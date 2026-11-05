@@ -1,0 +1,120 @@
+---
+name: do-better
+description: Helps an AI agent correct work that does not meet the user's intent.
+---
+
+# Do Better
+
+Guidance and instructions on how to react to a disappointed user.
+
+Use these instructions to analyze and correct the previous work.
+
+Invocation is evidence the result does not meet the user's intent. DO NOT assume it identifies the cause or the desired correction.
+
+## 1. Recover the user's intent
+
+### 1.1. Read the available context
+
+IF AVAILABLE, use your local context, prior knowledge, and memories to identify the user and their preferences.
+
+READ the original request, later corrections, relevant preferences, and examples the user accepted or rejected. IF a file is the target, READ its current contents before editing it.
+
+USE available task context before asking the user to repeat information. DO NOT treat your earlier explanations, proposals, or assumptions as user requirements. DO NOT treat silence as acceptance.
+
+### 1.2. Name the GOAL
+
+IDENTIFY what the user must be able to understand, learn, decide, or do after your work. DISTINGUISH this GOAL from the requested deliverable. Creating the deliverable does not establish that it serves the GOAL.
+
+IDENTIFY the required scope, coverage, evidence, format, and constraints. APPLY later user corrections while retaining earlier requirements that remain compatible.
+
+IF the context does not establish a requirement, KEEP it as an unknown. DO NOT convert a plausible preference into a fact about the user.
+
+## 2. Identify the mismatch
+
+### 2.1. Compare the work with the request
+
+CHECK the result against the GOAL and requirements. IDENTIFY supported mismatches, such as:
+
+1. You answered an adjacent question or changed the scope.
+2. You omitted requested information, distinctions, or work.
+3. You presented an assumption as a fact or exceeded the evidence.
+4. You made the user reconstruct relationships or compare inconsistent categories.
+5. You described an action instead of completing it.
+6. You repeated an approach that the user rejected.
+
+PRIORITIZE mismatches supported by the conversation, source material, or work product. DO NOT invent a defect to fill each category. PRESERVE correct content and accepted decisions.
+
+### 2.2. Check competing explanations
+
+IF several causes fit the evidence, IDENTIFY what would distinguish them. INSPECT relevant sources, task outcomes, artifact contents, or test results. USE tools when they can resolve a specific uncertainty about the work.
+
+DO NOT treat repeated reflection as new evidence. DO NOT assume that the user wants a shorter answer, more detail, more research, or a different tone because they invoked this skill.
+
+IF the success criterion is unknown, KEEP it unresolved. DO NOT invent a measurable target and claim that meeting it satisfies the user.
+
+
+## 3. Choose a correction
+
+### 3.1. Correct what the evidence supports
+
+IF the evidence identifies a mismatch, CORRECT it without requesting more feedback.
+
+IF several interpretations share a useful correction, MAKE that correction and preserve the unresolved choices.
+
+IF a reversible revision has support but depends on an assumption, MAKE the revision. STATE the assumption in one sentence when it affects how the user should assess the result. DO NOT present it as recovered intent.
+
+### 3.2. Ask only for a decision that blocks the work
+
+IF incompatible interpretations prevent a useful correction, ASK one short question that distinguishes them. OFFER two or three concrete choices grounded in the available context that the user can answer with a word or number. USE an available structured question tool when it reduces effort; otherwise ask in text.
+
+IF missing source material prevents you from identifying those choices, REQUEST the smallest missing source first, such as the message to answer. DO NOT invent choices or combine requests for source material, intent, and preferences in one question.
+
+ASK about the desired result or a concrete contrast. DO NOT ask the user to explain their dissatisfaction, diagnose your failure, rewrite the request, or review several complete alternatives.
+
+IF the user does not answer, CONTINUE only work that does not depend on the missing decision. DO NOT treat the absence of an answer as permission or preference.
+
+### 3.3. Keep the existing boundaries
+
+KEEP the correction within the user's authorized scope. DO NOT treat the invocation as permission to publish, send messages, delete work, or take other actions outside that scope. FOLLOW required approval and safety rules.
+
+## 4. Produce the corrected work
+
+### 4.1. Fix the substance
+
+REVISE the answer, artifact, or implementation in the requested medium. CHANGE the premise, structure, or approach when the evidence requires it. COMPLETE the work instead of offering a critique, plan, apology, or promise to improve.
+
+IF a tool or permission blocks completion, DELIVER the supported portion and STATE the blocker in one sentence.
+
+### 4.2. Reduce the user's effort
+
+PRESERVE requested coverage and depth. IMPROVE sequence, grouping, terminology, and comparison when they cause the problem. DO NOT equate low user energy with a preference for less information.
+
+DO NOT add length, citations, features, or formatting as a substitute for correcting the mismatch. DO NOT infer a diagnosis or comment on the user's cognitive capacity.
+
+## 5. Check the correction
+
+COMPARE the revision with the same GOAL and requirements used to identify the mismatch. FIX remaining observable defects. DO NOT change the requirements to make your result pass.
+
+CHECK factual claims against sources and check changed behavior or artifact content when relevant. REPORT only checks you performed. DO NOT claim that another rewrite or self-review proves correctness.
+
+DISTINGUISH these outcomes:
+
+1. The work meets observable requirements.
+2. The work passes relevant factual, functional, or artifact checks.
+3. The user accepts the result.
+
+DO NOT infer the third outcome from the first two or from silence.
+
+## 6. Respond
+
+LEAD with the corrected result or its artifact link. IF it helps the user assess the result, ADD one short sentence about the substantive correction. KEEP diagnostic notes and deliberation out of the response.
+
+AVOID defensive explanations, self-praise, repeated apologies, and requests to confirm that the answer is now better. FOLLOW required progress-update conventions without narrating the checklist.
+
+END after the deliverable unless a missing decision requires the question from section 3.2.
+
+## 7. Handle another invocation
+
+IF the user invokes this skill again on the same task, TREAT the previous revision as unsuccessful. RECHECK the original GOAL, rejected approaches, omitted constraints, and organizing principle before making another surface edit.
+
+IF the available evidence cannot distinguish the remaining incompatible directions, ASK the single question from section 3.2 instead of repeating an unsupported assumption.
