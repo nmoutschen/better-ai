@@ -60,20 +60,22 @@ MOVE additional details that do not directly support the GOAL of the user to app
 
 ### 2.4. Add nothing new when rewriting
 
-WHEN rewriting, DO NOT add steps, facts, or sections that the original does not contain. WHEN the original is already short and clear, keep it about the same length.
+WHEN rewriting, DO NOT add steps, facts, advice, options, recommendations, calculations, or sections that the original does not contain. DO NOT add a note about what you removed. WHEN the original is already short and clear, keep it about the same length.
 
 ## 3. Structure your writing
 
 ### 3.1. Give context before detail
 
-START your output with (1) a descriptive title, and (2) one or two sentences that state the main point itself. A reader who stops there must still know the key result and why it matters. DO NOT announce what the text will cover.
+START your output with one or two sentences that state the main point itself. A reader who stops there must still know the key result and why it matters. DO NOT announce what the text will cover.
+
+ADD a descriptive title before those sentences only when the output is long enough to need headings. A reply of a few sentences gets no title, because a title restates its point and adds length.
 
 ### 3.2. State the answer first
 
 WHEN the GOAL is to UNDERSTAND: provide a high-level summary of the topic.
 WHEN the GOAL is to LEARN: ask a question the user can attempt first, then explain the reasoning, rather than only giving the answer.
 WHEN the GOAL is to TAKE AN ACTION: provide clear and simple step-by-step instructions.
-WHEN the GOAL is to MAKE A DECISION: state your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, state the decision criteria there instead.
+WHEN the GOAL is to MAKE A DECISION: state your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, state the decision criteria there instead. WHEN rewriting, recommend an option only if the original does.
 
 IN ALL CASES, provide this in a simplified format, that does not require knowledge of concepts in the rest of the document.
 

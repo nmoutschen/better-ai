@@ -32,6 +32,8 @@ IF the topic is ambiguous (multiple possible meanings, even with context), expla
 > Worked example when relevant.
 ```
 
+IF the topic is a simple factual question with a settled answer, ANSWER it in one or two sentences and name one source. USE at most two `WebSearch`es, and only to confirm the answer. DO NOT add background, notes on precision, or a list of sources. SKIP the remaining steps.
+
 ### 2. Broadening searches
 
 Write different ways to express the MEANING for the research. Use these (AND ONLY THESE) in a first set of `WebSearch`es. Use the results of those searches to **identify new search terms** and expand beyond the direction implied by the initial queries.
