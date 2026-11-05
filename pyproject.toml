@@ -1,0 +1,18 @@
+[project]
+name = "better-ai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "deepeval>=4.3.3,<5",
+    "pytest>=8,<10",
+    "typesafe-sdk>=0.7.5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-rP"
