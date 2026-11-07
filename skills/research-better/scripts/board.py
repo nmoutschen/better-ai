@@ -79,32 +79,50 @@ body { background:var(--cream); color:var(--ink); font:400 15px/1.55 var(--sans)
   display:flex; flex-direction:column; }
 .band { height:10px; flex:none; background:var(--umber) var(--saya); background-size:13px 7.5px; }
 .band--thin { height:6px; }
-header { flex:none; padding:20px 40px 12px; }
+body { --pad:max(40px, (100% - 100rem) / 2); }
+header { flex:none; padding:20px var(--pad) 12px; }
 h1 { font:700 26px/1.2 var(--serif); color:var(--heading); margin:0 0 6px; }
 .status { color:var(--muted); margin:0; } .status b { color:var(--heading); }
+.conn { color:var(--heading); margin:4px 0 0; } .conn b { color:var(--umber); }
+.card .q, .answer .q, .answer .sum, dialog h3, dialog li { overflow-wrap:anywhere; }
 .meter { height:4px; background:var(--linen); display:flex; gap:2px; margin-top:10px; }
 .meter i { display:block; height:100%; }
 main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
-  grid-template-rows:auto minmax(0,1fr); gap:20px 48px; padding:8px 40px 16px; }
-section { min-height:0; overflow-y:auto; overflow-x:hidden; }
+  grid-template-rows:auto minmax(0,1fr); gap:20px 48px; padding:8px var(--pad) 16px; }
+section { min-height:0; overflow-y:auto; overflow-x:hidden; container-type:inline-size; }
 .workers { grid-column:1 / -1; }
+/* A stopped board with no worker drops the Workers row so the findings get the room. */
+main:has(> .workers[hidden]) { grid-template-rows:minmax(0,1fr); }
 h2 { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
   border-top:2px solid var(--line); padding-top:10px; margin:0 0 12px; display:flex; justify-content:space-between; }
 h2 span { font-weight:400; letter-spacing:0; text-transform:none; }
 .empty { color:var(--muted); font-style:italic; margin:0; grid-column:1 / -1; }
 #work { display:grid; grid-template-columns:repeat(var(--n, 1), minmax(0, 1fr)); grid-auto-rows:10rem; gap:12px; max-height:42vh; overflow-y:auto; }
-#work.compact { grid-template-columns:1fr; grid-auto-rows:auto; gap:4px; }
-#work.compact .card { flex-direction:row; align-items:baseline; gap:14px; padding:6px 14px 6px 22px; }
+/* Compact rows share the list's columns (subgrid), so names, questions, meta and last actions line up down the list. */
+#work.compact { grid-template-columns:fit-content(8em) minmax(0,1.6fr) auto minmax(0,1fr); grid-auto-rows:auto; gap:4px 14px; }
+#work.compact .card { display:grid; grid-column:1 / -1; grid-template-columns:subgrid; align-items:baseline; padding:6px 14px 6px 22px; }
 #work.compact .card::before { width:6px; }
-#work.compact .agent { flex:none; width:7.5em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-#work.compact .q { flex:1; min-width:0; -webkit-line-clamp:1; margin:0; font-size:14px; }
-#work.compact .meta { flex:none; width:16em; }
-#work.compact .last { flex:1.2; min-width:0; margin:0; -webkit-line-clamp:1; }
+#work.compact .agent { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#work.compact .q { -webkit-line-clamp:1; margin:0; font-size:14px; }
+#work.compact .last { margin:0; -webkit-line-clamp:1; }
+/* Narrower: the question gets its own line; what the worker is doing goes underneath. */
+@container (max-width:56rem) {
+  #work.compact { grid-template-columns:fit-content(7em) auto minmax(0,1fr); }
+  #work.compact .card { row-gap:1px; }
+  #work.compact .q { grid-column:2 / -1; }
+  #work.compact .meta { grid-column:2; }
+}
+@container (max-width:34rem) {
+  #work.compact { grid-template-columns:minmax(0,1fr); }
+  #work.compact .card { padding:8px 12px 8px 22px; }
+  #work.compact .card > span { grid-column:1 / -1; }
+  #work.compact .q { -webkit-line-clamp:2; }
+}
 #work:has(.empty) { grid-auto-rows:auto; }
 .card { position:relative; background:var(--linen); padding:10px 14px 10px 24px; cursor:pointer; overflow:hidden;
   display:flex; flex-direction:column; text-align:left; border:0; font:inherit; color:inherit; }
 .card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:10px; background:var(--terracotta) var(--saya); background-size:13px 7.5px; }
-.card:hover .q, .card:focus-visible .q { color:var(--terracotta); }
+.card:focus-visible .q { color:var(--terracotta); }
 .card > span { display:block; }
 .card .agent { font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--terracotta); }
 .card .q { font:500 15px/1.4 var(--sans); color:var(--heading); margin:2px 0 4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
@@ -116,11 +134,11 @@ ul.tree, ul.tree ul { list-style:none; margin:0; padding:0; }
 ul.tree ul { margin-left:9px; padding-left:16px; border-left:1px solid var(--line); }
 .row { display:flex; gap:6px; align-items:baseline; width:100%; padding:5px 0 5px 8px; border:0; border-left:3px solid var(--st);
   border-bottom:1px solid var(--linen); background:none; font:inherit; color:inherit; text-align:left; cursor:pointer; }
-.row:hover .text, .row:focus-visible .text { color:var(--terracotta); }
+.row:focus-visible .text { color:var(--terracotta); }
 .row .text { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
 .row.active .text { color:var(--heading); font-weight:600; }
 .row.closed .text { color:var(--muted); }
-.row .tag { font:700 11px var(--sans); letter-spacing:.06em; color:var(--cream); background:var(--umber); padding:1px 6px; }
+.row .tag { font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--cream); background:var(--umber); padding:1px 6px; }
 .row .pri { font:700 11px var(--sans); letter-spacing:.06em; color:var(--muted); width:4.5em; text-align:right; flex:none; }
 .row .pri-high { color:var(--heading); }
 .row .pri-low { font-weight:500; }
@@ -128,14 +146,14 @@ ul.tree ul { margin-left:9px; padding-left:16px; border-left:1px solid var(--lin
 .answer { display:block; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--linen);
   padding:0 0 14px; margin:0 0 14px; font:inherit; color:inherit; cursor:pointer; }
 .answer .q { font:500 14px/1.4 var(--sans); color:var(--heading); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.answer:hover .q, .answer:focus-visible .q { color:var(--terracotta); }
+.answer:focus-visible .q { color:var(--terracotta); }
 .answer .sum { font:400 14px/1.65 var(--serif); margin:4px 0 0; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
-dialog { max-width:44rem; width:calc(100% - 3rem); max-height:85vh; border:0; padding:0; background:var(--cream); color:var(--ink); }
+dialog { max-width:44rem; width:calc(100% - 3rem); max-height:85vh; max-height:85dvh; border:0; padding:0; background:var(--cream); color:var(--ink); }
 dialog:focus { outline:none; }
 :focus-visible { outline:2px solid var(--terracotta); outline-offset:2px; }
 dialog::backdrop { background:rgba(51,48,43,.45); }
 dialog .band { height:6px; }
-dialog .inner { padding:20px 28px 24px; overflow:auto; max-height:calc(85vh - 6px); }
+dialog .inner { padding:20px 28px 24px; overflow:auto; max-height:calc(85vh - 6px); max-height:calc(85dvh - 6px); }
 dialog .close { float:right; border:0; background:none; font:700 12px var(--sans); letter-spacing:.08em; color:var(--muted); cursor:pointer; text-transform:uppercase; }
 dialog h3 { font:700 20px/1.35 var(--serif); color:var(--heading); margin:6px 0 10px; }
 dialog .kicker { font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
@@ -147,20 +165,37 @@ dialog li { font-size:13.5px; padding:6px 0; border-bottom:1px solid var(--linen
 dialog li .by { display:block; font-size:12px; color:var(--muted); }
 dialog li a { color:var(--terracotta); text-underline-offset:2px; }
 dialog .log li { font-size:12.5px; overflow-wrap:anywhere; }
-.foot { flex:none; display:flex; justify-content:space-between; padding:4px 40px; font-size:12px; color:var(--muted); }
-.foot a { color:var(--muted); } .foot a:hover { color:var(--terracotta); }
-@media (max-width:900px) { main { grid-template-columns:1fr; } body { height:auto; } }
+.foot { flex:none; display:flex; flex-wrap:wrap; gap:0 16px; justify-content:space-between; padding:4px var(--pad); font-size:12px; color:var(--muted); }
+.foot a { color:var(--muted); }
+.status, .card .meta, .row .prog, h2 span, .legend, .foot { font-variant-numeric:tabular-nums; }
+@media (hover:hover) {
+  .card:hover .q, .row:hover .text, .answer:hover .q, .foot a:hover { color:var(--terracotta); }
+}
+/* Narrow questions column: let a question use two lines instead of a handful of characters. */
+@container (max-width:30rem) {
+  .row .text { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .row .prog { display:none; }
+}
+@media (pointer:coarse) { dialog .close { padding:12px 14px; margin:-12px -14px 0 0; } }
+/* One column: the page scrolls as a whole, so nothing scrolls inside it. */
+@media (max-width:900px) { main { grid-template-columns:1fr; } body { height:auto; } #work { max-height:none; } }
+@media (max-width:600px) {
+  body { --pad:20px; }
+  dialog { width:calc(100% - 1rem); max-height:92dvh; }
+  dialog .inner { padding:16px 18px 20px; max-height:calc(92dvh - 6px); }
+}
 </style></head><body>
 <div class="band"></div>
-<header><h1 id="topic">Research board</h1><p class="status" id="status"></p><div class="meter" id="meter"></div></header>
+<header><h1 id="topic" dir="auto">Research board</h1><p class="status" id="status">Loading the board…</p>
+<p class="conn" id="conn" role="status" hidden></p><div class="meter" id="meter" aria-hidden="true"></div></header>
 <main>
-  <section class="workers"><h2>Workers <span id="wcount"></span></h2><div id="work"></div></section>
+  <section class="workers" id="workers"><h2>Workers <span id="wcount"></span></h2><div id="work"></div></section>
   <section><h2>Questions <span id="qcount"></span></h2><div class="legend" id="legend"></div><ul class="tree" id="tree"></ul></section>
   <section><h2>Answers <span id="acount"></span></h2><div id="answers"></div></section>
 </main>
 <div class="band band--thin"></div>
-<div class="foot"><span id="hidden"></span><span>research-better by <a href="https://n14n.dev/" target="_blank" rel="noopener">n14n.dev</a> · <span id="updated"></span></span></div>
-<dialog id="modal"><div class="band"></div><div class="inner"><button class="close" id="close">Close</button><div id="mbody"></div></div></dialog>
+<footer class="foot"><span id="hidden"></span><span>research-better by <a href="https://n14n.dev/" target="_blank" rel="noopener">n14n.dev</a> · <span id="updated"></span></span></footer>
+<dialog id="modal" aria-labelledby="mtitle"><div class="band"></div><div class="inner"><button class="close" id="close">Close</button><div id="mbody"></div></div></dialog>
 <script>
 const SNAPSHOT = __SNAPSHOT__;
 const STATUS = {  // glyph, label, colour variable
@@ -182,12 +217,15 @@ function prepare(d) {
   d.questions.forEach(q => {
     q.claimsList = byQ[q.id] || [];
     q.srcCount = new Set(q.claimsList.map(c => c.source)).size;
-    q.view = q.status || "open";
+    q.view = String(q.status || "open").trim().toLowerCase();
+    if (!STATUS[q.view] || q.view === "partial") q.view = "open";  // agents write statuses by hand; never let a typo break the page
     if (q.view === "open" && q.claimsList.length) q.view = "partial";  // reopened, or started and released
   });
   d.src = src; return d;
 }
-const glyph = v => { const [g, l, c] = STATUS[v] || STATUS.open; return `<span class="g" style="color:var(${c})" aria-label="${l}">${g}</span>`; };
+const glyph = v => { const [g, l, c] = STATUS[v] || STATUS.open; return `<span class="g" style="color:var(${c})" role="img" aria-label="${l}">${g}</span>`; };
+const originOf = q => (q.origin || "").split(/[ ,;(]/)[0];
+const safeUrl = u => /^https?:\/\//i.test(String(u || "").trim()) ? String(u).trim() : "";  // source URLs come from web pages
 const progress = q => `${plural(q.claimsList.length, "claim")} from ${plural(q.srcCount, "source")}`;
 
 function render(d) {
@@ -198,6 +236,7 @@ function render(d) {
   const scope = qs.filter(q => (RANK[q.priority] ?? 1) <= (RANK[stopAt] ?? 1) && q.view !== "out of scope");
   const done = scope.filter(q => CLOSED.has(q.view)).length, working = qs.filter(q => q.view === "in progress");
   $("topic").textContent = b.topic || "Research board";
+  document.title = b.topic ? `${b.topic} · Research board` : "Research board";
   $("status").innerHTML = stopped
     ? `Stopped after ${mins(now - start)}. <b>${done} of ${scope.length}</b> questions at ${esc(stopAt)} priority or above are closed.`
     : `<b>${done} of ${scope.length}</b> questions closed at ${esc(stopAt)} priority or above · <b>${working.length}</b> in progress · ${mins(now - start)} in`;
@@ -210,19 +249,19 @@ function render(d) {
 
   // Workers: one card per question in progress, all the same height.
   $("wcount").textContent = working.length ? plural(working.length, "question") + " in progress" : "";
-  $("work").classList.toggle("compact", working.length > 5);
-  $("work").style.setProperty("--n", Math.max(1, Math.min(working.length, 5)));
-  $("work").innerHTML = working.sort((a, z) => a._changed - z._changed).map(q => {
+  setHTML($("work"), working.sort((a, z) => a._changed - z._changed).map(q => {
     const owner = has(q.owner) ? q.owner : "", log = (d.logs || {})[owner] || {};
     return `<button class="card" data-worker="${esc(owner)}" data-q="${esc(q.id)}"><span class="agent">${esc(owner || "unassigned")}</span>
-      <span class="q">${esc(q.question)}</span><span class="meta">${mins(now - q._changed)} · ${plural(q.claimsList.length, "claim")} · ${plural(q.srcCount, "source")}</span>
-      <span class="last">${log.last ? "Last: " + esc(log.last) : "No search logged yet."}</span></button>`;
-  }).join("") || `<p class="empty">${stopped ? "No worker is running: the research has stopped." : "No question is in progress right now."}</p>`;
+      <span class="q" dir="auto">${esc(q.question)}</span><span class="meta">${mins(now - q._changed)} · ${plural(q.claimsList.length, "claim")} · ${plural(q.srcCount, "source")}</span>
+      <span class="last" dir="auto">${log.last ? "Last: " + esc(log.last) : "No search logged yet."}</span></button>`;
+  }).join("") || '<p class="empty">No question is in progress right now.</p>');
+  $("workers").hidden = stopped && !working.length;  // the status line already says it stopped
+  fitWork();
 
   // Questions: the tree of what raised what.
   const qOfS = {}; d.claims.forEach(c => { if (c.source && !qOfS[c.source]) qOfS[c.source] = c.question; });
   const ids = new Set(qs.map(q => q.id)), shown = qs.filter(q => q.view !== "out of scope");
-  const parent = q => { const o = (q.origin || "").split(/[ ,;(]/)[0];
+  const parent = q => { const o = originOf(q);
     if (ids.has(o) && o !== q.id) return o;
     if (o.startsWith("S-") && ids.has(qOfS[o]) && qOfS[o] !== q.id) return qOfS[o]; return null; };
   const kids = {}, roots = [];
@@ -234,17 +273,17 @@ function render(d) {
     const right = v === "in progress" ? `<span class="prog">${plural(q.claimsList.length, "claim")}</span><span class="tag">${esc(has(q.owner) ? q.owner : "unassigned")}</span>`
       : v === "partial" ? `<span class="prog">${plural(q.claimsList.length, "claim")}</span>` : "";
     return `<li><button class="row ${v === "in progress" ? "active" : ""} ${CLOSED.has(v) ? "closed" : ""}" style="--st:var(${STATUS[v][2]})" data-q="${esc(q.id)}">
-      ${glyph(v)}<span class="text">${esc(q.question)}</span>${right}${has(q.priority) ? `<span class="pri pri-${esc(q.priority)}">${esc(q.priority.toUpperCase())}</span>` : ""}</button>${sub ? `<ul>${sub}</ul>` : ""}</li>`; };
-  $("tree").innerHTML = order(roots).map(node).join("") || '<li class="empty">No questions yet.</li>';
+      ${glyph(v)}<span class="text" dir="auto">${esc(q.question)}</span>${right}${has(q.priority) ? `<span class="pri pri-${esc(q.priority)}">${esc(q.priority.toUpperCase())}</span>` : ""}</button>${sub ? `<ul>${sub}</ul>` : ""}</li>`; };
+  setHTML($("tree"), order(roots).map(node).join("") || '<li class="empty">No questions yet.</li>');
   const counts = {}; shown.forEach(q => counts[q.view] = (counts[q.view] || 0) + 1);
-  $("legend").innerHTML = Object.keys(STATUS).filter(v => counts[v]).map(v => `<span>${glyph(v)}${counts[v]} ${STATUS[v][1]}</span>`).join("");
+  setHTML($("legend"), Object.keys(STATUS).filter(v => counts[v]).map(v => `<span>${glyph(v)}${counts[v]} ${STATUS[v][1]}</span>`).join(""));
   $("qcount").textContent = plural(shown.length, "question");
 
   // Answers: every closed question with a summary, newest first.
   const answers = qs.filter(q => CLOSED.has(q.view) && q.view !== "out of scope").sort((a, z) => z._changed - a._changed);
   $("acount").textContent = answers.length ? `${answers.length}, newest first` : "";
-  $("answers").innerHTML = answers.map(q => `<button class="answer" data-q="${esc(q.id)}"><span class="q">${glyph(q.view)}${esc(q.question)}</span>
-    ${has(q.summary) ? `<span class="sum">${esc(q.summary)}</span>` : ""}</button>`).join("") || '<p class="empty">No answers yet.</p>';
+  setHTML($("answers"), answers.map(q => `<button class="answer" data-q="${esc(q.id)}"><span class="q" dir="auto">${glyph(q.view)}${esc(q.question)}</span>
+    ${has(q.summary) ? `<span class="sum" dir="auto">${esc(q.summary)}</span>` : ""}</button>`).join("") || '<p class="empty">No answers yet.</p>');
 
   const hidden = qs.length - shown.length;
   $("hidden").textContent = hidden ? `${plural(hidden, "out-of-scope question")} hidden` : "";
@@ -258,12 +297,14 @@ function showQuestion(id) {
   const v = q.view, now = D.now;
   const state = v === "in progress" ? `${esc(has(q.owner) ? q.owner : "unassigned")} has worked on it for ${mins(now - q._changed)} · ${progress(q)} so far`
     : `${STATUS[v][1]} · ${progress(q)}`;
+  const link = s => { const u = safeUrl(s.url);
+    return u ? ` · <a href="${esc(u)}" target="_blank" rel="noopener noreferrer">source</a>` : has(s.url) ? ` · ${esc(s.url)}` : ""; };
   const claims = q.claimsList.map(c => { const s = D.src[c.source] || {};
-    return `<li>${esc(c.claim)}<span class="by">${esc(s.author || s.publisher || c.source)}${has(s.date) ? ` (${esc(s.date)})` : ""}${s.url ? ` · <a href="${esc(s.url)}" target="_blank" rel="noopener">source</a>` : ""} · ${esc(s.trust || "?")} trust · ${esc(c.verified || "unchecked")}</span></li>`; }).join("");
-  const children = D.questions.filter(x => (x.origin || "").startsWith(q.id)).map(x => `<li>${glyph(x.view)}${esc(x.question)}</li>`).join("");
-  $("mbody").innerHTML = `<div class="kicker">${glyph(v)}${esc(q.priority || "")} priority · ${esc(q.id)}</div><h3>${esc(q.question)}</h3>
-    <p class="note">${state}</p>${has(q.summary) ? `<p class="sum">${esc(q.summary)}</p>` : ""}${has(q.note) ? `<p class="note">Note: ${esc(q.note)}</p>` : ""}
-    ${claims ? `<h4>Claims</h4><ul>${claims}</ul>` : ""}${children ? `<h4>Questions it raised</h4><ul>${children}</ul>` : ""}`;
+    return `<li dir="auto">${esc(c.claim)}<span class="by">${esc(s.author || s.publisher || c.source)}${has(s.date) ? ` (${esc(s.date)})` : ""}${link(s)} · ${esc(s.trust || "?")} trust · ${esc(c.verified || "unchecked")}</span></li>`; }).join("");
+  const children = D.questions.filter(x => originOf(x) === q.id && x.id !== q.id).map(x => `<li dir="auto">${glyph(x.view)}${esc(x.question)}</li>`).join("");
+  setPanel(`<div class="kicker">${glyph(v)}${esc(q.priority || "")} priority · ${esc(q.id)}</div><h3 id="mtitle" dir="auto">${esc(q.question)}</h3>
+    <p class="note">${state}</p>${has(q.summary) ? `<p class="sum" dir="auto">${esc(q.summary)}</p>` : ""}${has(q.note) ? `<p class="note" dir="auto">Note: ${esc(q.note)}</p>` : ""}
+    ${claims ? `<h4>Claims</h4><ul>${claims}</ul>` : ""}${children ? `<h4>Questions it raised</h4><ul>${children}</ul>` : ""}`);
   CURRENT = () => showQuestion(id); openModal();
 }
 function showWorker(name, qid) {
@@ -272,15 +313,46 @@ function showWorker(name, qid) {
   const log = (D.logs || {})[name] || {}, lines = (log.lines || []).slice().reverse();
   const clock = t => t ? new Date(t * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "time not recorded";
   const current = D.questions.find(q => q.id === qid);
-  $("mbody").innerHTML = `<div class="kicker">Worker</div><h3>${esc(name)}</h3>
-    <p class="note">${current ? `Working on: ${esc(current.question)}` : ""}</p>
+  setPanel(`<div class="kicker">Worker</div><h3 id="mtitle">${esc(name)}</h3>
+    <p class="note" dir="auto">${current ? `Working on: ${esc(current.question)}` : ""}</p>
     <p class="note">Created ${plural(mine("claims").length, "claim")}, ${plural(mine("sources").length, "source")}, and ${plural(mine("questions").length, "question")}.</p>
-    <h4>Activity</h4><ul class="log">${lines.map(([t, l]) => `<li><span class="by">${clock(t)}</span>${esc(l)}</li>`).join("") || "<li>No activity logged.</li>"}</ul>`;
+    <h4>Activity</h4><ul class="log">${lines.map(([t, l]) => `<li dir="auto"><span class="by">${clock(t)}</span>${esc(l)}</li>`).join("") || "<li>No activity logged.</li>"}</ul>`);
   CURRENT = () => showWorker(name, qid); openModal();
 }
-function openModal() { if (!$("modal").open) $("modal").showModal(); }
-$("close").onclick = () => { $("modal").close(); CURRENT = null; };
-$("modal").addEventListener("click", e => { if (e.target === $("modal")) { $("modal").close(); CURRENT = null; } });
+
+// Workers show as cards while each card gets at least 200px, and as a compact list otherwise
+// (more than five workers, or a narrow window). Re-checked whenever the window changes size.
+function fitWork() {
+  const w = $("work"), n = w.querySelectorAll(".card").length, cols = Math.max(1, Math.min(n, 5));
+  w.style.setProperty("--n", cols);
+  w.classList.toggle("compact", n > 5 || (n > 0 && (w.clientWidth - 12 * (cols - 1)) / cols < 200));
+}
+new ResizeObserver(fitWork).observe($("work"));
+
+// Live updates must not take away what the reader is doing: replace a region only when its
+// content changed, and put focus back on the same item when it was inside the replaced region.
+const keyOf = el => { const t = el && el.closest && el.closest("[data-q]"); return t ? {cls: t.classList[0], q: t.dataset.q} : null; };
+const find = (root, k) => k && root.querySelector(`.${k.cls}[data-q="${CSS.escape(k.q)}"]`);
+function setHTML(el, html) {
+  if (el._html === html) return;
+  const a = document.activeElement, k = el.contains(a) ? keyOf(a) : null;
+  el.innerHTML = el._html = html;
+  const back = find(el, k); if (back) back.focus({preventScroll: true});
+}
+function setPanel(html) {
+  const m = $("mbody"), sel = getSelection();
+  const busy = !sel.isCollapsed && m.contains(sel.anchorNode) || m.contains(document.activeElement);
+  if ($("modal").open && m._html !== html && busy) return;  // the reader is selecting or on a link: update on a later tick
+  setHTML(m, html);
+}
+let OPENER = null;
+function openModal() { if (!$("modal").open) { OPENER = keyOf(document.activeElement); $("modal").showModal(); } }
+$("modal").addEventListener("close", () => {  // also fires on Escape
+  CURRENT = null; $("mbody")._html = null;
+  const back = find(document.querySelector("main"), OPENER); if (back && document.activeElement !== back) back.focus({preventScroll: true});
+});
+$("close").onclick = () => $("modal").close();
+$("modal").addEventListener("click", e => { if (e.target === $("modal")) $("modal").close(); });
 document.addEventListener("click", e => {
   const card = e.target.closest(".card"); if (card) return showWorker(card.dataset.worker, card.dataset.q);
   const q = e.target.closest("[data-q]"); if (q && !e.target.closest("dialog")) showQuestion(q.dataset.q);
@@ -288,7 +360,17 @@ document.addEventListener("click", e => {
 
 if (SNAPSHOT) render(SNAPSHOT);
 else {
-  const tick = () => fetch("board.json", {cache: "no-store"}).then(r => r.json()).then(render).catch(() => {});
+  // After three failed polls in a row, say so; a quiet page that stopped updating looks like a quiet research.
+  let fails = 0;
+  const lost = on => {
+    const c = $("conn"); c.hidden = !on; if (!on) return;
+    c.innerHTML = D ? `<b>Connection lost.</b> The board viewer stopped answering after ${new Date(D.now * 1000).toLocaleTimeString()}; this is the last state it sent.`
+      : `<b>Can't reach the board viewer.</b> Check that board.py watch is still running.`;
+  };
+  const tick = () => fetch("board.json", {cache: "no-store"})
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .then(d => { fails = 0; lost(false); try { render(d); } catch (err) { console.error("board render failed", err); } },
+          () => { if (++fails === 3 && D?.brief?.status !== "stopped") lost(true); });
   tick(); setInterval(tick, 2000);
 }
 </script></body></html>
@@ -317,6 +399,11 @@ def board_stopped(board: Path) -> bool:
 def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
+            # Only answer requests addressed to this machine, so a web page cannot read the board via DNS rebinding.
+            host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
+            if host not in ("127.0.0.1", "localhost"):
+                self.send_error(403)
+                return
             if self.path.startswith("/board.json"):
                 stamp_logs(board, initial=False)
                 body, kind = json.dumps(load(board)).encode(), "application/json"
