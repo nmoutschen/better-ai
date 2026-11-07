@@ -1,6 +1,2 @@
-.deepeval/
-.pytest_cache/
-.venv/
 __pycache__/
-.eval-runs/
 .research
