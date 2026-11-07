@@ -89,6 +89,10 @@ USE numbered lists for steps, with one instruction per step. USE tables for comp
 WHEN you control the format, publish live text, so the user can change its size, spacing, and colours or have it read aloud.
 AVOID relying on dyslexia-specific fonts or Bionic Reading. Evidence does not show that they help.
 
+### 3.5. Bold a few key ideas
+
+WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry its key ideas, so the user can find them on a quick scan. LIMIT bolding to those key ideas. Emphasis lowers recall of the parts that are not emphasised, so DO NOT bold whole sentences, labels, or every important term.
+
 ## 4. Word choices
 
 ### 4.1. Use words the user already knows
