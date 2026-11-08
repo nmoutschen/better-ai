@@ -6,8 +6,8 @@ argument-hint: "[DOCUMENT OR CONTENT]"
 
 # Show Better
 
-IF invoked without argument, use these instructions on your previous output.
-IF invoked with a document, a path or content as argument, use these instructions to introduce it.
+IF invoked without argument, USE these instructions on your previous output.
+IF invoked with a document, a path or content as argument, USE these instructions to introduce it.
 
 Being invoked means: find the structure and the relations in the content that a visual shows better than prose, and show them. It does NOT mean every point becomes a visual. A point that one sentence states well stays a sentence.
 
@@ -37,7 +37,7 @@ IDENTIFY what the reader already knows about the topic. FOR an expert reader, SH
 The renderer draws the same presentation in three formats. CHOOSE the first one the user can read:
 
 1. **A page.** IF you can run Python 3 and the user can open a browser, RENDER HTML (section 5). IF the harness can publish a page for the user, PUBLISH it and GIVE the link. OTHERWISE, OPEN it with `--open` and GIVE its path.
-2. **A terminal or a chat.** IF the user reads in a terminal, RENDER `--format text`. IF they read Markdown, RENDER `--format md`. USE `--ascii` when the output must survive copying into plain-text files or commit messages. IF the user reads with a screen reader, or says the diagrams are hard to follow, RENDER `--format text --screen-reader`: sentences and value lists instead of drawn diagrams.
+2. **A terminal or a chat.** IF the user reads in a terminal, RENDER `--format text`. IF they read Markdown, RENDER `--format md`. USE `--ascii` when the output must survive copying into plain-text files or commit messages. IF the user says they read with a screen reader, or says the diagrams are hard to follow, RENDER `--format text --screen-reader`: sentences and value lists instead of drawn diagrams.
 3. **No renderer.** IF you cannot run Python, PRESENT the panels in Markdown (section 6).
 
 DO NOT draw a text diagram by hand when the renderer is available.
@@ -70,7 +70,7 @@ DO NOT add a panel that only lists the document's sections: the strip above each
 
 REFER to parts of the document by their titles, in headlines, notes and `read`. DO NOT use section numbers or § signs: the reader has not seen them yet.
 
-KEEP the presentation to about 5 to 12 panels. IF the document needs more, INTRODUCE only the parts the GOAL needs.
+KEEP the presentation to about 5 to 12 panels. This range is a design choice: no study tests a panel count. IF the document needs more, INTRODUCE only the parts the GOAL needs.
 
 ### 3.2. Give each panel a relation to show
 
@@ -113,7 +113,7 @@ FOLLOW the conventions of the reader's field when they differ.
 
 - KEEP one structure across panels: the same kind for the same kind of point, and the same order of items.
 - MOVE from general to specific: the whole before its parts, the main result before its conditions.
-- WHERE the document has one, USE a concrete case to introduce an abstract point.
+- WHERE the document has one, USE a concrete case to introduce an abstract point. This is a design choice: plain, abstract diagrams supported transfer better than rich, concrete ones, so KEEP the case itself plain.
 - PUT the question before its answer. IN a business document, the complication comes before the proposal.
 - STATE limits in the note of the panel whose claim they qualify.
 
@@ -127,7 +127,7 @@ MAKE the headline's point the most prominent part of the visual. MARK with `high
 
 ### 4.2. Keep it plain
 
-DO NOT add images, icons or effects that carry no information. DO NOT reveal parts of a panel step by step.
+DO NOT add images, icons or effects that carry no information. SHOW each panel whole, not revealed step by step. TREAT this as a guide: one small study favours it, and the evidence is contested.
 
 The renderer's style is fixed. IF the user or project has a style guide that conflicts with it, SAY so and ASK whether to keep the renderer's style.
 

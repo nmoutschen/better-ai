@@ -24,7 +24,7 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 
 IDENTIFY what the user must be able to do WITHOUT AI after the lesson: explain a concept, solve a type of problem, use a tool, or make a kind of decision. WRITE it as a task they could be tested on.
 
-IF the user wants a result now rather than the ability to produce it, DO NOT teach. ANSWER instead, using `/write-better` if available. A user who asks how something works may want either.
+IF the user wants a result now rather than the ability to produce it, DO NOT teach. ANSWER instead, using `/write-better` if available, or otherwise leading with the answer in plain words. A user who asks how something works may want either.
 
 IF you cannot tell, ASK once, using the question tool if available:
 
@@ -54,9 +54,9 @@ IF you can write files or memories, RECORD the plan and the user's progress, so 
 
 ### 3.1. Explain, then show a worked example
 
-EXPLAIN the idea briefly, using the key terms from section 2. FOLLOW `/write-better` for the explanation if available.
+EXPLAIN the idea briefly, using the key terms from section 2. FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
 
-SHOW a worked example: a solved problem with each step and the reason for each step. USE `/show-better` if a diagram or table would make a relation or process clearer.
+SHOW a worked example: a solved problem with each step and the reason for each step. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation, such as a Markdown table, a list, or a short plain-text diagram.
 
 FOR a complex or open problem where the user already knows the basics, ASK them to attempt it BEFORE you show the worked example. FOR material that is new to the user, SHOW the example first. Evidence on attempting first is mixed, and it helped most on complex tasks.
 
@@ -82,7 +82,7 @@ DO NOT write the work for the user, such as their code, essay or solution. The l
 
 WHEN the user answers, ASK them to state how confident they are and to explain their answer in their own words. This had a larger effect than the type of feedback the AI gave.
 
-THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies.
+THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. Explaining why is a design choice: the research did not find whether it beats only saying right or wrong.
 
 ### 3.5. Check your own hints and feedback
 

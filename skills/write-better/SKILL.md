@@ -5,29 +5,40 @@ description: Helps an AI agent write better. Improves AI agents' structure and c
 
 # Write Better
 
-IF invoked without argument, use these instructions to rewrite your previous output.
-IF invoked with a document or artifact as argument, use these instructions to rewrite the document in question.
+IF invoked without argument, USE these instructions to rewrite your previous output.
+IF invoked with a document or artifact as argument, USE these instructions to rewrite that document.
+
+Being invoked does NOT mean the text needs large changes. A text that already meets these instructions keeps its length and structure, and a rewrite can end with few edits.
+
+## Principles
+
+1. Readers rate text as clear without understanding it better. Length and polish raise a reader's confidence without making them more accurate.
+2. Simpler wording helps readers new to a topic. Readers who know the topic skipped limitations in overly plain summaries.
+3. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and lowers recall of the rest.
+4. Models treat users differently by how they write and by what the user discloses about themselves, using stereotypes. What the user states about the output is a better guide.
+5. First-person uncertainty made readers rely less on wrong AI answers.
+6. Most of this evidence comes from students reading short texts, measured over a short time. TREAT these rules as the best available guide, not as tested on AI output for every reader.
 
 ## 1. Before writing
 
-### 1.1. Who is the reader?
+### 1.1. Identify the reader
 
-IF AVAILABLE, use your local context, prior knowledge, and memories to identify the user and their preferences.
-IF you know the user name, IDENTIFY skills such as `/review-for-{user}`, `/write-for-{user}` and READ their instructions.
-IF the user stated how they prefer to read, FOLLOW that preference over the general rules below.
+LOOK UP what the context says about the reader: the conversation, project files, and memories. IF the user or project has its own writing guide or writing skill, FOLLOW it.
+IF the user stated how they prefer to read, FOLLOW that preference over the general rules below. IF a stored preference changes the output, SAY so in one sentence.
 DO NOT infer the user's ability, education, or background from their dialect, spelling, or fluency. Models give less accurate and more condescending answers to users who write non-standard English, and guess demographics from stereotyped cues.
+IF the user disclosed a diagnosis or condition, DO NOT change the content or advice because of it. ADAPT the format only as the user asks. Models that tailor answers to a disclosed diagnosis apply stereotypes, and some readers find the result patronising.
 
 ### 1.2. Name the GOAL
 
-IF the user specified a personal GOAL, USE this as the ultimate outcome of your output.
-IDENTIFY what is the main GOAL of your writing:
+IF the user specified a personal GOAL, USE it as the ultimate outcome of your output.
+OTHERWISE, IDENTIFY the main GOAL of your writing:
 
 1. The user UNDERSTANDS something new.
 2. The user LEARNS to do something later without AI.
-3. The user TAKES AN ACTION thanks to the output.
-4. The user MAKES A DECISION thanks to the output.
+3. The user DOES something thanks to the output.
+4. The user DECIDES something thanks to the output.
 
-IF you cannot IDENTIFY the main GOAL, ASK the user, using `AskUser`:
+IF the context does not show the GOAL, CHOOSE the most plausible one and STATE it in one sentence next to the result, so the user can correct it. ASK only when a wrong GOAL would waste a large amount of the user's work. FOLLOW `/ask-better` for the question if available. OTHERWISE, ASK one question with these options, using a structured question tool such as `AskUserQuestion` if available, or in plain text at the end of your response:
 
 ```
 [question] How will you use this writing?
@@ -41,13 +52,17 @@ IF you cannot IDENTIFY the main GOAL, ASK the user, using `AskUser`:
 
 Research fills your context with specialized information the user does not have. Expertise makes the writer more abstract, more technical, and more passive.
 
-IDENTIFY what this audience already knows, and PROVIDE the context they are missing, so they can understand everything you write. EXPLAIN or REPLACE file names, function names, and internal labels they may not know. KEEP a technical name only when the user must type or find it, and explain it on first use.
+IDENTIFY what this audience already knows, and PROVIDE the context they are missing, so they can understand everything you write. EXPLAIN or REPLACE file names, function names, and internal labels they may not know. KEEP a technical name only when the user must type or find it, and EXPLAIN it on first use.
 
 ## 2. Include only what the user needs
 
 ### 2.1. Cut interesting but irrelevant material
 
 DELETE anecdotes, unsupported conclusions, research details, dead-ends, and trivia that do not serve the user's GOAL. Length and polish raise a reader's confidence without making them more accurate, so DO NOT add either for reassurance.
+
+DELETE padding: a restated question, a preamble, generic caveats, formatting around a short answer, and a list of possible answers given to cover the right one.
+
+DO NOT cut content the reader uses: the correction of a false premise in the request, the context that explains a result, and your first-person statements of uncertainty. Instructions to be brief made models worse at correcting false premises.
 
 ### 2.2. Repair reasoning gaps
 
@@ -59,7 +74,7 @@ MOVE details that do not directly support the user's GOAL to appendices. KEEP ea
 
 ### 2.4. Add nothing new when rewriting
 
-WHEN rewriting, DO NOT add steps, facts, advice, options, recommendations, calculations, or sections that the original does not contain. DO NOT add a note about what you removed. WHEN the original is already short and clear, keep it about the same length.
+WHEN rewriting, DO NOT add steps, facts, advice, options, recommendations, calculations, or sections that the original does not contain. DO NOT add a note about what you removed. WHEN the original is already short and clear, KEEP it about the same length.
 
 ## 3. Structure your writing
 
@@ -71,10 +86,10 @@ ADD a descriptive title before those sentences only when the output is long enou
 
 ### 3.2. State the answer first
 
-WHEN the GOAL is to UNDERSTAND: provide a high-level summary of the topic.
-WHEN the GOAL is to LEARN: ask a question the user can attempt first, then explain the reasoning, rather than only giving the answer. FOR teaching over several turns, USE `/teach-better` if available.
-WHEN the GOAL is to TAKE AN ACTION: provide clear and simple step-by-step instructions.
-WHEN the GOAL is to MAKE A DECISION: state your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, state the decision criteria there instead. WHEN rewriting, recommend an option only if the original does.
+WHEN the GOAL is to UNDERSTAND: PROVIDE a high-level summary of the topic.
+WHEN the GOAL is to LEARN: ASK a question the user can attempt first, then EXPLAIN the reasoning, rather than only giving the answer. FOR teaching over several turns, USE `/teach-better` if available.
+WHEN the GOAL is to DO something: PROVIDE clear and simple step-by-step instructions.
+WHEN the GOAL is to DECIDE: STATE your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, STATE the decision criteria there instead. WHEN rewriting, RECOMMEND an option only if the original does.
 
 IN ALL CASES, WRITE this part so it does not require concepts from the rest of the document.
 
@@ -85,14 +100,14 @@ USE numbered lists for steps, with one instruction per step. USE tables for comp
 
 ### 3.4. Show relations, not only describe them
 
-WHEN the GOAL is to UNDERSTAND or MAKE A DECISION and the content describes how things relate, such as causes, overlaps, comparisons or changes, ADD a table, chart or diagram next to the prose. Graphics added to text improve comprehension for most readers. USE `/show-better` to choose and build it, if available.
+WHEN the GOAL is to UNDERSTAND or DECIDE and the content describes how things relate, such as causes, overlaps, comparisons or changes, ADD a table, chart or diagram next to the prose. Graphics added to text improve comprehension for most readers. FOR a long, dense document, such as a report or a design doc, USE `/show-better` if available to introduce it with a short sequence of visual panels.
 
 DO NOT add a visual that only decorates, or one that repeats the prose word for word. Irrelevant material and identical text in two places both lower learning.
 
 ### 3.5. Keep the format adjustable
 
-WHEN you control the format, publish live text, so the user can change its size, spacing, and colours or have it read aloud.
-AVOID relying on dyslexia-specific fonts or Bionic Reading. Evidence does not show that they help.
+WHEN you control the format, PUBLISH live text, so the user can change its size, spacing, and colours or have it read aloud.
+DO NOT rely on dyslexia-specific fonts or Bionic Reading. Evidence does not show that they help.
 
 ### 3.6. Bold a few key ideas
 
@@ -102,9 +117,9 @@ WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry
 
 ### 4.1. Use words the user already knows
 
-Replace a long or rare word with a common one when the meaning stays exact. If this is not possible, explain the word on first-use.
+USE a common word instead of a long or rare one when the meaning stays exact. WHEN the rare word is needed, KEEP it and EXPLAIN it next to its first use, with a short common synonym. Showing a simple synonym next to a hard word helped readers more than replacing the word.
 
-Simplify the language, not the substance. A simpler version KEEPS its conditions and limitations: readers who know the topic skipped limitations in overly plain summaries.
+SIMPLIFY the language, not the substance. A simpler version KEEPS its conditions and limitations: readers who know the topic skipped limitations in overly plain summaries.
 
 IF you do not know what the user knows about the topic, WRITE for a reader who knows less, and USE headings so others can skip ahead. Simpler text helps readers new to a topic. TREAT this as a guide, not a rule: the evidence that extra support costs experts little is indirect.
 
@@ -120,7 +135,7 @@ Shorter sentences and words alone do not guarantee comprehension. USE one term f
 
 ### 4.4. Choose active or passive voice by what the user needs
 
-Use the active voice when the actor matters. Use the passive voice when the actor is unknown or irrelevant, or to keep the topic at the start of the sentence.
+USE the active voice when the actor matters. USE the passive voice when the actor is unknown or irrelevant, or to keep the topic at the start of the sentence.
 
 ### 4.5. Use concrete examples
 
@@ -128,15 +143,15 @@ PROVIDE worked examples when relevant. PREFER one continuous case study through 
 
 ### 4.6. Use a neutral tone
 
-AVOID aggressive and enthusiastic language.
+DO NOT use aggressive or enthusiastic language.
 
 ### 4.7. Keep sentence structure easy to follow
 
-Limit sentence length, and put the main verb early in the sentence. AVOID double negatives and clauses nested inside other clauses.
+LIMIT sentence length, and PUT the main verb early in the sentence. DO NOT use double negatives or clauses nested inside other clauses.
 
 ### 4.8. Say what you mean literally
 
-REPLACE metaphors, idioms, hints, and exaggeration with direct statements, or explain them. WHEN you need the user to do something, state what and by when.
+REPLACE metaphors, idioms, hints, and exaggeration with direct statements, or EXPLAIN them. WHEN you need the user to do something, STATE what and by when.
 
 ### 4.9. Be specific
 
@@ -149,3 +164,11 @@ USE gender-neutral words, such as "staff" or "humanity". USE "they" for a person
 DESCRIBE people the way they describe themselves. IF that is unknown, LEAVE OUT labels the point does not need. Style guides disagree on default wording for disability, and the people concerned disagree among themselves.
 
 REPLACE ableist words, such as "crazy", "lame" or "blind to", with a more accurate word. WHEN examples name people, VARY their names, genders, and cultures, and DO NOT default to a Western or affluent setting.
+
+## 5. Check the result
+
+WHEN rewriting, COMPARE the result with the original. CHECK that every number, name, condition, limit, and recommendation is still there and still says the same thing. RESTORE anything the rewrite dropped or changed.
+
+CHECK the opening against section 3.1: a reader who stops after it knows the main point.
+
+REPORT only the checks you performed. DO NOT claim the text is clearer because it reads more fluently: readers' sense of clarity does not show that they understand more.

@@ -1,15 +1,27 @@
 ---
 name: do-better
 description: Helps an AI agent correct work that does not meet the user's intent, including defects the agent finds itself in work it already delivered.
+argument-hint: "[WHAT IS WRONG]"
 ---
 
 # Do Better
 
-USE these instructions to analyze and correct the previous work.
+IF invoked without argument, USE these instructions to analyze and correct your previous work.
+IF invoked with an argument, TREAT it as the user's description of what is wrong, and USE these instructions to correct the previous work. The description is evidence about the mismatch, not a complete diagnosis.
 
 Invocation is evidence the result does not meet the user's intent. DO NOT assume it identifies the cause or the desired correction.
 
 IF you find a defect in work you already delivered, REPORT it before the user finds it, in one sentence naming what is wrong and what it affects, THEN correct it with these instructions.
+
+## Principles
+
+1. Agents often break constraints the user stated, misread what the user wanted, or claim work they did not do. Users find and fix most of these failures themselves, and only after pushing back.
+2. Asking someone what they would like to see done differently draws more concrete answers than asking them to explain their judgment.
+3. Reflection helped performance only when it used evidence about the work. Reflection alone did not.
+4. Setting your own measurable target does not reveal an unknown success criterion.
+5. Improved work, passing checks, and the user's approval are separate outcomes. One does not show another.
+6. Repeated apologies lowered managers' ratings of employees with each repetition.
+7. These findings come from studies of human feedback at work and of coding agents. No study tests this correction method for an AI agent. Reporting your own defect first is practitioner advice, not tested. TREAT these rules as the best available guide.
 
 ## 1. Recover the user's intent
 
@@ -62,7 +74,7 @@ IF a reversible revision has support but depends on an assumption, MAKE the revi
 
 ### 3.2. Ask only for a decision that blocks the work
 
-IF incompatible interpretations prevent a useful correction, ASK one short question that distinguishes them. OFFER two or three concrete choices grounded in the available context that the user can answer with a word or number. USE an available structured question tool when it reduces effort; otherwise ask in text.
+IF incompatible interpretations prevent a useful correction, ASK one short question that distinguishes them. FOLLOW `/ask-better` section 3 for the wording if available. OTHERWISE, OFFER two to four concrete choices grounded in the available context that the user can answer with a word or number, using a structured question tool if available, or in plain text.
 
 IF missing source material prevents you from identifying those choices, REQUEST the smallest missing source first, such as the message to answer. DO NOT invent choices or combine requests for source material, intent, and preferences in one question.
 

@@ -115,7 +115,7 @@ The n14n.dev palette fails the dataviz colour-blindness check for status colours
 | `scripts/board.py watch` shows the board live; questions nest under the question or source that raised them | User request |
 | No retrieval scripts: the skill treats fetch output as an extraction and records how each source was read | 1.7. `fetch_text.py` and `check_quote.py` were tried and removed: they need a shell and Python, add their own failure modes, and were never shown to improve a run |
 | One-page dashboard: question tree with status glyphs, evidence squares per claim, progress to the stop level, current answer, source read-and-trust table, agent lanes on a shared time axis; n14n.dev styling | User request; 1.9 |
-| `summary.md` holds the current answer in prose, kept by the coordinator | User request |
+| `summary.md` holds the current answer in prose, kept by the coordinator. Later replaced by a summary on each question, shown in the dashboard's answers list | User request |
 | Stop level (`high`, `medium`, `low`) chosen from the GOAL | User feedback; 1.10 |
 | Workers keep taking questions until none is left at the stop level or their context grows long; no per-worker cap | 1.10 |
 | No new question to check details of a known source | 1.10 |

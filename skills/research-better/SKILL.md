@@ -6,7 +6,8 @@ argument-hint: "TOPIC"
 
 # Research Better
 
-IF invoked without arguments, LOOK for an existing research board (section 3) and RESUME from it. IF there is none, use these instructions to restart the previous research.
+IF invoked with a topic as argument, RESEARCH that topic.
+IF invoked without argument, LOOK for an existing research board (section 3) and RESUME from it. IF there is none, USE these instructions to restart the previous research.
 
 ## Principles
 
@@ -15,6 +16,8 @@ IF invoked without arguments, LOOK for an existing research board (section 3) an
 3. An agent that already knows an answer writes searches that lead to it. The results then confirm what it expected and miss what it did not know.
 
 This skill names capabilities, not tools: web search, page fetch, a shell, asking the user, writing files, and sub-agents. USE the tool your harness provides for each. IF you cannot ask the user through a tool, ASK in plain text and STOP until they answer. DO NOT simulate a missing capability, for example by describing a page you could not open.
+
+IF you have no web search and no page fetch, DO NOT research from your training data. TELL the user, and ASK them for the sources to read, such as files, pages or papers. RESEARCH only from what they give you, and STATE that the research covers only those sources.
 
 ## 1. Topic confirmation
 
@@ -30,9 +33,11 @@ IF the topic still has several possible meanings with this context, EXPLAIN them
 > Worked example when relevant.
 ```
 
-IF the topic is a simple factual question with a settled answer, ANSWER it in one or two sentences and name one source. USE at most two web searches, and only to confirm the answer. DO NOT add background, notes on precision, or a list of sources. SKIP the remaining steps.
+IF the topic is a simple factual question, such as a date, a definition or a current value, USE at most two web searches. WRITE the queries from the question, not from an answer you expect. READ a source page, and ANSWER in one or two sentences from what it says, naming that source. DO NOT add background, notes on precision, or a list of sources. SKIP the remaining steps. IF the sources disagree or do not answer it, it is not a simple question: CONTINUE with the remaining steps.
 
 IDENTIFY the user's GOAL: what they must understand, learn, decide, or do with the findings. CHOOSE the stop level from the GOAL: `high` for a quick decision, `medium` by default, `low` for an exhaustive review. The stop level and the stop rules (section 6.4) decide how much research to do. DO NOT ask the user for a budget, a number of searches, or a research size. USE a limit only when the user states one.
+
+IF you chose the MEANING, the GOAL or the stop level without the user stating it, STATE your choice in one sentence when you tell the user the board's path, so they can correct it.
 
 ## 2. Know what your retrieval tools return
 
@@ -40,7 +45,7 @@ Search and fetch tools do not always return the page. Some return a model-writte
 
 - TREAT text written by a search tool as leads, not evidence. A source is evidence only after you read the page itself.
 - TREAT a fetch tool's output as an extraction unless the harness documents that it returns the page text. An extraction can paraphrase quotes, omit passages, or say a page lacks something it contains.
-- RECORD how you read each source: `raw` (full page text), `extracted` (a fetch tool's processed output), `snippet`, or `blocked`.
+- RECORD how you read each source: `raw` (full page text), `extracted` (a fetch tool's processed output), `abstract` (only the abstract or summary page of a paper, read on the page itself), `snippet` (only text from a search tool), or `blocked`. A `snippet` is never evidence. An `abstract` is evidence only for what the abstract states.
 
 IF a page cannot be read, because the site blocks automated access, asks for a login, or shows no text, DO NOT get around the block. LOOK for another copy, such as an archived or open-access version, or for the primary source it reports on. OTHERWISE, MARK it blocked and DO NOT use it as evidence.
 
@@ -119,7 +124,7 @@ WHEN you stop, SET the board's status to stopped.
 
 ## 7. Coordinate workers
 
-IF the harness has sub-agents, you are the coordinator. Workers search and read; you keep the board correct. DO NOT research questions yourself, because you are likely the most expensive model in the session.
+IF the harness has sub-agents, you are the coordinator. Workers search and read; you keep the board correct. DO NOT research questions yourself. This is a design choice to save cost, because you are likely the most expensive model in the session. No study has tested it on open-web research, and one benchmark found the reverse arrangement worked better for some models.
 
 ### 7.1. Start workers
 

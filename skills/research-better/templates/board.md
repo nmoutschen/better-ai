@@ -63,7 +63,7 @@ title: <title>
 publisher: <journal, publisher, or site name>
 url: <URL>
 type: <peer-reviewed | government | news | book | documentation | blog | vendor | other>
-read: <raw | extracted | snippet | blocked>
+read: <raw | extracted | abstract | snippet | blocked>
 trust: <high | medium | low>
 trust-reason: <one line>
 repeats: <S-... if it cites, copies, or summarizes that source, or none>

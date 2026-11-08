@@ -38,7 +38,7 @@ Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only)
 |---|---|---|
 | `kind` | yes | One of the kinds below |
 | `headline` | yes | A full sentence that states what the reader should conclude from this panel |
-| `note` | no | Short text shown beside the visual: the source, a condition, a limit. A string or a list of paragraphs. Write links as `[Koh (2026)](https://...)` |
+| `note` | no | Short text shown beside the visual: the source, a condition, a limit. A string or a list of paragraphs. Write links as `[<author> (<year>)](<url>)` |
 | `part` | no | The `document` section id, or list of ids, that this panel introduces |
 | `read` | no | Where to read the detail in the document, by section title, such as "Forms, the table of reader evidence" |
 

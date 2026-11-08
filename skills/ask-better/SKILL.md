@@ -6,8 +6,8 @@ argument-hint: "[REQUEST]"
 
 # Ask Better
 
-IF invoked without argument, use these instructions on the current task, before doing more work on it.
-IF invoked with a request as argument, use these instructions on that request before starting it.
+IF invoked without argument, USE these instructions on the current task, before doing more work on it.
+IF invoked with a request as argument, USE these instructions on that request before starting it.
 
 Being invoked does NOT mean a question is needed. When told to ask, agents ask about tasks that are already clear. These instructions can end with you proceeding without a question.
 
@@ -19,6 +19,7 @@ Being invoked does NOT mean a question is needed. When told to ask, agents ask a
 4. A wrong guess makes work for the user. They must notice the error, find its cause, and explain it to you before you can fix it. An error is hardest to notice when the result looks correct.
 5. A question helps only when it asks for something only the user knows.
 6. Agents tend to agree with a request instead of objecting to it. Managers rate employees who raise problems at a moderate frequency higher than those who rarely or very often do.
+7. Most of this evidence comes from coding agents tested with simulated users, which are more cooperative than real ones. No study has tested stating an assumption and proceeding (section 2.2), or the transfer of manager–employee findings to agents (section 1.5). TREAT those rules as design choices.
 
 ## 1. Check for gaps before acting
 
@@ -26,7 +27,7 @@ Being invoked does NOT mean a question is needed. When told to ask, agents ask a
 
 BEFORE starting the work, LIST what the result depends on:
 
-1. The GOAL: what the user must be able to understand, decide, or do afterwards.
+1. The GOAL: what the user must be able to understand, learn, do, or decide afterwards.
 2. The target: the exact files, systems, documents, people, or data to act on.
 3. The scope: what you may change, and what you must leave alone.
 4. The success criterion: how the user will judge the result.
@@ -82,7 +83,7 @@ IF the operator's and the user's instructions conflict, FOLLOW the operator unle
 
 ### 3.1. Ask few questions
 
-ASK only about unknowns that block the work. PUT them in one message, with at most three questions. DROP any question whose answer would not change your work.
+ASK only about unknowns that block the work. PUT them in one message, with as few questions as possible, usually no more than three. DROP any question whose answer would not change your work. Low-quality questions disturb users.
 
 ### 3.2. Make each question specific
 
@@ -106,7 +107,7 @@ USE a structured question tool, such as `AskUserQuestion`, when one is available
 
 ### 4.1. Ask early, and all at once
 
-ASK all blocking questions before starting work that depends on them. An error found early takes much less work to fix than one found at the end, and agents produce much worse results when requirements arrive over several messages.
+ASK all blocking questions before starting work that depends on them. An error found early is likely cheaper to fix than one found at the end, and agents produce much worse results when requirements arrive over several messages.
 
 ### 4.2. During the task, ask between steps
 
