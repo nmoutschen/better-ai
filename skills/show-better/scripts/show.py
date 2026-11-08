@@ -28,7 +28,7 @@ import webbrowser
 from pathlib import Path
 
 
-KINDS = ("map", "concept", "flow", "groups", "tree", "sets", "matrix", "quadrant", "numbers", "units", "bars", "slope",
+KINDS = ("map", "concept", "flow", "groups", "tree", "sets", "matrix", "effects", "pairs", "quadrant", "numbers", "units", "bars", "slope",
          "dots", "scatter", "line", "timeline", "table", "text", "svg")
 
 
@@ -63,6 +63,26 @@ GLYPHS = {
 
 
 # ---------- shared helpers: HTML and SVG ----------
+
+LINK = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
+
+
+def rich(value) -> str:
+    """Escape text and turn Markdown links, [label](https://...), into anchors."""
+    out, last = [], 0
+    text = str(value)
+    for m in LINK.finditer(text):
+        out.append(esc(text[last:m.start()]))
+        out.append(f'<a href="{esc(m.group(2))}" target="_blank" rel="noopener">{esc(m.group(1))}</a>')
+        last = m.end()
+    out.append(esc(text[last:]))
+    return "".join(out)
+
+
+def plain(value, keep_links=False) -> str:
+    """Text output: a link becomes its label followed by the address, or stays Markdown."""
+    return str(value) if keep_links else LINK.sub(lambda m: f"{m.group(1)} <{m.group(2)}>", str(value))
+
 
 def esc(value) -> str:
     return html.escape(str(value), quote=True)
@@ -165,7 +185,7 @@ def tfmt(v):
 
 
 def twrap(text, width, indent=""):
-    return textwrap.wrap(str(text), width=max(width, 10), initial_indent=indent, subsequent_indent=indent) or [indent]
+    return textwrap.wrap(str(text), width=max(width, 10), initial_indent=indent, subsequent_indent=indent, break_long_words=False, break_on_hyphens=False) or [indent]
 
 
 def tcut(text, n):
@@ -227,6 +247,9 @@ def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
             errors.append("'document' needs 'sections', each with an 'id' and a 'label'")
         else:
             digest.append(f"DOCUMENT: {doc.get('title', '')} — " + " · ".join(f"{x['id']} {x['label']}" for x in secs))
+            for x in secs:
+                if len(str(x.get("gist", ""))) > 50:
+                    warnings.append(f"document: the gist of '{x['label']}' is {len(x['gist'])} characters; keep it under 50, a few words")
     for i, p in enumerate(panels, 1):
         where = f"panel {i}"
         if not isinstance(p, dict):
@@ -283,6 +306,10 @@ def check_map(p, where, errors, warnings, digest, spec=None):
         return
     if len(secs) > 9:
         warnings.append(f"{where}: {len(secs)} sections; group them into at most 9 parts")
+    if p.get("sections"):
+        for sec in secs:
+            if isinstance(sec, dict) and len(str(sec.get("gist", ""))) > 50:
+                warnings.append(f"{where}: the gist of '{sec.get('label')}' is {len(sec['gist'])} characters; keep it under 50, a few words")
     for s in secs:
         if not isinstance(s, dict) or not s.get("label"):
             errors.append(f"{where}: each section needs a 'label'")
@@ -297,40 +324,33 @@ def v_map(p, spec=None):
     hl_ids = set(_as_list(p.get("highlight")))
     n = len(secs)
     body = []
-    if n <= 5:
-        gap = 18
+    stroke = lambda hl: f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else ""
+    if n <= 5:  # a row of parts, each with its gist inside the box
+        gap = 14
         bw = (W - gap * (n - 1)) / n
-        bh = 84
-        for i, s in enumerate(secs):
-            x = i * (bw + gap)
-            hl = s.get("highlight") or s.get("id") in hl_ids
-            body.append(f'<rect x="{x:.1f}" y="26" width="{bw:.1f}" height="{bh}" rx="4" fill="{C["linen"]}"'
-                        + (f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else "") + "/>")
-            body.append(text_el(x + 14, 18, [str(s.get("id", i + 1))], 13, 700, C["umber"] if hl else C["muted"]))
-            body.append(text_el(x + 14, 56, wrap(s["label"], int(bw / 9), 2), 16, 700, C["heading"], gap=19))
-            if s.get("gist"):
-                body.append(text_el(x + 14, 26 + bh + 26, wrap(s["gist"], int(bw / 7.6), 4), 13.5, 500, C["ink"], gap=18))
-            if i < n - 1:
-                body.append(f'<line x1="{x + bw + 2:.1f}" y1="{26 + bh / 2}" x2="{x + bw + gap - 2:.1f}" y2="{26 + bh / 2}" stroke="{C["sand"]}" stroke-width="2"/>')
-        h = 26 + bh + (26 + 18 * max(len(wrap(s.get("gist", ""), int(bw / 7.6), 4)) for s in secs) if any(s.get("gist") for s in secs) else 10)
-    else:
-        rh = 54
-        bw = 330
-        for i, s in enumerate(secs):
-            y = i * rh
-            hl = s.get("highlight") or s.get("id") in hl_ids
-            body.append(f'<rect x="0" y="{y}" width="{bw}" height="{rh - 10}" rx="4" fill="{C["linen"]}"'
-                        + (f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else "") + "/>")
-            body.append(text_el(14, y + 28, [str(s.get("id", i + 1))], 15, 700, C["umber"] if hl else C["muted"]))
-            body.append(text_el(70, y + 28, wrap(s["label"], 30, 1), 17, 700, C["heading"]))
-            if i < n - 1:
-                body.append(f'<line x1="34" y1="{y + rh - 10}" x2="34" y2="{y + rh}" stroke="{C["sand"]}" stroke-width="2"/>')
-            if s.get("gist"):
-                gl = wrap(s["gist"], 54, 2)
-                body.append(text_el(bw + 22, y + (28 if len(gl) == 1 else 19), gl, 15, 500, C["ink"], gap=18))
-        h = n * rh - 10
-    text = "<ol>" + "".join(f"<li><b>{esc(s['label'])}</b>{(': ' + esc(s['gist'])) if s.get('gist') else ''}</li>" for s in secs) + "</ol>"
-    return svg_wrap("".join(body), h + 4, p["headline"]), text
+        glines = {k: wrap(sec.get("gist", ""), int(bw / 7.4), 3) if sec.get("gist") else [] for k, sec in enumerate(secs)}
+        llines = {k: wrap(sec["label"], int(bw / 9), 2) for k, sec in enumerate(secs)}
+        bh = 26 + 19 * max(len(v) for v in llines.values()) + 17 * max(len(v) for v in glines.values())
+        for k, sec in enumerate(secs):
+            x = k * (bw + gap)
+            hl = sec.get("highlight") or sec.get("id") in hl_ids
+            body.append(f'<rect x="{x:.1f}" y="1" width="{bw:.1f}" height="{bh}" rx="4" fill="{C["linen"]}"{stroke(hl)}/>')
+            body.append(text_el(x + 14, 30, llines[k], 16, 700, C["heading"], gap=19))
+            if glines[k]:
+                body.append(text_el(x + 14, 30 + 19 * len(llines[k]) + 6, glines[k], 13, 500, C["muted"], gap=17))
+        h = bh + 2
+    else:  # one row per part: id, label, and its gist on the same line
+        rh = 50
+        for k, sec in enumerate(secs):
+            y = k * rh
+            hl = sec.get("highlight") or sec.get("id") in hl_ids
+            body.append(f'<rect x="1" y="{y + 1}" width="{W - 2}" height="{rh - 8}" rx="4" fill="{C["linen"]}"{stroke(hl)}/>')
+            body.append(text_el(18, y + 28, wrap(sec["label"], 34, 1), 16, 700, C["heading"]))
+            if sec.get("gist"):
+                body.append(text_el(370, y + 28, wrap(sec["gist"], 52, 1), 14, 500, C["muted"]))
+        h = n * rh - 6
+    text = "<ol>" + "".join(f"<li><b>{esc(sec['label'])}</b>{(': ' + esc(sec['gist'])) if sec.get('gist') else ''}</li>" for sec in secs) + "</ol>"
+    return svg_wrap("".join(body), h + 2, p["headline"]), text
 
 
 def t_map(p, W, g, spec=None):
@@ -339,10 +359,10 @@ def t_map(p, W, g, spec=None):
     out = []
     for s in secs:
         hl = s.get("highlight") or s.get("id") in hl_ids
-        head = f"{g['hl'] if hl else ' '} {s.get('id', '')}  {s['label']}"
+        head = f"{g['hl'] if hl else ' '} {s['label']}"
         out.append(head)
         if s.get("gist"):
-            out += twrap(s["gist"], W - 6, "      ")
+            out += twrap(s["gist"], W - 4, "   ")
     return out
 
 
@@ -403,6 +423,8 @@ def check_concept(p, where, errors, warnings, digest):
         if not e.get("label"):
             errors.append(f"{where}: edge {e['from']} → {e['to']} needs a 'label' that says how they relate, such as 'causes' or 'is part of'")
             continue
+        if len(e["label"]) > 40:
+            warnings.append(f"{where}: relation '{e['label']}' is {len(e['label'])} characters; keep relations to a few words and put conditions in the note")
         digest.append(f"    {labels[e['from']]} —{e['label']}→ {labels[e['to']]}")
 
 
@@ -416,13 +438,16 @@ def v_concept(p):
     xgap = (W - nw * L) / (L - 1) if L > 1 else 0
     lines_of = {i: wrap(by_id[i]["label"], max(int(nw / 8.4), 8), 3) for i in by_id}
     nh = {i: 22 + 18 * len(lines_of[i]) for i in by_id}
-    rows = max(len(c) for c in order)
+    col_of = {i: k for k, col in enumerate(order) for i in col}
+    long_edges = [e for e in edges if (e["from"], e["to"]) not in back and col_of[e["to"]] - col_of[e["from"]] > 1]
+    lab_chars = max(int((xgap - 12) / 7.2), 10) if L > 1 else 18
+    top = 30 + (16 * 3 + 30 if long_edges else 0)  # room above the nodes for edges that skip a column
     col_h = [sum(nh[i] for i in c) + 46 * (len(c) - 1) for c in order]
-    H = max(col_h) + 40
+    H = max(col_h) + top + 20
     box = {}
     for k, col in enumerate(order):
         x = k * (nw + xgap)
-        y = 20 + (H - 40 - col_h[k]) / 2
+        y = top + (H - top - 20 - col_h[k]) / 2
         for i in col:
             box[i] = (x, y, nw, nh[i])
             y += nh[i] + 46
@@ -438,14 +463,20 @@ def v_concept(p):
             path = f"M{sx:.1f} {sy:.1f} C{sx:.1f} {dip:.1f} {tx:.1f} {dip:.1f} {tx:.1f} {ty + 6:.1f}"
             mx, my = (sx + tx) / 2, dip - 6
             H = max(H, dip + 30)
+        elif e in long_edges:  # skips a column: arc over the nodes between, label at the top of the arc
+            sx, sy, tx, ty = x1 + w1 / 2, y1, x2 + w2 / 2, y2
+            arc = 22
+            path = f"M{sx:.1f} {sy:.1f} C{sx:.1f} {arc} {tx:.1f} {arc} {tx:.1f} {ty - 7:.1f}"
+            mx, my = (sx + tx) / 2, 0.75 * arc + 0.25 * (sy + ty) / 2 - 4
         else:
             sx, sy, tx, ty = x1 + w1, y1 + h1 / 2, x2, y2 + h2 / 2
             cx = (sx + tx) / 2
             path = f"M{sx:.1f} {sy:.1f} C{cx:.1f} {sy:.1f} {cx:.1f} {ty:.1f} {tx - 7:.1f} {ty:.1f}"
             mx, my = cx, (sy + ty) / 2
         body.append(f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{2.2 if hl else 1.5}" marker-end="url(#ah{"h" if hl else ""})"/>')
-        lab = wrap(e["label"], 18, 2)
+        lab = wrap(e["label"], 24 if e in long_edges else lab_chars, 4)
         lw = max(len(l) for l in lab) * 7.2 + 10
+        my -= (len(lab) - 1) * 8  # centre a multi-line label on its edge
         labels.append(f'<rect x="{mx - lw / 2:.1f}" y="{my - 13:.1f}" width="{lw:.1f}" height="{len(lab) * 16 + 6}" rx="3" fill="{C["cream"]}"/>'
                       + text_el(mx, my + 1, lab, 13, 600 if hl else 500, C["umber"] if hl else C["muted"], "middle", True, 16))
     for i, (x, y, w, h) in box.items():
@@ -838,6 +869,18 @@ def check_matrix(p, where, errors, warnings, digest):
         digest.append(f"    {group}{r['label']}: " + ", ".join(f"{_label(col)}={m}" for col, m in zip(cols, out)))
     if n_hl > LIMITS["highlights"]:
         warnings.append(f"{where}: {n_hl} highlighted rows or cells; emphasis works when it marks the one or two that carry the point")
+    if len(cols) == 1:
+        warnings.append(f"{where}: a matrix with one column is a list of marks; use 'pairs' if each item comes in a good and a bad form, or 'effects' for a list of findings")
+    measured = {}
+    for r in rows:
+        if isinstance(r, dict) and isinstance(r.get("cells"), list):
+            key = r.get("group") or r.get("label")
+            measured.setdefault(key, set()).update(k for k, c in enumerate(r["cells"]) if (c.get("mark") if isinstance(c, dict) else c))
+    keys = [k for k in measured if measured[k]]
+    for a in range(len(keys)):
+        for b in range(a + 1, len(keys)):
+            if not measured[keys[a]] & measured[keys[b]]:
+                warnings.append(f"{where}: '{keys[a]}' and '{keys[b]}' share no measured column, so they measure different things; use 'effects', which names each row's outcome, or separate panels")
 
 
 def v_matrix(p):
@@ -903,6 +946,186 @@ def t_matrix(p, W, g):
               for m in ["yes", "no", "up", "down", "same", None] if m in used]
     out += [""] + twrap("   ".join(legend), W)
     return out
+
+
+# ---------- effects and pairs: shared mark ----------
+
+EFFECTS = ("up", "down", "same")
+EFFECT_WORDS = {"up": "raises", "down": "lowers", "same": "no clear effect"}
+
+
+def mark_shape(cx, cy, m):
+    """An effect mark inside an SVG: the shape carries the meaning, colour only repeats it."""
+    if m == "up":
+        return f'<path d="M{cx:.1f} {cy - 12:.1f} L{cx + 13:.1f} {cy + 10:.1f} H{cx - 13:.1f} Z" fill="{C["moss"]}"/>'
+    if m == "down":
+        return f'<path d="M{cx:.1f} {cy + 12:.1f} L{cx + 13:.1f} {cy - 10:.1f} H{cx - 13:.1f} Z" fill="{C["umber"]}"/>'
+    return (f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="11" fill="none" stroke="{C["sand"]}" stroke-width="2.5"/>'
+            f'<path d="M{cx - 5.5:.1f} {cy - 3:.1f}h11M{cx - 5.5:.1f} {cy + 3:.1f}h11" stroke="{C["ink"]}" stroke-width="2.2"/>')
+
+
+def effect_legend(used, g=None):
+    marks = {"up": "▲", "down": "▼", "same": "="} if g is None else {"up": g["up"], "down": g["dn"], "same": g["same"]}
+    return "   ".join(f"{marks[m]} {EFFECT_WORDS[m]}" for m in EFFECTS if m in used)
+
+
+# ---------- effects: check, HTML, text ----------
+
+def check_effects(p, where, errors, warnings, digest):
+    rows = need_list(p, "rows", where, errors, 12, warnings, "findings")
+    count_highlights(rows, where, warnings)
+    for r in rows:
+        if not isinstance(r, dict) or not r.get("label") or r.get("effect") not in EFFECTS:
+            errors.append(f"{where}: each row needs a 'label' and an 'effect' of {', '.join(EFFECTS)}")
+            continue
+        g = f"{r['group']} / " if r.get("group") else ""
+        digest.append(f"    {g}{r['label']}{(' on ' + r['outcome']) if r.get('outcome') else ''}: {EFFECT_WORDS[r['effect']]}"
+                      + ("  [highlight]" if r.get("highlight") else ""))
+    if rows and not any(isinstance(r, dict) and r.get("outcome") for r in rows):
+        warnings.append(f"{where}: no row names its 'outcome'; when every finding has the same outcome and each item comes in a good and a bad form, use 'pairs'")
+
+
+def v_effects(p):
+    """One row per finding, its mark placed in a lowers / no clear effect / raises column; each row names its outcome."""
+    rows = p["rows"]
+    heads = p.get("columns") or ["Lowers", "No clear effect", "Raises"]
+    left = 360
+    zw = (W - left) / 3
+    zone = {"down": 0, "same": 1, "up": 2}
+    body = [f'<rect x="{left + zw:.1f}" y="0" width="{zw:.1f}" height="__H__" fill="{C["linen"]}"/>']
+    for k, h in enumerate(heads):
+        body.append(text_el(left + zw * k + zw / 2, 20, [h.upper()], 12, 700, C["muted"], "middle"))
+    y, group = 40, None
+    for r in rows:
+        if r.get("group") and r["group"] != group:
+            group = r["group"]
+            y += 22
+            body.append(text_el(0, y, [group.upper()], 12.5, 700, C["umber"]))
+            y += 8
+        hl = r.get("highlight")
+        lab = wrap(r["label"], 40, 2)
+        out = wrap("on " + r["outcome"], 46, 2) if r.get("outcome") else []
+        rh = 14 + 19 * len(lab) + 16 * len(out)
+        body.append(text_el(0, y + 18, lab, 16, 700 if hl else 600, C["heading"], gap=19))
+        if out:
+            body.append(text_el(0, y + 18 + 19 * len(lab) - 2, out, 13, 500, C["muted"], italic=True, gap=16))
+        body.append(mark_shape(left + zw * zone[r["effect"]] + zw / 2, y + rh / 2, r["effect"]))
+        body.append(f'<line x1="0" y1="{y + rh:.1f}" x2="{W}" y2="{y + rh:.1f}" stroke="{C["line"]}"/>')
+        y += rh
+    H = y + 8
+    text = "<ul>" + "".join(f"<li>{esc(r.get('group', ''))}{': ' if r.get('group') else ''}{esc(r['label'])}"
+                            f"{(' on ' + esc(r['outcome'])) if r.get('outcome') else ''}: {EFFECT_WORDS[r['effect']]}</li>" for r in rows) + "</ul>"
+    return svg_wrap("".join(body).replace("__H__", f"{H:.0f}"), H, p["headline"]), text
+
+
+def t_effects(p, W, g):
+    heads = p.get("columns") or ["Lowers", "No clear effect", "Raises"]
+    sym = {"up": g["up"], "down": g["dn"], "same": g["same"]}
+    zone = {"down": 0, "same": 1, "up": 2}
+    cw = 10
+    lw = max(W - 3 * cw - 2, 20)
+    hl = [twrap(h, cw - 1) for h in heads]
+    out = [" " * (lw + 1) + "".join((h[k] if k < len(h) else "").center(cw) for h in hl) for k in range(max(map(len, hl)))]
+    group = None
+    for r in p["rows"]:
+        if r.get("group") and r["group"] != group:
+            group = r["group"]
+            out.append(tcut(group.upper(), W))
+        label = r["label"] + (f" (on {r['outcome']})" if r.get("outcome") else "")
+        lines = twrap(label, lw - 2)
+        cells = ["".center(cw)] * 3
+        cells[zone[r["effect"]]] = sym[r["effect"]].center(cw)
+        mark = g["hl"] if r.get("highlight") else " "
+        out.append(f"{mark}{lines[0]:<{lw}}" + "".join(cells))
+        out += [f" {l}" for l in lines[1:]]
+    return out + ["", effect_legend({r["effect"] for r in p["rows"]}, g)]
+
+
+# ---------- pairs: check, HTML, text ----------
+
+def check_pairs(p, where, errors, warnings, digest):
+    heads = p.get("columns")
+    if not (isinstance(heads, list) and len(heads) == 2):
+        errors.append(f"{where}: 'columns' needs two headings, such as [\"Helps when\", \"Hurts or no gain when\"]")
+    else:
+        digest.append(f"    columns: {heads[0]} | {heads[1]}")
+    rows = need_list(p, "rows", where, errors, 7, warnings, "items")
+    count_highlights(rows, where, warnings)
+    for r in rows:
+        if not isinstance(r, dict) or not r.get("label"):
+            errors.append(f"{where}: each row needs a 'label'")
+            continue
+        for side in ("left", "right"):
+            for c in r.get(side) or []:
+                if not isinstance(c, dict) or not c.get("label") or c.get("effect") not in EFFECTS + (None,):
+                    errors.append(f"{where}: '{r['label']}': each entry in '{side}' needs a 'label', and an optional 'effect' of {', '.join(EFFECTS)}")
+        if not (r.get("left") or r.get("right")):
+            errors.append(f"{where}: '{r['label']}' has nothing in 'left' or 'right'")
+        digest.append(f"    {r['label']}: " + " | ".join(
+            ", ".join(f"{c.get('label')}{(' [' + EFFECT_WORDS.get(c.get('effect'), '') + ']') if c.get('effect') else ''}" for c in r.get(side) or [] if isinstance(c, dict)) or "–"
+            for side in ("left", "right")))
+
+
+def v_pairs(p):
+    """One row per item, its two contrasting forms side by side."""
+    heads = p["columns"]
+    left = 240
+    cw = (W - left) / 2
+    body = [text_el(left + 40, 20, [heads[0].upper()], 12, 700, C["muted"]), text_el(left + cw + 40, 20, [heads[1].upper()], 12, 700, C["muted"]),
+            f'<line x1="0" y1="32" x2="{W}" y2="32" stroke="{C["line"]}" stroke-width="2"/>']
+    y = 40
+    for r in p["rows"]:
+        hl = r.get("highlight")
+        sides = [r.get("left") or [], r.get("right") or []]
+        lines = [[wrap(c["label"], int((cw - 50) / 8), 2) for c in s] for s in sides]
+        heights = [sum(10 + 19 * len(l) for l in s) for s in lines]
+        lab = wrap(r["label"], 24, 3)
+        rh = max(heights + [19 * len(lab)]) + 16
+        body.append(text_el(0, y + 26, lab, 16, 700, C["heading"] if not hl else C["umber"], gap=19))
+        for k, (s, ls) in enumerate(zip(sides, lines)):
+            yy = y + 8
+            x = left + cw * k
+            for c, l in zip(s, ls):
+                h = 10 + 19 * len(l)
+                if c.get("effect"):
+                    body.append(mark_shape(x + 16, yy + h / 2, c["effect"]))
+                body.append(text_el(x + 40, yy + 18, l, 15, 600 if hl else 500, C["ink"], gap=19))
+                yy += h
+        body.append(f'<line x1="0" y1="{y + rh:.1f}" x2="{W}" y2="{y + rh:.1f}" stroke="{C["line"]}"/>')
+        y += rh
+    text = table_html(["", heads[0], heads[1]], [[r["label"]] + ["; ".join(c["label"] + (f" ({EFFECT_WORDS[c['effect']]})" if c.get("effect") else "") for c in r.get(s) or []) or "–"
+                                                   for s in ("left", "right")] for r in p["rows"]])
+    return svg_wrap("".join(body), y + 6, p["headline"]), text
+
+
+def t_pairs(p, W, g):
+    heads = p["columns"]
+    sym = {"up": g["up"], "down": g["dn"], "same": g["same"], None: " "}
+    lw = 18
+    cw = (W - lw - 2) // 2
+    ha, hb = twrap(heads[0].upper(), cw - 2), twrap(heads[1].upper(), cw - 2)
+    out = [" " * lw + "  " + (ha[k] if k < len(ha) else "").ljust(cw) + (hb[k] if k < len(hb) else "") for k in range(max(len(ha), len(hb)))]
+    out = [l.rstrip() for l in out] + [g["h"] * W]
+    used = set()
+    for r in p["rows"]:
+        cols = []
+        for s in (r.get("left") or [], r.get("right") or []):
+            lines = []
+            for c in s:
+                used.add(c.get("effect"))
+                w = twrap(c["label"], cw - 4)
+                lines.append(f"{sym[c.get('effect')]} {w[0]}")
+                lines += [f"  {l}" for l in w[1:]]
+            cols.append(lines or ["–"])
+        lab = twrap(r["label"], lw - 1)
+        n = max(len(cols[0]), len(cols[1]), len(lab))
+        for k in range(n):
+            a = lab[k] if k < len(lab) else ""
+            b = cols[0][k] if k < len(cols[0]) else ""
+            c = cols[1][k] if k < len(cols[1]) else ""
+            out.append(f"{(g['hl'] if r.get('highlight') and k == 0 else ' ')}{a:<{lw - 1}}  {b:<{cw}}{c}".rstrip())
+        out.append("")
+    return out + [effect_legend(used, g)]
 
 
 # ---------- quadrant: check, HTML, text ----------
@@ -1637,14 +1860,14 @@ def check_text(p, where, errors, warnings, digest):
 
 def v_text(p):
     body = p["body"] if isinstance(p["body"], list) else [p["body"]]
-    return '<div class="prose">' + "".join(f"<p>{esc(b)}</p>" for b in body) + "</div>", ""
+    return '<div class="prose">' + "".join(f"<p>{rich(b)}</p>" for b in body) + "</div>", ""
 
 
 def t_text(p, W, g):
     body = p["body"] if isinstance(p["body"], list) else [p["body"]]
     out = []
     for para in body:
-        out += twrap(para, W) + [""]
+        out += twrap(plain(para), W) + [""]
     return out[:-1]
 
 
@@ -1674,19 +1897,19 @@ def t_svg(p, W, g):
 
 # ---------- registries ----------
 
-PANEL_CHECKS = {"map": check_map, "concept": check_concept, "slope": check_slope, "dots": check_dots,
+PANEL_CHECKS = {"effects": check_effects, "pairs": check_pairs, "map": check_map, "concept": check_concept, "slope": check_slope, "dots": check_dots,
                 "scatter": check_scatter, "quadrant": check_quadrant, "sets": check_sets, "tree": check_tree,
                 "numbers": check_numbers, "units": check_units, "matrix": check_matrix, "bars": check_bars, "line": check_line, "table": check_table,
                 "flow": check_flow, "groups": check_groups, "timeline": check_timeline, "text": check_text,
                 "svg": check_svg}
 
 
-VISUALS = {"map": v_map, "concept": v_concept, "slope": v_slope, "dots": v_dots, "scatter": v_scatter,
+VISUALS = {"effects": v_effects, "pairs": v_pairs, "map": v_map, "concept": v_concept, "slope": v_slope, "dots": v_dots, "scatter": v_scatter,
            "quadrant": v_quadrant, "sets": v_sets, "tree": v_tree, "numbers": v_numbers, "units": v_units, "matrix": v_matrix, "bars": v_bars, "line": v_line, "table": v_table, "flow": v_flow,
            "groups": v_groups, "timeline": v_timeline, "text": v_text, "svg": v_svg}
 
 
-TEXT = {"numbers": t_numbers, "units": t_units, "bars": t_bars, "line": t_line, "table": t_table, "matrix": t_matrix,
+TEXT = {"effects": t_effects, "pairs": t_pairs, "numbers": t_numbers, "units": t_units, "bars": t_bars, "line": t_line, "table": t_table, "matrix": t_matrix,
         "flow": t_flow, "map": t_map, "concept": t_concept, "groups": t_groups, "timeline": t_timeline, "text": t_text,
         "svg": t_svg, "slope": t_slope, "dots": t_dots, "scatter": t_scatter, "quadrant": t_quadrant, "sets": t_sets, "tree": t_tree}
 
@@ -1703,7 +1926,7 @@ html, body { margin:0; }
 body { background:var(--cream); color:var(--ink); font:400 17px/1.75 var(--serif); -webkit-font-smoothing:antialiased;
   min-height:100vh; display:flex; flex-direction:column; }
 .band { height:10px; background:var(--umber) var(--saya); background-size:13px 7.5px; flex:none; }
-.band--terra { background-color:var(--terracotta); height:6px; }
+.band--thin { height:6px; }
 .wrap { width:100%; max-width:72rem; margin:0 auto; padding:0 clamp(20px, 4vw, 48px); flex:1; display:flex; flex-direction:column; }
 header.top { padding:28px 0 8px; }
 .kicker { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
@@ -1748,7 +1971,9 @@ tr.hl td:first-child { box-shadow:inset 4px 0 0 var(--terracotta); padding-left:
 .fig .lab { font:500 clamp(15px, 1.5vw, 18px)/1.4 var(--sans); color:var(--ink); max-width:18rem; margin-top:12px; }
 .prose { max-width:42rem; font-size:clamp(17px, 1.6vw, 20px); } .prose p { margin:0 0 14px; }
 .controls { display:none; }
-footer { font:400 12px var(--sans); color:var(--muted); padding:10px 0 18px; }
+.foot { flex:none; display:flex; flex-wrap:wrap; gap:0 16px; justify-content:space-between; padding:4px max(clamp(20px, 4vw, 48px), calc((100% - 72rem) / 2 + clamp(20px, 4vw, 48px))); font:400 12px var(--sans); color:var(--muted); font-variant-numeric:tabular-nums; }
+.foot a, .source a { color:var(--muted); } .foot a:hover, .source a:hover, .note a:hover, .readnext a:hover { color:var(--terracotta); }
+.note a, .readnext a, .prose a, .summary a { color:inherit; text-decoration-color:var(--sand); text-underline-offset:2px; }
 :focus-visible { outline:2px solid var(--terracotta); outline-offset:3px; }
 .bars { display:grid; grid-template-columns:max-content minmax(0, 1fr); gap:clamp(12px, 2.4vh, 26px) 18px; align-items:center; padding:4px 0;
   font:500 clamp(15px, 1.6vw, 19px)/1.3 var(--sans); }
@@ -1776,7 +2001,7 @@ footer { font:400 12px var(--sans); color:var(--muted); padding:10px 0 18px; }
 .mhead > span.hl { color:var(--heading); box-shadow:inset 0 -3px 0 var(--terracotta); }
 .mgroup > span { grid-column:1 / -1; font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--umber); padding:10px 0 0; }
 .mlab { color:var(--heading); padding-left:0 !important; }
-.mrow.hl .mlab { font-weight:700; box-shadow:inset 4px 0 0 var(--terracotta); padding-left:12px !important; }
+.mrow.hl .mlab { font-weight:700; }
 .mcell { justify-content:center; flex-direction:column; gap:2px; }
 .mcell svg { width:clamp(26px, 4.6vh, 40px); height:auto; display:block; }
 .mcell small { font:500 12px var(--sans); color:var(--muted); text-align:center; }
@@ -1874,12 +2099,12 @@ def doc_strip(spec, p):
         return ""
     parts = set(map(str, _as_list(p["part"])))
     cells = "".join(f'<li class="{"on" if str(s["id"]) in parts else ""}"{" aria-current=\"true\"" if str(s["id"]) in parts else ""}>'
-                    f'<b>{esc(s["id"])}</b> {esc(s["label"])}</li>' for s in doc["sections"])
+                    f'{esc(s["label"])}</li>' for s in doc["sections"])
     return f'<nav class="docstrip" aria-label="Where this is in the document"><ol>{cells}</ol></nav>'
 
 
 def read_next(p):
-    return f'<p class="readnext"><span>Read in the document</span> {esc(p["read"])}</p>' if p.get("read") else ""
+    return f'<p class="readnext"><span>Read in the document</span> {rich(p["read"])}</p>' if p.get("read") else ""
 
 
 def render(spec: dict) -> str:
@@ -1887,14 +2112,14 @@ def render(spec: dict) -> str:
     sections, toc = [], []
     for i, p in enumerate(panels, 1):
         visual, data = v_map(p, spec) if p["kind"] == "map" else VISUALS[p["kind"]](p)
-        if p["kind"] in ("flow", "groups", "timeline", "map", "concept", "sets", "quadrant", "tree"):  # on narrow screens show the text version instead of a shrunken svg
+        if p["kind"] in ("flow", "groups", "timeline", "map", "concept", "sets", "quadrant", "tree", "effects", "pairs"):  # on narrow screens show the text version instead of a shrunken svg
             visual = f'<div class="wide">{visual}</div><div class="narrow" aria-hidden="true">{data}</div>'
 
         note = p.get("note")
         note_html = ""
         if note:
             paras = note if isinstance(note, list) else [note]
-            note_html = '<aside class="note">' + "".join(f"<p>{esc(t)}</p>" for t in paras) + "</aside>"
+            note_html = '<aside class="note">' + "".join(f"<p>{rich(t)}</p>" for t in paras) + "</aside>"
         data_html = f'<details class="data"><summary>{"Data" if p["kind"] in ("bars", "line", "units", "slope", "dots", "scatter", "tree", "sets") else "As text"}</summary><div>{data}</div></details>' if data else ""
         sections.append(
             f'<section class="panel page" id="p{i}" aria-labelledby="h{i}"><div class="count">{i} of {len(panels)}</div>'
@@ -1902,8 +2127,8 @@ def render(spec: dict) -> str:
             f'<div class="body{" has-note" if note_html else ""}"><figure>{visual}{data_html}</figure>{note_html}</div>'
             f'{read_next(p)}</section>')
         toc.append(f'<li><a href="#p{i}">{esc(p["headline"])}</a></li>')
-    source = f'<p class="source">{esc(spec["source"])}</p>' if spec.get("source") else ""
-    summary = f'<p class="summary">{esc(spec["summary"])}</p>' if spec.get("summary") else ""
+    source = f'<p class="source">{rich(spec["source"])}</p>' if spec.get("source") else ""
+    summary = f'<p class="summary">{rich(spec["summary"])}</p>' if spec.get("summary") else ""
     kicker = f'<div class="kicker">{esc(spec["kicker"])}</div>' if spec.get("kicker") else ""
     return f"""<!DOCTYPE html>
 <html lang="{esc(spec.get('lang', 'en'))}"><head><meta charset="utf-8">
@@ -1915,12 +2140,13 @@ def render(spec: dict) -> str:
 <div class="wrap"><header class="top page" id="cover">{kicker}<h1 tabindex="-1">{esc(spec['title'])}</h1>{summary}{source}
 <nav class="toc" aria-label="Panels"><ol>{''.join(toc)}</ol></nav></header>
 <div class="slim"><a href="#cover">{esc(spec['title'])}</a></div>
-<div class="controls" role="group" aria-label="Move between panels"><button class="prev" type="button">← Back</button>
-<span class="pos" aria-live="polite"></span><button class="next" type="button">Next →</button><span class="dots" aria-hidden="true"></span>
+<div class="controls" role="group" aria-label="Move between panels"><button class="prev" type="button" aria-keyshortcuts="ArrowLeft Shift+Space">← Back</button>
+<span class="pos" aria-live="polite"></span><button class="next" type="button" aria-keyshortcuts="ArrowRight Space">Next →</button><span class="dots" aria-hidden="true"></span>
 <button class="all" type="button"></button></div>
 <main>{''.join(sections)}</main>
-<footer>Use the space bar, the arrow keys or the buttons to move between panels. Shift+Space goes back.</footer></div>
-<div class="band band--terra"></div>
+</div>
+<div class="band band--thin"></div>
+<footer class="foot"><span>{rich(spec.get("source", ""))}</span><span>show-better by <a href="https://n14n.dev/" target="_blank" rel="noopener">n14n.dev</a></span></footer>
 <script>{JS}</script></body></html>"""
 
 
@@ -1931,8 +2157,9 @@ def doc_line(spec, p, g, W=72):
     if not doc or p.get("part") is None:
         return []
     parts = set(map(str, p["part"] if isinstance(p["part"], list) else [p["part"]]))
-    cells = [(f"[{s['id']} {s['label']}]" if str(s["id"]) in parts else str(s["id"])) for s in doc["sections"]]
-    return twrap("In the document: " + (" | " if g["h"] == "-" else " · ").join(cells), W, "")
+    secs = doc["sections"]
+    here = [f"{k + 1} of {len(secs)}, {s['label']}" for k, s in enumerate(secs) if str(s["id"]) in parts]
+    return twrap("In the document: part " + "; part ".join(here), W, "")
 
 
 def render_text(spec, width=72, ascii=False, markdown=False):
@@ -1961,12 +2188,12 @@ def render_text(spec, width=72, ascii=False, markdown=False):
         note = p.get("note")
         if note:
             for para in (note if isinstance(note, list) else [note]):
-                out += ([""] if not markdown else []) + (twrap(para, W - 4, f"{g['v']}   ") if not markdown else ["> " + para])
+                out += ([""] if not markdown else []) + (twrap(plain(para), W - 4, f"{g['v']}   ") if not markdown else ["> " + para])
         if p.get("read"):
-            out += ["", f"Read in the document: {p['read']}"]
+            out += ["", f"Read in the document: {plain(p['read'], markdown)}"]
         out.append("")
     if spec.get("source"):
-        out += twrap(spec["source"], W)
+        out += twrap(plain(spec["source"], markdown), W)
     return "\n".join(l.rstrip() for l in out) + "\n"
 
 

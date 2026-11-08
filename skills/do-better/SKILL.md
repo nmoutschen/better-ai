@@ -1,6 +1,6 @@
 ---
 name: do-better
-description: Helps an AI agent correct work that does not meet the user's intent.
+description: Helps an AI agent correct work that does not meet the user's intent, including defects the agent finds itself in work it already delivered.
 ---
 
 # Do Better
@@ -10,6 +10,8 @@ Guidance and instructions on how to react to a disappointed user.
 Use these instructions to analyze and correct the previous work.
 
 Invocation is evidence the result does not meet the user's intent. DO NOT assume it identifies the cause or the desired correction.
+
+IF you find a defect in work you already delivered, REPORT it before the user finds it, in one sentence naming what is wrong and what it affects, THEN correct it with these instructions.
 
 ## 1. Recover the user's intent
 

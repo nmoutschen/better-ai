@@ -23,12 +23,12 @@ Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only)
   "kicker": "Optional small label above the title, such as the date or the topic",
   "source": "Optional line naming where the content comes from",
   "lang": "en",
-  "document": {"title": "The document this introduces", "sections": [{"id": "§1", "label": "Goals", "gist": "Optional one line"}]},
+  "document": {"title": "The document this introduces", "sections": [{"id": "goals", "label": "Goals", "gist": "Optional, a few words"}]},
   "panels": [ ... ]
 }
 ```
 
-`document` is optional: the parts of the document the presentation introduces, drawn by the `map` kind and marked by each panel's `part`.
+`document` is optional: the parts of the document the presentation introduces, drawn by the `map` kind and marked by each panel's `part`. A section's `id` is a key for `part` and `highlight` and is not shown; the reader sees the `label`.
 
 ## Every panel
 
@@ -36,9 +36,9 @@ Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only)
 |---|---|---|
 | `kind` | yes | One of the kinds below |
 | `headline` | yes | A full sentence that states what the reader should conclude from this panel |
-| `note` | no | Short text shown beside the visual: the source, a condition, a limit. A string or a list of paragraphs |
+| `note` | no | Short text shown beside the visual: the source, a condition, a limit. A string or a list of paragraphs. Write links as `[Koh (2026)](https://...)` |
 | `part` | no | The `document` section id, or list of ids, that this panel introduces |
-| `read` | no | Where to read the detail in the document, such as "§3.2, the table of forms" |
+| `read` | no | Where to read the detail in the document, by section title, such as "Forms, the table of reader evidence" |
 
 Highlight only the one or two items that carry the headline's point.
 
@@ -47,7 +47,7 @@ Highlight only the one or two items that carry the headline's point.
 ### `map`: the document's parts in order
 
 ```json
-{"kind": "map", "headline": "...", "highlight": ["§1", "§6"]}
+{"kind": "map", "headline": "...", "highlight": ["findings", "agents"]}
 ```
 
 Draws the top-level `document.sections`, or its own `sections` list. `highlight` marks the parts to read first.
@@ -60,7 +60,7 @@ Draws the top-level `document.sections`, or its own `sections` list. `highlight`
  "edges": [{"from": "slow", "to": "tickets", "label": "leads to"}]}
 ```
 
-Every edge needs a `label` that says how the two relate. Up to about 12 nodes.
+Every edge needs a `label` that says how the two relate, in a few words; conditions go in the note. Up to about 12 nodes.
 
 ### `tree`: a whole broken into parts
 
@@ -79,6 +79,24 @@ A node without `value` takes the sum of its children. Children that sum to more 
 ```
 
 Each region lists the sets it belongs to in `in`. A set with no region is shown as "none found", so it can show a gap.
+
+### `pairs`: items that help in one form and not in another
+
+```json
+{"kind": "pairs", "headline": "...", "columns": ["Helps when", "Hurts or does not help when"],
+ "rows": [{"label": "Raising problems", "left": [{"label": "At a moderate rate", "effect": "up"}], "right": [{"label": "Very often", "effect": "down"}]}]}
+```
+
+One row per item, its two contrasting forms side by side. `effect` is `up`, `down` or `same`, and is optional. A side can be empty, which shows an item that never helps. Up to 7 rows.
+
+### `effects`: findings that raise or lower different outcomes
+
+```json
+{"kind": "effects", "headline": "...",
+ "rows": [{"group": "Saying \"I'm not sure\"", "label": "In the first person", "outcome": "users' accuracy", "effect": "up"}]}
+```
+
+One row per finding, its mark in a Lowers, No clear effect or Raises column. `outcome` names what the finding measured; use it whenever the rows measure different things. `columns` replaces the three headings. Up to 12 rows.
 
 ### `quadrant`: options on two judged dimensions
 
@@ -144,7 +162,7 @@ One square per counted thing. Up to 3 parts and 100 units. `unit` names what one
  "legend": {"same": "no difference"}, "blank": "not measured"}
 ```
 
-Each cell is a mark: `yes` (✓), `no` (✗), `up` (▲, higher), `down` (▼, lower), `same` (=, no difference), or `null` for a blank cell. `legend` replaces the word shown for a mark; `blank` names what a blank cell means. Rows with the same `group` are shown under one label. A row or a cell can be highlighted. Up to 10 rows and 5 columns. Use a `table` instead when the cells must hold words or exact values.
+Each cell is a mark: `yes` (✓), `no` (✗), `up` (▲, higher), `down` (▼, lower), `same` (=, no difference), or `null` for a blank cell. `legend` replaces the word shown for a mark; `blank` names what a blank cell means. Rows with the same `group` are shown under one label. A row or a cell can be highlighted. Up to 10 rows and 5 columns. Columns are properties of the items, not of the research behind them, such as how a source was read: put that in the note. Use a `table` instead when the cells must hold words or exact values.
 
 ### `bars`: compare values across items
 

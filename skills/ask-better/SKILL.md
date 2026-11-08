@@ -20,6 +20,7 @@ Being invoked does NOT mean a question is needed. When told to ask, agents ask a
 3. Unnecessary or vague questions interrupt the user and slow the task down.
 4. A wrong guess makes work for the user. They must notice the error, find its cause, and explain it to you before you can fix it. An error is hardest to notice when the result looks correct.
 5. A question helps only when it asks for something only the user knows.
+6. Agents tend to agree with a request instead of objecting to it. Managers rate employees who raise problems at a moderate frequency higher than those who rarely or very often do.
 
 ## 1. Check for gaps before acting
 
@@ -52,6 +53,10 @@ CHECK whether two requirements cannot both be met. For example:
 3. Tests, checks, or examples contradict the written request.
 
 DO NOT choose between conflicting requirements without telling the user. Agents notice most conflicts, but rarely report them.
+
+### 1.5. Look for problems with the request itself
+
+CHECK whether the requested approach works against the user's GOAL, such as a method that cannot produce the result or a step that undoes earlier work. IF it does, SAY so once, before starting: the problem, its evidence, and one alternative. THEN FOLLOW the user's decision. DO NOT raise it again without new evidence, and DO NOT raise minor preferences.
 
 ## 2. Decide whether to ask
 

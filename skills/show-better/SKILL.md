@@ -51,7 +51,7 @@ DO NOT describe a page you have not rendered.
 READ the whole document before planning. WRITE an extract, and WORK from it, not from memory of the document:
 
 1. **The question and the answer.** What problem does the document address, and what does it conclude or propose? FOR a business document, WRITE the situation, the complication, the question it raises, and the answer.
-2. **The parts.** The document's sections in order, each with an id the reader can find (such as `§3` or a heading) and one line on what it covers.
+2. **The parts.** The document's sections in order, each with its title and a few words on what it covers.
 3. **The relations.** What causes, depends on, contains, overlaps or competes with what. These are the candidates for visuals.
 4. **The evidence.** Every value you might show, with the place in the document it comes from.
 5. **The terms.** The words the reader must know to read the document.
@@ -64,9 +64,13 @@ PUT the question and the answer on the cover: the title states the answer, and t
 
 THEN, in this order:
 
-1. A `map` panel of the document's parts.
+1. An overview panel that shows how the document's main ideas relate, usually a `concept` or `groups` panel. This is the organizer: it shows the ideas, not the list of sections.
 2. One panel or a few panels per important part, in the document's order, moving from the general to the specific. SET each panel's `part` to the section it introduces, and its `read` to where the reader finds the detail.
-3. A closing panel that tells the reader what to read first for their GOAL, usually the `map` again with those parts highlighted.
+3. A closing panel on the point the GOAL needs most.
+
+DO NOT add a panel that only lists the document's sections: the strip above each panel already shows where the reader is. USE a `map` only when the reader must find their way in a long document.
+
+REFER to parts of the document by their titles, in headlines, notes and `read`. DO NOT use section numbers or § signs: the reader has not seen them yet.
 
 KEEP the presentation to about 5 to 12 panels. IF the document needs more, INTRODUCE only the parts the GOAL needs.
 
@@ -81,13 +85,15 @@ WRITE each panel's point as a sentence that states a conclusion, not a topic. TH
 
 | What the reader must see | Kind |
 |---|---|
-| The document's parts and their order | `map` |
+| The parts of a long document the reader must find their way in | `map` |
 | How ideas relate: causes, dependencies, parts of an argument | `concept` |
 | A process or a sequence of steps | `flow` |
 | Categories and what belongs to each | `groups` |
 | A whole broken into parts, over several levels | `tree` |
 | Which items belong to several overlapping categories | `sets` |
 | Which items have which properties | `matrix` |
+| Items that help in one form and not in another | `pairs` |
+| Findings that raise or lower different outcomes | `effects` |
 | Options placed on two judged dimensions | `quadrant` |
 | A count out of a total, such as 7 of 15 | `units` |
 | Values compared across items | `bars` |
@@ -101,7 +107,7 @@ WRITE each panel's point as a sentence that states a conclusion, not a topic. TH
 | A point no visual makes clearer | `text` |
 | A relation no other kind fits | `svg` |
 
-PREFER a kind that shows the relation through position, length, count or shape over one that sets words in rows or boxes. USE `table` and `text` only when the reader needs the exact words or values.
+PREFER a kind that shows the relation through position, length, count or shape over one that sets words in rows or boxes. USE a `matrix` only when every row is measured on the same columns. A list of findings, each with its own condition or outcome, is not a grid: USE `pairs` or `effects`. USE `table` and `text` only when the reader needs the exact words or values.
 
 FOLLOW the conventions of the reader's field when they differ.
 
@@ -119,7 +125,7 @@ FOLLOW the conventions of the reader's field when they differ.
 
 WRITE the headline as a full sentence that states what the reader should conclude from this panel. Readers remember the headline, so it MUST match what the visual shows.
 
-MAKE the headline's point the most prominent part of the visual. MARK with `highlight` the one or two items that carry the point, and leave the rest neutral. IF the point is a small feature of the data, CHANGE the visual so that feature stands out, such as by sorting, filtering or showing the difference itself.
+MAKE the headline's point the most prominent part of the visual. MARK with `highlight` the one or two items that carry the point, and leave the rest neutral. HIGHLIGHT only items the headline names, so the reader can see why they stand out. IF the headline names none, highlight nothing. IF the point is a small feature of the data, CHANGE the visual so that feature stands out, such as by sorting, filtering or showing the difference itself.
 
 ### 4.2. Keep it plain
 
@@ -129,9 +135,15 @@ The renderer's style is fixed. IF the user or project has a style guide that con
 
 ### 4.3. Keep text short and next to the visual
 
-PUT the source, conditions and limits of a panel in its `note`. KEEP each note to a few sentences. FOR judged positions, such as in a `quadrant`, STATE in `basis` where they come from.
+PUT the source, conditions and limits of a panel in its `note`. KEEP each note to a few sentences. LINK each source the note cites to the page in the document's references, as `[Koh (2026)](https://...)`.
 
-### 4.4. Custom diagrams
+SHOW only what the reader needs to understand the point. Details about how the research was done, such as which sources were read in full, go in the note, not in the visual. FOR judged positions, such as in a `quadrant`, STATE in `basis` where they come from.
+
+### 4.4. Check the wording
+
+USE `/write-better` on the title, the summary, every headline, label and note. KEEP words the reader already knows: EXPLAIN or REPLACE research terms, such as "voice" or "ingratiation", and metaphors, such as "lever". USE one term for one idea across panels. KEEP labels, relations and section descriptions to a few words, and PUT conditions in the note. A headline names what the reader should conclude, so DO NOT leave it vaguer than its visual, such as "depends on several factors".
+
+### 4.5. Custom diagrams
 
 USE the `svg` kind only when no other kind fits. GIVE each line style one meaning and state it. KEEP one direction of flow, under about 15 nodes, short labels, and the colours in [templates/spec.md](templates/spec.md). DO NOT use colour as the only signal. WRITE an `alt` text that describes the essential information. In text output, an `svg` panel shows only its `alt`.
 

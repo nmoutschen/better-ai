@@ -99,10 +99,10 @@ WHEN you finish the question, SET its status and WRITE its summary: two or three
 
 - **open**: not yet worked on, or needs more work.
 - **in progress**: an agent owns it.
-- **answered**: supported by a source read in full. A claim the conclusion depends on needs two independent sources.
+- **answered**: supported by the evidence found. A claim the conclusion depends on needs two independent sources. IF the evidence is thin or comes only from abstracts, SAY so in the summary.
 - **contested**: credible sources disagree. RECORD each position. DO NOT pick a side without evidence that resolves the disagreement.
 - **not found**: at least three differently worded searches, including one using terms from sources, found nothing.
-- **unclear**: the question is ambiguous or cannot be answered as written.
+- **unclear**: the question is ambiguous or cannot be answered as written. Thin evidence is not unclear.
 - **out of scope**: outside the TOPIC or MEANING, or made irrelevant by later findings.
 
 DO NOT close a question because you know the answer from training data.

@@ -103,7 +103,9 @@ Simplify the language, not the substance.
 
 ### 4.2. State the limits
 
-Name what experts disagree on, where the evidence is weak, and whom to consult. Report limitations and conflicting results where real disagreement exists; state consensus only when agreement is high 
+Name what experts disagree on, where the evidence is weak, and whom to consult. Report limitations and conflicting results where real disagreement exists; state consensus only when agreement is high.
+
+STATE your own uncertainty in the first person, such as "I could not check X". First-person uncertainty made readers rely less on wrong AI answers; impersonal phrasing such as "it is not clear" had weaker effects.
 
 ### 4.3. Prefer coherence
 
