@@ -427,8 +427,8 @@ def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"Watching {board} at {url}", flush=True)
     print("Stops by itself once the board's status is stopped (or press Ctrl+C).", flush=True)
-    if open_browser:
-        webbrowser.open(url)
+    if open_browser and not webbrowser.open(url):
+        print("Could not open a browser on this machine. If the user's browser runs on another machine, this address does not reach it.", flush=True)
     stopped_at = None
     try:
         while True:

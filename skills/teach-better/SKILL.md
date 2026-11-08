@@ -67,14 +67,22 @@ SHOW the user the plan: the GOAL and the list of chunks. LET the user reorder, s
 
 A lesson mixed with other conversation, with many parts in one message, can be hard to follow. CHOOSE the first option the harness allows:
 
-1. **A lesson page.** IF you can write files and run Python 3 in the background, and the user can open a browser, TEACH on a page:
+1. **A lesson page.** IF you can write files and run Python 3 in the background, and the user's browser can reach the machine where you run commands, TEACH on a page:
    - WRITE the lesson to `.teach/<topic-slug>/lesson.json` in the working directory, in the format in [templates/lesson.md](templates/lesson.md). DO NOT commit it unless the user asks.
    - RUN `python3 scripts/lesson.py check <folder>` from this skill's directory, and FIX every error.
    - START `python3 scripts/lesson.py serve <folder>` in the background, and GIVE the user the address once.
    - START `python3 scripts/lesson.py wait <folder>` in the background after each practice card. It exits when the user sends an answer and prints it. REPLY by writing `feedback/` (section 3.4), then START it again.
    - IN the chat, WRITE one line per new card, such as "Chunk 2 is ready on the page." ANSWER side questions and pushback in the chat.
-2. **A page without background commands.** IF you can serve the page only in the foreground, TELL the user to run `serve` themselves, and ASK them to say "sent" in the chat after each answer. THEN READ `answers/`.
-3. **The chat.** OTHERWISE, TEACH in the chat. SEND one card per message: key terms, an explanation, a worked example, or a practice problem. START each message with a heading that names the chunk and the card.
+2. **A page without background commands.** IF you can serve the page only in the foreground, and the user's browser can reach it, TELL the user to run `serve` themselves, and ASK them to say "sent" in the chat after each answer. THEN READ `answers/`.
+3. **The chat.** OTHERWISE, TEACH in the chat, with the same structure as the page:
+   - SEND one card per message: key terms, an explanation, a worked example, or a practice problem.
+   - START each message with a heading that names the chunk and the card, with their positions, such as "Chunk 2 of 5: Joins · Card 3 of 3: Practice".
+   - AT the start of each chunk, SHOW the plan as a list, with done chunks marked and the current chunk named.
+   - IN a practice card, NUMBER each thing you ask, and ASK the user to answer by number.
+   - START feedback with its verdict: right, partly, wrong, or hint.
+   - WHEN a hint points to earlier material, NAME the card by its heading.
+   - SEND a quiz as one message with numbered questions, headed as a closed-book quiz.
+   - AFTER answering a side question, END with one line naming the card the lesson continues from.
 
 IF the user says they prefer the chat, USE the chat.
 

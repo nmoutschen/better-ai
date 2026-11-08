@@ -57,7 +57,9 @@ IF you can write files, CREATE the board in `.research/<topic-slug>/` in the wor
 
 TELL the user the board's path once.
 
-IF the harness can run a shell command in the background, START the live view: `python3 scripts/board.py watch <board-path>` from this skill's directory. It opens the user's browser, prints its address, and exits by itself once the board's status is stopped. GIVE the user the address. IF the harness can only run commands in the foreground, DO NOT start it, because it would block you. TELL the user they can run it themselves instead.
+IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the live view: `python3 scripts/board.py watch <board-path>` from this skill's directory. It opens the user's browser, prints its address, and exits by itself once the board's status is stopped. GIVE the user the address. IF the harness can only run commands in the foreground, DO NOT start it, because it would block you. TELL the user they can run it themselves instead.
+
+IF the user has no live view, REPORT progress in the chat each time a question is closed: one line with the question, its status, and how many questions remain open.
 
 IF you cannot write files, KEEP the board in your working notes and RESTATE it in full after every few results.
 

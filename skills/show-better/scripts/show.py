@@ -2382,8 +2382,8 @@ def main() -> None:
     out.write_text(render(spec), encoding="utf-8")
     print("\n".join(digest))
     print(f"\nwrote {out.resolve()}")
-    if args.open:
-        webbrowser.open(out.resolve().as_uri())
+    if args.open and not webbrowser.open(out.resolve().as_uri()):
+        print("could not open a browser on this machine: if the user's browser runs on another machine, this path does not reach it")
 
 
 if __name__ == "__main__":
