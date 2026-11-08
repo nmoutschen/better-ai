@@ -1,127 +1,164 @@
 ---
 name: show-better
-description: Helps an AI agent decide when to show information as a table, chart or diagram instead of prose, choose the format by what the reader must do, design it so it is read correctly, and check generated chart or diagram code before showing it.
-argument-hint: "[CONTENT]"
+description: Helps an AI agent introduce a dense document, such as a research paper, a strategy or a design doc, with a short sequence of visual panels the reader goes through before reading it. Each panel shows a relation the reader would otherwise have to work out from the prose, in a form chosen from a wide range (concept maps, set diagrams, slope charts, distributions, hierarchies, quadrants and more). The presentation is rendered as an HTML page or as plain text for a terminal, and every value is checked against the source.
+argument-hint: "[DOCUMENT OR CONTENT]"
 ---
 
 # Show Better
 
-Instructions on when and how to present information visually.
+Instructions on how to introduce a document with a short sequence of visuals that prepares the reader to understand it.
 
-IF invoked without argument, use these instructions on your previous output: add, change or remove its tables, charts and diagrams.
-IF invoked with content or data as argument, use these instructions to present it.
+IF invoked without argument, use these instructions on your previous output.
+IF invoked with a document, a path or content as argument, use these instructions to introduce it.
 
-Being invoked does NOT mean a visual is needed. These instructions can end with prose.
+Being invoked means: find the structure and the relations in the content that a visual shows better than prose, and show them. It does NOT mean every point becomes a visual. A point that one sentence states well stays a sentence.
 
 ## Principles
 
-1. A relevant graphic helps readers understand and learn from text. Decoration does not help, and irrelevant details can hurt.
-2. A diagram helps when the content is about relations: it groups related items in space, so the reader searches less.
-3. Most rules for choosing between prose, a table and a chart are design guidance, not experiments. No controlled study tests visual answers from AI assistants.
-4. Generated chart code often fails silently: it calls the wrong function, or misreads the data and plots wrong values that still look plausible.
+1. Graphics help comprehension only modestly, and only graphics that organize information help. Pictures that merely illustrate add nothing significant. A visual is better than prose when it lets the reader see a relation that the text would make them work out.
+2. Organizers given with a text improved comprehension of that text, and signals of a text's structure helped learning. The presentation is an organizer for the document: it introduces the document and does not replace it.
+3. Plain diagrams supported transfer to new cases better than rich, detailed ones. Readers who already know a topic need less guidance, and guidance can get in their way.
+4. Readers learn more deeply from content in segments they move through at their own pace. Keeping one structure from panel to panel helped memory, and most professional visual stories move from general to specific.
+5. Readers recall a panel's message from its headline, and take the most prominent feature of a visual as its point.
+6. Reach, preference and engagement do not show understanding. Readers prefer formats they do not learn more from, and polished generated posters scored poorly on comprehension quizzes.
+7. Generated slides fail mostly through missing content, then wrong values. Language models read text diagrams far more reliably than they draw them, so every diagram is laid out by code.
+8. No study tests a visual introduction placed before a full research paper or business document. Rules marked as design choices rest on neighbouring evidence.
 
-## 1. Know the reader and the medium
+The evidence is in [sources/visual-storytelling.md](../../sources/visual-storytelling.md) and [sources/visual-presentations.md](../../sources/visual-presentations.md).
 
-### 1.1. Name the reader's task
+## 1. Know the goal, the reader and the medium
 
-IDENTIFY what the reader must do with the information:
+### 1.1. Name the GOAL
 
-1. Take in one or two numbers.
-2. Look up or compare exact values.
-3. See a trend or pattern across many values.
-4. Understand relations, structure or a process.
-5. Compare several items on several aspects.
+IDENTIFY what the reader must UNDERSTAND, LEARN, DO or DECIDE after reading the document. USE `/write-better` to name the GOAL if available. The presentation prepares the reader for that GOAL.
 
-IF the content serves several tasks, CHOOSE the one that serves the user's GOAL. USE `/write-better` to name the GOAL if available.
+IDENTIFY what the reader already knows about the topic. FOR an expert reader, SHOW less: fewer panels and fewer labels.
 
-### 1.2. Know what will render
+### 1.2. Choose the medium
 
-IDENTIFY where the output will be read, and what it can display:
+The renderer draws the same presentation in three formats. CHOOSE the first one the user can read:
 
-- **Terminal or plain text**: monospace text only. Markdown may show as raw symbols. The width may be about 80 characters.
-- **Markdown chat**: tables, lists and code blocks. Mermaid and images only if the client renders them.
-- **HTML page or artifact**: anything, including interactive charts.
-- **File** (document, image, notebook): what that format and its viewer support.
+1. **A page.** IF you can run Python 3 and the user can open a browser, RENDER HTML (section 5). IF the harness can publish a page for the user, PUBLISH it and GIVE the link. OTHERWISE, OPEN it with `--open` and GIVE its path.
+2. **A terminal or a chat.** IF the user reads in a terminal, RENDER `--format text`. IF they read Markdown, RENDER `--format md`. USE `--ascii` when the output must survive copying into plain-text files or commit messages.
+3. **No renderer.** IF you cannot run Python, PRESENT the panels in Markdown (section 6).
 
-IF you do not know, ASSUME the simplest medium the context allows. DO NOT produce a format the reader cannot render.
+DO NOT draw a text diagram by hand when the renderer is available.
 
-## 2. Choose the format
+DO NOT describe a page you have not rendered.
 
-USE the reader's task from section 1.1:
+## 2. Read the document and extract its structure
 
-| Reader's task | Format |
+READ the whole document before planning. WRITE an extract, and WORK from it, not from memory of the document:
+
+1. **The question and the answer.** What problem does the document address, and what does it conclude or propose? FOR a business document, WRITE the situation, the complication, the question it raises, and the answer.
+2. **The parts.** The document's sections in order, each with an id the reader can find (such as `§3` or a heading) and one line on what it covers.
+3. **The relations.** What causes, depends on, contains, overlaps or competes with what. These are the candidates for visuals.
+4. **The evidence.** Every value you might show, with the place in the document it comes from.
+5. **The terms.** The words the reader must know to read the document.
+
+## 3. Plan the panels
+
+### 3.1. Order them as an introduction
+
+PUT the question and the answer on the cover: the title states the answer, and the summary gives it in one or two sentences.
+
+THEN, in this order:
+
+1. A `map` panel of the document's parts.
+2. One panel or a few panels per important part, in the document's order, moving from the general to the specific. SET each panel's `part` to the section it introduces, and its `read` to where the reader finds the detail.
+3. A closing panel that tells the reader what to read first for their GOAL, usually the `map` again with those parts highlighted.
+
+KEEP the presentation to about 5 to 12 panels. IF the document needs more, INTRODUCE only the parts the GOAL needs.
+
+### 3.2. Give each panel a relation to show
+
+WRITE each panel's point as a sentence that states a conclusion, not a topic. THEN ASK: does a visual let the reader see something that this sentence does not already say?
+
+- IF yes, the panel shows a relation among several items: a structure, an overlap, a change, a spread, a ranking, a dependency. CHOOSE the kind in section 3.3.
+- IF the headline already says everything, such as a single number, USE a `text` panel, or fold the point into another panel. DO NOT draw a chart of one or two numbers just to have a visual.
+
+### 3.3. Choose the kind by the relation
+
+| What the reader must see | Kind |
 |---|---|
-| Take in one or two numbers | Prose |
-| Look up or compare exact values | Table |
-| See a trend or pattern across many values | Chart, with its data in a table nearby |
-| Understand relations, structure or a process | Diagram |
-| Compare several items on several aspects | Table |
+| The document's parts and their order | `map` |
+| How ideas relate: causes, dependencies, parts of an argument | `concept` |
+| A process or a sequence of steps | `flow` |
+| Categories and what belongs to each | `groups` |
+| A whole broken into parts, over several levels | `tree` |
+| Which items belong to several overlapping categories | `sets` |
+| Which items have which properties | `matrix` |
+| Options placed on two judged dimensions | `quadrant` |
+| A count out of a total, such as 7 of 15 | `units` |
+| Values compared across items | `bars` |
+| The change of several items between two states | `slope` |
+| The spread of values, not only their average | `dots` |
+| The relation between two measures across many items | `scatter` |
+| A trend over many points | `line` |
+| Events in time | `timeline` |
+| One or two numbers the reader must remember | `numbers` |
+| Exact values or wording to look up | `table` |
+| A point no visual makes clearer | `text` |
+| A relation no other kind fits | `svg` |
 
-USE prose by default. ADD a visual only when it does something prose cannot do for that task.
+PREFER a kind that shows the relation through position, length, count or shape over one that sets words in rows or boxes. USE `table` and `text` only when the reader needs the exact words or values.
 
-DO NOT use a chart when a table is enough. DO NOT turn a whole answer into one large diagram: readers found whole-answer diagrams intimidating. SHOW the part that has the relations, and keep the rest as prose.
+FOLLOW the conventions of the reader's field when they differ.
 
-FOLLOW the conventions of the reader's field when they differ, such as charts for regression results.
+### 3.4. Make the sequence a story the reader can follow
 
-## 3. Design the visual
+- KEEP one structure across panels: the same kind for the same kind of point, and the same order of items.
+- MOVE from general to specific: the whole before its parts, the main result before its conditions.
+- WHERE the document has one, USE a concrete case to introduce an abstract point.
+- PUT the question before its answer. IN a business document, the complication comes before the proposal.
+- STATE limits in the note of the panel whose claim they qualify.
 
-### 3.1. For every visual
+## 4. Design each panel
 
-PUT labels and explanations next to what they describe: label lines and bars directly, and put a diagram's explanation beside it, not paragraphs away. This matters most for complex material.
+### 4.1. Make the point clear
 
-DO NOT add decoration: images, icons, colours or effects that carry no information.
+WRITE the headline as a full sentence that states what the reader should conclude from this panel. Readers remember the headline, so it MUST match what the visual shows.
 
-STATE the visual's main point in one sentence of text next to it.
+MAKE the headline's point the most prominent part of the visual. MARK with `highlight` the one or two items that carry the point, and leave the rest neutral. IF the point is a small feature of the data, CHANGE the visual so that feature stands out, such as by sorting, filtering or showing the difference itself.
 
-DO NOT use colour as the only signal. ADD a label, pattern or shape as well. GIVE the parts the reader needs at least 3:1 contrast against what is next to them.
+### 4.2. Keep it plain
 
-GIVE every image, chart and diagram a text description: one short line that names what it shows, and a longer description of its essential information. IN Markdown or text, the main-point sentence and the data table can serve as these.
+DO NOT add images, icons or effects that carry no information. DO NOT reveal parts of a panel step by step.
 
-### 3.2. Tables
+The renderer's style is fixed. IF the user or project has a style guide that conflicts with it, SAY so and ASK whether to keep the renderer's style.
 
-PUT units in column headers. ALIGN numbers so they can be compared. ORDER rows by what the reader will look for, such as size or date, not by the order you found them.
+### 4.3. Keep text short and next to the visual
 
-IN a terminal or narrow medium, KEEP tables to a few short columns. IF a table is too wide, PRESENT each row as a short list of fields instead.
+PUT the source, conditions and limits of a panel in its `note`. KEEP each note to a few sentences. FOR judged positions, such as in a `quadrant`, STATE in `basis` where they come from.
 
-### 3.3. Charts
+### 4.4. Custom diagrams
 
-ENCODE the main comparison as position on a shared scale, such as bars from one baseline or points on one axis, rather than area, angle or colour intensity. TREAT this as a guide, not a rule: how well an encoding works depends on the task and the data.
+USE the `svg` kind only when no other kind fits. GIVE each line style one meaning and state it. KEEP one direction of flow, under about 15 nodes, short labels, and the colours in [templates/spec.md](templates/spec.md). DO NOT use colour as the only signal. WRITE an `alt` text that describes the essential information. In text output, an `svg` panel shows only its `alt`.
 
-START a bar chart's value axis at zero. IF the chart's purpose requires a different start, STATE it on the chart.
+## 5. Build and check
 
-PUT the chart's data in a table below it, or make the values readable on the chart.
+FOLLOW these steps in order.
 
-IF the user or project has a style guide for charts or colours, FOLLOW it.
+1. **Extract.** WRITE the extract in section 2.
+2. **Write the spec.** WRITE a JSON spec in the format in [templates/spec.md](templates/spec.md), with a top-level `document` for the map. SAVE it as `.show/<slug>/spec.json` in the working directory. DO NOT commit it unless the user asks.
+3. **Check the spec.** RUN `python3 scripts/show.py check <spec>` from this skill's directory. FIX every error. TREAT each warning as a reason to split or simplify the panel, unless you can say why it does not apply.
+4. **Compare the digest with the document.** The check prints every headline, value, label, relation and note. CHECK each against the extract and the document. CHECK that each headline matches its visual. CHECK that nothing the GOAL needs is missing.
+5. **Render.** FOR a page: `python3 scripts/show.py render <spec> --out .show/<slug>/index.html --open`. FOR a terminal: `python3 scripts/show.py render <spec> --format text`, or `--format md` for Markdown.
+6. **Look at the result.** IF you can view the page or a screenshot, CHECK each panel: the headline matches the most prominent feature, labels do not overlap or get cut off, and highlights are visible. FOR text output, READ it as printed.
 
-### 3.4. Diagrams
+REPORT only the checks you performed. IF you could not look at the result, SAY so.
 
-GIVE each arrow and line one meaning, and STATE it in a label or legend. DO NOT use several arrow styles unless each style has its own stated meaning.
+## 6. Without the renderer
 
-KEEP one direction of flow: top to bottom or left to right. LEAVE room for labels on branches.
+PRESENT the same plan in Markdown:
 
-KEEP text in boxes short. PUT longer explanations next to the diagram.
+- START with the question and the answer, as the cover.
+- LIST the document's parts as a numbered list, as the map.
+- GIVE each panel as a bold sentence headline, then its content, then its note and where to read it in the document.
+- USE Markdown tables for comparisons and lists for structure. USE a plain-text diagram only for a flow of at most four short steps, and CHECK its alignment character by character.
 
-FOR a reader new to the topic, LABEL the parts in the diagram itself. FOR an expert, a less labelled diagram may be enough. The evidence for this difference is weak, so KEEP the labels when unsure.
+APPLY section 5's extract and digest checks by hand: CHECK each value against the document before showing it.
 
-### 3.5. In a terminal or plain text
+## 7. Hand it over
 
-USE a Markdown table only when the client renders Markdown or the raw table still reads clearly.
-
-FOR a small structure or flow, USE a plain-text diagram in a code block. KEEP it narrow, and CHECK that its characters line up in a monospace font.
-
-USE Mermaid or similar diagram code only when it will be rendered, or when the user will paste it into a tool that renders it. Raw Mermaid is hard to read once it is complex.
-
-## 4. Check the visual before showing it
-
-FOR a chart or diagram you generate with code:
-
-1. BEFORE writing the code, SUMMARISE the data: its fields, types, ranges and row count. WRITE the code from that summary, not from field names alone.
-2. RUN the code. FIX any error. DO NOT show code you have not run, unless you cannot run it; THEN SAY so.
-3. CHECK the plotted values against the source data: at least the largest, the smallest, and any value the main point depends on.
-4. LOOK at the rendered output if you can, and CHECK labels, overlaps, axis start and legend.
-
-FOR a table, CHECK each value against its source, and CHECK that totals and percentages add up.
-
-FOR a diagram, CHECK that every box and arrow matches the text it illustrates, and that nothing in the text contradicts it.
-
-REPORT only checks you performed.
+GIVE the user the page's link or path once, or the text output. STATE the document's answer in one or two sentences in the chat, so a reader who does not open the page still has it. STATE any assumption you made about the GOAL or the reader next to the result it affects. DO NOT repeat the whole presentation in the chat.

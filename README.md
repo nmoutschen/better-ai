@@ -16,7 +16,7 @@ Researches a topic from sources instead of the model's training data. It tracks 
 
 ## `/show-better`
 
-Decides when to show information as a table, chart or diagram instead of prose. It chooses the format by what the reader must do, designs it so it is read correctly, and checks generated chart code before showing it.
+Introduces a dense document, such as a research paper, a strategy or a design doc, with a short sequence of visual panels read before the document. Each panel shows a relation the reader would otherwise work out from the prose, in a form chosen from a wide range: concept maps, set diagrams, slope charts, distributions, hierarchies, quadrants and more. It renders the presentation as an HTML page or as plain text for a terminal, and checks every value against the source.
 
 ## `/teach-better`
 
