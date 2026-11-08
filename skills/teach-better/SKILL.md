@@ -17,6 +17,9 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 4. AI feedback and hints contain errors. A wrong hint teaches the wrong thing, and a learner cannot catch an error they share.
 5. Support that helps a beginner can get in the way of a learner who knows more, and fading worked examples as each learner progresses beat a fixed schedule. Matching instruction to a learner's stated learning style has little support. Adapt to what the learner can do, not to how they say they learn.
 6. Most of this evidence comes from students in courses, mostly in STEM, over short periods. Treat these rules as the best available guide for adults learning alone, not as tested for them.
+7. No study shows that a separate lesson page teaches better than chat. Asking learners to explain their answers helped in every medium tested, while a separate confidence rating added nothing in the one study that isolated it. The lesson page in section 2.3 is a design choice for learners who find a lesson in chat hard to follow.
+
+The evidence is in [sources/ai-agent-teaching-new-topics.md](../../sources/ai-agent-teaching-new-topics.md) and [sources/lesson-page-vs-chat-tutoring.md](../../sources/lesson-page-vs-chat-tutoring.md).
 
 ## 1. Confirm that the user wants to learn
 
@@ -42,21 +45,48 @@ THEN ASK one or two short questions that test the prerequisites, such as a small
 
 ## 2. Plan the lesson
 
+### 2.1. Research the topic
+
+DO NOT teach from your training data alone: a definition you are sure of can still be wrong or incomplete. BEFORE planning the chunks, RESEARCH the topic:
+
+- IF `/research-better` is available and the topic is not trivial, USE it, and BUILD the lesson from its findings.
+- FOR a trivial topic, or without `/research-better`, SEARCH the web and READ the pages that define the topic's key terms.
+- IF you have no web search and no page fetch, TELL the user that the lesson rests on your own knowledge, and ASK whether they have sources you should use.
+
+CITE the source on each card that states a definition or a fact, with a link.
+
+### 2.2. Break the topic into chunks
+
 BREAK the topic into small chunks. Each chunk teaches one idea or one step and ends with a practice problem.
 
 ORDER the chunks so each builds on earlier ones. START with the key terms the topic uses: name each one and state what it refers to, before the chunk that uses it.
 
-SHOW the user the plan in a few lines: the GOAL and the list of chunks. LET the user reorder, skip or add chunks.
+SHOW the user the plan: the GOAL and the list of chunks. LET the user reorder, skip or add chunks.
 
-IF you can write files or memories, RECORD the plan and the user's progress, so a later session can resume and review.
+### 2.3. Choose where the lesson happens
+
+A lesson mixed with other conversation, with many parts in one message, can be hard to follow. CHOOSE the first option the harness allows:
+
+1. **A lesson page.** IF you can write files and run Python 3 in the background, and the user can open a browser, TEACH on a page:
+   - WRITE the lesson to `.teach/<topic-slug>/lesson.json` in the working directory, in the format in [templates/lesson.md](templates/lesson.md). DO NOT commit it unless the user asks.
+   - RUN `python3 scripts/lesson.py check <folder>` from this skill's directory, and FIX every error.
+   - START `python3 scripts/lesson.py serve <folder>` in the background, and GIVE the user the address once.
+   - START `python3 scripts/lesson.py wait <folder>` in the background after each practice card. It exits when the user sends an answer and prints it. REPLY by writing `feedback/` (section 3.4), then START it again.
+   - IN the chat, WRITE one line per new card, such as "Chunk 2 is ready on the page." ANSWER side questions and pushback in the chat.
+2. **A page without background commands.** IF you can serve the page only in the foreground, TELL the user to run `serve` themselves, and ASK them to say "sent" in the chat after each answer. THEN READ `answers/`.
+3. **The chat.** OTHERWISE, TEACH in the chat. SEND one card per message: key terms, an explanation, a worked example, or a practice problem. START each message with a heading that names the chunk and the card.
+
+IF the user says they prefer the chat, USE the chat.
+
+RECORD the plan and the user's progress in `.teach/<topic-slug>/`, so a later session can resume and review: in `lesson.json` on a page, OTHERWISE in a `notes.md` file there. DO NOT store lessons in memory. IF you cannot write files, KEEP them in your working notes.
 
 ## 3. Teach each chunk
 
 ### 3.1. Explain, then show a worked example
 
-EXPLAIN the idea briefly, using the key terms from section 2. FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
+EXPLAIN the idea briefly, using the key terms from section 2.2. FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
 
-SHOW a worked example: a solved problem with each step and the reason for each step. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation, such as a Markdown table, a list, or a short plain-text diagram.
+SHOW a worked example: a solved problem with each step and the reason for each step. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation. ON a page, USE a `table`, `steps` or `timeline` block. IN the chat, USE a Markdown table or a list. DO NOT draw a plain-text diagram by hand: models draw them badly. WRITE a formula in a `code` block, with one operation per line, not inside a sentence, a table cell or a step note.
 
 FOR a complex or open problem where the user already knows the basics, ASK them to attempt it BEFORE you show the worked example. FOR material that is new to the user, SHOW the example first. Evidence on attempting first is mixed, and it helped most on complex tasks.
 
@@ -65,6 +95,8 @@ FOR a complex or open problem where the user already knows the basics, ASK them 
 GIVE a problem similar to the worked example, but not identical. WAIT for the user's attempt. DO NOT solve it in the same message.
 
 AS the user succeeds, GIVE less of the solution in later examples: leave out the steps they have shown they can do. IF they struggle, GIVE more steps again. CHOOSE the next problem's difficulty from how they did on the last one, not from their interests or a fixed order.
+
+ADAPT the chunks still to come to the user's answers, not the chunks already taught: those stay as the user saw them. IF an answer shows a gap, RE-TEACH the missed step at the start of the next chunk, with a new example. IF the user succeeds easily, SHORTEN the next chunk's worked example. IF the user says something is hard to follow, such as how values are shown, CHANGE it from the next card on.
 
 DO NOT spend effort personalising examples to the user's hobbies or field. It raised motivation without improving learning. USE the user's field only when the topic is meant for it.
 
@@ -76,23 +108,31 @@ WHEN the attempt is wrong or the user is stuck:
 2. IF still stuck, GIVE a more specific hint: the rule, formula or concept that applies.
 3. IF still stuck after two hints, SHOW the next step only, and LET them continue.
 
+WHEN a hint points to earlier material, QUOTE the rule in the hint. ON a page, also LINK the card that teaches it, as `[card 1 of this chunk](#<chunk-id>/1)`, so the user can open it in one click.
+
 DO NOT write the work for the user, such as their code, essay or solution. The learning gain from studying with AI faded for learners who had it write for them.
 
 ### 3.4. Give feedback that makes the user think
 
-WHEN the user answers, ASK them to state how confident they are and to explain their answer in their own words. This had a larger effect than the type of feedback the AI gave.
+WHEN the user answers, ASK them to explain their answer in their own words. Asking for an explanation and a confidence rating had a larger effect than the type of feedback the AI gave. The explanation is likely what helps: a separate confidence rating added nothing on its own. ASK for confidence only as an option. ASK for the answer and the reasoning together, in one reply. ON a page, IF a question asks several things, GIVE one answer box per thing. IF the reasoning is missing, ASK for it in the feedback.
 
-THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. Explaining why is a design choice: the research did not find whether it beats only saying right or wrong.
+THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. Explaining why is a design choice: the research did not find whether it beats only saying right or wrong. ON a page, WRITE this to `feedback/` with the verdict `right`, `partly`, `wrong` or `hint`.
 
 ### 3.5. Check your own hints and feedback
 
 BEFORE giving a hint, a worked example or feedback, CHECK it. RECOMPUTE numbers, RUN code, and LOOK UP facts you are not sure of. IF you cannot check a claim, SAY so. DO NOT present an unchecked step as certain.
+
+ON a page, RUN `lesson.py check` after each change to `lesson.json`, and CHECK every value it prints, such as each table cell and timeline event, against your worked solution.
+
+CHECK that every term in a practice question or quiz question was introduced on an earlier card. IF it was not, DEFINE it in the question or REWORD the question. CHECK that an example in a question does not give away its answer.
 
 ## 4. Check what the user learned
 
 ### 4.1. Test without help
 
 AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. INCLUDE at least one problem that differs from the examples, so it tests applying the idea, not recalling the example.
+
+TELL the user before the first chunk that quizzes are closed-book. Learners who expected a closed-book test retained more. ON a page, PUT the quiz in its own chunk with `"quiz": true`: the page hides the other chunks until you set it to `done`. GIVE no feedback on a quiz answer until the user has answered every question in the quiz: `wait` holds quiz answers until then. THEN WRITE the feedback for all of them. DO NOT ask the user to answer a quiz question again: a quiz checks what they know, it does not teach. IF a wrong answer comes from an unclear question, SAY so and COUNT the answer by the user's reading.
 
 DO NOT accept "I get it" or "makes sense" as evidence of understanding. TRUST what the user can do in the quiz.
 
@@ -117,3 +157,5 @@ IF the user's GOAL changes from learning to getting a result, STOP teaching and 
 SUMMARISE what the user can now do, based on the quizzes, and what they still struggled with. LIST the chunks not covered, if any.
 
 DO NOT praise the user's progress beyond what the quizzes show.
+
+ON a page, SET the lesson's `status` to `ended`, so the server stops.
