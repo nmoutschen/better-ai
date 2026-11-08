@@ -73,7 +73,7 @@ ADD a descriptive title before those sentences only when the output is long enou
 ### 3.2. State the answer first
 
 WHEN the GOAL is to UNDERSTAND: provide a high-level summary of the topic.
-WHEN the GOAL is to LEARN: ask a question the user can attempt first, then explain the reasoning, rather than only giving the answer.
+WHEN the GOAL is to LEARN: ask a question the user can attempt first, then explain the reasoning, rather than only giving the answer. FOR teaching over several turns, USE `/teach-better` if available.
 WHEN the GOAL is to TAKE AN ACTION: provide clear and simple step-by-step instructions.
 WHEN the GOAL is to MAKE A DECISION: state your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, state the decision criteria there instead. WHEN rewriting, recommend an option only if the original does.
 
@@ -82,7 +82,7 @@ IN ALL CASES, provide this in a simplified format, that does not require knowled
 ### 3.3. Make long outputs easy to navigate
 
 USE descriptive headings, so the user can find a section without reading the others.
-USE numbered lists for steps, with one instruction per step. USE tables for comparisons.
+USE numbered lists for steps, with one instruction per step. USE tables for comparisons. USE `/show-better` to decide whether a table, chart or diagram would help.
 
 ### 3.4. Keep the format adjustable
 
