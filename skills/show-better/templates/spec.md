@@ -7,7 +7,6 @@ python3 scripts/show.py check SPEC                       # validate, print every
 python3 scripts/show.py render SPEC --out FILE [--open]  # check, then write the HTML page
 python3 scripts/show.py render SPEC --format text        # print it as plain text for a terminal
 python3 scripts/show.py render SPEC --format md          # print it as Markdown, diagrams in code blocks
-python3 scripts/show.py example                          # print an example spec
 ```
 
 Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only). In text output, an `svg` panel shows only its `alt`.

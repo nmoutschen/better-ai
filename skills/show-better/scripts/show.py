@@ -3,7 +3,6 @@
 Usage:
   python3 show.py check SPEC                  validate the spec and print every value it will show
   python3 show.py render SPEC --out FILE      check, then write the page (add --open to open it)
-  python3 show.py example                     print an example spec
 
 SPEC is a JSON file described in templates/spec.md. Panels are shown one at a time, and the reader
 steps through them with buttons or the arrow keys. Without JavaScript, or when printed, all panels
@@ -2337,24 +2336,6 @@ def render_screen_reader(spec, width=72):
     return "\n".join(l.rstrip() for l in out) + "\n"
 
 
-EXAMPLE = {
-    "title": "Sentence headlines helped students recall slide content",
-    "summary": "Two studies by one research group found that slides whose headline states the point gave better recall than slides with topic headlines.",
-    "source": "Alley et al. (2006); Garner & Alley (2013). Example spec for show.py.",
-    "panels": [
-        {"kind": "bars", "headline": "Students who saw sentence headlines answered more questions correctly.",
-         "unit": "% correct", "items": [{"label": "Sentence headlines", "value": 79, "highlight": True},
-                                         {"label": "Phrase headlines", "value": 69}],
-         "note": "Average over 15 questions in one geoscience course. The gain was significant on 7 questions and reversed on 2."},
-        {"kind": "flow", "headline": "An assertion-evidence slide pairs one claim with the visual that supports it.",
-         "arrow": "is supported by",
-         "steps": [{"label": "Sentence headline", "note": "States the claim", "highlight": True},
-                   {"label": "Visual evidence", "note": "Chart, diagram or image"},
-                   {"label": "Spoken or written detail", "note": "Explains the evidence"}]},
-    ],
-}
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Render a short visual presentation from a JSON spec.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -2370,11 +2351,7 @@ def main() -> None:
     r.add_argument("--ascii", action="store_true", help="use only ASCII characters (text and md)")
     r.add_argument("--screen-reader", action="store_true",
                    help="text only: sentences and value lists, without box drawing, bars or rules that a screen reader reads aloud")
-    sub.add_parser("example", help="print an example spec")
     args = parser.parse_args()
-    if args.command == "example":
-        print(json.dumps(EXAMPLE, indent=2, ensure_ascii=False))
-        return
     try:
         spec = json.loads(Path(args.spec).expanduser().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
