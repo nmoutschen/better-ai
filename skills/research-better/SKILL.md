@@ -58,7 +58,7 @@ IF you cannot write files, KEEP the board in your working notes and RESTATE it i
 
 ## 4. Broadening searches
 
-WRITE several ways to express the MEANING. USE these, and only these, in a first set of web searches. USE their results to **identify new search terms** that go beyond the direction of the first queries.
+WRITE several ways to express the MEANING. IF the topic has sources in other languages, such as research, policy or practice from other regions, WRITE some of these in at least one other relevant language. Search and AI retrieval favour English and same-language sources, even over more relevant ones. USE these, and only these, in a first set of web searches. USE their results to **identify new search terms** that go beyond the direction of the first queries.
 
 ## 5. Seed the open questions
 
@@ -111,7 +111,7 @@ DO NOT close a question because you know the answer from training data.
 
 STOP when no question at or above the stop level is open or in progress, or when a limit the user stated is reached.
 
-IF results stop adding new sources, terms, or questions, CHANGE strategy once: SEARCH in another language, USE terms from another discipline or region, or LOOK for another type of source. IF results after the change still add nothing new, STOP.
+IF results stop adding new sources, terms, or questions, CHANGE strategy once: SEARCH in a further language, USE terms from another discipline or region, or LOOK for another type of source. IF results after the change still add nothing new, STOP.
 
 DO NOT stop because you found an answer that matches your expectation.
 

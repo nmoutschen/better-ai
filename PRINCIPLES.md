@@ -32,7 +32,11 @@ Invoking a skill tells the agent to apply its method, not what the result must b
 
 ### 2.3. Follow the user's stated preferences over general rules
 
-A user's stated preference overrides the skill's general rules. A skill DOES NOT adapt content to a guessed trait, such as a disclosed diagnosis, and DOES NOT treat silence as agreement.
+A user's stated preference overrides the skill's general rules. A skill DOES NOT adapt content to a guessed trait, such as a disclosed diagnosis, and DOES NOT treat silence as agreement. The way a user writes, such as their dialect, spelling or fluency, is not evidence of their ability.
+
+ADAPT to what the user knows and to what they state, not to who you guess they are. WHEN a preference matters, OFFER choices about the output, such as a diagram or a shorter version. DO NOT ask the user to disclose a condition.
+
+WHEN a skill records preferences in memory, RECORD only preferences the user stated about the output, not inferred traits. SAY when a stored preference changes the output. Stored personal profiles increase sycophancy.
 
 ## 3. Spend the user's effort carefully
 

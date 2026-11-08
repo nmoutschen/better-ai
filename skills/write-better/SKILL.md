@@ -15,6 +15,7 @@ IF invoked with a document or artifact as argument, use these instructions to re
 IF AVAILABLE, use your local context, prior knowledge, and memories to identify the user and their preferences.
 IF you know the user name, IDENTIFY skills such as `/review-for-{user}`, `/write-for-{user}` and READ their instructions.
 IF the user stated how they prefer to read, FOLLOW that preference over the general rules below.
+DO NOT infer the user's ability, education, or background from their dialect, spelling, or fluency. Models give less accurate and more condescending answers to users who write non-standard English, and guess demographics from stereotyped cues.
 
 ### 1.2. Name the GOAL
 
@@ -80,14 +81,20 @@ IN ALL CASES, WRITE this part so it does not require concepts from the rest of t
 ### 3.3. Make long outputs easy to navigate
 
 USE descriptive headings, so the user can find a section without reading the others.
-USE numbered lists for steps, with one instruction per step. USE tables for comparisons. USE `/show-better` to decide whether a table, chart or diagram would help.
+USE numbered lists for steps, with one instruction per step. USE tables for comparisons.
 
-### 3.4. Keep the format adjustable
+### 3.4. Show relations, not only describe them
+
+WHEN the GOAL is to UNDERSTAND or MAKE A DECISION and the content describes how things relate, such as causes, overlaps, comparisons or changes, ADD a table, chart or diagram next to the prose. Graphics added to text improve comprehension for most readers. USE `/show-better` to choose and build it, if available.
+
+DO NOT add a visual that only decorates, or one that repeats the prose word for word. Irrelevant material and identical text in two places both lower learning.
+
+### 3.5. Keep the format adjustable
 
 WHEN you control the format, publish live text, so the user can change its size, spacing, and colours or have it read aloud.
 AVOID relying on dyslexia-specific fonts or Bionic Reading. Evidence does not show that they help.
 
-### 3.5. Bold a few key ideas
+### 3.6. Bold a few key ideas
 
 WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry its key ideas, so the user can find them on a quick scan. LIMIT bolding to those key ideas. Emphasis lowers recall of the parts that are not emphasised, so DO NOT bold whole sentences, labels, or every important term.
 
@@ -97,7 +104,9 @@ WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry
 
 Replace a long or rare word with a common one when the meaning stays exact. If this is not possible, explain the word on first-use.
 
-Simplify the language, not the substance.
+Simplify the language, not the substance. A simpler version KEEPS its conditions and limitations: readers who know the topic skipped limitations in overly plain summaries.
+
+IF you do not know what the user knows about the topic, WRITE for a reader who knows less, and USE headings so others can skip ahead. Simpler text helps readers new to a topic. TREAT this as a guide, not a rule: the evidence that extra support costs experts little is indirect.
 
 ### 4.2. State the limits
 
@@ -132,3 +141,11 @@ REPLACE metaphors, idioms, hints, and exaggeration with direct statements, or ex
 ### 4.9. Be specific
 
 USE exact numbers, dates, and names instead of vague terms such as "soon" or "a few", unless the exact value is unknown. KEEP what each number measured and what it was compared with. SEPARATE facts from opinions and feelings.
+
+### 4.10. Write about people neutrally
+
+USE gender-neutral words, such as "staff" or "humanity". USE "they" for a person whose gender is unknown or does not matter. USE a known person's own pronouns.
+
+DESCRIBE people the way they describe themselves. IF that is unknown, LEAVE OUT labels the point does not need. Style guides disagree on default wording for disability, and the people concerned disagree among themselves.
+
+REPLACE ableist words, such as "crazy", "lame" or "blind to", with a more accurate word. WHEN examples name people, VARY their names, genders, and cultures, and DO NOT default to a Western or affluent setting.

@@ -15,7 +15,8 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 2. Learners feel they learn more from direct answers than from guidance, and rate guidance as less efficient, even when guidance teaches them more.
 3. Learners who study with AI overestimate what they know. Their own judgment is not evidence of learning.
 4. AI feedback and hints contain errors. A wrong hint teaches the wrong thing, and a learner cannot catch an error they share.
-5. Most of this evidence comes from students in courses, mostly in STEM, over short periods. Treat these rules as the best available guide for adults learning alone, not as tested for them.
+5. Support that helps a beginner can get in the way of a learner who knows more, and fading worked examples as each learner progresses beat a fixed schedule. Matching instruction to a learner's stated learning style has little support. Adapt to what the learner can do, not to how they say they learn.
+6. Most of this evidence comes from students in courses, mostly in STEM, over short periods. Treat these rules as the best available guide for adults learning alone, not as tested for them.
 
 ## 1. Confirm that the user wants to learn
 

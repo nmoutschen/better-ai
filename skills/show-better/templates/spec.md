@@ -12,6 +12,8 @@ python3 scripts/show.py example                          # print an example spec
 
 Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only). In text output, an `svg` panel shows only its `alt`.
 
+`--format text --screen-reader` prints each panel as sentences and value lists, built from the same data as the page's Data and As text sections, and names the highlighted items in words. It draws no box lines, bars, rules or symbols, which a screen reader reads aloud one by one.
+
 `check` stops with an error when a panel cannot be drawn correctly, and prints a warning when a panel is likely hard to read. Both commands print a digest: every headline, value, label and note, in order, for comparison with the source.
 
 ## Top level
@@ -236,11 +238,11 @@ The SVG must have a `viewBox`, and must contain no scripts, event handlers, `for
 | Colour | Hex | Use |
 |---|---|---|
 | Moss | `#6B7F5E` | Systems, components, ordinary nodes |
-| Terracotta | `#E8725C` | The highlighted node or path that carries the point |
+| Terracotta | `#E8725C` | The highlighted node or path that carries the point. Not for text: its contrast on cream is below 3:1 |
 | Umber | `#5C4033` | People, teams, external actors |
 | Linen | `#F2EDE5` | Neutral node fill, with ink text |
 | Ink | `#33302B` | Lines and text |
 | Sand | `#C4B69C` | Secondary or dashed lines, group borders |
-| Muted | `#78736B` | Annotations |
+| Muted | `#78736B` | Annotations, on cream only: on linen its contrast is below 4.5:1 |
 
 Use `font-family="Space Grotesk, sans-serif"` and font sizes of 13 to 16 in an 800-wide `viewBox`.

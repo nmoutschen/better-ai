@@ -9,7 +9,8 @@ SPEC is a JSON file described in templates/spec.md. Panels are shown one at a ti
 steps through them with buttons or the arrow keys. Without JavaScript, or when printed, all panels
 are shown in order.
 
-render --format text or md draws the same panels as plain text. Every layout is computed here, so the agent
+render --format text or md draws the same panels as plain text; --format text --screen-reader writes them as
+sentences and value lists, without box drawing, for screen readers. Every layout is computed here, so the agent
 never draws a text diagram by hand: language models read text diagrams far better than they construct them.
 """
 
@@ -25,6 +26,7 @@ import re
 import sys
 import textwrap
 import webbrowser
+from html.parser import HTMLParser
 from pathlib import Path
 
 
@@ -1968,6 +1970,7 @@ tr.hl td:first-child { box-shadow:inset 4px 0 0 var(--terracotta); padding-left:
 .figures { display:flex; flex-wrap:wrap; gap:28px 72px; }
 .fig .val { font:700 clamp(56px, 10vw, 136px)/1 var(--serif); letter-spacing:-.02em; color:var(--heading); font-variant-numeric:tabular-nums; }
 .fig.hl .val { color:var(--terracotta); }
+.fig.hl .lab { font-weight:700; color:var(--heading); }
 .fig .lab { font:500 clamp(15px, 1.5vw, 18px)/1.4 var(--sans); color:var(--ink); max-width:18rem; margin-top:12px; }
 .prose { max-width:42rem; font-size:clamp(17px, 1.6vw, 20px); } .prose p { margin:0 0 14px; }
 .controls { display:none; }
@@ -2197,6 +2200,143 @@ def render_text(spec, width=72, ascii=False, markdown=False):
     return "\n".join(l.rstrip() for l in out) + "\n"
 
 
+# ---------- screen-reader text ----------
+
+class _Linear(HTMLParser):
+    """Read a panel's HTML data as lines: a table row becomes one sentence, a list item one line."""
+
+    def __init__(self):
+        super().__init__()
+        self.lines, self.buf, self.lists = [], [], []
+        self.table = None  # {"head": [...], "rows": [(cells, hl)], "row": [...], "hl": bool, "cell": [...] or None, "in_head": bool}
+
+    def flush(self, prefix=""):
+        text = re.sub(r"\s+", " ", "".join(self.buf)).strip()
+        self.buf = []
+        if text:
+            self.lines.append(prefix + text)
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == "table":
+            self.flush()
+            self.table = {"head": [], "rows": [], "row": [], "hl": False, "cell": None, "in_head": False}
+        elif self.table is not None:
+            if tag == "thead":
+                self.table["in_head"] = True
+            elif tag == "tr":
+                self.table["row"], self.table["hl"] = [], "hl" in (a.get("class") or "").split()
+            elif tag in ("td", "th"):
+                self.table["cell"] = []
+        elif tag in ("ol", "ul"):
+            self.flush()
+            self.lists.append([tag, 0])
+        elif tag == "li":
+            self.flush()
+        elif tag in ("p", "div", "br"):
+            self.flush()
+
+    def handle_endtag(self, tag):
+        t = self.table
+        if t is not None:
+            if tag in ("td", "th") and t["cell"] is not None:
+                t["row"].append(re.sub(r"\s+", " ", "".join(t["cell"])).strip())
+                t["cell"] = None
+            elif tag == "tr":
+                if t["in_head"]:
+                    t["head"] = t["row"]
+                else:
+                    t["rows"].append((t["row"], t["hl"]))
+            elif tag == "thead":
+                t["in_head"] = False
+            elif tag == "table":
+                head = t["head"]
+                for cells, hl in t["rows"]:
+                    named = [f"{h}: {c}" if h else c for h, c in zip(head[1:], cells[1:]) if c]
+                    label = cells[0] if cells else ""
+                    line = f"{label}. {'; '.join(named)}" if label and named else (label or "; ".join(named))
+                    self.lines.append(line + (" (highlighted)" if hl else ""))
+                self.table = None
+            return
+        if tag == "li" and self.lists:
+            kind = self.lists[-1]
+            kind[1] += 1
+            self.flush(f"{kind[1]}. " if kind[0] == "ol" else "- ")
+        elif tag in ("ol", "ul") and self.lists:
+            self.lists.pop()
+        elif tag in ("p", "div"):
+            self.flush()
+
+    def handle_data(self, data):
+        if self.table is not None:
+            if self.table["cell"] is not None:
+                self.table["cell"].append(data)
+        else:
+            self.buf.append(data)
+
+
+def linear_lines(fragment):
+    parser = _Linear()
+    parser.feed(fragment)
+    parser.close()
+    parser.flush()
+    return parser.lines
+
+
+def highlighted(p, spec=None):
+    """Labels of the highlighted items in a panel, so a reader who cannot see the colour still knows the point."""
+    found = []
+    if p["kind"] == "map":
+        ids = set(map(str, _as_list(p.get("highlight"))))
+        secs = p.get("sections") or (spec or {}).get("document", {}).get("sections", [])
+        return [s["label"] for s in secs if str(s.get("id")) in ids or s.get("highlight")]
+
+    def walk(o):
+        if isinstance(o, dict):
+            if o.get("highlight") is True:
+                lab = o.get("label") or o.get("name") or o.get("value")
+                if lab is not None:
+                    found.append(str(lab))
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk({k: v for k, v in p.items() if k != "highlight"})
+    return found
+
+
+def render_screen_reader(spec, width=72):
+    """Plain sentences and value lists, with no box drawing, bars, rules or symbols that a screen reader reads aloud."""
+    W, n = width, len(spec["panels"])
+    out = twrap(spec["title"], W)
+    if spec.get("summary"):
+        out += twrap(plain(spec["summary"]), W)
+    out.append("")
+    for i, p in enumerate(spec["panels"], 1):
+        out += twrap(f"Panel {i} of {n}: {p['headline']}", W) + doc_line(spec, p, GLYPHS["ascii"], W)
+        if p["kind"] == "numbers":
+            body = [f"{f['value']}: {f['label']}" + (" (highlighted)" if f.get("highlight") else "") for f in p["figures"]]
+        elif p["kind"] == "text":
+            body = [plain(b) for b in _as_list(p.get("body"))]
+        else:
+            visual, data = v_map(p, spec) if p["kind"] == "map" else VISUALS[p["kind"]](p)
+            body = linear_lines(data or visual)
+        for line in body:
+            out += twrap(line, W)
+        hl = highlighted(p, spec) if p["kind"] not in ("numbers", "table") else []
+        if hl:
+            out += twrap("Highlighted: " + ", ".join(hl) + ".", W)
+        for para in _as_list(p.get("note")):
+            out += twrap("Note: " + plain(para), W)
+        if p.get("read"):
+            out += twrap(f"Read in the document: {plain(p['read'])}", W)
+        out.append("")
+    if spec.get("source"):
+        out += twrap(plain(spec["source"]), W)
+    return "\n".join(l.rstrip() for l in out) + "\n"
+
+
 EXAMPLE = {
     "title": "Sentence headlines helped students recall slide content",
     "summary": "Two studies by one research group found that slides whose headline states the point gave better recall than slides with topic headlines.",
@@ -2228,6 +2368,8 @@ def main() -> None:
     r.add_argument("--open", action="store_true", help="open the page in the default browser")
     r.add_argument("--width", type=int, default=72, help="text width in characters (text and md)")
     r.add_argument("--ascii", action="store_true", help="use only ASCII characters (text and md)")
+    r.add_argument("--screen-reader", action="store_true",
+                   help="text only: sentences and value lists, without box drawing, bars or rules that a screen reader reads aloud")
     sub.add_parser("example", help="print an example spec")
     args = parser.parse_args()
     if args.command == "example":
@@ -2246,7 +2388,10 @@ def main() -> None:
         print("\n".join(digest))
         sys.exit(1 if errors else 0)
     if args.format != "html":
-        text = render_text(spec, args.width, args.ascii, args.format == "md")
+        if args.screen_reader and args.format != "text":
+            sys.exit("error: --screen-reader works with --format text")
+        text = (render_screen_reader(spec, args.width) if args.screen_reader
+                else render_text(spec, args.width, args.ascii, args.format == "md"))
         if args.out:
             Path(args.out).expanduser().write_text(text, encoding="utf-8")
             print(f"wrote {Path(args.out).expanduser().resolve()}", file=sys.stderr)

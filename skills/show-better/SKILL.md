@@ -37,7 +37,7 @@ IDENTIFY what the reader already knows about the topic. FOR an expert reader, SH
 The renderer draws the same presentation in three formats. CHOOSE the first one the user can read:
 
 1. **A page.** IF you can run Python 3 and the user can open a browser, RENDER HTML (section 5). IF the harness can publish a page for the user, PUBLISH it and GIVE the link. OTHERWISE, OPEN it with `--open` and GIVE its path.
-2. **A terminal or a chat.** IF the user reads in a terminal, RENDER `--format text`. IF they read Markdown, RENDER `--format md`. USE `--ascii` when the output must survive copying into plain-text files or commit messages.
+2. **A terminal or a chat.** IF the user reads in a terminal, RENDER `--format text`. IF they read Markdown, RENDER `--format md`. USE `--ascii` when the output must survive copying into plain-text files or commit messages. IF the user reads with a screen reader, or says the diagrams are hard to follow, RENDER `--format text --screen-reader`: sentences and value lists instead of drawn diagrams.
 3. **No renderer.** IF you cannot run Python, PRESENT the panels in Markdown (section 6).
 
 DO NOT draw a text diagram by hand when the renderer is available.

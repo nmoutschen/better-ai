@@ -90,6 +90,8 @@ OFFER two to four concrete options taken from the context, so the user can answe
 
 IF you recommend an option, LIST it first and say that you recommend it.
 
+FOR a preference about how to present the result, OFFER choices about the output, such as "a diagram" or "a shorter version". DO NOT ask about the user's abilities or ask them to disclose a condition: preference settings can reveal a disability the user did not choose to share.
+
 ### 3.3. Make each question understandable on its own
 
 The user may see only the question. STATE in it what you found that makes the question necessary, and NAME the items it is about.
