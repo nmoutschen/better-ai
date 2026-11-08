@@ -10,17 +10,17 @@ IF invoked without arguments, LOOK for an existing research board (section 3) an
 
 ## Principles
 
-1. Large Language Models (LLMs) use a large training data set to both understand text and know facts. The user wants to use the AI agent for its ability to understand text, but not its training data.
-2. AI agents have a training cut-off date and are not trained on the entirety of text available in the world. Relying too heavily on training data may lead to blind spots.
-3. Knowing facts can lead to leading research questions with web searches. Results of those searches are highly susceptible to confirmation bias and blind spots.
+1. A Large Language Model (LLM) learns from its training data both to understand text and to know facts. The user wants the agent's ability to understand text, not the facts from its training data.
+2. Training data stops at a cut-off date and does not cover all text in the world. Relying on it leaves blind spots.
+3. An agent that already knows an answer writes searches that lead to it. The results then confirm what it expected and miss what it did not know.
 
 This skill names capabilities, not tools: web search, page fetch, a shell, asking the user, writing files, and sub-agents. USE the tool your harness provides for each. IF you cannot ask the user through a tool, ASK in plain text and STOP until they answer. DO NOT simulate a missing capability, for example by describing a page you could not open.
 
 ## 1. Topic confirmation
 
-Identify the TOPIC provided by the user and list all possible MEANINGs. Use context clues (previous prompts from the user, previous discussions, local repository, context, etc.) to identify reasonable meanings.
+IDENTIFY the TOPIC provided by the user and LIST its possible MEANINGs. USE earlier messages, previous discussions, and the local repository to find reasonable meanings.
 
-IF the topic is ambiguous (multiple possible meanings, even with context), explain the different meanings to the user and then ASK which one they meant. Use this structure when explaining the meaning:
+IF the topic still has several possible meanings with this context, EXPLAIN them to the user and ASK which one they meant. USE this structure for each meaning:
 
 ```
 ## Meaning
@@ -36,7 +36,7 @@ IDENTIFY the user's GOAL: what they must understand, learn, decide, or do with t
 
 ## 2. Know what your retrieval tools return
 
-Search and fetch tools can be black boxes. Some return a model-written summary instead of the page. Some return only part of a long page, or a cached copy.
+Search and fetch tools do not always return the page. Some return a model-written summary instead of the page. Some return only part of a long page, or a cached copy.
 
 - TREAT text written by a search tool as leads, not evidence. A source is evidence only after you read the page itself.
 - TREAT a fetch tool's output as an extraction unless the harness documents that it returns the page text. An extraction can paraphrase quotes, omit passages, or say a page lacks something it contains.
@@ -58,13 +58,13 @@ IF you cannot write files, KEEP the board in your working notes and RESTATE it i
 
 ## 4. Broadening searches
 
-Write different ways to express the MEANING for the research. Use these (AND ONLY THESE) in a first set of web searches. Use the results of those searches to **identify new search terms** and expand beyond the direction implied by the initial queries.
+WRITE several ways to express the MEANING. USE these, and only these, in a first set of web searches. USE their results to **identify new search terms** that go beyond the direction of the first queries.
 
 ## 5. Seed the open questions
 
 ADD open questions that came from the user's question, the identified MEANING, and the broadening searches. RECORD the origin of each question.
 
-Here are a set of starter questions:
+Starter questions:
 
 1. What terms do sources use for this topic, and what does each term refer to?
 2. Which cases, contexts, populations, or periods do the sources address?
@@ -141,7 +141,6 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 4. **Close obsolete questions**: CLOSE open questions that new findings made irrelevant, as out of scope, and RECORD why.
 5. **Rewrite unclear questions**: REWRITE questions with the status unclear, and REOPEN them.
 6. **Reprioritize** as findings change what matters for the GOAL.
-
 7. **Revise summaries**: REWRITE a question's summary when verification or new evidence changes what it says.
 
 APPLY the stop rules in section 6.4 to the whole board. WHEN they apply, SET the board's status to stopped, so workers take no new questions.
@@ -150,7 +149,7 @@ APPLY the stop rules in section 6.4 to the whole board. WHEN they apply, SET the
 
 CHECK that each claim you present is on the board with its sources, and that the claims the conclusion depends on are verified.
 
-START from the question summaries on the board. Use the `/write-better` skill to present your research findings to the user. IF it is not available, LEAD with the answer, STATE where sources disagree or the evidence is weak, and STATE what the research could not find.
+START from the question summaries on the board. PRESENT the findings with `/write-better`. IF it is not available, LEAD with the answer, STATE where sources disagree or the evidence is weak, and STATE what the research could not find.
 
 CITE sources in APA style (7th edition): an author–date citation in the text for each main claim, such as (Han & Zhang, 2025), and a reference list at the end with author, date, title, publisher or site, and URL. BUILD the reference list from the board's source entries only. IF an entry lacks a field, OPEN the source and COPY it from there. DO NOT fill in authors, titles, or dates from memory. WRITE "n.d." when the source itself has no date.
 

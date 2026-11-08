@@ -6,8 +6,6 @@ argument-hint: "[DOCUMENT OR CONTENT]"
 
 # Show Better
 
-Instructions on how to introduce a document with a short sequence of visuals that prepares the reader to understand it.
-
 IF invoked without argument, use these instructions on your previous output.
 IF invoked with a document, a path or content as argument, use these instructions to introduce it.
 
@@ -148,8 +146,6 @@ USE `/write-better` on the title, the summary, every headline, label and note. K
 USE the `svg` kind only when no other kind fits. GIVE each line style one meaning and state it. KEEP one direction of flow, under about 15 nodes, short labels, and the colours in [templates/spec.md](templates/spec.md). DO NOT use colour as the only signal. WRITE an `alt` text that describes the essential information. In text output, an `svg` panel shows only its `alt`.
 
 ## 5. Build and check
-
-FOLLOW these steps in order.
 
 1. **Extract.** WRITE the extract in section 2.
 2. **Write the spec.** WRITE a JSON spec in the format in [templates/spec.md](templates/spec.md), with a top-level `document` for the map. SAVE it as `.show/<slug>/spec.json` in the working directory. DO NOT commit it unless the user asks.

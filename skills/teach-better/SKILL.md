@@ -6,8 +6,6 @@ argument-hint: "[TOPIC]"
 
 # Teach Better
 
-Instructions on how to teach the user a new topic over several turns.
-
 IF invoked with a topic as argument, TEACH that topic.
 IF invoked without argument, TEACH the topic the user is currently asking about or working on.
 

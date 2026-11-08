@@ -5,8 +5,6 @@ description: Helps an AI agent write better. Improves AI agents' structure and c
 
 # Write Better
 
-Guidance and instructions on how to write better for the user.
-
 IF invoked without argument, use these instructions to rewrite your previous output.
 IF invoked with a document or artifact as argument, use these instructions to rewrite the document in question.
 
@@ -40,7 +38,7 @@ IF you cannot IDENTIFY the main GOAL, ASK the user, using `AskUser`:
 
 ### 1.3. Assume your draft is unclear
 
-IF you are doing research on a particular topic, you are loading your context with specialized information not available to the user. Expertise makes the writer more abstract, more technical, and more passive.
+Research fills your context with specialized information the user does not have. Expertise makes the writer more abstract, more technical, and more passive.
 
 IDENTIFY what this audience already knows, and PROVIDE the context they are missing, so they can understand everything you write. EXPLAIN or REPLACE file names, function names, and internal labels they may not know. KEEP a technical name only when the user must type or find it, and explain it on first use.
 
@@ -52,11 +50,11 @@ DELETE anecdotes, unsupported conclusions, research details, dead-ends, and triv
 
 ### 2.2. Repair reasoning gaps
 
-STATE causal and logical links between propositions. EXPAND/EXPLAIN new concepts when they first appear.
+STATE causal and logical links between propositions. EXPLAIN new concepts when they first appear.
 
 ### 2.3. Separate additional details
 
-MOVE additional details that do not directly support the GOAL of the user to appendices. KEEP each limit, condition, and exception next to the claim it qualifies, even when the claim is in a list.
+MOVE details that do not directly support the user's GOAL to appendices. KEEP each limit, condition, and exception next to the claim it qualifies, even when the claim is in a list.
 
 ### 2.4. Add nothing new when rewriting
 
@@ -77,7 +75,7 @@ WHEN the GOAL is to LEARN: ask a question the user can attempt first, then expla
 WHEN the GOAL is to TAKE AN ACTION: provide clear and simple step-by-step instructions.
 WHEN the GOAL is to MAKE A DECISION: state your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, state the decision criteria there instead. WHEN rewriting, recommend an option only if the original does.
 
-IN ALL CASES, provide this in a simplified format, that does not require knowledge of concepts in the rest of the document.
+IN ALL CASES, WRITE this part so it does not require concepts from the rest of the document.
 
 ### 3.3. Make long outputs easy to navigate
 
@@ -103,13 +101,13 @@ Simplify the language, not the substance.
 
 ### 4.2. State the limits
 
-Name what experts disagree on, where the evidence is weak, and whom to consult. Report limitations and conflicting results where real disagreement exists; state consensus only when agreement is high.
+NAME what experts disagree on, where the evidence is weak, and whom to consult. STATE consensus only when agreement is high.
 
 STATE your own uncertainty in the first person, such as "I could not check X". First-person uncertainty made readers rely less on wrong AI answers; impersonal phrasing such as "it is not clear" had weaker effects.
 
 ### 4.3. Prefer coherence
 
-Shorter sentences and words alone do not guarantee comprehension. Use a coherent terminology throughout your output. AVOID synonyms, paraphrases, etc.
+Shorter sentences and words alone do not guarantee comprehension. USE one term for each concept throughout the output. DO NOT switch to synonyms or paraphrases.
 
 ### 4.4. Choose active or passive voice by what the user needs
 
@@ -117,7 +115,7 @@ Use the active voice when the actor matters. Use the passive voice when the acto
 
 ### 4.5. Use concrete examples
 
-Provide worked examples in your outputs when relevant. Prefer a narrative sequence throughput the output. Use different examples when it provides different perspectives or boundary conditions. Use a single continuous case study otherwise.
+PROVIDE worked examples when relevant. PREFER one continuous case study through the output. USE several examples only when they show different perspectives or boundary conditions.
 
 ### 4.6. Use a neutral tone
 

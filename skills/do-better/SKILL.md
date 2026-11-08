@@ -5,9 +5,7 @@ description: Helps an AI agent correct work that does not meet the user's intent
 
 # Do Better
 
-Guidance and instructions on how to react to a disappointed user.
-
-Use these instructions to analyze and correct the previous work.
+USE these instructions to analyze and correct the previous work.
 
 Invocation is evidence the result does not meet the user's intent. DO NOT assume it identifies the cause or the desired correction.
 
@@ -17,11 +15,9 @@ IF you find a defect in work you already delivered, REPORT it before the user fi
 
 ### 1.1. Read the available context
 
-IF AVAILABLE, use your local context, prior knowledge, and memories to identify the user and their preferences.
+READ the original request, later corrections, the user's preferences and memories, and examples the user accepted or rejected. IF a file is the target, READ its current contents before editing it. DO NOT ask the user to repeat what this context already says.
 
-READ the original request, later corrections, relevant preferences, and examples the user accepted or rejected. IF a file is the target, READ its current contents before editing it.
-
-USE available task context before asking the user to repeat information. DO NOT treat your earlier explanations, proposals, or assumptions as user requirements. DO NOT treat silence as acceptance.
+DO NOT treat your earlier explanations, proposals, or assumptions as user requirements. DO NOT treat silence as acceptance.
 
 ### 1.2. Name the GOAL
 
@@ -48,12 +44,11 @@ PRIORITIZE mismatches supported by the conversation, source material, or work pr
 
 ### 2.2. Check competing explanations
 
-IF several causes fit the evidence, IDENTIFY what would distinguish them. INSPECT relevant sources, task outcomes, artifact contents, or test results. USE tools when they can resolve a specific uncertainty about the work.
+IF several causes fit the evidence, IDENTIFY what would distinguish them. INSPECT relevant sources, task outcomes, artifact contents, or test results.
 
 DO NOT treat repeated reflection as new evidence. DO NOT assume that the user wants a shorter answer, more detail, more research, or a different tone because they invoked this skill.
 
 IF the success criterion is unknown, KEEP it unresolved. DO NOT invent a measurable target and claim that meeting it satisfies the user.
-
 
 ## 3. Choose a correction
 

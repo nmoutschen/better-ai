@@ -6,8 +6,6 @@ argument-hint: "[REQUEST]"
 
 # Ask Better
 
-Instructions on when to ask the user a question during a task, and how to ask it.
-
 IF invoked without argument, use these instructions on the current task, before doing more work on it.
 IF invoked with a request as argument, use these instructions on that request before starting it.
 
@@ -74,11 +72,9 @@ ALSO ASK when a conflict from section 1.4 changes the result, or when checks con
 
 ### 2.2. Otherwise, proceed and state the assumption
 
-IF an unknown fails any condition in section 2.1, CHOOSE the most plausible option and proceed. STATE the assumption in one sentence where the user will see it, so they can correct it. DO NOT make assumptions without stating them.
+IF an unknown fails any condition in section 2.1, CHOOSE the most plausible option and proceed. STATE the assumption in one sentence, next to the result it affects, not in a log or earlier in the conversation. SAY what the user would see if it were wrong, so they can correct it without investigating.
 
-MAKE the assumption easy to check. SAY which part of the result it affects, and what the user would see if it were wrong. PUT it next to the result, not in a log or earlier in the conversation. The user must not have to investigate to learn what you assumed.
-
-PROCEED without asking when the task is simple and clear. DO NOT ask to confirm a clear task, to get permission the user already gave, or to choose between options when one is the usual default.
+DO NOT ask to confirm a clear task, to get permission the user already gave, or to choose between options when one is the usual default.
 
 IF the operator's and the user's instructions conflict, FOLLOW the operator unless that works against the user's basic interests. TELL the user what you cannot do for them.
 
@@ -106,19 +102,15 @@ USE a structured question tool, such as `AskUserQuestion`, when one is available
 
 ## 4. Choose when to ask
 
-### 4.1. Ask early
+### 4.1. Ask early, and all at once
 
-ASK before starting work that depends on the answer. An error found early takes much less work to fix than one found at the end.
+ASK all blocking questions before starting work that depends on them. An error found early takes much less work to fix than one found at the end, and agents produce much worse results when requirements arrive over several messages.
 
-### 4.2. Ask all questions at once
-
-ASK all blocking questions at the start, rather than one per message. Agents produce much worse results when requirements arrive over several messages.
-
-### 4.3. During the task, ask between steps
+### 4.2. During the task, ask between steps
 
 IF a new unknown appears during the task, ASK when a step ends or when you cannot continue. DO NOT interrupt a step for a question that can wait.
 
-### 4.4. Keep working on what does not depend on the answer
+### 4.3. Keep working on what does not depend on the answer
 
 WHILE waiting, CONTINUE only work that does not depend on the answer and is easy to reverse. IF the user does not answer, DO NOT treat the lack of an answer as permission or as a preference.
 
