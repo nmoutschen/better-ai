@@ -2,6 +2,35 @@
 
 \*Based on what I personally consider better.
 
+## Installation
+
+Claude Code:
+
+```
+/plugin marketplace add nmoutschen/better-ai
+/plugin install better-ai@better-ai
+```
+
+Droid:
+
+```sh
+droid plugin marketplace add nmoutschen/better-ai
+droid plugin install better-ai@better-ai
+```
+
+GitHub Copilot CLI:
+
+```sh
+copilot plugin marketplace add nmoutschen/better-ai
+copilot plugin install better-ai@better-ai
+```
+
+Codex, Cursor, Gemini CLI, OpenCode and other harnesses:
+
+```sh
+npx skills add nmoutschen/better-ai -g
+```
+
 ## `/ask-better`
 
 Decides when the agent should ask the user a question, and how to ask it. It looks up what the agent can find itself, asks only about what only the user knows, and raises conflicting instructions instead of resolving them silently.
