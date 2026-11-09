@@ -96,6 +96,8 @@ EXPLAIN the idea briefly, using the key terms from section 2.2. FOLLOW `/write-b
 
 SHOW a worked example: a solved problem with each step and the reason for each step. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation. ON a page, USE a `table`, `steps` or `timeline` block. IN the chat, USE a Markdown table or a list. DO NOT draw a plain-text diagram by hand: models draw them badly. WRITE a formula in a `code` block, with one operation per line, not inside a sentence, a table cell or a step note.
 
+WHEN a chunk asks the user to read a long text, GIVE a short instruction before the reading, saying what to look for, and one after it, saying what to check.
+
 FOR a complex or open problem where the user already knows the basics, ASK them to attempt it BEFORE you show the worked example. FOR material that is new to the user, SHOW the example first. Evidence on attempting first is mixed, and it helped most on complex tasks.
 
 ### 3.2. Give a practice problem
