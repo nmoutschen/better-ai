@@ -26,6 +26,7 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 13. Concrete examples help most when the link to the abstract rule is stated. Extra detail in an example hurts transfer.
 14. None of the tools in section 2.4 has been tested with an AI tutor. Treat them as the best available guide, not as tested for this setting.
 15. Answering questions about material helps recall days to months later more than rereading it, though rereading wins minutes later and feels more effective. Learners who expect to keep a record of information remember less of it, and knowing a test was coming did not remove the loss in most conditions tested. Whether a summary the learner writes beats one they are given is contested: each won in a different study. No study tested a take-away written by an AI.
+16. Retention over months depends on reviews spread over time. The best gap between reviews grows with how long the learner must remember, and a gap that is too long costs less than one that is too short. Recalling material again in later spaced sessions, each until it is right once, gave large gains over a single session. Learners rarely schedule review themselves. Most of this evidence comes from facts and vocabulary in lab and course studies, and no study tested review scheduled by an AI tutor over months.
 
 ## 1. Confirm that the user wants to learn
 
@@ -190,9 +191,22 @@ DO NOT accept "I get it" or "makes sense" as evidence of understanding. TRUST wh
 
 ### 4.2. Space the practice
 
-WHEN the user returns to the topic in a later message or session, START with two or three quiz questions on earlier chunks before teaching new material. IF earlier chunks hold problem types the user could confuse, MIX those questions, following the mixed set tool.
+BEFORE the end of the lesson, ASK how long the user needs to remember the topic, such as until an exam, for a project, or for years. The best gap between reviews depends on it.
 
-AT the end of the lesson, SUGGEST when to review, such as the next day and a week later. PUT the review questions in the take-away (section 6.2). DO NOT schedule anything without the user's permission.
+PLAN three review sessions from that answer, and PUT their dates in the take-away (section 6.2):
+
+- SET the first gap to about a fifth to a third of that period when it is a week or a few weeks, and to about a twentieth to a tenth when it is a year. A gap that is too long costs much less than one that is too short.
+- KEEP later gaps equal or growing. Neither beat the other on later tests.
+- IF the user will not use the skill for months after the last review, SUGGEST one more review a few months later. Unused procedural skills lost about half their gains in accuracy after six months, and cognitive skills decayed faster than physical ones.
+
+Learners rarely plan review themselves, and daily reminder messages did not make them review. Learners who chose a review program that a system scheduled completed most of it. IF the harness can schedule a task, OFFER to start each review session on its date. OTHERWISE, OFFER to add the dates to the user's calendar. No study tested calendar entries, so TREAT this as a guide. IF the user already uses a spaced-repetition app, OFFER the review questions in a form they can import. DO NOT schedule anything without the user's permission.
+
+WHEN the user returns to the topic in a later message or session:
+
+1. START with two or three questions on earlier chunks, BEFORE you show any material. Trying to recall first helps the restudy that follows, even when the attempt fails.
+2. WRITE new questions on the same rules, not the take-away's questions. Varied questions helped more than repeated ones in lab studies, and learners judged them less helpful. IF earlier chunks hold problem types the user could confuse, MIX the questions, following the mixed set tool.
+3. GIVE feedback on each answer. Retrieval helped more with feedback, and recall that mostly failed did not help without it. IF the user misses most questions on a chunk, RE-TEACH it before asking more.
+4. ASK again, later in the same session, each question the user missed, until they answer it right once.
 
 ## 5. Handle pushback
 

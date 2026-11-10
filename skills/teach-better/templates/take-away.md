@@ -2,7 +2,7 @@
 
 A take-away is a Markdown file the user keeps after the lesson: `.teach/<topic-slug>/take-away.md`. Section 6.2 of SKILL.md says when to write it and what goes in it. Copy the block below and replace the `<placeholders>`. Leave out a section that has nothing to hold, such as "Mistakes to watch" when the user made none.
 
-Put the review questions first. Keep their answers in a separate section at the end, so the user answers before they look.
+Put the review questions first, with the review dates planned in section 4.2 of SKILL.md. Keep their answers in a separate section at the end, so the user answers before they look.
 
 ```markdown
 # <topic>: take-away
@@ -12,8 +12,13 @@ Still to practise: <what the quizzes showed the user struggled with, or "nothing
 
 ## 1. Review questions
 
-Answer each question without looking at the rest of this file, then check the answers in section 4.
-Review on <date suggested in section 4.2 of the lesson>, and again on <date>.
+Review on <date 1>, <date 2> and <date 3>. Each time:
+
+1. Answer every question from memory, before you look at the rest of this file.
+2. Check your answers in section 4.
+3. For each question you missed, reread its part of section 2, then answer it again at the end of the session, until you get it right once.
+
+Questions:
 
 1. <question on a rule or fact the GOAL needs>
 2. <question that applies a rule to a case the lesson did not show>
