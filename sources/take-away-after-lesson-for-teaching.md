@@ -6,7 +6,7 @@ Research register · Search date: 10 November 2026
 
 **Status.** 13 questions closed: 9 answered, 2 contested, and 2 not found. Most evidence is old, small, or read only as abstracts. Many publisher pages were blocked. No study tested a take-away written by an AI tutor with a later test taken without AI.
 
-The best-supported finding concerns how a take-away should be used, not the document itself. Answering questions about material beat restudying a review sheet six months later (Larsen et al., 2013a, 2013b). Restudying won only at a 5-minute delay, while it raised learners' confidence (Roediger & Karpicke, 2006). A second finding concerns timing. Learners who expect to keep a record of information remember less of it (Sparrow et al., 2011). Students who expected to use crib cards scored lower on a surprise test without them (Funk & Dickson, 2011). The harm shrank when learners held an explicit goal to learn (Grinschgl et al., 2021). Whether the learner or the tutor should write the summary is contested. In older studies, reviewing both the learner's notes and the instructor's notes did best (Kiewra, 1985).
+The best-supported finding concerns how a take-away should be used, not the document itself. Answering questions about material beat restudying a review sheet six months later (Larsen et al., 2013a, 2013b). Restudying won only at a 5-minute delay, while it raised learners' confidence (Roediger & Karpicke, 2006). A second finding concerns timing. Learners who expect to keep a record of information remember less of it (Sparrow et al., 2011). Students who expected to use crib cards scored lower on a surprise test without them (Funk & Dickson, 2011). Knowing a test was coming did not remove the harm, except for people who were made to offload everything (Grinschgl et al., 2021). Whether the learner or the tutor should write the summary is contested. In older studies, reviewing both the learner's notes and the instructor's notes did best (Kiewra, 1985).
 
 ## 1. What the documents are
 
@@ -100,7 +100,7 @@ The best-supported finding concerns how a take-away should be used, not the docu
 These are inferences from the evidence above, not tested rules.
 
 1. **Give the take-away after the last quiz, and do not announce it earlier.** Expecting a record lowered memory for what it holds. Students who expected crib cards did worse without them. The skill's quizzes stay closed-book.
-2. **Lead with review questions, with the answers kept apart.** Answering questions beat rereading a review sheet at delays of days to months. A summary alone raises confidence more than recall.
+2. **Lead with review questions, with the answers kept apart.** Answering questions beat rereading a review sheet at delays of days to months. Restudying raised confidence without raising delayed recall.
 3. **Ask the learner for their own summary first, as an option.** Writing it from memory is a retrieval attempt, and reviewing one's own notes together with the tutor's did best in Kiewra's studies. Who should write the summary is contested, so the agent writes one as well.
 4. **Include a question that applies a rule to a new case.** Provided notes helped with facts, not with higher-order tasks.
 5. **Keep the reference short, and leave work for the learner.** Full notes interfered on immediate tests in one study. Reduced explanations with prompts beat complete ones.
