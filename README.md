@@ -39,6 +39,10 @@ Decides when the agent should ask the user a question, and how to ask it. It loo
 
 Corrects work that doesn't meet the user's intent. It recovers the user's goal, finds what is actually wrong, and fixes it, asking only when a decision blocks the work.
 
+## `/interview-me`
+
+Interviews the user about how they read and how they review work. It then writes two personal skills, `write-for-<name>` and `review-for-<name>`, so that agents write text the user understands and check work against the user's own criteria. It works from the user's real documents and reviews, and from comparisons of concrete samples, not from general questions about preferences. Each rule in the guides records whether the user chose it, showed it, or only said it.
+
 ## `/research-better`
 
 Researches a topic from sources instead of the model's training data. It tracks open questions and sources on a shared research board, lets cheaper worker agents research in parallel, then generates a report.

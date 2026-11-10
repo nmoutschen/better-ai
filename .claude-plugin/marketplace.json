@@ -5,7 +5,7 @@
     {
       "name": "better-ai",
       "source": "./",
-      "description": "Skills that change how an AI agent works for its user: ask, do, research, show, teach and write better."
+      "description": "Skills that change how an AI agent works for its user: ask, decide, do, research, show, teach and write better."
     }
   ]
 }
