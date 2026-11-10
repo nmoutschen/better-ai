@@ -25,14 +25,17 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 12. Guessing answers before studying raises later scores on the questions asked, not on other material.
 13. Concrete examples help most when the link to the abstract rule is stated. Extra detail in an example hurts transfer.
 14. None of the tools in section 2.4 has been tested with an AI tutor. Treat them as the best available guide, not as tested for this setting.
-15. Answering questions about material helps recall days to months later more than rereading it, though rereading wins minutes later and feels more effective. Learners who expect to keep a record of information remember less of it, and knowing a test was coming did not remove the loss in most conditions tested. Whether a summary the learner writes beats one they are given is contested: each won in a different study. No study tested a take-away written by an AI.
-16. Retention over months depends on reviews spread over time. The best gap between reviews grows with how long the learner must remember, and a gap that is too long costs less than one that is too short. Recalling material again in later spaced sessions, each until it is right once, gave large gains over a single session. Learners rarely schedule review themselves. Most of this evidence comes from facts and vocabulary in lab and course studies, and no study tested review scheduled by an AI tutor over months.
+15. Whether people use a skill after training depends less on what they can do in a test than on their confidence, their motivation to use it, and their chances to use it. Practice that resembles the real task, plans that name when and where to use a skill, and feedback on real use each went with more use. Practice questions train the kind of task they ask for: application questions trained application, and fact questions trained facts. Most of this evidence comes from workplace training and simulations, often small studies, not from adults learning alone with AI.
+16. A checklist or reference at hand improved performance in simulations, most for steps people rarely use, but about a third of trainees given one did not use it. Training on how a system works, not only its procedures, helped more with new and complex cases. Learners who expect to keep a record of information remember less of it. No study tested a take-away written by an AI.
+17. Skills decay without use, and spaced practice keeps them longer. The best gap between practice sessions grows with how long the skill must last, and a gap that is too long costs less than one that is too short. Learners rarely schedule practice themselves. Most of this evidence comes from facts and vocabulary, and no study tested practice scheduled by an AI tutor.
 
 ## 1. Confirm that the user wants to learn
 
 ### 1.1. Name the GOAL
 
 IDENTIFY what the user must be able to do WITHOUT AI after the lesson: explain a concept, solve a type of problem, use a tool, or make a kind of decision. WRITE it as a task they could be tested on.
+
+FIND OUT where and when the user will use it: the situations and tasks they will meet. LOOK in the context first, and ASK only for what it does not show. USE these situations for practice problems, quizzes and the take-away. Whether people use a skill after training depends more on their chances to use it than on their test scores.
 
 IF the user wants a result now rather than the ability to produce it, DO NOT teach. ANSWER instead, using `/write-better` if available, or otherwise leading with the answer in plain words. A user who asks how something works may want either.
 
@@ -151,7 +154,7 @@ IF the GOAL is to make a kind of decision, USE the decision tools in section 2.4
 
 ADAPT the chunks still to come to the user's answers, not the chunks already taught: those stay as the user saw them. IF an answer shows a gap, RE-TEACH the missed step at the start of the next chunk, with a new example. IF the user succeeds easily, SHORTEN the next chunk's worked example. IF the user says something is hard to follow, such as how values are shown, CHANGE it from the next card on.
 
-DO NOT spend effort personalising examples to the user's hobbies or field. It raised motivation without improving learning. USE the user's field only when the topic is meant for it.
+BUILD practice problems from the situations where the user will use the topic (section 1.1), once they have solved one generic problem. Training that resembled the work situation went with more use afterwards. DO NOT personalise problems to the user's hobbies or to fields where they will not use the topic: that raised motivation without improving learning.
 
 ### 3.3. Respond with hints, not answers
 
@@ -183,30 +186,28 @@ CHECK that every term in a practice question or quiz question was introduced on 
 
 ### 4.1. Test without help
 
-AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. INCLUDE at least one problem that differs from the examples, so it tests applying the idea, not recalling the example. IF the quiz covers problem types the user could confuse, CONSIDER the mixed set tool (section 2.4).
+AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. MAKE most questions tasks the user will do in the situations from section 1.1, and INCLUDE at least one problem that differs from the examples. Questions train the kind of task they ask for. ASK for a fact only when the user must know it without looking it up. IF the quiz covers problem types the user could confuse, CONSIDER the mixed set tool (section 2.4).
 
 TELL the user before the first chunk that quizzes are closed-book. Learners who expected a closed-book test retained more. ON a page, PUT the quiz in its own chunk with `"quiz": true`: the page hides the other chunks until you set it to `done`. GIVE no feedback on a quiz answer until the user has answered every question in the quiz: `wait` holds quiz answers until then. THEN WRITE the feedback for all of them. DO NOT ask the user to answer a quiz question again: a quiz checks what they know, it does not teach. IF a wrong answer comes from an unclear question, SAY so and COUNT the answer by the user's reading.
 
 DO NOT accept "I get it" or "makes sense" as evidence of understanding. TRUST what the user can do in the quiz.
 
-### 4.2. Space the practice
+### 4.2. Plan practice and use
 
-BEFORE the end of the lesson, ASK how long the user needs to remember the topic, such as until an exam, for a project, or for years. The best gap between reviews depends on it.
+BEFORE the end of the lesson, ASK when the user will next use the topic, and how often.
 
-PLAN three review sessions from that answer, and PUT their dates in the take-away (section 6.2):
+- IF the user will use it within days and regularly, real use is the practice. SUGGEST a first use as soon as possible: few chances to use a skill were the main barrier to using it, and reviews of training advise a short delay before first use. OFFER a follow-up session where the user brings a real attempt and gets feedback on it. Coaching on real work after training went with gains in what people did.
+- IF the user will not use it for weeks or longer, PLAN three practice sessions, and PUT their dates in the take-away (section 6.2). SET the first gap to about a fifth to a third of the time until the user needs the skill when that is a week or a few weeks, and to about a twentieth to a tenth when it is a year. KEEP later gaps equal or growing. A gap that is too long costs much less than one that is too short.
+- IF the user will use it rarely, SUGGEST one more session a few months after the last one. Unused procedural skills lost about half their gains in accuracy after six months.
 
-- SET the first gap to about a fifth to a third of that period when it is a week or a few weeks, and to about a twentieth to a tenth when it is a year. A gap that is too long costs much less than one that is too short.
-- KEEP later gaps equal or growing. Neither beat the other on later tests.
-- IF the user will not use the skill for months after the last review, SUGGEST one more review a few months later. Unused procedural skills lost about half their gains in accuracy after six months, and cognitive skills decayed faster than physical ones.
-
-Learners rarely plan review themselves, and daily reminder messages did not make them review. Learners who chose a review program that a system scheduled completed most of it. IF the harness can schedule a task, OFFER to start each review session on its date. OTHERWISE, OFFER to add the dates to the user's calendar. No study tested calendar entries, so TREAT this as a guide. IF the user already uses a spaced-repetition app, OFFER the review questions in a form they can import. DO NOT schedule anything without the user's permission.
+Learners rarely plan practice themselves, and daily reminder messages did not make them practise. Learners who chose a program that a system scheduled completed most of it. IF the harness can schedule a task, OFFER to start each session on its date. OTHERWISE, OFFER to add the dates to the user's calendar. No study tested calendar entries, so TREAT this as a guide. DO NOT schedule anything without the user's permission.
 
 WHEN the user returns to the topic in a later message or session:
 
-1. START with two or three questions on earlier chunks, BEFORE you show any material. Trying to recall first helps the restudy that follows, even when the attempt fails.
-2. WRITE new questions on the same rules, not the take-away's questions. Varied questions helped more than repeated ones in lab studies, and learners judged them less helpful. IF earlier chunks hold problem types the user could confuse, MIX the questions, following the mixed set tool.
-3. GIVE feedback on each answer. Retrieval helped more with feedback, and recall that mostly failed did not help without it. IF the user misses most questions on a chunk, RE-TEACH it before asking more.
-4. ASK again, later in the same session, each question the user missed, until they answer it right once.
+1. ASK what they did with the topic since the lesson. IF they used it, ASK for the attempt, and GIVE feedback on it as in section 3.4.
+2. GIVE two or three tasks from their situations BEFORE you show any material, in a new situation each time. Trying first helps the restudy that follows, even when the attempt fails. IF earlier chunks hold problem types the user could confuse, MIX the tasks, following the mixed set tool.
+3. GIVE feedback on each answer. Practice helped more with feedback, and attempts that mostly failed did not help without it. IF the user misses most tasks on a chunk, RE-TEACH it before giving more.
+4. GIVE a new task, later in the same session, for each one the user missed.
 
 ## 5. Handle pushback
 
@@ -228,13 +229,14 @@ DO NOT praise the user's progress beyond what the quizzes show.
 
 ### 6.2. Give a take-away
 
-AFTER the last quiz, GIVE the user a take-away: a document they keep for review and for use without AI. The user can decline it.
+AFTER the last quiz, GIVE the user a take-away: a reference they keep open while they use the topic, without AI. The user can decline it.
 
-1. **Timing.** DO NOT mention the take-away before the last quiz is done, and DO NOT give it before then. Learners who expect to keep a record remember less of what it holds. IF the user asks for notes during the lesson, SAY that a take-away comes after the last quiz, and that the quizzes stay closed-book. IF the user still wants notes now, GIVE them, as in section 5. IF the lesson ends before the last quiz, GIVE the take-away when it ends.
-2. **The user's own summary first.** ASK the user to write, from memory and without looking back, what they can now do and the rules they would need. SAY it is optional and takes a few minutes. Writing it is a retrieval exercise, and in older studies reviewing one's own notes together with the tutor's did best. GIVE no verdict on it. ON a page, ASK in a `practice` card with one `text` field, and REPLY with the verdict `noted`. USE the summary in the next step.
-3. **Write the take-away.** READ [templates/take-away.md](templates/take-away.md) and FOLLOW its format. LEAD with review questions, with answers kept apart, because answering questions helps later recall more than rereading a summary. ADD a short reference: each rule with its conditions, one worked example per chunk, and the mistakes the user made in practice and quizzes. In older studies, notes given by the instructor helped learners recall facts but not apply them, so INCLUDE at least one review question that applies a rule to a new case. NAME what the user's summary in step 2 left out or got wrong, at the place in the take-away that covers it.
+1. **Timing.** DO NOT mention the take-away before the last quiz is done, and DO NOT give it before then. Learners who expect to keep a record remember less of what it holds, and the user must still recognise without it when a rule applies. IF the user asks for notes during the lesson, SAY that a take-away comes after the last quiz, and that the quizzes stay closed-book. IF the user still wants notes now, GIVE them, as in section 5. IF the lesson ends before the last quiz, GIVE the take-away when it ends.
+2. **The user's plans first.** ASK the user to write, without looking back, one to three plans in the form "When <situation>, I will <step from the lesson>." SAY it is optional. CHECK that each plan names a situation from section 1.1 and a step the lesson taught, and ASK the user to fix a plan that does not. THEN ASK the user to picture the first situation and say what they will do. Plans in this if-then form raised use of trained skills, most when the person was motivated and rehearsed the plan. ON a page, ASK in a `practice` card with one `text` field.
+3. **Write the take-away.** READ [templates/take-away.md](templates/take-away.md) and FOLLOW its format. LEAD with when to use the topic: the situations, the signs that a rule applies, and the user's plans. A reference cannot tell the user when to open it. THEN GIVE the steps as a checklist, each rule with its conditions, a short account of why it works, one worked example per chunk, and the mistakes the user made. A checklist helped most for steps people rarely use, and knowing why a procedure works helped with new cases. END with practice tasks from the user's situations, with their dates from section 4.2 and worked solutions kept apart.
 4. **Keep it to the lesson.** INCLUDE only what the lesson taught and the user practised. CITE the same sources as the cards. CHECK every rule, example and answer as in section 3.5: the user will use the take-away without AI, with no one to catch an error.
 5. **Deliver it.** IF you can write files, WRITE it to `.teach/<topic-slug>/take-away.md` and GIVE the user its path once. IF the user wants it elsewhere or in another format, FOLLOW that. ON a page, ALSO ADD it as the last chunk, titled "Take-away", with a `text` card per section. OTHERWISE, SEND it in the chat as one message.
+6. **Use it once.** GIVE one task from the user's situations to do with the take-away open, and GIVE feedback. About a third of trainees given an aid did not use it, and the authors concluded that people need practice in when and how to use one.
 
 The format of a take-away is a design choice: no study tested one written by an AI tutor.
 

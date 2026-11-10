@@ -1,8 +1,8 @@
 # Take-away
 
-A take-away is a Markdown file the user keeps after the lesson: `.teach/<topic-slug>/take-away.md`. Section 6.2 of SKILL.md says when to write it and what goes in it. Copy the block below and replace the `<placeholders>`. Leave out a section that has nothing to hold, such as "Mistakes to watch" when the user made none.
+A take-away is a Markdown file the user keeps open while they use the topic: `.teach/<topic-slug>/take-away.md`. Section 6.2 of SKILL.md says when to write it and what goes in it. Copy the block below and replace the `<placeholders>`. Leave out a section that has nothing to hold, such as "Mistakes to watch" when the user made none.
 
-Put the review questions first, with the review dates planned in section 4.2 of SKILL.md. Keep their answers in a separate section at the end, so the user answers before they look.
+Put "When to use this" first: a reference cannot tell the user when to open it. Keep the worked solutions to the practice tasks in a separate section at the end, so the user attempts each task before they look.
 
 ```markdown
 # <topic>: take-away
@@ -10,25 +10,27 @@ Put the review questions first, with the review dates planned in section 4.2 of 
 You can now: <the GOAL, as a task the user did in the quizzes>.
 Still to practise: <what the quizzes showed the user struggled with, or "nothing the quizzes showed">.
 
-## 1. Review questions
+## 1. When to use this
 
-Review on <date 1>, <date 2> and <date 3>. Each time:
+| When you see | Use |
+|---|---|
+| <a sign in the user's situation that a rule applies> | <rule or step, and where section 2 covers it> |
 
-1. Answer every question from memory, before you look at the rest of this file.
-2. Check your answers in section 4.
-3. For each question you missed, reread its part of section 2, then answer it again at the end of the session, until you get it right once.
+Your plans:
 
-Questions:
+- When <situation>, I will <step from the lesson>.
 
-1. <question on a rule or fact the GOAL needs>
-2. <question that applies a rule to a case the lesson did not show>
-3. <question on a mistake the user made in practice or a quiz>
-
-## 2. Reference
+## 2. How to do it
 
 ### <chunk title>
 
-<rule, with the conditions under which it holds>
+Steps:
+
+1. <step>
+2. <step>
+
+Rule: <rule, with the conditions under which it holds>
+Why it works: <one or two sentences, so the user can adapt the steps to a case the lesson did not show>
 
 | Symbol | In the example |
 |---|---|
@@ -45,13 +47,26 @@ Source: [<source title>](<url>)
 ## 3. Mistakes to watch
 
 - <mistake the user made> → <the rule it misapplies, and where section 2 covers it>
-- In your own summary: <what it left out or got wrong> → <section of this file that covers it>
 
-## 4. Answers
+## 4. Practice
 
-1. <answer, with the reasoning>
-2. <answer, with the reasoning>
-3. <answer, with the reasoning>
+Practise on <date 1>, <date 2> and <date 3>, or as soon as you next use this. Each time:
+
+1. Do each task without looking at this file.
+2. Check your work against section 5, then reread the part of section 2 that covers anything you missed.
+3. Do a new task like each one you missed, from your own work if you can.
+
+Tasks:
+
+1. <task from a situation where the user will use the topic>
+2. <task in a different situation, that applies a rule to a case the lesson did not show>
+3. <task built on a mistake the user made in practice or a quiz>
+
+## 5. Worked solutions
+
+1. <solution, each step with its reason>
+2. <solution, each step with its reason>
+3. <solution, each step with its reason>
 
 ## Not covered
 
@@ -60,4 +75,4 @@ Source: [<source title>](<url>)
 
 In the chat, SEND the same content as one message, with the same headings.
 
-On a page, ADD a last chunk with one `text` card per section above. Put the answers on the last card.
+On a page, ADD a last chunk with one `text` card per section above. Put the worked solutions on the last card.

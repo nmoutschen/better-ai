@@ -97,6 +97,8 @@ The best-supported finding concerns how a take-away should be used, not the docu
 
 ## 4. What this means for `teach-better`
 
+The user later asked to optimise the skill for using the topic, not for recalling it. `sources/transfer-to-use-for-teaching.md` revises these points: practice and review use tasks from the user's own situations, and the take-away is a reference for use.
+
 These are inferences from the evidence above, not tested rules.
 
 1. **Give the take-away after the last quiz, and do not announce it earlier.** Expecting a record lowered memory for what it holds. Students who expected crib cards did worse without them. The skill's quizzes stay closed-book.
