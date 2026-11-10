@@ -28,7 +28,8 @@ LINK = re.compile(r"\]\(#([A-Za-z0-9_-]+)/(\d+)\)")
 CARD_KINDS = ("terms", "text", "example", "practice")
 BLOCK_TYPES = ("p", "list", "table", "steps", "timeline", "code")
 MARKS = ("allow", "reject", "neutral")
-VERDICTS = ("right", "partly", "wrong", "hint")
+VERDICTS = ("right", "partly", "wrong", "hint", "noted")
+FIELD_TYPES = ("text", "short", "choice", "rank")
 MAX_BODY = 40_000
 
 
@@ -129,7 +130,7 @@ def check_links(spec, where, errors):
             errors.append(f"{where}: link #{cid}/{n} points at no card")
 
 
-def check_fields(fields, where, errors, digest):
+def check_fields(fields, where, errors, warnings, digest):
     if not isinstance(fields, list) or not fields:
         errors.append(f"{where}: 'fields' must be a non-empty list")
         return
@@ -141,9 +142,34 @@ def check_fields(fields, where, errors, digest):
         seen.add(f["id"])
         if not isinstance(f.get("label"), str) or not f["label"].strip():
             errors.append(f"{where}: field {f['id']} needs a 'label'")
-        if f.get("type", "text") != "text":
-            errors.append(f"{where}: field {f['id']} 'type' must be text")
-        digest.append(f"    field {f['id']} {f.get('label', '')}" + (f" (prefill: {f['prefill']!r})" if f.get("prefill") else ""))
+        kind = f.get("type", "text")
+        if kind not in FIELD_TYPES:
+            errors.append(f"{where}: field {f['id']} 'type' must be one of {', '.join(FIELD_TYPES)}")
+            continue
+        line = f"    field {f['id']} [{kind}] {f.get('label', '')}"
+        if kind in ("text", "short"):
+            if f.get("prefill"):
+                line += f" (prefill: {f['prefill']!r})"
+            if "options" in f:
+                errors.append(f"{where}: field {f['id']} 'options' works only on choice and rank fields")
+            if "multiple" in f:
+                errors.append(f"{where}: field {f['id']} 'multiple' works only on choice fields")
+        else:
+            opts = f.get("options")
+            least = 3 if kind == "rank" else 2
+            if not isinstance(opts, list) or len(opts) < least or not all(isinstance(o, str) and o.strip() for o in opts):
+                errors.append(f"{where}: field {f['id']} needs 'options': a list of at least {least} non-empty strings")
+            elif len(set(opts)) != len(opts):
+                errors.append(f"{where}: field {f['id']} has duplicate options")
+            elif len(opts) > 8:
+                warnings.append(f"{where}: field {f['id']} has {len(opts)} options; more than 8 is hard to compare")
+            if "prefill" in f:
+                errors.append(f"{where}: field {f['id']} 'prefill' works only on text and short fields")
+            if "multiple" in f and (kind != "choice" or not isinstance(f["multiple"], bool)):
+                errors.append(f"{where}: field {f['id']} 'multiple' must be true or false, on a choice field")
+            if isinstance(opts, list):
+                line += (" (pick several)" if f.get("multiple") else "") + "".join(f"\n      - {o}" for o in opts)
+        digest.append(line)
 
 
 def check_card(card, where, errors, warnings, digest, seen_cards):
@@ -176,7 +202,7 @@ def check_card(card, where, errors, warnings, digest, seen_cards):
         seen_cards.add(pid)
         digest[-1] += f"  (id {pid})"
         if "fields" in card:
-            check_fields(card["fields"], where, errors, digest)
+            check_fields(card["fields"], where, errors, warnings, digest)
     blocks = card.get("blocks", [])
     if kind != "terms" and (not isinstance(blocks, list) or not blocks):
         errors.append(f"{where}: 'blocks' must be a non-empty list")
@@ -349,7 +375,17 @@ form { margin-top:22px; border-top:2px solid var(--line); padding-top:14px; disp
 label { display:grid; gap:4px; font:700 12px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
 label small { font-weight:400; letter-spacing:0; text-transform:none; }
 textarea { font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff; border:1px solid var(--line); padding:8px 10px; resize:vertical; min-height:4.5em; }
-textarea:focus { outline:2px solid var(--terracotta); outline-offset:0; border-color:transparent; }
+textarea:focus, input[type=text]:focus { outline:2px solid var(--terracotta); outline-offset:0; border-color:transparent; }
+input[type=text] { font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff; border:1px solid var(--line); padding:6px 10px; max-width:24rem; }
+fieldset[data-field] { display:grid; gap:6px; }
+.opts { display:grid; gap:6px; }
+.opts label { display:flex; gap:8px; align-items:baseline; font:400 15px var(--sans); letter-spacing:0; text-transform:none; color:var(--ink); }
+ol.rank { margin:0; padding:0; list-style:none; display:grid; gap:6px; counter-reset:r; }
+ol.rank li { counter-increment:r; display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); padding:6px 8px; font:400 15px var(--sans); letter-spacing:0; text-transform:none; color:var(--ink); }
+ol.rank li::before { content:counter(r); font:700 13px var(--sans); color:var(--muted); min-width:1.2em; }
+ol.rank li span { flex:1; }
+ol.rank button { font:700 13px var(--sans); border:1px solid var(--line); background:none; color:var(--heading); padding:2px 8px; cursor:pointer; }
+ol.rank button:disabled { opacity:.35; cursor:default; }
 fieldset { border:0; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; }
 fieldset legend { font:700 12px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:0; margin-bottom:4px; width:100%; }
 fieldset label { display:flex; gap:6px; align-items:center; font:400 14px var(--sans); letter-spacing:0; text-transform:none; color:var(--ink); }
@@ -363,7 +399,7 @@ fieldset label { display:flex; gap:6px; align-items:center; font:400 14px var(--
 .attempt .why { white-space:pre-wrap; margin:0 0 6px; color:var(--muted); font-size:14px; overflow-wrap:anywhere; }
 .fb { background:var(--linen); padding:8px 12px; margin-top:6px; }
 .fb .v { font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
-.fb.right .v { color:var(--moss); } .fb.wrong .v, .fb.hint .v { color:var(--terracotta); } .fb.partly .v { color:var(--umber); }
+.fb.right .v { color:var(--moss); } .fb.wrong .v, .fb.hint .v { color:var(--terracotta); } .fb.partly .v { color:var(--umber); } .fb.noted .v { color:var(--muted); }
 .fb .blocks p { font-size:15px; }
 .waiting { font-size:13px; color:var(--muted); font-style:italic; margin:4px 0 0; }
 .pager { display:flex; gap:10px; align-items:center; margin-top:28px; border-top:1px solid var(--linen); padding-top:14px; }
@@ -395,7 +431,7 @@ const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\
 const $ = id => document.getElementById(id);
 const KIND = {terms:"Key terms", text:"Explanation", example:"Worked example", practice:"Practice"};
 const MARK = {allow:["●", "var(--moss)"], reject:["✕", "var(--terracotta)"], neutral:["○", "var(--umber)"]};
-const VERDICT = {right:"Right", partly:"Partly right", wrong:"Not yet", hint:"Hint"};
+const VERDICT = {right:"Right", partly:"Partly right", wrong:"Not yet", hint:"Hint", noted:"Noted"};
 let L = null, A = [], pos = null, drafts = {}, sending = false;
 
 function chunks() { return (L && L.chunks) || []; }
@@ -464,7 +500,7 @@ function attemptHtml(a) {
 
 function form(card, quiz) {
   const tries = attemptsFor(card.id), last = tries[tries.length - 1];
-  const done = last && last.feedback && last.feedback.verdict === "right";
+  const done = last && last.feedback && ["right", "noted"].includes(last.feedback.verdict);  // "noted" closes a form that takes no verdict, such as a pre-question
   const pending = last && !last.feedback;
   if (quiz && last) return tries.map(attemptHtml).join("");  // a quiz question takes one answer
   const d = drafts[card.id] || {};
@@ -472,7 +508,25 @@ function form(card, quiz) {
   if (done || pending) return prior;
   const lastValue = id => last ? ((last.fields || []).find(x => x.id === id) || {}).value ?? (id === "answer" ? last.answer : undefined) : undefined;  // a retry starts from the previous answer
   const fields = card.fields || [{id:"answer", type:"text", label:"Your answer, and how you got it", hint:"in your own words"}];
-  const field = f => `<label>${inline(f.label)}${f.hint ? ` <small>(${esc(f.hint)})</small>` : ""}<textarea name="f:${esc(f.id)}" required rows="${fields.length > 1 ? 3 : 5}">${esc(d[`f:${f.id}`] ?? lastValue(f.id) ?? f.prefill ?? "")}</textarea></label>`;
+  const lastPick = f => { if (!last) return undefined; const r = (last.fields || []).find(x => x.id === f.id) || {}, got = r.order || r.selected;
+    return got ? got.map(o => f.options.indexOf(o)).filter(i => i >= 0) : undefined; };
+  const field = f => {
+    const kind = f.type || "text", name = `f:${f.id}`, head = `${inline(f.label)}${f.hint ? ` <small>(${esc(f.hint)})</small>` : ""}`;
+    if (kind === "short") return `<label>${head}<input type="text" name="${esc(name)}" required value="${esc(d[name] ?? lastValue(f.id) ?? f.prefill ?? "")}"></label>`;
+    if (kind === "choice") {
+      const picked = new Set((d[name] ?? lastPick(f) ?? []).map(String)), type = f.multiple ? "checkbox" : "radio";
+      return `<fieldset class="opts" data-field="${esc(f.id)}"><legend>${head}${f.multiple ? " <small>(choose all that apply)</small>" : ""}</legend>` +
+        f.options.map((o, i) => `<label><input type="${type}" name="${esc(name)}" value="${i}" ${picked.has(String(i)) ? "checked" : ""}> ${inline(o)}</label>`).join("") + `</fieldset>`;
+    }
+    if (kind === "rank") {
+      const order = d[name] ?? lastPick(f) ?? f.options.map((_, i) => i);
+      return `<fieldset data-field="${esc(f.id)}"><legend>${head} <small>(first is best; use the arrows to reorder)</small></legend><ol class="rank">` +
+        order.map((i, k) => `<li><span>${inline(f.options[i])}</span><button type="button" data-rank="${esc(f.id)}" data-from="${k}" data-to="${k - 1}" aria-label="Move up" ${k ? "" : "disabled"}>↑</button>` +
+          `<button type="button" data-rank="${esc(f.id)}" data-from="${k}" data-to="${k + 1}" aria-label="Move down" ${k < order.length - 1 ? "" : "disabled"}>↓</button></li>`).join("") +
+        `</ol><input type="hidden" name="${esc(name)}" value="${esc(JSON.stringify(order))}"></fieldset>`;
+    }
+    return `<label>${head}<textarea name="${esc(name)}" required rows="${fields.length > 1 ? 3 : 5}">${esc(d[name] ?? lastValue(f.id) ?? f.prefill ?? "")}</textarea></label>`;
+  };
   return prior + `<form id="answer" data-id="${esc(card.id)}">
     ${fields.map(field).join("")}
     <fieldset><legend>How confident are you? <small>(optional)</small></legend>
@@ -513,13 +567,31 @@ function show() {
   $("next").onclick = () => go(next);
   const f = $("answer");
   if (f) {
-    f.oninput = () => { const fd = new FormData(f); drafts[f.dataset.id] = Object.fromEntries(fd); };
+    const collect = () => {  // every field's value, keyed "f:<id>": text, an option index list, or a rank order
+      const fd = new FormData(f), out = {confidence: fd.get("confidence") || undefined};
+      (cardAt(pos).fields || [{id:"answer", type:"text"}]).forEach(fl => {
+        const name = `f:${fl.id}`, kind = fl.type || "text";
+        out[name] = kind === "rank" ? JSON.parse(fd.get(name) || "[]") : kind === "choice" ? fd.getAll(name) : fd.get(name);
+      });
+      return out;
+    };
+    f.oninput = f.onchange = () => { drafts[f.dataset.id] = collect(); };
+    f.querySelectorAll("button[data-rank]").forEach(b => b.onclick = () => {
+      const d = collect(), name = `f:${b.dataset.rank}`, order = d[name], from = +b.dataset.from, to = +b.dataset.to;
+      [order[from], order[to]] = [order[to], order[from]];
+      drafts[f.dataset.id] = d; show();
+      const near = d => $("answer") && $("answer").querySelector(`button[data-rank="${CSS.escape(b.dataset.rank)}"][data-from="${to}"][data-to="${to + d}"]`);
+      const step = to < from ? -1 : 1, again = [near(step), near(-step)].find(x => x && !x.disabled);  // keep focus on the moved item
+      if (again) again.focus();
+    });
     f.onsubmit = async ev => {
       ev.preventDefault(); if (sending) return; sending = true;
-      const fd = Object.fromEntries(new FormData(f)), card = cardAt(pos), out = {};
-      (card.fields || [{id:"answer", type:"text"}]).forEach(fl => {
-        out[fl.id] = fd[`f:${fl.id}`];
-      });
+      const fd = collect(), card = cardAt(pos), out = {};
+      for (const fl of card.fields || [{id:"answer", type:"text"}]) {
+        const v = fd[`f:${fl.id}`];
+        if (fl.type === "choice" && !v.length) { alert(`Choose an option: ${fl.label}`); sending = false; return; }
+        out[fl.id] = fl.type === "choice" ? (fl.multiple ? v.map(Number) : Number(v[0])) : v;
+      }
       f.querySelector("button").disabled = true;
       try {
         const r = await fetch("/answer", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:f.dataset.id, confidence:fd.confidence, fields:out})});
@@ -594,6 +666,39 @@ PAGE = PAGE.replace("__VERSION__", VERSION)
 
 # ---------- server ----------
 
+def read_field(f: dict, raw) -> tuple[dict, str]:
+    """Turn one submitted field into the record written to answers/, or return why it is refused.
+    Choice and rank fields arrive as option indexes and are stored as the option texts."""
+    kind, label = f.get("type", "text"), f["label"]
+    record = {"id": f["id"], "label": label, "type": kind}
+    if kind in ("text", "short"):
+        value = str(raw or "").strip()[:5000]
+        if not value or value == str(f.get("prefill", "")).strip():
+            return {}, f"fill in: {label}"
+        record["value"] = value
+        return record, ""
+    opts = f.get("options") or []
+    picks = raw if isinstance(raw, list) else ([] if raw in (None, "") else [raw])
+    try:
+        picks = [int(i) for i in picks]
+    except (TypeError, ValueError):
+        return {}, f"not a valid answer: {label}"
+    if any(not 0 <= i < len(opts) for i in picks) or len(set(picks)) != len(picks):
+        return {}, f"not a valid answer: {label}"
+    chosen = [opts[i] for i in picks]
+    if kind == "rank":
+        if len(picks) != len(opts):
+            return {}, f"rank every option: {label}"
+        record["order"] = chosen
+        record["value"] = "; ".join(f"{n}. {o}" for n, o in enumerate(chosen, 1))
+    else:
+        if not picks or (len(picks) > 1 and not f.get("multiple")):
+            return {}, f"choose {'at least one option' if f.get('multiple') else 'one option'}: {label}"
+        record["selected"] = chosen
+        record["value"] = "; ".join(chosen)
+    return record, ""
+
+
 def save_answer(lesson: Path, payload: dict) -> tuple[int, str]:
     spec = read_json(lesson / "lesson.json", {})
     ids = answerable(spec)
@@ -605,11 +710,11 @@ def save_answer(lesson: Path, payload: dict) -> tuple[int, str]:
     confidence = payload.get("confidence") if payload.get("confidence") in ("low", "medium", "high") else None
     answers, lines = [], []
     for f in fields:
-        value = str(sent.get(f["id"]) or "").strip()[:5000]
-        if not value or value == str(f.get("prefill", "")).strip():
-            return 400, f"fill in: {f['label']}"
-        answers.append({"id": f["id"], "label": f["label"], "value": value})
-        lines.append(value if len(fields) == 1 else f"{f['label']}: {value}")
+        record, error = read_field(f, sent.get(f["id"]))
+        if error:
+            return 400, error
+        answers.append(record)
+        lines.append(record["value"] if len(fields) == 1 else f"{f['label']}: {record['value']}")
     answer = "\n".join(lines)
     folder = lesson / "answers"
     folder.mkdir(exist_ok=True)

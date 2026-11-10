@@ -68,7 +68,7 @@ FOLLOW `/write-better` for the wording: plain words, one term per concept, liter
 
 ### 6.2. Keep skills short and self-contained
 
-KEEP each SKILL.md well under 500 lines. KEEP common mistakes and their fixes in SKILL.md, not in a reference file the agent may not open.
+KEEP each skill self-contained: SKILL.md, its templates and its scripts DO NOT link to or depend on files outside the skill's directory, such as reports in `sources/`. KEEP each SKILL.md well under 500 lines. KEEP common mistakes and their fixes in SKILL.md, not in a reference file the agent may not open.
 
 PUT copyable formats in `templates/`, with placeholders only. DO NOT include example content in templates.
 

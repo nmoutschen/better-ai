@@ -47,7 +47,18 @@ Each card is one screen. The learner moves through them with Back and Next.
 | `example` | A worked example, each step with its reason | `title`, `blocks` |
 | `practice` | A problem and the answer form | `id`, `title`, `blocks` |
 
-A practice card's answer form has one required box for the answer and how the learner got it, then an optional confidence rating (low, medium or high). IF the question asks several things, GIVE one box per thing with `fields`: `[{"id": "<field id>", "label": "<what this box answers>", "prefill": "<optional>"}]`. A box left as its prefill counts as empty.
+A practice card's answer form has one required box for the answer and how the learner got it, then an optional confidence rating (low, medium or high). IF the question asks several things, GIVE one field per thing with `fields`. Every field is required.
+
+| `type` | Shows | Fields |
+|---|---|---|
+| `text` (default) | A multi-line box | `id`, `label`, optional `prefill`. A box left as its prefill counts as empty |
+| `short` | A one-line box, for a number, a word or an option number | `id`, `label`, optional `prefill` |
+| `choice` | One option to pick, or several with `"multiple": true` | `id`, `label`, `options`: 2 to 8 strings, optional `multiple` |
+| `rank` | The options in a list the learner reorders, best first | `id`, `label`, `options`: 3 to 8 strings |
+
+`options` show in the order you list them, and a `rank` field starts in that order. LIST them in an order that does not hint at the answer.
+
+ASK for the reasoning in a `text` field next to a `choice` or `rank` field: a choice alone does not show how the learner got it.
 
 ## Blocks
 
@@ -78,13 +89,15 @@ Each mark has its own symbol and colour: ● `allow`, ✕ `reject`, ○ `neutral
 Written by the page. Read it; do not edit it.
 
 ```json
-{"id": "<card id>", "attempt": 0, "quiz": false, "answer": "<every field as readable text>", "fields": [{"id": "<field id>", "label": "<label>", "value": "<text>"}], "confidence": "low | medium | high | null", "at": "<time>"}
+{"id": "<card id>", "attempt": 0, "quiz": false, "answer": "<every field as readable text>", "fields": [{"id": "<field id>", "label": "<label>", "type": "<field type>", "value": "<text>"}], "confidence": "low | medium | high | null", "at": "<time>"}
 ```
+
+A `choice` field also has `"selected"`: the chosen options. A `rank` field also has `"order"`: every option, best first.
 
 ## feedback/<id>.<n>.json
 
 ```json
-{"verdict": "right | partly | wrong | hint", "text": "<reply>", "blocks": []}
+{"verdict": "right | partly | wrong | hint | noted", "text": "<reply>", "blocks": []}
 ```
 
-`blocks` is optional and takes the block types above. `text` takes the same inline marks as `p`, including links to a card. After a `right` verdict the form closes. After any other verdict the learner can try again, and each box starts with their previous answer.
+`blocks` is optional and takes the block types above. `text` takes the same inline marks as `p`, including links to a card. After a `right` verdict the form closes. `noted` also closes it, without judging the answer: USE it only where the answer takes no verdict, such as a pre-question. After any other verdict the learner can try again, and each box starts with their previous answer.
