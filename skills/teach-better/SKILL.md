@@ -25,6 +25,7 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 12. Guessing answers before studying raises later scores on the questions asked, not on other material.
 13. Concrete examples help most when the link to the abstract rule is stated. Extra detail in an example hurts transfer.
 14. None of the tools in section 2.4 has been tested with an AI tutor. Treat them as the best available guide, not as tested for this setting.
+15. Answering questions about material helps later recall more than rereading a summary of it. Learners who expect to keep a record of the material remember less of it, unless they intend to learn it. Studies disagree on whether a summary the learner writes beats one they are given. In older studies, reviewing both did best, and a summary given to learners helped them recall facts but not apply them. No study tested a take-away written by an AI.
 
 ## 1. Confirm that the user wants to learn
 
@@ -191,7 +192,7 @@ DO NOT accept "I get it" or "makes sense" as evidence of understanding. TRUST wh
 
 WHEN the user returns to the topic in a later message or session, START with two or three quiz questions on earlier chunks before teaching new material. IF earlier chunks hold problem types the user could confuse, MIX those questions, following the mixed set tool.
 
-AT the end of the lesson, SUGGEST when to review, such as the next day and a week later, and OFFER questions they can use. DO NOT schedule anything without the user's permission.
+AT the end of the lesson, SUGGEST when to review, such as the next day and a week later. PUT the review questions in the take-away (section 6.2). DO NOT schedule anything without the user's permission.
 
 ## 5. Handle pushback
 
@@ -205,8 +206,24 @@ IF the user's GOAL changes from learning to getting a result, STOP teaching and 
 
 ## 6. End the lesson
 
+### 6.1. Say what the user can do
+
 SUMMARISE what the user can now do, based on the quizzes, and what they still struggled with. FOR a decision scenario, REPORT agreement with the cited experts, not decision skill: the link between the two is untested. LIST the chunks not covered, if any.
 
 DO NOT praise the user's progress beyond what the quizzes show.
+
+### 6.2. Give a take-away
+
+AFTER the last quiz, GIVE the user a take-away: a document they keep for review and for use without AI. The user can decline it.
+
+1. **Timing.** DO NOT mention the take-away before the last quiz is done, and DO NOT give it before then. Learners who expect to keep a record remember less of what it holds. IF the user asks for notes during the lesson, SAY that a take-away comes after the last quiz, and that the quizzes stay closed-book. IF the user still wants notes now, GIVE them, as in section 5. IF the lesson ends before the last quiz, GIVE the take-away when it ends.
+2. **The user's own summary first.** ASK the user to write, from memory and without looking back, what they can now do and the rules they would need. SAY it is optional and takes a few minutes. Writing it is a retrieval exercise, and in older studies reviewing one's own notes together with the tutor's did best. GIVE no verdict on it. ON a page, ASK in a `practice` card with one `text` field, and REPLY with the verdict `noted`. USE the summary in the next step.
+3. **Write the take-away.** READ [templates/take-away.md](templates/take-away.md) and FOLLOW its format. LEAD with review questions, with answers kept apart, because answering questions helps later recall more than rereading a summary. ADD a short reference: each rule with its conditions, one worked example per chunk, and the mistakes the user made in practice and quizzes. A summary alone helped learners recall facts but not apply them, so INCLUDE at least one review question that applies a rule to a new case. NAME what the user's summary in step 2 left out or got wrong, at the place in the take-away that covers it.
+4. **Keep it to the lesson.** INCLUDE only what the lesson taught and the user practised. CITE the same sources as the cards. CHECK every rule, example and answer as in section 3.5: the user will use the take-away without AI, with no one to catch an error.
+5. **Deliver it.** IF you can write files, WRITE it to `.teach/<topic-slug>/take-away.md` and GIVE the user its path once. IF the user wants it elsewhere or in another format, FOLLOW that. ON a page, ALSO ADD it as the last chunk, titled "Take-away", with a `text` card per section. OTHERWISE, SEND it in the chat as one message.
+
+The format of a take-away is a design choice: no study tested one written by an AI tutor.
+
+### 6.3. Close the lesson
 
 ON a page, SET the lesson's `status` to `ended`, so the server stops.
