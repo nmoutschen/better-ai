@@ -17,7 +17,7 @@ GIVE the user a situation and a set of options. ASK them to rank the options and
 
 1. FIND the source. PREFER a documented case, so the expert view belongs to that exact situation.
 2. WRITE the situation: what is happening, what the decision maker knows, and what they must decide now.
-3. LIST three to five numbered options, including options the source advises against.
+3. LIST three to five options, including options the source advises against. ORDER them so the list does not hint at the source's ranking.
 4. ASK the user to rank the options, and to give the reasons for their first choice and what they paid attention to. ADD the decision checks fields IF the GOAL needs planning.
 5. WAIT for the answer.
 6. SHOW the source's choice and reasons, with a link, and a table that sets the user's ranking next to the source's.
@@ -31,11 +31,8 @@ Verdict on a page: `right` IF the user's first choice matches the source's first
 
 ```json
 {"kind": "practice", "id": "<chunk-id>-scenario", "title": "<decision to make>",
- "blocks": [{"type": "p", "text": "<situation>"},
-            {"type": "list", "numbered": true, "items": ["<option>", "<option>", "<option>"]}],
- "fields": [{"id": "first", "label": "Your first choice (option number)"},
-            {"id": "second", "label": "Your second choice (option number)"},
-            {"id": "last", "label": "Your last choice (option number)"},
+ "blocks": [{"type": "p", "text": "<situation>"}],
+ "fields": [{"id": "rank", "type": "rank", "label": "Rank the options", "options": ["<option>", "<option>", "<option>"]},
             {"id": "why", "label": "Why you chose your first choice, and what you paid attention to"}]}
 ```
 
