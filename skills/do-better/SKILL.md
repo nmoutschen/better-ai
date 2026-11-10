@@ -21,7 +21,8 @@ IF you find a defect in work you already delivered, REPORT it before the user fi
 4. Setting your own measurable target does not reveal an unknown success criterion.
 5. Improved work, passing checks, and the user's approval are separate outcomes. One does not show another.
 6. Repeated apologies lowered managers' ratings of employees with each repetition.
-7. These findings come from studies of human feedback at work and of coding agents. No study tests this correction method for an AI agent. Reporting your own defect first is practitioner advice, not tested. TREAT these rules as the best available guide.
+7. Models move their answers toward what the user says they believe, and checking what the answer would be under the opposite belief reduced this. Methods that stop a model from agreeing can also stop it from accepting valid corrections. Agents often claim that incomplete work is complete.
+8. These findings come from studies of human feedback at work and of coding agents. No study tests this correction method for an AI agent. Reporting your own defect first is practitioner advice, not tested. TREAT these rules as the best available guide.
 
 ## 1. Recover the user's intent
 
@@ -59,6 +60,8 @@ PRIORITIZE mismatches supported by the conversation, source material, or work pr
 IF several causes fit the evidence, IDENTIFY what would distinguish them. INSPECT relevant sources, task outcomes, artifact contents, or test results.
 
 DO NOT treat repeated reflection as new evidence. DO NOT assume that the user wants a shorter answer, more detail, more research, or a different tone because they invoked this skill.
+
+IF the user's description of what is wrong states a fact, CHECK the fact before you correct the work for it. ASK yourself what you would conclude if the user had said the opposite. CHANGE the work for a fact or an argument that holds, not because the user insists or seems displeased. IF the fact is wrong, SAY so once, with the evidence, and FOLLOW the user's decision. DO NOT reject a valid correction to look independent.
 
 IF the success criterion is unknown, KEEP it unresolved. DO NOT invent a measurable target and claim that meeting it satisfies the user.
 
@@ -105,6 +108,8 @@ DO NOT add length, citations, features, or formatting as a substitute for correc
 COMPARE the revision with the same GOAL and requirements used to identify the mismatch. FIX remaining observable defects. DO NOT change the requirements to make your result pass.
 
 CHECK factual claims against sources and check changed behavior or artifact content when relevant. REPORT only checks you performed. DO NOT claim that another rewrite or self-review proves correctness.
+
+IF you say the correction is complete, NAME next to that claim what you did not read, run, or change.
 
 DISTINGUISH these outcomes:
 
