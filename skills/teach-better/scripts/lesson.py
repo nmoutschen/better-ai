@@ -28,7 +28,7 @@ LINK = re.compile(r"\]\(#([A-Za-z0-9_-]+)/(\d+)\)")
 CARD_KINDS = ("terms", "text", "example", "practice")
 BLOCK_TYPES = ("p", "list", "table", "steps", "timeline", "code")
 MARKS = ("allow", "reject", "neutral")
-VERDICTS = ("right", "partly", "wrong", "hint")
+VERDICTS = ("right", "partly", "wrong", "hint", "noted")
 FIELD_TYPES = ("text", "short", "choice", "rank")
 MAX_BODY = 40_000
 
@@ -399,7 +399,7 @@ fieldset label { display:flex; gap:6px; align-items:center; font:400 14px var(--
 .attempt .why { white-space:pre-wrap; margin:0 0 6px; color:var(--muted); font-size:14px; overflow-wrap:anywhere; }
 .fb { background:var(--linen); padding:8px 12px; margin-top:6px; }
 .fb .v { font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
-.fb.right .v { color:var(--moss); } .fb.wrong .v, .fb.hint .v { color:var(--terracotta); } .fb.partly .v { color:var(--umber); }
+.fb.right .v { color:var(--moss); } .fb.wrong .v, .fb.hint .v { color:var(--terracotta); } .fb.partly .v { color:var(--umber); } .fb.noted .v { color:var(--muted); }
 .fb .blocks p { font-size:15px; }
 .waiting { font-size:13px; color:var(--muted); font-style:italic; margin:4px 0 0; }
 .pager { display:flex; gap:10px; align-items:center; margin-top:28px; border-top:1px solid var(--linen); padding-top:14px; }
@@ -431,7 +431,7 @@ const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\
 const $ = id => document.getElementById(id);
 const KIND = {terms:"Key terms", text:"Explanation", example:"Worked example", practice:"Practice"};
 const MARK = {allow:["●", "var(--moss)"], reject:["✕", "var(--terracotta)"], neutral:["○", "var(--umber)"]};
-const VERDICT = {right:"Right", partly:"Partly right", wrong:"Not yet", hint:"Hint"};
+const VERDICT = {right:"Right", partly:"Partly right", wrong:"Not yet", hint:"Hint", noted:"Noted"};
 let L = null, A = [], pos = null, drafts = {}, sending = false;
 
 function chunks() { return (L && L.chunks) || []; }
@@ -500,7 +500,7 @@ function attemptHtml(a) {
 
 function form(card, quiz) {
   const tries = attemptsFor(card.id), last = tries[tries.length - 1];
-  const done = last && last.feedback && last.feedback.verdict === "right";
+  const done = last && last.feedback && ["right", "noted"].includes(last.feedback.verdict);  // "noted" closes a form that takes no verdict, such as a pre-question
   const pending = last && !last.feedback;
   if (quiz && last) return tries.map(attemptHtml).join("");  // a quiz question takes one answer
   const d = drafts[card.id] || {};

@@ -21,9 +21,12 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 8. Asking learners why a stated fact or rule is true helps them remember it, mostly for facts and at short delays. It works when the learner builds the explanation, and many learners write poor explanations.
 9. Mixing problem types that learners could confuse raises scores on later tests, though it lowers scores during practice and learners judge it worse. It did not help with word lists or long texts.
 10. For decisions, comparing the learner's ranking and reasons with those of real experts raised agreement with the experts, without a teacher present. Whether it improves real decisions is unknown. No study tested an expert view written by an AI.
-11. None of the tools in section 2.4 has been tested with an AI tutor. Treat them as the best available guide, not as tested for this setting.
+11. Comparing two examples side by side helps learners who already know one of them, and hurts novices who know neither. Learners rarely compare unless asked a specific question.
+12. Guessing answers before studying raises later scores on the questions asked, not on other material.
+13. Concrete examples help most when the link to the abstract rule is stated. Extra detail in an example hurts transfer.
+14. None of the tools in section 2.4 has been tested with an AI tutor. Treat them as the best available guide, not as tested for this setting.
 
-The evidence is in [sources/ai-agent-teaching-new-topics.md](../../sources/ai-agent-teaching-new-topics.md), [sources/lesson-page-vs-chat-tutoring.md](../../sources/lesson-page-vs-chat-tutoring.md), [sources/deep-explanatory-questions-for-teaching.md](../../sources/deep-explanatory-questions-for-teaching.md), [sources/interleaved-practice-for-teaching.md](../../sources/interleaved-practice-for-teaching.md) and [sources/tactical-decision-games-for-teaching.md](../../sources/tactical-decision-games-for-teaching.md). You do not need them to teach.
+The evidence is in [sources/ai-agent-teaching-new-topics.md](../../sources/ai-agent-teaching-new-topics.md), [sources/lesson-page-vs-chat-tutoring.md](../../sources/lesson-page-vs-chat-tutoring.md), [sources/deep-explanatory-questions-for-teaching.md](../../sources/deep-explanatory-questions-for-teaching.md), [sources/interleaved-practice-for-teaching.md](../../sources/interleaved-practice-for-teaching.md), [sources/tactical-decision-games-for-teaching.md](../../sources/tactical-decision-games-for-teaching.md), [sources/analogical-comparison-for-teaching.md](../../sources/analogical-comparison-for-teaching.md), [sources/pre-questions-for-teaching.md](../../sources/pre-questions-for-teaching.md), [sources/concrete-abstract-linking-for-teaching.md](../../sources/concrete-abstract-linking-for-teaching.md) and [sources/erroneous-examples-for-teaching.md](../../sources/erroneous-examples-for-teaching.md). You do not need them to teach.
 
 ## 1. Confirm that the user wants to learn
 
@@ -83,7 +86,7 @@ A lesson mixed with other conversation, with many parts in one message, can be h
    - START each message with a heading that names the chunk and the card, with their positions, such as "Chunk 2 of 5: Joins · Card 3 of 3: Practice".
    - AT the start of each chunk, SHOW the plan as a list, with done chunks marked and the current chunk named.
    - IN a practice card, NUMBER each thing you ask, and ASK the user to answer by number.
-   - START feedback with its verdict: right, partly, wrong, or hint.
+   - START feedback with its verdict: right, partly, wrong, or hint. A pre-question takes no verdict.
    - WHEN a hint points to earlier material, NAME the card by its heading.
    - SEND a quiz as one message with numbered questions, headed as a closed-book quiz.
    - AFTER answering a side question, END with one line naming the card the lesson continues from.
@@ -96,7 +99,9 @@ A tool is a teaching move with its own template in `templates/tools/`. READ a to
 
 | Tool | Template | Moment | Use when |
 |---|---|---|---|
+| Pre-questions | [pre-questions.md](templates/tools/pre-questions.md) | Before teaching a chunk | The chunk teaches facts or rules that a later quiz will test |
 | Why prompt | [why-prompt.md](templates/tools/why-prompt.md) | After an explanation card that states a key fact or rule | The GOAL needs the user to explain facts or rules |
+| Compare examples | [compare-examples.md](templates/tools/compare-examples.md) | After the user has practised one method or case | A second method or case for the same idea exists |
 | Question stems | [question-stems.md](templates/tools/question-stems.md) | Around a long reading | A chunk asks the user to read a long text |
 | Decision checks | [decision-checks.md](templates/tools/decision-checks.md) | A practice card where the user chooses a course of action | The GOAL is to make a kind of decision |
 | Decision scenario | [decision-scenario.md](templates/tools/decision-scenario.md) | Practice and quiz | The GOAL is to make a kind of decision, AND you have a cited source of expert judgement |
@@ -106,7 +111,7 @@ AT each moment, CHOOSE in this order:
 
 1. MATCH the GOAL and the moment against the table. IF no tool matches, USE the cards of sections 3 and 4 alone.
 2. CHECK the "Do not use" list in the tool's template. IF any item applies, DO NOT use the tool.
-3. IF the user struggled on the last practice problem, DO NOT add a mixed set or a decision scenario yet. GIVE more support first (section 3.2).
+3. IF the user struggled on the last practice problem, DO NOT add a mixed set, a decision scenario or a comparison yet. GIVE more support first (section 3.2).
 4. USE at most one tool per card. Each tool adds time and effort for the user.
 5. IF the user states a preference about a tool, FOLLOW it. The one exception is the first common mistake below.
 6. WHEN a tool changes what the user sees, SAY so in one line, such as "This quiz mixes problems from chunks 1 to 3 on purpose."
@@ -116,20 +121,23 @@ Common mistakes:
 - Writing the expert view of a decision scenario yourself. Without a cited source, the user compares against your guess. USE decision checks instead, and SAY that no expert comparison is available. This holds even if the user asks for a scenario.
 - Reading lower scores on a mixed set as failure. Mixed practice is harder by design. RE-TEACH only when the user picks the wrong method for the same type again.
 - Accepting a circular or empty answer to a why prompt. CHECK each explanation as you check a practice answer.
+- Judging a pre-question guess. The user has not studied the chunk yet. ACKNOWLEDGE the guesses, and let the chunk's cards give the answers.
 
 RECORD the plan and the user's progress in `.teach/<topic-slug>/`, so a later session can resume and review: in `lesson.json` on a page, OTHERWISE in a `notes.md` file there. DO NOT store lessons in memory. IF you cannot write files, KEEP them in your working notes.
 
 ## 3. Teach each chunk
 
+BEFORE the first card of a chunk, CONSIDER the pre-questions tool (section 2.4).
+
 ### 3.1. Explain, then show a worked example
 
 EXPLAIN the idea briefly, using the key terms from section 2.2. FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
 
-SHOW a worked example: a solved problem with each step and the reason for each step. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation. ON a page, USE a `table`, `steps` or `timeline` block. IN the chat, USE a Markdown table or a list. DO NOT draw a plain-text diagram by hand: models draw them badly. WRITE a formula in a `code` block, with one operation per line, not inside a sentence, a table cell or a step note.
+SHOW a worked example: a solved problem with each step and the reason for each step. WHEN a card shows a formula, rule or symbol next to an example, STATE which part of the example each symbol stands for, such as in a table with one row per symbol. KEEP examples to the features the rule needs: extra detail hurts transfer. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation. ON a page, USE a `table`, `steps` or `timeline` block. IN the chat, USE a Markdown table or a list. DO NOT draw a plain-text diagram by hand: models draw them badly. WRITE a formula in a `code` block, with one operation per line, not inside a sentence, a table cell or a step note.
 
 WHEN a chunk asks the user to read a long text, GIVE a short instruction before the reading, saying what to look for, and one after it, saying what to check. CONSIDER the question stems tool (section 2.4).
 
-AFTER an explanation card that states a key fact or rule the GOAL needs, CONSIDER the why prompt tool (section 2.4).
+AFTER an explanation card that states a key fact or rule the GOAL needs, CONSIDER the why prompt tool (section 2.4). AFTER the user has practised one method or case, CONSIDER the compare examples tool.
 
 FOR a complex or open problem where the user already knows the basics, ASK them to attempt it BEFORE you show the worked example. FOR material that is new to the user, SHOW the example first. Evidence on attempting first is mixed, and it helped most on complex tasks.
 
@@ -161,7 +169,7 @@ DO NOT write the work for the user, such as their code, essay or solution. The l
 
 WHEN the user answers, ASK them to explain their answer in their own words. Asking for an explanation and a confidence rating had a larger effect than the type of feedback the AI gave. The explanation is likely what helps: a separate confidence rating added nothing on its own. ASK for confidence only as an option. ASK for the answer and the reasoning together, in one reply. ON a page, IF a question asks several things, GIVE one answer box per thing. IF the reasoning is missing, ASK for it in the feedback.
 
-THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. Explaining why is a design choice: the research did not find whether it beats only saying right or wrong. ON a page, WRITE this to `feedback/` with the verdict `right`, `partly`, `wrong` or `hint`.
+THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. Explaining why is a design choice: the research did not find whether it beats only saying right or wrong. ON a page, WRITE this to `feedback/` with the verdict `right`, `partly`, `wrong` or `hint`. USE `noted` only for a pre-question.
 
 ### 3.5. Check your own hints and feedback
 
