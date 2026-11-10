@@ -22,8 +22,6 @@ Being invoked means: find the structure and the relations in the content that a 
 7. Generated slides fail mostly through missing content, then wrong values. Language models read text diagrams far more reliably than they draw them, so every diagram is laid out by code.
 8. No study tests a visual introduction placed before a full research paper or business document. Rules marked as design choices rest on neighbouring evidence.
 
-The evidence is in [sources/visual-storytelling.md](../../sources/visual-storytelling.md) and [sources/visual-presentations.md](../../sources/visual-presentations.md).
-
 ## 1. Know the goal, the reader and the medium
 
 ### 1.1. Name the GOAL

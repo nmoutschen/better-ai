@@ -26,8 +26,6 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 13. Concrete examples help most when the link to the abstract rule is stated. Extra detail in an example hurts transfer.
 14. None of the tools in section 2.4 has been tested with an AI tutor. Treat them as the best available guide, not as tested for this setting.
 
-The evidence is in [sources/ai-agent-teaching-new-topics.md](../../sources/ai-agent-teaching-new-topics.md), [sources/lesson-page-vs-chat-tutoring.md](../../sources/lesson-page-vs-chat-tutoring.md), [sources/deep-explanatory-questions-for-teaching.md](../../sources/deep-explanatory-questions-for-teaching.md), [sources/interleaved-practice-for-teaching.md](../../sources/interleaved-practice-for-teaching.md), [sources/tactical-decision-games-for-teaching.md](../../sources/tactical-decision-games-for-teaching.md), [sources/analogical-comparison-for-teaching.md](../../sources/analogical-comparison-for-teaching.md), [sources/pre-questions-for-teaching.md](../../sources/pre-questions-for-teaching.md), [sources/concrete-abstract-linking-for-teaching.md](../../sources/concrete-abstract-linking-for-teaching.md) and [sources/erroneous-examples-for-teaching.md](../../sources/erroneous-examples-for-teaching.md). You do not need them to teach.
-
 ## 1. Confirm that the user wants to learn
 
 ### 1.1. Name the GOAL
