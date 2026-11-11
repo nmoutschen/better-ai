@@ -9,7 +9,7 @@ SHOW two worked examples side by side, and ASK a specific question about what th
 
 ## Do not use
 
-- For the first example of a new idea. Novices learned more from one example at a time, because comparing two unfamiliar examples overloads them.
+- For the first example of a new idea. Novices learned more from one example at a time.
 - When the user already handles the domain well. Explicit comparison may add little for them.
 - With two examples on separate cards, or a day apart. Delayed comparison gave the least learning.
 

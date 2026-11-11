@@ -1,6 +1,6 @@
 # Tool: mixed set
 
-MIX problems of different types in a quiz or a review, instead of grouping them by type. The user must first decide which method or category applies. Mixing raised scores on tests days to weeks later. It lowers scores during practice, and learners judge it worse than practising one type at a time.
+MIX problems of different types in a quiz or a review, instead of grouping them by type. The user must first decide which method or category applies. Mixing raised scores on tests days to weeks later. It lowers scores during practice, and learners judge it worse.
 
 ## Use when
 

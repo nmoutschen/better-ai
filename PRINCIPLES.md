@@ -28,7 +28,7 @@ WHEN a skill records preferences in memory, it RECORDS only preferences the user
 
 ### 3.1. Ask only what only the user knows
 
-A skill TELLS the agent to look up what the context can answer and to ask the user only about the rest. WHEN it lets the agent proceed without asking, it TELLS the agent to state the assumption next to the result it affects, so the user can correct it without investigating.
+A skill TELLS the agent to look up what the context can answer and to ask the user only about the rest. WHEN it lets the agent proceed without asking, it TELLS the agent to state the assumption next to the result it affects.
 
 ### 3.2. More is not better
 

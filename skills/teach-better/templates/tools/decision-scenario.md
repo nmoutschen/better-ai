@@ -9,13 +9,13 @@ GIVE the user a situation and a set of options. ASK them to rank the options and
 
 ## Do not use
 
-- Without a cited source. DO NOT write the expert view yourself, even if the user asks: the user would compare against your guess. USE decision checks instead, and SAY that no expert comparison is available.
+- Without a cited source, even if the user asks. USE decision checks instead, and SAY that no expert comparison is available.
 - When the source does not cover the options you would list. LIST only options the source discusses.
 - When the user struggled on the last practice problem. GIVE more support first.
 
 ## Steps
 
-1. FIND the source. PREFER a documented case, so the expert view belongs to that exact situation.
+1. FIND the source. PREFER a documented case.
 2. WRITE the situation: what is happening, what the decision maker knows, and what they must decide now.
 3. LIST three to five options, including options the source advises against. ORDER them so the list does not hint at the source's ranking.
 4. ASK the user to rank the options, and to give the reasons for their first choice and what they paid attention to. ADD the decision checks fields IF the GOAL needs planning.
