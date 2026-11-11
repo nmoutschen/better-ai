@@ -1,11 +1,11 @@
 ---
 name: review-for-<name>
-description: How <name> reviews <kind of work>. Use to check work against <name>'s criteria before showing it to them, or to review work the way they would.
+description: How <name> reviews <kind of work>. Use to check work against <name>'s criteria before showing it to them, or to review work the way they would, together with any skill that reviews work, such as /code-better. Adds <name>'s criteria to that skill's review; does not replace it.
 ---
 
 # Review for <name>
 
-USE these criteria to check <kind of work> before you show it to <name>, or to review it the way they would. FIX a blocking criterion before you send the work. REPORT a preference as a suggestion.
+USE these criteria to check <kind of work> before you show it to <name>, or to review it the way they would. APPLY them on top of the skill that does the review, such as `/code-better` for code. That skill checks that the work is correct; these criteria add what <name> checks. FIX a blocking criterion before you send the work. REPORT a preference as a suggestion.
 
 These criteria are about the work. They are not a reason to agree with <name> or to change what you would conclude.
 

@@ -80,10 +80,22 @@ Invoking a skill tells the agent to apply its method, not what the result must b
 
 ### 6.4. Link skills instead of repeating them
 
-WHEN a skill needs another skill's method, NAME it ("FOLLOW `/write-better` if available") and GIVE a short fallback for when it is missing.
+WHEN a skill needs another skill's method, NAME it ("FOLLOW `/write-better` if available") and GIVE a short fallback for when it is missing. No harness offers a portable way for one skill to declare or call another, so the name in the text is the link.
+
+WRITE the fallback so the step works without the other skill. Naming a skill does not make the agent load it: agents skip skills they are told to use.
+
+REFER to what the other skill does, not to its internals, such as its section numbers, wording or output format. A skill that relies on another skill's internals breaks when that skill changes.
+
+PREFER linking another skill at the end of a workflow, and PUT the steps the result depends on before the link. In some harnesses the agent stops when the other skill returns, and the remaining steps never run. TREAT this as a guide, not a rule.
 
 ### 6.5. Use a script only for consistent output
 
 ADD a script only when a step must produce the same form whatever the content, such as rendering a page. The agent supplies the content and the script supplies the form, so the agent never sees or reproduces the style. For example, `/show-better` writes a spec and `show.py` renders it. DO NOT add a script for a step the agent can do from instructions.
 
 WRITE scripts with the Python standard library only, so they run with `python3` and need no installs or network access.
+
+### 6.6. Keep each skill's purpose distinct
+
+KEEP each skill's purpose distinct from the other skills', and WRITE a description that says when to use it. Agents confuse skills whose purposes overlap or whose descriptions are vague.
+
+WHEN two skills cover the same kind of work, such as `/write-better` and a user's `write-for-<name>`, SAY in both how they relate: which one applies the general method, and which one adjusts it.

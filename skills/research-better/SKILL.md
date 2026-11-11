@@ -156,8 +156,8 @@ APPLY the stop rules in section 6.4 to the whole board. WHEN they apply, SET the
 
 CHECK that each claim you present is on the board with its sources, and that the claims the conclusion depends on are verified.
 
-START from the question summaries on the board. PRESENT the findings with `/write-better`. IF it is not available, LEAD with the answer, STATE where sources disagree or the evidence is weak, and STATE what the research could not find.
-
 CITE sources in APA style (7th edition): an author–date citation in the text for each main claim, such as (Han & Zhang, 2025), and a reference list at the end with author, date, title, publisher or site, and URL. BUILD the reference list from the board's source entries only. IF an entry lacks a field, OPEN the source and COPY it from there. DO NOT fill in authors, titles, or dates from memory. WRITE "n.d." when the source itself has no date.
 
 LIST the questions that remain open, and any blocked source that could change the answer. IF the board is a directory, GIVE its path so the user or a later session can resume.
+
+START from the question summaries on the board. PRESENT the findings, with the citations, the reference list and the open questions, using `/write-better`. IF it is not available, LEAD with the answer, STATE where sources disagree or the evidence is weak, and STATE what the research could not find.
