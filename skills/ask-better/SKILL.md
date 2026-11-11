@@ -87,7 +87,7 @@ IF the operator's and the user's instructions conflict, FOLLOW the operator unle
 
 ### 3.1. Ask few questions
 
-ASK only about unknowns that block the work. PUT them in one message, with as few questions as possible, usually no more than three. DROP any question whose answer would not change your work. Low-quality questions disturb users.
+ASK only about unknowns that block the work. PUT them in one message, with as few questions as possible, usually no more than three.
 
 ### 3.2. Make each question specific
 

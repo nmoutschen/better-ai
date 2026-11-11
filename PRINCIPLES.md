@@ -8,7 +8,7 @@ These principles are the author's preferences for what the skills do and how the
 
 EACH skill starts from a research report in `sources/`, produced with `/research-better`. A rule enters a skill only if the report supports it, if this file asks for it, or if the skill states it as a design choice. A rule that rests on one study or on practitioner guidance gets softer wording, such as "TREAT this as a guide, not a rule".
 
-START each skill with a short Principles section that states the findings its rules depend on. ADD a short reason to a rule when the reason is not obvious, such as "because learners misjudge it". DO NOT describe the research in a skill: no citations, effect sizes, references to studies, or statements about where the evidence comes from, how strong it is, or what it does not cover. They belong in the source report. A skill shows a weak rule only through softer wording or by naming it a design choice.
+START each skill with a short Principles section that states the findings two or more of its rules depend on. ADD a short reason to a rule when the reason is not obvious, such as "because learners misjudge it". A finding that only one rule depends on goes there, as that rule's reason, not in the Principles section. STATE each finding once. DO NOT describe the research in a skill: no citations, effect sizes, references to studies, or statements about where the evidence comes from, how strong it is, or what it does not cover. They belong in the source report.
 
 A skill DOES NOT ask the agent to rely on facts from its training data. The user wants the agent's ability to read and reason, not what it remembers.
 
@@ -82,9 +82,7 @@ Invoking a skill tells the agent to apply its method, not what the result must b
 
 ### 6.4. Link skills instead of repeating them
 
-WHEN a skill needs another skill's method, NAME it ("FOLLOW `/write-better` if available") and GIVE a short fallback for when it is missing. No harness offers a portable way for one skill to declare or call another, so the name in the text is the link.
-
-WRITE the fallback so the step works without the other skill. Naming a skill does not make the agent load it: agents skip skills they are told to use.
+WHEN a skill needs another skill's method, NAME it ("FOLLOW `/write-better` if available") and GIVE a short fallback that makes the step work without it, because naming a skill does not make the agent load it. No harness offers a portable way for one skill to declare or call another, so the name in the text is the link.
 
 REFER to what the other skill does, not to its internals, such as its section numbers, wording or output format. A skill that relies on another skill's internals breaks when that skill changes.
 

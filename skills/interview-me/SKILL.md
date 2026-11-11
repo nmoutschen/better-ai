@@ -16,15 +16,14 @@ Being invoked does NOT mean a long interview or new rules are needed. IF the exi
 
 ## Principles
 
-1. What people say helps them can differ from what does help them. Learners preferred, and felt they learned more from, the format that taught them less.
-2. The criteria people state for judging work only partly match the criteria their actual judgments reveal, and experts leave out much of what they do when they describe it.
-3. Comparing concrete work samples and justifying the choice made tacit quality criteria partly explicit. Walking through one real incident, and asking about the options the person rejected, revealed the reasons behind their actions.
-4. Recall of past behaviour is imperfect, even for recent days. A document the user wrote or reacted to is stronger evidence than their memory of it.
-5. A hypothetical question shows what a person knows a situation requires. It is weaker evidence of what they will do or prefer.
-6. AI interviewers produce answers of about the same quality as human interviewers. Their main failure is not following up on surprising or unclear answers. Agree/disagree questions give lower-quality answers than questions about the item itself, and answers get worse late in a long questionnaire.
-7. A user profile stored in an LLM's memory made it more agreeable and made it personalize where it should not. Examples of output the user approved carried most of the benefit of a profile.
-8. Users accepting a summary of their interview shows that they accept it, not that it is accurate.
-9. These rules adapt methods from other settings to an AI interviewing a user about their own reading or reviewing. TREAT them as a guide, not as fixed rules.
+1. What people say helps them, and the criteria they state for judging work, only partly match what helps them and what their actual judgments reveal. Learners preferred, and felt they learned more from, the format that taught them less, and experts leave out much of what they do when they describe it.
+2. Comparing concrete work samples and justifying the choice made tacit quality criteria partly explicit. Walking through one real incident revealed the reasons behind a person's actions.
+3. Recall of past behaviour is imperfect, even for recent days. A document the user wrote or reacted to is stronger evidence than their memory of it.
+4. A hypothetical question shows what a person knows a situation requires. It is weaker evidence of what they will do or prefer.
+5. AI interviewers produce answers of about the same quality as human interviewers. Their main failure is not following up on surprising or unclear answers.
+6. A user profile stored in an LLM's memory made it more agreeable and made it personalize where it should not.
+7. Users accepting a summary of their interview shows that they accept it, not that it is accurate.
+8. These rules adapt methods from other settings to an AI interviewing a user about their own reading or reviewing. TREAT them as a guide, not as fixed rules.
 
 ## 1. Prepare
 
@@ -51,9 +50,9 @@ APPLY these rules to every question in sections 3 and 4.
 
 ### 2.1. Ask about one thing, in its own terms
 
-ASK about the item itself, such as "How long should the first paragraph be?", not "Do you agree that short openings are better?". People tend to agree with a statement they are offered.
+ASK about the item itself, such as "How long should the first paragraph be?", not "Do you agree that short openings are better?". Agree/disagree questions give lower-quality answers than questions about the item itself.
 
-ASK about one thing per question. GIVE each answer you need its own question. IF you use a structured question tool, such as `AskUserQuestion`, OFFER concrete options and LET the user write their own. OTHERWISE, ASK in plain text.
+ASK about one thing per question. IF you use a structured question tool, such as `AskUserQuestion`, OFFER concrete options and LET the user write their own. OTHERWISE, ASK in plain text.
 
 DO NOT suggest the answer you expect, and DO NOT praise or judge the user's answers.
 
@@ -84,11 +83,11 @@ THEN PROBE the points where they made a choice:
 2. What they would have changed about the document, and what they would have kept.
 3. Whether they could act on it without asking anyone, and what was missing if not.
 
-ASK what they rejected: "Was there another way this could have been written that would have been worse?" The reasons behind a choice show most clearly in the options a person did not take.
+ASK what they rejected: "Was there another way this could have been written that would have been worse?" Asking about the options a person rejected revealed the reasons behind their actions.
 
 ### 3.2. Compare versions
 
-WRITE two short versions of the same passage. TAKE it from the user's own material when possible. CHANGE one thing between the two versions, such as where the main point appears, the length, the use of a list, the technical terms, or the amount of context. CHANGING one thing at a time makes the reason for the choice clear. This is a design choice, not a tested rule.
+WRITE two short versions of the same passage. TAKE it from the user's own material when possible. CHANGE one thing between the two versions, such as where the main point appears, the length, the use of a list, the technical terms, or the amount of context. This is a design choice, not a tested rule.
 
 FOR each pair, ASK:
 
@@ -120,7 +119,7 @@ ASK what they did not comment on and why. Criteria a reviewer applies but does n
 
 SHOW two versions of a small piece of work in the user's domain, such as two functions, two paragraphs, or two plans. TAKE them from the user's material or from your own work in this conversation when possible. MAKE them differ on one point that the walk-through did not settle.
 
-ASK which one they would approve, which comment they would write on the other, and whether that comment blocks approval. A reviewer's comparison with a justification brings out criteria they cannot list from memory.
+ASK which one they would approve, which comment they would write on the other, and whether that comment blocks approval.
 
 ### 4.3. Separate blocking criteria from preferences
 
@@ -143,7 +142,7 @@ WRITE each rule with:
 
 DO NOT write traits, such as "the user is detail-oriented" or "the user is an expert". WRITE the behaviour the trait was meant to cause instead, with its scope.
 
-DO NOT write anything the user did not confirm, any condition or diagnosis, or any view the user holds on a topic. The guides are about form and criteria. A stored profile made models more agreeable, so the guides SAY that they are not a reason to agree with the user.
+DO NOT write anything the user did not confirm, any condition or diagnosis, or any view the user holds on a topic. The guides are about form and criteria, and SAY that they are not a reason to agree with the user.
 
 KEEP each guide short enough to read in a few minutes. A rule earns its place only when it changes what an agent would do without it, including an agent already following `/write-better` for `write-for`, or `/code-better` for a code review in `review-for`. The guides adjust those general skills for one user; DO NOT repeat their rules.
 
@@ -171,4 +170,4 @@ DO NOT rewrite rules the update does not concern. SHOW the user the changed rule
 
 STATE what the guides were built from: which documents and reviews you read, how many comparisons the user made, and which parts were skipped. IF a part rests only on what the user said, SAY so.
 
-DO NOT claim the guides will improve the output. They are untested until agents use them and the user corrects less, or more.
+DO NOT claim the guides will improve the output.

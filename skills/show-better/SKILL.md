@@ -18,9 +18,8 @@ Being invoked means: find the structure and the relations in the content that a 
 3. Plain diagrams supported transfer to new cases better than rich, detailed ones. Readers who already know a topic need less guidance, and guidance can get in their way.
 4. Readers learn more deeply from content in segments they move through at their own pace. Keeping one structure from panel to panel helped memory, and most professional visual stories move from general to specific.
 5. Readers recall a panel's message from its headline, and take the most prominent feature of a visual as its point.
-6. Reach, preference and engagement do not show understanding. Readers prefer formats they do not learn more from, and polish does not show that a visual is understood.
-7. Generated slides fail mostly through missing content, then wrong values. Language models read text diagrams far more reliably than they draw them, so every diagram is laid out by code.
-8. Placing a visual introduction before a full research paper or business document is a design choice, and so are the rules marked as design choices.
+6. Generated slides fail mostly through missing content, then wrong values. Language models read text diagrams far more reliably than they draw them, so every diagram is laid out by code.
+7. Placing a visual introduction before a full research paper or business document is a design choice, and so are the rules marked as design choices.
 
 ## 1. Know the goal, the reader and the medium
 
@@ -61,7 +60,7 @@ PUT the question and the answer on the cover: the title states the answer, and t
 THEN, in this order:
 
 1. An overview panel that shows how the document's main ideas relate, usually a `concept` or `groups` panel. This is the organizer: it shows the ideas, not the list of sections.
-2. One panel or a few panels per important part, in the document's order, moving from the general to the specific. SET each panel's `part` to the section it introduces, and its `read` to where the reader finds the detail.
+2. One panel or a few panels per important part, in the document's order. SET each panel's `part` to the section it introduces, and its `read` to where the reader finds the detail.
 3. A closing panel on the point the GOAL needs most.
 
 DO NOT add a panel that only lists the document's sections: the strip above each panel already shows where the reader is. USE a `map` only when the reader must find their way in a long document.
@@ -111,7 +110,7 @@ FOLLOW the conventions of the reader's field when they differ.
 
 - KEEP one structure across panels: the same kind for the same kind of point, and the same order of items.
 - MOVE from general to specific: the whole before its parts, the main result before its conditions.
-- WHERE the document has one, USE a concrete case to introduce an abstract point. This is a design choice: plain, abstract diagrams supported transfer better than rich, concrete ones, so KEEP the case itself plain.
+- WHERE the document has one, USE a concrete case to introduce an abstract point, and KEEP the case itself plain. This is a design choice.
 - PUT the question before its answer. IN a business document, the complication comes before the proposal.
 - STATE limits in the note of the panel whose claim they qualify.
 
@@ -119,7 +118,7 @@ FOLLOW the conventions of the reader's field when they differ.
 
 ### 4.1. Make the point clear
 
-WRITE the headline as a full sentence that states what the reader should conclude from this panel. Readers remember the headline, so it MUST match what the visual shows.
+WRITE the headline as a full sentence that states what the reader should conclude from this panel. The headline MUST match what the visual shows.
 
 MAKE the headline's point the most prominent part of the visual. MARK with `highlight` the one or two items that carry the point, and leave the rest neutral. HIGHLIGHT only items the headline names, so the reader can see why they stand out. IF the headline names none, highlight nothing. IF the point is a small feature of the data, CHANGE the visual so that feature stands out, such as by sorting, filtering or showing the difference itself.
 
@@ -137,7 +136,7 @@ SHOW only what the reader needs to understand the point. Details about how the r
 
 ### 4.4. Check the wording
 
-CHECK the wording of the title, the summary, every headline, label and note. FOLLOW `/write-better` for this if available, THEN CONTINUE with section 5. With or without it, KEEP words the reader already knows: EXPLAIN or REPLACE research terms, such as "voice" or "ingratiation", and metaphors, such as "lever". USE one term for one idea across panels. KEEP labels, relations and section descriptions to a few words, and PUT conditions in the note. A headline names what the reader should conclude, so DO NOT leave it vaguer than its visual, such as "depends on several factors".
+CHECK the wording of the title, the summary, every headline, label and note. FOLLOW `/write-better` for this if available, THEN CONTINUE with section 5. With or without it, KEEP words the reader already knows: EXPLAIN or REPLACE research terms, such as "voice" or "ingratiation", and metaphors, such as "lever". USE one term for one idea across panels. KEEP labels, relations and section descriptions to a few words. A headline names what the reader should conclude, so DO NOT leave it vaguer than its visual, such as "depends on several factors".
 
 ### 4.5. Custom diagrams
 
