@@ -31,6 +31,16 @@ def born(path: Path) -> float:
     return getattr(stat, "st_birthtime", stat.st_mtime)
 
 
+def md_files(folder: Path) -> list:
+    """The board's .md files in a folder, in name order; none if the folder does not exist yet."""
+    return sorted(folder.glob("*.md")) if folder.is_dir() else []
+
+
+def log_lines(path: Path) -> list:
+    """The non-blank lines of an agent's log."""
+    return [line for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
+
+
 def read_entry(path: Path) -> dict:
     entry = {}
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -48,18 +58,15 @@ def load(board: Path) -> dict:
     if (board / "brief.md").exists():
         data["brief"] = read_entry(board / "brief.md")
     for kind in KINDS:
-        folder = board / kind
-        files = sorted(folder.glob("*.md")) if folder.is_dir() else []
-        data[kind] = [read_entry(path) for path in files]
-    if (board / "logs").is_dir():
-        for path in sorted((board / "logs").glob("*.md")):
-            lines = [line for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
-            stamped = []
-            for i, line in enumerate(lines):
-                key = (path.stem, i, line)
-                stamped.append([FIRST_SEEN.get(key), line])
-            data["logs"][path.stem] = {"last": lines[-1] if lines else "", "lines": stamped[-60:], "count": len(lines),
-                                       "_born": born(path), "_changed": path.stat().st_mtime}
+        data[kind] = [read_entry(path) for path in md_files(board / kind)]
+    for path in md_files(board / "logs"):
+        lines = log_lines(path)
+        stamped = []
+        for i, line in enumerate(lines):
+            key = (path.stem, i, line)
+            stamped.append([FIRST_SEEN.get(key), line])
+        data["logs"][path.stem] = {"last": lines[-1] if lines else "", "lines": stamped[-60:], "count": len(lines),
+                                   "_born": born(path), "_changed": path.stat().st_mtime}
     return data
 
 
@@ -74,9 +81,8 @@ def page(snapshot: dict | None) -> str:
 def stamp_logs(board: Path, initial: bool) -> None:
     """Record when each log line first appears. Lines present before the viewer started get no time."""
     now = time.time()
-    for path in sorted((board / "logs").glob("*.md")) if (board / "logs").is_dir() else []:
-        lines = [line for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
-        for i, line in enumerate(lines):
+    for path in md_files(board / "logs"):
+        for i, line in enumerate(log_lines(path)):
             FIRST_SEEN.setdefault((path.stem, i, line), None if initial else now)
 
 

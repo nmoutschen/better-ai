@@ -36,6 +36,11 @@ MAX_BODY = 40_000
 
 # ---------- reading ----------
 
+def filled(value) -> bool:
+    """A string with something other than whitespace in it."""
+    return isinstance(value, str) and bool(value.strip())
+
+
 def read_json(path: Path, default=None):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -81,7 +86,7 @@ def check(spec) -> tuple[list[str], list[str], list[str]]:
     if not isinstance(spec, dict):
         return ["lesson.json is missing or is not a JSON object"], [], []
     for key in ("title", "goal"):
-        if not isinstance(spec.get(key), str) or not spec[key].strip():
+        if not filled(spec.get(key)):
             errors.append(f"top level: '{key}' must be a non-empty string")
     if spec.get("status", "active") not in ("active", "ended"):
         errors.append("top level: 'status' must be 'active' or 'ended'")
@@ -104,7 +109,7 @@ def check(spec) -> tuple[list[str], list[str], list[str]]:
         if status not in ("planned", "current", "done", "skipped"):
             errors.append(f"{where}: 'status' must be planned, current, done or skipped")
         current += status == "current"
-        if not isinstance(chunk.get("title"), str) or not chunk["title"].strip():
+        if not filled(chunk.get("title")):
             errors.append(f"{where}: 'title' is required")
         digest.append(f"\nCHUNK {cid} [{status}{', quiz' if chunk.get('quiz') else ''}]  {chunk.get('title', '')}")
         cards = chunk.get("cards", [])
@@ -141,7 +146,7 @@ def check_fields(fields, where, errors, warnings, digest):
             errors.append(f"{where}: each field needs a unique 'id' (letters, digits, - or _)")
             continue
         seen.add(f["id"])
-        if not isinstance(f.get("label"), str) or not f["label"].strip():
+        if not filled(f.get("label")):
             errors.append(f"{where}: field {f['id']} needs a 'label'")
         kind = f.get("type", "text")
         if kind not in FIELD_TYPES:
@@ -181,7 +186,7 @@ def check_card(card, where, errors, warnings, digest, seen_cards):
     if kind not in CARD_KINDS:
         errors.append(f"{where}: 'kind' must be one of {', '.join(CARD_KINDS)}")
         return
-    if not isinstance(card.get("title"), str) or not card["title"].strip():
+    if not filled(card.get("title")):
         errors.append(f"{where}: 'title' is required")
     digest.append(f"  [{kind}] {card.get('title', '')}")
     if kind == "terms":
@@ -218,7 +223,7 @@ def check_block(b, where, errors, warnings, digest):
         return
     t = b["type"]
     if t == "p":
-        if not isinstance(b.get("text"), str) or not b["text"].strip():
+        if not filled(b.get("text")):
             errors.append(f"{where}: 'text' is required")
         else:
             digest.append(f"    {b['text']}")
