@@ -1,6 +1,6 @@
 ---
 name: write-better
-description: Helps an AI agent write better. Improves AI agents' structure and clarity.
+description: Helps an AI agent write or rewrite text the user understands and acts on, such as an answer, a report, a message or a document. Use it for any text the user reads; use show-better to add visual panels before a dense document, and the user's own write-for-NAME guide, if they have one, with it.
 ---
 
 # Write Better
@@ -23,7 +23,7 @@ Being invoked does NOT mean the text needs large changes. A text that already me
 
 ### 1.1. Identify the reader
 
-LOOK UP what the context says about the reader: the conversation, project files, and memories. IF the user or project has its own writing guide or writing skill, FOLLOW it.
+LOOK UP what the context says about the reader: the conversation, project files, and memories. IF the user or project has its own writing guide or writing skill, such as `write-for-<name>`, FOLLOW it as well. These instructions give the general method; the user's guide adjusts it for that reader, and overrides these rules where the two conflict.
 IF the user stated how they prefer to read, FOLLOW that preference over the general rules below. IF a stored preference changes the output, SAY so in one sentence.
 DO NOT infer the user's ability, education, or background from their dialect, spelling, or fluency. Models give less accurate and more condescending answers to users who write non-standard English, and guess demographics from stereotyped cues.
 IF the user disclosed a diagnosis or condition, DO NOT change the content or advice because of it. ADAPT the format only as the user asks. Models that tailor answers to a disclosed diagnosis apply stereotypes, and some readers find the result patronising.
@@ -38,7 +38,7 @@ OTHERWISE, IDENTIFY the main GOAL of your writing:
 3. The user DOES something thanks to the output.
 4. The user DECIDES something thanks to the output.
 
-IF the context does not show the GOAL, CHOOSE the most plausible one and STATE it in one sentence next to the result, so the user can correct it. ASK only when a wrong GOAL would waste a large amount of the user's work. FOLLOW `/ask-better` for the question if available. OTHERWISE, ASK one question with these options, using a structured question tool such as `AskUserQuestion` if available, or in plain text at the end of your response:
+IF the context does not show the GOAL, CHOOSE the most plausible one and STATE it in one sentence next to the result, so the user can correct it. ASK only when a wrong GOAL would waste a large amount of the user's work. FOLLOW `/ask-better` for the question if available, THEN CONTINUE with section 1.3. OTHERWISE, ASK one question with these options, using a structured question tool such as `AskUserQuestion` if available, or in plain text at the end of your response:
 
 ```
 [question] How will you use this writing?
@@ -107,7 +107,7 @@ DO NOT add a visual that only decorates, or one that repeats the prose word for 
 ### 3.5. Keep the format adjustable
 
 WHEN you control the format, PUBLISH live text, so the user can change its size, spacing, and colours or have it read aloud.
-DO NOT rely on dyslexia-specific fonts or Bionic Reading. Evidence does not show that they help.
+DO NOT rely on dyslexia-specific fonts or Bionic Reading. Dyslexia fonts gave no gain in reading, even for dyslexic readers. The rule on Bionic Reading is a design choice.
 
 ### 3.6. Bold a few key ideas
 

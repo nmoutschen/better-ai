@@ -9,6 +9,8 @@ argument-hint: "[TOPIC]"
 IF invoked with a topic as argument, TEACH that topic.
 IF invoked without argument, TEACH the topic the user is currently asking about or working on.
 
+Being invoked does NOT mean you must teach. IF the user wants a result now rather than the ability to produce it, these instructions end with the answer (section 1.1).
+
 ## Principles
 
 1. Answers from an AI raise a learner's scores while it helps and lower them once it is gone. Hints instead of answers avoid that loss, though learners rate hints as slower and less useful.
@@ -17,7 +19,7 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 4. Help that suits a beginner can hinder a learner who knows more. Adapt to what the learner can do: matching a stated learning style has little support.
 5. Asking learners to explain their answers helped in every medium tested. The lesson page is a design choice.
 6. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Training effects shrink when measured by what people do at work instead of by tests. Practice on real tasks, plans for when to use a skill, and feedback on real use each went with more use.
-7. Learners can state a rule and still not see when it applies. Questions train the kind of task they ask for: application questions helped fact questions, but fact questions did not help application, and pre-questions helped only the material they asked about. Cases where a rule does not apply helped learners find what the rule needs, in small laboratory studies.
+7. Learners can state a rule and still not see when it applies. Questions train the kind of task they ask for: application questions helped fact questions, but fact questions did not help application, and pre-questions helped only the material they asked about. Cases where a rule does not apply helped learners find what the rule needs.
 8. A reference at hand helps people perform, but cannot tell them when to use it, and learners who expect to keep a record remember less of it. Skills decay without use, and spaced practice slows the decay.
 9. The tools in section 2.4 and the take-away are design choices for an AI tutor. TREAT these rules as a guide, not as fixed rules.
 
@@ -43,7 +45,7 @@ IF you cannot tell, ASK once, using the question tool if available:
 
 LOOK UP what context already shows: earlier conversation, memories, the user's files and role.
 
-THEN ASK one or two short questions that test the prerequisites, such as a small problem or "what does X mean?". DO NOT ask the user to rate their own knowledge, because learners misjudge it. KEEP this check short: no tested method exists for a quick knowledge test in a conversation.
+THEN ASK one or two short questions that test the prerequisites, such as a small problem or "what does X mean?". DO NOT ask the user to rate their own knowledge, because learners misjudge it. KEEP this check short. This check is a design choice.
 
 ## 2. Plan the lesson
 
@@ -53,6 +55,7 @@ DO NOT teach from your training data alone: a definition you are sure of can sti
 
 - IF `/research-better` is available and the topic is not trivial, USE it, and BUILD the lesson from its findings.
 - FOR a trivial topic, or without `/research-better`, SEARCH the web and READ the pages that define the topic's key terms.
+- AFTER the research, CONTINUE with section 2.2. The research is a step of the lesson, not its end.
 - IF you have no web search and no page fetch, TELL the user that the lesson rests on your own knowledge, and ASK whether they have sources you should use.
 
 CITE the source on each card that states a definition or a fact, with a link.
@@ -63,7 +66,7 @@ BREAK the topic into small chunks. Each chunk teaches one idea or one step and e
 
 ORDER the chunks so each builds on earlier ones. NAME each chunk by what the user will do, such as "Pick the join for a report", not by the term it teaches.
 
-INTRODUCE a key term in the chunk that first needs it, not in an opening list. STATE the idea in plain words first, THEN GIVE the term. TEACH a term for its own sake only IF the user must use it with other people, such as colleagues or documentation. IF the topic is a system with many named parts, a short card on the parts and what each does BEFORE the explanation is the exception: naming the parts first helped transfer. Evidence on when to introduce terms is thin and points both ways.
+INTRODUCE a key term in the chunk that first needs it, not in an opening list. STATE the idea in plain words first, THEN GIVE the term. TEACH a term for its own sake only IF the user must use it with other people, such as colleagues or documentation. IF the topic is a system with many named parts, a short card on the parts and what each does BEFORE the explanation is the exception: naming the parts first helped transfer. TREAT the timing of terms as a guide, not a rule.
 
 SHOW the user the plan: the GOAL and the list of chunks. LET the user reorder, skip or add chunks.
 
@@ -137,7 +140,7 @@ WHEN a chunk asks the user to read a long text, GIVE a short instruction before 
 
 AFTER an explanation card that states a key fact or rule the GOAL needs, CONSIDER the why prompt tool (section 2.4). AFTER the user has practised one method or case, CONSIDER the compare examples tool.
 
-FOR a complex or open problem where the user already knows the basics, ASK them to attempt it BEFORE you show the worked example. FOR material that is new to the user, SHOW the example first. Evidence on attempting first is mixed, and it helped most on complex tasks.
+FOR a complex or open problem where the user already knows the basics, ASK them to attempt it BEFORE you show the worked example. FOR material that is new to the user, SHOW the example first. Attempting first helped most on complex tasks. TREAT this as a guide, not a rule.
 
 ### 3.2. Give a practice problem
 
@@ -151,7 +154,7 @@ IF the GOAL is to make a kind of decision, USE the decision tools in section 2.4
 
 ADAPT the chunks still to come to the user's answers, not the chunks already taught: those stay as the user saw them. IF an answer shows a gap, RE-TEACH the missed step at the start of the next chunk, with a new example. IF the user succeeds easily, SHORTEN the next chunk's worked example. IF the user says something is hard to follow, such as how values are shown, CHANGE it from the next card on.
 
-BUILD practice problems from the situations where the user will use the topic (section 1.1), from the first problem on. VARY the situation between problems, so the user does not tie the rule to one case. Training that resembled the work situation went with more use afterwards. No study compared first problems from the learner's own work with generic ones: this is a design choice. DO NOT personalise problems to the user's hobbies or to fields where they will not use the topic: that raised motivation without improving learning.
+BUILD practice problems from the situations where the user will use the topic (section 1.1), from the first problem on. VARY the situation between problems, so the user does not tie the rule to one case. Training that resembled the work situation went with more use afterwards. Taking the first problem from the user's own situations is a design choice. DO NOT personalise problems to the user's hobbies or to fields where they will not use the topic: that raised motivation without improving learning.
 
 ### 3.3. Respond with hints, not answers
 
@@ -169,7 +172,7 @@ DO NOT write the work for the user, such as their code, essay or solution. The l
 
 WHEN the user answers, ASK them to explain their answer in their own words. Asking for an explanation and a confidence rating had a larger effect than the type of feedback the AI gave. The explanation is likely what helps: a separate confidence rating added nothing on its own. ASK for confidence only as an option. ASK for the answer and the reasoning together, in one reply. ON a page, IF a question asks several things, GIVE one answer box per thing. IF the reasoning is missing, ASK for it in the feedback.
 
-THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. Explaining why is a design choice: the research did not find whether it beats only saying right or wrong. ON a page, WRITE this to `feedback/` with the verdict `right`, `partly`, `wrong` or `hint`. USE `noted` only for a pre-question.
+THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. Explaining why is a design choice. ON a page, WRITE this to `feedback/` with the verdict `right`, `partly`, `wrong` or `hint`. USE `noted` only for a pre-question.
 
 ### 3.5. Check your own hints and feedback
 
@@ -195,7 +198,7 @@ BEFORE the end of the lesson, ASK when the user will next use the topic, and how
 
 - IF the user will use it within days and regularly, real use is the practice. AGREE with the user on a first use as soon as possible: few chances to use a skill were the main barrier to using it, and reviews of training advise a short delay before first use. PLAN a follow-up where the user brings that real attempt and gets feedback on it, as the default end of the lesson. The user can decline it. Coaching on real work after training went with gains in what people did.
 - IF the user will not use it for weeks or longer, PLAN three practice sessions, and PUT their dates in the take-away (section 6.2). SET the first gap to about a fifth to a third of the time until the user needs the skill when that is a week or a few weeks, and to about a twentieth to a tenth when it is a year. KEEP later gaps equal or growing. A gap that is too long costs much less than one that is too short.
-- IF the user will use it rarely, SUGGEST one more session a few months after the last one. Unused procedural skills lost about half their gains in accuracy after six months.
+- IF the user will use it rarely, SUGGEST one more session a few months after the last one. Unused procedural skills decay within months.
 
 Learners rarely plan practice themselves, and daily reminder messages did not make them practise. Learners who chose a program that a system scheduled completed most of it. IF the harness can schedule a task, OFFER to start each session on its date. OTHERWISE, OFFER to add the dates to the user's calendar. TREAT this as a guide. DO NOT schedule anything without the user's permission.
 
@@ -233,7 +236,7 @@ AFTER the last quiz, GIVE the user a take-away: a reference they keep open while
 3. **Write the take-away.** READ [templates/take-away.md](templates/take-away.md) and FOLLOW its format. LEAD with when to use the topic: the situations, the signs that a rule applies, and the user's plans. A reference cannot tell the user when to open it. THEN GIVE the steps as a checklist, each rule with its conditions, a short account of why it works, one worked example per chunk, and the mistakes the user made. A checklist helped most for steps people rarely use, and knowing why a procedure works helped with new cases. END with practice tasks from the user's situations, with their dates from section 4.2 and worked solutions kept apart.
 4. **Keep it to the lesson.** INCLUDE only what the lesson taught and the user practised. CITE the same sources as the cards. CHECK every rule, example and answer as in section 3.5: the user will use the take-away without AI, with no one to catch an error.
 5. **Deliver it.** IF you can write files, WRITE it to `.teach/<topic-slug>/take-away.md` and GIVE the user its path once. IF the user wants it elsewhere or in another format, FOLLOW that. ON a page, ALSO ADD it as the last chunk, titled "Take-away", with a `text` card per section. OTHERWISE, SEND it in the chat as one message.
-6. **Use it once.** GIVE one task from the user's situations to do with the take-away open, and GIVE feedback. About a third of trainees given an aid did not use it, and the authors concluded that people need practice in when and how to use one.
+6. **Use it once.** GIVE one task from the user's situations to do with the take-away open, and GIVE feedback. People given an aid often leave it unused until they have practised when and how to use it.
 
 The format of a take-away is a design choice.
 

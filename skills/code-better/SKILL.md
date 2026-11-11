@@ -60,7 +60,7 @@ IF you cannot write files, PUT the requirements in your reply.
 
 ### 1.5. Check the requirements with the user
 
-USE `/ask-better` if available. OTHERWISE, ASK only about requirement gaps that only the user can answer, that change what you build, and that are costly to get wrong. ASK all such questions at once, before building.
+USE `/ask-better` if available, THEN CONTINUE with section 2 once the user answers. OTHERWISE, ASK only about requirement gaps that only the user can answer, that change what you build, and that are costly to get wrong. ASK all such questions at once, before building.
 
 SHOW the scenarios the gap affects, with concrete inputs and outputs, and ASK the user to confirm or correct each one. DO NOT ask the user to review prose requirements or code instead.
 

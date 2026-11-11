@@ -24,7 +24,7 @@ Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only)
   "kicker": "Optional small label above the title, such as the date or the topic",
   "source": "Optional line naming where the content comes from",
   "lang": "en",
-  "document": {"title": "The document this introduces", "sections": [{"id": "goals", "label": "Goals", "gist": "Optional, a few words"}]},
+  "document": {"title": "The document this introduces", "sections": [{"id": "<section-id>", "label": "<section title>", "gist": "Optional, a few words"}]},
   "panels": [ ... ]
 }
 ```
@@ -39,7 +39,7 @@ Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only)
 | `headline` | yes | A full sentence that states what the reader should conclude from this panel |
 | `note` | no | Short text shown beside the visual: the source, a condition, a limit. A string or a list of paragraphs. Write links as `[<author> (<year>)](<url>)` |
 | `part` | no | The `document` section id, or list of ids, that this panel introduces |
-| `read` | no | Where to read the detail in the document, by section title, such as "Forms, the table of reader evidence" |
+| `read` | no | Where to read the detail in the document, by section title |
 
 Highlight only the one or two items that carry the headline's point.
 
@@ -48,7 +48,7 @@ Highlight only the one or two items that carry the headline's point.
 ### `map`: the document's parts in order
 
 ```json
-{"kind": "map", "headline": "...", "highlight": ["findings", "agents"]}
+{"kind": "map", "headline": "...", "highlight": ["<section-id>"]}
 ```
 
 Draws the top-level `document.sections`, or its own `sections` list. `highlight` marks the parts to read first.
@@ -57,8 +57,8 @@ Draws the top-level `document.sections`, or its own `sections` list. `highlight`
 
 ```json
 {"kind": "concept", "headline": "...",
- "nodes": [{"id": "slow", "label": "Slow page loads", "highlight": true}, {"id": "tickets", "label": "Support tickets"}],
- "edges": [{"from": "slow", "to": "tickets", "label": "leads to"}]}
+ "nodes": [{"id": "<node-a>", "label": "<idea>", "highlight": true}, {"id": "<node-b>", "label": "<idea>"}],
+ "edges": [{"from": "<node-a>", "to": "<node-b>", "label": "<how they relate>"}]}
 ```
 
 Every edge needs a `label` that says how the two relate, in a few words; conditions go in the note. Up to about 12 nodes.
@@ -66,8 +66,8 @@ Every edge needs a `label` that says how the two relate, in a few words; conditi
 ### `tree`: a whole broken into parts
 
 ```json
-{"kind": "tree", "headline": "...", "unit": "days",
- "root": {"label": "Migration", "children": [{"label": "Content", "children": [{"label": "Reference", "value": 18}]}, {"label": "Launch", "value": 4, "highlight": true}]}}
+{"kind": "tree", "headline": "...", "unit": "<unit>",
+ "root": {"label": "<whole>", "children": [{"label": "<part>", "children": [{"label": "<sub-part>", "value": <number>}]}, {"label": "<part>", "value": <number>, "highlight": true}]}}
 ```
 
 A node without `value` takes the sum of its children. Children that sum to more than their parent's value are an error. Up to 4 levels.
@@ -75,8 +75,8 @@ A node without `value` takes the sum of its children. Children that sum to more 
 ### `sets`: overlapping categories
 
 ```json
-{"kind": "sets", "headline": "...", "sets": ["Fast", "Offline", "No server"],
- "regions": [{"label": "Static pages", "in": ["Fast", "Offline", "No server"], "count": 1, "highlight": true}]}
+{"kind": "sets", "headline": "...", "sets": ["<set>", "<set>", "<set>"],
+ "regions": [{"label": "<item>", "in": ["<set>", "<set>"], "count": <number>, "highlight": true}]}
 ```
 
 Each region lists the sets it belongs to in `in`. A set with no region is shown as "none found", so it can show a gap.
@@ -84,8 +84,8 @@ Each region lists the sets it belongs to in `in`. A set with no region is shown 
 ### `pairs`: items that help in one form and not in another
 
 ```json
-{"kind": "pairs", "headline": "...", "columns": ["Helps when", "Hurts or does not help when"],
- "rows": [{"label": "Raising problems", "left": [{"label": "At a moderate rate", "effect": "up"}], "right": [{"label": "Very often", "effect": "down"}]}]}
+{"kind": "pairs", "headline": "...", "columns": ["<first form>", "<second form>"],
+ "rows": [{"label": "<item>", "left": [{"label": "<form>", "effect": "up"}], "right": [{"label": "<form>", "effect": "down"}]}]}
 ```
 
 One row per item, its two contrasting forms side by side. `effect` is `up`, `down` or `same`, and is optional. A side can be empty, which shows an item that never helps. Up to 7 rows.
@@ -94,7 +94,7 @@ One row per item, its two contrasting forms side by side. `effect` is `up`, `dow
 
 ```json
 {"kind": "effects", "headline": "...",
- "rows": [{"group": "Saying \"I'm not sure\"", "label": "In the first person", "outcome": "users' accuracy", "effect": "up"}]}
+ "rows": [{"group": "<group>", "label": "<finding>", "outcome": "<what it measured>", "effect": "up"}]}
 ```
 
 One row per finding, its mark in a Lowers, No clear effect or Raises column. `outcome` names what the finding measured; use it whenever the rows measure different things. `columns` replaces the three headings. Up to 12 rows.
@@ -102,10 +102,10 @@ One row per finding, its mark in a Lowers, No clear effect or Raises column. `ou
 ### `quadrant`: options on two judged dimensions
 
 ```json
-{"kind": "quadrant", "headline": "...", "basis": "The team's estimates, not measurements",
- "x": {"label": "Effort", "low": "small", "high": "large"}, "y": {"label": "Cost", "low": "low", "high": "high"},
- "quadrants": {"bottom_left": "Do now", "top_right": "Avoid"},
- "items": [{"label": "Static pages", "x": 0.3, "y": 0.15, "highlight": true}]}
+{"kind": "quadrant", "headline": "...", "basis": "<where the positions come from>",
+ "x": {"label": "<dimension>", "low": "<low end>", "high": "<high end>"}, "y": {"label": "<dimension>", "low": "<low end>", "high": "<high end>"},
+ "quadrants": {"bottom_left": "<name>", "top_right": "<name>"},
+ "items": [{"label": "<option>", "x": <0 to 1>, "y": <0 to 1>, "highlight": true}]}
 ```
 
 `x` and `y` are between 0 and 1. `basis` is required: it says where the positions come from.
@@ -113,8 +113,8 @@ One row per finding, its mark in a Lowers, No clear effect or Raises column. `ou
 ### `slope`: change between two states
 
 ```json
-{"kind": "slope", "headline": "...", "from": "2024", "to": "2026", "unit": "ms",
- "items": [{"label": "Search", "before": 2300, "after": 850, "highlight": true}]}
+{"kind": "slope", "headline": "...", "from": "<first state>", "to": "<second state>", "unit": "<unit>",
+ "items": [{"label": "<item>", "before": <number>, "after": <number>, "highlight": true}]}
 ```
 
 The scale starts at zero unless `"y_from_zero": false`, which requires a `y_note`.
@@ -122,8 +122,8 @@ The scale starts at zero unless `"y_from_zero": false`, which requires a `y_note
 ### `dots`: the spread of values
 
 ```json
-{"kind": "dots", "headline": "...", "unit": "ms per load",
- "groups": [{"label": "Before", "values": [1200, 1500, 900]}, {"label": "After", "values": [800, 760, 820], "highlight": true}]}
+{"kind": "dots", "headline": "...", "unit": "<unit>",
+ "groups": [{"label": "<group>", "values": [<number>, <number>]}, {"label": "<group>", "values": [<number>, <number>], "highlight": true}]}
 ```
 
 The median is marked; `"marker": "none"` hides it.
@@ -131,8 +131,8 @@ The median is marked; `"marker": "none"` hides it.
 ### `scatter`: two measures across many items
 
 ```json
-{"kind": "scatter", "headline": "...", "x_label": "Page size (kB)", "y_label": "Load time (ms)",
- "points": [{"x": 40, "y": 2300, "label": "Search", "highlight": true}, {"x": 20, "y": 600}]}
+{"kind": "scatter", "headline": "...", "x_label": "<measure (unit)>", "y_label": "<measure (unit)>",
+ "points": [{"x": <number>, "y": <number>, "label": "<item>", "highlight": true}, {"x": <number>, "y": <number>}]}
 ```
 
 Label only the points the headline is about. Axes start at zero unless `"x_from_zero": false` or `"y_from_zero": false`.
@@ -140,7 +140,7 @@ Label only the points the headline is about. Axes start at zero unless `"x_from_
 ### `numbers`: one to three figures
 
 ```json
-{"kind": "numbers", "headline": "...", "figures": [{"value": "10 of 10", "label": "tests supported segmenting", "highlight": true}]}
+{"kind": "numbers", "headline": "...", "figures": [{"value": "<formatted value>", "label": "<what it counts>", "highlight": true}]}
 ```
 
 `value` is shown as written, so format it yourself.
@@ -148,8 +148,8 @@ Label only the points the headline is about. Axes start at zero unless `"x_from_
 ### `units`: a count out of a total
 
 ```json
-{"kind": "units", "headline": "...", "unit": "questions",
- "parts": [{"label": "significantly better", "count": 7, "highlight": true}, {"label": "no significant difference", "count": 6}, {"label": "significantly worse", "count": 2}]}
+{"kind": "units", "headline": "...", "unit": "<what one square counts>",
+ "parts": [{"label": "<part>", "count": <number>, "highlight": true}, {"label": "<part>", "count": <number>}]}
 ```
 
 One square per counted thing. Up to 3 parts and 100 units. `unit` names what one square counts.
@@ -158,9 +158,9 @@ One square per counted thing. Up to 3 parts and 100 units. `unit` names what one
 
 ```json
 {"kind": "matrix", "headline": "...",
- "columns": ["Trust", "Recall", "Accuracy"],
- "rows": [{"label": "Embellished charts", "group": "Bateman et al. 2010", "cells": [null, "up", {"mark": "same", "highlight": true}]}],
- "legend": {"same": "no difference"}, "blank": "not measured"}
+ "columns": ["<property>", "<property>", "<property>"],
+ "rows": [{"label": "<item>", "group": "<group>", "cells": [null, "up", {"mark": "same", "highlight": true}]}],
+ "legend": {"same": "<word for this mark>"}, "blank": "<what a blank cell means>"}
 ```
 
 Each cell is a mark: `yes` (✓), `no` (✗), `up` (▲, higher), `down` (▼, lower), `same` (=, no difference), or `null` for a blank cell. `legend` replaces the word shown for a mark; `blank` names what a blank cell means. Rows with the same `group` are shown under one label. A row or a cell can be highlighted. Up to 10 rows and 5 columns. Columns are properties of the items, not of the research behind them, such as how a source was read: put that in the note. Use a `table` instead when the cells must hold words or exact values.
@@ -168,8 +168,8 @@ Each cell is a mark: `yes` (✓), `no` (✗), `up` (▲, higher), `down` (▼, l
 ### `bars`: compare values across items
 
 ```json
-{"kind": "bars", "headline": "...", "unit": "% correct", "sort": "desc",
- "items": [{"label": "Sentence headlines", "value": 79, "highlight": true}, {"label": "Phrase headlines", "value": 69}]}
+{"kind": "bars", "headline": "...", "unit": "<unit>", "sort": "desc",
+ "items": [{"label": "<item>", "value": <number>, "highlight": true}, {"label": "<item>", "value": <number>}]}
 ```
 
 Bars start at zero. Values must be zero or positive. `sort` is `desc`, `asc`, or omitted to keep the given order. `max` sets the scale's end when panels must share a scale.
@@ -177,9 +177,9 @@ Bars start at zero. Values must be zero or positive. `sort` is `desc`, `asc`, or
 ### `line`: a trend over an ordered axis
 
 ```json
-{"kind": "line", "headline": "...", "unit": "ms", "x_label": "Release",
- "series": [{"name": "p95 latency", "points": [["v1", 120], ["v2", 95], ["v3", 80]], "highlight": true}],
- "annotations": [{"series": "p95 latency", "x": "v2", "text": "Cache added"}]}
+{"kind": "line", "headline": "...", "unit": "<unit>", "x_label": "<axis label>",
+ "series": [{"name": "<series>", "points": [["<x>", <number>], ["<x>", <number>]], "highlight": true}],
+ "annotations": [{"series": "<series>", "x": "<x>", "text": "<what happened here>"}]}
 ```
 
 `x` values are all numbers (drawn to scale) or all labels (drawn in order). The y axis starts at zero unless `"y_from_zero": false`, which requires a `y_note` that states where it starts and why.
@@ -188,8 +188,8 @@ Bars start at zero. Values must be zero or positive. `sort` is `desc`, `asc`, or
 
 ```json
 {"kind": "table", "headline": "...",
- "columns": [{"label": "Option"}, {"label": "Cost", "unit": "€/month"}, {"label": "Setup"}],
- "rows": [["A", 40, "1 day"], ["B", 25, "1 week"]], "highlight_rows": [2]}
+ "columns": [{"label": "<column>"}, {"label": "<column>", "unit": "<unit>"}],
+ "rows": [["<item>", <number>], ["<item>", <number>]], "highlight_rows": [<row number>]}
 ```
 
 Give numeric columns a `unit`, or `"align": "right"`. `highlight_rows` counts from 1.
@@ -197,8 +197,8 @@ Give numeric columns a `unit`, or `"align": "right"`. `highlight_rows` counts fr
 ### `flow`: a process or sequence
 
 ```json
-{"kind": "flow", "headline": "...", "arrow": "then",
- "steps": [{"label": "Extract", "note": "a table of values"}, {"label": "Check", "highlight": true}]}
+{"kind": "flow", "headline": "...", "arrow": "<what every arrow means>",
+ "steps": [{"label": "<step>", "note": "<optional detail>"}, {"label": "<step>", "highlight": true}]}
 ```
 
 `arrow` states what every arrow means; all arrows have this one meaning. Up to 7 steps.
@@ -207,7 +207,7 @@ Give numeric columns a `unit`, or `"align": "right"`. `highlight_rows` counts fr
 
 ```json
 {"kind": "groups", "headline": "...",
- "groups": [{"label": "Raised", "items": ["Trust", "Recall"], "highlight": true}, {"label": "Unchanged", "items": ["Accuracy"]}]}
+ "groups": [{"label": "<category>", "items": ["<item>", "<item>"], "highlight": true}, {"label": "<category>", "items": ["<item>"]}]}
 ```
 
 Up to 4 groups, about 15 items in total.
@@ -215,7 +215,7 @@ Up to 4 groups, about 15 items in total.
 ### `timeline`: events in time
 
 ```json
-{"kind": "timeline", "headline": "...", "events": [{"date": "2022", "label": "First version"}, {"date": "2026", "label": "Rewrite", "highlight": true}]}
+{"kind": "timeline", "headline": "...", "events": [{"date": "<date>", "label": "<event>"}, {"date": "<date>", "label": "<event>", "highlight": true}]}
 ```
 
 Events are evenly spaced, so the spacing does not show the time between them. Up to 8 events.
@@ -223,7 +223,7 @@ Events are evenly spaced, so the spacing does not show the time between them. Up
 ### `text`: a point that a visual would not help
 
 ```json
-{"kind": "text", "headline": "...", "body": ["Short paragraph.", "Another short paragraph."]}
+{"kind": "text", "headline": "...", "body": ["<short paragraph>", "<short paragraph>"]}
 ```
 
 ### `svg`: a relation no other kind fits
