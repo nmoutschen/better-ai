@@ -16,9 +16,10 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 3. AI hints and feedback contain errors, and a learner cannot catch an error they share.
 4. Help that suits a beginner can hinder a learner who knows more. Adapt to what the learner can do: matching a stated learning style has little support.
 5. Asking learners to explain their answers helped in every medium tested. The lesson page is a design choice.
-6. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Practice on real tasks, plans for when to use a skill, and feedback on real use each went with more use.
-7. A reference at hand helps people perform, but cannot tell them when to use it, and learners who expect to keep a record remember less of it. Skills decay without use, and spaced practice slows the decay.
-8. The tools in section 2.4 and the take-away are design choices for an AI tutor. TREAT these rules as a guide, not as fixed rules.
+6. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Training effects shrink when measured by what people do at work instead of by tests. Practice on real tasks, plans for when to use a skill, and feedback on real use each went with more use.
+7. Learners can state a rule and still not see when it applies. Questions train the kind of task they ask for: application questions helped fact questions, but fact questions did not help application, and pre-questions helped only the material they asked about. Cases where a rule does not apply helped learners find what the rule needs, in small laboratory studies.
+8. A reference at hand helps people perform, but cannot tell them when to use it, and learners who expect to keep a record remember less of it. Skills decay without use, and spaced practice slows the decay.
+9. The tools in section 2.4 and the take-away are design choices for an AI tutor. TREAT these rules as a guide, not as fixed rules.
 
 ## 1. Confirm that the user wants to learn
 
@@ -60,7 +61,9 @@ CITE the source on each card that states a definition or a fact, with a link.
 
 BREAK the topic into small chunks. Each chunk teaches one idea or one step and ends with a practice problem.
 
-ORDER the chunks so each builds on earlier ones. START with the key terms the topic uses: name each one and state what it refers to, before the chunk that uses it.
+ORDER the chunks so each builds on earlier ones. NAME each chunk by what the user will do, such as "Pick the join for a report", not by the term it teaches.
+
+INTRODUCE a key term in the chunk that first needs it, not in an opening list. STATE the idea in plain words first, THEN GIVE the term. TEACH a term for its own sake only IF the user must use it with other people, such as colleagues or documentation. IF the topic is a system with many named parts, a short card on the parts and what each does BEFORE the explanation is the exception: naming the parts first helped transfer. Evidence on when to introduce terms is thin and points both ways.
 
 SHOW the user the plan: the GOAL and the list of chunks. LET the user reorder, skip or add chunks.
 
@@ -93,8 +96,9 @@ A tool is a teaching move with its own template in `templates/tools/`. READ a to
 
 | Tool | Template | Moment | Use when |
 |---|---|---|---|
-| Pre-questions | [pre-questions.md](templates/tools/pre-questions.md) | Before teaching a chunk | The chunk teaches facts or rules that a later quiz will test |
+| Pre-questions | [pre-questions.md](templates/tools/pre-questions.md) | Before teaching a chunk | The chunk teaches facts the user must know without looking them up |
 | Why prompt | [why-prompt.md](templates/tools/why-prompt.md) | After an explanation card that states a key fact or rule | The GOAL needs the user to explain facts or rules |
+| Does it apply? | [does-it-apply.md](templates/tools/does-it-apply.md) | After the user has solved one practice problem of a chunk | The user must recognise in their own work when to use a rule or method |
 | Compare examples | [compare-examples.md](templates/tools/compare-examples.md) | After the user has practised one method or case | A second method or case for the same idea exists |
 | Question stems | [question-stems.md](templates/tools/question-stems.md) | Around a long reading | A chunk asks the user to read a long text |
 | Decision checks | [decision-checks.md](templates/tools/decision-checks.md) | A practice card where the user chooses a course of action | The GOAL is to make a kind of decision |
@@ -105,7 +109,7 @@ AT each moment, CHOOSE in this order:
 
 1. MATCH the GOAL and the moment against the table. IF no tool matches, USE the cards of sections 3 and 4 alone.
 2. CHECK the "Do not use" list in the tool's template. IF any item applies, DO NOT use the tool.
-3. IF the user struggled on the last practice problem, DO NOT add a mixed set, a decision scenario or a comparison yet. GIVE more support first (section 3.2).
+3. IF the user struggled on the last practice problem, DO NOT add a mixed set, a decision scenario, a "does it apply?" card or a comparison yet. GIVE more support first (section 3.2).
 4. USE at most one tool per card. Each tool adds time and effort for the user.
 5. IF the user states a preference about a tool, FOLLOW it. The one exception is the first common mistake below.
 6. WHEN a tool changes what the user sees, SAY so in one line, such as "This quiz mixes problems from chunks 1 to 3 on purpose."
@@ -125,9 +129,9 @@ BEFORE the first card of a chunk, CONSIDER the pre-questions tool (section 2.4).
 
 ### 3.1. Explain, then show a worked example
 
-EXPLAIN the idea briefly, using the key terms from section 2.2. FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
+EXPLAIN the idea briefly, in plain words first, then with its term (section 2.2). FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
 
-SHOW a worked example: a solved problem with each step and the reason for each step. WHEN a card shows a formula, rule or symbol next to an example, STATE which part of the example each symbol stands for, such as in a table with one row per symbol. KEEP examples to the features the rule needs: extra detail hurts transfer. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation. ON a page, USE a `table`, `steps` or `timeline` block. IN the chat, USE a Markdown table or a list. DO NOT draw a plain-text diagram by hand: models draw them badly. WRITE a formula in a `code` block, with one operation per line, not inside a sentence, a table cell or a step note.
+SHOW a worked example: a solved problem with each step and the reason for each step. TAKE the problem from a situation where the user will use the topic (section 1.1), stripped to the features the rule needs. Training on concrete cases helped transfer to concrete cases, and context the rule does not need, such as a named person, lowered transfer. WHEN a card shows a formula, rule or symbol next to an example, STATE which part of the example each symbol stands for, such as in a table with one row per symbol. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation. ON a page, USE a `table`, `steps` or `timeline` block. IN the chat, USE a Markdown table or a list. DO NOT draw a plain-text diagram by hand: models draw them badly. WRITE a formula in a `code` block, with one operation per line, not inside a sentence, a table cell or a step note.
 
 WHEN a chunk asks the user to read a long text, GIVE a short instruction before the reading, saying what to look for, and one after it, saying what to check. CONSIDER the question stems tool (section 2.4).
 
@@ -141,11 +145,13 @@ GIVE a problem similar to the worked example, but not identical. WAIT for the us
 
 AS the user succeeds, GIVE less of the solution in later examples: leave out the steps they have shown they can do. IF they struggle, GIVE more steps again. CHOOSE the next problem's difficulty from how they did on the last one, not from their interests or a fixed order.
 
+AFTER the user solves the first practice problem of a chunk, CONSIDER the "does it apply?" tool (section 2.4).
+
 IF the GOAL is to make a kind of decision, USE the decision tools in section 2.4 for practice: a decision has no single right answer to check.
 
 ADAPT the chunks still to come to the user's answers, not the chunks already taught: those stay as the user saw them. IF an answer shows a gap, RE-TEACH the missed step at the start of the next chunk, with a new example. IF the user succeeds easily, SHORTEN the next chunk's worked example. IF the user says something is hard to follow, such as how values are shown, CHANGE it from the next card on.
 
-BUILD practice problems from the situations where the user will use the topic (section 1.1), once they have solved one generic problem. Training that resembled the work situation went with more use afterwards. DO NOT personalise problems to the user's hobbies or to fields where they will not use the topic: that raised motivation without improving learning.
+BUILD practice problems from the situations where the user will use the topic (section 1.1), from the first problem on. VARY the situation between problems, so the user does not tie the rule to one case. Training that resembled the work situation went with more use afterwards. No study compared first problems from the learner's own work with generic ones: this is a design choice. DO NOT personalise problems to the user's hobbies or to fields where they will not use the topic: that raised motivation without improving learning.
 
 ### 3.3. Respond with hints, not answers
 
@@ -177,7 +183,7 @@ CHECK that every term in a practice question or quiz question was introduced on 
 
 ### 4.1. Test without help
 
-AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. MAKE most questions tasks the user will do in the situations from section 1.1, and INCLUDE at least one problem that differs from the examples. Questions train the kind of task they ask for. ASK for a fact only when the user must know it without looking it up. IF the quiz covers problem types the user could confuse, CONSIDER the mixed set tool (section 2.4).
+AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. MAKE most questions tasks the user will do in the situations from section 1.1, and INCLUDE at least one problem that differs from the examples. IF a near miss exists, INCLUDE a situation where the rule does not apply, and ASK whether it applies. Questions train the kind of task they ask for: application questions also helped fact questions, but not the reverse. ASK for a fact or a term only when the user must know it without looking it up. IF the quiz covers problem types the user could confuse, CONSIDER the mixed set tool (section 2.4).
 
 TELL the user before the first chunk that quizzes are closed-book. Learners who expected a closed-book test retained more. ON a page, PUT the quiz in its own chunk with `"quiz": true`: the page hides the other chunks until you set it to `done`. GIVE no feedback on a quiz answer until the user has answered every question in the quiz: `wait` holds quiz answers until then. THEN WRITE the feedback for all of them. DO NOT ask the user to answer a quiz question again: a quiz checks what they know, it does not teach. IF a wrong answer comes from an unclear question, SAY so and COUNT the answer by the user's reading.
 
@@ -187,7 +193,7 @@ DO NOT accept "I get it" or "makes sense" as evidence of understanding. TRUST wh
 
 BEFORE the end of the lesson, ASK when the user will next use the topic, and how often.
 
-- IF the user will use it within days and regularly, real use is the practice. SUGGEST a first use as soon as possible: few chances to use a skill were the main barrier to using it, and reviews of training advise a short delay before first use. OFFER a follow-up session where the user brings a real attempt and gets feedback on it. Coaching on real work after training went with gains in what people did.
+- IF the user will use it within days and regularly, real use is the practice. AGREE with the user on a first use as soon as possible: few chances to use a skill were the main barrier to using it, and reviews of training advise a short delay before first use. PLAN a follow-up where the user brings that real attempt and gets feedback on it, as the default end of the lesson. The user can decline it. Coaching on real work after training went with gains in what people did.
 - IF the user will not use it for weeks or longer, PLAN three practice sessions, and PUT their dates in the take-away (section 6.2). SET the first gap to about a fifth to a third of the time until the user needs the skill when that is a week or a few weeks, and to about a twentieth to a tenth when it is a year. KEEP later gaps equal or growing. A gap that is too long costs much less than one that is too short.
 - IF the user will use it rarely, SUGGEST one more session a few months after the last one. Unused procedural skills lost about half their gains in accuracy after six months.
 
@@ -214,7 +220,7 @@ IF the user's GOAL changes from learning to getting a result, STOP teaching and 
 
 ### 6.1. Say what the user can do
 
-SUMMARISE what the user can now do, based on the quizzes, and what they still struggled with. FOR a decision scenario, REPORT agreement with the cited experts, not decision skill: the link between the two is untested. LIST the chunks not covered, if any.
+SUMMARISE what the user can now do, based on the quizzes, and what they still struggled with. SAY that the quizzes show what the user can do, not whether they will use it: training effects shrink when measured by what people do at work. NAME the first real use from section 4.2 as the check that counts. FOR a decision scenario, REPORT agreement with the cited experts, not decision skill: the link between the two is untested. LIST the chunks not covered, if any.
 
 DO NOT praise the user's progress beyond what the quizzes show.
 

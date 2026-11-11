@@ -57,7 +57,7 @@ Introduces a dense document, such as a research paper, a strategy or a design do
 
 ## `/teach-better`
 
-Teaches the user a new topic so they can use it later without AI. It gives hints and worked examples instead of answers, tests understanding with practice the user does alone, and handles pushback when the user wants the answer. It picks extra teaching tools by the user's goal and the lesson moment: pre-questions, why prompts, example comparisons, question stems, mixed quizzes, and decision practice compared with cited experts. It builds practice from the situations where the user will use the topic, ends with the user's own plans for when to use it, and gives a take-away to keep open while using it: when to use each rule, the steps, and practice tasks.
+Teaches the user a new topic so they can use it later without AI. It gives hints and worked examples instead of answers, tests understanding with practice the user does alone, and handles pushback when the user wants the answer. It picks extra teaching tools by the user's goal and the lesson moment: pre-questions, why prompts, "does it apply?" checks with near misses, example comparisons, question stems, mixed quizzes, and decision practice compared with cited experts. It introduces terms where they are needed, builds worked examples and practice from the situations where the user will use the topic, ends with the user's own plans for when to use it, and gives a take-away to keep open while using it: when to use each rule, the steps, and practice tasks.
 
 ## `/write-better`
 
