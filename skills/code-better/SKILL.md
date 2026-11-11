@@ -21,9 +21,9 @@ Being invoked does NOT mean you must write code now. These instructions can end 
 5. Agents edit more than the task needs, and agent code erodes in structure as it grows while still passing tests. A plain instruction to preserve existing code reduced over-editing. Requests for quality did not stop erosion.
 6. Repair loops gain most in the first few rounds. Test results help more than compiler errors, and a weak critique can hurt more than a bare failure. Extra rounds can break code that was already correct, and repeated failure feedback leads agents to game tests.
 7. Self-review without outside evidence finds few errors. A reviewer that sees only the result in a fresh context does better. LLM judgements of whether code meets its requirements are unreliable.
-8. Delegating work to sub-agents usually costs more, and details of a plan get lost when it is handed to another agent. Teams of agents do not reliably beat a single agent.
+8. Delegating work to sub-agents usually costs more, and details of a plan get lost when it is handed to another agent. Evidence that teams of agents beat a single agent is mixed.
 9. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
-10. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), and showing the design before building (section 2) are design choices.
+10. Most of this evidence comes from benchmarks and preprints from 2025–2026. No study tests stopping rules for repair loops (section 5.2), checking requirements at checkpoints of long runs (section 8.3), or whether showing the design before building improves it (section 2). TREAT those rules as design choices.
 
 This skill names capabilities, not tools: reading files, running commands and tests, asking the user, writing files, and sub-agents. FOR each capability you lack, FOLLOW the fallback the section gives.
 
@@ -96,7 +96,7 @@ BEFORE finishing, REMOVE edits left over from approaches you tried and abandoned
 
 ### 4.2. Decide error handling on purpose
 
-HANDLE invalid input and failures as the requirements' scenarios say. IF they do not say, TREAT it as a requirement gap (section 1.3). Differences in input validation and error handling explained why agent code was harder to build on.
+HANDLE invalid input and failures as the requirements' scenarios say. IF they do not say, TREAT it as a requirement gap (section 1.3). In one study, differences in input validation and error handling explained why agent code was harder to build on. TREAT this as a guide, not a rule.
 
 ## 5. Verify
 
