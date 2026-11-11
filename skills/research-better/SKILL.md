@@ -17,13 +17,17 @@ Being invoked does NOT mean a full research run is needed. A simple factual ques
 2. Training data stops at a cut-off date and does not cover all text in the world. Relying on it leaves blind spots.
 3. An agent that already knows an answer writes searches that lead to it. The results then confirm what it expected and miss what it did not know.
 
-This skill names capabilities, not tools: web search, page fetch, a shell, asking the user, writing files, and sub-agents. USE the tool your harness provides for each. IF you cannot ask the user through a tool, ASK in plain text and STOP until they answer. DO NOT simulate a missing capability, for example by describing a page you could not open.
+This skill names capabilities, not tools: search and page reads in a COLLECTION, a shell, asking the user, writing files, and sub-agents. USE the tool your harness provides for each. IF you cannot ask the user through a tool, ASK in plain text and STOP until they answer. DO NOT simulate a missing capability, for example by describing a page you could not open.
 
-IF you have no web search and no page fetch, DO NOT research from your training data. TELL the user, and ASK them for the sources to read, such as files, pages or papers. RESEARCH only from what they give you, and STATE that the research covers only those sources.
+A COLLECTION is a set of documents a tool can search or read: the web, or an internal one such as a wiki (Confluence, Notion), a ticket tracker, a code host, a document drive or a chat archive. CHOOSE the COLLECTIONs from the TOPIC and the context. IF the TOPIC concerns the user's organisation, such as its systems, projects, teams or decisions, SEARCH the internal COLLECTIONs your harness gives you access to, not only the web. Everything this skill says about pages applies to documents in any COLLECTION.
+
+DO NOT fail open. IF a COLLECTION the TOPIC needs cannot be searched, because the tool is missing, asks for a login, returns an error, or returns nothing where documents should exist, DO NOT continue as if it had been searched. DO NOT fill the gap from another COLLECTION or from your training data: public pages do not describe internal systems. TELL the user which COLLECTION is missing, and ASK whether to wait for access, to continue without it, or to give you the sources to read, such as files, pages or papers. IF you continue, RECORD the gap in the board's brief and STATE in the findings what the research does not cover.
+
+DO NOT carry internal information into an external COLLECTION. A COLLECTION is external when it runs outside the user's organisation, such as web search or a public page; a query or URL sent to it can be logged and seen by others. WRITE external queries only from public terms: the general concepts, public products and standards the TOPIC involves. DO NOT put internal names, such as project, system, team, customer or people names, or text from internal documents, in an external query or in a URL you fetch. IF a question cannot be searched externally without them, SEARCH it only in internal COLLECTIONs. This rule also applies to the first searches in section 1.
 
 ## 1. Topic confirmation
 
-IDENTIFY the TOPIC provided by the user and LIST its possible MEANINGs. USE earlier messages, previous discussions, and the local repository to find reasonable meanings.
+IDENTIFY the TOPIC provided by the user. BEFORE you list its MEANINGs or ask the user anything about it, SEARCH once or twice with the topic's own words, in the COLLECTIONs the TOPIC needs, and READ the results to see which meanings sources use. A question written before any search comes from your training data, and the user's answer then steers the research toward what you expected. THEN LIST the possible MEANINGs from these results, earlier messages, previous discussions, and the local repository.
 
 IF the topic still has several possible meanings with this context, EXPLAIN them to the user and ASK which one they meant. USE this structure for each meaning:
 
@@ -35,7 +39,7 @@ IF the topic still has several possible meanings with this context, EXPLAIN them
 > Worked example when relevant.
 ```
 
-IF the topic is a simple factual question, such as a date, a definition or a current value, USE at most two web searches. WRITE the queries from the question, not from an answer you expect. READ a source page, and ANSWER in one or two sentences from what it says, naming that source. DO NOT add background, notes on precision, or a list of sources. SKIP the remaining steps. IF the sources disagree or do not answer it, it is not a simple question: CONTINUE with the remaining steps.
+IF the topic is a simple factual question, such as a date, a definition or a current value, USE at most two searches, counting the first ones. WRITE the queries from the question, not from an answer you expect. READ a source page, and ANSWER in one or two sentences from what it says, naming that source. DO NOT add background, notes on precision, or a list of sources. SKIP the remaining steps. IF the sources disagree or do not answer it, it is not a simple question: CONTINUE with the remaining steps.
 
 IDENTIFY the user's GOAL: what they must understand, learn, decide, or do with the findings. CHOOSE the stop level from the GOAL: `high` for a quick decision, `medium` by default, `low` for an exhaustive review. The stop level and the stop rules (section 6.4) decide how much research to do. DO NOT ask the user for a budget, a number of searches, or a research size. USE a limit only when the user states one.
 
@@ -134,7 +138,7 @@ IF the harness has sub-agents, you are the coordinator. Workers search and read;
 
 START as many workers as there are open questions that can be researched in parallel, up to a handful. GIVE each the brief in [templates/worker-brief.md](templates/worker-brief.md), filled in. Each worker keeps taking questions from the board until none is left at or above the stop level, or the board is stopped. In the brief, WRITE OUT the priorities to take, such as `high, medium` for the stop level `medium`.
 
-WHEN a worker stops and open questions remain, START a fresh worker to replace it. IF the harness cannot run sub-agents in the background, START a group of workers, WAIT for them, then START the next group.
+WHEN a worker stops and open questions remain, START a fresh worker to replace it. IF it stopped because a COLLECTION failed, DO NOT replace it. IF the harness cannot run sub-agents in the background, START a group of workers, WAIT for them, then START the next group.
 
 IF the harness lets you choose a worker's model, USE a cheaper model than yours. IF the harness sets models only in sub-agent definition files, USE an existing definition that runs a cheaper model. DO NOT create or edit harness configuration without the user's permission.
 

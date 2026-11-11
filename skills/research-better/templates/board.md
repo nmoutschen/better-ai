@@ -25,6 +25,8 @@ meaning: <the confirmed MEANING>
 goal: <what the user must understand, learn, decide, or do>
 limit: <a limit the user stated, or none>
 stop-at: <high | medium | low>
+collections: <the COLLECTIONs to search, such as web, or the name of a wiki>
+missing: <COLLECTIONs the TOPIC needs that could not be searched, or none>
 status: <running | stopped>
 ```
 
