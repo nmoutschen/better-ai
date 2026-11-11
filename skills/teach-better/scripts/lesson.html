@@ -135,6 +135,7 @@ const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\
   .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)"<>]+)\)/g, '<a class="goto" href="$2" target="_blank" rel="noopener">$1</a>');  // a link to a source
 const $ = id => document.getElementById(id);
 const KIND = {terms:"Key terms", text:"Explanation", example:"Worked example", practice:"Practice"};
+const kindOf = card => STATIC ? (card.solution ? "Try it" : card.kind === "example" ? "Example" : "") : KIND[card.kind];
 const MARK = {allow:["●", "var(--moss)"], reject:["✕", "var(--terracotta)"], neutral:["○", "var(--umber)"]};
 const VERDICT = {right:"Right", partly:"Partly right", wrong:"Not yet", hint:"Hint", noted:"Noted"};
 let L = null, A = [], pos = null, drafts = {}, sending = false;
@@ -232,7 +233,6 @@ function form(card, quiz) {
     }
     return `<label>${head}<textarea name="${esc(name)}" required rows="${fields.length > 1 ? 3 : 5}">${esc(d[name] ?? lastValue(f.id) ?? f.prefill ?? "")}</textarea></label>`;
   };
-  if (STATIC) return `<form id="answer" data-id="${esc(card.id)}">${fields.map(field).join("")}</form>` + reveal(card, quiz);
   return prior + `<form id="answer" data-id="${esc(card.id)}">
     ${fields.map(field).join("")}
     <fieldset><legend>How confident are you? <small>(optional)</small></legend>
@@ -241,13 +241,11 @@ function form(card, quiz) {
   </form>`;
 }
 
-function reveal(card, quiz) {  // on a static page, what a tutor would say: hints first, then the worked solution
+function reveal(card) {  // on a static page, an example with a solution is one to try first: hints, then the solution, on a click
   const p = text => blocks([{type:"p", text}]);
   const hints = (card.hints || []).map((h, n) => `<details class="reveal"><summary>Hint ${n + 1}</summary>${p(h)}</details>`).join("");
   const wrong = (card.wrong || []).length ? `<div class="wrong"><p class="kicker">Common wrong answers</p>${card.wrong.map(w => `<p><b>${inline(w.answer)}</b>: ${inline(w.why)}</p>`).join("")}</div>` : "";
-  const note = quiz ? "Answer every question in this quiz before you open a solution." : "Write your answer and why before you open the solution.";
-  return `<p class="sent">${note} Your answers stay in this page and are not sent anywhere.</p>${hints}` +
-    `<details class="reveal sol"><summary>Solution</summary>${blocks(card.solution)}${wrong}</details>`;
+  return `<p class="sent">Try it before you open the solution.</p>${hints}<details class="reveal sol"><summary>Solution</summary>${blocks(card.solution)}${wrong}</details>`;
 }
 
 function show() {
@@ -265,13 +263,13 @@ function show() {
   }
   const c = chunks()[pos.ci], card = c.cards[pos.k], i = all.findIndex(p => p.ci === pos.ci && p.k === pos.k);
   history.replaceState(null, "", `#${encodeURIComponent(c.id)}/${pos.k + 1}`);  // a reload keeps the learner's place
-  const kind = c.quiz ? "Quiz" : KIND[card.kind];
-  let h = STATIC && c.quiz && pos.k === 0 ? `<p class="banner"><b>Closed-book quiz.</b> Answer every question from memory, without looking back, then open the solutions.</p>` : "";
-  h += q ? `<p class="banner"><b>Closed-book quiz.</b> The other chunks are hidden until you finish it.</p>` : "";
-  h += `<p class="kicker"><span class="kind">${esc(kind)}</span> · ${esc(c.title)} · card ${pos.k + 1} of ${c.cards.length}</p><h2 class="title">${inline(card.title)}</h2>`;
+  const kind = c.quiz ? "Quiz" : kindOf(card);
+  let h = q ? `<p class="banner"><b>Closed-book quiz.</b> The other chunks are hidden until you finish it.</p>` : "";
+  h += `<p class="kicker">${kind ? `<span class="kind">${esc(kind)}</span> · ` : ""}${esc(c.title)} · card ${pos.k + 1} of ${c.cards.length}</p><h2 class="title">${inline(card.title)}</h2>`;
   if (card.kind === "terms") h += `<dl class="terms">${card.terms.map(t => `<dt>${inline(t.term)}</dt><dd>${inline(t.means)}</dd>`).join("")}</dl>`;
   if (card.blocks) h += blocks(card.blocks);
   if (card.kind === "practice") h += form(card, c.quiz);
+  if (STATIC && card.solution) h += reveal(card);
   const prev = all[i - 1], next = all[i + 1];
   h += `<div class="pager"><span class="pos">${i + 1} / ${all.length}</span>
     <button class="btn btn--plain" id="prev" ${ok(prev) ? "" : "disabled"}>← Back</button>
@@ -341,7 +339,7 @@ function renderNav() {
     return `<li class="${cls}"><button data-ci="${ci}" ${usable ? "" : "disabled"} ${pos && pos.ci === ci ? 'aria-current="true"' : ""}>
       <span class="n">${ci + 1}</span><span>${esc(lk ? "Hidden during the quiz" : c.title)}</span><span class="st">${esc(st)}</span></button>${
       pos && pos.ci === ci ? `<ol class="cards">${c.cards.map((card, k) => `<li><button data-ci="${ci}" data-k="${k}" ${k === pos.k ? 'aria-current="true" class="here"' : ""}>
-        <span class="ck">${esc(c.quiz ? "Quiz" : KIND[card.kind])}</span>${inline(card.title)}</button></li>`).join("")}</ol>` : ""}</li>`;
+        ${(c.quiz || kindOf(card)) ? `<span class="ck">${esc(c.quiz ? "Quiz" : kindOf(card))}</span>` : ""}${inline(card.title)}</button></li>`).join("")}</ol>` : ""}</li>`;
   }).join("");
   document.querySelectorAll("nav button[data-ci]").forEach(btn => btn.onclick = () => go({ci:+btn.dataset.ci, k:+(btn.dataset.k || 0)}));
 }
@@ -376,7 +374,7 @@ if (STATIC) {
   $("title").textContent = L.title || "Lesson"; document.title = L.title || "Lesson";
   $("goal").innerHTML = L.goal ? `<b>Goal:</b> ${inline(L.goal)}` : "";
   if (L.audience) { $("audience").innerHTML = `<b>For:</b> ${inline(L.audience)}`; $("audience").hidden = false; }
-  $("rule").textContent = "Quizzes are closed-book: answer from memory before you open a solution.";
+  $("rule").hidden = true;
   show();
 } else { poll(); setInterval(poll, 2000); }
 </script></body></html>

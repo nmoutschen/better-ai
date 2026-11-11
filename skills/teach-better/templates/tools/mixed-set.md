@@ -1,10 +1,10 @@
 # Tool: mixed set
 
-MIX problems of different types in a quiz or a review, instead of grouping them by type. The user must first decide which method or category applies. Mixing raised scores on tests days to weeks later. It lowers scores during practice, and learners judge it worse.
+MIX problems of different types in a practice set, instead of grouping them by type. The user must first decide which method or category applies. Mixing raised scores on tests days to weeks later. It lowers scores during practice, and learners judge it worse.
 
 ## Use when
 
-- The quiz or review covers two or more problem types that look alike but need different methods or categories.
+- The set covers two or more problem types that look alike but need different methods or categories.
 - The user practised each type alone first, in its own chunk.
 
 ## Do not use
@@ -16,7 +16,7 @@ MIX problems of different types in a quiz or a review, instead of grouping them 
 
 ## Steps
 
-1. LIST the problem types the quiz covers, and PICK the types the user could confuse.
+1. LIST the problem types the set covers, and PICK the types the user could confuse.
 2. WRITE at least one problem per type. CHECK that the wording does not give away the type.
 3. ORDER the problems so that no two problems of the same type come one after the other.
 4. DO NOT name the type or the chunk in a card title or a question. Choosing the method is part of the task.
@@ -27,8 +27,8 @@ MIX problems of different types in a quiz or a review, instead of grouping them 
 ## On a page
 
 ```json
-{"id": "<quiz-id>", "title": "Quiz: chunks <n> to <n>", "status": "current", "quiz": true,
- "cards": [{"kind": "practice", "id": "<quiz-id>-1", "title": "Question 1",
+{"id": "<set-id>", "title": "Mixed practice: chunks <n> to <n>", "status": "current",
+ "cards": [{"kind": "practice", "id": "<set-id>-1", "title": "Problem 1",
             "blocks": [{"type": "p", "text": "<problem>"}],
             "fields": [{"id": "method", "label": "Which method applies, and why"},
                        {"id": "answer", "label": "Your answer, and how you got it"}]}]}
@@ -37,9 +37,9 @@ MIX problems of different types in a quiz or a review, instead of grouping them 
 ## In the chat
 
 ```
-## Quiz: chunks <n> to <n> (closed book)
+## Mixed practice: chunks <n> to <n>
 
-These questions mix problem types on purpose. For each one, say which method applies and why, then answer. Answer by number.
+These problems mix types on purpose. For each one, say which method applies and why, then answer. Answer by number.
 
 1. <problem>
 2. <problem>

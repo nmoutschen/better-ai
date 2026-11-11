@@ -8,8 +8,8 @@ Usage:
   python3 lesson.py wait LESSON [--timeout S]
                                              block until an answer without feedback exists, print it, exit 0;
                                              exit 2 on timeout
-  python3 lesson.py build LESSON [--out DIR] write a static page that needs no server: answers stay in the
-                                             reader's browser, and hints and solutions open on a click
+  python3 lesson.py build LESSON [--out DIR] write a static reference page that needs no server; example cards
+                                             with a solution show it on a click
 
 LESSON is a lesson directory described in templates/lesson.md. The agent writes lesson.json and feedback/;
 the page writes answers/. Every diagram is laid out here, so the agent never draws one by hand.
@@ -221,7 +221,7 @@ def check_card(card, where, errors, warnings, digest, seen_cards):
         return
     for k, block in enumerate(blocks if isinstance(blocks, list) else [], 1):
         check_block(block, f"{where} block {k}", errors, warnings, digest)
-    if kind == "practice":
+    if kind in ("practice", "example"):
         check_static(card, where, errors, warnings, digest)
 
 
@@ -345,10 +345,16 @@ PAGE = PAGE.replace("__VERSION__", VERSION)
 
 
 def static_errors(spec: dict) -> list[str]:
-    """What a static page needs beyond check: a solution on every practice card, since no one answers the reader."""
-    return [f"practice card {card.get('id')}: a static page needs a 'solution'"
-            for chunk in spec.get("chunks", []) for card in chunk.get("cards", [])
-            if card.get("kind") == "practice" and "solution" not in card]
+    """A static page is a reference: no quizzes and no answer boxes, since no one reads the answers."""
+    errors = []
+    for chunk in spec.get("chunks", []):
+        if chunk.get("quiz"):
+            errors.append(f"chunk {chunk.get('id')}: a static page has no quizzes")
+        for card in chunk.get("cards", []):
+            if card.get("kind") == "practice":
+                errors.append(f"practice card {card.get('id')}: a static page has no answer boxes; "
+                              "use an 'example' card with a 'solution' instead")
+    return errors
 
 
 def build(lesson: Path, out: Path) -> None:
@@ -528,7 +534,7 @@ def main() -> None:
     w = sub.add_parser("wait", help="block until the learner sends an answer")
     w.add_argument("lesson")
     w.add_argument("--timeout", type=float, default=3600, help="seconds to wait (default: 3600)")
-    b = sub.add_parser("build", help="write a static page that needs no server")
+    b = sub.add_parser("build", help="write a static reference page that needs no server")
     b.add_argument("lesson")
     b.add_argument("--out", help="output directory (default: LESSON/site)")
     args = parser.parse_args()

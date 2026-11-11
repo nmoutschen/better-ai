@@ -1,6 +1,6 @@
 # Tutor mode
 
-Teach the user one to one, so they can use the topic without AI. This file adds to SKILL.md: each section says where it goes.
+Work through the topic with the user, one to one, so they understand it and use it in their own life and work. This file adds to SKILL.md: each section says where it goes.
 
 ## 1. Find what the user already knows
 
@@ -28,7 +28,6 @@ AFTER the user agrees to the plan (SKILL.md section 2.2), CHOOSE the first optio
    - IN a practice card, NUMBER each thing you ask, and ASK the user to answer by number.
    - START feedback with its verdict: right, partly, wrong, or hint. A pre-question takes no verdict.
    - WHEN a hint points to earlier material, NAME the card by its heading.
-   - SEND a quiz as one message with numbered questions, headed as a closed-book quiz.
    - AFTER answering a side question, END with one line naming the card the lesson continues from.
 
 IF the user says they prefer the chat, USE the chat.
@@ -43,8 +42,7 @@ AS the user succeeds, GIVE less of the solution in later examples: leave out the
 
 ADAPT the chunks still to come to the user's answers, not the chunks already taught: those stay as the user saw them. IF an answer shows a gap, RE-TEACH the missed step at the start of the next chunk, with a new example. IF the user succeeds easily, SHORTEN the next chunk's worked example. IF the user says something is hard to follow, such as how values are shown, CHANGE it from the next card on.
 
-
-TAKE the first practice problem from the user's own situations (SKILL.md section 1.1).
+TAKE the first practice problem from the user's own situations (SKILL.md section 1.1). No study has tested whether this helps later use. Personalising to interests helped only when it matched how deeply the learner engaged with them, so KEEP the situation to what the problem needs.
 
 ## 4. Respond with hints and feedback
 
@@ -62,30 +60,22 @@ WHEN the user answers, ASK them to explain their answer in their own words, IF t
 
 THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. ON a page, WRITE this to `feedback/` with the verdict `right`, `partly`, `wrong` or `hint`. USE `noted` only for a pre-question.
 
-CHECK every hint and every piece of feedback before you give it (SKILL.md section 3.4).
+CHECK every hint and every piece of feedback before you give it (SKILL.md section 3.3).
 
-## 5. Give the quizzes
+## 5. Check understanding
 
-GIVE the quizzes planned in SKILL.md section 3.3. ON a page, the page hides the other chunks while a quiz chunk is `current`, until you set it to `done`. GIVE no feedback on a quiz answer until the user has answered every question in the quiz: `wait` holds quiz answers until then. THEN WRITE the feedback for all of them. DO NOT ask the user to answer a quiz question again: a quiz checks what they know, it does not teach. IF a wrong answer comes from an unclear question, SAY so and COUNT the answer by the user's reading.
+AFTER every few chunks, ASK the user to apply what they learned to a new case from their own situations, and to explain why it works there. The reference and earlier cards stay open: the check is about use, not recall. INCLUDE a near miss when one exists, and ASK whether the idea applies. Questions train the kind of task they ask for: application questions helped fact questions, but fact questions did not help application. Explaining to someone, as the user does to you here, helped learning more than preparing to explain. GIVE feedback as in section 4.
 
-DO NOT read lower scores on a mixed set as failure. DO NOT accept "I get it" or "makes sense" as evidence of understanding. TRUST what the user can do in the quiz.
+DO NOT accept "I get it" or "makes sense" as evidence of understanding. TRUST what the user can do with a new case. IF the user wants to recall the topic without looking, such as for an exam, GIVE closed-book questions in a chunk with `"quiz": true` instead. ON a page, the page hides the other chunks until you set it to `done`, and `wait` holds the answers until all are in.
 
-## 6. Plan practice and use
-
-BEFORE the end of the lesson, ASK when the user will next use the topic, and how often.
-
-- IF the user will use it within days and regularly, real use is the practice. AGREE with the user on a first use as soon as possible; reviews of training advise a short delay before first use. PLAN a follow-up where the user brings that real attempt and gets feedback on it, as the default end of the lesson. The user can decline it. Coaching on real work after training went with gains in what people did.
-- IF the user will not use it for weeks or longer, PLAN three practice sessions, and PUT their dates on the Review chunk (section 9). SET the first gap to about a fifth to a third of the time until the user needs the skill when that is a week or a few weeks, and to about a twentieth to a tenth when it is a year. KEEP later gaps equal or growing. A gap that is too long costs much less than one that is too short.
-- IF the user will use it rarely, SUGGEST one more session a few months after the last one.
-
-Learners rarely plan practice themselves, and daily reminder messages did not make them practise. Learners who chose a program that a system scheduled completed most of it. IF the harness can schedule a task, OFFER to start each session on its date. OTHERWISE, OFFER to add the dates to the user's calendar. TREAT this as a guide. DO NOT schedule anything without the user's permission.
+## 6. When the user comes back
 
 WHEN the user returns to the topic in a later message or session:
 
-1. ASK what they did with the topic since the lesson. IF they used it, ASK for the attempt, and GIVE feedback on it as in section 4.
-2. GIVE two or three tasks from their situations BEFORE you show any material, in a new situation each time. Trying first helps the restudy that follows, even when the attempt fails. IF earlier chunks hold problem types the user could confuse, MIX the tasks, following the mixed set tool.
-3. GIVE feedback on each answer. Practice helped more with feedback, and attempts that mostly failed did not help without it. IF the user misses most tasks on a chunk, RE-TEACH it before giving more.
-4. GIVE a new task, later in the same session, for each one the user missed.
+1. ASK what they did with the topic since the lesson. IF they used it, ASK for the attempt, and WORK through it with them: what happened, what they expected, and what they would do next time. Debriefs on real attempts raised performance, most when they focused on the task. GIVE feedback on the task, not on the person: over a third of feedback interventions lowered performance, most when they drew attention to the self.
+2. IF they have no attempt, GIVE two or three tasks from their situations BEFORE you show any material, in a new situation each time. Trying first helps the restudy that follows, even when the attempt fails. IF earlier chunks hold problem types the user could confuse, MIX the tasks, following the mixed set tool.
+3. GIVE feedback on each answer. Practice helped more with feedback, and attempts that mostly failed did not help without it. IF the user misses most tasks on a chunk, RE-TEACH it before giving more, and GIVE a new task, later in the same session, for each one they missed.
+4. UPDATE their reference (section 9) with what the attempt taught: a new case, a mistake, or a situation it applies to.
 
 ## 7. Handle pushback
 
@@ -99,19 +89,19 @@ IF the user's GOAL changes from learning to getting a result, STOP teaching and 
 
 ## 8. Say what the user can do
 
-SUMMARISE what the user can now do, based on the quizzes, and what they still struggled with. SAY that the quizzes show what the user can do, not whether they will use it: training effects shrink when measured by what people do at work instead of by tests. NAME the first real use from section 6 as the check that counts. FOR a decision scenario, REPORT agreement with the cited experts, not decision skill: the link between the two is untested. LIST the chunks not covered, if any.
+SUMMARISE what the user can now do, based on the cases they worked through, and what they still struggled with. SAY that this shows what the user can do now, not whether they will use it: training effects shrink when measured by what people do at work instead of by tests. NAME their first real use as the check that counts. FOR a decision scenario, REPORT agreement with the cited experts, not decision skill: the link between the two is untested. LIST the chunks not covered, if any.
 
-DO NOT praise the user's progress beyond what the quizzes show.
+DO NOT praise the user's progress beyond what they showed.
 
-## 9. Give the user the lesson to keep
+## 9. Leave the user a reference
 
-AFTER the last quiz, TURN the lesson into a page the user keeps, with the Review and Reference chunks of SKILL.md section 3.5. The user can decline it.
+AT the end, WRITE the user a reference on the topic, following modes/static.md sections 3 to 6, for this user. The user can decline it.
 
-1. **Timing.** DO NOT mention the page to keep before the last quiz is done: the user must still recognise without it when a rule applies. IF the user asks for notes during the lesson, SAY that they get the lesson to keep after the last quiz, and that the quizzes stay closed-book. IF the user still wants notes now, GIVE them, as in section 7. IF the lesson ends before the last quiz, GIVE the page when it ends.
-2. **The user's plans first.** ASK the user to fill in the plans card without looking back. SAY it is optional. CHECK that each plan names a situation from SKILL.md section 1.1 and a step the lesson taught, and ASK the user to fix a plan that does not. THEN ASK the user to picture the first situation and say what they will do.
-3. **Make it the user's.** PUT the dates from section 6 on the Review chunk, and take its tasks from the user's situations, one of them built on a mistake the user made. IN the Reference, ADD the user's plans to "When to use this", with the feature each near miss the user missed lacks, and LIST the mistakes the user made under "Mistakes to watch". GIVE every practice card already taught a `solution`, from the worked solution you checked, and `wrong` entries from the user's own wrong answers.
-4. **Deliver it.** BUILD the page (SKILL.md section 3.5), and GIVE the user its path once. IF you taught in the chat, SEND the Review and Reference as one message instead. IF the user wants it elsewhere or in another format, FOLLOW that.
-5. **Use it once.** GIVE one task from the user's situations to do with the page open, and GIVE feedback. People given an aid often leave it unused until they have practised when and how to use it.
+1. **The user's plans first.** ASK the user to write one to three plans in the form "When <situation>, I will <step from the lesson>." SAY it is optional. CHECK that each plan names a situation from SKILL.md section 1.1 and a step the lesson taught, and ASK the user to fix a plan that does not. THEN ASK the user to picture the first situation and say what they will do. Plans in this if-then form raised use of trained skills, most when the person was motivated and rehearsed the plan.
+2. **Make it theirs.** IN "When to use this", PUT their situations and plans, and the feature each near miss they missed lacks. TURN the problems they worked through into examples to try, with the solutions you checked, and their own wrong answers as the common wrong answers. LIST the mistakes they made under "Common mistakes".
+3. **Deliver it.** WRITE it to `.teach/<topic-slug>/reference/`, BUILD it, and GIVE the user its path once. IF you taught in the chat, SEND it as one message instead. IF the user wants it elsewhere or in another format, FOLLOW that.
+4. **Use it once.** GIVE one task from the user's situations to do with the reference open, and GIVE feedback. People given an aid often leave it unused until they have practised when and how to use it.
+5. **Offer a follow-up.** OFFER to work through the user's first real attempt with them, whenever they make it, as in section 6. The user can decline. Coaching on real work after training went with gains in what people did.
 
 ## 10. Close the lesson
 

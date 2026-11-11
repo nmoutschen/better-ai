@@ -1,6 +1,6 @@
 ---
 name: teach-better
-description: Helps an AI agent teach a topic so people can use it later without AI. In tutor mode it teaches the user one to one, with hints instead of answers and practice the user does alone. In static mode it writes a lesson page that readers study alone, with worked solutions behind a click. Handles pushback when the user wants the answer.
+description: Helps an AI agent teach a topic so people understand it and use it in their own life and work. In tutor mode it works through the topic with the user, with hints instead of answers, and checks understanding by applying it to their situations. In static mode it writes a self-contained reference, a page or a plan of pages, with worked examples, examples to try and every claim read from its source. Handles pushback when the user wants the answer.
 argument-hint: "[TOPIC]"
 ---
 
@@ -17,14 +17,15 @@ This file holds what both modes share. Each mode has its own file in `modes/`, w
 
 1. Answers from an AI raise a learner's scores while it helps and lower them once it is gone. Hints instead of answers avoid that loss, though learners rate hints as slower and less useful.
 2. Learners who study with AI overestimate what they know. Judge learning by what they can do, not by what they say.
-3. AI hints and feedback contain errors, and a learner cannot catch an error they share.
+3. AI hints and feedback contain errors, and a learner cannot catch an error they share. AI-assembled content fabricates citations, cites sources that do not support the claim, and passes on retracted or wrong findings without saying so.
 4. Help that suits a beginner can hinder a learner who knows more. Adapt to what the learner can do: matching a stated learning style has little support.
 5. Asking learners to explain their answers helped in every medium tested, print included, and about as much when nobody checked the explanation. Open prompts worked; multiple-choice prompts did not.
 6. Feedback that explains why an answer is right or wrong helped more than giving the right answer, most on tasks that apply what was learned.
-7. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Practice on real tasks went with more use.
+7. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Practice on real tasks went with more use. The measures that are easy to collect, such as how learners rate a lesson and what they recall right after it, say little about later use.
 8. Learners can state a rule and still not see when it applies. Pre-questions helped only the material they asked about. Cases where a rule does not apply helped learners find what the rule needs.
-9. A reference at hand helps people perform. Skills decay without use, and spaced practice slows the decay.
-10. Design choices, to TREAT as a guide and not as fixed rules: the lesson page, the tools in section 2.3, the Review and Reference chunks and their format, the prerequisite check, attempting before a worked example, taking the first problem from the user's own situations, explaining why in feedback, the timing of terms, and, in static mode, the hints, the solutions behind a click and the review schedule.
+9. A reference at hand helps people perform.
+10. Knowing why a method works and knowing how to do it build on each other, and knowing why predicted use on new problems more than on practised ones.
+11. Design choices, to TREAT as a guide and not as fixed rules: the lesson page, the tools in section 2.3, the reference's structure, the prerequisite check, attempting before a worked example, taking the first problem from the user's own situations (untested for later use), explaining why in feedback, the timing of terms, and the hints and solutions behind a click.
 
 The LEARNER is the user in tutor mode and the page's readers in static mode.
 
@@ -32,7 +33,7 @@ The LEARNER is the user in tutor mode and the page's readers in static mode.
 
 ### 1.1. Name the GOAL
 
-IDENTIFY what the LEARNER must be able to do WITHOUT AI after the lesson: explain a concept, solve a type of problem, use a tool, or make a kind of decision. WRITE it as a task they could be tested on.
+IDENTIFY what the LEARNER will do with the topic in their own life or work, WITHOUT AI: explain it, solve a type of problem, use a tool, or make a kind of decision. INCLUDE what they must understand to do it well in situations the lesson does not show. WRITE the GOAL as that use, not as a test they could pass.
 
 FIND OUT where and when the LEARNER will use it: the situations and tasks they will meet. LOOK in the context first, and ASK only for what it does not show.
 
@@ -41,16 +42,16 @@ FIND OUT where and when the LEARNER will use it: the situations and tasks they w
 CHOOSE from what the user wants:
 
 - **A result now**, rather than the ability to produce it: DO NOT teach. ANSWER instead, using `/write-better` if available, or otherwise leading with the answer in plain words. A user who asks how something works may want either.
-- **To learn it themselves**: tutor mode. READ [modes/tutor.md](modes/tutor.md).
-- **Material that other people study alone**, such as a lesson page to publish or share: static mode. READ [modes/static.md](modes/static.md).
+- **To understand it and use it themselves, with guidance**: tutor mode. READ [modes/tutor.md](modes/tutor.md).
+- **A reference to come back to**, for themselves or for other people, such as a page or a plan of pages to publish or share: static mode. READ [modes/static.md](modes/static.md).
 
 IF you cannot tell, ASK once, using the question tool if available:
 
 ```
 [question] What do you want from this?
 [option] Give me the answer.
-[option] Teach me, so I can do it without help.
-[option] Write a lesson that other people study on their own.
+[option] Work through it with me, so I can use it myself.
+[option] Write a reference I or others can come back to.
 ```
 
 READ the mode file BEFORE you continue. It adds steps to the sections below and says where each one goes.
@@ -66,11 +67,11 @@ DO NOT teach from your training data alone: a definition you are sure of can sti
 - AFTER the research, CONTINUE with the lesson. The research is a step of the lesson, not its end.
 - IF you have no web search and no page fetch, TELL the user that the lesson rests on your own knowledge, and ASK whether they have sources you should use.
 
-CITE the source on each card that states a definition or a fact, with a link.
+CITE the source on each card that states a definition or a fact, with a link. READ every source you cite, not only a search result or a summary of it, and CHECK that it says what the card claims. IF a source was retracted or is disputed, SAY so on the card.
 
 ### 2.2. Break the topic into chunks
 
-BREAK the topic into small chunks. Each chunk teaches one idea or one step and ends with a practice problem.
+BREAK the topic into small chunks. Each chunk teaches one idea or one step and ends with something to try.
 
 ORDER the chunks so each builds on earlier ones. NAME each chunk by what the LEARNER will do, such as "Pick the join for a report", not by the term it teaches.
 
@@ -90,8 +91,8 @@ A tool is a teaching move with its own template in `templates/tools/`. READ a to
 | Compare examples | [compare-examples.md](templates/tools/compare-examples.md) | After one method or case has been practised | A second method or case for the same idea exists |
 | Question stems | [question-stems.md](templates/tools/question-stems.md) | Around a long reading | A chunk asks the LEARNER to read a long text |
 | Decision checks | [decision-checks.md](templates/tools/decision-checks.md) | A practice card where the LEARNER chooses a course of action | The GOAL is to make a kind of decision |
-| Decision scenario | [decision-scenario.md](templates/tools/decision-scenario.md) | Practice and quiz | The GOAL is to make a kind of decision, AND you have a cited source of expert judgement |
-| Mixed set | [mixed-set.md](templates/tools/mixed-set.md) | Quiz and review | The quiz covers two or more problem types the LEARNER could confuse, and each type was practised alone first |
+| Decision scenario | [decision-scenario.md](templates/tools/decision-scenario.md) | Practice | The GOAL is to make a kind of decision, AND you have a cited source of expert judgement |
+| Mixed set | [mixed-set.md](templates/tools/mixed-set.md) | Practice after several chunks | Two or more problem types the LEARNER could confuse, each practised alone first |
 
 AT each moment, CHOOSE in this order:
 
@@ -99,13 +100,15 @@ AT each moment, CHOOSE in this order:
 2. CHECK the "Do not use" list in the tool's template. IF any item applies, DO NOT use the tool.
 3. USE at most one tool per card.
 4. IF the user states a preference about a tool, FOLLOW it, except where the tool's template says otherwise.
-5. WHEN a tool changes what the LEARNER sees, SAY so in one line, such as "This quiz mixes problems from chunks 1 to 3 on purpose."
+5. WHEN a tool changes what the LEARNER sees, SAY so in one line, such as "These problems mix chunks 1 to 3 on purpose."
 
 ## 3. Write the cards
 
 ### 3.1. Explain, then show a worked example
 
 EXPLAIN the idea briefly, in plain words first, then with its term (section 2.2). FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
+
+SAY why the method works, not only how to apply it: the LEARNER will meet cases the lesson does not show.
 
 SHOW a worked example: a solved problem with each step and the reason for each step. TAKE the problem from a situation where the LEARNER will use the topic (section 1.1), stripped to the features the rule needs. Training on concrete cases helped transfer to concrete cases, and context the rule does not need, such as a named person, lowered transfer. WHEN a card shows a formula, rule or symbol next to an example, STATE which part of the example each symbol stands for, such as in a table with one row per symbol. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation. ON a page, USE a `table`, `steps` or `timeline` block. IN the chat, USE a Markdown table or a list. DO NOT draw a plain-text diagram by hand: models draw them badly. WRITE a formula in a `code` block, with one operation per line, not inside a sentence, a table cell or a step note.
 
@@ -121,28 +124,10 @@ ASK for the answer and the reasoning together, in one reply. ASK for the reasoni
 
 IF the GOAL is to make a kind of decision, USE the decision tools in section 2.3 for practice: a decision has no single right answer to check.
 
-### 3.3. Write quiz questions
-
-AT the end of each few chunks, PLAN a short quiz: two or three questions the LEARNER answers without looking back and without help. MAKE most questions tasks the LEARNER will do in the situations from section 1.1, and INCLUDE at least one problem that differs from the examples. IF a near miss exists, INCLUDE a situation where the rule does not apply, and ASK whether it applies. Questions train the kind of task they ask for: application questions helped fact questions, but fact questions did not help application. ASK for a fact or a term only when the LEARNER must know it without looking it up.
-
-TELL the LEARNER before the first chunk that quizzes are closed-book. Learners who expected a closed-book test retained more. ON a page, PUT the quiz in its own chunk with `"quiz": true`.
-
-### 3.4. Check what you write
+### 3.3. Check what you write
 
 BEFORE giving a hint, a worked example, a solution or feedback, CHECK it. RECOMPUTE numbers, RUN code, and LOOK UP facts you are not sure of. IF you cannot check a claim, SAY so. DO NOT present an unchecked step as certain.
 
 ON a page, RUN `python3 scripts/lesson.py check <folder>` from this skill's directory after each change to `lesson.json`, FIX every error, and CHECK every value it prints, such as each table cell and timeline event, against your worked solution.
 
-CHECK that every term in a practice question or quiz question was introduced on an earlier card. IF it was not, DEFINE it in the question or REWORD the question. CHECK that an example in a question does not give away its answer.
-
-### 3.5. End with a Review and a Reference
-
-AFTER the last quiz, ADD two chunks, so the LEARNER keeps a page they can use without AI. READ [templates/reference.md](templates/reference.md) and FOLLOW its format. They come after the quizzes because learners who expect to keep a record remember less of what it holds.
-
-1. **Review.** GIVE two or three application tasks in new situations from section 1.1, each with a worked solution. MIX them IF they cover types the LEARNER could confuse (the mixed set tool). PUT the review dates on its first card.
-2. **Reference.** LEAD with when to use the topic: the situations and the signs that a rule applies. A reference cannot tell the LEARNER when to open it. THEN GIVE, per chunk, the steps as a checklist, the rule with its conditions, a short account of why it works, and the worked example. A checklist helped most for steps people rarely use, and knowing why a procedure works helped with new cases. LIST the mistakes to watch.
-3. **Plans.** ADD a practice card that asks the LEARNER to write one to three plans in the form "When <situation>, I will <step from the lesson>." Plans in this if-then form raised use of trained skills, most when the person was motivated and rehearsed the plan.
-
-INCLUDE only what the lesson taught. CITE the same sources as the cards. CHECK every rule, example and answer as in section 3.4: the LEARNER will use the page without AI, with no one to catch an error.
-
-THEN RUN `python3 scripts/lesson.py build <folder>` from this skill's directory. It writes `site/index.html`, one file that needs no server. Every practice card needs a `solution`.
+CHECK that every term in a practice question was introduced on an earlier card. IF it was not, DEFINE it in the question or REWORD the question. CHECK that an example in a question does not give away its answer.

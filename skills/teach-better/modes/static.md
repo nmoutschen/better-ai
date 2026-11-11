@@ -1,51 +1,64 @@
 # Static mode
 
-Write a lesson page that readers study alone, with no tutor to answer them. The user is the author, not the learner. This file adds to SKILL.md: each section says where it goes.
+Write a self-contained reference that people come back to when they need the topic: a page, or a plan of pages. It has no quizzes, no answer boxes and no schedule. The user may be its reader or its author. This file adds to SKILL.md: each section says where it goes.
 
-No tutor reads the reader's answers, so the page carries what a tutor would say: hints, a worked solution, and the common wrong answers, each behind a click. Most readers try a question before opening its solution when the solution is one click away.
+## 1. Name the readers
 
-## 1. Name the audience
+WITH the GOAL (SKILL.md section 1.1), FIND OUT from the user who the readers are, what they already know, and where they will use the topic. The GOAL and the situations are the readers'. WRITE the readers and what they need to know first in the top-level `audience`.
 
-WITH the GOAL (SKILL.md section 1.1), FIND OUT from the user who the readers are, what they already know, and where they will use the topic. The GOAL and the situations are the readers', not the user's.
+PICK one level of prior knowledge to write for. Worked examples help readers new to a topic and can hinder readers who know more, and no tested way exists for readers to pick their own level. IF the readers span levels, ASK the user to pick one, or to plan one reference per level.
 
-PICK one level of prior knowledge to write for. Worked examples help readers who are new to a topic and can hinder readers who know more, and no tested way exists for readers to pick their own level. IF the readers span levels, ASK the user to pick one, or to plan one lesson per level.
+## 2. Choose a page or a plan
 
-WRITE the audience and the prerequisites in `audience`, such as "Analysts who can write a SELECT query". DO NOT run the prerequisite check on the user.
+WITH the chunks (SKILL.md section 2.2), CHOOSE the size:
 
-## 2. Write the lesson
+- A **page** IF the topic fits in one module of the structure below.
+- A **plan** OTHERWISE: one module per page, ordered from simple to complex whole tasks. PREFER a plan when the topic is broad, so that each page stays focused.
 
-AFTER the user agrees to the plan (SKILL.md section 2.2):
+MAKE each page of a plan stand on its own. A reader comes to it from a search or a link, not only from the page before. NAME the pages it builds on in its Summary, and LINK them. Readers who followed a fixed course order completed less often than readers who chose their own path.
 
-- WRITE the lesson to `.teach/<topic-slug>/lesson.json` in the working directory, in the format in [templates/lesson.md](../templates/lesson.md), with its static fields. DO NOT commit it unless the user asks.
-- WRITE every chunk's cards at once: there is no learner to adapt to.
-- FADE the worked examples by plan: in later chunks, LEAVE OUT the steps that earlier chunks practised.
-- FOR a tool, USE the "On a page" format in its template, and ADD the static fields of section 3. IGNORE the template's steps that wait for or reply to the learner.
+SHOW the user the list of pages before writing.
 
-## 3. Write what a tutor would say
+## 3. Follow the structure
 
-ON each practice card (SKILL.md section 3.2):
+EVERY page follows the same structure, in this order, so readers know where to look. READ [templates/reference.md](../templates/reference.md) for the cards.
 
-1. **The answer box.** ASK for the answer and why in an open `text` field. A `choice` or `rank` field always comes with a `text` field for the reasoning: prompts that ask readers to explain work in print and when nobody checks, but multiple-choice prompts did not.
-2. **`hints`.** WRITE up to three, from least to most help: one that points to where attempts go wrong or asks a question that leads to the next step, one that quotes the rule and LINKS the card that teaches it, and one that shows the next step only. DO NOT write a hint that gives the answer. Using help more than needed went with less learning. A reader who has not tried yet gets less from help, so the page asks them to answer before they open anything.
-3. **`solution`.** WRITE every step with its reason, and QUOTE the rule each step uses. An explanation helped more than the right answer alone. DO NOT put the explanation anywhere else on the card: an explanation in view lowers the reader's incentive to explain it themselves.
-4. **`wrong`.** LIST the wrong answers readers are likely to give: the ones the sources name, the near misses the chunk teaches, and the steps a worked example warns about. FOR each, NAME the idea it misapplies.
+1. **Summary.** What the topic lets the reader do, who it is for, and what they need to know first.
+2. **When to use this.** The situations, the signs that it applies, and the near misses where it does not. A reference cannot tell the reader when to open it.
+3. **Core ideas.** One block per idea, always in the same order: the idea in plain words, then its term (SKILL.md section 2.2); why it works (SKILL.md section 3.1); a worked example; then an example to try.
+4. **Cases.** Real, cited cases where the topic mattered.
+5. **Common mistakes.** Each with the idea it misapplies.
+6. **Limits and disagreements.** Where the evidence is thin, where sources disagree, and what the page does not cover.
+7. **Quick reference.** The steps as a checklist, or a table, for the reader who already knows the topic. A checklist helped most for steps people rarely use.
+8. **Sources.** Every source the page cites.
 
-FOR a pre-question, WRITE a solution that says the next cards give the answers. FOR a why prompt, the solution is the explanation.
+LEAVE OUT a part only when it has nothing to hold, such as Cases when no documented case exists. DO NOT invent a case to fill it.
 
-## 4. Quizzes, review and reference
+## 4. Write the examples to try
 
-WRITE the quizzes planned in SKILL.md section 3.3 as quiz chunks. The page asks the reader to answer every question in a quiz before opening its solutions.
+AFTER each worked example, ADD an example to try: a problem like the worked example in a different situation, with its solution behind a click (SKILL.md section 3.2). Most readers try a problem before opening a solution that is one click away.
 
-Readers use self-tests less than they should, and nothing found shows that readers follow a review schedule on their own. AFTER the last quiz, WRITE the Review and Reference chunks (SKILL.md section 3.5):
+- **Solution.** WRITE every step with its reason, and QUOTE the rule each step uses. An explanation helped more than the right answer alone.
+- **Hints**, optional. Up to three, from least to most help: one that points to where attempts go wrong, one that quotes the rule, and one that shows the next step only. DO NOT write a hint that gives the answer: using help more than needed went with less learning.
+- **Common wrong answers.** The wrong answers readers are likely to give, each with the idea it misapplies.
 
-- ASK the user how soon and how often readers will use the topic, and SUGGEST review dates by the gaps in [modes/tutor.md](tutor.md) section 6.
-- PUT the `wrong` entries under "Mistakes to watch".
-- IN the plans card's solution, SAY what a good plan names.
+DO NOT put the solution anywhere else on the card: an explanation in view lowers the reader's incentive to work it out.
 
-## 5. Check and build
+FOR a tool (SKILL.md section 2.3), WRITE its question as an example to try, with its answer as the solution, and IGNORE the template's steps that wait for or reply to the learner. A why prompt's solution is the explanation; a "does it apply?" example's solution gives the verdict per situation and the feature that decides it.
 
-CHECK every card, hint, solution and wrong answer as in SKILL.md section 3.4. No tutor will catch an error the page holds.
+## 5. Ground every claim
 
-BUILD the page (SKILL.md section 3.5). IF you cannot run Python, WRITE `lesson.json` and GIVE the user the build command.
+FOLLOW SKILL.md section 2.1 for every card. A page lives on without a tutor to correct it, so:
 
-GIVE the user the page's path once, and ASK them to review it. DO NOT publish or upload the page unless the user asks. REPORT which checks you ran, and which claims or values you could not check.
+- CITE a source for every fact, number, definition and case, and READ it in full. A search result or a fetch tool's summary is a lead, not a source.
+- CHECK that the cited passage says what the card claims, with the same numbers and conditions.
+- PUT what the sources do not settle in "Limits and disagreements", not in the Core ideas as fact.
+- MARK an example as invented when it is.
+
+## 6. Check and build
+
+CHECK every card, hint, solution and wrong answer as in SKILL.md section 3.3.
+
+WRITE the reference to `.teach/<topic-slug>/lesson.json`, in the format in [templates/lesson.md](../templates/lesson.md): one chunk per page, one card per part of the structure. DO NOT commit it unless the user asks. RUN `python3 scripts/lesson.py check <folder>` and then `python3 scripts/lesson.py build <folder>` from the skill's directory. It writes `site/index.html`, one file that needs no server. IF you cannot run Python, WRITE `lesson.json` and GIVE the user the build command.
+
+GIVE the user the page's path once, and ASK them to review it. DO NOT publish or upload it unless the user asks. REPORT which checks you ran, and which claims you could not check.

@@ -21,7 +21,7 @@ BEFORE teaching a chunk, ASK the user to guess the answers to two or three quest
 2. ASK the user to write a guess for each, and SAY in one line that wrong guesses are expected and help them remember the answer.
 3. WAIT for the guesses. DO NOT give a verdict or the answers. ON a page, WRITE the feedback with the verdict `noted` and one line saying that the next cards answer the questions.
 4. TEACH the chunk. ON the card that gives each answer, POINT back to the question, such as "This answers pre-question 2."
-5. IN the next quiz, TEST these facts inside a task that uses them, not as recall questions.
+5. LATER, ASK for these facts inside a task that uses them, not as recall questions.
 
 ## On a page
 

@@ -1,12 +1,12 @@
 # Lesson folder
 
-`scripts/lesson.py` shows a lesson folder as a local page and writes the learner's answers back to it. It also builds a static page from the same folder, for readers who study alone.
+`scripts/lesson.py` shows a lesson folder as a local page and writes the learner's answers back to it. It also builds a static reference page from a folder, for readers who come back to it.
 
 ```
 python3 scripts/lesson.py check LESSON               # validate lesson.json, print every text and value the page shows
 python3 scripts/lesson.py serve LESSON [--port N]    # serve the page; exits once lesson.json has "status": "ended"
 python3 scripts/lesson.py wait LESSON [--timeout S]  # block until an answer has no feedback, print it, exit 0 (2 on timeout)
-python3 scripts/lesson.py build LESSON [--out DIR]   # write DIR/index.html (default LESSON/site): a static page, no server
+python3 scripts/lesson.py build LESSON [--out DIR]   # write DIR/index.html (default LESSON/site): a static reference, no server
 ```
 
 ```
@@ -65,7 +65,7 @@ ASK for the reasoning in a `text` field next to a `choice` or `rank` field: a ch
 
 ## Static fields
 
-A static page has no tutor, so each practice card carries what a tutor would say. The live page ignores these fields. `build` requires `solution` on every practice card.
+A static page is a reference: one chunk per page, no quiz chunks and no `practice` cards. An `example` card becomes an example to try when it has a `solution`: the page shows the problem, then the hints and the solution on a click. `build` refuses quiz chunks and practice cards.
 
 | Field | Shows | Format |
 |---|---|---|
@@ -73,7 +73,7 @@ A static page has no tutor, so each practice card carries what a tutor would say
 | `solution` | The worked solution, behind a click | list of blocks |
 | `wrong` | Common wrong answers, under the solution | `[{"answer": "<wrong answer>", "why": "<the idea it misapplies>"}]` |
 
-Add a top-level `"audience"`: who the page is for and what they must know before it. The page shows it under the goal. On a static page every chunk is open, `status` is ignored, and a quiz chunk shows its solutions behind a click like any other card. The reader's answers stay in their browser.
+Add a top-level `"audience"`: who the page is for and what they must know before it. The page shows it under the goal. On a static page every chunk is open and `status` is ignored.
 
 ## Blocks
 
