@@ -70,6 +70,8 @@ FOLLOW `/write-better` for the wording: plain words, one term per concept, liter
 
 KEEP each skill self-contained: SKILL.md, its templates and its scripts DO NOT link to or depend on files outside the skill's directory, such as reports in `sources/`. KEEP each SKILL.md well under 500 lines. KEEP common mistakes and their fixes in SKILL.md, not in a reference file the agent may not open.
 
+BEFORE adding a rule or a Principles bullet to a SKILL.md, LOOK in that SKILL.md for one that covers the same case, and MERGE the new content into it instead. STATE each rule once in a SKILL.md. A template that an agent reads without SKILL.md, such as a worker brief, MAY restate it.
+
 PUT copyable formats in `templates/`, with placeholders only. DO NOT include example content in templates.
 
 ### 6.3. Say what invoking the skill means
