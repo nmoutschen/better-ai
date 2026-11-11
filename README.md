@@ -61,4 +61,4 @@ Teaches the user a new topic so they can use it later without AI. It gives hints
 
 ## `/write-better`
 
-Rewrites the agent's output so the user can understand and act on it. It names the reader's goal, cuts what they don't need, puts the main point first, and uses plain, specific words.
+Rewrites the agent's output so the user can understand and act on it. It names the reader's goal, cuts what they don't need, puts the main point first, and uses plain, specific words. It writes from what the user has seen: it says what tool output, earlier plans and its own labels refer to, and starts from where things stand when the user comes back.
