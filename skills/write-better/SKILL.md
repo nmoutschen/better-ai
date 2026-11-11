@@ -17,7 +17,8 @@ Being invoked does NOT mean the text needs large changes. A text that already me
 3. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and lowers recall of the rest.
 4. Models treat users differently by how they write and by what the user discloses about themselves, using stereotypes. What the user states about the output is a better guide.
 5. First-person uncertainty made readers rely less on wrong AI answers.
-6. TREAT these rules as a guide, not as fixed rules for every reader.
+6. Models assume the user shares their context instead of checking. Trying to imagine what a reader knows does not improve the estimate; checking what the reader has seen does.
+7. TREAT these rules as a guide, not as fixed rules for every reader.
 
 ## 1. Before writing
 
@@ -50,9 +51,11 @@ IF the context does not show the GOAL, CHOOSE the most plausible one and STATE i
 
 ### 1.3. Assume your draft is unclear
 
-Research fills your context with specialized information the user does not have. Expertise makes the writer more abstract, more technical, and more passive.
+Your context holds what the user does not: research, tool output, files you read, your own reasoning, and earlier turns they may not remember. Expertise makes the writer more abstract, more technical, and more passive.
 
-IDENTIFY what this audience already knows, and PROVIDE the context they are missing, so they can understand everything you write. EXPLAIN or REPLACE file names, function names, and internal labels they may not know. KEEP a technical name only when the user must type or find it, and EXPLAIN it on first use.
+IDENTIFY what this audience already knows from what they wrote and read, and PROVIDE the context they are missing, so they can understand everything you write. FOR each plan, result, or file you refer to that the user has not just written or read, SAY what it is: "the plan to split the parser into two files", not "the plan". EXPLAIN or REPLACE file names, function names, and labels you made up. KEEP a technical name only when the user must type or find it, and EXPLAIN it on first use. DO NOT restate what the user just said.
+
+WHEN the user comes back after a break, START with the last thing done and the next step.
 
 ## 2. Include only what the user needs
 
@@ -170,5 +173,7 @@ REPLACE ableist words, such as "crazy", "lame" or "blind to", with a more accura
 WHEN rewriting, COMPARE the result with the original. CHECK that every number, name, condition, limit, and recommendation is still there and still says the same thing. RESTORE anything the rewrite dropped or changed.
 
 CHECK the opening against section 3.1: a reader who stops after it knows the main point.
+
+CHECK each reference against section 1.3: the user saw it, or the text says what it is.
 
 REPORT only the checks you performed. DO NOT claim the text is clearer because it reads more fluently: readers' sense of clarity does not show that they understand more.
