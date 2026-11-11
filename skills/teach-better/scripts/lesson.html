@@ -374,7 +374,7 @@ if (STATIC) {
   $("title").textContent = L.title || "Lesson"; document.title = L.title || "Lesson";
   $("goal").innerHTML = L.goal ? `<b>Goal:</b> ${inline(L.goal)}` : "";
   if (L.audience) { $("audience").innerHTML = `<b>For:</b> ${inline(L.audience)}`; $("audience").hidden = false; }
-  $("rule").hidden = true;
+  $("rule").hidden = true; document.querySelector("nav h2.label").textContent = "Pages"; document.querySelector("nav").setAttribute("aria-label", "Pages");
   show();
 } else { poll(); setInterval(poll, 2000); }
 </script></body></html>

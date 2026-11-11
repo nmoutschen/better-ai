@@ -1,6 +1,6 @@
 # Reference page
 
-One page of a reference: one chunk in `lesson.json`, with its cards in the order below. modes/static.md section 3 says what goes in each part. Copy the chunk and replace the `<placeholders>`. Repeat the three core-idea cards once per idea. Leave out a card that has nothing to hold.
+One page of a reference: one chunk in `lesson.json`, with its cards in the order below. modes/static.md section 3 says what goes in each part. Copy the chunk and replace the `<placeholders>`. Repeat the three core-idea cards once per idea. The page labels an `example` card "Example", or "Try it" when it has a solution, so its title names only the situation. Leave out a card that has nothing to hold.
 
 In the chat, SEND the same parts as one message, with each card title as a heading and each solution at the end of the message.
 
@@ -16,9 +16,9 @@ In the chat, SEND the same parts as one message, with each card title as a headi
   {"kind": "text", "title": "<idea, named by what the reader does>", "blocks": [
     {"type": "p", "text": "<the idea in plain words, then its term>"},
     {"type": "p", "text": "Why it works: <one or two sentences> ([<source>](<url>))"}]},
-  {"kind": "example", "title": "Example: <situation>", "blocks": [
+  {"kind": "example", "title": "<situation>", "blocks": [
     {"type": "steps", "items": [{"label": "<step>", "note": "<why>"}]}]},
-  {"kind": "example", "title": "Try it: <situation>", "blocks": [
+  {"kind": "example", "title": "<situation>", "blocks": [
     {"type": "p", "text": "<a problem like the example, in a different situation>"}],
    "hints": ["<where attempts go wrong>", "<the rule, quoted>"],
    "solution": [{"type": "p", "text": "<every step with its reason>"}],
