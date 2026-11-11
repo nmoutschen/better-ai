@@ -47,6 +47,7 @@ C = {"cream": "#FFFCF7", "linen": "#F2EDE5", "sand": "#C4B69C", "terracotta": "#
 
 
 SANS = "Space Grotesk, -apple-system, sans-serif"
+HL_STROKE = f' stroke="{C["terracotta"]}" stroke-width="2.5"'  # the outline of a highlighted box
 
 
 W = 800  # SVG viewBox width
@@ -162,7 +163,7 @@ def arrow(x1, y1, x2, y2, color):
 
 def node(x, y, w, h, label, hl, chars):
     lines = wrap(label, chars, 3)
-    stroke = f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else ""
+    stroke = HL_STROKE if hl else ""
     ty = y + h / 2 - (len(lines) - 1) * 9 + 5
     return (f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h}" rx="4" fill="{C["linen"]}"{stroke}/>' +
             text_el(x + w / 2, ty, lines, 15, 700 if hl else 600, C["heading"], "middle", gap=18))
@@ -172,6 +173,11 @@ def _is_num(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
+def axis_start(p, axis, values):
+    """Where a value axis starts: at zero, unless the panel sets '<axis>_from_zero' to false."""
+    return min(values) if p.get(f"{axis}_from_zero") is False else min(0, min(values))
+
+
 def _as_list(v):
     return v if isinstance(v, list) else ([] if v is None else [v])
 
@@ -179,11 +185,7 @@ def _as_list(v):
 # ---------- shared helpers: plain text ----------
 
 def tfmt(v):
-    if isinstance(v, float) and not v.is_integer():
-        return f"{v:,.2f}".rstrip("0").rstrip(".")
-    if isinstance(v, (int, float)) and not isinstance(v, bool):
-        return f"{int(v):,}"
-    return str(v)
+    return num(v) if _is_num(v) else str(v)
 
 
 def twrap(text, width, indent=""):
@@ -326,7 +328,7 @@ def v_map(p, spec=None):
     hl_ids = set(_as_list(p.get("highlight")))
     n = len(secs)
     body = []
-    stroke = lambda hl: f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else ""
+    stroke = lambda hl: HL_STROKE if hl else ""
     if n <= 5:  # a row of parts, each with its gist inside the box
         gap = 14
         bw = (W - gap * (n - 1)) / n
@@ -485,7 +487,7 @@ def v_concept(p):
         n = by_id[i]
         hl = n.get("highlight")
         body.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h}" rx="4" fill="{C["linen"]}"'
-                    + (f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else f' stroke="{C["sand"]}" stroke-width="1"') + "/>")
+                    + (HL_STROKE if hl else f' stroke="{C["sand"]}" stroke-width="1"') + "/>")
         body.append(text_el(x + w / 2, y + 26, lines_of[i], 15, 700 if hl else 600, C["heading"], "middle", gap=18))
     defs = (f'<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{C["ink"]}"/></marker>'
             f'<marker id="ahh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{C["terracotta"]}"/></marker></defs>')
@@ -811,7 +813,7 @@ def v_sets(p):
 def t_sets(p, W, g):
     sets = [str(s) for s in p["sets"]]
     regions = p["regions"]
-    order = sorted(range(len(regions)), key=lambda k: [0 if s in regions[k]["in"] else 1 for s in sets])
+    order = _region_order(sets, regions)
     lw = min(max(len(s) for s in sets), 24)
     cw = max(3, min((W - lw - 2) // len(order), 8))
     out = [" " * (lw + 1) + "".join(f"{j + 1}".center(cw) for j in range(len(order)))]
@@ -830,6 +832,11 @@ def t_sets(p, W, g):
 
 
 # ---------- matrix: check, HTML, text ----------
+
+def _mark(cell):
+    """A matrix cell is a mark, or an object with a 'mark'."""
+    return cell.get("mark") if isinstance(cell, dict) else cell
+
 
 def _label(col):
     return col.get("label", "") if isinstance(col, dict) else str(col)
@@ -861,7 +868,7 @@ def check_matrix(p, where, errors, warnings, digest):
             continue
         out = []
         for c in cells:
-            mark = c.get("mark") if isinstance(c, dict) else c
+            mark = _mark(c)
             if mark is not None and mark not in MARKS:
                 errors.append(f"{where}: row '{r['label']}' has mark '{mark}'; use one of {', '.join(MARKS)}, or null")
             n_hl += 1 if isinstance(c, dict) and c.get("highlight") else 0
@@ -877,7 +884,7 @@ def check_matrix(p, where, errors, warnings, digest):
     for r in rows:
         if isinstance(r, dict) and isinstance(r.get("cells"), list):
             key = r.get("group") or r.get("label")
-            measured.setdefault(key, set()).update(k for k, c in enumerate(r["cells"]) if (c.get("mark") if isinstance(c, dict) else c))
+            measured.setdefault(key, set()).update(k for k, c in enumerate(r["cells"]) if _mark(c))
     keys = [k for k in measured if measured[k]]
     for a in range(len(keys)):
         for b in range(a + 1, len(keys)):
@@ -901,7 +908,7 @@ def v_matrix(p):
             out.append(f'<div class="mgroup" role="row"><span role="rowheader">{esc(group)}</span></div>')
         cells = []
         for c, col in zip(r["cells"], cols):
-            mark = c.get("mark") if isinstance(c, dict) else c
+            mark = _mark(c)
             hl = isinstance(c, dict) and c.get("highlight")
             word = words.get(mark, blank) if mark else blank
             if mark not in used:
@@ -912,7 +919,7 @@ def v_matrix(p):
                          f'{f"<small>{esc(text)}</small>" if text else ""}</span>')
         out.append(f'<div class="mrow{" hl" if r.get("highlight") else ""}" role="row"><span role="rowheader" class="mlab">{esc(r["label"])}</span>{"".join(cells)}</div>')
         rows_text.append([(f"{r['group']}: " if r.get("group") else "") + r["label"]] +
-                         [words.get(c.get("mark") if isinstance(c, dict) else c, blank) if (c.get("mark") if isinstance(c, dict) else c) else blank for c in r["cells"]])
+                         [words.get(_mark(c), blank) if _mark(c) else blank for c in r["cells"]])
     out.append("</div>")
     legend = "".join(f'<span>{mark_svg(m, False)}{esc(words.get(m, blank) if m else blank)}</span>' for m in [m for m in MARKS if m in used] + ([None] if None in used else []))
     out.append(f'<p class="mlegend">{legend}</p>')
@@ -922,7 +929,7 @@ def v_matrix(p):
 def t_matrix(p, W, g):
     cols = [c if isinstance(c, dict) else {"label": c} for c in p["columns"]]
     sym = {"yes": g["yes"], "no": g["no"], "up": g["up"], "down": g["dn"], "same": g["same"], None: g["blank"]}
-    words = {"yes": "yes", "no": "no", "up": "higher", "down": "lower", "same": "no difference", **(p.get("legend") or {})}
+    words = {**MARKS, **(p.get("legend") or {})}
     lw = min(max(len(r["label"]) for r in p["rows"]) + 2, int(W * 0.45))
     cw = max(6, min((W - lw) // len(cols), 16))
     heads = [twrap(c["label"], cw - 2) for c in cols]
@@ -936,7 +943,7 @@ def t_matrix(p, W, g):
             out.append(tcut(group.upper(), W))
         cells = []
         for c in r["cells"]:
-            m = c.get("mark") if isinstance(c, dict) else c
+            m = _mark(c)
             used.append(m)
             s = sym[m]
             if isinstance(c, dict) and c.get("highlight"):
@@ -1426,7 +1433,7 @@ def v_slope(p):
     items = sorted(p["items"], key=lambda it: bool(it.get("highlight")))
     unit = p.get("unit", "")
     vals = [v for it in items for v in (it["before"], it["after"])]
-    lo = min(vals) if p.get("y_from_zero") is False else min(0, min(vals))
+    lo = axis_start(p, "y", vals)
     hi = max(vals)
     top, ph = 44, 300
     x1, x2 = 250, W - 250
@@ -1499,7 +1506,7 @@ def v_dots(p):
     """Every value as a dot, stacked where values are close, so the spread is visible."""
     groups, unit = p["groups"], p.get("unit", "")
     allv = [v for g in groups for v in g["values"]]
-    ticks = nice_ticks(min(allv) if p.get("x_from_zero") is False else min(0, min(allv)), max(allv), 5)
+    ticks = nice_ticks(axis_start(p, "x", allv), max(allv), 5)
     lo, hi = ticks[0], ticks[-1]
     left, right = 170, 20
     pw = W - left - right
@@ -1545,7 +1552,7 @@ def v_dots(p):
 def t_dots(p, W, g):
     groups = p["groups"]
     allv = [v for grp in groups for v in grp["values"]]
-    lo = min(allv) if p.get("x_from_zero") is False else min(0, min(allv))
+    lo = axis_start(p, "x", allv)
     hi = max(allv)
     lw = min(max(len(grp["label"]) for grp in groups), int(W * 0.3))
     nb = max(W - lw - 4, 20)
@@ -1592,8 +1599,8 @@ def check_scatter(p, where, errors, warnings, digest):
 def v_scatter(p):
     pts = p["points"]
     xs, ys = [pt["x"] for pt in pts], [pt["y"] for pt in pts]
-    xt = nice_ticks(min(xs) if p.get("x_from_zero") is False else min(0, min(xs)), max(xs), 5)
-    yt = nice_ticks(min(ys) if p.get("y_from_zero") is False else min(0, min(ys)), max(ys), 4)
+    xt = nice_ticks(axis_start(p, "x", xs), max(xs), 5)
+    yt = nice_ticks(axis_start(p, "y", ys), max(ys), 4)
     left, top, pw, ph = 64, 40, W - 64 - 30, 360
     X = lambda v: left + (v - xt[0]) / ((xt[-1] - xt[0]) or 1) * pw
     Y = lambda v: top + ph - (v - yt[0]) / ((yt[-1] - yt[0]) or 1) * ph
@@ -1618,8 +1625,8 @@ def v_scatter(p):
 def t_scatter(p, W, g):
     pts = p["points"]
     xs, ys = [q["x"] for q in pts], [q["y"] for q in pts]
-    x0 = min(xs) if p.get("x_from_zero") is False else min(0, min(xs))
-    y0 = min(ys) if p.get("y_from_zero") is False else min(0, min(ys))
+    x0 = axis_start(p, "x", xs)
+    y0 = axis_start(p, "y", ys)
     cols, rows = min(W - 10, 60), 14
     grid = [[" "] * cols for _ in range(rows)]
     for q in sorted(pts, key=lambda q: bool(q.get("highlight"))):
@@ -1683,7 +1690,7 @@ def v_line(p):
         xpos = lambda x: order.index(x) / ((len(order) - 1) or 1)
         xticks = order
     ys = [pt[1] for s in series for pt in s["points"]]
-    lo = min(ys) if p.get("y_from_zero") is False else min(0, min(ys))
+    lo = axis_start(p, "y", ys)
     ticks = nice_ticks(lo, max(ys), 4)
     ylo, yhi = ticks[0], ticks[-1]
     unit = p.get("unit", "")
@@ -1741,7 +1748,7 @@ def t_line(p, W, g):
     series = p["series"]
     unit = p.get("unit", "")
     ys = [pt[1] for s in series for pt in s["points"]]
-    lo = min(ys) if p.get("y_from_zero") is False else min(0, min(ys))
+    lo = axis_start(p, "y", ys)
     nw = min(max(len(s["name"]) for s in series), 22)
     out = []
     for s in series:
@@ -1916,6 +1923,16 @@ TEXT = {"effects": t_effects, "pairs": t_pairs, "numbers": t_numbers, "units": t
         "svg": t_svg, "slope": t_slope, "dots": t_dots, "scatter": t_scatter, "quadrant": t_quadrant, "sets": t_sets, "tree": t_tree}
 
 
+def visual_of(p, spec):
+    """A panel's (visual HTML, data HTML). A map draws the spec's document, so it gets the spec."""
+    return v_map(p, spec) if p["kind"] == "map" else VISUALS[p["kind"]](p)
+
+
+def text_of(p, W, g, spec):
+    """A panel's plain-text lines."""
+    return t_map(p, W, g, spec) if p["kind"] == "map" else TEXT[p["kind"]](p, W, g)
+
+
 # ---------- page ----------
 
 CSS = (HERE / "show.css").read_text(encoding="utf-8")
@@ -1944,7 +1961,7 @@ def render(spec: dict) -> str:
     panels = spec["panels"]
     sections, toc = [], []
     for i, p in enumerate(panels, 1):
-        visual, data = v_map(p, spec) if p["kind"] == "map" else VISUALS[p["kind"]](p)
+        visual, data = visual_of(p, spec)
         if p["kind"] in ("flow", "groups", "timeline", "map", "concept", "sets", "quadrant", "tree", "effects", "pairs"):  # on narrow screens show the text version instead of a shrunken svg
             visual = f'<div class="wide">{visual}</div><div class="narrow" aria-hidden="true">{data}</div>'
 
@@ -1989,7 +2006,7 @@ def doc_line(spec, p, g, W=72):
     doc = spec.get("document")
     if not doc or p.get("part") is None:
         return []
-    parts = set(map(str, p["part"] if isinstance(p["part"], list) else [p["part"]]))
+    parts = set(map(str, _as_list(p["part"])))
     secs = doc["sections"]
     here = [f"{k + 1} of {len(secs)}, {s['label']}" for k, s in enumerate(secs) if str(s["id"]) in parts]
     return twrap("In the document: part " + "; part ".join(here), W, "")
@@ -2010,7 +2027,7 @@ def render_text(spec, width=72, ascii=False, markdown=False):
             out += twrap(spec["summary"], W)
         out.append("")
     for i, p in enumerate(spec["panels"], 1):
-        visual = t_map(p, W, g, spec) if p["kind"] == "map" else TEXT[p["kind"]](p, W, g)
+        visual = text_of(p, W, g, spec)
         strip = doc_line(spec, p, g, W)
         if markdown:
             out += [f"## {i}. {p['headline']}", ""] + ([f"*{' '.join(strip)}*", ""] if strip else [])
@@ -2150,7 +2167,7 @@ def render_screen_reader(spec, width=72):
         elif p["kind"] == "text":
             body = [plain(b) for b in _as_list(p.get("body"))]
         else:
-            visual, data = v_map(p, spec) if p["kind"] == "map" else VISUALS[p["kind"]](p)
+            visual, data = visual_of(p, spec)
             body = linear_lines(data or visual)
         for line in body:
             out += twrap(line, W)
