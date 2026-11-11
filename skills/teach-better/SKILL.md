@@ -11,23 +11,14 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 
 ## Principles
 
-1. Giving the learner answers raises their scores while the AI helps, and lowers them once the AI is gone. A tutor that gives hints instead of answers avoids that loss.
-2. Learners feel they learn more from direct answers than from guidance, and rate guidance as less efficient, even when guidance teaches them more.
-3. Learners who study with AI overestimate what they know. Their own judgment is not evidence of learning.
-4. AI feedback and hints contain errors. A wrong hint teaches the wrong thing, and a learner cannot catch an error they share.
-5. Support that helps a beginner can get in the way of a learner who knows more, and fading worked examples as each learner progresses beat a fixed schedule. Matching instruction to a learner's stated learning style has little support. Adapt to what the learner can do, not to how they say they learn.
-6. Most of this evidence comes from students in courses, mostly in STEM, over short periods. Treat these rules as the best available guide for adults learning alone, not as tested for them.
-7. No study shows that a separate lesson page teaches better than chat. Asking learners to explain their answers helped in every medium tested, while a separate confidence rating added nothing in the one study that isolated it. The lesson page in section 2.3 is a design choice for learners who find a lesson in chat hard to follow.
-8. Asking learners why a stated fact or rule is true helps them remember it, mostly for facts and at short delays. It works when the learner builds the explanation, and many learners write poor explanations.
-9. Mixing problem types that learners could confuse raises scores on later tests, though it lowers scores during practice and learners judge it worse. It did not help with word lists or long texts.
-10. For decisions, comparing the learner's ranking and reasons with those of real experts raised agreement with the experts, without a teacher present. Whether it improves real decisions is unknown. No study tested an expert view written by an AI.
-11. Comparing two examples side by side helps learners who already know one of them, and hurts novices who know neither. Learners rarely compare unless asked a specific question.
-12. Guessing answers before studying raises later scores on the questions asked, not on other material.
-13. Concrete examples help most when the link to the abstract rule is stated. Extra detail in an example hurts transfer.
-14. None of the tools in section 2.4 has been tested with an AI tutor. Treat them as the best available guide, not as tested for this setting.
-15. Whether people use a skill after training depends less on what they can do in a test than on their confidence, their motivation to use it, and their chances to use it. Practice that resembles the real task, plans that name when and where to use a skill, and feedback on real use each went with more use. Practice questions train the kind of task they ask for: application questions trained application, and fact questions trained facts. Most of this evidence comes from workplace training and simulations, often small studies, not from adults learning alone with AI.
-16. A checklist or reference at hand improved performance in simulations, most for steps people rarely use, but about a third of trainees given one did not use it. Training on how a system works, not only its procedures, helped more with new and complex cases. Learners who expect to keep a record of information remember less of it. No study tested a take-away written by an AI.
-17. Skills decay without use, and spaced practice keeps them longer. The best gap between practice sessions grows with how long the skill must last, and a gap that is too long costs less than one that is too short. Learners rarely schedule practice themselves. Most of this evidence comes from facts and vocabulary, and no study tested practice scheduled by an AI tutor.
+1. Answers from an AI raise a learner's scores while it helps and lower them once it is gone. Hints instead of answers avoid that loss, though learners rate hints as slower and less useful.
+2. Learners who study with AI overestimate what they know. Judge learning by what they can do, not by what they say.
+3. AI hints and feedback contain errors, and a learner cannot catch an error they share.
+4. Help that suits a beginner can hinder a learner who knows more. Adapt to what the learner can do: matching a stated learning style has little support.
+5. Asking learners to explain their answers helped in every medium tested. The lesson page is a design choice, not a tested improvement over chat.
+6. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Practice on real tasks, plans for when to use a skill, and feedback on real use each went with more use.
+7. A reference at hand helps people perform, but cannot tell them when to use it, and learners who expect to keep a record remember less of it. Skills decay without use, and spaced practice slows the decay.
+8. Most of this evidence comes from students, trainees and lab studies over short periods. None of the tools in section 2.4, nor the take-away, was tested with an AI tutor. Treat these rules as the best available guide.
 
 ## 1. Confirm that the user wants to learn
 
