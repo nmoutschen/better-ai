@@ -16,7 +16,7 @@ GIVE the user question stems before a long reading. AFTER the reading, ASK them 
 1. BEFORE the reading, GIVE the stems and SAY that the user will write questions with them afterwards.
 2. AFTER the reading, ASK for two or three questions about the main ideas, each built on a stem, and an answer to each.
 3. CHECK each question: does it ask about a concept, a cause or a difference?
-4. CHECK each answer, as in section 3.5 of SKILL.md. GIVE hints, not answers (section 3.3 of SKILL.md).
+4. CHECK each answer, as in section 3.4 of SKILL.md. GIVE hints, not answers (section 4 of modes/tutor.md).
 
 ## Stems
 

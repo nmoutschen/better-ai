@@ -13,7 +13,7 @@ GIVE the user three or four short situations from their own work, and ASK, for e
 - Before the user has seen the rule and a worked example.
 - When the user struggled on the last practice problem. GIVE more support first.
 - When the rule applies to every case the user will meet.
-- With a near miss you cannot justify. CHECK each verdict against the rule's conditions and a source (section 3.5 of SKILL.md).
+- With a near miss you cannot justify. CHECK each verdict against the rule's conditions and a source (section 3.4 of SKILL.md).
 
 ## Steps
 
@@ -22,7 +22,7 @@ GIVE the user three or four short situations from their own work, and ASK, for e
 3. ORDER them so the near miss is not first or last. DO NOT label them.
 4. ASK, for each situation, "Does <rule or method> apply? Why or why not?"
 5. WAIT for the answers. THEN GIVE a verdict per situation, and NAME the feature that decides it.
-6. IF the user misses a near miss, ADD the feature it lacks to the take-away's "When to use this" table (section 6.2 of SKILL.md).
+6. IF the user misses a near miss, ADD the feature it lacks to the take-away's "When to use this" table (section 9 of modes/tutor.md).
 
 ## On a page
 

@@ -1,11 +1,12 @@
 # Lesson folder
 
-`scripts/lesson.py` shows a lesson folder as a local page and writes the learner's answers back to it.
+`scripts/lesson.py` shows a lesson folder as a local page and writes the learner's answers back to it. It also builds a static page from the same folder, for readers who study alone.
 
 ```
 python3 scripts/lesson.py check LESSON               # validate lesson.json, print every text and value the page shows
 python3 scripts/lesson.py serve LESSON [--port N]    # serve the page; exits once lesson.json has "status": "ended"
 python3 scripts/lesson.py wait LESSON [--timeout S]  # block until an answer has no feedback, print it, exit 0 (2 on timeout)
+python3 scripts/lesson.py build LESSON [--out DIR]   # write DIR/index.html (default LESSON/site): a static page, no server
 ```
 
 ```
@@ -40,7 +41,7 @@ The page re-reads the folder every two seconds. Edit `lesson.json` to add cards 
 
 Each card is one screen. The learner moves through them with Back and Next.
 
-USE a `terms` card only where section 2.1 of SKILL.md allows it: the named parts of a system, or terms the user must use with other people. OTHERWISE, GIVE a term in the `text` or `example` card that first needs it.
+USE a `terms` card only where section 2.2 of SKILL.md allows it: the named parts of a system, or terms the user must use with other people. OTHERWISE, GIVE a term in the `text` or `example` card that first needs it.
 
 | `kind` | Shows | Fields |
 |---|---|---|
@@ -61,6 +62,18 @@ A practice card's answer form has one required box for the answer and how the le
 `options` show in the order you list them, and a `rank` field starts in that order. LIST them in an order that does not hint at the answer.
 
 ASK for the reasoning in a `text` field next to a `choice` or `rank` field: a choice alone does not show how the learner got it.
+
+## Static fields
+
+A static page has no tutor, so each practice card carries what a tutor would say. The live page ignores these fields. `build` requires `solution` on every practice card.
+
+| Field | Shows | Format |
+|---|---|---|
+| `hints` | Up to 3 hints, each behind its own click, in order | list of strings, with the same inline marks as `p` |
+| `solution` | The worked solution, behind a click | list of blocks |
+| `wrong` | Common wrong answers, under the solution | `[{"answer": "<wrong answer>", "why": "<the idea it misapplies>"}]` |
+
+Add a top-level `"audience"`: who the page is for and what they must know before it. The page shows it under the goal. On a static page every chunk is open, `status` is ignored, and a quiz chunk shows its solutions behind a click like any other card. The reader's answers stay in their browser.
 
 ## Blocks
 

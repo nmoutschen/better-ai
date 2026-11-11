@@ -1,6 +1,6 @@
 # Take-away
 
-A take-away is a Markdown file the user keeps open while they use the topic: `.teach/<topic-slug>/take-away.md`. Section 6.2 of SKILL.md says when to write it and what goes in it. Copy the block below and replace the `<placeholders>`. Leave out a section that has nothing to hold, such as "Mistakes to watch" when the user made none.
+A take-away is a Markdown file the user keeps open while they use the topic: `.teach/<topic-slug>/take-away.md`. Section 9 of modes/tutor.md says when to write it and what goes in it. Copy the block below and replace the `<placeholders>`. Leave out a section that has nothing to hold, such as "Mistakes to watch" when the user made none.
 
 Keep the worked solutions to the practice tasks in a separate section at the end, so the user attempts each task before they look.
 

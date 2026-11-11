@@ -16,10 +16,10 @@ SHOW two worked examples side by side, and ASK a specific question about what th
 ## Steps
 
 1. PICK the second example. PREFER a second method for the same problem over a second problem with the same method: comparing methods helped more.
-2. CHECK that the two examples differ only in the aspect you want the user to notice, and that both are correct (section 3.5 of SKILL.md).
+2. CHECK that the two examples differ only in the aspect you want the user to notice, and that both are correct (section 3.4 of SKILL.md).
 3. SHOW both examples on one card, aligned step by step in a table, with the same words for the same things.
 4. ASK one or two specific questions about a named aspect, such as "Which step differs, and why do both reach the same answer?" or "What do both cases have in common that makes the rule apply?". DO NOT ask only "Compare these": learners rarely compare without a specific prompt.
-5. WAIT for the answer, then CHECK it as a practice answer (section 3.4 of SKILL.md).
+5. WAIT for the answer, then CHECK it as a practice answer (section 4 of modes/tutor.md).
 6. AFTER the comparison, STATE the principle in one or two sentences. Stating it after the comparison went with larger effects.
 
 ## On a page

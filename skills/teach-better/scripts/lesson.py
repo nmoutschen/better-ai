@@ -8,6 +8,8 @@ Usage:
   python3 lesson.py wait LESSON [--timeout S]
                                              block until an answer without feedback exists, print it, exit 0;
                                              exit 2 on timeout
+  python3 lesson.py build LESSON [--out DIR] write a static page that needs no server: answers stay in the
+                                             reader's browser, and hints and solutions open on a click
 
 LESSON is a lesson directory described in templates/lesson.md. The agent writes lesson.json and feedback/;
 the page writes answers/. Every diagram is laid out here, so the agent never draws one by hand.
@@ -90,7 +92,11 @@ def check(spec) -> tuple[list[str], list[str], list[str]]:
             errors.append(f"top level: '{key}' must be a non-empty string")
     if spec.get("status", "active") not in ("active", "ended"):
         errors.append("top level: 'status' must be 'active' or 'ended'")
+    if "audience" in spec and not filled(spec["audience"]):
+        errors.append("top level: 'audience' must be a non-empty string")
     digest += [f"TITLE  {spec.get('title', '')}", f"GOAL   {spec.get('goal', '')}"]
+    if spec.get("audience"):
+        digest.append(f"FOR    {spec['audience']}")
     chunks = spec.get("chunks")
     if not isinstance(chunks, list) or not chunks:
         errors.append("top level: 'chunks' must be a non-empty list")
@@ -215,6 +221,31 @@ def check_card(card, where, errors, warnings, digest, seen_cards):
         return
     for k, block in enumerate(blocks if isinstance(blocks, list) else [], 1):
         check_block(block, f"{where} block {k}", errors, warnings, digest)
+    if kind == "practice":
+        check_static(card, where, errors, warnings, digest)
+
+
+def check_static(card, where, errors, warnings, digest):
+    """The fields a static page shows behind a click: hints, a worked solution, and common wrong answers."""
+    hints = card.get("hints", [])
+    if not isinstance(hints, list) or not all(filled(h) for h in hints):
+        errors.append(f"{where}: 'hints' must be a list of non-empty strings")
+    else:
+        if len(hints) > 3:
+            warnings.append(f"{where}: {len(hints)} hints; more than 3 gives the answer away step by step")
+        digest += [f"    hint {n}: {h}" for n, h in enumerate(hints, 1)]
+    if "solution" in card:
+        if not isinstance(card["solution"], list) or not card["solution"]:
+            errors.append(f"{where}: 'solution' must be a non-empty list of blocks")
+        else:
+            digest.append("    solution:")
+            for k, block in enumerate(card["solution"], 1):
+                check_block(block, f"{where} solution block {k}", errors, warnings, digest)
+    wrong = card.get("wrong", [])
+    if not isinstance(wrong, list) or not all(isinstance(w, dict) and filled(w.get("answer")) and filled(w.get("why")) for w in wrong):
+        errors.append(f"{where}: 'wrong' must be a list of {{answer, why}}")
+    else:
+        digest += [f"    wrong: {w['answer']} -> {w['why']}" for w in wrong]
 
 
 def check_block(b, where, errors, warnings, digest):
@@ -311,6 +342,21 @@ PAGE = (HERE / "lesson.html").read_text(encoding="utf-8")
 
 VERSION = hashlib.sha1(PAGE.encode()).hexdigest()[:12]
 PAGE = PAGE.replace("__VERSION__", VERSION)
+
+
+def static_errors(spec: dict) -> list[str]:
+    """What a static page needs beyond check: a solution on every practice card, since no one answers the reader."""
+    return [f"practice card {card.get('id')}: a static page needs a 'solution'"
+            for chunk in spec.get("chunks", []) for card in chunk.get("cards", [])
+            if card.get("kind") == "practice" and "solution" not in card]
+
+
+def build(lesson: Path, out: Path) -> None:
+    """Write out/index.html: the lesson page with lesson.json inside it, for any static host."""
+    spec = read_json(lesson / "lesson.json")
+    data = json.dumps({"lesson": spec}, ensure_ascii=False).replace("</", "<\\/")  # keep the JSON inside its <script>
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "index.html").write_text(PAGE.replace("const STATIC = null;", f"const STATIC = {data};"), encoding="utf-8")
 
 
 # ---------- server ----------
@@ -482,6 +528,9 @@ def main() -> None:
     w = sub.add_parser("wait", help="block until the learner sends an answer")
     w.add_argument("lesson")
     w.add_argument("--timeout", type=float, default=3600, help="seconds to wait (default: 3600)")
+    b = sub.add_parser("build", help="write a static page that needs no server")
+    b.add_argument("lesson")
+    b.add_argument("--out", help="output directory (default: LESSON/site)")
     args = parser.parse_args()
     lesson = Path(args.lesson).expanduser().resolve()
     if not lesson.is_dir():
@@ -496,6 +545,15 @@ def main() -> None:
         if errors:
             sys.exit(1)
         print("\nok" if not warnings else "\nok, with warnings")
+    elif args.command == "build":
+        spec = read_json(lesson / "lesson.json")
+        errors, _, _ = check(spec)
+        errors += static_errors(spec) if not errors else []
+        if errors:
+            sys.exit("\n".join(f"error: {e}" for e in errors))
+        out = Path(args.out).expanduser().resolve() if args.out else lesson / "site"
+        build(lesson, out)
+        print(f"Wrote {out / 'index.html'}")
     elif args.command == "serve":
         errors, _, _ = check(read_json(lesson / "lesson.json"))
         if errors:

@@ -22,7 +22,7 @@ MIX problems of different types in a quiz or a review, instead of grouping them 
 4. DO NOT name the type or the chunk in a card title or a question. Choosing the method is part of the task.
 5. ASK the user to name the method they chose and why, with their answer.
 6. SAY in one line that the set mixes types on purpose, and that it feels harder.
-7. WHEN the user picks the wrong method, NAME the feature that tells the two types apart. RE-TEACH only IF they pick the wrong method for the same type again.
+7. WHEN the user picks the wrong method, NAME the feature that tells the two types apart. RE-TEACH only IF they pick the wrong method for the same type again. DO NOT read lower scores on a mixed set as failure: mixing is harder by design.
 
 ## On a page
 
