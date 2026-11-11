@@ -23,6 +23,7 @@ import time
 import webbrowser
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent  # lesson.html, the page template, sits next to this script
 ID = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 LINK = re.compile(r"\]\(#([A-Za-z0-9_-]+)/(\d+)\)")
 CARD_KINDS = ("terms", "text", "example", "practice")
@@ -34,6 +35,11 @@ MAX_BODY = 40_000
 
 
 # ---------- reading ----------
+
+def filled(value) -> bool:
+    """A string with something other than whitespace in it."""
+    return isinstance(value, str) and bool(value.strip())
+
 
 def read_json(path: Path, default=None):
     try:
@@ -80,7 +86,7 @@ def check(spec) -> tuple[list[str], list[str], list[str]]:
     if not isinstance(spec, dict):
         return ["lesson.json is missing or is not a JSON object"], [], []
     for key in ("title", "goal"):
-        if not isinstance(spec.get(key), str) or not spec[key].strip():
+        if not filled(spec.get(key)):
             errors.append(f"top level: '{key}' must be a non-empty string")
     if spec.get("status", "active") not in ("active", "ended"):
         errors.append("top level: 'status' must be 'active' or 'ended'")
@@ -103,7 +109,7 @@ def check(spec) -> tuple[list[str], list[str], list[str]]:
         if status not in ("planned", "current", "done", "skipped"):
             errors.append(f"{where}: 'status' must be planned, current, done or skipped")
         current += status == "current"
-        if not isinstance(chunk.get("title"), str) or not chunk["title"].strip():
+        if not filled(chunk.get("title")):
             errors.append(f"{where}: 'title' is required")
         digest.append(f"\nCHUNK {cid} [{status}{', quiz' if chunk.get('quiz') else ''}]  {chunk.get('title', '')}")
         cards = chunk.get("cards", [])
@@ -140,7 +146,7 @@ def check_fields(fields, where, errors, warnings, digest):
             errors.append(f"{where}: each field needs a unique 'id' (letters, digits, - or _)")
             continue
         seen.add(f["id"])
-        if not isinstance(f.get("label"), str) or not f["label"].strip():
+        if not filled(f.get("label")):
             errors.append(f"{where}: field {f['id']} needs a 'label'")
         kind = f.get("type", "text")
         if kind not in FIELD_TYPES:
@@ -180,7 +186,7 @@ def check_card(card, where, errors, warnings, digest, seen_cards):
     if kind not in CARD_KINDS:
         errors.append(f"{where}: 'kind' must be one of {', '.join(CARD_KINDS)}")
         return
-    if not isinstance(card.get("title"), str) or not card["title"].strip():
+    if not filled(card.get("title")):
         errors.append(f"{where}: 'title' is required")
     digest.append(f"  [{kind}] {card.get('title', '')}")
     if kind == "terms":
@@ -217,7 +223,7 @@ def check_block(b, where, errors, warnings, digest):
         return
     t = b["type"]
     if t == "p":
-        if not isinstance(b.get("text"), str) or not b["text"].strip():
+        if not filled(b.get("text")):
             errors.append(f"{where}: 'text' is required")
         else:
             digest.append(f"    {b['text']}")
@@ -300,364 +306,7 @@ def check_timeline(b, where, errors, warnings, digest):
 
 # ---------- page ----------
 
-PAGE = r"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson</title>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-:root { --cream:#FFFCF7; --linen:#F2EDE5; --sand:#C4B69C; --terracotta:#E8725C; --moss:#6B7F5E; --umber:#5C4033;
-  --ink:#33302B; --heading:#1C1A17; --muted:#78736B; --line:#DDD6CA;
-  --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
-  --mono:ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E"); }
-* { box-sizing:border-box; }
-html, body { margin:0; }
-body { background:var(--cream); color:var(--ink); font:400 15px/1.6 var(--sans); -webkit-font-smoothing:antialiased;
-  min-height:100vh; display:flex; flex-direction:column; --pad:max(32px, (100% - 72rem) / 2); }
-.band { height:10px; background:var(--umber) var(--saya); background-size:13px 7.5px; }
-.band--thin { height:6px; }
-header { padding:20px var(--pad) 10px; }
-h1 { font:700 26px/1.2 var(--serif); color:var(--heading); margin:0 0 4px; }
-.goal { margin:0; color:var(--ink); max-width:60rem; } .goal b { color:var(--heading); }
-.rule { margin:4px 0 0; font-size:13px; color:var(--muted); }
-.conn { color:var(--heading); margin:6px 0 0; } .conn b { color:var(--terracotta); }
-main { flex:1; display:grid; grid-template-columns:minmax(12rem, 17rem) minmax(0, 1fr); gap:24px 48px; padding:12px var(--pad) 24px; }
-h2.label { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
-  border-top:2px solid var(--line); padding-top:10px; margin:0 0 10px; }
-nav ol { list-style:none; margin:0; padding:0; counter-reset:c; }
-nav li button { display:flex; gap:8px; align-items:baseline; width:100%; text-align:left; border:0; background:none; font:inherit; color:inherit;
-  padding:6px 0 6px 8px; border-left:3px solid var(--line); border-bottom:1px solid var(--linen); cursor:pointer; }
-nav li button:disabled { cursor:not-allowed; color:var(--muted); }
-nav li .n { font:700 12px var(--sans); color:var(--muted); width:1.6em; flex:none; font-variant-numeric:tabular-nums; }
-nav li .st { margin-left:auto; font-size:12px; color:var(--muted); white-space:nowrap; padding-right:4px; }
-nav li.done button { border-left-color:var(--moss); }
-nav li.current button { border-left-color:var(--terracotta); color:var(--heading); font-weight:600; }
-nav li.open button { background:var(--linen); }
-nav li.quiz .st { color:var(--terracotta); font-weight:700; }
-nav ol.cards { margin:4px 0 8px 22px; }
-nav ol.cards button { display:block; border:0; background:none; border-left:2px solid var(--linen); padding:4px 0 4px 10px; font-size:13.5px; line-height:1.35; color:var(--ink); font-weight:400; }
-nav ol.cards button.here { border-left-color:var(--terracotta); color:var(--heading); font-weight:600; }
-nav ol.cards .ck { display:block; font:700 10.5px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
-a.goto { color:var(--terracotta); text-underline-offset:2px; }
-article { min-width:0; max-width:46rem; }
-.kicker { font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 4px; }
-.kicker .kind { color:var(--terracotta); }
-article h2.title { font:700 22px/1.3 var(--serif); color:var(--heading); margin:0 0 14px; }
-.blocks > :not(:first-child) { margin-top:16px; }
-.blocks p { font:400 16px/1.75 var(--serif); margin:0; }
-.blocks ul, .blocks ol:not(.steps) { margin:0; padding-left:1.4em; font:400 16px/1.7 var(--serif); }
-code { font:13.5px var(--mono); background:var(--linen); padding:1px 4px; }
-pre { font:13.5px/1.55 var(--mono); background:var(--linen); padding:12px 14px; margin:0; overflow-x:auto; border-left:3px solid var(--sand); }
-pre code { background:none; padding:0; }
-figure { margin:0; }
-figcaption { font-size:13px; color:var(--muted); margin-top:6px; }
-table { border-collapse:collapse; width:100%; font-size:14px; font-variant-numeric:tabular-nums; }
-th { font:700 13px var(--sans); color:var(--muted); text-align:left; border-bottom:2px solid var(--line); padding:6px 10px; }
-td { padding:6px 10px; border-bottom:1px solid var(--linen); vertical-align:top; }
-td.num, th.num { text-align:right; }
-tr.hl td { background:var(--linen); color:var(--heading); font-weight:600; }
-tr.hl td:first-child { box-shadow:inset 3px 0 0 var(--terracotta); }
-.terms { display:grid; grid-template-columns:fit-content(14em) 1fr; gap:0 20px; margin:0; }
-.terms dt { font-weight:700; color:var(--heading); padding:8px 0; border-bottom:1px solid var(--linen); }
-.terms dd { margin:0; padding:8px 0; border-bottom:1px solid var(--linen); font-family:var(--serif); }
-ol.steps { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:10px 0; align-items:stretch; counter-reset:s; }
-ol.steps li { display:flex; align-items:stretch; counter-increment:s; }
-ol.steps li .box { background:var(--linen); padding:8px 12px 8px 14px; border-left:3px solid var(--umber); max-width:14rem; }
-ol.steps li .box::before { content:counter(s); display:block; font:700 11px var(--sans); color:var(--muted); }
-ol.steps li .box b { display:block; color:var(--heading); font-weight:600; }
-ol.steps li .box span { display:block; font-size:13px; color:var(--muted); }
-ol.steps li + li::before { content:"→"; align-self:center; padding:0 8px; color:var(--umber); font-weight:700; }
-svg text { font-family:var(--sans); }
-.legend { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:13px; color:var(--muted); margin-top:4px; }
-.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-form { margin-top:22px; border-top:2px solid var(--line); padding-top:14px; display:grid; gap:12px; }
-label { display:grid; gap:4px; font:700 12px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
-label small { font-weight:400; letter-spacing:0; text-transform:none; }
-textarea { font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff; border:1px solid var(--line); padding:8px 10px; resize:vertical; min-height:4.5em; }
-textarea:focus, input[type=text]:focus { outline:2px solid var(--terracotta); outline-offset:0; border-color:transparent; }
-input[type=text] { font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff; border:1px solid var(--line); padding:6px 10px; max-width:24rem; }
-fieldset[data-field] { display:grid; gap:6px; }
-.opts { display:grid; gap:6px; }
-.opts label { display:flex; gap:8px; align-items:baseline; font:400 15px var(--sans); letter-spacing:0; text-transform:none; color:var(--ink); }
-ol.rank { margin:0; padding:0; list-style:none; display:grid; gap:6px; counter-reset:r; }
-ol.rank li { counter-increment:r; display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); padding:6px 8px; font:400 15px var(--sans); letter-spacing:0; text-transform:none; color:var(--ink); }
-ol.rank li::before { content:counter(r); font:700 13px var(--sans); color:var(--muted); min-width:1.2em; }
-ol.rank li span { flex:1; }
-ol.rank button { font:700 13px var(--sans); border:1px solid var(--line); background:none; color:var(--heading); padding:2px 8px; cursor:pointer; }
-ol.rank button:disabled { opacity:.35; cursor:default; }
-fieldset { border:0; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; }
-fieldset legend { font:700 12px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:0; margin-bottom:4px; width:100%; }
-fieldset label { display:flex; gap:6px; align-items:center; font:400 14px var(--sans); letter-spacing:0; text-transform:none; color:var(--ink); }
-.btn { font:700 13px var(--sans); letter-spacing:.06em; text-transform:uppercase; border:0; padding:9px 16px; cursor:pointer; background:var(--umber); color:var(--cream); }
-.btn:disabled { opacity:.5; cursor:default; }
-.btn--plain { background:none; color:var(--heading); border:1px solid var(--line); }
-.sent { font-size:13px; color:var(--muted); margin:0; }
-.attempt { margin-top:18px; border-left:3px solid var(--line); padding:4px 0 4px 14px; }
-.attempt .who { font:700 12px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
-.attempt .ans { white-space:pre-wrap; margin:2px 0 6px; overflow-wrap:anywhere; }
-.attempt .why { white-space:pre-wrap; margin:0 0 6px; color:var(--muted); font-size:14px; overflow-wrap:anywhere; }
-.fb { background:var(--linen); padding:8px 12px; margin-top:6px; }
-.fb .v { font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
-.fb.right .v { color:var(--moss); } .fb.wrong .v, .fb.hint .v { color:var(--terracotta); } .fb.partly .v { color:var(--umber); } .fb.noted .v { color:var(--muted); }
-.fb .blocks p { font-size:15px; }
-.waiting { font-size:13px; color:var(--muted); font-style:italic; margin:4px 0 0; }
-.pager { display:flex; gap:10px; align-items:center; margin-top:28px; border-top:1px solid var(--linen); padding-top:14px; }
-.pager .pos { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; margin-right:auto; }
-.banner { background:var(--linen); border-left:3px solid var(--terracotta); padding:8px 12px; margin:0 0 16px; font-size:14px; }
-.empty { color:var(--muted); font-style:italic; }
-:focus-visible { outline:2px solid var(--terracotta); outline-offset:2px; }
-.foot { display:flex; justify-content:space-between; padding:4px var(--pad); font-size:12px; color:var(--muted); }
-.foot a { color:var(--muted); }
-@media (hover:hover) { nav li button:not(:disabled):hover { color:var(--terracotta); } .btn--plain:hover { border-color:var(--terracotta); } }
-@media (max-width:800px) { main { grid-template-columns:1fr; } body { --pad:20px; } }
-</style></head><body>
-<div class="band"></div>
-<header><h1 id="title">Lesson</h1><p class="goal" id="goal"></p>
-<p class="rule">Quizzes are closed-book: answer from memory, without looking back or asking for help.</p>
-<p class="conn" id="conn" role="status" hidden></p></header>
-<main>
-  <nav aria-label="Chunks"><h2 class="label">Chunks</h2><ol id="chunks"></ol></nav>
-  <article id="card" aria-live="polite"><p class="empty">Loading the lesson…</p></article>
-</main>
-<div class="band band--thin"></div>
-<footer class="foot"><span id="updated"></span><span>teach-better by <a href="https://n14n.dev/" target="_blank" rel="noopener">n14n.dev</a></span></footer>
-<script>
-const VERSION = "__VERSION__";  // the server's page version; an open tab compares it to spot an updated page
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
-  .replace(/\[([^\]]+)\]\(#([A-Za-z0-9_-]+)\/(\d+)\)/g, '<a class="goto" href="#$2/$3">$1</a>')  // a link to a card
-  .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)"<>]+)\)/g, '<a class="goto" href="$2" target="_blank" rel="noopener">$1</a>');  // a link to a source
-const $ = id => document.getElementById(id);
-const KIND = {terms:"Key terms", text:"Explanation", example:"Worked example", practice:"Practice"};
-const MARK = {allow:["●", "var(--moss)"], reject:["✕", "var(--terracotta)"], neutral:["○", "var(--umber)"]};
-const VERDICT = {right:"Right", partly:"Partly right", wrong:"Not yet", hint:"Hint", noted:"Noted"};
-let L = null, A = [], pos = null, drafts = {}, sending = false;
-
-function chunks() { return (L && L.chunks) || []; }
-function quizOn() { return chunks().find(c => c.status === "current" && c.quiz); }
-function locked(c) { const q = quizOn(); return q && c !== q; }
-function flat() { const out = []; chunks().forEach((c, ci) => (c.cards || []).forEach((card, k) => out.push({ci, k}))); return out; }
-
-function blocks(list) { return `<div class="blocks">${(list || []).map(block).join("")}</div>`; }
-function block(b) {
-  const cap = b.caption ? `<figcaption>${inline(b.caption)}</figcaption>` : "";
-  if (b.type === "p") return `<p>${inline(b.text)}</p>`;
-  if (b.type === "list") { const tag = b.numbered ? "ol" : "ul"; return `<${tag}>${b.items.map(i => `<li>${inline(i)}</li>`).join("")}</${tag}>`; }
-  if (b.type === "code") return `<figure><pre><code>${esc(b.text)}</code></pre>${cap}</figure>`;
-  if (b.type === "table") {
-    const isNum = k => b.rows.every(r => typeof r[k] === "number" || /^-?[\d.,]+%?$/.test(String(r[k]).trim()));
-    const nums = b.columns.map((_, k) => isNum(k)), hl = new Set(b.highlight || []);
-    return `<figure><table><thead><tr>${b.columns.map((c, k) => `<th class="${nums[k] ? "num" : ""}">${inline(c)}</th>`).join("")}</tr></thead><tbody>` +
-      b.rows.map((r, i) => `<tr class="${hl.has(i) ? "hl" : ""}">${r.map((v, k) => `<td class="${nums[k] ? "num" : ""}">${inline(v)}</td>`).join("")}</tr>`).join("") +
-      `</tbody></table>${cap}</figure>`;
-  }
-  if (b.type === "steps") return `<figure><ol class="steps">${b.items.map(s => `<li><div class="box"><b>${inline(s.label)}</b>${s.note ? `<span>${inline(s.note)}</span>` : ""}</div></li>`).join("")}</ol>${cap}</figure>`;
-  if (b.type === "timeline") return timeline(b, cap);
-  return "";
-}
-
-function timeline(b, cap) {
-  const W = 720, left = 24, right = 24, span = b.end - b.start, unit = b.unit || "";
-  const x = v => left + (v - b.start) / span * (W - left - right);
-  const rows = [];  // stack markers that would overlap
-  const evs = [...b.events].sort((p, q) => p.at - q.at).map(e => {
-    let r = 0; while (rows[r] !== undefined && x(e.at) - rows[r] < 15) r++;
-    rows[r] = x(e.at); return {...e, r};
-  });
-  const levels = Math.max(1, rows.length), bandTop = 22, axisY = bandTop + 18 + levels * 16, H = axisY + 34;
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(b.caption || "Timeline")}">`;
-  (b.bands || []).forEach((bd, i) => {
-    const x1 = x(bd.from), x2 = x(bd.to);
-    s += `<rect x="${x1}" y="${bandTop}" width="${x2 - x1}" height="${axisY - bandTop}" fill="${bd.highlight ? "var(--sand)" : i % 2 ? "var(--cream)" : "var(--linen)"}" opacity="${bd.highlight ? .45 : 1}"/>`;
-    s += `<line x1="${x1}" x2="${x1}" y1="${bandTop - 4}" y2="${axisY}" stroke="var(--sand)" stroke-dasharray="3 3"/>`;
-    if (bd.label) s += `<text x="${(x1 + x2) / 2}" y="${bandTop - 8}" text-anchor="middle" font-size="12" fill="var(--muted)">${esc(bd.label)}</text>`;
-  });
-  s += `<line x1="${left}" x2="${W - right}" y1="${axisY}" y2="${axisY}" stroke="var(--ink)"/>`;
-  const ticks = b.ticks || (() => { const n = 8, raw = span / n, p = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map(m => m * p).find(m => m >= raw);
-    const t = []; for (let v = Math.ceil(b.start / st) * st; v <= b.end + 1e-9; v += st) t.push(+v.toFixed(6)); return t; })();
-  ticks.forEach(t => { s += `<line x1="${x(t)}" x2="${x(t)}" y1="${axisY}" y2="${axisY + 5}" stroke="var(--ink)"/><text x="${x(t)}" y="${axisY + 19}" text-anchor="middle" font-size="12" fill="var(--ink)">${esc(t)}${esc(unit)}</text>`; });
-  evs.forEach(e => {
-    const [g, col] = MARK[e.mark || "neutral"], cx = x(e.at), cy = axisY - 12 - e.r * 16;
-    s += `<line x1="${cx}" x2="${cx}" y1="${cy + 6}" y2="${axisY}" stroke="${col}" stroke-width="1" opacity=".5"/>`;  // a stem pins a stacked marker to its exact time
-    s += `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="15" font-weight="700" fill="${col}"><title>${esc(e.at)}${esc(unit)} ${esc(e.label || "")}</title>${g}</text>`;
-  });
-  s += `</svg>`;
-  const used = [...new Set(b.events.map(e => e.mark || "neutral"))], words = b.legend || {};
-  const legend = used.length > 1 || words[used[0]] ? `<div class="legend">${used.map(m => `<span><b style="color:${MARK[m][1]}">${MARK[m][0]}</b> ${esc(words[m] || m)}</span>`).join("")}</div>` : "";
-  const text = `<ul class="sr">${(b.bands || []).map(bd => `<li>${esc(bd.label || "")} from ${esc(bd.from)} to ${esc(bd.to)}${esc(unit)}</li>`).join("")}${b.events.map(e => `<li>${esc(e.at)}${esc(unit)}: ${esc(words[e.mark || "neutral"] || e.mark || "")} ${esc(e.label || "")}</li>`).join("")}</ul>`;
-  return `<figure>${s}${legend}${cap}${text}</figure>`;
-}
-
-function attemptsFor(id) { return A.filter(a => a.id === id); }
-function attemptHtml(a) {
-  const f = a.feedback, conf = a.confidence ? ` · confidence ${esc(a.confidence)}` : "";
-  return `<div class="attempt"><div class="who">Attempt ${esc(a.attempt)}${conf}</div><p class="ans">${esc(a.answer)}</p>` +
-    (a.explanation ? `<p class="why">${esc(a.explanation)}</p>` : "") +
-    (f ? `<div class="fb ${esc(f.verdict)}"><div class="v">${esc(VERDICT[f.verdict] || f.verdict)}</div>${f.text ? blocks([{type:"p", text:f.text}]) : ""}${f.blocks ? blocks(f.blocks) : ""}</div>`
-       : `<p class="waiting">${a.quiz ? "Saved. You get feedback once you have answered every question in the quiz." : "Sent. Waiting for feedback…"}</p>`) + `</div>`;
-}
-
-function form(card, quiz) {
-  const tries = attemptsFor(card.id), last = tries[tries.length - 1];
-  const done = last && last.feedback && ["right", "noted"].includes(last.feedback.verdict);  // "noted" closes a form that takes no verdict, such as a pre-question
-  const pending = last && !last.feedback;
-  if (quiz && last) return tries.map(attemptHtml).join("");  // a quiz question takes one answer
-  const d = drafts[card.id] || {};
-  const prior = tries.map(attemptHtml).join("");
-  if (done || pending) return prior;
-  const lastValue = id => last ? ((last.fields || []).find(x => x.id === id) || {}).value ?? (id === "answer" ? last.answer : undefined) : undefined;  // a retry starts from the previous answer
-  const fields = card.fields || [{id:"answer", type:"text", label:"Your answer, and how you got it", hint:"in your own words"}];
-  const lastPick = f => { if (!last) return undefined; const r = (last.fields || []).find(x => x.id === f.id) || {}, got = r.order || r.selected;
-    return got ? got.map(o => f.options.indexOf(o)).filter(i => i >= 0) : undefined; };
-  const field = f => {
-    const kind = f.type || "text", name = `f:${f.id}`, head = `${inline(f.label)}${f.hint ? ` <small>(${esc(f.hint)})</small>` : ""}`;
-    if (kind === "short") return `<label>${head}<input type="text" name="${esc(name)}" required value="${esc(d[name] ?? lastValue(f.id) ?? f.prefill ?? "")}"></label>`;
-    if (kind === "choice") {
-      const picked = new Set((d[name] ?? lastPick(f) ?? []).map(String)), type = f.multiple ? "checkbox" : "radio";
-      return `<fieldset class="opts" data-field="${esc(f.id)}"><legend>${head}${f.multiple ? " <small>(choose all that apply)</small>" : ""}</legend>` +
-        f.options.map((o, i) => `<label><input type="${type}" name="${esc(name)}" value="${i}" ${picked.has(String(i)) ? "checked" : ""}> ${inline(o)}</label>`).join("") + `</fieldset>`;
-    }
-    if (kind === "rank") {
-      const order = d[name] ?? lastPick(f) ?? f.options.map((_, i) => i);
-      return `<fieldset data-field="${esc(f.id)}"><legend>${head} <small>(first is best; use the arrows to reorder)</small></legend><ol class="rank">` +
-        order.map((i, k) => `<li><span>${inline(f.options[i])}</span><button type="button" data-rank="${esc(f.id)}" data-from="${k}" data-to="${k - 1}" aria-label="Move up" ${k ? "" : "disabled"}>↑</button>` +
-          `<button type="button" data-rank="${esc(f.id)}" data-from="${k}" data-to="${k + 1}" aria-label="Move down" ${k < order.length - 1 ? "" : "disabled"}>↓</button></li>`).join("") +
-        `</ol><input type="hidden" name="${esc(name)}" value="${esc(JSON.stringify(order))}"></fieldset>`;
-    }
-    return `<label>${head}<textarea name="${esc(name)}" required rows="${fields.length > 1 ? 3 : 5}">${esc(d[name] ?? lastValue(f.id) ?? f.prefill ?? "")}</textarea></label>`;
-  };
-  return prior + `<form id="answer" data-id="${esc(card.id)}">
-    ${fields.map(field).join("")}
-    <fieldset><legend>How confident are you? <small>(optional)</small></legend>
-      ${["low", "medium", "high"].map(c => `<label><input type="radio" name="confidence" value="${c}" ${d.confidence === c ? "checked" : ""}> ${c}</label>`).join("")}</fieldset>
-    <div><button class="btn" type="submit">${quiz ? "Submit" : "Send answer"}</button></div>
-  </form>`;
-}
-
-function show() {
-  if (!L) return;
-  const all = flat();
-  if (!all.length) { $("card").innerHTML = `<p class="empty">No cards yet.</p>`; return; }
-  const q = quizOn();
-  if (!pos && location.hash) {
-    const [id, k] = decodeURIComponent(location.hash.slice(1)).split("/"), ci = chunks().findIndex(c => c.id === id);
-    if (ci >= 0) pos = {ci, k: Math.max(0, (+k || 1) - 1)};
-  }
-  if (!pos || !chunks()[pos.ci] || !(chunks()[pos.ci].cards || [])[pos.k] || locked(chunks()[pos.ci])) {
-    const cur = q || chunks().find(c => c.status === "current") || chunks()[0];
-    pos = {ci: chunks().indexOf(cur), k: 0};
-  }
-  const c = chunks()[pos.ci], card = c.cards[pos.k], i = all.findIndex(p => p.ci === pos.ci && p.k === pos.k);
-  history.replaceState(null, "", `#${encodeURIComponent(c.id)}/${pos.k + 1}`);  // a reload keeps the learner's place
-  const kind = c.quiz ? "Quiz" : KIND[card.kind];
-  let h = q ? `<p class="banner"><b>Closed-book quiz.</b> The other chunks are hidden until you finish it.</p>` : "";
-  h += `<p class="kicker"><span class="kind">${esc(kind)}</span> · ${esc(c.title)} · card ${pos.k + 1} of ${c.cards.length}</p><h2 class="title">${inline(card.title)}</h2>`;
-  if (card.kind === "terms") h += `<dl class="terms">${card.terms.map(t => `<dt>${inline(t.term)}</dt><dd>${inline(t.means)}</dd>`).join("")}</dl>`;
-  if (card.blocks) h += blocks(card.blocks);
-  if (card.kind === "practice") h += form(card, c.quiz);
-  const prev = all[i - 1], next = all[i + 1];
-  h += `<div class="pager"><span class="pos">${i + 1} / ${all.length}</span>
-    <button class="btn btn--plain" id="prev" ${ok(prev) ? "" : "disabled"}>← Back</button>
-    <button class="btn btn--plain" id="next" ${ok(next) ? "" : "disabled"}>Next →</button></div>`;
-  const active = document.activeElement, keep = active && active.name && active.form ? active.name : null;
-  $("card").innerHTML = h;
-  if (keep && $("answer")) { const el = $("answer").elements[keep]; if (el && el.focus) el.focus(); }
-  $("prev").onclick = () => go(prev);
-  $("next").onclick = () => go(next);
-  const f = $("answer");
-  if (f) {
-    const collect = () => {  // every field's value, keyed "f:<id>": text, an option index list, or a rank order
-      const fd = new FormData(f), out = {confidence: fd.get("confidence") || undefined};
-      (cardAt(pos).fields || [{id:"answer", type:"text"}]).forEach(fl => {
-        const name = `f:${fl.id}`, kind = fl.type || "text";
-        out[name] = kind === "rank" ? JSON.parse(fd.get(name) || "[]") : kind === "choice" ? fd.getAll(name) : fd.get(name);
-      });
-      return out;
-    };
-    f.oninput = f.onchange = () => { drafts[f.dataset.id] = collect(); };
-    f.querySelectorAll("button[data-rank]").forEach(b => b.onclick = () => {
-      const d = collect(), name = `f:${b.dataset.rank}`, order = d[name], from = +b.dataset.from, to = +b.dataset.to;
-      [order[from], order[to]] = [order[to], order[from]];
-      drafts[f.dataset.id] = d; show();
-      const near = d => $("answer") && $("answer").querySelector(`button[data-rank="${CSS.escape(b.dataset.rank)}"][data-from="${to}"][data-to="${to + d}"]`);
-      const step = to < from ? -1 : 1, again = [near(step), near(-step)].find(x => x && !x.disabled);  // keep focus on the moved item
-      if (again) again.focus();
-    });
-    f.onsubmit = async ev => {
-      ev.preventDefault(); if (sending) return; sending = true;
-      const fd = collect(), card = cardAt(pos), out = {};
-      for (const fl of card.fields || [{id:"answer", type:"text"}]) {
-        const v = fd[`f:${fl.id}`];
-        if (fl.type === "choice" && !v.length) { alert(`Choose an option: ${fl.label}`); sending = false; return; }
-        out[fl.id] = fl.type === "choice" ? (fl.multiple ? v.map(Number) : Number(v[0])) : v;
-      }
-      f.querySelector("button").disabled = true;
-      try {
-        const r = await fetch("/answer", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:f.dataset.id, confidence:fd.confidence, fields:out})});
-        if (!r.ok) throw new Error(await r.text());
-        delete drafts[f.dataset.id]; await poll();
-      } catch (e) { alert("Could not send the answer: " + e.message); f.querySelector("button").disabled = false; }
-      sending = false;
-    };
-  }
-  renderNav();
-}
-
-function cardAt(p) { const c = chunks()[p.ci]; return c && (c.cards || [])[p.k]; }
-function ok(p) { return p && cardAt(p) && !locked(chunks()[p.ci]); }
-function go(p) {
-  if (!ok(p)) return;
-  pos = {ci:p.ci, k:p.k}; show(); window.scrollTo(0, 0);
-}
-document.addEventListener("click", e => {
-  const a = e.target.closest("a.goto"); if (!a || !a.getAttribute("href").startsWith("#")) return;
-  e.preventDefault();
-  const [id, k] = decodeURIComponent(a.getAttribute("href").slice(1)).split("/"), ci = chunks().findIndex(c => c.id === id);
-  if (ci >= 0) go({ci, k:(+k || 1) - 1});
-});
-
-function renderNav() {
-  $("chunks").innerHTML = chunks().map((c, ci) => {
-    const lk = locked(c), st = c.status === "done" ? "done" : c.status === "skipped" ? "skipped" : c.quiz ? "quiz" : c.status === "current" ? "now" : "";
-    const cls = [c.status, c.quiz && c.status !== "done" ? "quiz" : "", pos && pos.ci === ci ? "open" : ""].join(" ");
-    const usable = (c.cards || []).length && !lk;
-    return `<li class="${cls}"><button data-ci="${ci}" ${usable ? "" : "disabled"} ${pos && pos.ci === ci ? 'aria-current="true"' : ""}>
-      <span class="n">${ci + 1}</span><span>${esc(lk ? "Hidden during the quiz" : c.title)}</span><span class="st">${esc(st)}</span></button>${
-      pos && pos.ci === ci ? `<ol class="cards">${c.cards.map((card, k) => `<li><button data-ci="${ci}" data-k="${k}" ${k === pos.k ? 'aria-current="true" class="here"' : ""}>
-        <span class="ck">${esc(c.quiz ? "Quiz" : KIND[card.kind])}</span>${inline(card.title)}</button></li>`).join("")}</ol>` : ""}</li>`;
-  }).join("");
-  document.querySelectorAll("nav button[data-ci]").forEach(btn => btn.onclick = () => go({ci:+btn.dataset.ci, k:+(btn.dataset.k || 0)}));
-}
-
-document.addEventListener("keydown", e => {
-  if (["TEXTAREA", "INPUT", "SELECT"].includes(document.activeElement.tagName)) return;
-  if (e.key === "ArrowRight" && $("next")) $("next").click();
-  if (e.key === "ArrowLeft" && $("prev")) $("prev").click();
-});
-
-let lastSig = "";
-async function poll() {
-  try {
-    const r = await fetch("/lesson.json", {cache:"no-store"}); const d = await r.json();
-    $("conn").hidden = true;
-    if (d.version && d.version !== VERSION) {
-      $("conn").innerHTML = `<b>This page was updated.</b> <a href="${esc(location.hash)}" onclick="location.reload();return false">Reload</a> to see the new version. Copy any answer you are typing first.`;
-      $("conn").hidden = false;
-    }
-    const sig = JSON.stringify([d.lesson, d.attempts]);
-    if (sig === lastSig) return; lastSig = sig;
-    L = d.lesson || {}; A = d.attempts || [];
-    $("title").textContent = L.title || "Lesson"; document.title = (L.title || "Lesson") + " · Lesson";
-    $("goal").innerHTML = L.goal ? `<b>Goal:</b> ${inline(L.goal)}` : "";
-    $("updated").textContent = "Updated " + new Date().toLocaleTimeString();
-    if (L.status === "ended") $("conn").innerHTML = "<b>Lesson ended.</b> This page keeps the last state.", $("conn").hidden = false;
-    show();
-  } catch (e) { $("conn").innerHTML = "<b>Not connected.</b> The lesson server has stopped; the page shows the last state."; $("conn").hidden = false; }
-}
-poll(); setInterval(poll, 2000);
-</script></body></html>
-"""
+PAGE = (HERE / "lesson.html").read_text(encoding="utf-8")
 
 
 VERSION = hashlib.sha1(PAGE.encode()).hexdigest()[:12]

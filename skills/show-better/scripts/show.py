@@ -29,6 +29,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 
+HERE = Path(__file__).resolve().parent  # show.css and show.js, inlined into every page, sit next to this script
 KINDS = ("map", "concept", "flow", "groups", "tree", "sets", "matrix", "effects", "pairs", "quadrant", "numbers", "units", "bars", "slope",
          "dots", "scatter", "line", "timeline", "table", "text", "svg")
 
@@ -46,6 +47,7 @@ C = {"cream": "#FFFCF7", "linen": "#F2EDE5", "sand": "#C4B69C", "terracotta": "#
 
 
 SANS = "Space Grotesk, -apple-system, sans-serif"
+HL_STROKE = f' stroke="{C["terracotta"]}" stroke-width="2.5"'  # the outline of a highlighted box
 
 
 W = 800  # SVG viewBox width
@@ -161,7 +163,7 @@ def arrow(x1, y1, x2, y2, color):
 
 def node(x, y, w, h, label, hl, chars):
     lines = wrap(label, chars, 3)
-    stroke = f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else ""
+    stroke = HL_STROKE if hl else ""
     ty = y + h / 2 - (len(lines) - 1) * 9 + 5
     return (f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h}" rx="4" fill="{C["linen"]}"{stroke}/>' +
             text_el(x + w / 2, ty, lines, 15, 700 if hl else 600, C["heading"], "middle", gap=18))
@@ -171,6 +173,11 @@ def _is_num(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
+def axis_start(p, axis, values):
+    """Where a value axis starts: at zero, unless the panel sets '<axis>_from_zero' to false."""
+    return min(values) if p.get(f"{axis}_from_zero") is False else min(0, min(values))
+
+
 def _as_list(v):
     return v if isinstance(v, list) else ([] if v is None else [v])
 
@@ -178,11 +185,7 @@ def _as_list(v):
 # ---------- shared helpers: plain text ----------
 
 def tfmt(v):
-    if isinstance(v, float) and not v.is_integer():
-        return f"{v:,.2f}".rstrip("0").rstrip(".")
-    if isinstance(v, (int, float)) and not isinstance(v, bool):
-        return f"{int(v):,}"
-    return str(v)
+    return num(v) if _is_num(v) else str(v)
 
 
 def twrap(text, width, indent=""):
@@ -325,7 +328,7 @@ def v_map(p, spec=None):
     hl_ids = set(_as_list(p.get("highlight")))
     n = len(secs)
     body = []
-    stroke = lambda hl: f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else ""
+    stroke = lambda hl: HL_STROKE if hl else ""
     if n <= 5:  # a row of parts, each with its gist inside the box
         gap = 14
         bw = (W - gap * (n - 1)) / n
@@ -356,7 +359,7 @@ def v_map(p, spec=None):
 
 def t_map(p, W, g, spec=None):
     secs = p.get("sections") or spec["document"]["sections"]
-    hl_ids = set(p.get("highlight") if isinstance(p.get("highlight"), list) else [p.get("highlight")])
+    hl_ids = set(_as_list(p.get("highlight")))
     out = []
     for s in secs:
         hl = s.get("highlight") or s.get("id") in hl_ids
@@ -484,7 +487,7 @@ def v_concept(p):
         n = by_id[i]
         hl = n.get("highlight")
         body.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h}" rx="4" fill="{C["linen"]}"'
-                    + (f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else f' stroke="{C["sand"]}" stroke-width="1"') + "/>")
+                    + (HL_STROKE if hl else f' stroke="{C["sand"]}" stroke-width="1"') + "/>")
         body.append(text_el(x + w / 2, y + 26, lines_of[i], 15, 700 if hl else 600, C["heading"], "middle", gap=18))
     defs = (f'<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{C["ink"]}"/></marker>'
             f'<marker id="ahh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{C["terracotta"]}"/></marker></defs>')
@@ -810,7 +813,7 @@ def v_sets(p):
 def t_sets(p, W, g):
     sets = [str(s) for s in p["sets"]]
     regions = p["regions"]
-    order = sorted(range(len(regions)), key=lambda k: [0 if s in regions[k]["in"] else 1 for s in sets])
+    order = _region_order(sets, regions)
     lw = min(max(len(s) for s in sets), 24)
     cw = max(3, min((W - lw - 2) // len(order), 8))
     out = [" " * (lw + 1) + "".join(f"{j + 1}".center(cw) for j in range(len(order)))]
@@ -829,6 +832,11 @@ def t_sets(p, W, g):
 
 
 # ---------- matrix: check, HTML, text ----------
+
+def _mark(cell):
+    """A matrix cell is a mark, or an object with a 'mark'."""
+    return cell.get("mark") if isinstance(cell, dict) else cell
+
 
 def _label(col):
     return col.get("label", "") if isinstance(col, dict) else str(col)
@@ -860,7 +868,7 @@ def check_matrix(p, where, errors, warnings, digest):
             continue
         out = []
         for c in cells:
-            mark = c.get("mark") if isinstance(c, dict) else c
+            mark = _mark(c)
             if mark is not None and mark not in MARKS:
                 errors.append(f"{where}: row '{r['label']}' has mark '{mark}'; use one of {', '.join(MARKS)}, or null")
             n_hl += 1 if isinstance(c, dict) and c.get("highlight") else 0
@@ -876,7 +884,7 @@ def check_matrix(p, where, errors, warnings, digest):
     for r in rows:
         if isinstance(r, dict) and isinstance(r.get("cells"), list):
             key = r.get("group") or r.get("label")
-            measured.setdefault(key, set()).update(k for k, c in enumerate(r["cells"]) if (c.get("mark") if isinstance(c, dict) else c))
+            measured.setdefault(key, set()).update(k for k, c in enumerate(r["cells"]) if _mark(c))
     keys = [k for k in measured if measured[k]]
     for a in range(len(keys)):
         for b in range(a + 1, len(keys)):
@@ -900,7 +908,7 @@ def v_matrix(p):
             out.append(f'<div class="mgroup" role="row"><span role="rowheader">{esc(group)}</span></div>')
         cells = []
         for c, col in zip(r["cells"], cols):
-            mark = c.get("mark") if isinstance(c, dict) else c
+            mark = _mark(c)
             hl = isinstance(c, dict) and c.get("highlight")
             word = words.get(mark, blank) if mark else blank
             if mark not in used:
@@ -911,7 +919,7 @@ def v_matrix(p):
                          f'{f"<small>{esc(text)}</small>" if text else ""}</span>')
         out.append(f'<div class="mrow{" hl" if r.get("highlight") else ""}" role="row"><span role="rowheader" class="mlab">{esc(r["label"])}</span>{"".join(cells)}</div>')
         rows_text.append([(f"{r['group']}: " if r.get("group") else "") + r["label"]] +
-                         [words.get(c.get("mark") if isinstance(c, dict) else c, blank) if (c.get("mark") if isinstance(c, dict) else c) else blank for c in r["cells"]])
+                         [words.get(_mark(c), blank) if _mark(c) else blank for c in r["cells"]])
     out.append("</div>")
     legend = "".join(f'<span>{mark_svg(m, False)}{esc(words.get(m, blank) if m else blank)}</span>' for m in [m for m in MARKS if m in used] + ([None] if None in used else []))
     out.append(f'<p class="mlegend">{legend}</p>')
@@ -921,7 +929,7 @@ def v_matrix(p):
 def t_matrix(p, W, g):
     cols = [c if isinstance(c, dict) else {"label": c} for c in p["columns"]]
     sym = {"yes": g["yes"], "no": g["no"], "up": g["up"], "down": g["dn"], "same": g["same"], None: g["blank"]}
-    words = {"yes": "yes", "no": "no", "up": "higher", "down": "lower", "same": "no difference", **(p.get("legend") or {})}
+    words = {**MARKS, **(p.get("legend") or {})}
     lw = min(max(len(r["label"]) for r in p["rows"]) + 2, int(W * 0.45))
     cw = max(6, min((W - lw) // len(cols), 16))
     heads = [twrap(c["label"], cw - 2) for c in cols]
@@ -935,7 +943,7 @@ def t_matrix(p, W, g):
             out.append(tcut(group.upper(), W))
         cells = []
         for c in r["cells"]:
-            m = c.get("mark") if isinstance(c, dict) else c
+            m = _mark(c)
             used.append(m)
             s = sym[m]
             if isinstance(c, dict) and c.get("highlight"):
@@ -1425,7 +1433,7 @@ def v_slope(p):
     items = sorted(p["items"], key=lambda it: bool(it.get("highlight")))
     unit = p.get("unit", "")
     vals = [v for it in items for v in (it["before"], it["after"])]
-    lo = min(vals) if p.get("y_from_zero") is False else min(0, min(vals))
+    lo = axis_start(p, "y", vals)
     hi = max(vals)
     top, ph = 44, 300
     x1, x2 = 250, W - 250
@@ -1498,7 +1506,7 @@ def v_dots(p):
     """Every value as a dot, stacked where values are close, so the spread is visible."""
     groups, unit = p["groups"], p.get("unit", "")
     allv = [v for g in groups for v in g["values"]]
-    ticks = nice_ticks(min(allv) if p.get("x_from_zero") is False else min(0, min(allv)), max(allv), 5)
+    ticks = nice_ticks(axis_start(p, "x", allv), max(allv), 5)
     lo, hi = ticks[0], ticks[-1]
     left, right = 170, 20
     pw = W - left - right
@@ -1544,7 +1552,7 @@ def v_dots(p):
 def t_dots(p, W, g):
     groups = p["groups"]
     allv = [v for grp in groups for v in grp["values"]]
-    lo = min(allv) if p.get("x_from_zero") is False else min(0, min(allv))
+    lo = axis_start(p, "x", allv)
     hi = max(allv)
     lw = min(max(len(grp["label"]) for grp in groups), int(W * 0.3))
     nb = max(W - lw - 4, 20)
@@ -1591,8 +1599,8 @@ def check_scatter(p, where, errors, warnings, digest):
 def v_scatter(p):
     pts = p["points"]
     xs, ys = [pt["x"] for pt in pts], [pt["y"] for pt in pts]
-    xt = nice_ticks(min(xs) if p.get("x_from_zero") is False else min(0, min(xs)), max(xs), 5)
-    yt = nice_ticks(min(ys) if p.get("y_from_zero") is False else min(0, min(ys)), max(ys), 4)
+    xt = nice_ticks(axis_start(p, "x", xs), max(xs), 5)
+    yt = nice_ticks(axis_start(p, "y", ys), max(ys), 4)
     left, top, pw, ph = 64, 40, W - 64 - 30, 360
     X = lambda v: left + (v - xt[0]) / ((xt[-1] - xt[0]) or 1) * pw
     Y = lambda v: top + ph - (v - yt[0]) / ((yt[-1] - yt[0]) or 1) * ph
@@ -1617,8 +1625,8 @@ def v_scatter(p):
 def t_scatter(p, W, g):
     pts = p["points"]
     xs, ys = [q["x"] for q in pts], [q["y"] for q in pts]
-    x0 = min(xs) if p.get("x_from_zero") is False else min(0, min(xs))
-    y0 = min(ys) if p.get("y_from_zero") is False else min(0, min(ys))
+    x0 = axis_start(p, "x", xs)
+    y0 = axis_start(p, "y", ys)
     cols, rows = min(W - 10, 60), 14
     grid = [[" "] * cols for _ in range(rows)]
     for q in sorted(pts, key=lambda q: bool(q.get("highlight"))):
@@ -1682,7 +1690,7 @@ def v_line(p):
         xpos = lambda x: order.index(x) / ((len(order) - 1) or 1)
         xticks = order
     ys = [pt[1] for s in series for pt in s["points"]]
-    lo = min(ys) if p.get("y_from_zero") is False else min(0, min(ys))
+    lo = axis_start(p, "y", ys)
     ticks = nice_ticks(lo, max(ys), 4)
     ylo, yhi = ticks[0], ticks[-1]
     unit = p.get("unit", "")
@@ -1740,7 +1748,7 @@ def t_line(p, W, g):
     series = p["series"]
     unit = p.get("unit", "")
     ys = [pt[1] for s in series for pt in s["points"]]
-    lo = min(ys) if p.get("y_from_zero") is False else min(0, min(ys))
+    lo = axis_start(p, "y", ys)
     nw = min(max(len(s["name"]) for s in series), 22)
     out = []
     for s in series:
@@ -1874,14 +1882,71 @@ def t_text(p, W, g):
 
 # ---------- svg: check, HTML, text ----------
 
+# Static drawing only. Names are lower case because HTMLParser lowers them. <title> is left out on purpose: newer
+# HTMLParsers read its content as text, while a browser drawing SVG reads it as markup, so markup inside could hide.
+SVG_ELEMENTS = frozenset((
+    "svg g defs desc symbol use path rect circle ellipse line polyline polygon text tspan textpath marker "
+    "lineargradient radialgradient stop clippath mask pattern").split())
+SVG_ATTRIBUTES = frozenset((
+    "id class style lang xml:space xmlns xmlns:xlink role aria-label aria-labelledby aria-describedby aria-hidden "
+    "viewbox preserveaspectratio width height x y x1 y1 x2 y2 cx cy r rx ry fx fy d points transform pathlength "
+    "fill fill-opacity fill-rule stroke stroke-width stroke-opacity stroke-dasharray stroke-dashoffset stroke-linecap "
+    "stroke-linejoin stroke-miterlimit opacity color visibility display vector-effect paint-order shape-rendering "
+    "font-family font-size font-weight font-style text-anchor dominant-baseline alignment-baseline baseline-shift "
+    "letter-spacing word-spacing text-decoration text-rendering dx dy rotate textlength lengthadjust startoffset "
+    "method spacing side href xlink:href marker-start marker-mid marker-end markerwidth markerheight markerunits refx "
+    "refy orient offset stop-color stop-opacity gradientunits gradienttransform spreadmethod clip-path clip-rule "
+    "clippathunits mask maskunits maskcontentunits patternunits patterncontentunits patterntransform").split())
+URL_REF = re.compile(r"url\(\s*(?!['\"]?#)", re.I)  # url(...) that is not a reference to an element in this svg
+
+
+class _SvgCheck(HTMLParser):
+    """Collect every element, attribute or construct in an svg that is not on the allowlist."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.problems = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in SVG_ELEMENTS:
+            self.problems.append(f"element <{tag}>; use shapes, paths, text, groups, gradients, markers and masks only")
+            return
+        for name, value in attrs:
+            value = value or ""
+            if name not in SVG_ATTRIBUTES:
+                self.problems.append(f"attribute '{name}' on <{tag}>; use geometry, paint, text and marker attributes only")
+            elif name in ("href", "xlink:href") and not value.strip().startswith("#"):
+                self.problems.append(f"link '{value}' on <{tag}>; only links to an id in this svg, such as '#arrow'")
+            elif URL_REF.search(value):
+                self.problems.append(f"url() in '{name}' on <{tag}>; only references to an id in this svg, such as 'url(#fade)'")
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+    def handle_comment(self, data):
+        self.problems.append("a comment")
+
+    def handle_decl(self, decl):
+        self.problems.append(f"<!{decl}>")
+
+    def unknown_decl(self, data):
+        self.problems.append(f"<![{data[:20]}…]>")
+
+    def handle_pi(self, data):
+        self.problems.append(f"<?{data[:20]}…>")
+
+
 def check_svg(p, where, errors, warnings, digest):
     svg = str(p.get("svg", "")).strip()
     if not svg.startswith("<svg") or not svg.endswith("</svg>"):
         errors.append(f"{where}: 'svg' must be one <svg>…</svg> element")
     if "viewBox" not in svg:
         errors.append(f"{where}: the svg needs a viewBox and no fixed width or height")
-    if re.search(r"<script|\son\w+\s*=|javascript:|<foreignObject|href\s*=\s*[\"']?(https?:|//)", svg, re.I):
-        errors.append(f"{where}: the svg must not contain scripts, event handlers, foreignObject or external links")
+    parser = _SvgCheck()
+    parser.feed(svg)
+    parser.close()
+    for problem in dict.fromkeys(parser.problems):  # each problem once, in order
+        errors.append(f"{where}: the svg must not contain {problem}")
     if not p.get("alt"):
         errors.append(f"{where}: an 'svg' panel needs 'alt': a description of its essential information")
     digest.append(f"    custom svg; alt: {p.get('alt', '')}")
@@ -1914,184 +1979,27 @@ TEXT = {"effects": t_effects, "pairs": t_pairs, "numbers": t_numbers, "units": t
         "flow": t_flow, "map": t_map, "concept": t_concept, "groups": t_groups, "timeline": t_timeline, "text": t_text,
         "svg": t_svg, "slope": t_slope, "dots": t_dots, "scatter": t_scatter, "quadrant": t_quadrant, "sets": t_sets, "tree": t_tree}
 
+# Every kind needs a check, a visual and a text form; fail at start-up, not later in one output format.
+for _name, _table in (("PANEL_CHECKS", PANEL_CHECKS), ("VISUALS", VISUALS), ("TEXT", TEXT)):
+    if set(_table) != set(KINDS):
+        raise RuntimeError(f"{_name} does not match KINDS: missing {sorted(set(KINDS) - set(_table))}, extra {sorted(set(_table) - set(KINDS))}")
+
+def visual_of(p, spec):
+    """A panel's (visual HTML, data HTML). A map draws the spec's document, so it gets the spec."""
+    return v_map(p, spec) if p["kind"] == "map" else VISUALS[p["kind"]](p)
+
+
+def text_of(p, W, g, spec):
+    """A panel's plain-text lines."""
+    return t_map(p, W, g, spec) if p["kind"] == "map" else TEXT[p["kind"]](p, W, g)
+
 
 # ---------- page ----------
 
-CSS = r"""
-:root { --cream:#FFFCF7; --linen:#F2EDE5; --sand:#C4B69C; --terracotta:#E8725C; --moss:#6B7F5E; --umber:#5C4033;
-  --ink:#33302B; --heading:#1C1A17; --muted:#78736B; --line:#DDD6CA;
-  --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
-  --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E"); }
-* { box-sizing:border-box; }
-html, body { margin:0; }
-body { background:var(--cream); color:var(--ink); font:400 17px/1.75 var(--serif); -webkit-font-smoothing:antialiased;
-  min-height:100vh; display:flex; flex-direction:column; }
-.band { height:10px; background:var(--umber) var(--saya); background-size:13px 7.5px; flex:none; }
-.band--thin { height:6px; }
-.wrap { width:100%; max-width:72rem; margin:0 auto; padding:0 clamp(20px, 4vw, 48px); flex:1; display:flex; flex-direction:column; }
-header.top { padding:28px 0 8px; }
-.kicker { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
-h1 { font:700 clamp(30px, 4.2vw, 52px)/1.12 var(--serif); color:var(--heading); margin:8px 0 16px; max-width:52rem; letter-spacing:-.01em; }
-.summary { font-size:clamp(17px, 1.6vw, 20px); line-height:1.6; max-width:44rem; margin:0 0 16px; }
-.source { font:400 13px var(--sans); color:var(--muted); margin:0; }
-nav.toc { font:500 15px/1.4 var(--sans); margin:22px 0 0; border-top:2px solid var(--line); padding-top:12px; }
-nav.toc ol { margin:0; padding:0; list-style:none; display:grid; grid-template-columns:repeat(auto-fit, minmax(22rem, 1fr)); gap:8px 40px; counter-reset:t; }
-nav.toc li { counter-increment:t; display:flex; gap:10px; }
-nav.toc li::before { content:counter(t); font-weight:700; color:var(--muted); width:1.2em; flex:none; font-variant-numeric:tabular-nums; }
-nav.toc a { color:var(--heading); text-decoration:none; }
-nav.toc a[aria-current] { color:var(--terracotta); font-weight:700; }
-nav.toc a:hover { color:var(--terracotta); }
-main { flex:1; padding:24px 0 12px; }
-section.panel { border-top:2px solid var(--line); padding:18px 0 32px; }
-.panel .count { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--terracotta); }
-.panel h2 { font:700 clamp(24px, 2.8vw, 38px)/1.22 var(--serif); color:var(--heading); margin:8px 0 24px; max-width:56rem; letter-spacing:-.005em; }
-.body { display:grid; grid-template-columns:minmax(0, 1fr); gap:20px 40px; align-items:start; }
-.body.has-note { grid-template-columns:minmax(0, 3fr) minmax(14rem, 1fr); }
-.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-figure { margin:0; position:relative; }
-figure svg { width:100%; height:auto; display:block; }
-.note { font:400 16px/1.65 var(--serif); border-left:10px solid var(--moss); padding:2px 0 2px 16px; position:relative; }
-.note::before { content:""; position:absolute; left:-10px; top:0; bottom:0; width:10px; background:var(--moss) var(--saya); background-size:13px 7.5px; }
-.note p { margin:0 0 10px; } .note p:last-child { margin:0; }
-.legend { font:500 13px var(--sans); color:var(--muted); margin:10px 0 0; } .legend .arrow { color:var(--ink); font-weight:700; }
-details.data { margin-top:14px; font:400 14px var(--sans); }
-details.data summary { cursor:pointer; color:var(--muted); font-weight:700; font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
-details.data summary:hover { color:var(--terracotta); }
-details.data > div { margin-top:8px; }
-table { border-collapse:collapse; font:400 16px/1.45 var(--sans); width:100%; }
-th { font:700 12px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:left;
-  border-bottom:2px solid var(--line); padding:8px 12px 8px 0; vertical-align:bottom; }
-td { border-bottom:1px solid var(--linen); padding:8px 12px 8px 0; vertical-align:top; color:var(--ink); }
-th.n, td.n { text-align:right; font-variant-numeric:tabular-nums; }
-tr.hl td { background:var(--linen); color:var(--heading); font-weight:700; }
-tr.hl td:first-child { box-shadow:inset 4px 0 0 var(--terracotta); padding-left:10px; }
-.tablewrap { overflow-x:auto; }
-.figures { display:flex; flex-wrap:wrap; gap:28px 72px; }
-.fig .val { font:700 clamp(56px, 10vw, 136px)/1 var(--serif); letter-spacing:-.02em; color:var(--heading); font-variant-numeric:tabular-nums; }
-.fig.hl .val { color:var(--terracotta); }
-.fig.hl .lab { font-weight:700; color:var(--heading); }
-.fig .lab { font:500 clamp(15px, 1.5vw, 18px)/1.4 var(--sans); color:var(--ink); max-width:18rem; margin-top:12px; }
-.prose { max-width:42rem; font-size:clamp(17px, 1.6vw, 20px); } .prose p { margin:0 0 14px; }
-.controls { display:none; }
-.foot { flex:none; display:flex; flex-wrap:wrap; gap:0 16px; justify-content:space-between; padding:4px max(clamp(20px, 4vw, 48px), calc((100% - 72rem) / 2 + clamp(20px, 4vw, 48px))); font:400 12px var(--sans); color:var(--muted); font-variant-numeric:tabular-nums; }
-.foot a, .source a { color:var(--muted); } .foot a:hover, .source a:hover, .note a:hover, .readnext a:hover { color:var(--terracotta); }
-.note a, .readnext a, .prose a, .summary a { color:inherit; text-decoration-color:var(--sand); text-underline-offset:2px; }
-:focus-visible { outline:2px solid var(--terracotta); outline-offset:3px; }
-.bars { display:grid; grid-template-columns:max-content minmax(0, 1fr); gap:clamp(12px, 2.4vh, 26px) 18px; align-items:center; padding:4px 0;
-  font:500 clamp(15px, 1.6vw, 19px)/1.3 var(--sans); }
-.brow { display:contents; }
-.blab { color:var(--heading); text-align:right; max-width:18rem; }
-.btrack { position:relative; border-left:1.5px solid var(--ink); padding:4px 0; margin-right:var(--valw, 8rem); min-width:0; }
-.bar { height:clamp(28px, 6.5vh, 64px); background:var(--moss); }
-.bval { position:absolute; top:50%; transform:translateY(-50%); color:var(--heading); white-space:nowrap; font:700 1.3em var(--serif); font-variant-numeric:tabular-nums; }
-.bval small { font:500 .62em var(--sans); color:var(--muted); }
-.brow.hl .bar { background:var(--terracotta); }
-.brow.hl .blab { font-weight:700; } .brow:not(.hl) .bval { font-weight:400; }
-.narrow { display:none; font:400 15px/1.6 var(--sans); }
-.narrow ol, .narrow ul { margin:0; padding-left:1.3em; } .narrow li { margin:0 0 6px; }
-@media (max-width: 760px) { .body.has-note { grid-template-columns:minmax(0, 1fr); } }
-@media (max-width: 600px) {
-  .wide { display:none; } .narrow { display:block; }
-  .bars { grid-template-columns:minmax(0, 1fr); gap:2px; } .blab { text-align:left; } .btrack { margin-bottom:8px; }
-  .controls .all { margin-left:0; } }
-
-.matrix { display:grid; grid-template-columns:minmax(9rem, max-content) repeat(var(--mcols), minmax(5.5rem, 1fr)); font:500 clamp(15px, 1.5vw, 18px)/1.3 var(--sans); }
-.mrow, .mgroup { display:contents; }
-.mrow > span { padding:clamp(2px, .7vh, 8px) 12px; border-bottom:1px solid var(--linen); display:flex; align-items:center; }
-.mhead > span { font:700 12px/1.3 var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); justify-content:center; text-align:center;
-  border-bottom:2px solid var(--line); align-items:end; }
-.mhead > span.hl { color:var(--heading); box-shadow:inset 0 -3px 0 var(--terracotta); }
-.mgroup > span { grid-column:1 / -1; font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--umber); padding:10px 0 0; }
-.mlab { color:var(--heading); padding-left:0 !important; }
-.mrow.hl .mlab { font-weight:700; }
-.mcell { justify-content:center; flex-direction:column; gap:2px; }
-.mcell svg { width:clamp(26px, 4.6vh, 40px); height:auto; display:block; }
-.mcell small { font:500 12px var(--sans); color:var(--muted); text-align:center; }
-.mlegend { display:flex; flex-wrap:wrap; gap:6px 22px; font:500 14px var(--sans); color:var(--muted); margin:14px 0 0; }
-.mlegend span { display:inline-flex; align-items:center; gap:6px; } .mlegend svg { width:22px; height:22px; }
-
-.docstrip ol { list-style:none; margin:0 0 6px; padding:0; display:flex; flex-wrap:wrap; gap:4px; font:500 12px/1.2 var(--sans); }
-.docstrip li { padding:5px 9px; background:var(--linen); color:var(--muted); }
-.docstrip li b { color:var(--muted); margin-right:3px; }
-.docstrip li.on { background:var(--heading); color:var(--cream); } .docstrip li.on b { color:var(--terracotta); }
-.readnext { font:500 14px var(--sans); color:var(--ink); margin:14px 0 0; padding-top:10px; border-top:1px solid var(--line); }
-.readnext span { font-weight:700; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--umber); margin-right:8px; }
-
-/* Paged mode: JavaScript turns it on; without JavaScript or in print every panel shows in order.
-   Page 0 is the cover (title, summary, list of panels); each later page is one panel. */
-.slim { display:none; }
-.paged .page { display:none; }
-.paged .page.current { display:block; }
-/* Each page fills the screen like a slide: the visual is centred in the space below the headline. */
-.paged main { display:flex; flex-direction:column; }
-.paged section.panel.current { display:flex; flex-direction:column; flex:1; }
-.paged .panel .body { flex:1; align-content:center; padding-bottom:4vh; }
-.paged figure svg { max-height:58vh; }
-.paged.on-cover header.top { margin-top:auto; padding-top:3vh; }
-.paged.on-cover .controls { margin-bottom:auto; padding-bottom:3vh; }
-.paged:not(.on-cover) .slim { display:flex; gap:12px; align-items:baseline; padding:18px 0 0; font:700 12px var(--sans);
-  letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
-.slim a { color:var(--muted); text-decoration:none; } .slim a:hover { color:var(--terracotta); }
-.paged section.panel { border-top:0; padding-top:clamp(8px, 3vh, 32px); }
-.paged main { padding-top:8px; }
-.paged .controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; font:700 13px var(--sans); padding:14px 0 0; }
-.paged.on-cover .controls { padding-top:6px; }
-.paged.on-cover main { padding:0; }
-.controls button { font:700 13px var(--sans); letter-spacing:.06em; text-transform:uppercase; border:0; padding:10px 16px;
-  background:var(--linen); color:var(--heading); cursor:pointer; }
-.controls button:hover:not(:disabled) { color:var(--terracotta); }
-.controls button:disabled { color:var(--sand); cursor:default; }
-.controls .pos { color:var(--muted); font-variant-numeric:tabular-nums; min-width:4.5em; text-align:center; }
-.controls .all { margin-left:auto; background:none; color:var(--muted); padding:10px 0; }
-.dots { display:flex; gap:4px; flex:1 1 6rem; max-width:18rem; min-width:4rem; } .dots span { flex:1; height:4px; background:var(--line); }
-.dots span.on { background:var(--terracotta); }
-@media print { .paged .page { display:block; } .controls, .slim, nav.toc { display:none !important; } section.panel { break-inside:avoid; } }
-"""
+CSS = (HERE / "show.css").read_text(encoding="utf-8")
 
 
-JS = r"""
-(() => {
-  const pages = [...document.querySelectorAll(".page")];  // pages[0] is the cover
-  const n = pages.length - 1;
-  if (n < 2) return;
-  const root = document.documentElement, ctrl = document.querySelector(".controls");
-  const prev = ctrl.querySelector(".prev"), next = ctrl.querySelector(".next"), pos = ctrl.querySelector(".pos");
-  const all = ctrl.querySelector(".all"), dots = ctrl.querySelector(".dots");
-  const links = [...document.querySelectorAll("nav.toc a")];
-  dots.innerHTML = pages.slice(1).map(() => "<span></span>").join("");
-  let i = Math.max(0, pages.findIndex(p => p.id && "#" + p.id === location.hash));
-  function show(k, focus) {
-    i = Math.min(Math.max(k, 0), n);
-    pages.forEach((p, j) => p.classList.toggle("current", j === i));
-    root.classList.toggle("on-cover", i === 0);
-    [...dots.children].forEach((d, j) => d.classList.toggle("on", j < i));
-    prev.disabled = i === 0; next.disabled = i === n;
-    next.textContent = i === 0 ? "Start →" : "Next →";
-    pos.textContent = i === 0 ? `${n} panels` : `${i} / ${n}`;
-    history.replaceState(null, "", i === 0 ? location.pathname : "#" + pages[i].id);
-    window.scrollTo(0, 0);
-    if (focus) pages[i].querySelector("h1, h2").focus({ preventScroll: true });
-  }
-  function paged(on) {
-    root.classList.toggle("paged", on);
-    all.textContent = on ? "Show all panels" : "One panel at a time";
-    if (on) show(i); else root.classList.remove("on-cover");
-  }
-  prev.onclick = () => show(i - 1, true);
-  next.onclick = () => show(i + 1, true);
-  all.onclick = () => paged(!root.classList.contains("paged"));
-  document.querySelector(".slim a").onclick = e => { e.preventDefault(); show(0, true); };
-  links.forEach((a, k) => a.onclick = e => { if (root.classList.contains("paged")) { e.preventDefault(); show(k + 1, true); } });
-  document.addEventListener("keydown", e => {
-    if (!root.classList.contains("paged") || e.target.closest("input, textarea, summary")) return;
-    // Space pages forward and Shift+Space back, except on a focused button, which Space already presses.
-    const space = e.key === " " && !e.target.closest("button, a");
-    if (e.key === "ArrowRight" || e.key === "PageDown" || (space && !e.shiftKey)) { e.preventDefault(); show(i + 1, true); }
-    if (e.key === "ArrowLeft" || e.key === "PageUp" || (space && e.shiftKey)) { e.preventDefault(); show(i - 1, true); }
-  });
-  paged(true);
-})();
-"""
+JS = (HERE / "show.js").read_text(encoding="utf-8")
 
 
 def doc_strip(spec, p):
@@ -2100,7 +2008,8 @@ def doc_strip(spec, p):
     if not doc or p.get("part") is None:
         return ""
     parts = set(map(str, _as_list(p["part"])))
-    cells = "".join(f'<li class="{"on" if str(s["id"]) in parts else ""}"{" aria-current=\"true\"" if str(s["id"]) in parts else ""}>'
+    current = ' aria-current="true"'
+    cells = "".join(f'<li class="{"on" if str(s["id"]) in parts else ""}"{current if str(s["id"]) in parts else ""}>'
                     f'{esc(s["label"])}</li>' for s in doc["sections"])
     return f'<nav class="docstrip" aria-label="Where this is in the document"><ol>{cells}</ol></nav>'
 
@@ -2113,7 +2022,7 @@ def render(spec: dict) -> str:
     panels = spec["panels"]
     sections, toc = [], []
     for i, p in enumerate(panels, 1):
-        visual, data = v_map(p, spec) if p["kind"] == "map" else VISUALS[p["kind"]](p)
+        visual, data = visual_of(p, spec)
         if p["kind"] in ("flow", "groups", "timeline", "map", "concept", "sets", "quadrant", "tree", "effects", "pairs"):  # on narrow screens show the text version instead of a shrunken svg
             visual = f'<div class="wide">{visual}</div><div class="narrow" aria-hidden="true">{data}</div>'
 
@@ -2158,7 +2067,7 @@ def doc_line(spec, p, g, W=72):
     doc = spec.get("document")
     if not doc or p.get("part") is None:
         return []
-    parts = set(map(str, p["part"] if isinstance(p["part"], list) else [p["part"]]))
+    parts = set(map(str, _as_list(p["part"])))
     secs = doc["sections"]
     here = [f"{k + 1} of {len(secs)}, {s['label']}" for k, s in enumerate(secs) if str(s["id"]) in parts]
     return twrap("In the document: part " + "; part ".join(here), W, "")
@@ -2179,7 +2088,7 @@ def render_text(spec, width=72, ascii=False, markdown=False):
             out += twrap(spec["summary"], W)
         out.append("")
     for i, p in enumerate(spec["panels"], 1):
-        visual = t_map(p, W, g, spec) if p["kind"] == "map" else TEXT[p["kind"]](p, W, g)
+        visual = text_of(p, W, g, spec)
         strip = doc_line(spec, p, g, W)
         if markdown:
             out += [f"## {i}. {p['headline']}", ""] + ([f"*{' '.join(strip)}*", ""] if strip else [])
@@ -2319,7 +2228,7 @@ def render_screen_reader(spec, width=72):
         elif p["kind"] == "text":
             body = [plain(b) for b in _as_list(p.get("body"))]
         else:
-            visual, data = v_map(p, spec) if p["kind"] == "map" else VISUALS[p["kind"]](p)
+            visual, data = visual_of(p, spec)
             body = linear_lines(data or visual)
         for line in body:
             out += twrap(line, W)

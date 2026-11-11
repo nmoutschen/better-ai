@@ -232,7 +232,7 @@ Events are evenly spaced, so the spacing does not show the time between them. Up
 {"kind": "svg", "headline": "...", "alt": "What the diagram shows, in words", "svg": "<svg viewBox=\"0 0 800 300\" ...>...</svg>"}
 ```
 
-The SVG must have a `viewBox`, and must contain no scripts, event handlers, `foreignObject` or external links. `alt` is required. Use only these colours:
+The SVG must have a `viewBox`. It may contain only static drawing elements: `g`, `defs`, `desc`, `symbol`, `use`, `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `text`, `tspan`, `textPath`, `marker`, `linearGradient`, `radialGradient`, `stop`, `clipPath`, `mask` and `pattern`, with geometry, paint, text and marker attributes. Links and `url()` may only point to an `id` in the same SVG, such as `href="#box"` or `marker-end="url(#arrow)"`. No `title`, `style` element, comments, scripts, event handlers, images or animation. `alt` is required. Use only these colours:
 
 | Colour | Hex | Use |
 |---|---|---|
