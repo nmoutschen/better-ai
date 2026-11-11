@@ -36,15 +36,16 @@ FOR a pre-question, WRITE a solution that says the next cards give the answers. 
 
 WRITE the quizzes planned in SKILL.md section 3.3 as quiz chunks. The page asks the reader to answer every question in a quiz before opening its solutions.
 
-Readers use self-tests less than they should, and nothing found shows that readers follow a review schedule on their own. AFTER the last quiz:
+Readers use self-tests less than they should, and nothing found shows that readers follow a review schedule on their own. AFTER the last quiz, WRITE the Review and Reference chunks (SKILL.md section 3.5):
 
-1. **Review.** ADD a chunk titled "Review": two or three application tasks in new situations, each with a solution, mixed IF they cover types the reader could confuse (the mixed set tool). ASK the user how soon and how often readers will use the topic, and SUGGEST review dates in its first card, by the gaps in [modes/tutor.md](tutor.md) section 6.
-2. **Reference.** ADD a last chunk titled "Reference", in the format of [templates/take-away.md](../templates/take-away.md), with a `text` card per section. LEAD with when to use the topic. LEAVE OUT the parts that need a learner: "You can now", "Still to practise" and "Your plans". PUT the `wrong` entries under "Mistakes to watch". INSTEAD of the user's plans, ADD a practice card that asks the reader to write one to three plans in the form "When <situation>, I will <step from the lesson>.", with a solution that says what a good plan names. The reference comes after the quizzes because readers who expect a record remember less of what it holds.
+- ASK the user how soon and how often readers will use the topic, and SUGGEST review dates by the gaps in [modes/tutor.md](tutor.md) section 6.
+- PUT the `wrong` entries under "Mistakes to watch".
+- IN the plans card's solution, SAY what a good plan names.
 
 ## 5. Check and build
 
 CHECK every card, hint, solution and wrong answer as in SKILL.md section 3.4. No tutor will catch an error the page holds.
 
-RUN `python3 scripts/lesson.py build <folder>` from the skill's directory. It writes `site/index.html`, one file that needs no server. IF you cannot run Python, WRITE `lesson.json` and GIVE the user the build command.
+BUILD the page (SKILL.md section 3.5). IF you cannot run Python, WRITE `lesson.json` and GIVE the user the build command.
 
 GIVE the user the page's path once, and ASK them to review it. DO NOT publish or upload the page unless the user asks. REPORT which checks you ran, and which claims or values you could not check.

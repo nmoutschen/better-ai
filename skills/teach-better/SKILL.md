@@ -24,7 +24,7 @@ This file holds what both modes share. Each mode has its own file in `modes/`, w
 7. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Practice on real tasks went with more use.
 8. Learners can state a rule and still not see when it applies. Pre-questions helped only the material they asked about. Cases where a rule does not apply helped learners find what the rule needs.
 9. A reference at hand helps people perform. Skills decay without use, and spaced practice slows the decay.
-10. Design choices, to TREAT as a guide and not as fixed rules: the lesson page, the tools in section 2.3, the take-away and its format, the prerequisite check, attempting before a worked example, taking the first problem from the user's own situations, explaining why in feedback, the timing of terms, and, in static mode, the hints, the solutions behind a click and the review schedule.
+10. Design choices, to TREAT as a guide and not as fixed rules: the lesson page, the tools in section 2.3, the Review and Reference chunks and their format, the prerequisite check, attempting before a worked example, taking the first problem from the user's own situations, explaining why in feedback, the timing of terms, and, in static mode, the hints, the solutions behind a click and the review schedule.
 
 The LEARNER is the user in tutor mode and the page's readers in static mode.
 
@@ -134,3 +134,15 @@ BEFORE giving a hint, a worked example, a solution or feedback, CHECK it. RECOMP
 ON a page, RUN `python3 scripts/lesson.py check <folder>` from this skill's directory after each change to `lesson.json`, FIX every error, and CHECK every value it prints, such as each table cell and timeline event, against your worked solution.
 
 CHECK that every term in a practice question or quiz question was introduced on an earlier card. IF it was not, DEFINE it in the question or REWORD the question. CHECK that an example in a question does not give away its answer.
+
+### 3.5. End with a Review and a Reference
+
+AFTER the last quiz, ADD two chunks, so the LEARNER keeps a page they can use without AI. READ [templates/reference.md](templates/reference.md) and FOLLOW its format. They come after the quizzes because learners who expect to keep a record remember less of what it holds.
+
+1. **Review.** GIVE two or three application tasks in new situations from section 1.1, each with a worked solution. MIX them IF they cover types the LEARNER could confuse (the mixed set tool). PUT the review dates on its first card.
+2. **Reference.** LEAD with when to use the topic: the situations and the signs that a rule applies. A reference cannot tell the LEARNER when to open it. THEN GIVE, per chunk, the steps as a checklist, the rule with its conditions, a short account of why it works, and the worked example. A checklist helped most for steps people rarely use, and knowing why a procedure works helped with new cases. LIST the mistakes to watch.
+3. **Plans.** ADD a practice card that asks the LEARNER to write one to three plans in the form "When <situation>, I will <step from the lesson>." Plans in this if-then form raised use of trained skills, most when the person was motivated and rehearsed the plan.
+
+INCLUDE only what the lesson taught. CITE the same sources as the cards. CHECK every rule, example and answer as in section 3.4: the LEARNER will use the page without AI, with no one to catch an error.
+
+THEN RUN `python3 scripts/lesson.py build <folder>` from this skill's directory. It writes `site/index.html`, one file that needs no server. Every practice card needs a `solution`.
