@@ -21,7 +21,7 @@ Being invoked does NOT mean you must teach. IF the user wants a result now rathe
 6. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Training effects shrink when measured by what people do at work instead of by tests. Practice on real tasks, plans for when to use a skill, and feedback on real use each went with more use.
 7. Learners can state a rule and still not see when it applies. Questions train the kind of task they ask for: application questions helped fact questions, but fact questions did not help application, and pre-questions helped only the material they asked about. Cases where a rule does not apply helped learners find what the rule needs.
 8. A reference at hand helps people perform, but cannot tell them when to use it, and learners who expect to keep a record remember less of it. Skills decay without use, and spaced practice slows the decay.
-9. The tools in section 2.4 and the take-away are design choices for an AI tutor. TREAT these rules as a guide, not as fixed rules.
+9. The tools in section 2.3 and the take-away are design choices for an AI tutor. TREAT these rules as a guide, not as fixed rules.
 
 ## 1. Confirm that the user wants to learn
 
@@ -41,26 +41,26 @@ IF you cannot tell, ASK once, using the question tool if available:
 [option] Teach me, so I can do it without help.
 ```
 
-### 1.2. Find what the user already knows
+### 1.2. Research the topic
 
-LOOK UP what context already shows: earlier conversation, memories, the user's files and role.
-
-THEN ASK one or two short questions that test the prerequisites, such as a small problem or "what does X mean?". DO NOT ask the user to rate their own knowledge, because learners misjudge it. KEEP this check short. This check is a design choice.
-
-## 2. Plan the lesson
-
-### 2.1. Research the topic
-
-DO NOT teach from your training data alone: a definition you are sure of can still be wrong or incomplete. BEFORE planning the chunks, RESEARCH the topic:
+DO NOT teach from your training data alone: a definition you are sure of can still be wrong or incomplete. RESEARCH the topic BEFORE you ask the user anything about it, including the prerequisite check in section 1.3. A question written before any search comes from your training data, and it frames the lesson around what you expected:
 
 - IF `/research-better` is available and the topic is not trivial, USE it, and BUILD the lesson from its findings.
 - FOR a trivial topic, or without `/research-better`, SEARCH the web and READ the pages that define the topic's key terms.
-- AFTER the research, CONTINUE with section 2.2. The research is a step of the lesson, not its end.
+- AFTER the research, CONTINUE with section 1.3. The research is a step of the lesson, not its end.
 - IF you have no web search and no page fetch, TELL the user that the lesson rests on your own knowledge, and ASK whether they have sources you should use.
 
 CITE the source on each card that states a definition or a fact, with a link.
 
-### 2.2. Break the topic into chunks
+### 1.3. Find what the user already knows
+
+LOOK UP what context already shows: earlier conversation, memories, the user's files and role.
+
+THEN ASK one or two short questions that test the prerequisites the sources name, such as a small problem or "what does X mean?". DO NOT ask the user to rate their own knowledge, because learners misjudge it. KEEP this check short. This check is a design choice.
+
+## 2. Plan the lesson
+
+### 2.1. Break the topic into chunks
 
 BREAK the topic into small chunks. Each chunk teaches one idea or one step and ends with a practice problem.
 
@@ -70,7 +70,7 @@ INTRODUCE a key term in the chunk that first needs it, not in an opening list. S
 
 SHOW the user the plan: the GOAL and the list of chunks. LET the user reorder, skip or add chunks.
 
-### 2.3. Choose where the lesson happens
+### 2.2. Choose where the lesson happens
 
 A lesson mixed with other conversation, with many parts in one message, can be hard to follow. CHOOSE the first option the harness allows:
 
@@ -93,7 +93,7 @@ A lesson mixed with other conversation, with many parts in one message, can be h
 
 IF the user says they prefer the chat, USE the chat.
 
-### 2.4. Choose the tools
+### 2.3. Choose the tools
 
 A tool is a teaching move with its own template in `templates/tools/`. READ a tool's template before you first use it in a lesson. Each template says when to use the tool, when not to, and the card format for the page and the chat.
 
@@ -128,17 +128,17 @@ RECORD the plan and the user's progress in `.teach/<topic-slug>/`, so a later se
 
 ## 3. Teach each chunk
 
-BEFORE the first card of a chunk, CONSIDER the pre-questions tool (section 2.4).
+BEFORE the first card of a chunk, CONSIDER the pre-questions tool (section 2.3).
 
 ### 3.1. Explain, then show a worked example
 
-EXPLAIN the idea briefly, in plain words first, then with its term (section 2.2). FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
+EXPLAIN the idea briefly, in plain words first, then with its term (section 2.1). FOLLOW `/write-better` for the explanation if available. OTHERWISE, USE plain words and one term per idea.
 
 SHOW a worked example: a solved problem with each step and the reason for each step. TAKE the problem from a situation where the user will use the topic (section 1.1), stripped to the features the rule needs. Training on concrete cases helped transfer to concrete cases, and context the rule does not need, such as a named person, lowered transfer. WHEN a card shows a formula, rule or symbol next to an example, STATE which part of the example each symbol stands for, such as in a table with one row per symbol. IF a diagram or table would make a relation or process clearer, ADD it next to the explanation. ON a page, USE a `table`, `steps` or `timeline` block. IN the chat, USE a Markdown table or a list. DO NOT draw a plain-text diagram by hand: models draw them badly. WRITE a formula in a `code` block, with one operation per line, not inside a sentence, a table cell or a step note.
 
-WHEN a chunk asks the user to read a long text, GIVE a short instruction before the reading, saying what to look for, and one after it, saying what to check. CONSIDER the question stems tool (section 2.4).
+WHEN a chunk asks the user to read a long text, GIVE a short instruction before the reading, saying what to look for, and one after it, saying what to check. CONSIDER the question stems tool (section 2.3).
 
-AFTER an explanation card that states a key fact or rule the GOAL needs, CONSIDER the why prompt tool (section 2.4). AFTER the user has practised one method or case, CONSIDER the compare examples tool.
+AFTER an explanation card that states a key fact or rule the GOAL needs, CONSIDER the why prompt tool (section 2.3). AFTER the user has practised one method or case, CONSIDER the compare examples tool.
 
 FOR a complex or open problem where the user already knows the basics, ASK them to attempt it BEFORE you show the worked example. FOR material that is new to the user, SHOW the example first. Attempting first helped most on complex tasks. TREAT this as a guide, not a rule.
 
@@ -148,9 +148,9 @@ GIVE a problem similar to the worked example, but not identical. WAIT for the us
 
 AS the user succeeds, GIVE less of the solution in later examples: leave out the steps they have shown they can do. IF they struggle, GIVE more steps again. CHOOSE the next problem's difficulty from how they did on the last one, not from their interests or a fixed order.
 
-AFTER the user solves the first practice problem of a chunk, CONSIDER the "does it apply?" tool (section 2.4).
+AFTER the user solves the first practice problem of a chunk, CONSIDER the "does it apply?" tool (section 2.3).
 
-IF the GOAL is to make a kind of decision, USE the decision tools in section 2.4 for practice: a decision has no single right answer to check.
+IF the GOAL is to make a kind of decision, USE the decision tools in section 2.3 for practice: a decision has no single right answer to check.
 
 ADAPT the chunks still to come to the user's answers, not the chunks already taught: those stay as the user saw them. IF an answer shows a gap, RE-TEACH the missed step at the start of the next chunk, with a new example. IF the user succeeds easily, SHORTEN the next chunk's worked example. IF the user says something is hard to follow, such as how values are shown, CHANGE it from the next card on.
 
@@ -186,7 +186,7 @@ CHECK that every term in a practice question or quiz question was introduced on 
 
 ### 4.1. Test without help
 
-AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. MAKE most questions tasks the user will do in the situations from section 1.1, and INCLUDE at least one problem that differs from the examples. IF a near miss exists, INCLUDE a situation where the rule does not apply, and ASK whether it applies. Questions train the kind of task they ask for: application questions also helped fact questions, but not the reverse. ASK for a fact or a term only when the user must know it without looking it up. IF the quiz covers problem types the user could confuse, CONSIDER the mixed set tool (section 2.4).
+AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. MAKE most questions tasks the user will do in the situations from section 1.1, and INCLUDE at least one problem that differs from the examples. IF a near miss exists, INCLUDE a situation where the rule does not apply, and ASK whether it applies. Questions train the kind of task they ask for: application questions also helped fact questions, but not the reverse. ASK for a fact or a term only when the user must know it without looking it up. IF the quiz covers problem types the user could confuse, CONSIDER the mixed set tool (section 2.3).
 
 TELL the user before the first chunk that quizzes are closed-book. Learners who expected a closed-book test retained more. ON a page, PUT the quiz in its own chunk with `"quiz": true`: the page hides the other chunks until you set it to `done`. GIVE no feedback on a quiz answer until the user has answered every question in the quiz: `wait` holds quiz answers until then. THEN WRITE the feedback for all of them. DO NOT ask the user to answer a quiz question again: a quiz checks what they know, it does not teach. IF a wrong answer comes from an unclear question, SAY so and COUNT the answer by the user's reading.
 

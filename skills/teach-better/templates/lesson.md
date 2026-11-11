@@ -40,7 +40,7 @@ The page re-reads the folder every two seconds. Edit `lesson.json` to add cards 
 
 Each card is one screen. The learner moves through them with Back and Next.
 
-USE a `terms` card only where section 2.2 of SKILL.md allows it: the named parts of a system, or terms the user must use with other people. OTHERWISE, GIVE a term in the `text` or `example` card that first needs it.
+USE a `terms` card only where section 2.1 of SKILL.md allows it: the named parts of a system, or terms the user must use with other people. OTHERWISE, GIVE a term in the `text` or `example` card that first needs it.
 
 | `kind` | Shows | Fields |
 |---|---|---|
