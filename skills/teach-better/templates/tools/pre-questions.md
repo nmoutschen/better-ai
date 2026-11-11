@@ -1,25 +1,27 @@
 # Tool: pre-questions
 
-BEFORE teaching a chunk, ASK the user to guess the answers to two or three questions about its key facts. THEN teach the chunk, which gives the answers. Guessing first raised later scores on those same questions. It did almost nothing for material that was not asked about.
+BEFORE teaching a chunk, ASK the user to guess the answers to two or three questions about its key facts. THEN teach the chunk, which gives the answers. Guessing first raised later scores on those same questions. It did almost nothing for material that was not asked about, and pre-questions about concepts did not improve learning of the concepts.
 
 ## Use when
 
-- The chunk teaches facts or rules the GOAL needs, and a later quiz will test them.
+- The chunk teaches facts the user must know without looking them up, such as a limit, a default or a safety rule they need in the moment.
 - The user has not studied the chunk yet.
 
 ## Do not use
 
+- To prepare the user to apply a rule or method. The benefit stays with the facts asked, and does not reach application. USE the "does it apply?" tool after the chunk instead.
+- For terms the user can look up when they need them.
 - With questions that need inference or a full method. Factual questions helped more. FOR a complex problem, USE the attempt-first rule in section 3.1 of SKILL.md instead.
 - When the chunk does not answer the question. The benefit depends on the user studying the answer afterwards.
 - On every chunk. The benefit is limited to the questions asked, and learners judge the technique less useful than reading.
 
 ## Steps
 
-1. PICK two or three facts or rules from the chunk that the GOAL needs. WRITE one question per fact, answerable in a word, a number or a sentence.
+1. PICK two or three facts from the chunk that the user must know without looking them up. WRITE one question per fact, answerable in a word, a number or a sentence.
 2. ASK the user to write a guess for each, and SAY in one line that wrong guesses are expected and help them remember the answer.
 3. WAIT for the guesses. DO NOT give a verdict or the answers. ON a page, WRITE the feedback with the verdict `noted` and one line saying that the next cards answer the questions.
 4. TEACH the chunk. ON the card that gives each answer, POINT back to the question, such as "This answers pre-question 2."
-5. INCLUDE the same facts in the next quiz.
+5. IN the next quiz, TEST these facts inside a task that uses them, not as recall questions.
 
 ## On a page
 
