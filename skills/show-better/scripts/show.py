@@ -1880,7 +1880,7 @@ def check_svg(p, where, errors, warnings, digest):
         errors.append(f"{where}: 'svg' must be one <svg>…</svg> element")
     if "viewBox" not in svg:
         errors.append(f"{where}: the svg needs a viewBox and no fixed width or height")
-    if re.search(r"<script|\son\w+\s*=|javascript:|<foreignObject|href\s*=\s*[\"']?(https?:|//)", svg, re.I):
+    if re.search(r"<script|[\s/]on\w+\s*=|javascript:|<foreignObject|href\s*=\s*[\"']?(https?:|//)", svg, re.I):
         errors.append(f"{where}: the svg must not contain scripts, event handlers, foreignObject or external links")
     if not p.get("alt"):
         errors.append(f"{where}: an 'svg' panel needs 'alt': a description of its essential information")
