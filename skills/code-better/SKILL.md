@@ -96,7 +96,7 @@ BEFORE finishing, REMOVE edits left over from approaches you tried and abandoned
 
 ### 4.2. Decide error handling on purpose
 
-HANDLE invalid input and failures as the requirements' scenarios say. IF they do not say, TREAT it as a requirement gap (section 1.3). In one study, differences in input validation and error handling explained why agent code was harder to build on. TREAT this as a guide, not a rule.
+HANDLE invalid input and failures as the requirements' scenarios say. IF they do not say, TREAT it as a requirement gap (section 1.3). Differences in input validation and error handling explained why agent code was harder to build on. TREAT this as a guide, not a rule.
 
 ## 5. Verify
 
