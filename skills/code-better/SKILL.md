@@ -18,10 +18,10 @@ Being invoked does NOT mean you must write code now. These instructions can end 
 2. Passing tests does not show the result is what the user needs. Maintainers would reject many patches that pass their tests.
 3. People judge whether a result is right more accurately from concrete scenarios, examples and tests than from prose or from the code itself.
 4. Requirements, design and plan are different artifacts. Requirements align on intent and the user checks them. A design aligns on shared understanding and structure. A plan orders the work. They change each other: design work reveals missing requirements.
-5. Agents edit more than the task needs, and agent code erodes in structure as it grows while still passing tests. A plain instruction to preserve existing code reduced over-editing. Requests for quality did not stop erosion.
+5. Agents edit more than the task needs. A plain instruction to preserve existing code reduced over-editing.
 6. Repair loops gain most in the first few rounds. Test results help more than compiler errors, and a weak critique can hurt more than a bare failure. Extra rounds can break code that was already correct, and repeated failure feedback leads agents to game tests.
 7. Self-review without outside evidence finds few errors. A reviewer that sees only the result in a fresh context does better. LLM judgements of whether code meets its requirements are unreliable.
-8. Delegating work to sub-agents usually costs more, and details of a plan get lost when it is handed to another agent. Teams of agents do not reliably beat a single agent.
+8. Delegating work to sub-agents usually costs more. Teams of agents do not reliably beat a single agent.
 9. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
 10. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), and showing the design before building (section 2) are design choices.
 
@@ -184,10 +184,10 @@ DO the building yourself. USE sub-agents for independent reading, such as search
 
 ### 8.2. Hand over the full requirements
 
-WHEN you hand work to another agent or session, GIVE it the requirements, the design, and your raw notes on what you tried and found. DO NOT give only a summary: details get lost at handoffs.
+WHEN you hand work to another agent or session, GIVE it the requirements, the design, and your raw notes on what you tried and found. DO NOT give only a summary: details of a plan get lost when it is handed to another agent.
 
 ### 8.3. Keep long runs on track
 
 FOR work that spans several sessions, KEEP the plan file current, COMMIT a working state after each task, and BEGIN each session by reading the requirements, the design, and the plan.
 
-AT each checkpoint, RE-CHECK the result against the requirements' scenarios and REVIEW the structure for growing duplication or complexity. Agent code erodes over long runs while its tests keep passing.
+AT each checkpoint, RE-CHECK the result against the requirements' scenarios and REVIEW the structure for growing duplication or complexity. Agent code erodes in structure as it grows while still passing tests. Requests for quality did not stop erosion.

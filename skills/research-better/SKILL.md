@@ -13,9 +13,8 @@ Being invoked does NOT mean a full research run is needed. A simple factual ques
 
 ## Principles
 
-1. A Large Language Model (LLM) learns from its training data both to understand text and to know facts. The user wants the agent's ability to understand text, not the facts from its training data.
-2. Training data stops at a cut-off date and does not cover all text in the world. Relying on it leaves blind spots.
-3. An agent that already knows an answer writes searches that lead to it. The results then confirm what it expected and miss what it did not know.
+1. A Large Language Model (LLM) learns from its training data both to understand text and to know facts. The user wants the agent's ability to understand text, not the facts from its training data, which stop at a cut-off date and do not cover all text in the world.
+2. An agent that already knows an answer writes searches that lead to it. The results then confirm what it expected and miss what it did not know.
 
 This skill names capabilities, not tools: search and page reads in a COLLECTION, a shell, asking the user, writing files, and sub-agents. USE the tool your harness provides for each. IF you cannot ask the user through a tool, ASK in plain text and STOP until they answer. DO NOT simulate a missing capability, for example by describing a page you could not open.
 
@@ -51,7 +50,7 @@ Search and fetch tools do not always return the page. Some return a model-writte
 
 - TREAT text written by a search tool as leads, not evidence. A source is evidence only after you read the page itself.
 - TREAT a fetch tool's output as an extraction unless the harness documents that it returns the page text. An extraction can paraphrase quotes, omit passages, or say a page lacks something it contains.
-- RECORD how you read each source: `raw` (full page text), `extracted` (a fetch tool's processed output), `abstract` (only the abstract or summary page of a paper, read on the page itself), `snippet` (only text from a search tool), or `blocked`. A `snippet` is never evidence. An `abstract` is evidence only for what the abstract states.
+- RECORD how you read each source: `raw` (full page text), `extracted` (a fetch tool's processed output), `abstract` (only the abstract or summary page of a paper, read on the page itself), `snippet` (only text from a search tool), or `blocked`. An `abstract` is evidence only for what the abstract states.
 
 IF a page cannot be read, because the site blocks automated access, asks for a login, or shows no text, DO NOT get around the block. LOOK for another copy, such as an archived or open-access version, or for the primary source it reports on. OTHERWISE, MARK it blocked and DO NOT use it as evidence.
 

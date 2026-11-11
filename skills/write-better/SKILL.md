@@ -12,8 +12,8 @@ Being invoked does NOT mean the text needs large changes. A text that already me
 
 ## Principles
 
-1. Readers rate text as clear without understanding it better. Length and polish raise a reader's confidence without making them more accurate.
-2. Simpler wording helps readers new to a topic. Readers who know the topic skipped limitations in overly plain summaries.
+1. Length and polish raise a reader's confidence without making them more accurate.
+2. Simpler wording helps readers new to a topic.
 3. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and lowers recall of the rest.
 4. Models treat users differently by how they write and by what the user discloses about themselves, using stereotypes. What the user states about the output is a better guide.
 5. First-person uncertainty made readers rely less on wrong AI answers.
@@ -61,7 +61,7 @@ WHEN the user comes back after a break, START with the last thing done and the n
 
 ### 2.1. Cut interesting but irrelevant material
 
-DELETE anecdotes, unsupported conclusions, research details, dead-ends, and trivia that do not serve the user's GOAL. Length and polish raise a reader's confidence without making them more accurate, so DO NOT add either for reassurance.
+DELETE anecdotes, unsupported conclusions, research details, dead-ends, and trivia that do not serve the user's GOAL. DO NOT add length or polish for reassurance.
 
 DELETE padding: a restated question, a preamble, generic caveats, formatting around a short answer, and a list of possible answers given to cover the right one.
 
@@ -103,7 +103,7 @@ USE numbered lists for steps, with one instruction per step. USE tables for comp
 
 ### 3.4. Show relations, not only describe them
 
-WHEN the GOAL is to UNDERSTAND or DECIDE and the content describes how things relate, such as causes, overlaps, comparisons or changes, ADD a table, chart or diagram next to the prose. Graphics added to text improve comprehension for most readers. FOR a long, dense document, such as a report or a design doc, USE `/show-better` if available to introduce it with a short sequence of visual panels.
+WHEN the GOAL is to UNDERSTAND or DECIDE and the content describes how things relate, such as causes, overlaps, comparisons or changes, ADD a table, chart or diagram next to the prose. FOR a long, dense document, such as a report or a design doc, USE `/show-better` if available to introduce it with a short sequence of visual panels.
 
 DO NOT add a visual that only decorates, or one that repeats the prose word for word. Irrelevant material and identical text in two places both lower learning.
 
@@ -114,7 +114,7 @@ DO NOT rely on dyslexia-specific fonts or Bionic Reading. Dyslexia fonts gave no
 
 ### 3.6. Bold a few key ideas
 
-WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry its key ideas, so the user can find them on a quick scan. LIMIT bolding to those key ideas. Emphasis lowers recall of the parts that are not emphasised, so DO NOT bold whole sentences, labels, or every important term.
+WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry its key ideas, so the user can find them on a quick scan. LIMIT bolding to those key ideas: DO NOT bold whole sentences, labels, or every important term.
 
 ## 4. Word choices
 
@@ -124,13 +124,13 @@ USE a common word instead of a long or rare one when the meaning stays exact. WH
 
 SIMPLIFY the language, not the substance. A simpler version KEEPS its conditions and limitations: readers who know the topic skipped limitations in overly plain summaries.
 
-IF you do not know what the user knows about the topic, WRITE for a reader who knows less, and USE headings so others can skip ahead. Simpler text helps readers new to a topic. TREAT this as a guide, not a rule.
+IF you do not know what the user knows about the topic, WRITE for a reader who knows less, and USE headings so others can skip ahead. TREAT this as a guide, not a rule.
 
 ### 4.2. State the limits
 
 NAME what experts disagree on, where the evidence is weak, and whom to consult. STATE consensus only when agreement is high.
 
-STATE your own uncertainty in the first person, such as "I could not check X". First-person uncertainty made readers rely less on wrong AI answers; impersonal phrasing such as "it is not clear" had weaker effects.
+STATE your own uncertainty in the first person, such as "I could not check X". Impersonal phrasing such as "it is not clear" had weaker effects than the first person.
 
 ### 4.3. Prefer coherence
 
