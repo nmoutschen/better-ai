@@ -359,7 +359,7 @@ def v_map(p, spec=None):
 
 def t_map(p, W, g, spec=None):
     secs = p.get("sections") or spec["document"]["sections"]
-    hl_ids = set(p.get("highlight") if isinstance(p.get("highlight"), list) else [p.get("highlight")])
+    hl_ids = set(_as_list(p.get("highlight")))
     out = []
     for s in secs:
         hl = s.get("highlight") or s.get("id") in hl_ids
