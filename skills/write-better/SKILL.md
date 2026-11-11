@@ -17,11 +17,8 @@ Being invoked does NOT mean the text needs large changes. A text that already me
 3. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and lowers recall of the rest.
 4. Models treat users differently by how they write and by what the user discloses about themselves, using stereotypes. What the user states about the output is a better guide.
 5. First-person uncertainty made readers rely less on wrong AI answers.
-6. Models assume the user shares their context instead of checking, and early misunderstandings lead to later ones. Writers who try to set aside what they know do not judge readers better. Concrete cues, such as whether the reader has seen something, and feedback from the reader do help.
-7. A name one side made up is not shared until the other side uses or accepts it. A reference costs the reader more the further back its target is. Repeating what a knowledgeable reader already knows hinders them.
-8. After a break, a specific cue to the last action helps people resume. Handovers that state the current situation apart from its history did better.
-9. Applying findings about sentences, interruptions and handovers to chat turns and agent work (section 1.4) is a design choice.
-10. TREAT these rules as a guide, not as fixed rules for every reader.
+6. Models assume the user shares their context instead of checking. Trying to imagine what a reader knows does not improve the estimate; checking what the reader has seen does.
+7. TREAT these rules as a guide, not as fixed rules for every reader.
 
 ## 1. Before writing
 
@@ -54,30 +51,11 @@ IF the context does not show the GOAL, CHOOSE the most plausible one and STATE i
 
 ### 1.3. Assume your draft is unclear
 
-Research fills your context with specialized information the user does not have. Expertise makes the writer more abstract, more technical, and more passive.
+Your context holds what the user does not: research, tool output, files you read, your own reasoning, and earlier turns they may not remember. Expertise makes the writer more abstract, more technical, and more passive.
 
-IDENTIFY what this audience already knows, and PROVIDE the context they are missing, so they can understand everything you write. EXPLAIN or REPLACE file names, function names, and internal labels they may not know. KEEP a technical name only when the user must type or find it, and EXPLAIN it on first use.
+IDENTIFY what this audience already knows from what they wrote and read, and PROVIDE the context they are missing, so they can understand everything you write. FOR each plan, result, or file you refer to that the user has not just written or read, SAY what it is: "the plan to split the parser into two files", not "the plan". EXPLAIN or REPLACE file names, function names, and labels you made up. KEEP a technical name only when the user must type or find it, and EXPLAIN it on first use. DO NOT restate what the user just said.
 
-### 1.4. Write from what the user has seen
-
-Your context holds more than the user does: tool output, files you read, your own reasoning, reports from sub-agents, and earlier turns the user may have skimmed or forgotten. DO NOT judge what the user remembers. CHECK each reference instead.
-
-BEFORE writing during a long task, RE-READ the user's request and the constraints they stated, not only their last message. Agents drift from the user's goal over many turns.
-
-FOR each plan, decision, option, result, file, or name you refer to, CHECK where the user saw it:
-
-- IF the user wrote it, or it is in their last message or earlier in your own message: REFER to it directly.
-- IF only you saw it, such as tool output, a file you read, your reasoning, or a sub-agent's report: STATE what it says. DO NOT write "as shown above" or "the output shows".
-- IF it is from an earlier turn: RESTATE it in a few words, such as "the plan to split the parser into two files" instead of "the plan".
-- IF it is a name you made up, such as "phase 2", "Option B", or "the fallback path", and the user has not used it: REPLACE it with a description.
-
-IF the user asks what a reference means, DESCRIBE it, and STOP using the reference in later messages.
-
-DO NOT restate what the user just said or decided, or explain what they showed they already know.
-
-WHEN the user comes back after a break, or after a long run of your work, START with where things stand: the last thing done and the next step. STATE anything that changed that the user relied on, such as a file you moved or a plan you dropped. PUT history after that, and only if the user needs it.
-
-WHEN reporting on ongoing work, DESCRIBE the result as it is now, such as "handles X and Y", rather than relative to an earlier version the user may not hold in mind, such as "now also handles Y".
+WHEN the user comes back after a break, START with the last thing done and the next step.
 
 ## 2. Include only what the user needs
 
@@ -196,6 +174,6 @@ WHEN rewriting, COMPARE the result with the original. CHECK that every number, n
 
 CHECK the opening against section 3.1: a reader who stops after it knows the main point.
 
-CHECK each reference to a plan, result, file, or name against section 1.4: the user saw it, or the text says what it is.
+CHECK each reference against section 1.3: the user saw it, or the text says what it is.
 
 REPORT only the checks you performed. DO NOT claim the text is clearer because it reads more fluently: readers' sense of clarity does not show that they understand more.
