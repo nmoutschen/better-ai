@@ -9,6 +9,8 @@ Usage:
 BOARD is the board directory described in templates/board.md.
 """
 
+from __future__ import annotations
+
 import argparse
 import http.server
 import json

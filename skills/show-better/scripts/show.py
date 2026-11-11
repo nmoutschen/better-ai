@@ -2100,7 +2100,8 @@ def doc_strip(spec, p):
     if not doc or p.get("part") is None:
         return ""
     parts = set(map(str, _as_list(p["part"])))
-    cells = "".join(f'<li class="{"on" if str(s["id"]) in parts else ""}"{" aria-current=\"true\"" if str(s["id"]) in parts else ""}>'
+    current = ' aria-current="true"'
+    cells = "".join(f'<li class="{"on" if str(s["id"]) in parts else ""}"{current if str(s["id"]) in parts else ""}>'
                     f'{esc(s["label"])}</li>' for s in doc["sections"])
     return f'<nav class="docstrip" aria-label="Where this is in the document"><ol>{cells}</ol></nav>'
 
