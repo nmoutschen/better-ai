@@ -1882,14 +1882,71 @@ def t_text(p, W, g):
 
 # ---------- svg: check, HTML, text ----------
 
+# Static drawing only. Names are lower case because HTMLParser lowers them. <title> is left out on purpose: newer
+# HTMLParsers read its content as text, while a browser drawing SVG reads it as markup, so markup inside could hide.
+SVG_ELEMENTS = frozenset((
+    "svg g defs desc symbol use path rect circle ellipse line polyline polygon text tspan textpath marker "
+    "lineargradient radialgradient stop clippath mask pattern").split())
+SVG_ATTRIBUTES = frozenset((
+    "id class style lang xml:space xmlns xmlns:xlink role aria-label aria-labelledby aria-describedby aria-hidden "
+    "viewbox preserveaspectratio width height x y x1 y1 x2 y2 cx cy r rx ry fx fy d points transform pathlength "
+    "fill fill-opacity fill-rule stroke stroke-width stroke-opacity stroke-dasharray stroke-dashoffset stroke-linecap "
+    "stroke-linejoin stroke-miterlimit opacity color visibility display vector-effect paint-order shape-rendering "
+    "font-family font-size font-weight font-style text-anchor dominant-baseline alignment-baseline baseline-shift "
+    "letter-spacing word-spacing text-decoration text-rendering dx dy rotate textlength lengthadjust startoffset "
+    "method spacing side href xlink:href marker-start marker-mid marker-end markerwidth markerheight markerunits refx "
+    "refy orient offset stop-color stop-opacity gradientunits gradienttransform spreadmethod clip-path clip-rule "
+    "clippathunits mask maskunits maskcontentunits patternunits patterncontentunits patterntransform").split())
+URL_REF = re.compile(r"url\(\s*(?!['\"]?#)", re.I)  # url(...) that is not a reference to an element in this svg
+
+
+class _SvgCheck(HTMLParser):
+    """Collect every element, attribute or construct in an svg that is not on the allowlist."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.problems = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in SVG_ELEMENTS:
+            self.problems.append(f"element <{tag}>; use shapes, paths, text, groups, gradients, markers and masks only")
+            return
+        for name, value in attrs:
+            value = value or ""
+            if name not in SVG_ATTRIBUTES:
+                self.problems.append(f"attribute '{name}' on <{tag}>; use geometry, paint, text and marker attributes only")
+            elif name in ("href", "xlink:href") and not value.strip().startswith("#"):
+                self.problems.append(f"link '{value}' on <{tag}>; only links to an id in this svg, such as '#arrow'")
+            elif URL_REF.search(value):
+                self.problems.append(f"url() in '{name}' on <{tag}>; only references to an id in this svg, such as 'url(#fade)'")
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+    def handle_comment(self, data):
+        self.problems.append("a comment")
+
+    def handle_decl(self, decl):
+        self.problems.append(f"<!{decl}>")
+
+    def unknown_decl(self, data):
+        self.problems.append(f"<![{data[:20]}…]>")
+
+    def handle_pi(self, data):
+        self.problems.append(f"<?{data[:20]}…>")
+
+
 def check_svg(p, where, errors, warnings, digest):
     svg = str(p.get("svg", "")).strip()
     if not svg.startswith("<svg") or not svg.endswith("</svg>"):
         errors.append(f"{where}: 'svg' must be one <svg>…</svg> element")
     if "viewBox" not in svg:
         errors.append(f"{where}: the svg needs a viewBox and no fixed width or height")
-    if re.search(r"<script|[\s/\"']on\w+\s*=|javascript:|<foreignObject|href\s*=\s*[\"']?(https?:|//)", svg, re.I):
-        errors.append(f"{where}: the svg must not contain scripts, event handlers, foreignObject or external links")
+    parser = _SvgCheck()
+    parser.feed(svg)
+    parser.close()
+    for problem in dict.fromkeys(parser.problems):  # each problem once, in order
+        errors.append(f"{where}: the svg must not contain {problem}")
     if not p.get("alt"):
         errors.append(f"{where}: an 'svg' panel needs 'alt': a description of its essential information")
     digest.append(f"    custom svg; alt: {p.get('alt', '')}")
