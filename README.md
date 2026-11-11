@@ -35,6 +35,10 @@ npx skills add nmoutschen/better-ai -g
 
 Decides when the agent should ask the user a question, and how to ask it. It looks up what the agent can find itself, asks only about what only the user knows, and raises conflicting instructions instead of resolving them silently.
 
+## `/code-better`
+
+Writes, checks and reviews code so it builds what the user needs. It writes requirements as concrete scenarios the user can check, keeps the design and the plan separate from them, and changes only what the task needs. It verifies against the requirements in a bounded repair loop, never weakens tests, and reviews in a fresh context. It hands back a report of decisions, assumptions and checks, so the user can still understand and maintain the code.
+
 ## `/do-better`
 
 Corrects work that doesn't meet the user's intent. It recovers the user's goal, finds what is actually wrong, and fixes it, asking only when a decision blocks the work.

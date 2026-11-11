@@ -22,7 +22,7 @@ IF you find a defect in work you already delivered, REPORT it before the user fi
 5. Improved work, passing checks, and the user's approval are separate outcomes. One does not show another.
 6. Repeated apologies lowered managers' ratings of employees with each repetition.
 7. Models move their answers toward what the user says they believe, and checking what the answer would be under the opposite belief reduced this. Methods that stop a model from agreeing can also stop it from accepting valid corrections. Agents often claim that incomplete work is complete.
-8. These findings come from studies of human feedback at work and of coding agents. No study tests this correction method for an AI agent. Reporting your own defect first is practitioner advice, not tested. TREAT these rules as the best available guide.
+8. This correction method and reporting your own defect first are design choices. TREAT these rules as a guide, not as fixed rules.
 
 ## 1. Recover the user's intent
 

@@ -17,7 +17,7 @@ Being invoked does NOT mean the text needs large changes. A text that already me
 3. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and lowers recall of the rest.
 4. Models treat users differently by how they write and by what the user discloses about themselves, using stereotypes. What the user states about the output is a better guide.
 5. First-person uncertainty made readers rely less on wrong AI answers.
-6. Most of this evidence comes from students reading short texts, measured over a short time. TREAT these rules as the best available guide, not as tested on AI output for every reader.
+6. TREAT these rules as a guide, not as fixed rules for every reader.
 
 ## 1. Before writing
 
@@ -121,7 +121,7 @@ USE a common word instead of a long or rare one when the meaning stays exact. WH
 
 SIMPLIFY the language, not the substance. A simpler version KEEPS its conditions and limitations: readers who know the topic skipped limitations in overly plain summaries.
 
-IF you do not know what the user knows about the topic, WRITE for a reader who knows less, and USE headings so others can skip ahead. Simpler text helps readers new to a topic. TREAT this as a guide, not a rule: the evidence that extra support costs experts little is indirect.
+IF you do not know what the user knows about the topic, WRITE for a reader who knows less, and USE headings so others can skip ahead. Simpler text helps readers new to a topic. TREAT this as a guide, not a rule.
 
 ### 4.2. State the limits
 

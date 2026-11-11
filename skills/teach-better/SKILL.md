@@ -15,10 +15,10 @@ IF invoked without argument, TEACH the topic the user is currently asking about 
 2. Learners who study with AI overestimate what they know. Judge learning by what they can do, not by what they say.
 3. AI hints and feedback contain errors, and a learner cannot catch an error they share.
 4. Help that suits a beginner can hinder a learner who knows more. Adapt to what the learner can do: matching a stated learning style has little support.
-5. Asking learners to explain their answers helped in every medium tested. The lesson page is a design choice, not a tested improvement over chat.
+5. Asking learners to explain their answers helped in every medium tested. The lesson page is a design choice.
 6. Whether people use a skill depends less on their test scores than on their confidence and their chances to use it. Practice on real tasks, plans for when to use a skill, and feedback on real use each went with more use.
 7. A reference at hand helps people perform, but cannot tell them when to use it, and learners who expect to keep a record remember less of it. Skills decay without use, and spaced practice slows the decay.
-8. Most of this evidence comes from students, trainees and lab studies over short periods. None of the tools in section 2.4, nor the take-away, was tested with an AI tutor. Treat these rules as the best available guide.
+8. The tools in section 2.4 and the take-away are design choices for an AI tutor. TREAT these rules as a guide, not as fixed rules.
 
 ## 1. Confirm that the user wants to learn
 
@@ -191,7 +191,7 @@ BEFORE the end of the lesson, ASK when the user will next use the topic, and how
 - IF the user will not use it for weeks or longer, PLAN three practice sessions, and PUT their dates in the take-away (section 6.2). SET the first gap to about a fifth to a third of the time until the user needs the skill when that is a week or a few weeks, and to about a twentieth to a tenth when it is a year. KEEP later gaps equal or growing. A gap that is too long costs much less than one that is too short.
 - IF the user will use it rarely, SUGGEST one more session a few months after the last one. Unused procedural skills lost about half their gains in accuracy after six months.
 
-Learners rarely plan practice themselves, and daily reminder messages did not make them practise. Learners who chose a program that a system scheduled completed most of it. IF the harness can schedule a task, OFFER to start each session on its date. OTHERWISE, OFFER to add the dates to the user's calendar. No study tested calendar entries, so TREAT this as a guide. DO NOT schedule anything without the user's permission.
+Learners rarely plan practice themselves, and daily reminder messages did not make them practise. Learners who chose a program that a system scheduled completed most of it. IF the harness can schedule a task, OFFER to start each session on its date. OTHERWISE, OFFER to add the dates to the user's calendar. TREAT this as a guide. DO NOT schedule anything without the user's permission.
 
 WHEN the user returns to the topic in a later message or session:
 
@@ -229,7 +229,7 @@ AFTER the last quiz, GIVE the user a take-away: a reference they keep open while
 5. **Deliver it.** IF you can write files, WRITE it to `.teach/<topic-slug>/take-away.md` and GIVE the user its path once. IF the user wants it elsewhere or in another format, FOLLOW that. ON a page, ALSO ADD it as the last chunk, titled "Take-away", with a `text` card per section. OTHERWISE, SEND it in the chat as one message.
 6. **Use it once.** GIVE one task from the user's situations to do with the take-away open, and GIVE feedback. About a third of trainees given an aid did not use it, and the authors concluded that people need practice in when and how to use one.
 
-The format of a take-away is a design choice: no study tested one written by an AI tutor.
+The format of a take-away is a design choice.
 
 ### 6.3. Close the lesson
 
