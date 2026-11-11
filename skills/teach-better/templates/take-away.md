@@ -2,7 +2,7 @@
 
 A take-away is a Markdown file the user keeps open while they use the topic: `.teach/<topic-slug>/take-away.md`. Section 6.2 of SKILL.md says when to write it and what goes in it. Copy the block below and replace the `<placeholders>`. Leave out a section that has nothing to hold, such as "Mistakes to watch" when the user made none.
 
-Put "When to use this" first: a reference cannot tell the user when to open it. Keep the worked solutions to the practice tasks in a separate section at the end, so the user attempts each task before they look.
+Keep the worked solutions to the practice tasks in a separate section at the end, so the user attempts each task before they look.
 
 ```markdown
 # <topic>: take-away
@@ -73,6 +73,4 @@ Tasks:
 - <chunk not taught, or "Every planned chunk was taught.">
 ```
 
-In the chat, SEND the same content as one message, with the same headings.
-
-On a page, ADD a last chunk with one `text` card per section above. Put the worked solutions on the last card.
+In the chat, SEND it as one message with the same headings. On a page, PUT the worked solutions on the last card.

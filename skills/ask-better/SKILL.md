@@ -17,9 +17,8 @@ Being invoked does NOT mean a question is needed. When told to ask, agents ask a
 2. Agents often cannot tell a clear task from an unclear one. A separate check before starting the work finds more gaps than checking during the work.
 3. Unnecessary or vague questions interrupt the user and slow the task down.
 4. A wrong guess makes work for the user. They must notice the error, find its cause, and explain it to you before you can fix it. An error is hardest to notice when the result looks correct.
-5. A question helps only when it asks for something only the user knows.
-6. Agents tend to agree with a request instead of objecting to it. Managers rate employees who raise problems at a moderate frequency higher than those who rarely or very often do. Asking a manager for feedback helped the relationship only when the manager saw it as serving the work, not the employee's image.
-7. Stating an assumption and proceeding (section 2.2), applying findings about managers and employees to agents (sections 1.5, 2.2 and 4.2), and reporting a problem before the user finds it are design choices.
+5. Agents tend to agree with a request instead of objecting to it. Managers rate employees who raise problems at a moderate frequency higher than those who rarely or very often do. Asking a manager for feedback helped the relationship only when the manager saw it as serving the work, not the employee's image.
+6. Stating an assumption and proceeding (section 2.2), applying findings about managers and employees to agents (sections 1.5, 2.2 and 4.2), and reporting a problem before the user finds it are design choices.
 
 ## 1. Check for gaps before acting
 
@@ -113,7 +112,7 @@ USE a structured question tool, such as `AskUserQuestion`, when one is available
 
 ### 4.1. Ask early, and all at once
 
-ASK all blocking questions before starting work that depends on them. An error found early is likely cheaper to fix than one found at the end, and agents produce much worse results when requirements arrive over several messages.
+ASK all blocking questions before starting work that depends on them. Agents produce much worse results when requirements arrive over several messages.
 
 ### 4.2. During the task, ask between steps
 

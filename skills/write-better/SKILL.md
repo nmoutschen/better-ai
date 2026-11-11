@@ -13,12 +13,10 @@ Being invoked does NOT mean the text needs large changes. A text that already me
 ## Principles
 
 1. Length and polish raise a reader's confidence without making them more accurate.
-2. Simpler wording helps readers new to a topic.
-3. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and lowers recall of the rest.
-4. Models treat users differently by how they write and by what the user discloses about themselves, using stereotypes. What the user states about the output is a better guide.
-5. First-person uncertainty made readers rely less on wrong AI answers.
-6. Models assume the user shares their context instead of checking. Trying to imagine what a reader knows does not improve the estimate; checking what the reader has seen does.
-7. TREAT these rules as a guide, not as fixed rules for every reader.
+2. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and lowers recall of the rest.
+3. First-person uncertainty made readers rely less on wrong AI answers than impersonal phrasing such as "it is not clear".
+4. Models assume the user shares their context instead of checking. Trying to imagine what a reader knows does not improve the estimate; checking what the reader has seen does.
+5. TREAT these rules as a guide, not as fixed rules for every reader.
 
 ## 1. Before writing
 
@@ -85,7 +83,7 @@ WHEN rewriting, DO NOT add steps, facts, advice, options, recommendations, calcu
 
 START your output with one or two sentences that state the main point itself. A reader who stops there must still know the key result and why it matters. DO NOT announce what the text will cover.
 
-ADD a descriptive title before those sentences only when the output is long enough to need headings. A reply of a few sentences gets no title, because a title restates its point and adds length.
+ADD a descriptive title before those sentences only when the output is long enough to need headings.
 
 ### 3.2. State the answer first
 
@@ -114,7 +112,7 @@ DO NOT rely on dyslexia-specific fonts or Bionic Reading. Dyslexia fonts gave no
 
 ### 3.6. Bold a few key ideas
 
-WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry its key ideas, so the user can find them on a quick scan. LIMIT bolding to those key ideas: DO NOT bold whole sentences, labels, or every important term.
+WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry its key ideas, so the user can find them on a quick scan. DO NOT bold whole sentences, labels, or every important term.
 
 ## 4. Word choices
 
@@ -124,13 +122,13 @@ USE a common word instead of a long or rare one when the meaning stays exact. WH
 
 SIMPLIFY the language, not the substance. A simpler version KEEPS its conditions and limitations: readers who know the topic skipped limitations in overly plain summaries.
 
-IF you do not know what the user knows about the topic, WRITE for a reader who knows less, and USE headings so others can skip ahead. TREAT this as a guide, not a rule.
+IF you do not know what the user knows about the topic, WRITE for a reader who knows less, and USE headings so others can skip ahead. Simpler wording helps readers new to a topic. TREAT this as a guide, not a rule.
 
 ### 4.2. State the limits
 
 NAME what experts disagree on, where the evidence is weak, and whom to consult. STATE consensus only when agreement is high.
 
-STATE your own uncertainty in the first person, such as "I could not check X". Impersonal phrasing such as "it is not clear" had weaker effects than the first person.
+STATE your own uncertainty in the first person, such as "I could not check X".
 
 ### 4.3. Prefer coherence
 

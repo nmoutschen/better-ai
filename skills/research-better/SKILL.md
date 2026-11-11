@@ -46,7 +46,7 @@ IF you chose the MEANING, the GOAL or the stop level without the user stating it
 
 ## 2. Know what your retrieval tools return
 
-Search and fetch tools do not always return the page. Some return a model-written summary instead of the page. Some return only part of a long page, or a cached copy.
+Search and fetch tools do not always return the page: some return a model-written summary, part of a long page, or a cached copy.
 
 - TREAT text written by a search tool as leads, not evidence. A source is evidence only after you read the page itself.
 - TREAT a fetch tool's output as an extraction unless the harness documents that it returns the page text. An extraction can paraphrase quotes, omit passages, or say a page lacks something it contains.
@@ -62,7 +62,7 @@ IF you can write files, CREATE the board in `.research/<topic-slug>/` in the wor
 
 TELL the user the board's path once.
 
-IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the live view: `python3 scripts/board.py watch <board-path>` from this skill's directory. It opens the user's browser, prints its address, and exits by itself once the board's status is stopped. GIVE the user the address. IF the harness can only run commands in the foreground, DO NOT start it, because it would block you. TELL the user they can run it themselves instead.
+IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the live view: `python3 scripts/board.py watch <board-path>` from this skill's directory. It opens the user's browser, prints its address, and exits by itself once the board's status is stopped. GIVE the user the address. IF the harness can only run commands in the foreground, DO NOT start it. TELL the user they can run it themselves instead.
 
 IF the user has no live view, REPORT progress in the chat each time a question is closed: one line with the question, its status, and how many questions remain open.
 
@@ -155,7 +155,7 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 6. **Reprioritize** as findings change what matters for the GOAL.
 7. **Revise summaries**: REWRITE a question's summary when verification or new evidence changes what it says.
 
-APPLY the stop rules in section 6.4 to the whole board. WHEN they apply, SET the board's status to stopped, so workers take no new questions.
+APPLY the stop rules in section 6.4 to the whole board. WHEN they apply, SET the board's status to stopped.
 
 ## 8. Present your findings
 

@@ -19,11 +19,10 @@ Being invoked does NOT mean a long interview or new rules are needed. IF the exi
 1. What people say helps them, and the criteria they state for judging work, only partly match what helps them and what their actual judgments reveal. Learners preferred, and felt they learned more from, the format that taught them less, and experts leave out much of what they do when they describe it.
 2. Comparing concrete work samples and justifying the choice made tacit quality criteria partly explicit. Walking through one real incident revealed the reasons behind a person's actions.
 3. Recall of past behaviour is imperfect, even for recent days. A document the user wrote or reacted to is stronger evidence than their memory of it.
-4. A hypothetical question shows what a person knows a situation requires. It is weaker evidence of what they will do or prefer.
-5. AI interviewers produce answers of about the same quality as human interviewers. Their main failure is not following up on surprising or unclear answers.
-6. A user profile stored in an LLM's memory made it more agreeable and made it personalize where it should not.
-7. Users accepting a summary of their interview shows that they accept it, not that it is accurate.
-8. These rules adapt methods from other settings to an AI interviewing a user about their own reading or reviewing. TREAT them as a guide, not as fixed rules.
+4. AI interviewers produce answers of about the same quality as human interviewers. Their main failure is not following up on surprising or unclear answers.
+5. A user profile stored in an LLM's memory made it more agreeable and made it personalize where it should not.
+6. Users accepting a summary of their interview shows that they accept it, not that it is accurate.
+7. These rules adapt methods from other settings to an AI interviewing a user about their own reading or reviewing. TREAT them as a guide, not as fixed rules.
 
 ## 1. Prepare
 
@@ -99,7 +98,7 @@ DO NOT tell the user which version follows `write-better` or any rule. COVER the
 
 ### 3.3. Check the scope with hypotheticals
 
-ASK hypotheticals only to find when a rule applies, such as "Would this change for an urgent message?" or "for a topic you know well?". DO NOT record a hypothetical answer as a preference by itself.
+ASK hypotheticals only to find when a rule applies, such as "Would this change for an urgent message?" or "for a topic you know well?". DO NOT record a hypothetical answer as a preference by itself: it shows what the person knows a situation requires, not what they will do or prefer.
 
 ## 4. Part B: how the user reviews (`review-for`)
 
@@ -134,7 +133,7 @@ FOLLOW the templates [templates/write-for.md](templates/write-for.md) and [templ
 WRITE each rule with:
 
 1. The rule, as an instruction to an agent.
-2. When it applies, and when it does not. A rule with no scope gets applied where it does not belong.
+2. When it applies, and when it does not.
 3. Its evidence: **chose** (the user picked it in a comparison or could act on it), **shown** (their material or their review comments show it), or **said** (they stated it). IF the evidence contradicts itself, WRITE the rule from what the user chose or showed, and RECORD what they said next to it.
 4. One example the user approved or wrote, taken from the interview or their material. Examples of output the user approved carry most of the benefit of a profile.
 

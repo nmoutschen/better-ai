@@ -18,12 +18,10 @@ Being invoked does NOT mean you must write code now. These instructions can end 
 2. Passing tests does not show the result is what the user needs. Maintainers would reject many patches that pass their tests.
 3. People judge whether a result is right more accurately from concrete scenarios, examples and tests than from prose or from the code itself.
 4. Requirements, design and plan are different artifacts. Requirements align on intent and the user checks them. A design aligns on shared understanding and structure. A plan orders the work. They change each other: design work reveals missing requirements.
-5. Agents edit more than the task needs. A plain instruction to preserve existing code reduced over-editing.
-6. Repair loops gain most in the first few rounds. Test results help more than compiler errors, and a weak critique can hurt more than a bare failure. Extra rounds can break code that was already correct, and repeated failure feedback leads agents to game tests.
-7. Self-review without outside evidence finds few errors. A reviewer that sees only the result in a fresh context does better. LLM judgements of whether code meets its requirements are unreliable.
-8. Delegating work to sub-agents usually costs more. Teams of agents do not reliably beat a single agent.
-9. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
-10. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), and showing the design before building (section 2) are design choices.
+5. Repair loops gain most in the first few rounds. Test results help more than compiler errors, and a weak critique can hurt more than a bare failure. Extra rounds can break code that was already correct, and repeated failure feedback leads agents to game tests.
+6. Self-review without outside evidence finds few errors. A reviewer that sees only the result in a fresh context does better. LLM judgements of whether code meets its requirements are unreliable.
+7. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
+8. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), and showing the design before building (section 2) are design choices.
 
 This skill names capabilities, not tools: reading files, running commands and tests, asking the user, writing files, and sub-agents. FOR each capability you lack, FOLLOW the fallback the section gives.
 
@@ -80,7 +78,7 @@ IF design work reveals a requirement gap, such as what happens when a step fails
 
 ## 3. Plan: only for long or shared work
 
-IF the work spans several sessions, several agents, or more steps than fit in one context, THEN WRITE a plan with [templates/plan.md](templates/plan.md). A plan orders the work and records progress. It does not replace the requirements or the design.
+IF the work spans several sessions, several agents, or more steps than fit in one context, THEN WRITE a plan with [templates/plan.md](templates/plan.md). A plan records progress. It does not replace the requirements or the design.
 
 KEEP one task per step, each with a check that shows it is done. MARK a task done only after its check passes.
 
@@ -88,7 +86,7 @@ KEEP one task per step, each with a check that shows it is done. MARK a task don
 
 ### 4.1. Change only what the task needs
 
-PRESERVE existing code that the task does not require you to change. DO NOT add features, options, refactors, or defensive code the requirements do not ask for. IF you see something else worth changing, LIST it in your report instead of changing it.
+PRESERVE existing code that the task does not require you to change, since agents edit more than the task needs and a plain instruction to preserve existing code reduced over-editing. DO NOT add features, options, refactors, or defensive code the requirements do not ask for. IF you see something else worth changing, LIST it in your report instead of changing it.
 
 KEEP each change to one purpose. Maintainers ask for small, focused changes, and large mixed changes are rejected more often.
 
@@ -131,7 +129,7 @@ DO NOT edit, skip, or delete tests or checks to make them pass. DO NOT special-c
 
 ### 5.4. Check the result against the requirements
 
-COMPARE the finished behaviour with each scenario in the requirements, using the results of section 5.1. A scenario counts as met only if a check you ran shows it. DO NOT rely on your own reading of the code as proof that it meets the requirements.
+COMPARE the finished behaviour with each scenario in the requirements, using the results of section 5.1. A scenario counts as met only if a check you ran shows it.
 
 ## 6. Review
 
@@ -180,7 +178,7 @@ IF the user rejects the result, USE `/do-better` if available. OTHERWISE, FIND w
 
 ### 8.1. Default to one agent
 
-DO the building yourself. USE sub-agents for independent reading, such as searching a large codebase, and for review (section 6.1). DO NOT split building across agents by role, such as planner, coder and tester, unless the work does not fit in one context.
+DO the building yourself, since delegating usually costs more and teams of agents do not reliably beat a single agent. USE sub-agents for independent reading, such as searching a large codebase, and for review (section 6.1). DO NOT split building across agents by role, such as planner, coder and tester, unless the work does not fit in one context.
 
 ### 8.2. Hand over the full requirements
 
