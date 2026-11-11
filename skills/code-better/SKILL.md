@@ -23,7 +23,7 @@ Being invoked does NOT mean you must write code now. These instructions can end 
 7. Self-review without outside evidence finds few errors. A reviewer that sees only the result in a fresh context does better. LLM judgements of whether code meets its requirements are unreliable.
 8. Delegating work to sub-agents usually costs more, and details of a plan get lost when it is handed to another agent. Evidence that teams of agents beat a single agent is mixed.
 9. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
-10. Most of this evidence comes from benchmarks and preprints from 2025–2026. No study tests stopping rules for repair loops (section 5.2), checking requirements at checkpoints of long runs (section 8.3), or whether showing the design before building improves it (section 2). TREAT those rules as design choices.
+10. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), and showing the design before building (section 2) are design choices.
 
 This skill names capabilities, not tools: reading files, running commands and tests, asking the user, writing files, and sub-agents. FOR each capability you lack, FOLLOW the fallback the section gives.
 
