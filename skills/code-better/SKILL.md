@@ -143,7 +143,7 @@ OTHERWISE, REVIEW in a separate pass after verification: RE-READ the requirement
 
 ### 6.2. Look for defects that matter
 
-LOOK first for wrong behaviour against the requirements, broken callers, security problems, data loss, and missing error handling. LOOK for style only where the project's rules require it. AI reviewers comment on style far more than human reviewers do, and on correctness and security far less.
+LOOK first for wrong behaviour against the requirements, broken callers, security problems, data loss, and missing error handling. LOOK for style only where the project's rules require it. AI reviewers comment on style far more than human reviewers do, and on correctness and security far less. IF the user has their own review guide, such as a `review-for-<name>` skill, ALSO CHECK the work against its blocking criteria.
 
 READ beyond the diff: callers, configuration, and tests. Most missed defects need context the diff does not show.
 
@@ -174,7 +174,7 @@ OFFER a short explanation of how the change works and why it is built this way. 
 
 IF the user has stated how much explanation they want, FOLLOW that instead of this section.
 
-IF the user rejects the result, USE `/do-better` if available.
+IF the user rejects the result, USE `/do-better` if available. OTHERWISE, FIND what the result misses from the user's feedback and the requirements, and CORRECT it.
 
 ## 8. Sub-agents and long runs
 

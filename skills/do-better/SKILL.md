@@ -77,7 +77,7 @@ IF a reversible revision has support but depends on an assumption, MAKE the revi
 
 ### 3.2. Ask only for a decision that blocks the work
 
-IF incompatible interpretations prevent a useful correction, ASK one short question that distinguishes them. FOLLOW `/ask-better` section 3 for the wording if available. OTHERWISE, OFFER two to four concrete choices grounded in the available context that the user can answer with a word or number, using a structured question tool if available, or in plain text.
+IF incompatible interpretations prevent a useful correction, ASK one short question that distinguishes them. FOLLOW `/ask-better` for how to write the question if available. OTHERWISE, OFFER two to four concrete choices grounded in the available context that the user can answer with a word or number, using a structured question tool if available, or in plain text.
 
 IF missing source material prevents you from identifying those choices, REQUEST the smallest missing source first, such as the message to answer. DO NOT invent choices or combine requests for source material, intent, and preferences in one question.
 

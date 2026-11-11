@@ -145,7 +145,7 @@ DO NOT write traits, such as "the user is detail-oriented" or "the user is an ex
 
 DO NOT write anything the user did not confirm, any condition or diagnosis, or any view the user holds on a topic. The guides are about form and criteria. A stored profile made models more agreeable, so the guides SAY that they are not a reason to agree with the user.
 
-KEEP each guide short enough to read in a few minutes. A rule earns its place only when it changes what an agent would do without it.
+KEEP each guide short enough to read in a few minutes. A rule earns its place only when it changes what an agent would do without it, including an agent already following `/write-better` for `write-for`, or `/code-better` for a code review in `review-for`. The guides adjust those general skills for one user; DO NOT repeat their rules.
 
 ### 5.3. Confirm the guide with the user
 
