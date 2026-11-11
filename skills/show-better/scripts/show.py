@@ -1922,6 +1922,10 @@ TEXT = {"effects": t_effects, "pairs": t_pairs, "numbers": t_numbers, "units": t
         "flow": t_flow, "map": t_map, "concept": t_concept, "groups": t_groups, "timeline": t_timeline, "text": t_text,
         "svg": t_svg, "slope": t_slope, "dots": t_dots, "scatter": t_scatter, "quadrant": t_quadrant, "sets": t_sets, "tree": t_tree}
 
+# Every kind needs a check, a visual and a text form; fail at start-up, not later in one output format.
+for _name, _table in (("PANEL_CHECKS", PANEL_CHECKS), ("VISUALS", VISUALS), ("TEXT", TEXT)):
+    if set(_table) != set(KINDS):
+        raise RuntimeError(f"{_name} does not match KINDS: missing {sorted(set(KINDS) - set(_table))}, extra {sorted(set(_table) - set(KINDS))}")
 
 def visual_of(p, spec):
     """A panel's (visual HTML, data HTML). A map draws the spec's document, so it gets the spec."""
