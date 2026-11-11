@@ -41,8 +41,6 @@ Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only)
 | `part` | no | The `document` section id, or list of ids, that this panel introduces |
 | `read` | no | Where to read the detail in the document, by section title |
 
-Highlight only the one or two items that carry the headline's point.
-
 ## Kinds
 
 ### `map`: the document's parts in order
@@ -108,7 +106,7 @@ One row per finding, its mark in a Lowers, No clear effect or Raises column. `ou
  "items": [{"label": "<option>", "x": <0 to 1>, "y": <0 to 1>, "highlight": true}]}
 ```
 
-`x` and `y` are between 0 and 1. `basis` is required: it says where the positions come from.
+`x` and `y` are between 0 and 1. `basis` is required.
 
 ### `slope`: change between two states
 
@@ -163,7 +161,7 @@ One square per counted thing. Up to 3 parts and 100 units. `unit` names what one
  "legend": {"same": "<word for this mark>"}, "blank": "<what a blank cell means>"}
 ```
 
-Each cell is a mark: `yes` (✓), `no` (✗), `up` (▲, higher), `down` (▼, lower), `same` (=, no difference), or `null` for a blank cell. `legend` replaces the word shown for a mark; `blank` names what a blank cell means. Rows with the same `group` are shown under one label. A row or a cell can be highlighted. Up to 10 rows and 5 columns. Columns are properties of the items, not of the research behind them, such as how a source was read: put that in the note. Use a `table` instead when the cells must hold words or exact values.
+Each cell is a mark: `yes` (✓), `no` (✗), `up` (▲, higher), `down` (▼, lower), `same` (=, no difference), or `null` for a blank cell. `legend` replaces the word shown for a mark; `blank` names what a blank cell means. Rows with the same `group` are shown under one label. A row or a cell can be highlighted. Up to 10 rows and 5 columns.
 
 ### `bars`: compare values across items
 

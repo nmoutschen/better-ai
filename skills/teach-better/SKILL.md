@@ -72,7 +72,7 @@ SHOW the user the plan: the GOAL and the list of chunks. LET the user reorder, s
 
 ### 2.2. Choose where the lesson happens
 
-A lesson mixed with other conversation, with many parts in one message, can be hard to follow. CHOOSE the first option the harness allows:
+CHOOSE the first option the harness allows:
 
 1. **A lesson page.** IF you can write files and run Python 3 in the background, and the user's browser can reach the machine where you run commands, TEACH on a page:
    - WRITE the lesson to `.teach/<topic-slug>/lesson.json` in the working directory, in the format in [templates/lesson.md](templates/lesson.md). DO NOT commit it unless the user asks.
@@ -113,7 +113,7 @@ AT each moment, CHOOSE in this order:
 1. MATCH the GOAL and the moment against the table. IF no tool matches, USE the cards of sections 3 and 4 alone.
 2. CHECK the "Do not use" list in the tool's template. IF any item applies, DO NOT use the tool.
 3. IF the user struggled on the last practice problem, DO NOT add a mixed set, a decision scenario, a "does it apply?" card or a comparison yet. GIVE more support first (section 3.2).
-4. USE at most one tool per card. Each tool adds time and effort for the user.
+4. USE at most one tool per card.
 5. IF the user states a preference about a tool, FOLLOW it. The one exception is the first common mistake below.
 6. WHEN a tool changes what the user sees, SAY so in one line, such as "This quiz mixes problems from chunks 1 to 3 on purpose."
 
@@ -122,13 +122,11 @@ Common mistakes:
 - Writing the expert view of a decision scenario yourself. Without a cited source, the user compares against your guess. USE decision checks instead, and SAY that no expert comparison is available. This holds even if the user asks for a scenario.
 - Reading lower scores on a mixed set as failure. Mixed practice is harder by design. RE-TEACH only when the user picks the wrong method for the same type again.
 - Accepting a circular or empty answer to a why prompt. CHECK each explanation as you check a practice answer.
-- Judging a pre-question guess. The user has not studied the chunk yet. ACKNOWLEDGE the guesses, and let the chunk's cards give the answers.
+- Judging a pre-question guess. ACKNOWLEDGE the guesses, and let the chunk's cards give the answers.
 
 RECORD the plan and the user's progress in `.teach/<topic-slug>/`, so a later session can resume and review: in `lesson.json` on a page, OTHERWISE in a `notes.md` file there. DO NOT store lessons in memory. IF you cannot write files, KEEP them in your working notes.
 
 ## 3. Teach each chunk
-
-BEFORE the first card of a chunk, CONSIDER the pre-questions tool (section 2.3).
 
 ### 3.1. Explain, then show a worked example
 
@@ -138,8 +136,6 @@ SHOW a worked example: a solved problem with each step and the reason for each s
 
 WHEN a chunk asks the user to read a long text, GIVE a short instruction before the reading, saying what to look for, and one after it, saying what to check. CONSIDER the question stems tool (section 2.3).
 
-AFTER an explanation card that states a key fact or rule the GOAL needs, CONSIDER the why prompt tool (section 2.3). AFTER the user has practised one method or case, CONSIDER the compare examples tool.
-
 FOR a complex or open problem where the user already knows the basics, ASK them to attempt it BEFORE you show the worked example. FOR material that is new to the user, SHOW the example first. Attempting first helped most on complex tasks. TREAT this as a guide, not a rule.
 
 ### 3.2. Give a practice problem
@@ -147,8 +143,6 @@ FOR a complex or open problem where the user already knows the basics, ASK them 
 GIVE a problem similar to the worked example, but not identical. WAIT for the user's attempt. DO NOT solve it in the same message.
 
 AS the user succeeds, GIVE less of the solution in later examples: leave out the steps they have shown they can do. IF they struggle, GIVE more steps again. CHOOSE the next problem's difficulty from how they did on the last one, not from their interests or a fixed order.
-
-AFTER the user solves the first practice problem of a chunk, CONSIDER the "does it apply?" tool (section 2.3).
 
 IF the GOAL is to make a kind of decision, USE the decision tools in section 2.3 for practice: a decision has no single right answer to check.
 
@@ -170,7 +164,7 @@ DO NOT write the work for the user, such as their code, essay or solution.
 
 ### 3.4. Give feedback that makes the user think
 
-WHEN the user answers, ASK them to explain their answer in their own words. Asking for an explanation and a confidence rating had a larger effect than the type of feedback the AI gave. The explanation is likely what helps: a separate confidence rating added nothing on its own. ASK for confidence only as an option. ASK for the answer and the reasoning together, in one reply. ON a page, IF a question asks several things, GIVE one answer box per thing. IF the reasoning is missing, ASK for it in the feedback.
+WHEN the user answers, ASK them to explain their answer in their own words. Asking for an explanation and a confidence rating had a larger effect than the feedback type. The explanation likely does the work: a confidence rating added nothing alone. ASK for confidence only as an option. ASK for the answer and the reasoning together, in one reply. ON a page, IF a question asks several things, GIVE one answer box per thing. IF the reasoning is missing, ASK for it in the feedback.
 
 THEN SAY whether the answer is right, and WHY. FOR a wrong answer, NAME the mistake and the idea it misapplies. Explaining why is a design choice. ON a page, WRITE this to `feedback/` with the verdict `right`, `partly`, `wrong` or `hint`. USE `noted` only for a pre-question.
 
@@ -186,7 +180,7 @@ CHECK that every term in a practice question or quiz question was introduced on 
 
 ### 4.1. Test without help
 
-AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. MAKE most questions tasks the user will do in the situations from section 1.1, and INCLUDE at least one problem that differs from the examples. IF a near miss exists, INCLUDE a situation where the rule does not apply, and ASK whether it applies. Questions train the kind of task they ask for: application questions helped fact questions, but fact questions did not help application. ASK for a fact or a term only when the user must know it without looking it up. IF the quiz covers problem types the user could confuse, CONSIDER the mixed set tool (section 2.3).
+AT the end of each few chunks, GIVE a short quiz: two or three questions the user answers without looking back and without your help. MAKE most questions tasks the user will do in the situations from section 1.1, and INCLUDE at least one problem that differs from the examples. IF a near miss exists, INCLUDE a situation where the rule does not apply, and ASK whether it applies. Questions train the kind of task they ask for: application questions helped fact questions, but fact questions did not help application. ASK for a fact or a term only when the user must know it without looking it up.
 
 TELL the user before the first chunk that quizzes are closed-book. Learners who expected a closed-book test retained more. ON a page, PUT the quiz in its own chunk with `"quiz": true`: the page hides the other chunks until you set it to `done`. GIVE no feedback on a quiz answer until the user has answered every question in the quiz: `wait` holds quiz answers until then. THEN WRITE the feedback for all of them. DO NOT ask the user to answer a quiz question again: a quiz checks what they know, it does not teach. IF a wrong answer comes from an unclear question, SAY so and COUNT the answer by the user's reading.
 

@@ -25,7 +25,7 @@ Being invoked means: find the structure and the relations in the content that a 
 
 ### 1.1. Name the GOAL
 
-IDENTIFY what the reader must UNDERSTAND, LEARN, DO or DECIDE after reading the document. The presentation prepares the reader for that GOAL. IF the context does not show the GOAL, CHOOSE the most plausible one and STATE it when you hand the presentation over (section 7).
+IDENTIFY what the reader must UNDERSTAND, LEARN, DO or DECIDE after reading the document. The presentation prepares the reader for that GOAL. IF the context does not show the GOAL, CHOOSE the most plausible one and STATE it (section 7).
 
 IDENTIFY what the reader already knows about the topic. FOR an expert reader, SHOW less: fewer panels and fewer labels.
 
@@ -65,7 +65,7 @@ THEN, in this order:
 
 DO NOT add a panel that only lists the document's sections: the strip above each panel already shows where the reader is. USE a `map` only when the reader must find their way in a long document.
 
-REFER to parts of the document by their titles, in headlines, notes and `read`. DO NOT use section numbers or § signs: the reader has not seen them yet.
+REFER to parts of the document by their titles, in headlines, notes and `read`. DO NOT use section numbers or § signs.
 
 KEEP the presentation to about 5 to 12 panels. This range is a design choice. IF the document needs more, INTRODUCE only the parts the GOAL needs.
 
@@ -120,7 +120,7 @@ FOLLOW the conventions of the reader's field when they differ.
 
 WRITE the headline as a full sentence that states what the reader should conclude from this panel. The headline MUST match what the visual shows.
 
-MAKE the headline's point the most prominent part of the visual. MARK with `highlight` the one or two items that carry the point, and leave the rest neutral. HIGHLIGHT only items the headline names, so the reader can see why they stand out. IF the headline names none, highlight nothing. IF the point is a small feature of the data, CHANGE the visual so that feature stands out, such as by sorting, filtering or showing the difference itself.
+MAKE the headline's point the most prominent part of the visual. MARK with `highlight` the one or two items that carry the point, and leave the rest neutral. HIGHLIGHT only items the headline names. IF the headline names none, highlight nothing. IF the point is a small feature of the data, CHANGE the visual so that feature stands out, such as by sorting, filtering or showing the difference itself.
 
 ### 4.2. Keep it plain
 
@@ -136,7 +136,7 @@ SHOW only what the reader needs to understand the point. Details about how the r
 
 ### 4.4. Check the wording
 
-CHECK the wording of the title, the summary, every headline, label and note. FOLLOW `/write-better` for this if available, THEN CONTINUE with section 5. With or without it, KEEP words the reader already knows: EXPLAIN or REPLACE research terms, such as "voice" or "ingratiation", and metaphors, such as "lever". USE one term for one idea across panels. KEEP labels, relations and section descriptions to a few words. A headline names what the reader should conclude, so DO NOT leave it vaguer than its visual, such as "depends on several factors".
+CHECK the wording of the title, the summary, every headline, label and note. FOLLOW `/write-better` for this if available, THEN CONTINUE with section 5. With or without it, KEEP words the reader already knows: EXPLAIN or REPLACE research terms, such as "voice" or "ingratiation", and metaphors, such as "lever". USE one term for one idea across panels. KEEP labels, relations and section descriptions to a few words. DO NOT leave a headline vaguer than its visual, such as "depends on several factors".
 
 ### 4.5. Custom diagrams
 

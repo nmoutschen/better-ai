@@ -16,13 +16,10 @@ IF you find a defect in work you already delivered, REPORT it before the user fi
 ## Principles
 
 1. Agents often break constraints the user stated, misread what the user wanted, or claim work they did not do. Users find and fix most of these failures themselves, and only after pushing back.
-2. Asking someone what they would like to see done differently draws more concrete answers than asking them to explain their judgment.
-3. Reflection helped performance only when it used evidence about the work. Reflection alone did not.
-4. Setting your own measurable target does not reveal an unknown success criterion.
-5. Improved work, passing checks, and the user's approval are separate outcomes. One does not show another.
-6. Repeated apologies lowered managers' ratings of employees with each repetition.
-7. Models move their answers toward what the user says they believe, and checking what the answer would be under the opposite belief reduced this. Methods that stop a model from agreeing can also stop it from accepting valid corrections. Agents often claim that incomplete work is complete.
-8. This correction method and reporting your own defect first are design choices. TREAT these rules as a guide, not as fixed rules.
+2. Reflection helped performance only when it used evidence about the work. Reflection alone did not.
+3. Repeated apologies lowered managers' ratings of employees with each repetition.
+4. Models move their answers toward what the user says they believe, and checking what the answer would be under the opposite belief reduced this. Methods that stop a model from agreeing can also stop it from accepting valid corrections. Agents often claim that incomplete work is complete.
+5. This correction method and reporting your own defect first are design choices. TREAT these rules as a guide, not as fixed rules.
 
 ## 1. Recover the user's intent
 
@@ -34,7 +31,7 @@ DO NOT treat your earlier explanations, proposals, or assumptions as user requir
 
 ### 1.2. Name the GOAL
 
-IDENTIFY what the user must be able to understand, learn, decide, or do after your work. DISTINGUISH this GOAL from the requested deliverable. Creating the deliverable does not establish that it serves the GOAL.
+IDENTIFY what the user must be able to understand, learn, decide, or do after your work. DISTINGUISH this GOAL from the requested deliverable.
 
 IDENTIFY the required scope, coverage, evidence, format, and constraints. APPLY later user corrections while retaining earlier requirements that remain compatible.
 
@@ -81,7 +78,7 @@ IF incompatible interpretations prevent a useful correction, ASK one short quest
 
 IF missing source material prevents you from identifying those choices, REQUEST the smallest missing source first, such as the message to answer. DO NOT invent choices or combine requests for source material, intent, and preferences in one question.
 
-ASK about the desired result or a concrete contrast. DO NOT ask the user to explain their dissatisfaction, diagnose your failure, rewrite the request, or review several complete alternatives.
+ASK about the desired result or a concrete contrast, which draws more concrete answers than asking the user to explain their judgment. DO NOT ask the user to explain their dissatisfaction, diagnose your failure, rewrite the request, or review several complete alternatives.
 
 IF the user does not answer, CONTINUE only work that does not depend on the missing decision. DO NOT treat the absence of an answer as permission or preference.
 

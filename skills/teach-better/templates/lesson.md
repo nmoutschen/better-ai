@@ -102,4 +102,4 @@ A `choice` field also has `"selected"`: the chosen options. A `rank` field also 
 {"verdict": "right | partly | wrong | hint | noted", "text": "<reply>", "blocks": []}
 ```
 
-`blocks` is optional and takes the block types above. `text` takes the same inline marks as `p`, including links to a card. After a `right` verdict the form closes. `noted` also closes it, without judging the answer: USE it only where the answer takes no verdict, such as a pre-question. After any other verdict the learner can try again, and each box starts with their previous answer.
+`blocks` is optional and takes the block types above. `text` takes the same inline marks as `p`, including links to a card. After a `right` verdict the form closes. `noted` also closes it, without judging the answer. After any other verdict the learner can try again, and each box starts with their previous answer.
