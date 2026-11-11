@@ -1,6 +1,6 @@
 # Tool: pre-questions
 
-BEFORE teaching a chunk, ASK the user to guess the answers to two or three questions about its key facts. THEN teach the chunk, which gives the answers. Guessing first raised later scores on those same questions. It did almost nothing for material that was not asked about, and pre-questions about concepts did not improve learning of the concepts.
+BEFORE teaching a chunk, ASK the user to guess the answers to two or three questions about its key facts. THEN teach the chunk, which gives the answers. Guessing first raised later scores on those same questions. Pre-questions about concepts did not improve learning of the concepts.
 
 ## Use when
 
@@ -13,7 +13,7 @@ BEFORE teaching a chunk, ASK the user to guess the answers to two or three quest
 - For terms the user can look up when they need them.
 - With questions that need inference or a full method. Factual questions helped more. FOR a complex problem, USE the attempt-first rule in section 3.1 of SKILL.md instead.
 - When the chunk does not answer the question. The benefit depends on the user studying the answer afterwards.
-- On every chunk. The benefit is limited to the questions asked, and learners judge the technique less useful than reading.
+- On every chunk. Learners judge the technique less useful than reading.
 
 ## Steps
 

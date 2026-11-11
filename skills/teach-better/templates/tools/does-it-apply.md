@@ -1,6 +1,6 @@
 # Tool: does it apply?
 
-GIVE the user three or four short situations from their own work, and ASK, for each one, whether the rule or method of the chunk applies, and why. INCLUDE at least one near miss: a situation that looks like the others but lacks a feature the rule needs. Learners can state a rule and still not see when it applies. Cases where a concept does not apply, most of all near misses, helped learners find the features that matter. This tool is a design choice.
+GIVE the user three or four short situations from their own work, and ASK, for each one, whether the rule or method of the chunk applies, and why. INCLUDE at least one near miss: a situation that looks like the others but lacks a feature the rule needs. This tool is a design choice.
 
 ## Use when
 
@@ -10,10 +10,10 @@ GIVE the user three or four short situations from their own work, and ASK, for e
 
 ## Do not use
 
-- Before the user has seen the rule and a worked example. The tool checks recognition, not first learning.
+- Before the user has seen the rule and a worked example.
 - When the user struggled on the last practice problem. GIVE more support first.
-- When the rule applies to every case the user will meet. Then no near miss exists, and the question has one answer.
-- With a near miss you cannot justify. CHECK each verdict against the rule's conditions and a source (section 3.5 of SKILL.md): the user cannot catch your error.
+- When the rule applies to every case the user will meet.
+- With a near miss you cannot justify. CHECK each verdict against the rule's conditions and a source (section 3.5 of SKILL.md).
 
 ## Steps
 

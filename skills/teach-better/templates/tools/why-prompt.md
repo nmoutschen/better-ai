@@ -18,7 +18,7 @@ ASK the user why a fact or rule they just read is true, and let them build the e
 1. STATE the fact or rule on a `terms`, `text` or `example` card.
 2. ON the next card, ASK "Why is <fact or rule> true?" or "Why does <cause> lead to <effect>?", one numbered question per fact or rule.
 3. WAIT for the answer. DO NOT give the explanation in the same message.
-4. CHECK each explanation, as in section 3.5 of SKILL.md. Many users write explanations that are circular, missing or wrong.
+4. CHECK each explanation, as in section 3.5 of SKILL.md.
 5. FOR a wrong or missing explanation, GIVE a hint (section 3.3 of SKILL.md), not the explanation.
 6. IF the explanation is still wrong after the hints, SHOW a correct explanation, and NAME what the user's explanation missed.
 
