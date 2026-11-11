@@ -65,7 +65,7 @@ ASK for the reasoning in a `text` field next to a `choice` or `rank` field: a ch
 
 ## Static fields
 
-A static page is a reference: one chunk per page, no quiz chunks and no `practice` cards. An `example` card becomes an example to try when it has a `solution`: the page shows the problem, then the hints and the solution on a click. `build` refuses quiz chunks and practice cards.
+A static page is a reference: one chunk per page, no quiz chunks and no `practice` cards. An `example` card becomes an example to try when it has a `solution`: the page shows the problem, then the hints and the solution on a click. Each chunk shows as one scrolling page, with its cards as sections. `build` refuses quiz chunks and practice cards.
 
 | Field | Shows | Format |
 |---|---|---|
