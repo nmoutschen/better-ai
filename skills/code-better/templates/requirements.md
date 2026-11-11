@@ -12,11 +12,18 @@
 
 ## Scenarios
 
+<Use one form for all scenarios: Given/When/Then, or EARS.>
+
 ### <Scenario name>
 
 - Given: <starting state, with concrete data>
 - When: <the user's or system's action, with concrete input>
 - Then: <the expected observable result, with concrete output>
+- Source: <user | project files | assumption>
+
+### <Requirement name>
+
+- <While <state>,> <When <trigger> | If <unwanted condition>, then> the <system> shall <response, with concrete values>.
 - Source: <user | project files | assumption>
 
 ## Constraints

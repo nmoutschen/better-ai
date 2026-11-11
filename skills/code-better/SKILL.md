@@ -21,9 +21,9 @@ Being invoked does NOT mean you must write code now. These instructions can end 
 5. Agents edit more than the task needs, and agent code erodes in structure as it grows while still passing tests. A plain instruction to preserve existing code reduced over-editing. Requests for quality did not stop erosion.
 6. Repair loops gain most in the first few rounds. Test results help more than compiler errors, and a weak critique can hurt more than a bare failure. Extra rounds can break code that was already correct, and repeated failure feedback leads agents to game tests.
 7. Self-review without outside evidence finds few errors. A reviewer that sees only the result in a fresh context does better. LLM judgements of whether code meets its requirements are unreliable.
-8. Delegating work to sub-agents usually costs more, and details of a plan get lost when it is handed to another agent. Evidence that teams of agents beat a single agent is mixed.
+8. Delegating work to sub-agents usually costs more, and details of a plan get lost when it is handed to another agent. Teams of agents do not reliably beat a single agent.
 9. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
-10. Most of this evidence comes from benchmarks and preprints from 2025–2026. No study tests stopping rules for repair loops (section 5.2), checking requirements at checkpoints of long runs (section 8.3), or whether reviewing a design improves it (section 2). TREAT those rules as design choices.
+10. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), and showing the design before building (section 2) are design choices.
 
 This skill names capabilities, not tools: reading files, running commands and tests, asking the user, writing files, and sub-agents. FOR each capability you lack, FOLLOW the fallback the section gives.
 
@@ -52,15 +52,15 @@ DECIDE design gaps yourself from the codebase (section 2). CHECK requirement gap
 
 ### 1.4. Write the requirements as scenarios
 
-FOR any change beyond a small fix with one obvious reading, WRITE the requirements with [templates/requirements.md](templates/requirements.md): the need, what changes for the user, scenarios with concrete inputs and expected results, constraints, what is out of scope, and assumptions.
+IF the change is more than a small fix with one obvious reading, THEN WRITE the requirements with [templates/requirements.md](templates/requirements.md): the need, what changes for the user, scenarios with concrete inputs and expected results, constraints, what is out of scope, and assumptions.
 
-WRITE each scenario so the user can check it without reading code. INCLUDE the error and edge cases that the request leaves open, because that is where silent assumptions hide. KEEP the requirements short: a scenario earns its place only if a wrong guess on it would change what you build.
+WRITE each scenario in a structured form, such as Given/When/Then (Gherkin) or EARS ("When <trigger>, the <system> shall <response>"), with concrete data. WRITE it so the user can check it without reading code. INCLUDE the error and edge cases that the request leaves open, because that is where silent assumptions hide. KEEP the requirements short: a scenario earns its place only if a wrong guess on it would change what you build.
 
 IF you cannot write files, PUT the requirements in your reply.
 
 ### 1.5. Check the requirements with the user
 
-FOLLOW `/ask-better` if available. OTHERWISE, ASK only about requirement gaps that only the user can answer, that change what you build, and that are costly to get wrong. ASK all such questions at once, before building.
+USE `/ask-better` if available. OTHERWISE, ASK only about requirement gaps that only the user can answer, that change what you build, and that are costly to get wrong. ASK all such questions at once, before building.
 
 SHOW the scenarios the gap affects, with concrete inputs and outputs, and ASK the user to confirm or correct each one. DO NOT ask the user to review prose requirements or code instead.
 
@@ -70,7 +70,7 @@ KEEP the requirements as the reference for the whole task. ADD each later answer
 
 ## 2. Design: shared understanding and structure
 
-WRITE a design with [templates/design.md](templates/design.md) only when the change adds or changes structure: a new module, data model, interface, dependency, or migration. FOR other changes, KEEP the design to a few lines in your report.
+IF the change adds or changes structure, such as a new module, data model, interface, dependency, or migration, THEN WRITE a design with [templates/design.md](templates/design.md). SHOW only the C4 levels the change touches and the main flows it adds or changes. OTHERWISE, KEEP the design to a few lines in your report.
 
 FOLLOW the existing patterns, conventions and dependencies of the codebase. IF you must depart from them, SAY why.
 
@@ -80,7 +80,7 @@ IF design work reveals a requirement gap, such as what happens when a step fails
 
 ## 3. Plan: only for long or shared work
 
-WRITE a plan with [templates/plan.md](templates/plan.md) only when the work spans several sessions, several agents, or more steps than fit in one context. A plan orders the work and records progress. It does not replace the requirements or the design.
+IF the work spans several sessions, several agents, or more steps than fit in one context, THEN WRITE a plan with [templates/plan.md](templates/plan.md). A plan orders the work and records progress. It does not replace the requirements or the design.
 
 KEEP one task per step, each with a check that shows it is done. MARK a task done only after its check passes.
 
@@ -96,7 +96,7 @@ BEFORE finishing, REMOVE edits left over from approaches you tried and abandoned
 
 ### 4.2. Decide error handling on purpose
 
-HANDLE invalid input and failures as the requirements' scenarios say. IF they do not say, TREAT it as a requirement gap (section 1.3). In one study, differences in input validation and error handling explained why agent code was harder to build on. TREAT this as a guide.
+HANDLE invalid input and failures as the requirements' scenarios say. IF they do not say, TREAT it as a requirement gap (section 1.3). Differences in input validation and error handling explained why agent code was harder to build on.
 
 ## 5. Verify
 
@@ -105,7 +105,7 @@ HANDLE invalid input and failures as the requirements' scenarios say. IF they do
 RUN, in this order:
 
 1. The existing tests that the change affects. FIND them from the code you changed, not by running a generic test-first procedure.
-2. A check for each scenario in the requirements: an automated test where the project has a place for it, OTHERWISE a command or a manual run whose result you record.
+2. A check for each scenario in the requirements. IF the project would keep the test, THEN ADD it next to the existing tests, in their style. OTHERWISE, RUN a command or the program and record the result. DO NOT add test helpers, fixtures or frameworks the project does not already use.
 3. A smoke check that the program starts and its main path works.
 4. Static analysis, type checks and security checks that the project already uses.
 
@@ -159,7 +159,7 @@ REPORT each finding with its location, the input or situation that triggers it, 
 
 ### 7.1. Report what was done and checked
 
-FOLLOW `/write-better` if available. OTHERWISE, lead with the result, THEN report:
+USE `/write-better` if available. OTHERWISE, lead with the result, THEN report:
 
 1. What changed and why, in terms of the requirements.
 2. The design decisions from section 2 and the assumptions from section 1.5.
@@ -170,11 +170,11 @@ DISTINGUISH meeting the requirements, passing the checks, and the user accepting
 
 ### 7.2. Leave the user able to maintain the code
 
-OFFER a short explanation of how the change works and why it is built this way. IF the user wants to learn the code or the technique, FOLLOW `/teach-better` if available. OTHERWISE, ANSWER conceptual questions and let the user write parts themselves.
+OFFER a short explanation of how the change works and why it is built this way. IF the user wants to understand the code, THEN USE `/write-better` for the explanation if available. OTHERWISE, ASK a question about the change that the user can attempt first, THEN EXPLAIN the reasoning.
 
 IF the user has stated how much explanation they want, FOLLOW that instead of this section.
 
-IF the user rejects the result, FOLLOW `/do-better` if available.
+IF the user rejects the result, USE `/do-better` if available.
 
 ## 8. Sub-agents and long runs
 

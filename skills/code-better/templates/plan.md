@@ -13,6 +13,10 @@ Design: <path or link>
 
 - <date or session>: <what was done, what was found, what to do next>
 
+## Open questions
+
+- <Question>: <who can answer it | what it blocks | status: asked | assumed | open>
+
 ## Open problems
 
 - <Problem>: <what was tried, what is known>
