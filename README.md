@@ -43,6 +43,10 @@ Writes, checks and reviews code so it builds what the user needs. It writes requ
 
 Corrects work that doesn't meet the user's intent. It recovers the user's goal, finds what is actually wrong, and fixes it, asking only when a decision blocks the work.
 
+## `/improve-better`
+
+Improves what persists across the agent's sessions, such as its memory, instructions files, skills and workflows, without waiting for a failure. It finds candidate changes in evidence from past sessions, including rules to remove, tests each one against past tasks it was not built from, and tests the passing changes together. It proposes only tested changes, each with its evidence, test result and how to undo it, and applies only what the user approves.
+
 ## `/interview-me`
 
 Interviews the user about how they read and how they review work. It then writes two personal skills, `write-for-<name>` and `review-for-<name>`, so that agents write text the user understands and check work against the user's own criteria. It works from the user's real documents and reviews, and from comparisons of concrete samples, not from general questions about preferences. Each rule in the guides records whether the user chose it, showed it, or only said it.
