@@ -11,7 +11,7 @@ BEFORE teaching a chunk, ASK the user to guess the answers to two or three quest
 
 - To prepare the user to apply a rule or method. The benefit stays with the facts asked, and does not reach application. USE the "does it apply?" tool after the chunk instead.
 - For terms the user can look up when they need them.
-- With questions that need inference or a full method. Factual questions helped more. FOR a complex problem, USE the attempt-first rule in section 3.1 of SKILL.md instead.
+- With questions that need inference or a full method. Factual questions helped more. FOR a complex problem, USE the attempt-first rule instead.
 - When the chunk does not answer the question. The benefit depends on the user studying the answer afterwards.
 - On every chunk. Learners judge the technique less useful than reading.
 
