@@ -21,11 +21,9 @@ This skill names capabilities, not tools: search and page reads in a COLLECTION,
 
 A COLLECTION is a set of documents a tool can search or read: the web, or an internal one such as a wiki (Confluence, Notion), a ticket tracker, a code host, a document drive or a chat archive. CHOOSE the COLLECTIONs from the TOPIC and the context. IF the TOPIC concerns the user's organisation, such as its systems, projects, teams or decisions, SEARCH the internal COLLECTIONs your harness gives you access to, not only the web. Everything this skill says about pages applies to documents in any COLLECTION.
 
-DO NOT fail open. IF a COLLECTION the TOPIC needs cannot be searched, because the tool is missing, asks for a login, returns an error, or returns nothing where documents should exist, DO NOT continue as if it had been searched. DO NOT fill the gap from another COLLECTION or from your training data: public pages do not describe internal systems. TELL the user which COLLECTION is missing, and ASK whether to wait for access or to continue without it. IF you continue, RECORD the gap in the board's brief and STATE in the findings that the research does not cover that COLLECTION.
+DO NOT fail open. IF a COLLECTION the TOPIC needs cannot be searched, because the tool is missing, asks for a login, returns an error, or returns nothing where documents should exist, DO NOT continue as if it had been searched. DO NOT fill the gap from another COLLECTION or from your training data: public pages do not describe internal systems. TELL the user which COLLECTION is missing, and ASK whether to wait for access, to continue without it, or to give you the sources to read, such as files, pages or papers. IF you continue, RECORD the gap in the board's brief and STATE in the findings what the research does not cover.
 
 DO NOT carry internal information into an external COLLECTION. A COLLECTION is external when it runs outside the user's organisation, such as web search or a public page; a query or URL sent to it can be logged and seen by others. WRITE external queries only from public terms: the general concepts, public products and standards the TOPIC involves. DO NOT put internal names, such as project, system, team, customer or people names, or text from internal documents, in an external query or in a URL you fetch. IF a question cannot be searched externally without them, SEARCH it only in internal COLLECTIONs. This rule also applies to the first searches in section 1.
-
-IF you have no tool to search or read any COLLECTION the TOPIC needs, DO NOT research from your training data. TELL the user, and ASK them for the sources to read, such as files, pages or papers. RESEARCH only from what they give you, and STATE that the research covers only those sources.
 
 ## 1. Topic confirmation
 
@@ -140,7 +138,7 @@ IF the harness has sub-agents, you are the coordinator. Workers search and read;
 
 START as many workers as there are open questions that can be researched in parallel, up to a handful. GIVE each the brief in [templates/worker-brief.md](templates/worker-brief.md), filled in. Each worker keeps taking questions from the board until none is left at or above the stop level, or the board is stopped. In the brief, WRITE OUT the priorities to take, such as `high, medium` for the stop level `medium`.
 
-WHEN a worker stops and open questions remain, START a fresh worker to replace it. IF it stopped because a COLLECTION failed, DO NOT replace it. FOLLOW the rule on failing open above before you start more workers. IF the harness cannot run sub-agents in the background, START a group of workers, WAIT for them, then START the next group.
+WHEN a worker stops and open questions remain, START a fresh worker to replace it. IF it stopped because a COLLECTION failed, DO NOT replace it. IF the harness cannot run sub-agents in the background, START a group of workers, WAIT for them, then START the next group.
 
 IF the harness lets you choose a worker's model, USE a cheaper model than yours. IF the harness sets models only in sub-agent definition files, USE an existing definition that runs a cheaper model. DO NOT create or edit harness configuration without the user's permission.
 
