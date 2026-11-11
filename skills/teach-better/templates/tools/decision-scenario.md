@@ -1,6 +1,6 @@
 # Tool: decision scenario
 
-GIVE the user a situation and a set of options. ASK them to rank the options and give their reasons. THEN SHOW how experts ranked them and why, from a cited source, and ASK the user to compare. Comparing with real experts raised agreement with the experts, without a teacher present. Whether it improves real decisions is unknown.
+GIVE the user a situation and a set of options. ASK them to rank the options and give their reasons. THEN SHOW how experts ranked them and why, from a cited source, and ASK the user to compare. Comparing with real experts raised agreement with the experts, without a teacher present. TREAT this tool as a guide, not a rule.
 
 ## Use when
 

@@ -9,6 +9,8 @@ argument-hint: "TOPIC"
 IF invoked with a topic as argument, RESEARCH that topic.
 IF invoked without argument, LOOK for an existing research board (section 3) and RESUME from it. IF there is none, USE these instructions to restart the previous research.
 
+Being invoked does NOT mean a full research run is needed. A simple factual question ends after a few searches (section 1), and the research can end with questions it could not answer.
+
 ## Principles
 
 1. A Large Language Model (LLM) learns from its training data both to understand text and to know facts. The user wants the agent's ability to understand text, not the facts from its training data.

@@ -18,7 +18,7 @@ Being invoked means: find the structure and the relations in the content that a 
 3. Plain diagrams supported transfer to new cases better than rich, detailed ones. Readers who already know a topic need less guidance, and guidance can get in their way.
 4. Readers learn more deeply from content in segments they move through at their own pace. Keeping one structure from panel to panel helped memory, and most professional visual stories move from general to specific.
 5. Readers recall a panel's message from its headline, and take the most prominent feature of a visual as its point.
-6. Reach, preference and engagement do not show understanding. Readers prefer formats they do not learn more from, and polished generated posters scored poorly on comprehension quizzes.
+6. Reach, preference and engagement do not show understanding. Readers prefer formats they do not learn more from, and polish does not show that a visual is understood.
 7. Generated slides fail mostly through missing content, then wrong values. Language models read text diagrams far more reliably than they draw them, so every diagram is laid out by code.
 8. Placing a visual introduction before a full research paper or business document is a design choice, and so are the rules marked as design choices.
 
@@ -26,7 +26,7 @@ Being invoked means: find the structure and the relations in the content that a 
 
 ### 1.1. Name the GOAL
 
-IDENTIFY what the reader must UNDERSTAND, LEARN, DO or DECIDE after reading the document. USE `/write-better` to name the GOAL if available. The presentation prepares the reader for that GOAL.
+IDENTIFY what the reader must UNDERSTAND, LEARN, DO or DECIDE after reading the document. The presentation prepares the reader for that GOAL. IF the context does not show the GOAL, CHOOSE the most plausible one and STATE it when you hand the presentation over (section 7).
 
 IDENTIFY what the reader already knows about the topic. FOR an expert reader, SHOW less: fewer panels and fewer labels.
 
@@ -137,7 +137,7 @@ SHOW only what the reader needs to understand the point. Details about how the r
 
 ### 4.4. Check the wording
 
-USE `/write-better` on the title, the summary, every headline, label and note. KEEP words the reader already knows: EXPLAIN or REPLACE research terms, such as "voice" or "ingratiation", and metaphors, such as "lever". USE one term for one idea across panels. KEEP labels, relations and section descriptions to a few words, and PUT conditions in the note. A headline names what the reader should conclude, so DO NOT leave it vaguer than its visual, such as "depends on several factors".
+CHECK the wording of the title, the summary, every headline, label and note. FOLLOW `/write-better` for this if available, THEN CONTINUE with section 5. With or without it, KEEP words the reader already knows: EXPLAIN or REPLACE research terms, such as "voice" or "ingratiation", and metaphors, such as "lever". USE one term for one idea across panels. KEEP labels, relations and section descriptions to a few words, and PUT conditions in the note. A headline names what the reader should conclude, so DO NOT leave it vaguer than its visual, such as "depends on several factors".
 
 ### 4.5. Custom diagrams
 

@@ -1,6 +1,6 @@
 # Tool: decision checks
 
-BEFORE the user commits to a course of action, ASK them to state the goal, what they expect to happen, and the main risk and benefit. In one study, these prompts led decision makers to plan before acting, instead of moving from information straight to action. The evidence is one study, read as an abstract: TREAT this tool as a guide, not a rule.
+BEFORE the user commits to a course of action, ASK them to state the goal, what they expect to happen, and the main risk and benefit. These prompts led decision makers to plan before acting, instead of moving from information straight to action. TREAT this tool as a guide, not a rule.
 
 ## Use when
 
