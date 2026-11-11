@@ -1,6 +1,6 @@
 ---
 name: write-for-<name>
-description: How to write text that <name> understands and acts on. Use when writing anything <name> will read, together with any skill that writes for them, such as /write-better, /show-better or /teach-better. Adjusts those skills' output for <name>; does not replace their method.
+description: How to write text that <name> understands and acts on. Use when writing anything <name> will read, and with /write-better when rewriting for them.
 ---
 
 # Write for <name>

@@ -1,6 +1,6 @@
 ---
 name: review-for-<name>
-description: How <name> reviews <kind of work>. Use to check work against <name>'s criteria before showing it to them, or to review work the way they would, together with any skill that reviews work, such as /code-better. Adds <name>'s criteria to that skill's review; does not replace it.
+description: How <name> reviews <kind of work>. Use to check work against <name>'s criteria before showing it to them, or to review work the way they would.
 ---
 
 # Review for <name>
