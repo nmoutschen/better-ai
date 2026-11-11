@@ -20,7 +20,7 @@ Being invoked means: find the structure and the relations in the content that a 
 5. Readers recall a panel's message from its headline, and take the most prominent feature of a visual as its point.
 6. Reach, preference and engagement do not show understanding. Readers prefer formats they do not learn more from, and polished generated posters scored poorly on comprehension quizzes.
 7. Generated slides fail mostly through missing content, then wrong values. Language models read text diagrams far more reliably than they draw them, so every diagram is laid out by code.
-8. No study tests a visual introduction placed before a full research paper or business document. Rules marked as design choices rest on neighbouring evidence.
+8. Placing a visual introduction before a full research paper or business document is a design choice, and so are the rules marked as design choices.
 
 ## 1. Know the goal, the reader and the medium
 
@@ -68,7 +68,7 @@ DO NOT add a panel that only lists the document's sections: the strip above each
 
 REFER to parts of the document by their titles, in headlines, notes and `read`. DO NOT use section numbers or § signs: the reader has not seen them yet.
 
-KEEP the presentation to about 5 to 12 panels. This range is a design choice: no study tests a panel count. IF the document needs more, INTRODUCE only the parts the GOAL needs.
+KEEP the presentation to about 5 to 12 panels. This range is a design choice. IF the document needs more, INTRODUCE only the parts the GOAL needs.
 
 ### 3.2. Give each panel a relation to show
 
@@ -125,7 +125,7 @@ MAKE the headline's point the most prominent part of the visual. MARK with `high
 
 ### 4.2. Keep it plain
 
-DO NOT add images, icons or effects that carry no information. SHOW each panel whole, not revealed step by step. TREAT this as a guide: one small study favours it, and the evidence is contested.
+DO NOT add images, icons or effects that carry no information. SHOW each panel whole, not revealed step by step. TREAT this as a guide, not a rule.
 
 The renderer's style is fixed. IF the user or project has a style guide that conflicts with it, SAY so and ASK whether to keep the renderer's style.
 
