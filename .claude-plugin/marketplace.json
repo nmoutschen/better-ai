@@ -5,7 +5,7 @@
     {
       "name": "better-ai",
       "source": "./",
-      "description": "Skills that change how an AI agent works for its user: ask, code, decide, do, research, show, teach and write better."
+      "description": "Skills that change how an AI agent works for its user: ask, code, do, research, show, teach and write better, and interview the user about how they read and review."
     }
   ]
 }
