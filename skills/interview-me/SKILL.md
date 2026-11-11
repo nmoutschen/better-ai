@@ -1,6 +1,6 @@
 ---
 name: interview-me
-description: Interviews the user about how they read and how they review work, then writes two personal skills from what it learns, write-for-<name> and review-for-<name>, so agents write text the user understands and acts on and check work the way the user would. Works from the user's real documents and reviews and from comparisons of concrete samples, not from general questions about their preferences.
+description: Interviews the user about how they read and how they review work, then writes two personal skills from what it learns, write-for-NAME and review-for-NAME (NAME is the user's name), so agents write text the user understands and acts on and check work the way the user would. Works from the user's real documents and reviews and from comparisons of concrete samples, not from general questions about their preferences.
 argument-hint: "[write | review | PATH-TO-EXISTING-GUIDE]"
 ---
 
