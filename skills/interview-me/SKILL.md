@@ -24,7 +24,7 @@ Being invoked does NOT mean a long interview or new rules are needed. IF the exi
 6. AI interviewers produce answers of about the same quality as human interviewers. Their main failure is not following up on surprising or unclear answers. Agree/disagree questions give lower-quality answers than questions about the item itself, and answers get worse late in a long questionnaire.
 7. A user profile stored in an LLM's memory made it more agreeable and made it personalize where it should not. Examples of output the user approved carried most of the benefit of a profile.
 8. Users accepting a summary of their interview shows that they accept it, not that it is accurate.
-9. No study tests an AI interviewing a user about their own reading or reviewing. These rules come from classrooms, hiring interviews, surveys and LLM preference studies. TREAT them as the best available guide.
+9. These rules adapt methods from other settings to an AI interviewing a user about their own reading or reviewing. TREAT them as a guide, not as fixed rules.
 
 ## 1. Prepare
 

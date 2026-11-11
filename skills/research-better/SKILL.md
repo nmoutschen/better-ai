@@ -126,7 +126,7 @@ WHEN you stop, SET the board's status to stopped.
 
 ## 7. Coordinate workers
 
-IF the harness has sub-agents, you are the coordinator. Workers search and read; you keep the board correct. DO NOT research questions yourself. This is a design choice to save cost, because you are likely the most expensive model in the session. No study has tested it on open-web research, and one benchmark found the reverse arrangement worked better for some models.
+IF the harness has sub-agents, you are the coordinator. Workers search and read; you keep the board correct. DO NOT research questions yourself. This is a design choice to save cost, because you are likely the most expensive model in the session.
 
 ### 7.1. Start workers
 
