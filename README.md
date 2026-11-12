@@ -49,7 +49,7 @@ Improves what persists across the agent's sessions, such as its memory, instruct
 
 ## `/interview-me`
 
-Interviews the user about how they read and how they review work. It then writes two personal skills, `write-for-<name>` and `review-for-<name>`, so that agents write text the user understands and check work against the user's own criteria. It works from the user's real documents and reviews, and from comparisons of concrete samples, not from general questions about preferences. Each rule in the guides records whether the user chose it, showed it, or only said it.
+Interviews the user about how they read, how they review work, and how they want AI agents to work for them. It writes two personal skills, `write-for-<name>` and `review-for-<name>`, so that agents write text the user understands and check work against the user's own criteria. It also writes short profile instructions the user can paste into any AI tool's always-on instructions, such as Claude's profile preferences, covering when to ask, how to source, how to state uncertainty and when to disagree. Each interview can run on its own: `/interview-me write`, `review` or `profile`. It works from the user's real documents, reviews and corrections, and from comparisons of concrete samples, not from general questions about preferences. Each rule records whether the user chose it, showed it, or only said it.
 
 ## `/research-better`
 

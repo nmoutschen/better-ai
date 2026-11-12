@@ -13,7 +13,7 @@ The GOAL is that the user repeats, corrects and waits less in later sessions. A 
 
 Being invoked does NOT mean a change is needed. This skill can end with no proposal, and SAYS so in one sentence when it does.
 
-This skill improves what persists across sessions. `/do-better` corrects the work in front of you, and `/interview-me` learns how the user reads and reviews by asking them. USE `/do-better` instead IF the user is pointing at a defect in the current work.
+This skill improves what persists across sessions. `/do-better` corrects the work in front of you, and `/interview-me` learns how the user reads, reviews and wants agents to work by asking them. USE `/do-better` instead IF the user is pointing at a defect in the current work.
 
 ## Principles
 

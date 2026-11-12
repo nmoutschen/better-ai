@@ -1,18 +1,25 @@
 ---
 name: interview-me
-description: Interviews the user about how they read and how they review work, then writes two personal skills from what it learns, write-for-NAME and review-for-NAME (NAME is the user's name), so agents write text the user understands and acts on and check work the way the user would. Works from the user's real documents and reviews and from comparisons of concrete samples, not from general questions about their preferences.
-argument-hint: "[write | review | PATH-TO-EXISTING-GUIDE]"
+description: Interviews the user about how they read, how they review work, and how they want AI agents to work for them, then writes what it learns as personal guides, write-for-NAME and review-for-NAME (NAME is the user's name), and as short profile instructions the user can paste into any AI tool, so agents write text the user understands and acts on, check work the way the user would, and ask, source and disagree the way the user needs. Works from the user's real documents, reviews and corrections, and from comparisons of concrete samples, not from general questions about their preferences.
+argument-hint: "[write | review | profile | PATH-TO-EXISTING-GUIDE]"
 ---
 
 # Interview Me
 
-IF invoked without argument, USE these instructions to interview the user for both guides: `write-for-<name>` (section 3) and `review-for-<name>` (section 4).
-IF invoked with `write` or `review`, RUN only that part.
-IF invoked with the path of an existing guide, UPDATE that guide (section 6).
+IF invoked without argument, RUN the three interviews in this order, and OFFER to stop after each one:
 
-The GOAL is that the user DOES less explaining later: agents that load the guides write text this user understands and acts on, and check work against the criteria this user applies. The guides are only a means to that.
+1. `write`: how the user reads. FOLLOW [write.md](write.md). It writes the `write-for-<name>` skill.
+2. `review`: how the user reviews work. FOLLOW [review.md](review.md). It writes the `review-for-<name>` skill.
+3. `profile`: how the user wants agents to work for them. FOLLOW [profile.md](profile.md). It writes profile instructions: a short text the user pastes into the always-on instructions of any AI tool, such as Claude's profile preferences. It runs last because the profile points to the two skills.
 
-Being invoked does NOT mean a long interview or new rules are needed. IF the existing guides already cover what the user wants, these instructions can end with no change.
+IF invoked with `write`, `review` or `profile`, RUN only that interview.
+IF invoked with the path of an existing guide or profile record, UPDATE it (section 5).
+
+The steps in this file apply to every interview. Each interview file adds the material to collect, the questions to ask, and the rules for its output.
+
+The GOAL is that the user DOES less explaining and correcting later: agents write text this user understands and acts on, check work against this user's criteria, and work the way this user needs. The guides and the profile are only a means to that.
+
+Being invoked does NOT mean a long interview or new rules are needed. IF the existing guides or profile already cover what the user wants, these instructions can end with no change.
 
 ## Principles
 
@@ -20,32 +27,29 @@ Being invoked does NOT mean a long interview or new rules are needed. IF the exi
 2. Comparing concrete work samples and justifying the choice made tacit quality criteria partly explicit. Walking through one real incident revealed the reasons behind a person's actions.
 3. Recall of past behaviour is imperfect, even for recent days. A document the user wrote or reacted to is stronger evidence than their memory of it.
 4. AI interviewers produce answers of about the same quality as human interviewers. Their main failure is not following up on surprising or unclear answers.
-5. A user profile stored in an LLM's memory made it more agreeable and made it personalize where it should not.
+5. A user profile in an LLM's context made it more agreeable and made it personalize where it should not. The model mirrored the user's views only when the context let it infer them.
 6. Users accepting a summary of their interview shows that they accept it, not that it is accurate.
-7. These rules adapt methods from other settings to an AI interviewing a user about their own reading or reviewing. TREAT them as a guide, not as fixed rules.
+7. These rules adapt methods from other settings to an AI interviewing a user about their own reading, reviewing, and use of AI. TREAT them as a guide, not as fixed rules.
 
 ## 1. Prepare
 
 ### 1.1. Look up what is already known
 
-READ the conversation, memories, project instructions, and any existing writing guide or `write-for-*` or `review-for-*` skill first. LIST what they already say about how the user reads and reviews.
+READ the conversation, memories, project instructions, and any existing writing guide, `write-for-*` or `review-for-*` skill, profile record, or profile instructions first. LIST what they already say about how the user reads, reviews, and wants agents to work.
 
-DO NOT ask about anything they already answer. IF an existing guide covers the part being run, SWITCH to updating it (section 6).
+DO NOT ask about anything they already answer. IF an existing guide or profile covers the interview being run, SWITCH to updating it (section 5).
 
 ### 1.2. Collect real material
 
-ASK the user for real material, in one message:
+ASK the user, in one message, for the material the interview file lists.
 
-1. FOR `write`: a document they found easy to understand and act on, and one they found hard. Documents written for them by anyone count, including earlier AI output.
-2. FOR `review`: a piece of work they reviewed, with the comments they gave, such as a pull request, a marked-up draft, or a feedback message.
+READ each item before the interview. IF you cannot open it, ASK the user to paste it. NOTE what each item shows, such as the length of its opening, which review comments ask for a change before approval, or what an agent did before the user corrected it. These notes are not rules yet.
 
-READ each item before the interview. IF you cannot open it, ASK the user to paste it. NOTE what each item shows, such as the length of its opening, how it uses headings, or which comments ask for a change before approval. These notes are not rules yet.
-
-IF the user has no material at hand, CONTINUE with the comparisons in sections 3.2 and 4.2, built from a topic in their current work. SAY that the guide will rest on fewer kinds of evidence.
+IF the user has no material at hand, CONTINUE with the comparisons in the interview file, built from a topic in their current work. SAY that the output will rest on fewer kinds of evidence.
 
 ## 2. How to ask
 
-APPLY these rules to every question in sections 3 and 4.
+APPLY these rules to every question in every interview.
 
 ### 2.1. Ask about one thing, in its own terms
 
@@ -64,109 +68,63 @@ FOLLOW UP, with one question, WHEN an answer:
 3. States a rule with no example. ASK for the last time it mattered.
 4. Says "it depends". ASK what it depends on.
 
-### 2.3. Respect the user's time and limits
+### 2.3. Ask about the options the user rejected
 
-PUT the questions whose answers change the guide most first. AFTER each part, OFFER to stop and write the guides from what you have. Answers get worse as an interview gets long.
+WHEN the user describes a choice, ASK what they rejected, such as "Was there another way this could have been done that would have been worse?". Asking about the options a person rejected revealed the reasons behind their actions.
 
-DO NOT ask the user to disclose a condition, a diagnosis, or anything about who they are. DO NOT infer their ability or background from how they write. ASK only about documents, reviews and the choices they make about them.
+### 2.4. Use hypotheticals only for scope
 
-## 3. Part A: how the user reads (`write-for`)
+ASK hypotheticals only to find when a rule applies, such as "Would this change for an urgent message?". DO NOT record a hypothetical answer as a preference by itself: it shows what the person knows a situation requires, not what they will do or prefer.
 
-### 3.1. Walk through a real document
+### 2.5. Respect the user's time and limits
 
-FOR each document from section 1.2, ASK the user to describe what happened when they read it: what they did first, where they slowed down, and what they did afterwards. LET them answer without interrupting, except for a short clarification.
+PUT the questions whose answers change the output most first. AFTER each interview, OFFER to stop and write the output from what you have. Answers get worse as an interview gets long.
 
-THEN PROBE the points where they made a choice:
+DO NOT ask the user to disclose a condition, a diagnosis, or anything about who they are. DO NOT infer their ability or background from how they write. ASK only about documents, reviews, agent behaviour, and the choices they make about them.
 
-1. What they skipped, reread, or looked up, and why.
-2. What they would have changed about the document, and what they would have kept.
-3. Whether they could act on it without asking anyone, and what was missing if not.
+## 3. Write the output
 
-ASK what they rejected: "Was there another way this could have been written that would have been worse?" Asking about the options a person rejected revealed the reasons behind their actions.
+### 3.1. Write each rule from evidence
 
-### 3.2. Compare versions
-
-WRITE two short versions of the same passage. TAKE it from the user's own material when possible. CHANGE one thing between the two versions, such as where the main point appears, the length, the use of a list, the technical terms, or the amount of context. This is a design choice, not a tested rule.
-
-FOR each pair, ASK:
-
-1. Which version they would rather receive.
-2. Why, in their own words.
-3. What they would do next after reading each one. IF they could act on one and not the other, RECORD that: it is stronger evidence than which one they liked.
-
-DO NOT tell the user which version follows `write-better` or any rule. COVER the dimensions where the user's material and answers disagree, or where they gave no answer, first.
-
-### 3.3. Check the scope with hypotheticals
-
-ASK hypotheticals only to find when a rule applies, such as "Would this change for an urgent message?" or "for a topic you know well?". DO NOT record a hypothetical answer as a preference by itself: it shows what the person knows a situation requires, not what they will do or prefer.
-
-## 4. Part B: how the user reviews (`review-for`)
-
-### 4.1. Walk through a real review
-
-FOR the work from section 1.2, ASK the user to describe how they reviewed it: what they looked at first, what made them comment, and what made them approve or reject it. LET them answer without interrupting.
-
-THEN, FOR each of their comments, ASK:
-
-1. Whether it had to be fixed before approval, or was a suggestion.
-2. What they saw that made them write it.
-3. What a version that needed no comment would have looked like.
-
-ASK what they did not comment on and why. Criteria a reviewer applies but does not state often show up in what they let pass.
-
-### 4.2. Compare two samples
-
-SHOW two versions of a small piece of work in the user's domain, such as two functions, two paragraphs, or two plans. TAKE them from the user's material or from your own work in this conversation when possible. MAKE them differ on one point that the walk-through did not settle.
-
-ASK which one they would approve, which comment they would write on the other, and whether that comment blocks approval.
-
-### 4.3. Separate blocking criteria from preferences
-
-LIST the criteria found so far. ASK the user to mark each one as blocking, meaning the work is not approved until it is fixed, or as a preference. DO NOT ask them to rate criteria on a scale: a scale lets every criterion look important.
-
-## 5. Write the guides
-
-### 5.1. Write each rule from evidence
-
-FOLLOW the templates [templates/write-for.md](templates/write-for.md) and [templates/review-for.md](templates/review-for.md). FOLLOW `/write-better` for the wording if available. OTHERWISE, USE plain words, one term per concept, and literal statements.
+FOLLOW the template the interview file names. FOLLOW `/write-better` for the wording if available. OTHERWISE, USE plain words, one term per concept, and literal statements.
 
 WRITE each rule with:
 
 1. The rule, as an instruction to an agent.
 2. When it applies, and when it does not.
-3. Its evidence: **chose** (the user picked it in a comparison or could act on it), **shown** (their material or their review comments show it), or **said** (they stated it). IF the evidence contradicts itself, WRITE the rule from what the user chose or showed, and RECORD what they said next to it.
+3. Its evidence: **chose** (the user picked it in a comparison or could act on it), **shown** (their material, review comments or corrections show it), or **said** (they stated it). IF the evidence contradicts itself, WRITE the rule from what the user chose or showed, and RECORD what they said next to it.
 4. One example the user approved or wrote, taken from the interview or their material. Examples of output the user approved carry most of the benefit of a profile.
 
-### 5.2. Leave out what the guide must not contain
+### 3.2. Leave out what the output must not contain
 
 DO NOT write traits, such as "the user is detail-oriented" or "the user is an expert". WRITE the behaviour the trait was meant to cause instead, with its scope.
 
-DO NOT write anything the user did not confirm, any condition or diagnosis, or any view the user holds on a topic. The guides are about form and criteria, and SAY that they are not a reason to agree with the user.
+DO NOT write anything the user did not confirm, any condition or diagnosis, or any view the user holds on a topic. The guides and the profile are about form, criteria and ways of working, and SAY that they are not a reason to agree with the user.
 
-KEEP each guide short enough to read in a few minutes. A rule earns its place only when it changes what an agent would do without it, including an agent already following `/write-better` for `write-for`, or `/code-better` for a code review in `review-for`. The guides adjust those general skills for one user; DO NOT repeat their rules.
+KEEP each guide short enough to read in a few minutes. A rule earns its place only when it changes what an agent would do without it. The guides and the profile adjust general skills, such as `/write-better` and `/code-better`, for one user; DO NOT repeat those skills' rules.
 
-### 5.3. Confirm the guide with the user
+### 3.3. Confirm the output with the user
 
-SHOW the user each guide before saving it. ASK them to correct or delete rules. SAY, once, that their approval makes the guide theirs but does not show that it works: the test is whether later output needs fewer corrections.
+SHOW the user each guide or profile before saving it. ASK them to correct or delete rules. SAY, once, that their approval makes the output theirs but does not show that it works: the test is whether later output needs fewer corrections.
 
-### 5.4. Save the guides as skills
+### 3.4. Save the output
 
-NAME the skills `write-for-<name>` and `review-for-<name>`. USE the name the user gives; OTHERWISE PROPOSE one from the context.
+USE the name the user gives in the names `write-for-<name>`, `review-for-<name>` and `profile-for-<name>`; OTHERWISE PROPOSE one from the context.
 
-PROPOSE where to save each skill: a folder where the user's harness loads personal skills, or a project's skills folder if the guide is for one project. IF you do not know where the harness loads skills, ASK the user. WRITE the files only after the user agrees, because skills change how every later agent behaves.
+PROPOSE where to save each file. The interview file says which kind of location fits. IF you do not know where the user's harness loads skills, ASK the user. WRITE the files only after the user agrees, because they change how every later agent behaves.
 
-IF you cannot write files, GIVE each guide in a code block, with the path where the user should save it.
+IF you cannot write files, GIVE each file in a code block, with the path where the user should save it.
 
-## 6. Update an existing guide
+## 4. Report
 
-READ the guide. ASK what prompted the update: a correction the user made, a new kind of document, or a rule that no longer fits.
+STATE what the output was built from: which documents, reviews and corrections you read, how many comparisons the user made, and which interviews were skipped. IF an output rests only on what the user said, SAY so.
 
-RUN only the parts of sections 3 and 4 that concern the rules in question. WHEN later feedback contradicts a rule, REPLACE the rule, even if the user approved it before. Feedback on real output outweighs what the interview found.
+DO NOT claim the guides or the profile will improve the output.
 
-DO NOT rewrite rules the update does not concern. SHOW the user the changed rules before saving them.
+## 5. Update an existing guide or profile
 
-## 7. Report
+READ the guide or the profile record. IF the user gives profile instructions without a record, LOOK for the record next to them; OTHERWISE TREAT every rule in them as **said**. ASK what prompted the update: a correction the user made, a new kind of document or task, or a rule that no longer fits.
 
-STATE what the guides were built from: which documents and reviews you read, how many comparisons the user made, and which parts were skipped. IF a part rests only on what the user said, SAY so.
+RUN only the steps of the interview file that concern the rules in question. WHEN later feedback contradicts a rule, REPLACE the rule, even if the user approved it before. Feedback on real output outweighs what the interview found.
 
-DO NOT claim the guides will improve the output.
+DO NOT rewrite rules the update does not concern. SHOW the user the changed rules before saving them. FOR a profile, UPDATE the record first, then WRITE the profile instructions again from it.
