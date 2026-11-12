@@ -13,7 +13,7 @@ Being invoked does NOT mean the text needs large changes. A text that already me
 ## Principles
 
 1. Length and polish raise a reader's confidence without making them more accurate.
-2. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts, and in one study lowered recall of the rest.
+2. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and can lower recall of the rest.
 3. First-person uncertainty, such as "I'm not sure", made readers rely less on AI answers and raised their accuracy; impersonal phrasing such as "it is not clear" moved them the same way, but not clearly.
 4. Models assume the user shares their context instead of checking. Trying to imagine what a reader knows does not improve the estimate; checking what the reader has seen does.
 5. TREAT these rules as a guide, not as fixed rules for every reader.
