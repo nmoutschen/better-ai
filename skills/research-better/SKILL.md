@@ -158,7 +158,7 @@ WHEN a worker stops and open questions remain, START a fresh worker to replace i
 
 IF the harness lets you choose a worker's model, USE a cheaper model than yours. IF the harness sets models only in sub-agent definition files, USE an existing definition that runs a cheaper model. DO NOT create or edit harness configuration without the user's permission.
 
-START verifiers as claims accumulate, and GIVE each the brief in [templates/verifier-brief.md](templates/verifier-brief.md), filled in. A verifier is a separate agent that checks claims it did not record, because a model judges its own output too leniently. START enough verifiers to keep up with the new claims, and START a fresh one when a verifier stops while unchecked claims remain. USE the same cheaper model as for workers.
+START verifiers when the first claims appear, while workers still run, and GIVE each the brief in [templates/verifier-brief.md](templates/verifier-brief.md), filled in. Verifiers check claims as workers add them, so a claim is checked before the research ends. A verifier is a separate agent that checks claims it did not record, because a model judges its own output too leniently. START more verifiers when unchecked claims pile up, and START a fresh one when a verifier stops while unchecked claims remain or workers still run. USE the same cheaper model as for workers.
 
 DO NOT put the answer you expect or your own conclusions in a brief or on the board.
 
@@ -180,7 +180,7 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 8. **Review gaps**: EACH time a few questions close, COMPARE the board with the GOAL. ADD a question, kind `gap`, for each part of the GOAL that no question covers, with `goal` as origin.
 9. **Check the three checks**: CHECK that each answered high-priority question has a challenge question, and that its primary sources have a chain question. ADD the missing ones. IF a worker's log shows no frontier check after a closed question, ADD the frontier questions its sources point to.
 
-APPLY the stop rules in section 6.5 to the whole board. WHEN they apply, SET the board's status to stopped.
+APPLY the stop rules in section 6.5 to the whole board. WHEN they apply, SET the board's status to stopped. Verifiers then check the remaining claims and stop. WAIT for them before you present the findings.
 
 ## 8. Present your findings
 
