@@ -27,8 +27,10 @@ limit: <a limit the user stated, or none>
 stop-at: <high | medium | low>
 collections: <the COLLECTIONs to search, such as web, or the name of a wiki>
 missing: <COLLECTIONs the TOPIC needs that could not be searched, or none>
-status: <running | stopped>
+status: <running | checking | stopped>
 ```
+
+`running`: workers research and verifiers check. `checking`: research has ended, workers stop, and verifiers check the remaining claims. `stopped`: all checks are done.
 
 ## questions/<id>.md
 

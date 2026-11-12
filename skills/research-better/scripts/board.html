@@ -24,6 +24,7 @@ h1 { font:700 26px/1.2 var(--serif); color:var(--heading); margin:0 0 6px; }
 .conn { color:var(--heading); margin:4px 0 0; } .conn b { color:var(--umber); }
 .card .q, .answer .q, .answer .sum, dialog h3, dialog li { overflow-wrap:anywhere; }
 .meter { height:4px; background:var(--linen); display:flex; gap:2px; margin-top:10px; }
+.meter + .meter { margin-top:3px; }
 .meter i { display:block; height:100%; }
 main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
   grid-template-rows:auto minmax(0,1fr); gap:20px 48px; padding:8px var(--pad) 16px; }
@@ -63,6 +64,16 @@ h2 span { font-weight:400; letter-spacing:0; text-transform:none; }
 .card:focus-visible .q { color:var(--terracotta); }
 .card > span { display:block; }
 .card .agent { font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--terracotta); }
+/* Verifiers check claims rather than research questions: same card, moss instead of terracotta. */
+.card.verifier::before { background-color:var(--moss); }
+.card.verifier .agent { color:var(--moss); }
+.marks { flex:none; font:700 13px var(--sans); letter-spacing:.04em; white-space:nowrap; }
+.answer .head { display:flex; gap:8px; align-items:baseline; }
+.answer .head .q { flex:1; min-width:0; }
+.flag { display:block; font-size:12.5px; margin:6px 0 0; padding:4px 8px; background:var(--linen); overflow-wrap:anywhere; }
+.flag b, dialog .why b { color:var(--terracotta); }
+dialog .span { display:block; font:italic 400 13px/1.6 var(--serif); background:var(--linen); padding:6px 10px; margin:6px 0 0; }
+dialog .why { display:block; font-size:12.5px; margin:6px 0 0; }
 .card .q { font:500 15px/1.4 var(--sans); color:var(--heading); margin:2px 0 4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .card .meta { font-size:13px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .card .last { font-size:12.5px; color:var(--ink); margin-top:auto; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
@@ -105,7 +116,7 @@ dialog li a { color:var(--terracotta); text-underline-offset:2px; }
 dialog .log li { font-size:12.5px; overflow-wrap:anywhere; }
 .foot { flex:none; display:flex; flex-wrap:wrap; gap:0 16px; justify-content:space-between; padding:4px var(--pad); font-size:12px; color:var(--muted); }
 .foot a { color:var(--muted); }
-.status, .card .meta, .row .prog, h2 span, .legend, .foot { font-variant-numeric:tabular-nums; }
+.status, .card .meta, .row .prog, h2 span, .legend, .foot, .marks { font-variant-numeric:tabular-nums; }
 @media (hover:hover) {
   .card:hover .q, .row:hover .text, .answer:hover .q, .foot a:hover { color:var(--terracotta); }
 }
@@ -125,9 +136,9 @@ dialog .log li { font-size:12.5px; overflow-wrap:anywhere; }
 </style></head><body>
 <div class="band"></div>
 <header><h1 id="topic" dir="auto">Research board</h1><p class="status" id="status">Loading the board…</p>
-<p class="conn" id="conn" role="status" hidden></p><div class="meter" id="meter" aria-hidden="true"></div></header>
+<p class="conn" id="conn" role="status" hidden></p><div class="meter" id="meter" aria-hidden="true"></div><div class="meter" id="cmeter" aria-hidden="true"></div></header>
 <main>
-  <section class="workers" id="workers"><h2>Workers <span id="wcount"></span></h2><div id="work"></div></section>
+  <section class="workers" id="workers"><h2>Agents <span id="wcount"></span></h2><div id="work"></div></section>
   <section><h2>Questions <span id="qcount"></span></h2><div class="legend" id="legend"></div><ul class="tree" id="tree"></ul></section>
   <section><h2>Answers <span id="acount"></span></h2><div id="answers"></div></section>
 </main>
@@ -141,6 +152,9 @@ const STATUS = {  // glyph, label, colour variable
   "open": ["○", "open", "--st-open"], "answered": ["●", "answered", "--st-answered"], "contested": ["◆", "contested", "--st-contested"],
   "not found": ["✕", "not found", "--st-notfound"], "unclear": ["?", "unclear", "--st-unclear"], "out of scope": ["–", "out of scope", "--st-scope"] };
 const CLOSED = new Set(["answered", "contested", "not found", "out of scope"]);
+const CHECK = {  // a claim's check: glyph, label, colour variable
+  "verified": ["✓", "verified", "--moss"], "failed": ["✗", "failed", "--terracotta"],
+  "checking": ["◐", "being checked", "--umber"], "waiting": ["○", "not checked yet", "--sand"] };
 const RANK = {high:0, medium:1, low:2};
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const mins = secs => secs < 90 ? "under 2 min" : `${Math.round(secs / 60)} min`;
@@ -151,10 +165,14 @@ let D = null, CURRENT = null;
 
 function prepare(d) {
   const byQ = {}; d.claims.forEach(c => (byQ[c.question] ||= []).push(c));
+  d.claims.forEach(c => {  // verifiers write these lines by hand; anything unexpected counts as not checked
+    const v = String(c.verified || "").trim().toLowerCase();
+    c.check = v === "verified" ? "verified" : v === "unverified" ? "failed" : has(c.checker) ? "checking" : "waiting"; });
   const src = Object.fromEntries(d.sources.map(s => [s.id, s]));
   d.questions.forEach(q => {
     q.claimsList = byQ[q.id] || [];
     q.srcCount = new Set(q.claimsList.map(c => c.source)).size;
+    q.claimsList.sort((a, z) => CHECK_ORDER.indexOf(a.check) - CHECK_ORDER.indexOf(z.check));
     q.view = String(q.status || "open").trim().toLowerCase();
     if (!STATUS[q.view] || q.view === "partial") q.view = "open";  // agents write statuses by hand; never let a typo break the page
     if (q.view === "open" && q.claimsList.length) q.view = "partial";  // reopened, or started and released
@@ -164,6 +182,13 @@ function prepare(d) {
 const glyph = v => { const [g, l, c] = STATUS[v] || STATUS.open; return `<span class="g" style="color:var(${c})" role="img" aria-label="${l}">${g}</span>`; };
 const originOf = q => (q.origin || "").split(/[ ,;(]/)[0];
 const safeUrl = u => /^https?:\/\//i.test(String(u || "").trim()) ? String(u).trim() : "";  // source URLs come from web pages
+const CHECK_ORDER = ["failed", "checking", "waiting", "verified"];  // what needs attention first
+// One glyph per claim, or a count once there are more than four of a kind.
+const marks = q => { if (!q.claimsList.length) return "";
+  const n = v => q.claimsList.filter(c => c.check === v).length;
+  const label = Object.keys(CHECK).filter(n).map(v => `${n(v)} ${CHECK[v][1]}`).join(", ");
+  return `<span class="marks" role="img" aria-label="Claims: ${label}">${Object.keys(CHECK).filter(n).map(v =>
+    `<span style="color:var(${CHECK[v][2]})">${n(v) > 4 ? n(v) + CHECK[v][0] : CHECK[v][0].repeat(n(v))}</span>`).join("")}</span>`; };
 const progress = q => `${plural(q.claimsList.length, "claim")} from ${plural(q.srcCount, "source")}`;
 
 function render(d) {
@@ -175,25 +200,43 @@ function render(d) {
   const done = scope.filter(q => CLOSED.has(q.view)).length, working = qs.filter(q => q.view === "in progress");
   $("topic").textContent = b.topic || "Research board";
   document.title = b.topic ? `${b.topic} · Research board` : "Research board";
-  $("status").innerHTML = stopped
-    ? `Stopped after ${mins(now - start)}. <b>${done} of ${scope.length}</b> questions at ${esc(stopAt)} priority or above are closed.`
-    : `<b>${done} of ${scope.length}</b> questions closed at ${esc(stopAt)} priority or above · <b>${working.length}</b> in progress · ${mins(now - start)} in`;
+  const nCheck = v => d.claims.filter(c => c.check === v).length;
+  const checked = nCheck("verified") + nCheck("failed");
+  const claimsLine = d.claims.length ? ` · <b>${checked} of ${d.claims.length}</b> claims checked${nCheck("failed") ? `, <b>${nCheck("failed")}</b> failed` : ""}` : "";
+  const checkingPhase = b.status === "checking";  // research ended; verifiers finish the remaining claims
+  $("status").innerHTML = checkingPhase
+    ? `Research ended after ${mins(b._changed - start)}: <b>${done} of ${scope.length}</b> questions at ${esc(stopAt)} priority or above are closed${claimsLine}. Verifiers are finishing.`
+    : stopped
+    ? `Stopped after ${mins(now - start)}. <b>${done} of ${scope.length}</b> questions at ${esc(stopAt)} priority or above are closed${claimsLine}.`
+    : `<b>${done} of ${scope.length}</b> questions closed at ${esc(stopAt)} priority or above · <b>${working.length}</b> in progress${claimsLine} · ${mins(now - start)} in`;
   const m = $("meter"); m.innerHTML = "";
   ["answered", "contested", "not found", "in progress", "partial"].forEach(v => {
     const n = scope.filter(q => q.view === v).length;
     if (n) { const i = document.createElement("i"); i.style.flex = n; i.style.background = `var(${STATUS[v][2]})`; i.title = `${n} ${STATUS[v][1]}`; m.append(i); } });
   const rest = scope.filter(q => q.view === "open" || q.view === "unclear").length;
   if (rest) { const i = document.createElement("i"); i.style.flex = rest; m.append(i); }
+  // Second line: the claims, in the same order as a question's marks.
+  const cm = $("cmeter"); cm.innerHTML = "";
+  Object.keys(CHECK).forEach(v => { const n = nCheck(v);
+    if (n) { const i = document.createElement("i"); i.style.flex = n; i.style.background = v === "waiting" ? "" : `var(${CHECK[v][2]})`; i.title = `${plural(n, "claim")} ${CHECK[v][1]}`; cm.append(i); } });
 
-  // Workers: one card per question in progress, all the same height.
-  $("wcount").textContent = working.length ? plural(working.length, "question") + " in progress" : "";
+  // Agents: one card per question in progress, then one per verifier checking a claim, all the same height.
+  const checkers = {};  // verifier name -> the claim it holds; a verifier holds one at a time, keep its newest
+  d.claims.filter(c => c.check === "checking").forEach(c => { const o = checkers[c.checker]; if (!o || c._changed > o._changed) checkers[c.checker] = c; });
+  const checking = Object.values(checkers).sort((a, z) => a._changed - z._changed);
+  $("wcount").textContent = [working.length ? `${working.length} researching` : "", checking.length ? `${checking.length} checking claims` : ""].filter(Boolean).join(" · ");
+  const qText = id => (D.questions.find(q => q.id === id) || {}).question || id;
+  const verifierCard = c => { const mine = d.claims.filter(x => x.checker === c.checker), n = v => mine.filter(x => x.check === v).length;
+    return `<button class="card verifier" data-worker="${esc(c.checker)}" data-q="${esc(c.question)}"><span class="agent">${esc(c.checker)} · checking</span>
+      <span class="q" dir="auto">“${esc(c.claim)}”</span><span class="meta" dir="auto">${esc(c.id)} · for “${esc(qText(c.question))}”</span>
+      <span class="last">${n("verified") + n("failed")} checked · ${n("verified")} verified · ${n("failed")} failed</span></button>`; };
   setHTML($("work"), working.sort((a, z) => a._changed - z._changed).map(q => {
     const owner = has(q.owner) ? q.owner : "", log = (d.logs || {})[owner] || {};
     return `<button class="card" data-worker="${esc(owner)}" data-q="${esc(q.id)}"><span class="agent">${esc(owner || "unassigned")}</span>
       <span class="q" dir="auto">${esc(q.question)}</span><span class="meta">${mins(now - q._changed)} · ${plural(q.claimsList.length, "claim")} · ${plural(q.srcCount, "source")}</span>
       <span class="last" dir="auto">${log.last ? "Last: " + esc(log.last) : "No search logged yet."}</span></button>`;
-  }).join("") || '<p class="empty">No question is in progress right now.</p>');
-  $("workers").hidden = stopped && !working.length;  // the status line already says it stopped
+  }).join("") + checking.map(verifierCard).join("") || '<p class="empty">No agent is working right now.</p>');
+  $("workers").hidden = stopped && !working.length && !checking.length;  // the status line already says it stopped
   fitWork();
 
   // Questions: the tree of what raised what.
@@ -209,7 +252,7 @@ function render(d) {
   const node = q => {
     const v = q.view, sub = order(kids[q.id] || []).map(node).join("");
     const right = v === "in progress" ? `<span class="prog">${plural(q.claimsList.length, "claim")}</span><span class="tag">${esc(has(q.owner) ? q.owner : "unassigned")}</span>`
-      : v === "partial" ? `<span class="prog">${plural(q.claimsList.length, "claim")}</span>` : "";
+      : v === "partial" ? `<span class="prog">${plural(q.claimsList.length, "claim")}</span>` : marks(q);
     return `<li><button class="row ${v === "in progress" ? "active" : ""} ${CLOSED.has(v) ? "closed" : ""}" style="--st:var(${STATUS[v][2]})" data-q="${esc(q.id)}">
       ${glyph(v)}<span class="text" dir="auto">${esc(q.question)}</span>${right}${has(q.priority) ? `<span class="pri pri-${esc(q.priority)}">${esc(q.priority.toUpperCase())}</span>` : ""}</button>${sub ? `<ul>${sub}</ul>` : ""}</li>`; };
   setHTML($("tree"), order(roots).map(node).join("") || '<li class="empty">No questions yet.</li>');
@@ -220,8 +263,12 @@ function render(d) {
   // Answers: every closed question with a summary, newest first.
   const answers = qs.filter(q => CLOSED.has(q.view) && q.view !== "out of scope").sort((a, z) => z._changed - a._changed);
   $("acount").textContent = answers.length ? `${answers.length}, newest first` : "";
-  setHTML($("answers"), answers.map(q => `<button class="answer" data-q="${esc(q.id)}"><span class="q" dir="auto">${glyph(q.view)}${esc(q.question)}</span>
-    ${has(q.summary) ? `<span class="sum" dir="auto">${esc(q.summary)}</span>` : ""}</button>`).join("") || '<p class="empty">No answers yet.</p>');
+  setHTML($("answers"), answers.map(q => {
+    const failed = q.claimsList.filter(c => c.check === "failed"), unchecked = q.claimsList.filter(c => c.check === "waiting" || c.check === "checking").length;
+    return `<button class="answer" data-q="${esc(q.id)}"><span class="head"><span class="q" dir="auto">${glyph(q.view)}${esc(q.question)}</span>${marks(q)}</span>
+    ${has(q.summary) ? `<span class="sum" dir="auto">${esc(q.summary)}</span>` : ""}
+    ${failed.map(c => `<span class="flag" dir="auto"><b>✗ ${esc(c.id)} failed:</b> ${esc(has(c.reason) ? c.reason : "no reason given")}</span>`).join("")}
+    ${unchecked ? `<span class="flag">${plural(unchecked, "claim")} not checked yet.</span>` : ""}</button>`; }).join("") || '<p class="empty">No answers yet.</p>');
 
   const hidden = qs.length - shown.length;
   $("hidden").textContent = hidden ? `${plural(hidden, "out-of-scope question")} hidden` : "";
@@ -235,13 +282,19 @@ function showQuestion(id) {
   const v = q.view, now = D.now;
   const state = v === "in progress" ? `${esc(has(q.owner) ? q.owner : "unassigned")} has worked on it for ${mins(now - q._changed)} · ${progress(q)} so far`
     : `${STATUS[v][1]} · ${progress(q)}`;
+  const tally = Object.keys(CHECK).map(k => [k, q.claimsList.filter(c => c.check === k).length]).filter(([, n]) => n).map(([k, n]) => `${n} ${CHECK[k][1]}`).join(", ");
   const link = s => { const u = safeUrl(s.url);
     return u ? ` · <a href="${esc(u)}" target="_blank" rel="noopener noreferrer">source</a>` : has(s.url) ? ` · ${esc(s.url)}` : ""; };
-  const claims = q.claimsList.map(c => { const s = D.src[c.source] || {};
-    return `<li dir="auto">${esc(c.claim)}<span class="by">${esc(s.author || s.publisher || c.source)}${has(s.date) ? ` (${esc(s.date)})` : ""}${link(s)} · ${esc(s.trust || "?")} trust · ${esc(c.verified || "unchecked")}</span></li>`; }).join("");
+  const claims = q.claimsList.map(c => { const s = D.src[c.source] || {}, [g, label, col] = CHECK[c.check];
+    const by = c.check === "waiting" ? label : `${label}${has(c.checker) ? `, ${c.check === "checking" ? "by" : "checked by"} ${esc(c.checker)}` : ""}`;
+    const hard = String(c.hard || "").trim().toLowerCase() === "yes" ? " · <b>hard: number not stated in the span</b>" : "";
+    // A verified claim can still carry a reason: source fields that differ from the page.
+    const reason = has(c.reason) ? `<span class="why" dir="auto">${c.check === "failed" ? "<b>Why it failed:</b> " : "Verifier note: "}${esc(c.reason)}</span>` : "";
+    const span = has(c.span) && c.span !== '"none"' ? `<span class="span" dir="auto">${esc(c.span)}</span>` : "";
+    return `<li dir="auto"><span class="g" style="color:var(${col})" role="img" aria-label="${label}">${g}</span>${esc(c.claim)}<span class="by">${esc(s.author || s.publisher || c.source)}${has(s.date) ? ` (${esc(s.date)})` : ""}${link(s)} · ${esc(s.trust || "?")} trust · ${by}${hard}</span>${reason}${span}</li>`; }).join("");
   const children = D.questions.filter(x => originOf(x) === q.id && x.id !== q.id).map(x => `<li dir="auto">${glyph(x.view)}${esc(x.question)}</li>`).join("");
   setPanel(`<div class="kicker">${glyph(v)}${esc(q.priority || "")} priority · ${esc(q.id)}</div><h3 id="mtitle" dir="auto">${esc(q.question)}</h3>
-    <p class="note">${state}</p>${has(q.summary) ? `<p class="sum" dir="auto">${esc(q.summary)}</p>` : ""}${has(q.note) ? `<p class="note" dir="auto">Note: ${esc(q.note)}</p>` : ""}
+    <p class="note">${state}${tally ? ` · ${tally}` : ""}</p>${has(q.summary) ? `<p class="sum" dir="auto">${esc(q.summary)}</p>` : ""}${has(q.note) ? `<p class="note" dir="auto">Note: ${esc(q.note)}</p>` : ""}
     ${claims ? `<h4>Claims</h4><ul>${claims}</ul>` : ""}${children ? `<h4>Questions it raised</h4><ul>${children}</ul>` : ""}`);
   CURRENT = () => showQuestion(id); openModal();
 }
@@ -251,9 +304,15 @@ function showWorker(name, qid) {
   const log = (D.logs || {})[name] || {}, lines = (log.lines || []).slice().reverse();
   const clock = t => t ? new Date(t * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) : "time not recorded";
   const current = D.questions.find(q => q.id === qid);
-  setPanel(`<div class="kicker">Worker</div><h3 id="mtitle">${esc(name)}</h3>
-    <p class="note" dir="auto">${current ? `Working on: ${esc(current.question)}` : ""}</p>
-    <p class="note">Created ${plural(mine("claims").length, "claim")}, ${plural(mine("sources").length, "source")}, and ${plural(mine("questions").length, "question")}.</p>
+  const checked = D.claims.filter(c => c.checker === name), holding = checked.find(c => c.check === "checking");
+  const n = v => checked.filter(c => c.check === v).length;
+  const summary = checked.length
+    ? `<p class="note" dir="auto">${holding ? `Checking ${esc(holding.id)}: “${esc(holding.claim)}”` : ""}</p>
+    <p class="note">Checked ${plural(n("verified") + n("failed"), "claim")}: ${n("verified")} verified, ${n("failed")} failed.</p>`
+    : `<p class="note" dir="auto">${current ? `Working on: ${esc(current.question)}` : ""}</p>
+    <p class="note">Created ${plural(mine("claims").length, "claim")}, ${plural(mine("sources").length, "source")}, and ${plural(mine("questions").length, "question")}.</p>`;
+  setPanel(`<div class="kicker">${checked.length ? "Verifier" : "Worker"}</div><h3 id="mtitle">${esc(name)}</h3>
+    ${summary}
     <h4>Activity</h4><ul class="log">${lines.map(([t, l]) => `<li dir="auto"><span class="by">${clock(t)}</span>${esc(l)}</li>`).join("") || "<li>No activity logged.</li>"}</ul>`);
   CURRENT = () => showWorker(name, qid); openModal();
 }
