@@ -2,25 +2,28 @@
 
 Research findings · Search date: 12 November 2026
 
-**Scope.** What makes AI-generated output "slop" in any medium (text, code and its pull requests, user interfaces, images, slides, charts), how people recognise it and react to it, what it costs the people who receive it, and which methods reduce it. These findings are input for deciding whether to write a skill that removes slop from AI output. This report does not write those rules. Padding and over-editing are covered in `llm-output-semantic-density.md` and `code-quality-for-coding-agents.md`; this report does not repeat them.
+**Scope.** What makes AI-generated output "slop" in any medium (text, code and its pull requests, user interfaces, images, slides, charts), how people recognise it and react to it, what it costs the people who receive it, and which methods reduce it. These findings are input for a possible skill that removes slop from AI output. The skill would serve two aims the user stated: reduce the cognitive load that AI output puts on the people who read, review or use it, and give them more polished experiences, where good design helps cognition. Hiding that AI produced an output is not an aim. This report does not write the skill's rules. Padding and over-editing are covered in `llm-output-semantic-density.md` and `code-quality-for-coding-agents.md`; this report does not repeat them.
 
-**Status.** Fifteen questions are closed: fourteen answered and one not found (section 9). All 59 claims were checked against their source pages. Most sources are 2024–2026 arXiv preprints. About half were read only as abstracts, so their figures are the authors' own summaries. Evidence on designs, code artifacts and costs is thin.
+**Status.** 47 questions: 39 answered, 1 contested, 3 not found, 4 low-priority questions left open (section 15). Every high-priority answer was tested by a challenge question that looked for contradicting evidence; each section states what it found. 167 of 170 claims were checked against their source pages; the 3 unchecked claims are not used here. Most sources are 2024–2026 arXiv preprints, and about two thirds were read only as abstracts, so their figures are the authors' own summaries. Evidence on designs, cognitive load and costs is thin.
 
-**Slop is mostly a content problem, not a word problem.** In the only study that asked experts to label text as slop, relevance, information density and tone predicted the label best, and surface features predicted it only modestly (Shaib et al., 2025). Studies do find that LLM text overuses certain words, punctuation and sentence templates, but no study found links these surface features to reader-judged quality. For designs, the measured problems are sameness across tools, stated design reasoning that the output does not implement, and factual and layout errors in slides.
+**Slop is mostly a content problem, and its cost falls on the recipient.** In the only study that asked experts to label text as slop, relevance, information density and tone predicted the label best (Shaib et al., 2025), although the annotators agreed poorly on the label itself. Studies find that LLM text overuses certain words, punctuation and sentence templates, but these tells shift over time and no study links them to reader-judged quality. For designs, the measured problems are sameness across tools, stated design reasoning that the output does not implement, and factual and layout errors in slides. Good visual design raises perceived usability and satisfaction reliably, and raises objective performance by a small amount, mostly in hard tasks. LLM rewriting, the obvious way to remove slop, changes meaning and certainty, and an LLM reviewing its own output favours it.
 
 ## Findings at a glance
 
-| Question | What the evidence shows | Evidence boundary |
+| Question | What the evidence shows | What the challenge found |
 | --- | --- | --- |
-| What is slop? | Two kinds of definition: by content (generic, low quality, mass produced) and by practice (low effort, unrequested, burdens the reader). | No source compares definitions across media. |
-| What predicts a "slop" label on text? | Relevance, density and tone. Automatic features reach AUROC 0.64–0.68. | One annotation study, news and question answering. |
-| Which surface features are typical of LLM text? | Overused words, em dashes, syntactic templates, instruction-tuned style, lower lexical diversity. | Measured as frequency against human text, not as quality. |
-| What do expert editors fix in LLM prose? | Awkward wording (28%), poor sentence structure (20%), redundant exposition (18%), clichés (17%). | One study, literary fiction and creative non-fiction. |
-| Are AI designs generic? | UIs from five tools converge in look and layout; over 25% of stated design rationales are not implemented. | One measured study; no human-rater study of generic design. |
-| Does AI make users' work alike? | Yes in small controlled studies of essays, ideas and visual ideation. | Small samples; depends on model and task. |
-| Can people spot AI output? | Detection clusters around chance; disclosing AI use lowers quality ratings. | Abstracts only; nothing for code or designs. |
-| What does slop cost recipients? | Reviewers and maintainers carry the time cost; one self-report survey puts it at about 1 h 51 min per instance. | No study measured maintainer time directly. |
-| What reduces slop? | Prompting "avoid clichés" did not remove them; editing flagged spans helps; decoding and training methods report large reductions. | No study tested whether removing slop drops content readers need. |
+| What predicts a "slop" label on text? | Relevance, density and tone; automatic features reach AUROC 0.64–0.68. | No replication. Annotators agreed poorly; English news and QA only. |
+| Which surface features are typical of LLM text? | Overused words, em dashes, syntactic templates, lower lexical diversity. | Tells rise and fall with public attention; not linked to quality. |
+| What do expert editors fix in LLM prose? | Awkward wording (28%), poor sentence structure (20%), redundant exposition (18%), clichés (17%). | Editing reduces AI style but does not remove it. |
+| Are AI designs generic? | UIs from five tools converge in look and layout; over 25% of stated design rationales are not implemented. | No contradicting study; no human reference set; persona prompting raised diversity in one image study. |
+| Does AI make users' work alike? | Yes: a meta-analysis of 19 studies finds a small effect, stronger in constrained tasks. | — |
+| Can people spot AI output? | Non-experts: near chance. Frequent LLM users: near perfect on short nonfiction. | Disclosure effects are small and depend on context. |
+| Which output features drive cognitive load? | Studies vary the tool, not the output. Medium-length explanations helped error detection most. | No study varies length and measures load. |
+| Does good design help users think? | Aesthetics raises objective performance a little (g = 0.12 to 0.29) and perceived usability a lot. | Gains appear in hard tasks; none in simple tasks. |
+| Does polish raise trust without accuracy? | Same content, more aesthetic: judged more credible. | No study holds AI correctness fixed and varies polish. |
+| What does slop cost recipients? | Review burden is reported; one trial measured over 5% longer reviews. | No study measures the cost of low-quality AI contributions directly. |
+| Does rewriting keep meaning? | Rewrites shift stance; 30–49% change expressed certainty. | Passing results use similarity measures blind to certainty. |
+| Can an agent check its own output? | Judges agree with experts less than experts agree with each other, and favour their own text. | Contested: blind, rubric-based judging reduces self-preference. |
 
 ## 1. Definitions
 
@@ -29,9 +32,8 @@ Research findings · Search date: 12 November 2026
 - Content-centred: "generic, low-quality content that appears to have been generated by AI" (Shaib et al., 2025), and the dictionary sense of "digital content of low quality that is produced usually in quantity by means of artificial intelligence", quoted in the MINT review (Minty, 2026).
 - Practice-centred: content "mindlessly generated and thrust upon someone who didn't ask for it" (Willison, quoted in Minty, 2026). One expert in Shaib et al.'s survey defined it as "the brazen publishing (online or IRL) of content that wastes a reader's time" (Shaib et al., 2025).
 - Kommers et al. (2025) name three traits: superficial competence ("its veneer of quality is belied by a deeper lack of substance"), asymmetric effort, and mass producibility.
-- A legal definition by Silbey and Hartzog (2025) could not be read (blocked).
 
-**No source compares definitions across media.** The MINT review notes that misuse of images and video can be realistic rather than low quality, which fits poorly with quality-based definitions (Minty, 2026).
+No source compares definitions across media. The MINT review notes that misuse of images and video can be realistic rather than low quality, which fits poorly with quality-based definitions (Minty, 2026). A legal definition by Silbey and Hartzog (2025) could not be read.
 
 ## 2. Text: what makes readers call it slop
 
@@ -41,144 +43,241 @@ Research findings · Search date: 12 November 2026
 - information quality: factuality, bias
 - style quality: repetition, templatedness, coherence, fluency, verbosity, word complexity, tone
 
-In their annotation of news and question-answering text, "the strongest predictors are text issues like Relevance", together with density and tone, and the important features differed by the purpose of the text. Syntax-only automatic features predicted the binary slop label best, but only modestly (AUROC 0.64 linear, 0.68 PCA+LDA). Three of the five significant codes have no reliable automatic metric (Shaib et al., 2025).
+In their annotation of news and question-answering text, "the strongest predictors are text issues like Relevance", together with density and tone. Syntax-only automatic features predicted the binary label best, at AUROC 0.64 (linear) and 0.68 (PCA+LDA) (Shaib et al., 2025).
 
-**What expert editors change.** Chakrabarty et al. (2025) built a seven-category taxonomy of edits from professional writers who edited LLM-written literary fiction and creative non-fiction: cliché, unnecessary or redundant exposition, purple prose, poor sentence structure, lack of specificity and detail, awkward word choice and phrasing, and tense inconsistency. "The most common categories being Awkward Word Choice and Phrasing (28%), Poor Sentence Structure (20%), Unnecessary/Redundant Exposition (18%), and Clichés (17%)." The distribution was similar across model families.
+**Challenge.** No independent critique or replication was found. The limits come from the paper itself: agreement on the binary label was poor ("a Cohen's κ of -0.12 (A1–A2), 0.11 (A1–A3), and 0.01 (A2–A3)"), the data are English news and MS MARCO answers with three annotators, and which features matter depends on the genre (Shaib et al., 2025). Because syntax-only features predicted best, "content matters more than wording" is not cleanly tested. Expert detectors name "AI vocabulary" as their most common cue (Russell et al., 2025), so word choice matters for recognising AI text even where it does not predict a slop label.
 
-## 3. Text: surface features measured in LLM output
+**What expert editors change.** Professional writers edited LLM-written literary fiction and creative non-fiction with a seven-category taxonomy: cliché, unnecessary or redundant exposition, purple prose, poor sentence structure, lack of specificity and detail, awkward word choice and phrasing, and tense inconsistency. "The most common categories being Awkward Word Choice and Phrasing (28%), Poor Sentence Structure (20%), Unnecessary/Redundant Exposition (18%), and Clichés (17%)", similar across model families (Chakrabarty et al., 2025a).
 
-Studies measure these features as frequency against human text. None of them tests whether readers judge text with these features as worse.
+## 3. Text: surface tells and how they change over time
 
-- **Overused words.** Juzek and Ward (2024) found 21 focal words (such as *delve*, *intricate*, *underscore*) whose rise in scientific abstracts is likely due to LLM use, and point to RLHF as a possible cause. Kobak et al. (2025) measured an abrupt rise of "style words" in 15 million PubMed abstracts and estimated that at least 13.5% of 2024 abstracts were processed with an LLM.
-- **Em dashes.** Em dash prevalence in medRxiv Discussion sections rose from 4.23% before ChatGPT to 11.58% after, across 69,632 preprints (Czuma, 2026). Across twelve models the rate ranges from 0.0 to 9.1 per 1,000 words. Freeburg (2026) proposes to "reframe em dash frequency as a diagnostic of fine-tuning methodology rather than a stylistic defect".
-- **Syntactic templates.** Models produce repeated part-of-speech sequences "at a higher rate than what is found in human-reference texts"; most templates come from pre-training data and survive RLHF (Shaib et al., 2024).
-- **Grammatical and rhetorical style.** On Biber's features, Llama 3 and GPT-4o differ systematically from human text, and the differences "are larger for instruction-tuned models than base models" (Reinhart et al., 2025).
-- **Diversity.** Newer instruction-tuned models show "reduced syntactic and, especially, lexical diversity" compared with older models, while human news text changed little (Gude et al., 2026).
+Studies measure these features as frequency against human text. None tests whether readers judge text with these features as worse.
 
-**Gap.** No corpus measurement of specific rhetorical constructions, such as "not just X but Y" or groups of three, was found. The template measure above is the closest.
+- **Overused words.** Juzek and Ward (2024) found 21 focal words (such as *delve*, *intricate*, *underscore*) whose rise in scientific abstracts is likely due to LLM use. Kobak et al. (2025) measured an abrupt rise of "style words" in 15 million PubMed abstracts.
+- **Em dashes.** Em dash prevalence in medRxiv Discussion sections rose from 4.23% before ChatGPT to 11.58% after (Czuma, 2026). Rates range from 0.0 to 9.1 per 1,000 words across twelve models, and Freeburg (2026) proposes to "reframe em dash frequency as a diagnostic of fine-tuning methodology rather than a stylistic defect".
+- **Syntactic templates.** Models produce repeated part-of-speech sequences "at a higher rate than what is found in human-reference texts" (Shaib et al., 2024).
+- **Style and diversity.** Differences from human style on Biber's features "are larger for instruction-tuned models than base models" (Reinhart et al., 2025). Newer instruction-tuned models show "reduced syntactic and, especially, lexical diversity" compared with older models (Gude et al., 2026).
+
+**The tells move.** Several words flagged as overused by ChatGPT, such as *delve*, dropped in arXiv abstracts soon after they were publicly pointed out in early 2024, while others, such as *significant*, kept rising (Geng & Trotta, 2025). A curation-free method finds other overused items in open models, such as *suggest*, *additionally* and *strategy* (Juzek et al., 2026). No study compares named tells across releases of the same commercial model.
 
 ## 4. Designs, slides and charts
 
-**User interfaces.** Imteyaz et al. (2026) generated 120 interfaces with five generative UI tools. The "generated interfaces converge across tools, showing narrow differences in visual appearance and layout organization, while color choices vary more widely". They also found that "over 25% of user-facing design rationales are not implemented in the generated interface": the tool's stated reasoning does not match its output. Shin et al. (2026) argue, without measurement, that "the push for frictionless generation can exacerbate homogenization".
+**User interfaces.** Imteyaz et al. (2026) generated 120 interfaces with five generative UI tools. The "generated interfaces converge across tools, showing narrow differences in visual appearance and layout organization, while color choices vary more widely". They also found that "over 25% of user-facing design rationales are not implemented in the generated interface": the reasoning the tool shows the user does not match what it built.
 
-**Web page benchmarks do not catalogue real defects.** WebGen-V tests defect detection with degradations its authors injected (text, layout, media), not with defects raters found in generated pages (Wang et al., 2025). MM-WebAgent names "style inconsistency and poor global coherence" when generated images and charts are added to pages separately (Li et al., 2026). The DesignBench abstract names no defect types (Xiao et al., 2025). Whether vision-language judges agree with designers was not answered.
+**Challenge.** No study contradicts the sameness finding, and none compares generated UIs with a set of human designs, across model versions or across repeated runs (searched, not found). Imteyaz et al. used default settings, and Shin et al. (2026) argue the point without measuring it. In an image-design setting, conditioning the generator on simulated personas raised visual diversity (Choi et al., 2026), so sameness may be a default that prompting can reduce.
 
-**Slides.** PresentBench reports that slide generators "frequently make factual or numerical mistakes when filling in specifics", and that "Visual Design and Layout scores are low overall, making it a primary bottleneck for slide generation" (Chen et al., 2026). Xu et al. (2025) state, without a measured rate, that first-pass LLM layouts "often contain errors such as misalignment, text overflow, and inconsistent spacing".
+**Slides and charts.** Slide generators "frequently make factual or numerical mistakes when filling in specifics", and "Visual Design and Layout scores are low overall, making it a primary bottleneck for slide generation" (Chen et al., 2026). First-pass LLM layouts "often contain errors such as misalignment, text overflow, and inconsistent spacing", with no measured rate (Xu et al., 2025). VisEval's evaluation of LLM-generated charts "reveals prevalent challenges" (Chen et al., 2024).
 
-**Charts.** VisEval's evaluation of LLM-generated charts on validity, legality and readability "reveals prevalent challenges" (Chen et al., 2024).
-
-**Images.** In a 100-person survey, the cues people named for AI images were errors in perspective, light and reflections, inconsistent shapes or colours, texture errors, "unnatural blurred background" and blended items (Poletti et al., 2026). These cues concern photorealistic images, not graphic design.
-
-**Gap.** No human-rater study of generic AI graphic or UI design was found. Practitioner lists of design tells were not recorded as evidence.
+**Finish defects and their effect on users.** No study measures how users respond to overflow, misalignment or inconsistent spacing in AI-generated designs. In a pre-AI e-commerce experiment with 272 students, perceived presentation flaws lowered perceived quality, which lowered trust and purchase intention (Everard & Galletta, 2005). Models detect slide design flaws poorly (Zhang et al., 2025).
 
 ## 5. Sameness across users
 
-**Small controlled studies find that AI assistance makes different users' work more alike.**
+A meta-analysis of 19 studies (61 effect sizes) found a small but significant homogenisation effect of AI use on creative output, stronger in semantically constrained ideation tasks and weaker in open divergent-thinking tasks (de Rooij & Biskjaer, 2026). Individual studies:
 
-- Co-writing essays with InstructGPT, but not base GPT-3, "results in a statistically significant reduction in diversity" (Padmakumar & He, 2024). The authors measured each essay's average pairwise similarity to other essays on the same topic (Rouge-L, BertScore), n-gram diversity and key-point diversity.
-- In a 36-person study, "different users tended to produce less semantically distinct ideas with ChatGPT" than with another creativity tool (Anderson et al., 2024).
-- In visual ideation (N = 60), "participants who used AI produced fewer ideas, with less variety and lower originality compared to a baseline", and fixated on the initial example (Wadinambiarachchi et al., 2024).
-- Chen et al. (2025) find fixation in the generator itself, "limiting its ability to generate novel and diverse design outcomes".
+- Co-writing essays with InstructGPT, but not base GPT-3, "results in a statistically significant reduction in diversity" (Padmakumar & He, 2024).
+- In a 36-person study, "different users tended to produce less semantically distinct ideas with ChatGPT" (Anderson et al., 2024).
+- In visual ideation (N = 60), "participants who used AI produced fewer ideas, with less variety and lower originality compared to a baseline" (Wadinambiarachchi et al., 2024).
 
 ## 6. Recognising AI output and reacting to it
 
-**People cannot reliably recognise AI output.** A systematic review of 30 studies across text, image and voice found that "human detection accuracy varied widely but generally clustered around chance performance" (Ramos, 2026). In one study, participants misclassified real and AI photos 38.7% of the time (Lu et al., 2023). "Without feedback, participants made the most errors precisely when feeling most confident"; immediate feedback improved accuracy and calibration (Milička et al., 2025).
+**Non-experts recognise AI output at about chance level.** A systematic review of 30 studies across text, image and voice found that accuracy "generally clustered around chance performance" (Ramos, 2026). "Without feedback, participants made the most errors precisely when feeling most confident" (Milička et al., 2025).
 
-**The cues people use are not quality cues.** Readers rely on cues such as pronouns, contractions and family topics; these are flawed and can be exploited so that AI text is judged "more human than human", "raising concerns about novel forms of deception and manipulation" (Jakesch et al., 2023).
+**Challenge: expert readers are accurate.** Five annotators who use LLMs often for writing detected AI-written articles almost perfectly by majority vote, while non-experts reached a 56.7% true-positive rate against a 52.5% false-positive rate (Russell et al., 2025). That study is restricted "to English nonfiction articles of fewer than 1K words". Across languages, 19 recruited annotators averaged 87.6% (Y. Wang et al., 2025). Readers trained in creative writing (MFA programmes) strongly disfavoured prompted AI fiction that general readers favoured (Chakrabarty et al., 2025b). Wikipedia editors often flagged AI text from a mismatch with its context rather than from a specific feature (Morgenstern et al., 2026). Reviewers of bestsellers who suspected AI authorship complained more about shallow content and poor presentation (Dibia, 2026).
 
-**Knowing AI was involved changes the judgement.** Disclosing AI assistance "decreases the average quality ratings for both argumentative essays and creative stories" (Li et al., 2024). Readers cite "a perceived loss of human sincerity, diminished author effort, and the contextual inappropriateness of AI" (Nakano et al., 2025). Beliefs about LLM involvement "significantly shape their evaluations" of research summaries, and LLM-edited abstracts were rated higher than purely human or purely LLM ones (Akpinar et al., 2026).
+**The cues people use are not quality cues.** Readers rely on cues such as pronouns and contractions, which can be exploited so that AI text is judged "more human than human", "raising concerns about novel forms of deception and manipulation" (Jakesch et al., 2023).
 
-**Gap.** No independent study tests whether "humanizer" tools improve quality. Only vendor pages discuss them.
+**Disclosure lowers ratings, but modestly.** Disclosing AI assistance "decreases the average quality ratings for both argumentative essays and creative stories" (Li et al., 2024). Readers cite "a perceived loss of human sincerity, diminished author effort, and the contextual inappropriateness of AI" (Nakano et al., 2025). The challenge found smaller effects elsewhere: a slight bias against AI-labelled messages (Lim & Schmälzle, 2023), and lower perceived accuracy of AI-labelled news with limited broader effects (C. Wang et al., 2025). No study found that disclosure raises ratings.
 
-## 7. Costs to recipients
+## 7. Cognitive load
 
-**The cost falls on reviewers and readers, not on the producer.** Baltes et al. (2026) analysed 1,154 Reddit and Hacker News posts and describe this asymmetry: "The development time has been shortened but the team now needs to spend more time to review." Developers also report technical debt: "You can go very fast with AI, but you accrue technical debt at a much higher speed too." The study is qualitative, and its sample was chosen by searching for "AI slop", so it skews negative.
+**The studies vary the tool or the label, not the features of the output.** Samples are small (15–24 people) and only abstracts were read.
+
+- Showing runtime values next to AI-generated code lowered "the cost of validation by execution" (Ferdowsi et al., 2023).
+- A test-based clarification workflow lowered self-reported cognitive load and led to more correct evaluation of AI code (Fakhoury et al., 2024).
+- When an LLM explanation was wrong, medium-length explanations gave higher error-detection accuracy than shorter or longer ones (Friedman et al., 2026).
+- Programmers looked less at model-generated code than at human code of equal readability (Al Madi, 2022). Reviewers fixated longer on code labelled as LLM-generated, without reviewing it more thoroughly (Khojah et al., 2026).
+
+**Challenge.** No study varies output length and measures reader load. The one experiment that varies length shows that shortest is not always best for catching errors (Friedman et al., 2026).
+
+## 8. Design quality, polish and cognition
+
+**Aesthetics raises perceived usability reliably and objective performance a little.**
+
+- A 2019 meta-analysis of 25 studies found "a small significant overall effect of interface aesthetics on user performance (g = 0.12)" with high heterogeneity, and warned that two very small studies show large effects (Thielsch et al., 2019a).
+- A 2026 preregistered meta-analysis of 31 studies (18,794 participants) found "a small to medium positive effect of aesthetics on performance (g = 0.29), though with high unexplained heterogeneity", moderated by interaction device and typography (Schlamann et al., 2026). Only its abstract and supplement were read.
+- Two experiments disagree on speed: more attractive designs "led to longer task completion times" in one (Sauer & Sonderegger, 2011) and "reduced task completion times for the attractive model" in another (Sonderegger & Sauer, 2010).
+- An enhanced text layout did not change reading speed or comprehension but raised satisfaction (Chaparro et al., 2005). Embellished charts were interpreted no less accurately than plain ones and recalled better weeks later (Bateman et al., 2010).
+
+**Challenge: gains appear where tasks are hard.** Aesthetic appeal sped up icon search only when the task was hard and made no difference when it was easy (Reppa & McDougall, 2015). A 331-person web experiment found "neither significant main effects of aesthetics and goal orientation on performance regarding both accuracy and response times" (Thielsch et al., 2019b). No study measured comprehension or error rates for visual hierarchy, alignment or consistency specifically.
+
+**Polish raises perceived credibility.** "When the same content is presented using different levels of aesthetic treatment, the content with a higher aesthetic treatment was judged as having higher credibility" (Robins & Holmes, 2008). Users were less likely to check facts or question reasoning in conversations where the AI produced artifacts such as code or documents, but this finding is correlational (Anthropic Education, 2026). No study holds the correctness of AI output fixed, varies its polish, and measures whether users verify it.
+
+## 9. Costs to recipients
+
+**Reviewers and readers carry the cost.** Developers describe it as an asymmetry: "The development time has been shortened but the team now needs to spend more time to review" (Baltes et al., 2026). That study is qualitative and sampled posts that use the term "AI slop", so it skews negative.
 
 - The curl maintainer ended its bug bounty because "the current torrent of submissions put a high load on the curl security team" (Sharwood, 2026).
-- An LF Research survey reports that maintainers estimate "25% of incoming PRs are estimated to be low-quality", 31% in large projects; the press release gives no method (The Linux Foundation, 2026).
-- A BetterUp and Stanford self-report survey found that 40% of US desk workers received "workslop" in the past month, at about "1 hour and 51 minutes" per instance, and called it an "invisible tax" of $186 per employee per month (Leon, 2025). The blog does not explain the dollar figure, and its sample size is inconsistent. The Harvard Business Review original was blocked.
+- Maintainers estimate that "25% of incoming PRs are estimated to be low-quality"; the press release gives no method (The Linux Foundation, 2026).
+- A self-report survey found 40% of US desk workers received "workslop" in the past month, at about "1 hour and 51 minutes" per instance (Leon, 2025). Critics point to recall bias and sample contamination (Otter, 2025).
 
-**Gap.** No study measured maintainers' time directly (question not found after several searches).
+**Challenge: measured effects are mixed.** In a randomized trial at Meta, showing AI-generated fixes to reviewers raised review time by over 5%, with no regression once the fixes were shown only to authors (Maddila et al., 2025). An observational study found faster resolution of GPT-assisted pull requests, but its own numbers are inconsistent (Collante et al., 2025). No study measures the time cost of low-quality AI contributions directly (searched, not found).
 
-## 8. Code artifacts other than the code change
+## 10. Code artifacts other than the code change
 
-- In 33,596 agent-authored pull requests, "negative comments often target presentation issues rather than rejecting the code itself", and PR description readability alone did not decide merges (Watanabe et al., 2026).
-- Among 326 closed, unmerged AI fix PRs, the main reasons were redundancy with another PR (22.1%), test failures (18.1%) and incorrect or incomplete fixes (15.3%); "syntactically plausible fixes alone are often insufficient for successful integration" (Alam et al., 2026).
-- Developers name emojis in comments and verbose style as cues of AI code (Baltes et al., 2026; summarised, no quote checked).
+- In 33,596 agent-authored pull requests, "negative comments often target presentation issues rather than rejecting the code itself" (Watanabe et al., 2026a).
+- Among 326 closed, unmerged AI fix PRs, the main reasons were redundancy with another PR (22.1%), test failures (18.1%) and incorrect or incomplete fixes (15.3%) (Alam et al., 2026).
+- Agent code is 2.3 times more verbose than code in human repositories (Orlanski et al., 2026), and many methods generated by agents are deleted in review (Watanabe et al., 2026b).
 
-**Gap.** No study codes verbose comments, commit messages or issue reports as slop.
+No study codes verbose comments, commit messages or issue reports as slop.
 
-## 9. Methods that reduce slop
+## 11. Methods that reduce slop, and what rewriting costs
 
-- **Prompting.** Chakrabarty et al. (2025) prompted models with "Try your best to be original, avoiding clichés or overused tropes", and clichés still made up 17% of expert edits. Verbalized Sampling, a prompting method that asks for several answers with their probabilities, "increases diversity by 1.6-2.1x over direct prompting" in creative writing (Zhang et al., 2025). It targets sameness, not slop phrases.
-- **Editing.** "Editing undesirable portions of a response can be seen as an effective mechanism for enhancing alignment" with human writing. Automatic editors detect problems less well than experts agree with each other, and experts still prefer expert edits (Chakrabarty et al., 2025).
-- **Decoding and training.** The Antislop backtracking sampler "successfully suppresses 8,000+ patterns while maintaining quality". Its training method cut slop about 90%, while DPO "suffers significant degradation in writing quality and lexical diversity despite achieving weaker suppression" (Paech et al., 2025). An agent working on a finished model cannot use these methods.
+**Prompting alone did not remove clichés.** Models prompted with "Try your best to be original, avoiding clichés or overused tropes" still produced clichés that made up 17% of expert edits (Chakrabarty et al., 2025a).
 
-**Gap.** No study tested whether removing slop also removes content readers need, and none tested review checklists.
+**Editing reduces AI style but does not remove it.**
 
-## 10. What this adds to the existing reports
+- Editing flagged spans improves alignment with human writing, but automatic editors detect problems less well than experts (Chakrabarty et al., 2025a).
+- A trained writing-quality reward model selected revisions that expert writers preferred 66% of the time, while general LLMs barely beat chance at judging writing quality (Chakrabarty et al., 2025c).
+- People who post-edited LLM drafts toward their own style ended closer to LLM style than to their own (Baumler et al., 2026).
+- Decoding and training methods report large reductions, such as an Antislop sampler that "successfully suppresses 8,000+ patterns while maintaining quality" (Paech et al., 2025), but they need access to the model.
+
+**Rewriting changes meaning and certainty.**
+
+- LLM revisions of student essays shifted word choice up to "nearly triple the human baseline" and reframed "arguments in more positive, optimistic terms" (Abdulhai et al., 2026).
+- 30–49% of rewrites of scientific and radiology text changed expressed certainty. "Prompt interventions reduce overall certainty distortion but do not eliminate it": explicit preserve instructions cut distortion on news rewriting from 64% to 42% (Belem et al., 2026).
+- LLM science summaries were nearly five times more likely than expert summaries to broaden claims (Peters & Chin-Yee, 2025).
+
+**Challenge.** Rewrites kept high embedding similarity to the original under grammar prompts (Sourati et al., 2024), and LLM post-editing of summaries changed meaning about as much as human editors did (Lee et al., 2025). Both measure meaning with similarity scores that cannot detect changes in certainty or stance. No study shows hedges or stance preserved under a rewrite.
+
+**Gap.** No study tests whether removing slop also removes content readers need.
+
+## 12. Checks an agent can run on its own output
+
+- The best LLM judge of web-development quality agreed with experts about 14 points less often than experts agreed with each other, and an agent that interacts with the page did not help: "the agentic workflow fails to outperform the vanilla models" (Li et al., 2025).
+- A rubric-based judge reached "96% agreement with human preferences" on recreating web pages from video, a different task (Dai et al., 2026).
+- The strongest off-the-shelf judge matched human preferences on creative writing 73% of the time (Fein et al., 2025).
+- Rendering pages and critiquing them with a vision-language model improved generated pages by up to 17.8% (Sansford et al., 2026). Vision models used as UI fault finders flagged 18–62% of clean screens and found only 47–72% of text-layout faults (Sun et al., 2026).
+- LLM judges prefer longer answers than humans do (Saito et al., 2023; Dubois et al., 2024), and reward models over-favour length, jargon and vagueness (Bharadwaj et al., 2025).
+- Even 20 professional designers agree weakly on UI preferences, which caps how far any judge can agree with humans (Peng et al., 2025).
+
+**Self-preference is contested.** LLMs that recognise their own text rate it higher (Panickssery et al., 2024; Spiliopoulou et al., 2025). Under blind evaluation, "self-preference disappears" once quality and judge severity are controlled, although labelling an output as the judge's own still inflates its score (Chae et al., 2026). A structured multi-dimension evaluation cut self-preference by 31.5% on average (Yang et al., 2026). Hiding authorship helps, but self-preference recovers when style is fully neutralised (Mahbub & Feng, 2025). No study tests an agent reviewing its own output for slop or design defects.
+
+## 13. What this adds to the existing reports
 
 | Already covered | Source report | New here |
 | --- | --- | --- |
-| Restated question, preambles, generic caveats, lists of possible answers | `llm-output-semantic-density.md` | Relevance and tone as the main predictors of a slop label; expert edit categories (wording, sentence structure, clichés) |
-| Over-editing, leftover edits ("CodeSlop") | `code-quality-for-coding-agents.md` | PR presentation as a target of negative review; reviewer-pays asymmetry |
-| — | — | Overused words, em dashes and templates as population signals, not proven defects |
+| Restated question, preambles, generic caveats, lists of possible answers | `llm-output-semantic-density.md` | Relevance and tone as predictors of a slop label; expert edit categories; medium-length explanations best for catching errors |
+| Over-editing, leftover edits ("CodeSlop") | `code-quality-for-coding-agents.md` | PR presentation as a target of negative review; reviewer-pays asymmetry; review-time trial |
+| — | — | Surface tells as moving population signals, not proven defects |
 | — | — | Generic designs, stated design reasoning not implemented, slide errors |
+| — | — | Design quality: perceived usability and credibility, small performance gains in hard tasks |
 | — | — | Sameness across users |
-| — | — | Detection near chance; disclosure lowers ratings; humanizing raises deception concerns |
+| — | — | Rewriting shifts meaning and certainty |
+| — | — | Limits of self-review and of LLM and vision judges |
 
-## 11. Where sources disagree
+## 14. Where sources disagree
 
-- **Are surface tells defects?** Shaib et al. (2024) and Juzek and Ward (2024) treat templates and focal words as artefacts of training. Freeburg (2026) argues em dashes are a marker of fine-tuning, not a defect. No source links them to reader-judged quality.
-- **Does AI involvement lower perceived quality?** Disclosure lowered ratings of essays and stories (Li et al., 2024), but LLM-edited abstracts were rated higher than human-only ones (Akpinar et al., 2026). The two studies differ in task and in whether readers were told.
+- **Are surface tells defects?** Shaib et al. (2024) and Juzek and Ward (2024) treat templates and focal words as artefacts of training, and expert detectors use AI vocabulary as a cue (Russell et al., 2025). Freeburg (2026) argues em dashes mark fine-tuning, not a defect. No source links tells to reader-judged quality.
+- **Does attractive design speed tasks?** One experiment found longer completion times (Sauer & Sonderegger, 2011), another shorter (Sonderegger & Sauer, 2010), and a third no effect (Thielsch et al., 2019b). Task difficulty may explain the difference (Reppa & McDougall, 2015).
+- **Does self-review favour its own output?** Yes in Panickssery et al. (2024) and Spiliopoulou et al. (2025); not under blind evaluation in Chae et al. (2026).
 
-## 12. Limits
+## 15. Limits and open questions
 
-- About half the sources were read only as abstracts.
+- About two thirds of the 128 sources were read only as abstracts.
 - The cost figures come from self-report surveys, a vendor blog and a press release.
-- Design evidence rests on one measured study of UIs and benchmark papers on slides and charts.
+- Design evidence rests on one measured study of UIs, benchmark papers on slides and charts, and pre-AI studies of web aesthetics.
 - No study tests a deslop method on code, designs or documents, or checks that it keeps needed content.
-- Blocked: Silbey and Hartzog (2025), SSRN; the Harvard Business Review article on workslop.
+- Not found after several searches: a direct measure of maintainers' time spent on low-quality AI contributions; a comparison of generated-UI diversity with human designs or across model versions; agreement between image-diversity metrics and human judgements of sameness.
+- Open, low priority: later replications of Everard and Galletta (2005); trends of named tells across 2025–2026 model releases; web-design homogenisation before AI (Goree et al., 2021); independent tests of revision-based slop reduction.
+- Blocked: Silbey and Hartzog (2025, SSRN); the Harvard Business Review article on workslop; Goree et al. (2021, ACM).
+- Not used because their quotes could not be checked: Tractinsky et al. (2000) on aesthetics and perceived usability; Hornof and Halverson (2003) on labelled layouts; one quality statement in the Schlamann et al. (2026) supplement.
+
+The research board is in `.research/ai-output-slop/` (not committed).
 
 ## Sources
 
-- Akpinar, N.-J., Avula, S., Lee, C., Dang, B., Razat, K., & Murdock, V. (2026). *LLM or human? Perceptions of trust and information quality in research summaries*. arXiv. https://arxiv.org/abs/2601.15556
+- Abdulhai, M., White, I., Wan, Y., Qureshi, I., Leibo, J. Z., Kleiman-Weiner, M., & Jaques, N. (2026). *How LLMs distort our written language*. arXiv. https://arxiv.org/abs/2603.18161
+- Al Madi, N. (2022). *How readable is model-generated code? Examining readability and visual inspection of GitHub Copilot*. arXiv. https://arxiv.org/abs/2208.14613
 - Alam, K., Mondal, S., & Roy, B. (2026). *Why are AI agent-involved pull requests (fix-related) remain unmerged? An empirical study*. arXiv. https://arxiv.org/abs/2602.00164
 - Anderson, B. R., Shah, J. H., & Kreminski, M. (2024). *Homogenization effects of large language models on human creative ideation*. arXiv. https://arxiv.org/abs/2402.01536
+- Anthropic Education. (2026, February 23). *The AI fluency index*. Anthropic. https://academy.claude.com/tutorials/the-ai-fluency-index
 - Baltes, S., Cheong, M., & Treude, C. (2026). *"An endless stream of AI slop": How developers discuss the burden of AI-assisted software development*. arXiv. https://arxiv.org/abs/2603.27249
-- Chakrabarty, T., Laban, P., & Wu, C.-S. (2025). *Can AI writing be salvaged? Mitigating idiosyncrasies and improving human-AI alignment in the writing process through edits*. arXiv. https://arxiv.org/abs/2409.14509
-- Chen, L., Song, Y., Zheng, C., Jing, Q., Hansen, P., & Sun, L. (2025). *Understanding design fixation in generative AI*. arXiv. https://arxiv.org/abs/2502.05870
+- Bateman, S., Mandryk, R. L., Gutwin, C., Genest, A., McDine, D., & Brooks, C. (2010). Useful junk? The effects of visual embellishment on comprehension and memorability of charts. In *Proceedings of the SIGCHI Conference on Human Factors in Computing Systems*. ACM. https://vis.csail.mit.edu/classes/6.859/readings/pdfs/Bateman-UsefulJunk.pdf
+- Baumler, C., Bao, C., Nghiem, H., Yang, X., Carpuat, M., & Daumé III, H. (2026). *Can you make it sound like you? Post-editing LLM-generated text for personal style*. arXiv. https://arxiv.org/abs/2604.24444
+- Belem, C. G., Wu, S., Yao, H., Steyvers, M., Singh, S., & Smyth, P. (2026). *From 'may' to 'is': Certainty distortion in language model rewriting*. arXiv. https://arxiv.org/abs/2606.07951
+- Bharadwaj, A., Malaviya, C., Joshi, N., & Yatskar, M. (2025). *Flattery, fluff, and fog: Diagnosing and mitigating idiosyncratic biases in preference models*. arXiv. https://arxiv.org/abs/2506.05339
+- Chae, S., Kim, M., Jung, D., Choi, S., & Jung, S. (2026). Self- and other-labels induce bidirectional bias in LLM judges. In *Findings of the Association for Computational Linguistics: EMNLP 2026*. https://aclanthology.org/2026.findings-emnlp.1571.pdf
+- Chakrabarty, T., Laban, P., & Wu, C.-S. (2025a). *Can AI writing be salvaged? Mitigating idiosyncrasies and improving human-AI alignment in the writing process through edits*. arXiv. https://arxiv.org/abs/2409.14509
+- Chakrabarty, T., Ginsburg, J. C., & Dhillon, P. (2025b). *Readers prefer outputs of AI trained on copyrighted books over expert human writers*. arXiv. https://arxiv.org/abs/2510.13939
+- Chakrabarty, T., Laban, P., & Wu, C.-S. (2025c). *AI-slop to AI-polish? Aligning language models through edit-based writing rewards and test-time computation*. arXiv. https://arxiv.org/abs/2504.07532
+- Chaparro, B. S., Shaikh, A. D., & Baker, J. R. (2005). Reading online text with a poor layout: Is performance worse? *Usability News, 7*. https://portfolio.erau.edu/en/publications/reading-online-text-with-a-poor-layout-is-performance-worse/
 - Chen, N., Zhang, Y., Xu, J., Ren, K., & Yang, Y. (2024). *VisEval: A benchmark for data visualization in the era of large language models*. arXiv. https://arxiv.org/abs/2407.00981
 - Chen, X.-S., Zhu, J., Li, P., Wang, H., Yang, S., & Guo, M.-H. (2026). *PresentBench: A fine-grained rubric-based benchmark for slide generation*. arXiv. https://arxiv.org/abs/2603.07244
+- Choi, J., Vasconcelos, H., Lee, H., Zou, C., Lee, T. Y., & Bernstein, M. (2026). *FocusGen: Expanding visual design exploration with a simulated focus group of persona agents*. arXiv. https://arxiv.org/abs/2608.28001
+- Collante, A., Abedu, S., Khatoonabadi, S., Abdellatif, A., Alor, E., & Shihab, E. (2025). *The impact of large language models (LLMs) on code review process*. arXiv. https://arxiv.org/abs/2508.11034
 - Czuma, P. (2026). *Em-ergence of the em-dash: A population-level rise in em-dash frequency in medRxiv preprints at the dawn of the large-language-model era*. arXiv. https://arxiv.org/abs/2606.29540
+- Dai, Y., Lai, Y., Huang, M., Guo, H., Li, D., Peng, H., Li, H., Zhao, Y., Lyu, H., Ge, Z., Zhang, X., & Jiang, D. (2026). *WebVR: Benchmarking multimodal LLMs for webpage recreation from videos via human-aligned visual rubrics*. arXiv. https://arxiv.org/abs/2603.13391
+- de Rooij, A., & Biskjaer, M. M. (2026). Does generative AI make us think alike? A systematic review and meta-analysis of homogenisation effects in human-AI co-creation. *Behaviour & Information Technology*. https://research.tilburguniversity.edu/en/publications/does-generative-ai-make-us-think-alike-a-systematic-review-and-me-3/
+- Dibia, V. (2026). *"Is this book AI-generated?" How authorship suspicion manifests in marketplace reviews*. arXiv. https://arxiv.org/abs/2609.33950
+- Dubois, Y., Galambosi, B., Liang, P., & Hashimoto, T. B. (2024). *Length-controlled AlpacaEval: A simple way to debias automatic evaluators*. arXiv. https://arxiv.org/abs/2404.04475
+- Everard, A., & Galletta, D. F. (2005). How presentation flaws affect perceived site quality, trust, and intention to purchase from an online store. *Journal of Management Information Systems, 22*(3), 55–95. https://jmis-web.org/articles/326
+- Fakhoury, S., Naik, A., Sakkas, G., Chakraborty, S., & Lahiri, S. K. (2024). LLM-based test-driven interactive code generation: User study and empirical evaluation. *IEEE Transactions on Software Engineering, 50*(9). https://arxiv.org/abs/2404.10100
+- Fein, D., Russo, S., Xiang, V., Jolly, K., Rafailov, R., & Haber, N. (2025). *LitBench: A benchmark and dataset for reliable evaluation of creative writing*. arXiv. https://arxiv.org/abs/2507.00769
+- Ferdowsi, K., Huang, R., James, M. B., Polikarpova, N., & Lerner, S. (2023). *Validating AI-generated code with live programming*. arXiv. https://arxiv.org/abs/2306.09541
 - Freeburg, E. M. (2026). *The last fingerprint: How markdown training shapes LLM prose*. arXiv. https://arxiv.org/abs/2603.27006
+- Friedman, N., Nyanyo, A., Weatherwax, K., Wang, L., Zhu, C., Zhu, Z., & Mountford, S. J. (2026). *Not too short, not too long: How LLM response length shapes people's critical thinking in error detection*. arXiv. https://arxiv.org/abs/2603.06878
+- Geng, M., & Trotta, R. (2025). *Human-LLM coevolution: Evidence from academic writing*. arXiv. https://arxiv.org/abs/2502.09606
 - Gude, A., Santos-Ríos, R., Bond, F., Flickinger, D., Gómez-Rodríguez, C., & Zamaraeva, O. (2026). *More aligned, less diverse? Analyzing the grammar and lexicon of two generations of LLMs*. arXiv. https://arxiv.org/abs/2605.06030
 - Imteyaz, K., Imteyaz, K., Rajpal, N., Shaikh, K., Muller, M., & Savage, S. (2026). *Design theater: Evaluating the gap between user-facing design reasoning and implementation in generative UI tools*. arXiv. https://arxiv.org/abs/2607.22928
 - Jakesch, M., Hancock, J., & Naaman, M. (2023). Human heuristics for AI-generated language are flawed. *Proceedings of the National Academy of Sciences, 120*(11). https://arxiv.org/abs/2206.07271
+- Juzek, T. S., Ming, X., & Hernandez, J. A. (2026). *Fully automated identification of lexical alignment and preference-stage shifts in large language models*. arXiv. https://arxiv.org/abs/2606.03165
 - Juzek, T. S., & Ward, Z. B. (2024). *Why does ChatGPT "delve" so much? Exploring the sources of lexical overrepresentation in large language models*. arXiv. https://arxiv.org/abs/2412.11385
+- Khojah, R., Neto, F. G. de O., Mohamad, M., Frattini, J., & Leitner, P. (2026). *Same scrutiny, more time: Eye tracking insights into reviewing LLM-labelled code*. arXiv. https://arxiv.org/abs/2606.26505
 - Kobak, D., González-Márquez, R., Horvát, E.-Á., & Lause, J. (2025). Delving into LLM-assisted writing in biomedical publications through excess vocabulary. *Science Advances, 11*(27). https://arxiv.org/abs/2406.07016
 - Kommers, C., Duede, E., Gordon, J., Holtzman, A., McNulty, T., Stewart, S., Thomas, L., So, R. J., & Long, H. (2025). *Why slop matters*. arXiv. https://arxiv.org/abs/2601.06060
+- Lee, Y.-H., Li, X., & Ouyang, J. (2025). *Multi-round, chain-of-thought post-editing for unfaithful summaries*. arXiv. https://arxiv.org/abs/2501.11273
 - Leon, M. (2025, September 29). *The hidden cost of AI 'workslop' — and how leaders can fix it*. BetterUp. https://www.betterup.com/blog/hidden-costs-workslop
-- Li, Y., Zeng, Z., Yang, Y., Yang, Y., Liao, N., Guo, W., Qiu, L., Cheng, M., Dai, Q., Wang, Z., Yang, Z., Yang, X., Li, J., Wang, L., & Luo, C. (2026). *MM-WebAgent: A hierarchical multimodal web agent for webpage generation*. arXiv. https://arxiv.org/abs/2604.15309
+- Li, C., Zheng, Y., Huang, X., Fang, T., Xu, J., Chen, L., Song, Y., & Hu, H. (2025). *WebDevJudge: Evaluating (M)LLMs as critiques for web development quality*. arXiv. https://arxiv.org/abs/2510.18560
 - Li, Z., Liang, C., Peng, J., & Yin, M. (2024). *How does the disclosure of AI assistance affect the perceptions of writing?* arXiv. https://arxiv.org/abs/2410.04545
-- Lu, Z., Huang, D., Bai, L., Qu, J., Wu, C., Liu, X., & Ouyang, W. (2023). *Seeing is not always believing: Benchmarking human and model perception of AI-generated images*. arXiv. https://arxiv.org/abs/2304.13023
+- Lim, S., & Schmälzle, R. (2023). *The effect of source disclosure on evaluation of AI-generated messages: A two-part study*. arXiv. https://arxiv.org/abs/2311.15544
+- Maddila, C., Ghorbani, N., Saindon, J., Thakkar, P., Murali, V., Abreu, R., Shen, J., Zhou, B., Nagappan, N., & Rigby, P. C. (2025). *AI-assisted fixes to code review comments at scale*. arXiv. https://arxiv.org/abs/2507.13499
+- Mahbub, T., & Feng, S. (2025). *Mitigating self-preference by authorship obfuscation*. arXiv. https://arxiv.org/abs/2512.05379
 - Milička, J., Marklová, A., Drobil, O., & Pospíšilová, E. (2025). *Humans can learn to detect AI-generated texts, or at least learn when they can't*. arXiv. https://arxiv.org/abs/2505.01877
 - Minty. (2026, March 4). *AI slop: Definitions and normative status*. MINT Research Lab. https://mintresearch.org/reports/ai-slop/
+- Morgenstern, M., Zimmerman, J. W., Prama, T. T., Harootunian, K., Clark, J., Loftness, B., Beauregard, C., & Lovato, J. (2026). *Contextuality and contradictions: Exploring real-world identifications of AI-generated writing*. arXiv. https://arxiv.org/abs/2611.08704
 - Nakano, H., Takezawa, J., Matulic, F., Yang, C.-L., & Yatani, K. (2025). *Understanding reader perception shifts upon disclosure of AI authorship*. arXiv. https://arxiv.org/abs/2510.24011
+- Orlanski, G., Roy, D., Yun, A., Shin, C., Gu, A., Ge, A., Adila, D., Roberts, N., Sala, F., & Albarghouthi, A. (2026). *SlopCodeBench: Benchmarking how coding agents degrade over long-horizon iterative tasks*. arXiv. https://arxiv.org/abs/2603.24755
+- Otter, T. (2025, September 26). *Workslop: Great neologism, brilliant argument, sloppy research?* Work in Progress (Substack). https://thomasotter.substack.com/p/workslop
 - Padmakumar, V., & He, H. (2024). *Does writing with language models reduce content diversity?* arXiv. https://arxiv.org/abs/2309.05196
 - Paech, S., Roush, A., Goldfeder, J., & Shwartz-Ziv, R. (2025). *Antislop: A comprehensive framework for identifying and eliminating repetitive patterns in language models*. arXiv. https://arxiv.org/abs/2510.15061
-- Poletti, S., Ilyes, J., Hasenbalg, M., Fischinger, D., & Boyer, M. (2026). *AI-generated images: What humans and machines see when they look at the same image*. arXiv. https://arxiv.org/abs/2605.06143
+- Panickssery, A., Bowman, S. R., & Feng, S. (2024). *LLM evaluators recognize and favor their own generations*. arXiv. https://arxiv.org/abs/2404.13076
+- Peng, Y.-H., Bigham, J. P., & Wu, J. (2025). *DesignPref: Capturing personal preferences in visual design generation*. arXiv. https://arxiv.org/abs/2511.20513
+- Peters, U., & Chin-Yee, B. (2025). *Generalization bias in large language model summarization of scientific research*. arXiv. https://arxiv.org/abs/2504.00025
 - Ramos, M. L. F. (2026). *Is it cake or is it AI? A systematic review of human uncertainty in distinguishing generative artificial intelligence content*. arXiv. https://arxiv.org/abs/2604.03437
 - Reinhart, A., Markey, B., Laudenbach, M., Pantusen, K., Yurko, R., Weinberg, G., & Brown, D. W. (2025). Do LLMs write like humans? Variation in grammatical and rhetorical styles. *Proceedings of the National Academy of Sciences, 122*, e2422455122. https://arxiv.org/abs/2410.16107
+- Reppa, I., & McDougall, S. (2015). When the going gets tough the beautiful get going: Aesthetic appeal facilitates task performance. *Psychonomic Bulletin & Review, 22*(5), 1243–1254. https://pmc.ncbi.nlm.nih.gov/articles/PMC4577531/
+- Robins, D., & Holmes, J. (2008). Aesthetics and credibility in web site design. *Information Processing and Management, 44*, 386–399. https://makinggood.ac.nz/media/1276/robinsholmes_2008_aestheticsandcredibilityinwebdesign.pdf
+- Russell, J., Karpinska, M., & Iyyer, M. (2025). *People who frequently use ChatGPT for writing tasks are accurate and robust detectors of AI-generated text*. arXiv. https://arxiv.org/abs/2501.15654
+- Saito, K., Wachi, A., Wataoka, K., & Akimoto, Y. (2023). *Verbosity bias in preference labeling by large language models*. arXiv. https://arxiv.org/abs/2310.10076
+- Sansford, H., Law, D. H. C., Liu, W., Tripathi, A., Agarwal, N., & van den Burg, G. J. J. (2026). *Vision-guided iterative refinement for frontend code generation*. arXiv. https://arxiv.org/abs/2604.05839
+- Sauer, J., & Sonderegger, A. (2011). *The influence of design aesthetics and user state in usability testing* [Author preprint]. University of Fribourg. https://sonar.ch/documents/303018/files/sauer_sonderegger_2011_aesthetics_userstate_preprint.pdf
+- Schlamann, M., Nestler, S., & Thielsch, M. T. (2026). *Attractive things do work better: A meta-analysis on visual aesthetics and user performance – Online supplementary materials*. Zenodo. https://zenodo.org/records/18777943
 - Shaib, C., Chakrabarty, T., Garcia-Olano, D., & Wallace, B. C. (2025). *Measuring AI "slop" in text*. arXiv. https://arxiv.org/abs/2509.19163
 - Shaib, C., Elazar, Y., Li, J. J., & Wallace, B. C. (2024). *Detection and measurement of syntactic templates in generated text*. arXiv. https://arxiv.org/abs/2407.00211
 - Sharwood, S. (2026, January 21). Curl shutters bug bounty program to remove incentive for submitting AI slop. *The Register*. https://www.theregister.com/2026/01/21/curl_ends_bug_bounty/
 - Shin, D., Gao, A., Pang, R. Y., Lee, J., Reinecke, K., & Tseng, E. (2026). *Interrogating design homogenization in web vibe coding*. arXiv. https://arxiv.org/abs/2603.13036
-- Silbey, J. M., & Hartzog, W. (2025). *AI slop*. SSRN. https://papers.ssrn.com/abstract=5870742 (blocked, not used as evidence)
+- Sonderegger, A., & Sauer, J. (2010). The influence of design aesthetics in usability testing: Effects on user performance and perceived usability. *Applied Ergonomics, 41*, 403–410. https://sonar.ch/documents/302271/files/Sonderegger_Sauer2010.pdf
+- Sourati, Z., Ozcan, M., McDaniel, C., Ziabari, A., Wen, N., Tak, A., Morstatter, F., & Dehghani, M. (2024). *Secret keepers: The impact of LLMs on linguistic markers of personal traits*. arXiv. https://arxiv.org/abs/2404.00267
+- Spiliopoulou, E., Fogliato, R., Burnsky, H., Soliman, T., Ma, J., Horwood, G., & Ballesteros, M. (2025). *Play favorites: A statistical method to measure self-bias in LLM-as-a-judge*. arXiv. https://arxiv.org/abs/2508.06709
+- Sun, H., Li, Y., Yang, K., Li, R., Cai, J., Fu, L., Fu, Y., Li, J., & Shen, J. (2026). *ScreenProof: Where is this screen wrong? Finding UI faults without a reference*. arXiv. https://arxiv.org/abs/2611.10234
 - The Linux Foundation. (2026, October 20). *New LF Research survey shows generative AI cuts open source coding time in half, but 25% of incoming pull requests are considered AI slop*. https://www.linuxfoundation.org/press/new-lf-research-survey-shows-generative-ai-cuts-open-source-coding-time-in-half-but-25-of-incoming-pull-requests-are-considered-ai-slop
+- Thielsch, M. T., Scharfen, J., Masoudi, E., & Reuter, M. (2019a). Visual aesthetics and performance: A first meta-analysis. In *Proceedings of Mensch und Computer 2019*. ACM. https://www.uni-muenster.de/imperia/md/content/owms/2019_thielsch_et_al.pdf
+- Thielsch, M. T., Haines, R., & Flacke, L. (2019b). Experimental investigation on the effects of website aesthetics on user performance in different virtual tasks. *PeerJ*. https://www.peerj.com/articles/6516
 - Wadinambiarachchi, S., Kelly, R. M., Pareek, S., Zhou, Q., & Velloso, E. (2024). The effects of generative AI on design fixation and divergent thinking. In *Proceedings of the CHI Conference on Human Factors in Computing Systems*. https://doi.org/10.1145/3613904.3642919
-- Wang, K.-D., Wang, Z., Shimose, Y., Wang, W.-Y., & Takamatsu, S. (2025). *WebGen-V Bench: Structured representation for enhancing visual design in LLM-based web generation and evaluation*. arXiv. https://arxiv.org/abs/2510.15306
-- Watanabe, K., Tsuchida, R., Monno, T., Huang, B., Yamasaki, K., Fan, Y., Shimari, K., & Matsumoto, K. (2026). *How AI coding agents communicate: A study of pull request description characteristics and human review responses*. arXiv. https://arxiv.org/abs/2602.17084
-- Xiao, J., Wang, M., Lam, M. H., Wan, Y., Liu, J., Huo, Y., & Lyu, M. R. (2025). *DesignBench: A comprehensive benchmark for MLLM-based front-end code generation*. arXiv. https://arxiv.org/abs/2506.06251
+- Wang, C., Sturgis, P., & de Kadt, D. (2025). *AI labeling reduces the perceived accuracy of online content but has limited broader effects*. arXiv. https://arxiv.org/abs/2506.16202
+- Wang, Y., Xing, R., Mansurov, J., Puccetti, G., Xie, Z., Ta, M. N., Geng, J., Su, J., Abassy, M., Ahmed, S. E. D., Elozeiri, K., Laiyk, N., Goloburda, M., Mahmoud, T., Tomar, R. V., Aziz, A., Koike, R., Kaneko, M., Shelmanov, A., . . . Nakov, P. (2025). *Is human-like text liked by humans? Multilingual human detection and preference against AI*. arXiv. https://arxiv.org/abs/2502.11614
+- Watanabe, K., Tsuchida, R., Monno, T., Huang, B., Yamasaki, K., Fan, Y., Shimari, K., & Matsumoto, K. (2026a). *How AI coding agents communicate: A study of pull request description characteristics and human review responses*. arXiv. https://arxiv.org/abs/2602.17084
+- Watanabe, K., Shirai, T., Kashiwa, Y., & Iida, H. (2026b). *What to cut? Predicting unnecessary methods in agentic code generation*. arXiv. https://arxiv.org/abs/2602.17091
 - Xu, Y., Ma, X., Qiu, J., & Zhao, H. (2025). *Textual-to-visual iterative self-verification for slide generation*. arXiv. https://arxiv.org/abs/2502.15412
-- Zhang, J., Yu, S., Chong, D., Sicilia, A., Tomz, M. R., Manning, C. D., & Shi, W. (2025). *Verbalized sampling: How to mitigate mode collapse and unlock LLM diversity*. arXiv. https://arxiv.org/abs/2510.01171
+- Yang, J., Hu, Z., Qiu, C., Deng, Z., Jiao, X., & Zhou, T. (2026). *Quantifying and mitigating self-preference bias of LLM judges*. arXiv. https://arxiv.org/abs/2604.22891
+- Zhang, Z. J., Chen, R., Zhong, M., & Wobbrock, J. O. (2025). *SlideAudit: A dataset and taxonomy for automated evaluation of presentation slides*. arXiv. https://arxiv.org/abs/2508.03630
