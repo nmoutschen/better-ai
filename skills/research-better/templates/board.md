@@ -38,7 +38,10 @@ question: <one question>
 priority: <high | medium | low>
 status: <open | in progress | answered | contested | not found | unclear | out of scope>
 owner: <agent name, or none>
-origin: <user | meaning | Q-... | S-...>
+origin: <user | meaning | goal | Q-... | S-...>
+kind: <seed | frontier | challenge | chain | conflict | gap>
+stakes: <how the answer could change the conclusion for the GOAL>
+done-when: <the evidence that would answer the question>
 answer: <claim IDs, or none>
 summary: <two or three sentences answering the question from the evidence, or none>
 note: <why it was closed, rewritten, or dropped, or none>
@@ -78,5 +81,8 @@ One line per event, added at the end:
 ```
 search "<query>" for <Q-...> — new terms: <terms, or none>
 strategy change: <what changed and why>
+frontier after <Q-...>: newer <Q-..., or none>; origin <Q-..., or none>; field <Q-..., or none>; region <Q-..., or none>; critics <Q-..., or none>
+challenge after <Q-...>: <Q-..., or none>
+chain after <Q-...>: <Q-..., or none>
 gap: <what could not be found, and the queries tried>
 ```
