@@ -15,9 +15,10 @@ LOOP:
    - found: the recorded quote is in the span, with at most extraction differences.
    - supports: the span states what the claim says. Check each number, unit, comparison, population, condition and qualifier in the claim against the span. A span on the same topic that does not state the claim does not support it. A span that states only part of the claim supports it partly: name the missing part in the reason line.
    - answers: the claim answers its question.
-7. Set verified to verified only if all three hold. Otherwise set verified to unverified, and write in the reason line which check failed and why, in one sentence. Set hard to yes if the claim combines several passages or computes a number the span does not state; otherwise no.
+7. Set verified to verified only if all three hold. Otherwise set verified to unverified, and write in the reason line which check failed and why, in one sentence. Set hard to yes if the claim states a number the span does not state, such as a difference, a sum or a rate computed from the span; otherwise no.
 8. Check the source entry's author, date, title and publisher against the page. Write any field that differs from the page in the claim's reason line, with the page's value.
-9. Log the claim ID and your verdict in <BOARD>/logs/<YOUR NAME>.md. Go back to step 2.
+9. Before you write steps 5 to 8 to the claim file, re-read its checker line. If it is not your name, write nothing to it and take another claim.
+10. Log the claim ID and your verdict in <BOARD>/logs/<YOUR NAME>.md. Go back to step 2.
 
 RULES:
 1. Edit only the checker, verified, span, hard and reason lines of claims you took, and your own log.

@@ -53,7 +53,7 @@ Interviews the user about how they read, how they review work, and how they want
 
 ## `/research-better`
 
-Researches a topic from sources instead of the model's training data. It tracks open questions and sources on a shared research board, lets cheaper worker agents research in parallel, then generates a report. Workers grow the board as they go: after each question they add questions that sources point to in newer work, origins, other fields, other regions and critics, a challenge question that looks for evidence against each key answer, and citation-chain questions for key sources.
+Researches a topic from sources instead of the model's training data. It tracks open questions and sources on a shared research board, lets cheaper worker agents research in parallel, then generates a report. Workers grow the board as they go: after each question they add questions that sources point to in newer work, origins, other fields, other regions and critics, a challenge question that looks for evidence against each key answer, and citation-chain questions for key sources. Separate verifier agents, not the coordinator, check each claim: they open the source page, copy the passage the claim rests on, and judge the claim from it. The coordinator reads only their flags and compares key claims with the copied passages.
 
 ## `/show-better`
 
