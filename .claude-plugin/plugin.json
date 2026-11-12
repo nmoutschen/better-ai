@@ -1,6 +1,6 @@
 {
   "name": "better-ai",
-  "description": "Skills that change how an AI agent works for its user: ask, code, do, improve, research, show, teach and write better, and interview the user about how they read, review and want agents to work.",
+  "description": "Skills that change how an AI agent works for its user.",
   "author": { "name": "Nicolas Moutschen" },
   "homepage": "https://github.com/nmoutschen/better-ai",
   "repository": "https://github.com/nmoutschen/better-ai",

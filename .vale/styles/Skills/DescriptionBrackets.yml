@@ -1,0 +1,7 @@
+extends: existence
+message: "Skill descriptions must not contain angle brackets ('%s')."
+level: error
+scope: text.frontmatter.description
+nonword: true
+raw:
+  - '[<>]'

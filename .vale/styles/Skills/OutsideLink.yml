@@ -1,0 +1,7 @@
+extends: existence
+message: "PRINCIPLES.md 6.2: do not link to files outside the skill directory ('%s')."
+level: error
+scope: raw
+nonword: true
+raw:
+  - '\]\((?:\.\./\.\./|/)[^)]*\)'

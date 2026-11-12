@@ -1,0 +1,15 @@
+name: Vale
+
+on:
+  pull_request:
+
+jobs:
+  vale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vale-cli/vale-action@v3
+        with:
+          files: skills
+          sync: false
+          fail_on_error: true
