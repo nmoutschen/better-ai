@@ -38,11 +38,11 @@ status: <running | checking | stopped>
 id: Q-<agent>-<n>
 question: <one question>
 priority: <high | medium | low>
-status: <open | in progress | answered | contested | not found | unclear | out of scope>
+status: <proposed | open | in progress | answered | contested | not found | unclear | out of scope>
 owner: <agent name, or none>
 origin: <user | meaning | goal | Q-... | S-...>
 kind: <seed | frontier | challenge | chain | conflict | gap>
-stakes: <how the answer could change the conclusion for the GOAL>
+stakes: <which conclusion for the GOAL the answer could change>
 done-when: <the evidence that would answer the question>
 answer: <claim IDs, or none>
 summary: <two or three sentences answering the question from the evidence, or none>
