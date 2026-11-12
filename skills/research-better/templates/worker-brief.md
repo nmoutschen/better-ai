@@ -6,7 +6,7 @@ BOARD FORMAT: <absolute path of templates/board.md>
 PRIORITIES: <the priorities to take, written out, highest first>
 
 LOOP:
-1. Read <BOARD>/brief.md. If its status is stopped, stop.
+1. Read <BOARD>/brief.md. If its status is checking or stopped, stop.
 2. Take the open question with no owner whose priority is listed in PRIORITIES, highest priority first. Set yourself as owner and the status to in progress, then re-read the file. If another worker owns it, take another question. Do not take a challenge question whose origin is a question you answered. If no such question is left, stop.
 3. Read the search logs in <BOARD>/logs/ and the existing sources in <BOARD>/sources/. Do not repeat a logged query or re-add a known URL.
 4. Research the question until its done-when line holds. For a challenge question, search for critiques of the method, failed replications, negative or unpublished results (trial registers, theses, conference abstracts), and the conditions where the claim does not hold; write queries about the method and the conditions, not the claim with "not" added. For a chain question, read the source's reference list, and find the works that cite it with a citation index (such as OpenAlex or Semantic Scholar) or a search for its title; if the round adds a relevant source, add a chain question for that source. After each search or page read, write to the board before the next step:
@@ -16,7 +16,7 @@ LOOP:
    - Each new line of inquiry the sources raise, as a question in <BOARD>/questions/ (see ADDING QUESTIONS).
 5. Set the question's status: answered, contested, not found, or unclear. Write its summary: two or three sentences that answer the question from the evidence you recorded, including disagreement or gaps. Add a note if it is not answered.
 6. Run the three checks in ADDING QUESTIONS, add the questions they find, and log the result of each check.
-7. Go back to step 1. Do not stop after one question: keep going until no open, unowned question with a priority listed in PRIORITIES is left, or the board is stopped.
+7. Go back to step 1. Do not stop after one question: keep going until no open, unowned question with a priority listed in PRIORITIES is left, or the board's status is no longer running.
 
 ADDING QUESTIONS:
 Most questions on the board should come from workers, not from the coordinator's first list. Each new question has status open, owner none, the source or question that raised it as origin, a kind, a stakes line (how its answer could change the conclusion for the goal in brief.md), a done-when line (the evidence that would answer it), and a priority set from its stakes: low if you cannot state how it could change the conclusion. Do not add a question to check details of a source you already have: read it now, or log a gap.

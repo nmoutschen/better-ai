@@ -152,7 +152,7 @@ IF the harness has sub-agents, you are the coordinator. Workers search and read;
 
 ### 7.1. Start workers
 
-START one worker for each open question at or above the stop level that can be researched in parallel. SCALE the number of workers with the open questions, not with a fixed number: START more as workers add questions. IF the TOPIC is narrow, such as one fact or a comparison of two options, START fewer, because parallel workers add little to a narrow question and multiply its cost. GIVE each the brief in [templates/worker-brief.md](templates/worker-brief.md), filled in. Each worker keeps taking questions from the board until none is left at or above the stop level, or the board is stopped. In the brief, WRITE OUT the priorities to take, such as `high, medium` for the stop level `medium`.
+START one worker for each open question at or above the stop level that can be researched in parallel. SCALE the number of workers with the open questions, not with a fixed number: START more as workers add questions. IF the TOPIC is narrow, such as one fact or a comparison of two options, START fewer, because parallel workers add little to a narrow question and multiply its cost. GIVE each the brief in [templates/worker-brief.md](templates/worker-brief.md), filled in. Each worker keeps taking questions from the board until none is left at or above the stop level, or the board's status is no longer running. In the brief, WRITE OUT the priorities to take, such as `high, medium` for the stop level `medium`.
 
 WHEN a worker stops and open questions remain, START a fresh worker to replace it. Workers stop early even when a brief tells them to continue. IF it stopped because a COLLECTION failed, DO NOT replace it. IF the harness cannot run sub-agents in the background, START a group of workers, WAIT for them, then START the next group.
 
@@ -180,7 +180,7 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 8. **Review gaps**: EACH time a few questions close, COMPARE the board with the GOAL. ADD a question, kind `gap`, for each part of the GOAL that no question covers, with `goal` as origin.
 9. **Check the three checks**: CHECK that each answered high-priority question has a challenge question, and that its primary sources have a chain question. ADD the missing ones. IF a worker's log shows no frontier check after a closed question, ADD the frontier questions its sources point to.
 
-APPLY the stop rules in section 6.5 to the whole board. WHEN they apply, SET the board's status to stopped. Verifiers then check the remaining claims and stop. WAIT for them before you present the findings.
+APPLY the stop rules in section 6.5 to the whole board. WHEN they apply, SET the board's status to checking. Workers then stop, and verifiers check the remaining claims and stop. WAIT for them, THEN SET the board's status to stopped, before you present the findings.
 
 ## 8. Present your findings
 
