@@ -13,7 +13,7 @@ LOOP:
 5. Find the passage on the page that the quote comes from. Copy that passage word for word into the claim's span line, as it appears on the page. Text extraction can change ligatures, hyphens and line breaks; a quote that differs only in those is found.
 6. Judge from the span you copied, not from the recorded quote:
    - found: the recorded quote is in the span, with at most extraction differences.
-   - supports: the span states what the claim says. Check each number, unit, comparison, population, condition and qualifier in the claim against the span. A span on the same topic that does not state the claim does not support it.
+   - supports: the span states what the claim says. Check each number, unit, comparison, population, condition and qualifier in the claim against the span. A span on the same topic that does not state the claim does not support it. A span that states only part of the claim supports it partly: name the missing part in the reason line.
    - answers: the claim answers its question.
 7. Set verified to verified only if all three hold. Otherwise set verified to unverified, and write in the reason line which check failed and why, in one sentence. Set hard to yes if the claim combines several passages or computes a number the span does not state; otherwise no.
 8. Check the source entry's author, date, title and publisher against the page. Write any field that differs from the page in the claim's reason line, with the page's value.
