@@ -6,7 +6,7 @@ These principles are the author's preferences for what the skills do and how the
 
 ## 1. Base each rule on evidence
 
-EACH skill starts from a research report in `sources/`, produced with `/research-better`. A rule enters a skill only if the report supports it, if this file asks for it, or if the skill states it as a design choice. A rule that rests on one study or on practitioner guidance gets softer wording, such as "TREAT this as a guide, not a rule".
+EACH skill starts from a Markdown research report in `sources/`, produced with `/research-better`. A rule enters a skill only if the report supports it, if this file asks for it, or if the skill states it as a design choice. A rule that rests on one study or on practitioner guidance gets softer wording, such as "TREAT this as a guide, not a rule".
 
 START each skill with a short Principles section that states the findings two or more of its rules depend on. ADD a short reason to a rule when the reason is not obvious, such as "because learners misjudge it". A finding that only one rule depends on goes there, as that rule's reason, not in the Principles section. STATE each finding once. DO NOT describe the research in a skill: no citations, effect sizes, references to studies, or statements about where the evidence comes from, how strong it is, or what it does not cover. They belong in the source report.
 

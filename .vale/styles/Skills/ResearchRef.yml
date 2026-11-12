@@ -1,0 +1,13 @@
+extends: existence
+message: "PRINCIPLES.md 1: do not describe the research in a skill ('%s')."
+level: error
+ignorecase: true
+tokens:
+  - in one study
+  - no study
+  - one (?:small )?study
+  - studies (?:show|found|of)
+  - benchmarks?
+  - evidence (?:comes from|is mixed|is contested)
+  - practitioner (?:advice|guidance)
+  - best available guide
