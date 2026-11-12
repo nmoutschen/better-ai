@@ -56,7 +56,13 @@ question: <Q-...>
 source: <S-...>
 quote: "<verbatim passage from the source>"
 verified: <unchecked | verified | unverified>
+checker: <verifier name, or none>
+span: "<passage the verifier copied from the page, or none>"
+hard: <yes | no | none>
+reason: <why the claim is unverified, or source fields that differ from the page, or none>
 ```
+
+A verifier, not the agent that recorded the claim, sets the last five lines.
 
 ## sources/<id>.md
 
