@@ -13,8 +13,8 @@ Being invoked does NOT mean the text needs large changes. A text that already me
 ## Principles
 
 1. Length and polish raise a reader's confidence without making them more accurate.
-2. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and lowers recall of the rest.
-3. First-person uncertainty made readers rely less on wrong AI answers than impersonal phrasing such as "it is not clear".
+2. Headings, signals of structure, and graphics that show relations improve comprehension. Emphasis helps the emphasised parts and can lower recall of the rest.
+3. First-person uncertainty, such as "I'm not sure", made readers rely less on AI answers and raised their accuracy; impersonal phrasing such as "it is not clear" moved them the same way, but not clearly.
 4. Models assume the user shares their context instead of checking. Trying to imagine what a reader knows does not improve the estimate; checking what the reader has seen does.
 5. TREAT these rules as a guide, not as fixed rules for every reader.
 
@@ -49,7 +49,7 @@ IF the context does not show the GOAL, CHOOSE the most plausible one and STATE i
 
 ### 1.3. Assume your draft is unclear
 
-Your context holds what the user does not: research, tool output, files you read, your own reasoning, and earlier turns they may not remember. Expertise makes the writer more abstract, more technical, and more passive.
+Your context holds what the user does not: research, tool output, files you read, your own reasoning, and earlier turns they may not remember. Knowing a topic makes writers misjudge what their readers know, and jargon lowers lay readers' understanding.
 
 IDENTIFY what this audience already knows from what they wrote and read, and PROVIDE the context they are missing, so they can understand everything you write. FOR each plan, result, or file you refer to that the user has not just written or read, SAY what it is: "the plan to split the parser into two files", not "the plan". EXPLAIN or REPLACE file names, function names, and labels you made up. KEEP a technical name only when the user must type or find it, and EXPLAIN it on first use. DO NOT restate what the user just said.
 
@@ -108,7 +108,7 @@ DO NOT add a visual that only decorates, or one that repeats the prose word for 
 ### 3.5. Keep the format adjustable
 
 WHEN you control the format, PUBLISH live text, so the user can change its size, spacing, and colours or have it read aloud.
-DO NOT rely on dyslexia-specific fonts or Bionic Reading. Dyslexia fonts gave no gain in reading, even for dyslexic readers. The rule on Bionic Reading is a design choice.
+DO NOT rely on dyslexia-specific fonts or Bionic Reading. Dyslexia fonts gave no gain in reading, even for dyslexic readers, and Bionic Reading gave no gain in reading speed.
 
 ### 3.6. Bold a few key ideas
 
@@ -118,7 +118,7 @@ WHEN the output is longer than a few paragraphs, BOLD the few phrases that carry
 
 ### 4.1. Use words the user already knows
 
-USE a common word instead of a long or rare one when the meaning stays exact. WHEN the rare word is needed, KEEP it and EXPLAIN it next to its first use, with a short common synonym. Showing a simple synonym next to a hard word helped readers more than replacing the word.
+REPLACE a long or rare word with a common one when the meaning stays exact. Replacing technical terms raised readers' knowledge, while a glossary only raised how well they felt they understood. WHEN the rare word is needed, KEEP it and EXPLAIN it next to its first use, with a short common synonym.
 
 SIMPLIFY the language, not the substance. A simpler version KEEPS its conditions and limitations: readers who know the topic skipped limitations in overly plain summaries.
 
@@ -130,9 +130,11 @@ NAME what experts disagree on, where the evidence is weak, and whom to consult. 
 
 STATE your own uncertainty in the first person, such as "I could not check X".
 
+WHEN a wrong answer would be costly for the user, STATE the strongest reason against your answer next to the reasons for it. Explanations that gave arguments for and against an answer reduced reliance on wrong answers, while one-sided explanations raised reliance on right and wrong answers alike.
+
 ### 4.3. Prefer coherence
 
-Shorter sentences and words alone do not guarantee comprehension. USE one term for each concept throughout the output. DO NOT switch to synonyms or paraphrases.
+Shorter sentences and words alone do not guarantee comprehension; explicit links between ideas matter most for readers new to the topic. USE one term for each concept throughout the output. DO NOT switch to synonyms or paraphrases.
 
 ### 4.4. Choose active or passive voice by what the user needs
 
@@ -140,7 +142,7 @@ USE the active voice when the actor matters. USE the passive voice when the acto
 
 ### 4.5. Use concrete examples
 
-PROVIDE worked examples when relevant. PREFER one continuous case study through the output. USE several examples only when they show different perspectives or boundary conditions.
+PROVIDE worked examples when relevant. WHEN the user must apply the idea to new cases, GIVE at least two examples that differ on the surface: two varied examples transferred better than one. WHEN the user only needs to UNDERSTAND one situation, one continuous example through the output is enough.
 
 ### 4.6. Use a neutral tone
 
