@@ -6,9 +6,9 @@ IF the interface has no brief, WRITE its scenarios first (SKILL.md section 1.3).
 
 ## R1. Review in a fresh context
 
-IF you can start a sub-agent, GIVE a fresh reviewer only the interface and the brief, with [../templates/review-brief.md](../templates/review-brief.md). DO NOT give it your reasoning or your conversation with the user. A cheaper model can review, but it must not share your context.
+IF you can start a sub-agent, GIVE a fresh reviewer only the interface, the brief, and every decision the user has made about the interface or its design language, with [../templates/review-brief.md](../templates/review-brief.md). DO NOT give it your reasoning or your conversation with the user. A cheaper model can review, but it must not share your context.
 
-OTHERWISE, REVIEW in a separate pass after you built: RE-READ the brief first, THEN check the interface by SKILL.md sections 2 and 3 as if someone else built it.
+OTHERWISE, REVIEW in a separate pass after you built: RE-READ the brief and the user's decisions first, THEN check the interface by SKILL.md sections 2 and 3 as if someone else built it.
 
 IF the interface is important enough for more than one review, RUN the same review again independently. DO NOT give reviewers different characters or temperaments instead: repeated independent reviews find most of what such roles find. TREAT this as a guide, not a rule.
 
@@ -22,7 +22,7 @@ ORDER findings by their effect on the AUDIENCE completing a scenario.
 
 ## R3. Review a design language
 
-WHEN the thing to review is a design language, or an interface against its design language, CHECK in this order:
+WHEN the thing to review is the design language itself, CHECK in this order:
 
 1. The rules of SKILL.md section 2 that a design language fixes: each allowed pair of text and background colour, text sizes, and meaning carried by colour alone.
 2. What was built against what is written: LIST the colours, type sizes, spacing values and components the interface uses, and COMPARE them with the document. LOOK at screens side by side, because reviews of single elements miss problems that span a page.

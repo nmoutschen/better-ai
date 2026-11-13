@@ -1,6 +1,6 @@
 # Build an interface
 
-USE this file WHEN the task is to design, build or change an interface. FOLLOW SKILL.md sections 1 and 2 with it. Showing directions before building, reusing the project's components, and the stopping rules of section B4 are design choices.
+USE this file WHEN the task is to design, build or change an interface. FOLLOW SKILL.md sections 1 and 2 with it. Showing directions before building, reusing the project's components, shipping visual changes in small batches, and the stopping rules of section B4 are design choices.
 
 ## B1. Direction: show before building
 
@@ -14,7 +14,7 @@ ASK whether the user has a direction or references in mind BEFORE you show yours
 
 MAKE the directions differ in a way the user can see, such as the structure, the order of content, or what is prominent. DO NOT vary only a colour or a font. USE the same real content in each.
 
-KEEP them rough: real structure and content, little styling. A rough version reveals largely the same problems as a finished one, and polish changes how people rate it. IF you can render, SHOW rendered versions. OTHERWISE, SHOW each direction as a plain text outline of the screen. TREAT two or three as a guide, not a rule.
+KEEP them rough: real structure and content, little styling. A rough version reveals largely the same problems as a finished one, and polish changes how people rate it. SHOW them by SKILL.md section 1.4. TREAT two or three as a guide, not a rule.
 
 ### B1.3. Ask what is wrong, not how to fix it
 
@@ -27,6 +27,8 @@ TREAT what the user picks about the look as this user's preference. It is not ev
 PRESERVE the parts of an existing interface that the task does not require you to change. REUSE the project's components, tokens and patterns. IF none exist, DEFINE a small set of colours, type sizes and spacing values once, and USE only those.
 
 BUILD by the rules of SKILL.md section 2.
+
+WHEN you change how the interface looks, CHANGE a few things at a time and SHOW each batch before and after, so that the user can tell which change caused their reaction. DO NOT ship many visual changes together.
 
 ## B3. Decide the cases the design leaves out
 
