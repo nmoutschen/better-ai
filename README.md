@@ -54,6 +54,7 @@ Writes, checks and reviews code so it builds what you need.
 Designs, builds and checks an interface or page so the people who use it can do what they came for.
 
 - Agrees the audience and their tasks with you as scenarios, and shows two or three rough directions before building.
+- Shows visual choices, and each visual change before and after, as rendered versions side by side on one page, not as text descriptions.
 - Keeps your existing design language.
 - Checks the result by walking each scenario in the rendered page, by pointer, by keyboard and on a small screen. Automated checks and good looks do not show that people can use it.
 - Reviews without the builder's reasoning, keeps only findings tied to a step where a person is stopped, and offers a short test with real people instead of simulating them.
