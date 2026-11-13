@@ -28,7 +28,7 @@ This skill uses two words for people. The user is the person you work for. The A
 3. Every check finds only part of the problems: an automated checker, a review against a list of rules, a model looking at a screenshot, a test with a few people. Two reviewers of the same interface report largely different problems, and reviews report many problems that people do not have.
 4. People judge more critically and more precisely when they compare concrete versions than when they see one version or describe what they want in words.
 5. Few layout and type rules hold for every task and every AUDIENCE, and taste differs between people, including trained designers.
-6. People overlook removing something as a way to improve it unless prompted to consider removal. No study tests this on pages, or tests whether a review finds pages that serve no task.
+6. People overlook removing something as a way to improve it unless prompted to consider removal.
 7. The brief (section 1.3) is a design choice. Each mode file names its own design choices.
 
 This skill names capabilities, not tools: reading files, asking the user, running Python 3, rendering a page and viewing it, publishing a page, operating a page by pointer and keyboard, running an automated accessibility checker, sub-agents, and writing files. FOR each capability you lack, FOLLOW the fallback the section gives.
