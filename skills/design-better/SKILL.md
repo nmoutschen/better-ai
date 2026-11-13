@@ -30,7 +30,7 @@ This skill uses two words for people. The user is the person you work for. The A
 5. Few layout and type rules hold for every task and every AUDIENCE, and taste differs between people, including trained designers.
 6. The brief (section 1.3) is a design choice. Each mode file names its own design choices.
 
-This skill names capabilities, not tools: reading files, asking the user, rendering a page and viewing it, operating a page by pointer and keyboard, running an automated accessibility checker, sub-agents, and writing files. FOR each capability you lack, FOLLOW the fallback the section gives.
+This skill names capabilities, not tools: reading files, asking the user, running Python 3, rendering a page and viewing it, publishing a page, operating a page by pointer and keyboard, running an automated accessibility checker, sub-agents, and writing files. FOR each capability you lack, FOLLOW the fallback the section gives.
 
 FOR the code that implements the interface, FOLLOW `/code-better` if available. OTHERWISE, CHANGE only what the task needs and RUN the project's existing checks.
 
@@ -60,9 +60,21 @@ WRITE each scenario as one task from its start to an end the person can observe,
 
 USE `/ask-better` if available, THEN CONTINUE with the mode file once the user answers. OTHERWISE, ASK only what only the user knows and what changes the interface. ASK at most about three questions, all at once, before building. WRITE each one so the user can answer in a few words or by choosing. The first questions carry most of the value, and many or generic questions cost the user more than they give. TREAT the number as a guide, not a rule.
 
-WHEN a question is about how something looks, such as a colour, a layout or a component, and you can render, SHOW rendered versions side by side with the same real content, and ASK the user to choose between them. DO NOT ask from a text description or a text sketch. IF you cannot render, SHOW each version as a plain text outline, and SAY that the choice may change once it is rendered.
+WHEN a question is about how something looks, such as a colour, a layout or a component, SHOW the versions by section 1.5, and ASK the user to choose between them. DO NOT ask from a text description or a text sketch when you can render.
 
 FOR every other gap, CHOOSE the most plausible option, PROCEED, and STATE the assumption next to the result it affects.
+
+### 1.5. Show versions on one page
+
+WHEN you show the user versions to choose between, or a change before and after, PUT them on one rendered page, side by side, because people judge a version more critically when they see it among others. Showing every version at the same screen sizes and scale, in the order you give, is a design choice.
+
+1. WRITE each version as its own HTML file, with the same real content and the project's styles. FOR a before and after, SAVE a copy of the page before you change it.
+2. RUN `python3 scripts/compare.py A=<file> B=<file> --question "<what the user decides>" --width <widest screen> --width <smallest screen in the brief> --out .design/<slug>/index.html` from this skill's directory, with the output path in the working directory. A version can also be an address the user's browser can reach. FOR a before and after, LABEL them `Before=` and `After=`: the page then also offers to switch between them in the same place, which shows small changes at one spot better than looking from one to the other. Versions with other labels are shown side by side only, because switching loses that advantage when the layout moves between versions. DO NOT commit the page unless the user asks.
+3. LOOK at the rendered page before you show it, and FIX each version that does not load, overlaps or is cut off.
+4. IF you can publish a page for the user, PUBLISH it and GIVE the link. IF the script warns that a version links files by relative path, PUT those files' content into the version first, because a published page cannot reach them. OTHERWISE, OPEN the page with `--open` and GIVE its path.
+5. ASK the question in your reply too, so the user can answer in a few words.
+
+IF you cannot run Python but can render, WRITE one HTML page that shows the versions side by side at the same width. IF you cannot render, SHOW each version as a plain text outline, and SAY that the choice may change once it is rendered.
 
 ## 2. Design rules
 
@@ -145,7 +157,7 @@ FOR these AUDIENCES, FOLLOW section 2.4 and the published accessibility guidance
 
 USE `/write-better` if available. OTHERWISE, lead with the result.
 
-WHEN the change alters how the interface looks and you can render, the result is a rendered page that shows each changed screen before and after the change, side by side. KEEP the text to the points below.
+WHEN the change alters how the interface looks and you can render, the result is a page that shows each changed screen before and after the change (section 1.5). KEEP the text to the points below.
 
 THEN REPORT:
 

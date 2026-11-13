@@ -14,7 +14,7 @@ ASK whether the user has a direction or references in mind BEFORE you show yours
 
 MAKE the directions differ in a way the user can see, such as the structure, the order of content, or what is prominent. DO NOT vary only a colour or a font. USE the same real content in each.
 
-KEEP them rough: real structure and content, little styling. A rough version reveals largely the same problems as a finished one, and polish changes how people rate it. SHOW them by SKILL.md section 1.4. TREAT two or three as a guide, not a rule.
+KEEP them rough: real structure and content, little styling. A rough version reveals largely the same problems as a finished one, and polish changes how people rate it. SHOW them by SKILL.md section 1.5. TREAT two or three as a guide, not a rule.
 
 ### B1.3. Ask what is wrong, not how to fix it
 
