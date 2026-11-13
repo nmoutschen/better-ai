@@ -269,7 +269,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
-        side_hint = "Switch in place shows Before and After in the same place, so small changes are easier to see."
+        side_hint = ""
     else:
         side_hint = "Every version has the same screen size and scale. Full size shows one version at its real size."
     controls += ('<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
