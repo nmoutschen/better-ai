@@ -28,7 +28,7 @@ PRESERVE the parts of an existing interface that the task does not require you t
 
 BUILD by the rules of SKILL.md section 2.
 
-WHEN you change how the interface looks, CHANGE a few things at a time and SHOW each batch before and after, so that the user can tell which change caused their reaction. DO NOT ship many visual changes together.
+WHEN you change how the interface looks, CHANGE a few things at a time and SHOW each batch before and after, so that the user can tell which change caused their reaction: when many changes land at once, nobody can tell which one helped and which one did harm. DO NOT ship many visual changes together.
 
 ## B3. Decide the cases the design leaves out
 

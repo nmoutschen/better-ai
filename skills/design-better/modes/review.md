@@ -22,7 +22,7 @@ ORDER findings by their effect on the AUDIENCE completing a scenario.
 
 ## R3. Review a design language
 
-WHEN the thing to review is the design language itself, CHECK in this order:
+WHEN the thing to review is a design language, CHECK items 1 to 4 below in this order. WHEN it is an interface that has a design language, WALK its scenarios first (SKILL.md section 3.1), THEN CHECK items 2 and 3.
 
 1. The rules of SKILL.md section 2 that a design language fixes: each allowed pair of text and background colour, text sizes, and meaning carried by colour alone.
 2. What was built against what is written: LIST the colours, type sizes, spacing values and components the interface uses, and COMPARE them with the document. LOOK at screens side by side, because reviews of single elements miss problems that span a page.
