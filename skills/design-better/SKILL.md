@@ -1,6 +1,6 @@
 ---
 name: design-better
-description: Helps an AI agent design, build and check an interface or page, such as a web page, an app screen or a rendered report, so that the people who use it can do what they came for. Agrees the audience and their tasks with the user, shows rough directions before building, and checks the result by walking each task instead of trusting how it looks. Use show-better to introduce a document with visual panels, and write-better for the words in the interface.
+description: Helps an AI agent design, build and review an interface or page, such as a web page, an app screen or a rendered report, so that the people who use it can do what they came for, and create, apply and review the design language behind it. Agrees the audience and their tasks with the user, shows rough directions before building, and checks the result by walking each task instead of trusting how it looks. Use show-better to introduce a document with visual panels, and write-better for the words in the interface.
 argument-hint: "[INTERFACE OR TASK]"
 ---
 
@@ -9,6 +9,7 @@ argument-hint: "[INTERFACE OR TASK]"
 IF invoked with an interface or a design task as argument, USE these instructions to design, build or change it.
 IF invoked without argument, USE these instructions on the interface in the current conversation: CHECK the work done so far against sections 1, 5 and 6, THEN continue or correct it.
 IF the interface to check is someone else's, WRITE its scenarios (section 1.3), THEN USE sections 5 and 6.
+IF the task is to create, extend or change a design language, READ [modes/language.md](modes/language.md) and FOLLOW it. IF the task is to review one, USE section 6.3.
 
 Being invoked does NOT mean a redesign, and does NOT mean you must build now. These instructions can end with a brief and questions for the user, or with a report that the interface already lets people do what they came for.
 
@@ -36,6 +37,8 @@ NAME what the AUDIENCE must be able to do with the interface, and what the user 
 ### 1.2. Read before deciding anything
 
 READ the existing interface, its components, styles and design files, the content it must show, the project's instruction files, and earlier conversation. DO NOT ask the user what these sources answer.
+
+IF no design language exists and the work covers more than one screen, ASK the user whether to create one first. IF they agree, READ [modes/language.md](modes/language.md) and FOLLOW it before section 2. OTHERWISE, USE section 3.1.
 
 TREAT an existing design language, such as its colours, typefaces, spacing and components, as a requirement the user owns. KEEP it. IF it conflicts with a rule in section 3, such as text contrast, DO NOT change it. REPORT the conflict once, with its effect on the AUDIENCE and one alternative, THEN FOLLOW the user's decision.
 
@@ -182,7 +185,18 @@ A finding that only names a broken rule, with no step where a person is stopped,
 
 ORDER findings by their effect on the AUDIENCE completing a scenario.
 
-### 6.3. Do not simulate people
+### 6.3. Review a design language
+
+WHEN the thing to review is a design language, or an interface against its design language, CHECK in this order:
+
+1. The rules of section 3 that a design language fixes: each allowed pair of text and background colour, text sizes, and meaning carried by colour alone.
+2. What was built against what is written: LIST the colours, type sizes, spacing values and components the interface uses, and COMPARE them with the document. LOOK at screens side by side, because reviews of single elements miss problems that span a page.
+3. What the scenarios need and the document lacks, such as a component or a state.
+4. Whether it expresses what the user wants it to express. REPORT this as your reading, separate from the findings: it is a matter of preference.
+
+WORK through this list instead of reviewing freely: a fixed list of criteria makes a review more useful to the person who receives it. REPORT each finding in the format of section 6.2, with the builder or the member of the AUDIENCE who is stopped. NAME what works and must be kept, specifically, so that fixes do not remove it.
+
+### 6.4. Do not simulate people
 
 DO NOT take, or give a reviewer, the role of a person with a disability, a neurodivergent profile, an age or an emotional state to predict how such a person would experience the interface. Such roles produce stereotypes and do not match the people they imitate.
 
