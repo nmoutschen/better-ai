@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Put versions of a screen side by side on one page, at the same screen widths, so the user can compare them.
+"""Put versions of a screen side by side on one page, at the same screen sizes, so the user can compare them.
 
 Usage:
   python3 compare.py VERSION... --out FILE [--title T] [--question Q] [--width WxH ...] [--open]
 
 VERSION is LABEL=SOURCE or SOURCE. SOURCE is an HTML file, embedded into the page, or an http(s) address, loaded
-when the page is viewed. Without a LABEL, versions are labelled A, B, C in order. For a before and after, pass
-Before=old.html After=new.html.
+when the page is viewed. Without a LABEL, versions are labelled A, B, C in order.
 
-Each version is shown in a frame of the given screen size, scaled down to fit, so that every version gets the same
-width, the same height and the same scale. The reader can switch from all versions side by side to one at a time,
-with buttons or the arrow keys, to see small differences. The page styles only its own labels: each version keeps
-the styles it brings.
+Every version is shown side by side, in a frame of each screen size, scaled down by the same amount to fit. Each
+version can also be opened at full size. When the two versions are labelled Before and After, the page also offers
+a view that switches between them in the same place, which shows small changes at one spot better than looking
+from one to the other. The page styles only its own labels: each version keeps the styles it brings.
 """
 
 import argparse
 import html
+import json
 import re
 import sys
 import webbrowser
@@ -28,72 +28,179 @@ URL = re.compile(r"^https?://", re.I)
 RELATIVE_REF = re.compile(r"""(?:href|src)\s*=\s*["'](?![a-z][a-z0-9+.-]*:|//|#)[^"']+["']""", re.I)
 HEAD = re.compile(r"<head[^>]*>", re.I)
 
+FONTS = ("https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400"
+         "&family=Space+Grotesk:wght@400;500;700&display=swap")
+
+# The n14n "Journal" tokens, as in research-better's board.html.
 CSS = """
-:root { --cream:#FFFCF7; --linen:#F2EDE5; --umber:#5C4033; --terracotta:#E8725C; --ink:#33302B; --heading:#1C1A17;
-  --muted:#78736B; --line:#DDD6CA; --sans:'Space Grotesk', -apple-system, 'Segoe UI', sans-serif; }
+:root { --cream:#FFFCF7; --linen:#F2EDE5; --sand:#C4B69C; --terracotta:#E8725C; --umber:#5C4033;
+  --moss-dark:#66795A; --ink:#33302B;
+  /* ISO 3664 asks for a neutral, matte surround when judging colour: Munsell N8 grey behind the versions. */
+  --surround:#C9C9C9; --heading:#1C1A17; --muted:#78736B; --line:#DDD6CA;
+  --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
+  --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E"); }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--cream); color:var(--ink); font:400 15px/1.5 var(--sans); }
-.band { height:8px; background:var(--umber); }
-header, main { padding:0 max(24px, (100% - 110rem) / 2); }
-header { padding-top:20px; padding-bottom:4px; }
-h1 { font:700 24px/1.25 var(--sans); color:var(--heading); margin:0 0 4px; }
-.question { margin:0 0 12px; max-width:70ch; }
-.views { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 4px; }
-.views span { color:var(--muted); font-size:13px; margin-right:4px; }
-.views button { font:500 14px var(--sans); color:var(--ink); background:var(--linen); border:1px solid var(--line);
-  padding:4px 12px; cursor:pointer; }
-.views button[aria-pressed="true"] { background:var(--umber); border-color:var(--umber); color:var(--cream); }
-.views button:focus-visible { outline:2px solid var(--terracotta); outline-offset:2px; }
-.hint { color:var(--muted); font-size:13px; margin:0 0 8px; }
-h2 { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
-  border-top:2px solid var(--line); padding-top:10px; margin:20px 0 10px; }
-.row { display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:24px; align-items:start; }
-main.single .row { grid-template-columns:minmax(0, 1fr); }
-main.single figure:not(.current) { display:none; }
+body { margin:0; background:var(--cream); color:var(--ink); font:400 15px/1.55 var(--sans); -webkit-font-smoothing:antialiased;
+  --pad:max(40px, (100% - 110rem) / 2); }
+.band { height:10px; background:var(--umber) var(--saya); background-size:13px 7.5px; }
+.band--thin { height:6px; }
+header { padding:24px var(--pad) 12px; }
+main { padding:4px var(--pad) 36px; background:var(--surround); color:var(--ink); }
+h1 { font:700 28px/1.2 var(--serif); color:var(--heading); margin:0 0 8px; }
+.question { font:400 17px/1.6 var(--serif); margin:0 0 16px; max-width:65ch; }
+.controls { position:sticky; top:0; z-index:2; background:var(--cream); border-bottom:1px solid var(--line);
+  padding:10px var(--pad); display:flex; flex-wrap:wrap; gap:8px 28px; align-items:center; }
+.seg { display:inline-flex; border:1px solid var(--umber); }
+.seg button { border:0; background:var(--cream); color:var(--umber); padding:7px 14px; cursor:pointer;
+  font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.seg button + button { border-left:1px solid var(--umber); }
+.seg button[aria-pressed="true"] { background:var(--umber); color:var(--cream); }
+.seg[hidden] { display:none; }
+/* Scroll together is a separate setting from the view, so it uses moss instead of umber. */
+.seg--moss { border-color:var(--moss-dark); }
+.seg--moss button { color:var(--moss-dark); }
+.seg--moss button[aria-pressed="true"] { background:var(--moss-dark); color:var(--cream); }
+.full { border:0; background:none; padding:4px 0; cursor:pointer; font:700 12px var(--sans);
+  letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
+:focus-visible { outline:2px solid var(--terracotta); outline-offset:2px; }
+.hint { color:var(--muted); font-size:13px; margin:0; }
+h2 { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink);
+  border-top:2px solid var(--ink); padding-top:10px; margin:28px 0 14px; }
+.row { display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:32px; align-items:start; }
+/* Frames narrow enough to fit at full size sit next to each other, not spread across the page. */
+.row.packed { grid-template-columns:repeat(var(--n), max-content); }
 figure { margin:0; min-width:0; }
-figcaption { font:700 14px var(--sans); color:var(--heading); margin:0 0 6px; overflow-wrap:anywhere; }
-figcaption small { font-weight:400; color:var(--muted); margin-left:6px; }
-.screen { overflow:auto; border:1px solid var(--line); background:#fff; max-width:100%; }
+.label { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin:0 0 8px; }
+.label b { font:700 15px/1.3 var(--sans); color:var(--heading); overflow-wrap:anywhere; }
+.screen { position:relative; overflow:auto; border:1px solid var(--line); background:#fff; max-width:100%; }
 .screen iframe { display:block; border:0; transform-origin:0 0; background:#fff; }
-.scaled .screen { overflow:hidden; }
+.scaled main .screen { overflow:hidden; }
+figcaption { font-size:13px; color:var(--ink); border-top:1px solid var(--ink); margin-top:8px; padding-top:6px; }
+/* Switch view: the two frames of a row sit in one place; only the current one shows. */
+main.switch .row { grid-template-columns:minmax(0, 1fr); }
+main.switch .row { position:relative; }
+/* The hidden version stays laid out, so it keeps scrolling with the shown one. */
+main.switch figure:not(.current) { position:absolute; top:0; left:0; width:100%; visibility:hidden; }
+dialog { border:0; padding:0; max-width:calc(100vw - 32px); max-height:calc(100vh - 32px); background:var(--cream); }
+dialog::backdrop { background:rgba(28,26,23,.6); }
+dialog .bar { display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding:10px 16px; }
+dialog .bar b { font:700 15px var(--sans); color:var(--heading); }
+dialog .screen { margin:0 16px 16px; max-height:calc(100vh - 100px); }
+.foot { padding:6px var(--pad); font-size:12px; color:var(--muted); }
 """
 
 JS = """
 (function () {
-  var main = document.querySelector('main'), buttons = document.querySelectorAll('.views button');
-  var figures = function (i) { return document.querySelectorAll('figure[data-i="' + i + '"]'); };
-  var count = buttons.length - 1, view = -1;
+  var main = document.querySelector('main'), hint = document.querySelector('.hint');
+  var labels = JSON.parse(main.dataset.labels), current = 0;
+  var viewButtons = document.querySelectorAll('[data-view]'), pickButtons = document.querySelectorAll('[data-pick]');
+  var pick = document.querySelector('.pick'), together = document.querySelector('#together');
+  together.addEventListener('click', function () { together.setAttribute('aria-pressed', String(together.getAttribute('aria-pressed') !== 'true')); });
   function fit() {
-    document.querySelectorAll('.screen').forEach(function (box) {
+    document.querySelectorAll('main .row').forEach(function (row) {
+      var frames = row.querySelectorAll('figure:not([hidden]) iframe'), n = main.classList.contains('switch') ? 1 : frames.length;
+      var w = +frames[0].getAttribute('width');
+      row.classList.toggle('packed', n * w + (n - 1) * 32 + n * 2 <= row.clientWidth);
+    });
+    document.querySelectorAll('main .screen').forEach(function (box) {
       var frame = box.firstElementChild, w = +frame.getAttribute('width'), h = +frame.getAttribute('height');
-      var room = box.parentElement.clientWidth - 2;
+      var row = box.closest('.row'), packed = row.classList.contains('packed');
+      var room = packed ? w + 2 : box.parentElement.clientWidth;
       if (room <= 0) return;
-      var scale = Math.min(1, room / w);
+      var scale = Math.min(1, (room - 2) / w);
       frame.style.transform = 'scale(' + scale + ')';
       box.style.width = Math.ceil(w * scale + 2) + 'px';
       box.style.height = Math.ceil(h * scale + 2) + 'px';
-      var note = box.parentElement.querySelector('figcaption small');
-      if (note) note.textContent = scale < 1 ? 'shown at ' + Math.round(scale * 100) + '%' : 'actual size';
+      box.parentElement.querySelector('figcaption').textContent =
+        w + ' × ' + h + ' px, ' + (scale < 1 ? 'shown at ' + Math.round(scale * 100) + '%' : 'actual size');
     });
   }
-  function show(i) {
-    view = i;
-    main.classList.toggle('single', i >= 0);
-    document.querySelectorAll('figure').forEach(function (f) { f.classList.remove('current'); });
-    if (i >= 0) figures(i).forEach(function (f) { f.classList.add('current'); });
-    buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.view === i)); });
-    fit();
+  // Scrolling: frames of one screen size scroll together. The position is matched between elements with the
+  // same id in both versions, such as headings, so versions of different length stay on the same section.
+  // This works only for versions embedded from files; a page loaded from an address cannot be followed.
+  var quietUntil = new WeakMap();
+  function tops(win, ids) {
+    var doc = win.document, end = doc.documentElement.scrollHeight;
+    var marks = [{ id: '', top: 0 }];
+    ids.forEach(function (id) {
+      var el = doc.getElementById(id);
+      if (el) marks.push({ id: id, top: el.getBoundingClientRect().top + win.scrollY });
+    });
+    marks.push({ id: '', top: end });
+    return marks;
   }
-  buttons.forEach(function (b) { b.addEventListener('click', function () { show(+b.dataset.view); }); });
-  document.addEventListener('keydown', function (e) {
-    if (e.target.closest && e.target.closest('iframe, input, textarea')) return;
-    if (e.key === 'ArrowRight') { show(view < 0 ? 0 : (view + 1) % count); e.preventDefault(); }
-    if (e.key === 'ArrowLeft') { show(view < 0 ? count - 1 : (view - 1 + count) % count); e.preventDefault(); }
-    if (e.key === 'Escape') show(-1);
+  function sharedIds(a, b) {
+    return Array.prototype.map.call(a.document.querySelectorAll('[id]'), function (el) { return el.id; })
+      .filter(function (id) { return id && b.document.getElementById(id); });
+  }
+  function match(from, to) {
+    try {
+      var src = from.contentWindow, dst = to.contentWindow, ids = sharedIds(src, dst);
+      var a = tops(src, ids), b = tops(dst, ids), y = src.scrollY, k = 0;
+      while (k < a.length - 2 && a[k + 1].top <= y) k++;
+      var p = (y - a[k].top) / Math.max(1, a[k + 1].top - a[k].top);
+      quietUntil.set(to, Date.now() + 150);
+      dst.scrollTo(0, b[k].top + p * (b[k + 1].top - b[k].top));
+    } catch (e) {}
+  }
+  function follow(frame) {
+    if (together.getAttribute('aria-pressed') !== 'true' || (quietUntil.get(frame) || 0) > Date.now()) return;
+    frame.closest('.row').querySelectorAll('iframe').forEach(function (other) { if (other !== frame) match(frame, other); });
+  }
+  function bind(frame) {
+    try { frame.contentWindow.addEventListener('scroll', function () { follow(frame); }); } catch (e) { together.parentElement.hidden = true; }
+  }
+  var bound = new WeakSet();
+  function bindOnce(frame) {
+    var win; try { win = frame.contentWindow; } catch (e) { return; }
+    if (!win || bound.has(win)) return;
+    bound.add(win); bind(frame);
+  }
+  document.querySelectorAll('main iframe').forEach(function (frame) {
+    frame.addEventListener('load', function () { bindOnce(frame); });
+    try { if (frame.contentDocument.readyState === 'complete' && frame.contentDocument.body.childElementCount) bindOnce(frame); } catch (e) {}
   });
+  function show(i) {
+    var previous = current;
+    current = i;
+    document.querySelectorAll('main figure').forEach(function (f) { f.classList.toggle('current', +f.dataset.i === i); });
+    pickButtons.forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.pick === i)); });
+    fit();
+    if (main.classList.contains('switch') && previous !== i) document.querySelectorAll('main .row').forEach(function (row) {
+      match(row.querySelector('figure[data-i="' + previous + '"] iframe'), row.querySelector('figure[data-i="' + i + '"] iframe'));
+    });
+  }
+  function view(name) {
+    main.classList.toggle('switch', name === 'switch');
+    viewButtons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.view === name)); });
+    if (pick) pick.hidden = name !== 'switch';
+    hint.textContent = name === 'switch' ? 'Press Space to switch.' : hint.dataset.side;
+    show(current);
+  }
+  viewButtons.forEach(function (b) { b.addEventListener('click', function () { view(b.dataset.view); }); });
+  pickButtons.forEach(function (b) { b.addEventListener('click', function () { show(+b.dataset.pick); }); });
+  document.addEventListener('keydown', function (e) {
+    if (!main.classList.contains('switch') || document.querySelector('dialog[open]')) return;
+    if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      if (e.target.tagName === 'BUTTON' && e.key === ' ') return;
+      show((current + 1) % labels.length); e.preventDefault();
+    }
+  });
+  var dialog = document.querySelector('dialog');
+  document.querySelectorAll('figure .full').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var src = b.closest('figure').querySelector('iframe'), copy = src.cloneNode(false);
+      copy.style.transform = '';
+      dialog.querySelector('.bar b').textContent = src.title;
+      var box = dialog.querySelector('.screen'); box.replaceChildren(copy);
+      box.style.width = ''; box.style.height = '';
+      dialog.showModal();
+    });
+  });
+  dialog.querySelector('.close').addEventListener('click', function () { dialog.close(); });
   document.body.classList.add('scaled');
   window.addEventListener('resize', fit);
-  fit();
+  view('side');
 })();
 """
 
@@ -138,29 +245,44 @@ def frame_source(source: str, warnings: list) -> str:
 def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     warnings = []
     loaded = [(label, frame_source(source, warnings)) for label, source in versions]
-    buttons = ['<button type="button" data-view="-1" aria-pressed="true">Side by side</button>']
-    buttons += [f'<button type="button" data-view="{i}" aria-pressed="false">{esc(label)}</button>'
-                for i, (label, _) in enumerate(loaded)]
+    labels = [label for label, _ in loaded]
+    before_after = [label.lower() for label in labels] == ["before", "after"]
     rows = []
     for w, h in sizes:
         figures = "".join(
-            f'<figure data-i="{i}"><figcaption>{esc(label)}<small></small></figcaption>'
-            f'<div class="screen"><iframe title="{esc(label)}, {w} by {h} pixels" width="{w}" height="{h}" '
-            f'loading="lazy" {attr}></iframe></div></figure>'
+            f'<figure data-i="{i}"><div class="label"><b>{esc(label)}</b>'
+            f'<button type="button" class="full">Full size</button></div>'
+            f'<div class="screen"><iframe title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
+            f'{attr}></iframe></div><figcaption>{w} × {h} px</figcaption></figure>'
             for i, (label, attr) in enumerate(loaded))
         rows.append(f'<section><h2>Screen {w} × {h} px</h2><div class="row" style="--n:{len(loaded)}">{figures}</div></section>')
+    controls = ""
+    if before_after:
+        controls += ('<div class="seg" role="group" aria-label="View">'
+                     '<button type="button" data-view="side" aria-pressed="true">Side by side</button>'
+                     '<button type="button" data-view="switch" aria-pressed="false">Switch in place</button></div>'
+                     '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
+                     + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
+                               for i, label in enumerate(labels)) + '</div>')
+        side_hint = "Switch in place shows Before and After in the same spot, to spot small changes."
+    else:
+        side_hint = "Every version is shown at the same screen size and scale. Full size opens one version unscaled."
+    controls += ('<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
+                 'Scroll together</button></div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
     page = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(title)}</title>
+<link href="{FONTS}" rel="stylesheet">
 <style>{CSS}</style></head>
 <body><div class="band"></div>
-<header><h1>{esc(title)}</h1>{question_html}
-<div class="views" role="group" aria-label="View"><span>View</span>{"".join(buttons)}</div>
-<p class="hint">Left and right arrow keys step through the versions one at a time; Escape shows them side by side.</p>
-</header>
-<main>{"".join(rows)}</main>
+<header><h1>{esc(title)}</h1>{question_html}</header>
+<div class="controls">{controls}<p class="hint" data-side="{esc(side_hint)}">{esc(side_hint)}</p></div>
+<main data-labels="{esc(json.dumps(labels))}">{"".join(rows)}</main>
+<div class="band band--thin"></div>
+<p class="foot">design-better by n14n.dev</p>
+<dialog aria-label="Full size"><div class="bar"><b></b><button type="button" class="full close">Close</button></div><div class="screen"></div></dialog>
 <script>{JS}</script>
 </body></html>
 """
