@@ -2,7 +2,9 @@
 
 USE this file WHEN the task is to review an interface or a design language, yours or someone else's. Review in a fresh context is a design choice.
 
-IF the interface has no brief, WRITE its scenarios first (SKILL.md section 1.3).
+IF the interface has no brief, WRITE one first (SKILL.md section 1.3). WRITE the GOAL and the scenarios from what the AUDIENCE comes to do, not from the pages that exist. CHECK the GOAL of an existing brief or design document the same way: it can name the request instead.
+
+CHECK the structure (SKILL.md section 1.3) before looking for defects inside pages, because a review of defects takes the pages as given. A page or part that should merge or go is a finding ahead of any defect inside it. Your own check of the structure finds candidates. It does not show that readers find what they look for: a model finds items in a structure that people struggle with.
 
 ## R1. Review in a fresh context
 
@@ -17,6 +19,8 @@ IF the interface is important enough for more than one review, RUN the same revi
 KEEP a finding only if it names the scenario and step, what the reviewer did, what happened, and why that stops or slows the person. REPRODUCE it in the rendered interface before fixing it.
 
 A finding that only names a broken rule, with no step where a person is stopped, is unconfirmed. Most such findings are not problems people have. DROP it only when you can show it is wrong. OTHERWISE, REPORT it as unconfirmed.
+
+A finding about structure names the page or part, the scenarios checked, and why none needs it or which page it repeats.
 
 ORDER findings by their effect on the AUDIENCE completing a scenario.
 
@@ -34,3 +38,5 @@ WORK through this list instead of reviewing freely: a fixed list of criteria mak
 ## R4. Hand back
 
 HAND BACK by SKILL.md section 4. IF the review is of someone else's work, REPORT the findings and DO NOT change the work unless the user asks.
+
+IF the user then asks for changes, READ [build.md](build.md) and START at SKILL.md section 1.4.

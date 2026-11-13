@@ -4,7 +4,7 @@ USE this file WHEN the task is to design, build or change an interface. FOLLOW S
 
 ## B1. Direction: show before building
 
-USE this section WHEN the interface is new, or the change alters its layout or flow, and the brief leaves more than one reasonable direction. FOR a small change inside an existing interface, FOLLOW its patterns and SKIP this section.
+USE this section WHEN the interface is new, or the change alters its structure, layout or flow, and the brief leaves more than one reasonable direction. FOR a small change inside an existing interface, FOLLOW its patterns and SKIP this section.
 
 ### B1.1. Ask for the user's own direction first
 
