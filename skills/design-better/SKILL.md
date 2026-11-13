@@ -15,7 +15,7 @@ This file holds the practices every design task shares. The steps of each kind o
 | Create, extend or change a design language | [modes/language.md](modes/language.md) |
 
 IF invoked with an interface or a design task as argument, CHOOSE the mode from the task.
-IF invoked without argument, USE the review mode on the interface in the current conversation, THEN continue or correct the work.
+IF invoked without argument and the current conversation is building or changing an interface, USE the review mode on that interface, THEN continue or correct the work. OTHERWISE, ASK the user which interface or design language to work on, and whether to build, review or change it.
 
 Being invoked does NOT mean a redesign, and does NOT mean you must build now. These instructions can end with a brief and questions for the user, or with a report that the interface already lets people do what they came for.
 
@@ -44,7 +44,7 @@ NAME what the AUDIENCE must be able to do with the interface, and what the user 
 
 READ the existing interface, its components, styles and design files, the content it must show, the project's instruction files, and earlier conversation. DO NOT ask the user what these sources answer.
 
-TREAT an existing design language, such as its colours, typefaces, spacing and components, as a requirement the user owns. KEEP it. IF it conflicts with a rule in section 2, such as text contrast, DO NOT change it. REPORT the conflict once, with its effect on the AUDIENCE and one alternative, THEN FOLLOW the user's decision.
+TREAT an existing design language, such as its colours, typefaces, spacing and components, as a requirement the user owns. KEEP it. IF it conflicts with a rule in section 2, such as text contrast, DO NOT change it. REPORT the conflict once, with its effect on the AUDIENCE and one alternative, THEN FOLLOW the user's decision. A change to a colour, typeface, type size, spacing value or component that the design language defines is a change to the design language, however small. DO NOT make it as a quick fix: WAIT for the user's decision.
 
 IF no design language exists and the work covers more than one screen, ASK the user whether to create one first. IF they agree, FOLLOW [modes/language.md](modes/language.md) before building.
 
@@ -59,6 +59,8 @@ WRITE each scenario as one task from its start to an end the person can observe,
 ### 1.4. Ask a few questions before building
 
 USE `/ask-better` if available, THEN CONTINUE with the mode file once the user answers. OTHERWISE, ASK only what only the user knows and what changes the interface. ASK at most about three questions, all at once, before building. WRITE each one so the user can answer in a few words or by choosing. The first questions carry most of the value, and many or generic questions cost the user more than they give. TREAT the number as a guide, not a rule.
+
+WHEN a question is about how something looks, such as a colour, a layout or a component, and you can render, SHOW rendered versions side by side with the same real content, and ASK the user to choose between them. DO NOT ask from a text description or a text sketch. IF you cannot render, SHOW each version as a plain text outline, and SAY that the choice may change once it is rendered.
 
 FOR every other gap, CHOOSE the most plausible option, PROCEED, and STATE the assumption next to the result it affects.
 
@@ -115,7 +117,7 @@ FOR the words in the interface, such as labels, button text and messages, FOLLOW
 
 IF you can render and operate the interface, WALK each scenario from start to end: with a pointer, then with the keyboard only, then at the smallest screen width in the brief. AT each step, CHECK that the next action is visible and named in the AUDIENCE's words, and that the interface shows the result of the action.
 
-A scenario counts as walked only if you operated the interface. Reading the code or looking at a screenshot does not count. IF you cannot render or operate it, SAY so. DO NOT describe how the page looks or behaves. LIST the walks for the user to do.
+A scenario counts as walked only if you operated the interface. Reading the code or looking at a screenshot does not count. BEFORE you conclude that you cannot operate it, LOOK for a way to drive a browser in the environment, such as a headless browser, a browser automation library or the browser's debugging protocol, and USE it. IF you still cannot render or operate it, SAY so. DO NOT describe how the page looks or behaves. LIST the walks for the user to do.
 
 Completing a scenario yourself shows that it can be completed. It does not show where a person would hesitate or fail, because agents complete tasks that people struggle with.
 
@@ -141,7 +143,11 @@ FOR these AUDIENCES, FOLLOW section 2.4 and the published accessibility guidance
 
 ### 4.1. Report what the user must act on
 
-USE `/write-better` if available. OTHERWISE, lead with the result. THEN REPORT:
+USE `/write-better` if available. OTHERWISE, lead with the result.
+
+WHEN the change alters how the interface looks and you can render, the result is a rendered page that shows each changed screen before and after the change, side by side. KEEP the text to the points below.
+
+THEN REPORT:
 
 1. In one sentence, which scenarios you walked and how. Each scenario that fails or that you could not walk, and why.
 2. The decisions the user owns: each conflict between the design language and a rule (section 1.2), and each assumption that changed what you built.
