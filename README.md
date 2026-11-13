@@ -39,6 +39,10 @@ Decides when the agent should ask the user a question, and how to ask it. It loo
 
 Writes, checks and reviews code so it builds what the user needs. It writes requirements as concrete scenarios the user can check, keeps the design and the plan separate from them, and changes only what the task needs. It verifies against the requirements in a bounded repair loop, never weakens tests, and reviews in a fresh context. It hands back a report of decisions, assumptions and checks, so the user can still understand and maintain the code.
 
+## `/design-better`
+
+Designs, builds and checks an interface or page so the people who use it can do what they came for. It agrees the audience and their tasks with the user as scenarios, asks a few questions before building, and shows two or three rough directions before committing to one. It keeps an existing design language and reports where it conflicts with a rule. It decides what the interface shows when a step goes wrong, walks every scenario in the rendered interface by pointer, by keyboard and on a small screen, and reads the markup for meaning, because automated checks and good looks do not show that people can use a page. It reviews in a fresh context, keeps only findings tied to a step where a person is stopped, does not simulate people, and offers a short test with real people.
+
 ## `/do-better`
 
 Corrects work that doesn't meet the user's intent. It recovers the user's goal, finds what is actually wrong, and fixes it, asking only when a decision blocks the work.
