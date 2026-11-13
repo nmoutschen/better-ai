@@ -70,6 +70,9 @@ h2 { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; c
 .row { display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:32px; align-items:start; }
 /* Frames narrow enough to fit at full size sit next to each other, not spread across the page. */
 .row.packed { grid-template-columns:repeat(var(--n), max-content); }
+/* With two versions, packed frames sit in the middle of the page. */
+.row.packed.pair { justify-content:center; }
+main.switch .row.packed.pair { grid-template-columns:max-content; }
 figure { margin:0; min-width:0; }
 .label { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin:0 0 8px; }
 .label b { font:700 15px/1.3 var(--sans); color:var(--heading); overflow-wrap:anywhere; }
@@ -102,6 +105,7 @@ JS = """
       var frames = row.querySelectorAll('figure:not([hidden]) iframe'), n = main.classList.contains('switch') ? 1 : frames.length;
       var w = +frames[0].getAttribute('width');
       row.classList.toggle('packed', n * w + (n - 1) * 32 + n * 2 <= row.clientWidth);
+      row.classList.toggle('pair', labels.length === 2);
     });
     document.querySelectorAll('main .screen').forEach(function (box) {
       var frame = box.firstElementChild, w = +frame.getAttribute('width'), h = +frame.getAttribute('height');
