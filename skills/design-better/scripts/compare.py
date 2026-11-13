@@ -179,7 +179,7 @@ JS = """
     main.classList.toggle('switch', name === 'switch');
     viewButtons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.view === name)); });
     if (pick) pick.hidden = name !== 'switch';
-    hint.textContent = name === 'switch' ? 'Press Space to switch.' : hint.dataset.side;
+    hint.textContent = name === 'switch' ? 'Press Space to switch between ' + labels.join(' and ') + '.' : hint.dataset.side;
     show(current);
   }
   viewButtons.forEach(function (b) { b.addEventListener('click', function () { view(b.dataset.view); }); });
@@ -269,9 +269,9 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
-        side_hint = "Switch in place shows Before and After in the same spot, to spot small changes."
+        side_hint = "Switch in place shows Before and After in the same place, so small changes are easier to see."
     else:
-        side_hint = "Every version is shown at the same screen size and scale. Full size opens one version unscaled."
+        side_hint = "Every version has the same screen size and scale. Full size shows one version at its real size."
     controls += ('<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
                  'Scroll together</button></div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
