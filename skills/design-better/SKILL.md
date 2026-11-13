@@ -6,10 +6,16 @@ argument-hint: "[INTERFACE OR TASK]"
 
 # Design Better
 
-IF invoked with an interface or a design task as argument, USE these instructions to design, build or change it.
-IF invoked without argument, USE these instructions on the interface in the current conversation: CHECK the work done so far against sections 1, 5 and 6, THEN continue or correct it.
-IF the interface to check is someone else's, WRITE its scenarios (section 1.3), THEN USE sections 5 and 6.
-IF the task is to create, extend or change a design language, READ [modes/language.md](modes/language.md) and FOLLOW it. IF the task is to review one, USE section 6.3.
+This file holds the practices every design task shares. The steps of each kind of task are in a mode file. READ the mode file that fits the task and FOLLOW it together with this file:
+
+| Task | Mode file |
+|---|---|
+| Design, build or change an interface | [modes/build.md](modes/build.md) |
+| Review an interface or a design language, yours or someone else's | [modes/review.md](modes/review.md) |
+| Create, extend or change a design language | [modes/language.md](modes/language.md) |
+
+IF invoked with an interface or a design task as argument, CHOOSE the mode from the task.
+IF invoked without argument, USE the review mode on the interface in the current conversation, THEN continue or correct the work.
 
 Being invoked does NOT mean a redesign, and does NOT mean you must build now. These instructions can end with a brief and questions for the user, or with a report that the interface already lets people do what they came for.
 
@@ -22,13 +28,13 @@ This skill uses two words for people. The user is the person you work for. The A
 3. Every check finds only part of the problems: an automated checker, a review against a list of rules, a model looking at a screenshot, a test with a few people. Two reviewers of the same interface report largely different problems, and reviews report many problems that people do not have.
 4. People judge more critically and more precisely when they compare concrete versions than when they see one version or describe what they want in words.
 5. Few layout and type rules hold for every task and every AUDIENCE, and taste differs between people, including trained designers.
-6. The brief (section 1.3), reusing the project's components (section 3.1), the stopping rules (section 5.4), and review in a fresh context (section 6.1) are design choices.
+6. The brief (section 1.3) is a design choice. Each mode file names its own design choices.
 
 This skill names capabilities, not tools: reading files, asking the user, rendering a page and viewing it, operating a page by pointer and keyboard, running an automated accessibility checker, sub-agents, and writing files. FOR each capability you lack, FOLLOW the fallback the section gives.
 
 FOR the code that implements the interface, FOLLOW `/code-better` if available. OTHERWISE, CHANGE only what the task needs and RUN the project's existing checks.
 
-## 1. Brief: build the right interface
+## 1. Know the goal, the audience and what exists
 
 ### 1.1. Name the GOAL
 
@@ -38,9 +44,9 @@ NAME what the AUDIENCE must be able to do with the interface, and what the user 
 
 READ the existing interface, its components, styles and design files, the content it must show, the project's instruction files, and earlier conversation. DO NOT ask the user what these sources answer.
 
-IF no design language exists and the work covers more than one screen, ASK the user whether to create one first. IF they agree, READ [modes/language.md](modes/language.md) and FOLLOW it before section 2. OTHERWISE, USE section 3.1.
+TREAT an existing design language, such as its colours, typefaces, spacing and components, as a requirement the user owns. KEEP it. IF it conflicts with a rule in section 2, such as text contrast, DO NOT change it. REPORT the conflict once, with its effect on the AUDIENCE and one alternative, THEN FOLLOW the user's decision.
 
-TREAT an existing design language, such as its colours, typefaces, spacing and components, as a requirement the user owns. KEEP it. IF it conflicts with a rule in section 3, such as text contrast, DO NOT change it. REPORT the conflict once, with its effect on the AUDIENCE and one alternative, THEN FOLLOW the user's decision.
+IF no design language exists and the work covers more than one screen, ASK the user whether to create one first. IF they agree, FOLLOW [modes/language.md](modes/language.md) before building.
 
 ### 1.3. Write the audience and their tasks
 
@@ -48,43 +54,17 @@ IF the work is more than a small change with one obvious reading, THEN WRITE a b
 
 DESCRIBE the AUDIENCE by what they do and the conditions they do it in: the device, the input method, how much time they have, what they already know. DO NOT invent a fictional person, and DO NOT assign the AUDIENCE traits or conditions you guessed.
 
-WRITE each scenario as one task from its start to an end the person can observe, with concrete data: who comes, what they came to do, and what they see or have when it is done. KEEP the scenarios few: a scenario earns its place only if a wrong guess on it would change what you build. Sections 4 to 6 check the interface against these scenarios.
+WRITE each scenario as one task from its start to an end the person can observe, with concrete data: who comes, what they came to do, and what they see or have when it is done. KEEP the scenarios few: a scenario earns its place only if a wrong guess on it would change what you build. Every mode checks the interface against these scenarios.
 
 ### 1.4. Ask a few questions before building
 
-USE `/ask-better` if available, THEN CONTINUE with section 2 once the user answers. OTHERWISE, ASK only what only the user knows and what changes the interface. ASK at most about three questions, all at once, before building. WRITE each one so the user can answer in a few words or by choosing. The first questions carry most of the value, and many or generic questions cost the user more than they give. TREAT the number as a guide, not a rule.
+USE `/ask-better` if available, THEN CONTINUE with the mode file once the user answers. OTHERWISE, ASK only what only the user knows and what changes the interface. ASK at most about three questions, all at once, before building. WRITE each one so the user can answer in a few words or by choosing. The first questions carry most of the value, and many or generic questions cost the user more than they give. TREAT the number as a guide, not a rule.
 
 FOR every other gap, CHOOSE the most plausible option, PROCEED, and STATE the assumption next to the result it affects.
 
-## 2. Direction: show before building
+## 2. Design rules
 
-USE this section WHEN the interface is new, or the change alters its layout or flow, and the brief leaves more than one reasonable direction. FOR a small change inside an existing interface, FOLLOW its patterns and SKIP this section.
-
-### 2.1. Ask for the user's own direction first
-
-ASK whether the user has a direction or references in mind BEFORE you show yours, because seeing examples first narrows what people consider. TREAT this order as a guide, not a rule. IF no design language exists, ASK for interfaces they like and dislike. PREFER pictures and examples over adjectives: people rarely have the words for a look they would recognise.
-
-### 2.2. Show two or three rough directions
-
-MAKE the directions differ in a way the user can see, such as the structure, the order of content, or what is prominent. DO NOT vary only a colour or a font. USE the same real content in each.
-
-KEEP them rough: real structure and content, little styling. A rough version reveals largely the same problems as a finished one, and polish changes how people rate it. IF you can render, SHOW rendered versions. OTHERWISE, SHOW each direction as a plain text outline of the screen. TREAT two or three as a guide, not a rule.
-
-### 2.3. Ask what is wrong, not how to fix it
-
-ASK which direction serves each scenario best and what is wrong with each one. DO NOT ask the user to design the fix: people identify problems far more reliably than solutions. RECORD the chosen direction in the brief.
-
-TREAT what the user picks about the look as this user's preference. It is not evidence that the interface works for the AUDIENCE.
-
-## 3. Build
-
-### 3.1. Change only what the task needs
-
-PRESERVE the parts of an existing interface that the task does not require you to change. REUSE the project's components, tokens and patterns. IF none exist, DEFINE a small set of colours, type sizes and spacing values once, and USE only those.
-
-FOR the words in the interface, such as labels, button text and messages, FOLLOW `/write-better` if available. OTHERWISE, USE the words the AUDIENCE uses, and NAME the action on the control that performs it.
-
-### 3.2. Lay out the page for the task
+### 2.1. Lay out the page for the task
 
 TREAT the rules in this section as guides, not rules, because their effect depends on the task and the AUDIENCE.
 
@@ -93,9 +73,9 @@ TREAT the rules in this section as guides, not rules, because their effect depen
 - MAKE every control look like something that can be clicked or tapped, and everything else look like it cannot.
 - ON touch screens, MAKE targets about 9 mm or larger.
 - PUT an element where the task leads the person. DO NOT rely on size or colour alone to get it noticed: people searching for something else miss prominent elements.
-- DO NOT judge navigation by counting clicks or menu levels. JUDGE it by whether each step is obvious (section 5.1).
+- DO NOT judge navigation by counting clicks or menu levels. JUDGE it by whether each step is obvious (section 3.1).
 
-### 3.3. Text and colour
+### 2.2. Text and colour
 
 - DO NOT use small body text. No single size is right for everyone: larger text helps up to a point.
 - AVOID very short lines of running text. AIM for about 55 to 70 characters per line. TREAT this as a guide, not a rule.
@@ -104,7 +84,7 @@ TREAT the rules in this section as guides, not rules, because their effect depen
 - DO NOT use colour as the only signal. ADD text, an icon or a shape.
 - TREAT the choice between ordinary serif and sans serif typefaces as taste, and FOLLOW the design language. DO NOT choose a special typeface on the claim that it helps a group of readers.
 
-### 3.4. Forms and feedback
+### 2.3. Forms and feedback
 
 - GIVE every field a visible label. Label position is a choice: PICK one and KEEP it across the form.
 - PUT each error message next to the field it concerns. SAY what is wrong and what to enter instead.
@@ -112,7 +92,7 @@ TREAT the rules in this section as guides, not rules, because their effect depen
 - MARK which fields are required.
 - WHEN an action takes time, SHOW that something is happening. DO NOT choose a loading pattern on the claim that it feels faster.
 
-### 3.5. Make it work without sight or a mouse
+### 2.4. Make it work without sight or a mouse
 
 Generated interfaces fail here more than anywhere else.
 
@@ -125,17 +105,13 @@ Generated interfaces fail here more than anywhere else.
 
 WRITE names, labels and descriptions from the scenarios, because no checker can judge whether they mean anything.
 
-## 4. Decide the cases the design leaves out
+### 2.5. Words
 
-WALK each scenario step by step. AT each step, ASK what can go wrong or differ: no data yet, a lot of data, very long text, a slow or failed response, invalid input, no permission, the person going back or repeating the step, a small screen.
+FOR the words in the interface, such as labels, button text and messages, FOLLOW `/write-better` if available. OTHERWISE, USE the words the AUDIENCE uses, and NAME the action on the control that performs it.
 
-THEN CHECK each screen against a short list of states: empty, loading, error, partial, full and success. Each method finds cases the other misses. TREAT this section as a guide, not a rule.
+## 3. Check the interface, not its looks
 
-FOR each case, DECIDE what the interface shows, and BUILD it. IF a case changes what happens to the person's data or work, TREAT it as a question for the user (section 1.4) or state it as an assumption.
-
-## 5. Verify
-
-### 5.1. Walk every scenario in the rendered interface
+### 3.1. Walk every scenario in the rendered interface
 
 IF you can render and operate the interface, WALK each scenario from start to end: with a pointer, then with the keyboard only, then at the smallest screen width in the brief. AT each step, CHECK that the next action is visible and named in the AUDIENCE's words, and that the interface shows the result of the action.
 
@@ -143,68 +119,27 @@ A scenario counts as walked only if you operated the interface. Reading the code
 
 Completing a scenario yourself shows that it can be completed. It does not show where a person would hesitate or fail, because agents complete tasks that people struggle with.
 
-### 5.2. Run a checker and fix what it reports
-
-IF an automated accessibility checker is available, RUN it on the rendered interface and FIX what it reports. A clean run covers a minority of accessibility problems. DO NOT report the interface as accessible from it. IF none is available, SAY so, and RELY on sections 5.1 and 5.3.
-
-### 5.3. Read the markup for meaning
+### 3.2. Read the markup for meaning
 
 READ the names of controls, the labels, the headings and the alt texts in the order assistive technology gives them, without the visual page. CHECK that each one says what the thing is or does in its scenario.
 
-### 5.4. Bound the fix loop
+### 3.3. Run a checker and fix what it reports
 
-AFTER each round of fixes, WALK all scenarios again, not only the one that failed, because fixing one problem in an interface often creates another.
+IF an automated accessibility checker is available, RUN it on the rendered interface and FIX what it reports. A clean run covers a minority of accessibility problems. DO NOT report the interface as accessible from it. IF none is available, SAY so, and RELY on sections 3.1 and 3.2.
 
-STOP fixing and REPORT when:
-
-1. The same problem remains after two attempts.
-2. About three rounds of fixes have not made every scenario pass.
-3. A fix breaks a scenario that passed before.
-
-DO NOT change a scenario or drop a check so that the walk passes. IF a scenario looks wrong, STOP, EXPLAIN why, and ASK the user.
-
-### 5.5. Use screenshots for defects, not for quality
+### 3.4. Use screenshots for defects, not for quality
 
 LOOK at screenshots to find visible defects, such as overlap, clipped text, unreadable text and broken layout. DO NOT treat your judgment of a screenshot, or another model's, as evidence that the interface is easy to use or well designed.
 
-## 6. Review
-
-### 6.1. Review in a fresh context
-
-IF you can start a sub-agent, GIVE a fresh reviewer only the interface and the brief, with [templates/review-brief.md](templates/review-brief.md). DO NOT give it your reasoning or your conversation with the user. A cheaper model can review, but it must not share your context.
-
-OTHERWISE, REVIEW in a separate pass after verification: RE-READ the brief first, THEN walk the interface as if someone else built it.
-
-IF the interface is important enough for more than one review, RUN the same review again independently. DO NOT give reviewers different characters or temperaments instead: repeated independent reviews find most of what such roles find. TREAT this as a guide, not a rule.
-
-### 6.2. Treat findings as candidates
-
-KEEP a finding only if it names the scenario and step, what the reviewer did, what happened, and why that stops or slows the person. REPRODUCE it in the rendered interface before fixing it.
-
-A finding that only names a broken rule, with no step where a person is stopped, is unconfirmed. Most such findings are not problems people have. DROP it only when you can show it is wrong. OTHERWISE, REPORT it as unconfirmed.
-
-ORDER findings by their effect on the AUDIENCE completing a scenario.
-
-### 6.3. Review a design language
-
-WHEN the thing to review is a design language, or an interface against its design language, CHECK in this order:
-
-1. The rules of section 3 that a design language fixes: each allowed pair of text and background colour, text sizes, and meaning carried by colour alone.
-2. What was built against what is written: LIST the colours, type sizes, spacing values and components the interface uses, and COMPARE them with the document. LOOK at screens side by side, because reviews of single elements miss problems that span a page.
-3. What the scenarios need and the document lacks, such as a component or a state.
-4. Whether it expresses what the user wants it to express. REPORT this as your reading, separate from the findings: it is a matter of preference.
-
-WORK through this list instead of reviewing freely: a fixed list of criteria makes a review more useful to the person who receives it. REPORT each finding in the format of section 6.2, with the builder or the member of the AUDIENCE who is stopped. NAME what works and must be kept, specifically, so that fixes do not remove it.
-
-### 6.4. Do not simulate people
+### 3.5. Do not simulate people
 
 DO NOT take, or give a reviewer, the role of a person with a disability, a neurodivergent profile, an age or an emotional state to predict how such a person would experience the interface. Such roles produce stereotypes and do not match the people they imitate.
 
-FOR these AUDIENCES, FOLLOW section 3.5 and the published accessibility guidance for the platform, and RECOMMEND a test with people from that AUDIENCE (section 7.2).
+FOR these AUDIENCES, FOLLOW section 2.4 and the published accessibility guidance for the platform, and RECOMMEND a test with people from that AUDIENCE (section 4.2).
 
-## 7. Hand back
+## 4. Hand back
 
-### 7.1. Report what the user must act on
+### 4.1. Report what the user must act on
 
 USE `/write-better` if available. OTHERWISE, lead with the result. THEN REPORT:
 
@@ -214,7 +149,7 @@ USE `/write-better` if available. OTHERWISE, lead with the result. THEN REPORT:
 
 DISTINGUISH three things, and DO NOT claim one from another: the scenarios can be completed, the checks pass, and the AUDIENCE can use the interface. Only a test with people shows the third.
 
-### 7.2. Offer a test with people
+### 4.2. Offer a test with people
 
 WHEN the interface is new or its main flow changed, and people other than the user will use it, OFFER a short test: the user watches three to five people from the AUDIENCE try the scenarios without help, and notes where each one hesitates or fails. GIVE the scenarios as tasks worded without the labels the interface uses. IF the AUDIENCE has distinct groups, SUGGEST a few people from each.
 
