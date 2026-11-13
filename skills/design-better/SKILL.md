@@ -28,7 +28,8 @@ This skill uses two words for people. The user is the person you work for. The A
 3. Every check finds only part of the problems: an automated checker, a review against a list of rules, a model looking at a screenshot, a test with a few people. Two reviewers of the same interface report largely different problems, and reviews report many problems that people do not have.
 4. People judge more critically and more precisely when they compare concrete versions than when they see one version or describe what they want in words.
 5. Few layout and type rules hold for every task and every AUDIENCE, and taste differs between people, including trained designers.
-6. The brief (section 1.3) is a design choice. Each mode file names its own design choices.
+6. People overlook removing something as a way to improve it unless prompted to consider removal.
+7. The brief (section 1.3) is a design choice. Each mode file names its own design choices.
 
 This skill names capabilities, not tools: reading files, asking the user, running Python 3, rendering a page and viewing it, publishing a page, operating a page by pointer and keyboard, running an automated accessibility checker, sub-agents, and writing files. FOR each capability you lack, FOLLOW the fallback the section gives.
 
@@ -46,6 +47,8 @@ READ the existing interface, its components, styles and design files, the conten
 
 TREAT an existing design language, such as its colours, typefaces, spacing and components, as a requirement the user owns. KEEP it. IF it conflicts with a rule in section 2, such as text contrast, DO NOT change it. REPORT the conflict once, with its effect on the AUDIENCE and one alternative, THEN FOLLOW the user's decision. A change to a colour, typeface, type size, spacing value or component that the design language defines is a change to the design language, however small. DO NOT make it as a quick fix: WAIT for the user's decision.
 
+The pages a design document chooses, and what each holds, are part of the structure (section 1.3), not of the design language. CHECK them against the GOAL instead of keeping them as a requirement.
+
 IF no design language exists and the work covers more than one screen, ASK the user whether to create one first. IF they agree, FOLLOW [modes/language.md](modes/language.md) before building.
 
 ### 1.3. Write the audience and their tasks
@@ -55,6 +58,8 @@ IF the work is more than a small change with one obvious reading, THEN WRITE a b
 DESCRIBE the AUDIENCE by what they do and the conditions they do it in: the device, the input method, how much time they have, what they already know. DO NOT invent a fictional person, and DO NOT assign the AUDIENCE traits or conditions you guessed.
 
 WRITE each scenario as one task from its start to an end the person can observe, with concrete data: who comes, what they came to do, and what they see or have when it is done. KEEP the scenarios few: a scenario earns its place only if a wrong guess on it would change what you build. Every mode checks the interface against these scenarios.
+
+The structure is part of the design: which pages exist, what each holds, and how they link. WRITE it in the brief. FOR each page and each main part of a page, NAME the scenario it serves, THEN ASK whether it should stay, merge with another, or go (Principle 6). A page or part that serves no scenario, repeats another, or follows how its content was produced instead of what the AUDIENCE comes to do, is a candidate to merge or remove. TREAT the last point as a question to settle with the user, not a rule: organising pages by task beats organising them by subject in some studies and not in others, and the labels matter at least as much as the grouping.
 
 ### 1.4. Ask a few questions before building
 
@@ -69,6 +74,7 @@ FOR every other gap, CHOOSE the most plausible option, PROCEED, and STATE the as
 WHEN you show the user versions to choose between, or a change before and after, PUT them on one rendered page, side by side, because people judge a version more critically when they see it among others. Showing every version at the same screen sizes and scale, in the order you give, is a design choice.
 
 1. WRITE each version as its own HTML file, with the same real content and the project's styles. FOR a before and after, SAVE a copy of the page before you change it.
+   WHEN versions differ in only part of a page, WRITE each version as that part, with enough of its surroundings to place it, so it shows at a size where its text can be read. LABEL under each version what differs from the others. IF the change is small inside the part shown, also MARK where it is, with the same mark at the same place in every version, so the user finds it without searching and no version stands out. KEEP the mark out of the interface itself.
 2. RUN `python3 scripts/compare.py A=<file> B=<file> --question "<what the user decides>" --width <widest screen> --width <smallest screen in the brief> --out .design/<slug>/index.html` from this skill's directory, with the output path in the working directory. A version can also be an address the user's browser can reach. FOR a before and after, LABEL them `Before=` and `After=`: the page then also offers to switch between them in the same place, which shows small changes at one spot better than looking from one to the other. Versions with other labels are shown side by side only, because switching loses that advantage when the layout moves between versions. DO NOT commit the page unless the user asks.
 3. LOOK at the rendered page before you show it, and FIX each version that does not load, overlaps or is cut off.
 4. IF you can publish a page for the user, PUBLISH it and GIVE the link. IF the script warns that a version links files by relative path, PUT those files' content into the version first, because a published page cannot reach them. OTHERWISE, OPEN the page with `--open` and GIVE its path.

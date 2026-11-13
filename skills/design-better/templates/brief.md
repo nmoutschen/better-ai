@@ -23,6 +23,12 @@
 - Done when: <what they see or have at the end>
 - Source: <user | project files | assumption>
 
+## Structure
+
+| Page or main part | What it holds | Scenario it serves | Stay, merge or go |
+|---|---|---|---|
+| <page> | <content> | <scenario name, or none> | <decision and reason> |
+
 ## Content
 
 - <What the interface must show or collect, and where it comes from>
