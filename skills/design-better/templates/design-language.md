@@ -2,7 +2,7 @@
 
 ## What it must express
 
-- Qualities: <three to five qualities, in the user's words>
+- Qualities: <what the interfaces must express, in the user's words>
 - Audience: <who uses the interfaces, and where>
 - References: <interfaces the user likes and dislikes, and what about them>
 

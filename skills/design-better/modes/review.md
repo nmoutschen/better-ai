@@ -8,7 +8,7 @@ IF the interface has no brief, WRITE its scenarios first (SKILL.md section 1.3).
 
 IF you can start a sub-agent, GIVE a fresh reviewer only the interface and the brief, with [../templates/review-brief.md](../templates/review-brief.md). DO NOT give it your reasoning or your conversation with the user. A cheaper model can review, but it must not share your context.
 
-OTHERWISE, REVIEW in a separate pass after you built: RE-READ the brief first, THEN check the interface by SKILL.md section 3 as if someone else built it.
+OTHERWISE, REVIEW in a separate pass after you built: RE-READ the brief first, THEN check the interface by SKILL.md sections 2 and 3 as if someone else built it.
 
 IF the interface is important enough for more than one review, RUN the same review again independently. DO NOT give reviewers different characters or temperaments instead: repeated independent reviews find most of what such roles find. TREAT this as a guide, not a rule.
 

@@ -18,7 +18,7 @@ KEEP one source of truth: GIVE every value a name, and USE the same names in the
 
 ## L2. Find what it must express, and for whom
 
-ASK the user for three to five qualities the interfaces must express, such as calm, precise or playful, and for interfaces they like and dislike ([build.md](build.md) section B1.1). IF the brief does not say who the AUDIENCE is, ASK: preferred colourfulness and density differ by country, education and age.
+ASK the user what the interfaces must express, in their own words, and for interfaces they like and dislike ([build.md](build.md) section B1.1). DO NOT suggest example qualities: examples narrow what people consider. IF the user has no words for it, DERIVE the qualities from the interfaces they like and dislike, and CONFIRM them with the user. IF the brief does not say who the AUDIENCE is, ASK: preferred colourfulness and density differ by country, education and age.
 
 USE what colours and typefaces commonly express as a starting point for each quality. DO NOT assume the result expresses it. CHECK it in section L3.
 
