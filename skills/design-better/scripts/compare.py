@@ -44,26 +44,27 @@ body { margin:0; background:var(--cream); color:var(--ink); font:400 15px/1.55 v
   --pad:max(40px, (100% - 110rem) / 2); }
 .band { height:10px; background:var(--umber) var(--saya); background-size:13px 7.5px; }
 .band--thin { height:6px; }
-header { padding:24px var(--pad) 12px; }
+/* The banner above the versions is an inverted n14n block: umber with cream text. */
+header { padding:24px var(--pad) 12px; background:var(--umber); color:var(--cream); }
 main { padding:4px var(--pad) 36px; background:var(--surround); color:var(--ink); }
-h1 { font:700 28px/1.2 var(--serif); color:var(--heading); margin:0 0 8px; }
+h1 { font:700 28px/1.2 var(--serif); color:var(--cream); margin:0 0 8px; }
 .question { font:400 17px/1.6 var(--serif); margin:0 0 16px; max-width:65ch; }
-.controls { position:sticky; top:0; z-index:2; background:var(--cream); border-bottom:1px solid var(--line);
+.controls { position:sticky; top:0; z-index:2; background:var(--umber); color:var(--cream);
   padding:10px var(--pad); display:flex; flex-wrap:wrap; gap:8px 28px; align-items:center; }
-.seg { display:inline-flex; border:1px solid var(--umber); }
-.seg button { border:0; background:var(--cream); color:var(--umber); padding:7px 14px; cursor:pointer;
+.seg { display:inline-flex; border:1px solid var(--cream); }
+.seg button { border:0; background:transparent; color:var(--cream); padding:7px 14px; cursor:pointer;
   font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
-.seg button + button { border-left:1px solid var(--umber); }
-.seg button[aria-pressed="true"] { background:var(--umber); color:var(--cream); }
+.seg button + button { border-left:1px solid var(--cream); }
+.seg button[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
 .seg[hidden] { display:none; }
 /* Scroll together is a separate setting from the view, so it uses moss instead of umber. */
 .seg--moss { border-color:var(--moss-dark); }
-.seg--moss button { color:var(--moss-dark); }
+.seg--moss button { color:var(--cream); }
 .seg--moss button[aria-pressed="true"] { background:var(--moss-dark); color:var(--cream); }
 .full { border:0; background:none; padding:4px 0; cursor:pointer; font:700 12px var(--sans);
   letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
 :focus-visible { outline:2px solid var(--terracotta); outline-offset:2px; }
-.hint { color:var(--muted); font-size:13px; margin:0; }
+.hint { color:var(--cream); font-size:13px; margin:0; }
 h2 { font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink);
   border-top:2px solid var(--ink); padding-top:10px; margin:28px 0 14px; }
 .row { display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:32px; align-items:start; }
