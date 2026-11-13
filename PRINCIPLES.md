@@ -2,11 +2,11 @@
 
 Use these principles to write a new skill or to change an existing one. The skills in this repository make AI elevate the user and work better with them.
 
-These principles are the author's preferences for what the skills do and how they are written. They are choices, not research findings. What research shows about agents and readers lives in `sources/` and in the Principles section of each skill.
+These principles are the author's preferences for what the skills do and how they are written. They are choices, not research findings. What research shows about agents and readers lives in the research reports (see section 1) and in the Principles section of each skill.
 
 ## 1. Base each rule on evidence
 
-EACH skill starts from a Markdown research report in `sources/`, produced with `/research-better`. A rule enters a skill only if the report supports it, if this file asks for it, or if the skill states it as a design choice. A rule that rests on one study or on practitioner guidance gets softer wording, such as "TREAT this as a guide, not a rule".
+EACH skill starts from a Markdown research report, produced with `/research-better`. The reports and their research boards are kept outside this repository, in the author's research archive; articles written from them are published at https://w.n14n.dev/. A rule enters a skill only if the report supports it, if this file asks for it, or if the skill states it as a design choice. A rule that rests on one study or on practitioner guidance gets softer wording, such as "TREAT this as a guide, not a rule".
 
 START each skill with a short Principles section that states the findings two or more of its rules depend on. ADD a short reason to a rule when the reason is not obvious, such as "because learners misjudge it". A finding that only one rule depends on goes there, as that rule's reason, not in the Principles section. STATE each finding once. DO NOT describe the research in a skill: no citations, effect sizes, references to studies, or statements about where the evidence comes from, how strong it is, or what it does not cover. They belong in the source report.
 
@@ -68,7 +68,7 @@ FOLLOW `/write-better` for the wording: plain words, one term per concept, liter
 
 ### 6.2. Keep skills short and self-contained
 
-KEEP each skill self-contained: SKILL.md, its templates and its scripts DO NOT link to or depend on files outside the skill's directory, such as reports in `sources/`. KEEP each SKILL.md well under 500 lines. KEEP common mistakes and their fixes in SKILL.md, not in a reference file the agent may not open.
+KEEP each skill self-contained: SKILL.md, its templates and its scripts DO NOT link to or depend on files outside the skill's directory, such as research reports. KEEP each SKILL.md well under 500 lines. KEEP common mistakes and their fixes in SKILL.md, not in a reference file the agent may not open.
 
 BEFORE adding a rule or a Principles bullet to a SKILL.md, LOOK in that SKILL.md for one that covers the same case, and MERGE the new content into it instead. STATE each rule once in a SKILL.md. A template that an agent reads without SKILL.md, such as a worker brief, MAY restate it.
 
