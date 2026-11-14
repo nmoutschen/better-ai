@@ -17,9 +17,9 @@ This skill improves what persists across sessions. `/do-better` corrects the wor
 
 ## Principles
 
-1. Skills an agent wrote for itself and adopted without a test lowered results below having no skills at all. Systems that report gains admit a change only after it improves results on tasks held back from the ones it was built from, within a limit on what it breaks.
+1. Skills an agent wrote for itself and adopted without a test lowered results below having no skills at all. Gains came from changes admitted after they improved results on tasks held back from the ones they were built from, or from a reliable outcome signal, such as whether the task succeeded. Passing such a test is not proof: tests that keep any change that scores higher accepted worse changes, a small test set reused across runs overstated gains, and tests that score only task success deleted safety rules that looked redundant.
 2. A model judging its own output favours it, and correcting itself without an outside signal at times made results worse. Reflection can store its own errors as guidance.
-3. A library of rules or skills that only grows gets worse, until adding one scores below adding none. Retiring entries on measured results and capping their number reversed this.
+3. As a library of rules or skills grows, agents pick the wrong skill more often, and models follow many stacked or conflicting instructions poorly.
 4. People approve most of the prompts they see and stop reading them. A written rationale raised acceptance of AI advice whether or not it was right.
 5. Candidate changes can come from successful runs, from routines the agent repeats, and from reviewing past sessions offline, not only from failures. No tested cadence exists for running this loop.
 6. Proposing changes for approval, the evidence each proposal shows, the cap on proposals per run, and keeping each target no larger than it was are design choices. TREAT these rules as a guide, not as fixed rules.
@@ -92,6 +92,8 @@ COUNT what got worse as well as what got better. A change that breaks a case tha
 
 IF results vary between runs, RUN each side more than once before you call a difference real.
 
+DO NOT reuse the same few held-out tasks run after run. IF a gain shows on only a few tasks, SAY so in the test result instead of calling it a gain.
+
 ### 3.2. Keep the judge apart from the author
 
 DO NOT judge a change with the same step that wrote it. USE a fixed check, such as a test, an assertion or the user's recorded acceptance, or a separate sub-agent that did not see the reasoning behind the change. IF you have no sub-agents, WRITE the check before you write the change, and DO NOT edit the check afterwards.
@@ -110,7 +112,7 @@ CHECK the size of each target after the changes. IF a target grows, PROPOSE what
 
 IF a target has no size limit the user set, KEEP it no larger than it was at the start of the run unless a proposal shows why it must grow.
 
-RETIRE a rule or skill only on evidence that it does not help, such as no session using it, or a test showing results without it are as good. DO NOT retire an entry the user added unless they approve it.
+RETIRE a rule or skill only on evidence that it does not help, such as no session using it, or a test showing results without it are as good. DO NOT retire a rule that guards against a rare failure, such as a safety or permission rule, on such a test, because the replayed tasks may never trigger that failure. DO NOT retire an entry the user added unless they approve it.
 
 ## 5. Propose the changes
 
