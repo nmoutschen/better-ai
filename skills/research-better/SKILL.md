@@ -109,7 +109,7 @@ After each search or page read, WRITE to the board before the next step:
 
 - The query, in your search log.
 - New sources, with author, date, title, publisher, URL, type, how you read it, and a trust assessment. COPY the author, date, title, and publisher from the page itself, not from memory or the search result. CHECK the board for the URL first. MARK a source that cites, copies, or summarizes another source as a repeat of it: the two are not independent.
-- New claims, each with its source and a verbatim quote. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
+- New claims, each with its source and a verbatim quote. That a source does not report something is not a claim, because no quote can show it: WRITE it in the question's summary or as a gap. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
 - New terms, and new questions (section 6.3).
 
 WHEN the question's `done-when` holds, STOP searching it, even if more searches are possible. SET its status and WRITE its summary: two or three sentences that answer the question from the evidence, including where sources disagree or evidence is thin.
