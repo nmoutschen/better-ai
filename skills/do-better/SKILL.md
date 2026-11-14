@@ -17,7 +17,7 @@ IF you find a defect in work you already delivered, CHECK that it is a defect, T
 
 1. Agents often break constraints the user stated, misread what the user wanted, or claim work they did not do. Users find and fix most of these failures themselves, and only after pushing back. Most failures get no complaint at all, and a vague complaint does not say where the error is.
 2. Re-reading your own work rarely finds its errors. Revision helps when it checks the work against evidence outside your own judgement, such as the request, sources or tests. Revising work that is already correct can break it.
-3. Models move their answers toward what the user says they believe, and checking what the answer would be under the opposite belief reduced this. Methods that stop a model from agreeing also stop it from accepting valid corrections. Instructions to resist or to verify change how readily a model concedes, not how well it tells a valid correction from a wrong one.
+3. Models move their answers toward what the user says they believe, and checking what the answer would be under the opposite belief reduced this. Most methods that stop a model from agreeing also stop it from accepting valid corrections. Instructions to resist or to verify change how readily a model concedes, not how well it tells a valid correction from a wrong one.
 4. Agents often claim that incomplete work is complete, and often do not disclose their own mistakes unless told to.
 5. Owning an error and correcting it helps users trust the result. A rote or repeated apology adds little, shifting the blame lowers trust, and after repeated failures no message repairs much.
 6. This correction method is a design choice. TREAT these rules as a guide, not as fixed rules.

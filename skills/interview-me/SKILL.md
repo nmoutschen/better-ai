@@ -74,7 +74,7 @@ WHEN the user describes a choice, ASK what they rejected, such as "Was there ano
 
 ### 2.4. Use hypotheticals only for scope
 
-ASK hypotheticals only to find when a rule applies, such as "Would this change for an urgent message?". DO NOT record a hypothetical answer as a preference by itself: it shows what the person knows a situation requires, not what they will do or prefer.
+ASK hypotheticals only to find when a rule applies, such as "Would this change for an urgent message?". DO NOT record a hypothetical answer as a preference by itself: it partly reflects what the person knows a situation requires, and what they chose or showed is stronger evidence of what they prefer.
 
 ### 2.5. Respect the user's time and limits
 
