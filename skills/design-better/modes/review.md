@@ -10,7 +10,7 @@ CHECK the structure (SKILL.md section 1.3) before looking for defects inside pag
 
 FOLLOW `/review-better` if available to run the review, confirm findings and hand them back, with this file and SKILL.md sections 2 and 3 as what to look for. GIVE the reviewer [../templates/review-brief.md](../templates/review-brief.md) as its brief, with every decision the user has made about the interface or its design language.
 
-OTHERWISE, IF you can start a sub-agent, GIVE a fresh reviewer only the interface, the brief, and those decisions, with the same template. DO NOT give it your reasoning or your conversation with the user. IF you cannot, REVIEW in a separate pass after you built: RE-READ the brief and the user's decisions first, THEN check the interface by SKILL.md sections 2 and 3 as if someone else built it.
+OTHERWISE, IF you can start a sub-agent, GIVE a fresh reviewer only the interface, the brief, and those decisions, with the same template. DO NOT give it your reasoning, your conversation with the user, or your verdict. IF you cannot, REVIEW in a separate pass after you built: RE-READ the brief and the user's decisions first, THEN check the interface by SKILL.md sections 2 and 3 as if someone else built it.
 
 ## R2. Findings about an interface
 

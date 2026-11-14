@@ -133,7 +133,7 @@ COMPARE the finished behaviour with each scenario in the requirements, using the
 
 ## 6. Review
 
-FOLLOW `/review-better` if available to run the review, confirm findings and hand them back, with section 6.1 as what to look for. OTHERWISE, IF you can start a sub-agent, GIVE a separate reviewer only the diff, the requirements and access to the code, from a different model if you can choose, and not your reasoning or your conversation with the user. IF you cannot, RE-READ the requirements, THEN read the diff as if someone else wrote it. ALSO CHECK the blocking criteria of the user's review guide, if there is one. KEEP a finding you cannot confirm as unconfirmed, ORDER findings by effect, and REPORT each with its location, the input that triggers it, its effect, and a fix.
+FOLLOW `/review-better` if available to run the review, confirm findings and hand them back, with section 6.1 as what to look for. OTHERWISE, IF you can start a sub-agent, GIVE a separate reviewer only the diff, the requirements and access to the code, from the most capable model you can choose, and not your reasoning, your conversation with the user, or your verdict. IF you cannot, RE-READ the requirements, THEN read the diff as if someone else wrote it. ALSO CHECK the blocking criteria of the user's review guide, if there is one. KEEP a finding you cannot confirm as unconfirmed, ORDER findings by effect, and REPORT each with its location, the input that triggers it, its effect, and a fix.
 
 ### 6.1. What to look for in code
 
