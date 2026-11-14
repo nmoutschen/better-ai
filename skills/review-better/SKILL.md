@@ -25,7 +25,7 @@ IF the user has a review guide, such as a `review-for-<name>` skill, ADD its cri
 
 1. Authors act on findings that say where the problem is and are accurate. A specific proposed fix makes plain acceptance more likely. Praise added to soften a finding does not change what authors act on.
 2. AI reviewers miss most serious problems. Naming the kinds of problem that matter for this work helps a reviewer find real problems. A long generic checklist adds little over reading freely. Anything that makes a reviewer report more also makes it report more false findings.
-3. Ordering findings by effect, labelling them blocking or suggestion, choosing the action by kind of finding (section 4.2), keeping the reviewer's context separate from the author's, the length of the list in section 1.3, keeping findings few, and leaving out praise are design choices.
+3. Ordering findings by effect, labelling them blocking or suggestion, choosing the action by kind of finding (section 4.2), starting a separate reviewer, the method for holding a disputed finding (section 5), the length of the list in section 1.3, keeping findings few, and leaving out praise are design choices.
 
 This skill names capabilities, not tools: reading files, running commands, opening sources, sub-agents, choosing a sub-agent's model, asking the user, and editing the work. FOR each capability you lack, FOLLOW the fallback the section gives.
 
@@ -59,11 +59,11 @@ KEEP the list short and focused. DO NOT replace it with a long generic checklist
 
 ### 2.1. Use a separate reviewer
 
-IF you can start a sub-agent, GIVE a reviewer the work, the GOALS, what the work answers to, the decisions already made and the list from section 1.3, with [templates/review-brief.md](templates/review-brief.md). DO NOT give it your reasoning or your conversation with the user. IF you can choose its model, CHOOSE a different model from the one that made the work, especially when the work is yours: a model reviewing its own work rejects some of its correct work and approves some of its own errors, and a reviewer from a different model does better. The reviewer reports findings and does not change the work. APPLY section 4 to its findings yourself.
+IF you can start a sub-agent, GIVE a reviewer the work, the GOALS, what the work answers to, the decisions already made and the list from section 1.3, with [templates/review-brief.md](templates/review-brief.md). DO NOT give it your reasoning, your conversation with the user, or your verdict, such as a note that the work is done or correct: what the author says about the work pulls a reviewer toward accepting it. IF you can choose its model, CHOOSE the most capable model available, and a different model from the one that made the work when one is as capable: a model misses errors in its own output that it catches in someone else's. The reviewer reports findings and does not change the work. APPLY section 4 to its findings yourself.
 
-OTHERWISE, REVIEW in a separate pass after the work is done: RE-READ the GOAL and the list first, THEN read the work as if someone else made it.
+OTHERWISE, REVIEW in a separate pass after the work is done: RE-READ the GOAL and the list first, THEN read the work as if someone else made it. DO NOT review the same work a second time in the same conversation: a second review there does clearly worse than a review from a fresh context.
 
-IF the user asks for a thorough review, or a missed problem would be costly and hard to undo, RUN a second independent review, from a different model if you can. DO NOT give reviewers different characters or temperaments instead: repeated independent reviews find most of what such roles find.
+IF the user asks for a thorough review, or a missed problem would be costly and hard to undo, RUN a second independent review, from a different model if one is as capable. DO NOT give reviewers different characters or temperaments instead: repeated independent reviews find most of what such roles find.
 
 ### 2.2. Read beyond the work
 
@@ -126,5 +126,7 @@ DISTINGUISH three things, and DO NOT claim one from another: the work meets its 
 WHEN the author disputes a finding, FIRST WRITE what the finding claims and its evidence. THEN PUT the finding and the author's argument side by side, and JUDGE them together, not the argument alone as a reply. AI reviewers drop correct findings when the author pushes back without evidence, and less so when they weigh both positions side by side.
 
 CHANGE the finding only when the argument adds evidence or shows that the finding misread the work. IF it does neither, KEEP the finding, SAY once that the argument adds no evidence, and LEAVE the decision to the author. DO NOT keep a finding the argument disproves to look independent.
+
+COUNT a source the argument cites as evidence only after you open it and it says what the argument claims: citations in a rebuttal make reviewers concede more, rightly or not.
 
 IF the user rejects the review itself, USE `/do-better` if available. OTHERWISE, FIND what the review missed from the user's feedback and the GOAL, and CORRECT it.

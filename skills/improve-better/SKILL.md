@@ -98,6 +98,8 @@ DO NOT reuse the same few held-out tasks run after run. IF a gain shows on only 
 
 DO NOT judge a change with the same step that wrote it. USE a fixed check, such as a test, an assertion or the user's recorded acceptance, or a separate sub-agent that did not see the reasoning behind the change. IF you have no sub-agents, WRITE the check before you write the change, and DO NOT edit the check afterwards.
 
+IF a sub-agent judges which of two versions did better, GIVE it the outputs of both versions on the same tasks, SHOW each pair in both orders, and REPEAT each judgement: a judge's verdict on the same pair often flips when asked again. COUNT a version as better only if it wins in both orders in most repeats. TREAT a small gain from one judging run as noise, and CHECK a judged gain against a fixed check when the task has one, because judges declare gains that running the tasks does not confirm.
+
 ### 3.3. Test the changes together
 
 AFTER the candidates pass one by one, TEST the changes that passed together, because changes that pass alone can conflict and removing a bad change afterwards recovered little. IF the combination does worse than the best single change, DROP changes until it does not.
