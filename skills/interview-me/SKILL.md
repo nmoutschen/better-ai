@@ -27,7 +27,7 @@ Being invoked does NOT mean a long interview or new rules are needed. IF the exi
 2. Comparing concrete work samples and justifying the choice made tacit quality criteria partly explicit. Walking through one real incident revealed the reasons behind a person's actions.
 3. Recall of past behaviour is imperfect, even for recent days. A document the user wrote or reacted to is stronger evidence than their memory of it.
 4. AI interviewers produce answers of about the same quality as human interviewers. Their main failure is not following up on surprising or unclear answers.
-5. A user profile in an LLM's context made it more agreeable and made it personalize where it should not. The model mirrored the user's views only when the context let it infer them.
+5. A user profile in an LLM's context made most models tested more agreeable, and feedback given in context was applied where it should not be. The model mirrored the user's views only when the context let it infer them.
 6. Users accepting a summary of their interview shows that they accept it, not that it is accurate.
 7. These rules adapt methods from other settings to an AI interviewing a user about their own reading, reviewing, and use of AI. TREAT them as a guide, not as fixed rules.
 
@@ -93,7 +93,7 @@ WRITE each rule with:
 1. The rule, as an instruction to an agent.
 2. When it applies, and when it does not.
 3. Its evidence: **chose** (the user picked it in a comparison or could act on it), **shown** (their material, review comments or corrections show it), or **said** (they stated it). IF the evidence contradicts itself, WRITE the rule from what the user chose or showed, and RECORD what they said next to it.
-4. One example the user approved or wrote, taken from the interview or their material. Examples of output the user approved carry most of the benefit of a profile.
+4. One example the user approved or wrote, taken from the interview or their material. An example shows what the rule means in practice. Examples helped on some tasks and not on others, so the example goes with the rule, not in place of it.
 
 ### 3.2. Leave out what the output must not contain
 
