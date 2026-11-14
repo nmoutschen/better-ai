@@ -80,9 +80,11 @@ START each skill by saying what it does when invoked with an argument and withou
 
 Invoking a skill tells the agent to apply its method, not what the result must be. `/ask-better` can end without a question, and `/show-better` can end with prose. A skill SAYS this explicitly.
 
-### 6.4. Link skills instead of repeating them
+### 6.4. Link and layer skills instead of repeating them
 
 WHEN a skill needs another skill's method, NAME it ("FOLLOW `/write-better` if available") and GIVE a short fallback that makes the step work without it, because naming a skill does not make the agent load it. No harness offers a portable way for one skill to declare or call another, so the name in the text is the link.
+
+WHEN several skills share a method, such as reviewing, LAYER them. One general skill holds the method, such as `/review-better`. Each skill for a kind of work holds only what that kind of work adds, such as what to look for in code, and NAMES the general skill for the method. The general skill NAMES each of them for what they add. DO NOT copy the method into each skill: a fallback that makes the step work is enough.
 
 REFER to what the other skill does, not to its internals, such as its section numbers, wording or output format. A skill that relies on another skill's internals breaks when that skill changes.
 

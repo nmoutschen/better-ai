@@ -19,7 +19,7 @@ Being invoked does NOT mean you must write code now. These instructions can end 
 3. People judge whether a result is right more accurately from concrete scenarios, examples and tests than from prose or from the code itself.
 4. Requirements, design and plan are different artifacts. Requirements align on intent and the user checks them. A design aligns on shared understanding and structure. A plan orders the work. They change each other: design work reveals missing requirements.
 5. Repair loops gain most in the first few rounds. Test results help more than compiler errors, and a weak critique can hurt more than a bare failure. Extra rounds can break code that was already correct, and repeated failure feedback leads agents to game tests.
-6. Self-review without outside evidence finds few errors. A reviewer that sees only the result in a fresh context does better. LLM judgements of whether code meets its requirements are unreliable.
+6. Self-review without outside evidence finds few errors. LLM judgements of whether code meets its requirements are unreliable.
 7. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
 8. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), and showing the design before building (section 2) are design choices.
 
@@ -133,25 +133,15 @@ COMPARE the finished behaviour with each scenario in the requirements, using the
 
 ## 6. Review
 
-### 6.1. Review in a fresh context
+FOLLOW `/review-better` if available to run the review, confirm findings and hand them back, with section 6.1 as what to look for. OTHERWISE, IF you can start a sub-agent, GIVE a separate reviewer only the diff, the requirements and access to the code, from a different model if you can choose, and not your reasoning or your conversation with the user. IF you cannot, RE-READ the requirements, THEN read the diff as if someone else wrote it. ALSO CHECK the blocking criteria of the user's review guide, if there is one. KEEP a finding you cannot confirm as unconfirmed, ORDER findings by effect, and REPORT each with its location, the input that triggers it, its effect, and a fix.
 
-IF you can start a sub-agent, GIVE a fresh reviewer only the diff, the requirements, and access to the code. DO NOT give it your reasoning or your conversation with the user. A cheaper model can review, but it must not share your context.
+### 6.1. What to look for in code
 
-OTHERWISE, REVIEW in a separate pass after verification: RE-READ the requirements first, THEN read the diff as if someone else wrote it.
+LOOK first for wrong behaviour against the requirements, broken callers, security problems, data loss, and missing error handling. LOOK for style only where the project's rules require it. AI reviewers comment on style far more than human reviewers do, and on correctness and security far less.
 
-### 6.2. Look for defects that matter
+READ beyond the diff: callers, configuration, and tests.
 
-LOOK first for wrong behaviour against the requirements, broken callers, security problems, data loss, and missing error handling. LOOK for style only where the project's rules require it. AI reviewers comment on style far more than human reviewers do, and on correctness and security far less. IF the user has their own review guide, such as a `review-for-<name>` skill, ALSO CHECK the work against its blocking criteria.
-
-READ beyond the diff: callers, configuration, and tests. Most missed defects need context the diff does not show.
-
-### 6.3. Confirm each finding with evidence
-
-FOR each finding, FIND evidence: a failing test, a reproduction, or the exact lines and input that cause it. DROP a finding only when you can show it is wrong. DO NOT drop a finding only because you could not confirm it: REPORT it as unconfirmed.
-
-### 6.4. Report few, specific findings
-
-REPORT each finding with its location, the input or situation that triggers it, the effect, and a suggested fix as code. ORDER findings by effect on the user. DO NOT pad the report with minor style comments.
+CONFIRM a finding with a failing test, a reproduction, or the exact lines and input that cause it. WRITE the fix as code.
 
 ## 7. Hand back
 
@@ -178,7 +168,7 @@ IF the user rejects the result, USE `/do-better` if available. OTHERWISE, FIND w
 
 ### 8.1. Default to one agent
 
-DO the building yourself, since delegating usually costs more and teams of agents do not reliably beat a single agent. USE sub-agents for independent reading, such as searching a large codebase, and for review (section 6.1). DO NOT split building across agents by role, such as planner, coder and tester, unless the work does not fit in one context.
+DO the building yourself, since delegating usually costs more and teams of agents do not reliably beat a single agent. USE sub-agents for independent reading, such as searching a large codebase, and for review (section 6). DO NOT split building across agents by role, such as planner, coder and tester, unless the work does not fit in one context.
 
 ### 8.2. Hand over the full requirements
 
