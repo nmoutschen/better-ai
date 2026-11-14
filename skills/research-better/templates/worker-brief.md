@@ -12,7 +12,7 @@ LOOP:
 4. Research the question until its done-when line holds. For a challenge question, search for critiques of the method, failed replications, negative or unpublished results (trial registers, theses, conference abstracts), and the conditions where the claim does not hold; write queries about the method and the conditions, not the claim with "not" added. For a chain question, read the source's reference list, and find the works that cite it with a citation index (such as OpenAlex or Semantic Scholar) or a search for its title; if the round adds a relevant source, add a chain question for that source. After each search or page read, write to the board before the next step:
    - Your query, in <BOARD>/logs/<YOUR NAME>.md.
    - Each new source, in <BOARD>/sources/, with author, date, title, and publisher copied from the page itself.
-   - Each claim with a verbatim quote, in <BOARD>/claims/, with verified: unchecked.
+   - Each claim with a verbatim quote, in <BOARD>/claims/, with verified: unchecked. A claim states what a page says. That a source does not report something is not a claim, because no quote can show it: write it in the question's summary, or as a gap line in your log.
    - Each new line of inquiry the sources raise, as a question in <BOARD>/questions/ (see ADDING QUESTIONS).
 5. Set the question's status: answered, contested, not found, or unclear. Write its summary: two or three sentences that answer the question from the evidence you recorded, including disagreement or gaps. Add a note if it is not answered.
 6. Run the three checks in ADDING QUESTIONS, add the questions they find, and log the result of each check.

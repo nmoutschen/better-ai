@@ -109,7 +109,7 @@ After each search or page read, WRITE to the board before the next step:
 
 - The query, in your search log.
 - New sources, with author, date, title, publisher, URL, type, how you read it, and a trust assessment. COPY the author, date, title, and publisher from the page itself, not from memory or the search result. CHECK the board for the URL first. MARK a source that cites, copies, or summarizes another source as a repeat of it: the two are not independent.
-- New claims, each with its source and a verbatim quote. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
+- New claims, each with its source and a verbatim quote. That a source does not report something is not a claim, because no quote can show it: WRITE it in the question's summary or as a gap. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
 - New terms, and new questions (section 6.3).
 
 WHEN the question's `done-when` holds, STOP searching it, even if more searches are possible. SET its status and WRITE its summary: two or three sentences that answer the question from the evidence, including where sources disagree or evidence is thin.
@@ -176,8 +176,8 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 
    DO NOT reject a question because you expect its answer.
 2. **Review verification**: DO NOT open source pages to verify claims yourself; verifiers do it (section 7.1).
-   - FOR each unverified claim, READ the verifier's reason. CORRECT the claim to match the span, DELETE it, or REOPEN its question.
-   - FOR each verified claim the conclusion depends on, COMPARE the claim with the span the verifier copied. Reading only the claims a verifier flagged misses the errors it did not flag.
+   - FOR each claim whose reason line is not none, verified or unverified, READ the reason. Verifiers often mark a claim verified while writing that it adds an inference or drops a caveat, so reading only unverified claims misses most errors. CORRECT the claim to match the span, DELETE it, or REOPEN its question.
+   - FOR each verified claim the conclusion depends on, COMPARE the claim with the span the verifier copied. Verifiers catch claims that contradict their span, but miss many that say more than it, such as a dropped hedge or a wider scope. A claim with no span cannot be checked: SEND it back to a verifier.
    - IF the claim and the span disagree, or the claim is marked `hard`, CHECK that the span states each number and condition in the claim. OPEN the page only if the span is not enough to decide.
    - CORRECT source fields that a verifier found differ from the page.
 3. **Resolve conflicts**: FIND claims that contradict each other. ADD a question that targets the disagreement, such as which method, population, or date explains it, kind `conflict`.
