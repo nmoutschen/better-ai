@@ -152,6 +152,8 @@ DO NOT use aggressive or enthusiastic language.
 
 LIMIT sentence length, and PUT the main verb early in the sentence. DO NOT use double negatives or clauses nested inside other clauses.
 
+WRITE a sentence or a plain phrase, not short fragments joined by a middle dot or a similar separator. WRITE "Written by AI, published by Ana Silva", not "AI-generated · published by Ana Silva", and "53 articles in 9 topics", not "53 articles · 9 topics". This is a design choice.
+
 ### 4.8. Say what you mean literally
 
 REPLACE metaphors, idioms, hints, and exaggeration with direct statements, or EXPLAIN them. WHEN you need the user to do something, STATE what and by when.
