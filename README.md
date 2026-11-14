@@ -94,6 +94,16 @@ Researches a topic from sources instead of the model's training data, and writes
 - Workers add questions as they go: what sources point to in newer work, origins, other fields, other regions and critics; the works that key sources cite and that cite them; and a challenge question that looks for evidence against each key answer.
 - Separate verifier agents check each claim: they open the source page, copy the passage the claim rests on, and judge the claim from it. The coordinating agent reads only their flags and compares key claims with the copied passages.
 
+## `/review-better`
+
+Reviews work, such as text, code, an interface, a plan or a research report, so each finding leads to an action.
+
+- Agrees what the review is for, and looks for a short list of problems that would stop the work from reaching its goal.
+- Uses a separate reviewer, from a different model when it can, and backs each finding with a check it ran. Keeps findings it cannot confirm, marked as unconfirmed.
+- Fixes what is simple, asks what only the author knows, and explains the options when there are several. In someone else's work, proposes changes instead of making them.
+- Keeps a finding when the author pushes back without evidence.
+- Holds the review method that `/code-better`, `/design-better` and `/write-better` add their checks to.
+
 ## `/show-better`
 
 Introduces a dense document, such as a research paper, a strategy or a design doc, with a short sequence of visual panels you read before the document.

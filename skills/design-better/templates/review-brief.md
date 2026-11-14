@@ -19,7 +19,7 @@ FINDING FORMAT:
 - What I did: <the action, with the input>
 - What happened: <what the interface showed or did>
 - Why it stops or slows the person: <the diagnosis, in one or two sentences>
-- Suggested fix: <optional>
+- Proposed fix: <the change you would make, specifically enough to apply; or the question only the builder can answer; or the alternatives and what each one changes>
 
 STRUCTURE FINDING FORMAT:
 - Page or part: <which>

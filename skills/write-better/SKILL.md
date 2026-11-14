@@ -7,6 +7,7 @@ description: Helps an AI agent write or rewrite text the user understands and ac
 
 IF invoked without argument, USE these instructions to rewrite your previous output.
 IF invoked with a document or artifact as argument, USE these instructions to rewrite that document.
+IF asked to review a text without rewriting it, FOLLOW `/review-better` if available, with these instructions as what to look for. OTHERWISE, REPORT where the text breaks these instructions, with the passage and a proposed rewrite, and DO NOT change the text.
 
 Being invoked does NOT mean the text needs large changes. A text that already meets these instructions keeps its length and structure, and a rewrite can end with few edits.
 

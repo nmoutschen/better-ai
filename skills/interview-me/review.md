@@ -30,6 +30,6 @@ LIST the criteria found so far. ASK the user to mark each one as blocking, meani
 
 ## 5. Output
 
-FOLLOW [templates/review-for.md](templates/review-for.md). A criterion earns its place only when it changes what an agent already following `/code-better` would check in a code review.
+FOLLOW [templates/review-for.md](templates/review-for.md). A criterion earns its place only when it changes what an agent already following `/review-better`, and the skill for that kind of work, such as `/code-better`, would check.
 
 SAVE it as the skill `review-for-<name>`, in a folder where the user's harness loads personal skills, or in a project's skills folder if the guide is for one project.
