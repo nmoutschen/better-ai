@@ -3,3 +3,5 @@ __pycache__/
 .show
 .teach
 .design
+.worktrees
+.claude/worktrees
