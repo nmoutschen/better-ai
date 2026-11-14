@@ -20,7 +20,7 @@ This skill improves what persists across sessions. `/do-better` corrects the wor
 1. Skills an agent wrote for itself and adopted without a test lowered results below having no skills at all. Gains came from changes admitted after they improved results on tasks held back from the ones they were built from, or from a reliable outcome signal, such as whether the task succeeded. Passing such a test is not proof: tests that keep any change that scores higher accepted worse changes, a small test set reused across runs overstated gains, and tests that score only task success deleted safety rules that looked redundant.
 2. A model judging its own output favours it, and correcting itself without an outside signal at times made results worse. Reflection can store its own errors as guidance.
 3. As a library of rules or skills grows, agents pick the wrong skill more often, and models follow many stacked or conflicting instructions poorly.
-4. People approve most of the prompts they see and stop reading them. A written rationale raised acceptance of AI advice whether or not it was right.
+4. People approve most of the prompts they see and stop reading them. A written rationale raised acceptance of AI advice whether or not it was right, unless it made the advice cheaper to check.
 5. Candidate changes can come from successful runs, from routines the agent repeats, and from reviewing past sessions offline, not only from failures. No tested cadence exists for running this loop.
 6. Proposing changes for approval, the evidence each proposal shows, the cap on proposals per run, and keeping each target no larger than it was are design choices. TREAT these rules as a guide, not as fixed rules.
 
@@ -129,7 +129,7 @@ FOR each proposal, SHOW:
 3. The test you ran and its result, including anything that got worse, or "untested" with the reason.
 4. How to undo it.
 
-DO NOT add a persuasive rationale, a predicted benefit you did not measure, or a summary of how much the change will help.
+DO NOT add a persuasive rationale, a predicted benefit you did not measure, or a summary of how much the change will help. You MAY add what makes the change cheaper to check, such as one replayed task's output with and without it.
 
 ### 5.3. Ask for a decision on each
 
