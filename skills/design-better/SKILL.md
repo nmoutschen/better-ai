@@ -102,6 +102,7 @@ TREAT the rules in this section as guides, not rules, because their effect depen
 - KEEP the contrast between text and background high, at least the conventional 4.5 to 1 for normal text. Low contrast costs most for people with low vision and for small text.
 - PREFER dark text on a light background for small text.
 - DO NOT use colour as the only signal. ADD text, an icon or a shape.
+- WRITE bylines, stat lines and metadata as a sentence or a plain phrase, such as "53 articles in 9 topics, last updated 14 Nov 2026", not as short fragments joined by a middle dot or a similar separator, such as "53 articles · 9 topics". This is a design choice.
 - TREAT the choice between ordinary serif and sans serif typefaces as taste, and FOLLOW the design language. DO NOT choose a special typeface on the claim that it helps a group of readers.
 
 ### 2.3. Forms and feedback
