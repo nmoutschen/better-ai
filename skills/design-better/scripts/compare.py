@@ -301,11 +301,12 @@ JS = r"""
   });
 
   // Comment mode: hovering a version outlines the element under the pointer; a click opens the comment box for it.
-  var modeBtn = document.querySelector('#comment'), commenting = false, pop = document.querySelector('.pop'), draft = null;
+  var modeBtn = document.querySelector('#comment'), commenting = true, pop = document.querySelector('.pop'), draft = null;
   function setMode(on) {
     commenting = on; modeBtn.setAttribute('aria-pressed', String(on)); main.classList.toggle('commenting', on);
     if (!on) document.querySelectorAll('main iframe').forEach(function (f) { try { clearHover(f.contentDocument); } catch (e) {} });
   }
+  main.classList.add('commenting');
   modeBtn.addEventListener('click', function () { setMode(!commenting); });
   document.addEventListener('keydown', function (e) {
     if ((e.key === 'c' || e.key === 'C') && !/INPUT|TEXTAREA/.test(e.target.tagName) && !e.metaKey && !e.ctrlKey) setMode(!commenting);
@@ -517,10 +518,10 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
-        side_hint = "Press C to switch comments on or off."
+        side_hint = "Click any part of a version to comment on it. Press C to switch commenting off and use the versions as pages."
     else:
-        side_hint = "Press C to switch comments on or off."
-    controls += ('<div class="seg seg--terra"><button type="button" id="comment" aria-pressed="false">Comment</button></div>'
+        side_hint = "Click any part of a version to comment on it. Press C to switch commenting off and use the versions as pages."
+    controls += ('<div class="seg seg--terra"><button type="button" id="comment" aria-pressed="true">Comment</button></div>'
                  '<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
                  'Scroll together</button></div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
