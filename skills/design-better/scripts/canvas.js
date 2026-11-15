@@ -253,13 +253,11 @@
     article: 'Article', form: 'Form', figure: 'Figure', figcaption: 'Caption', blockquote: 'Quote', span: 'Text' };
   // Two lines: the path to the element, small and muted, then what the element is and what it says.
   function crumb(version, t) {
-    // The path names what tells this element apart: its section's heading and its nearest parent with other text,
-    // such as the row a cell sits in, not generic containers.
+    // The path: the version, the section's heading, and the element's place, such as "Row 2, Status".
     var said = t.image ? (t.image.alt || 'no alt text') : (t.words || t.text || '');
-    var path = [version], short = function (x) { return x.length > 32 ? x.slice(0, 32) + '…' : x; };
-    if (t.heading && t.heading !== said) path.push(short(t.heading));
-    var near = (t.parents || []).filter(function (x) { return !/^(tbody|thead|tfoot|main|body|section|div|span)$/.test(x.tag) || x.id; })[0];
-    if (near && near.text && near.text !== said && near.text !== t.heading) path.push((ROLE[near.tag] || 'Block') + ' “' + short(near.text) + '”');
+    var path = [version];
+    if (t.heading && t.heading !== said) path.push(t.heading.length > 40 ? t.heading.slice(0, 40) + '…' : t.heading);
+    if (t.place) path.push(t.place);
     var box = document.createElement('span'), a = document.createElement('span'), b = document.createElement('span'), r = document.createElement('span');
     box.className = 'crumb'; a.className = 'path'; b.className = 'el'; r.className = 'role';
     a.textContent = path.join(' › ');
@@ -267,6 +265,23 @@
     b.append(r, said ? ' “' + said.slice(0, 90) + (said.length > 90 ? '…' : '') + '”' : '');
     box.append(a, b);
     return box;
+  }
+  // Where an element sits among its peers, in the words a person would use: "Row 2, Status" in a table,
+  // "Item 3" in a list. Empty when position adds nothing.
+  function placeOf(el) {
+    var cell = el.closest('td, th');
+    if (cell) {
+      var row = cell.parentElement, table = cell.closest('table');
+      var body = Array.prototype.filter.call(table.rows, function (r) { return !r.closest('thead') && !r.querySelector('th:only-child, th:first-child:last-child'); });
+      var head = table.tHead ? table.tHead.rows[0] : table.rows[0].querySelector('th') ? table.rows[0] : null;
+      var name = head && head.cells[cell.cellIndex] ? head.cells[cell.cellIndex].innerText.trim() : '';
+      var n = body.indexOf(row) + 1;
+      if (row.closest('thead')) return 'Column ' + (name || cell.cellIndex + 1);
+      return 'Row ' + n + ', ' + (name || 'column ' + (cell.cellIndex + 1));
+    }
+    var li = el.closest('li');
+    if (li && li.parentElement) return 'Item ' + (Array.prototype.indexOf.call(li.parentElement.children, li) + 1);
+    return '';
   }
   function describe(el, cx, cy) {
     var doc = el.ownerDocument, win = doc.defaultView, r = el.getBoundingClientRect(), d = brief(el);
@@ -281,6 +296,7 @@
     if (img) image = { src: (img.currentSrc || img.getAttribute('src') || '').slice(0, 300), alt: img.getAttribute('alt') };
     else { var bg = win.getComputedStyle(el).backgroundImage; if (bg && bg !== 'none') image = { src: bg.slice(0, 300), alt: null }; }
     return { selector: selectorOf(el), tag: d.tag, text: d.text, heading: heading, words: wordsAt(doc, cx, cy), image: image,
+             place: placeOf(el),
              parents: parents, point: { x: Math.round(cx + win.scrollX), y: Math.round(cy + win.scrollY) },
              box: { x: Math.round(r.left + win.scrollX), y: Math.round(r.top + win.scrollY), w: Math.round(r.width), h: Math.round(r.height) } };
   }

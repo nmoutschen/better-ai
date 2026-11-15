@@ -172,10 +172,10 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .thread .reply.mine { background:#fff; }
 .thread .reply.mine .who { color:var(--heading); }
 .thread > li.msg.agent .reply { margin:-10px -12px; border:0; background:none; }
-/* The state row closes the item. A reply pulls its bottom edge 10px down; 12px leaves the same 2px gap as without one. */
-.thread .foot { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; margin:2px 0 -6px; padding:6px 40px;
-  font-size:12px; color:var(--muted); }
-.thread .reply + .foot { margin-top:12px; }
+/* The state row closes the item, aligned with its text. A reply pulls its bottom edge 10px down; 16px leaves the same
+   6px gap as without one. */
+.thread .foot { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; margin:6px 0 0; font-size:12px; color:var(--muted); }
+.thread .reply + .foot { margin-top:16px; }
 .thread .reply:has(+ .foot) { padding-bottom:2px; }
 .thread .foot .answer { margin-left:auto; }
 .thread .foot .mini:first-of-type { margin-left:auto; }
