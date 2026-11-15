@@ -202,8 +202,6 @@ body.app figure { display:flex; flex-direction:column; min-height:0; position:re
 .stage { flex:1; min-height:0; display:flex; justify-content:center; align-items:flex-start; }
 body.app .screen { overflow:hidden; flex:none; }
 main.switch figure:not(.current) { position:absolute; inset:0; }
-main.focus .row { grid-template-columns:minmax(0, 1fr); }
-main.focus figure.aside { display:none; }
 body.app .notes { overflow:hidden; border-top:0; border-left:2px solid var(--ink); padding:16px 0 0; display:flex; flex-direction:column; min-height:0; }
 body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .notes .thread { flex:1; min-height:0; overflow:auto; list-style:none; margin:0; padding:0 20px 12px; max-width:none; }
@@ -391,6 +389,7 @@ JS = r"""
     main.classList.toggle('switch', name === 'switch');
     viewButtons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.view === name)); });
     if (pick) pick.hidden = name !== 'switch';
+    document.querySelectorAll('figure .full').forEach(function (b) { b.textContent = name === 'switch' ? 'Side by side' : 'Full size'; });
     hint.textContent = hint.dataset.side;
     show(current);
   }
@@ -403,20 +402,16 @@ JS = r"""
       show((current + 1) % labels.length); e.preventDefault();
     }
   });
-  // Full size: one version fills the viewer, the others step aside; the same button brings them back.
-  var focused = null;
-  function focusOn(i) {
-    focused = focused === i ? null : i;
-    main.classList.toggle('focus', focused !== null);
-    document.querySelectorAll('main figure').forEach(function (f) { f.classList.toggle('aside', focused !== null && +f.dataset.i !== focused); });
-    document.querySelectorAll('figure .full').forEach(function (b) { b.textContent = focused === null ? 'Full size' : 'Back to all'; });
-    fit();
-  }
+  // Full size is the switch view opened on that version: one version fills the viewer, the tabs pick another,
+  // and the same button, now Side by side, brings the others back.
   document.querySelectorAll('figure .full').forEach(function (b) {
-    b.addEventListener('click', function () { focusOn(+b.closest('figure').dataset.i); });
+    b.addEventListener('click', function () {
+      if (main.classList.contains('switch')) view('side');
+      else { current = +b.closest('figure').dataset.i; view('switch'); }
+    });
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && focused !== null && pop.hidden) focusOn(focused);
+    if (e.key === 'Escape' && main.classList.contains('switch') && pop.hidden && !e.target.closest('textarea')) view('side');
   });
   document.body.classList.add('scaled');
   window.addEventListener('resize', fit);
