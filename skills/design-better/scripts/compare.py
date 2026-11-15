@@ -58,6 +58,8 @@ ICONS = {
     "Tablet": icon('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/>'),
     "Mobile": icon('<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'),
     "comment": icon('<path d="M4 4h16v12H9l-5 4z"/>'),
+    "use": icon('<path d="M5 3l14 8-6 2-3 6z"/>'),
+    "free": icon('<path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4"/>'),
     "together": icon('<path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4M7 12h10"/>'),
     "side": icon('<rect x="3" y="4" width="8" height="16"/><rect x="13" y="4" width="8" height="16"/>'),
     "switch": icon('<rect x="5" y="4" width="14" height="16"/><path d="M9 12h6M13 9l3 3-3 3"/>'),
@@ -66,7 +68,7 @@ ICONS = {
 # default, as in design tools; dark is for versions meant for a dark context. A mid-grey is left out: judgment is
 # sharpest near the surround's own lightness, so mid-grey favours mid-tones.
 BACKGROUNDS = (("Light", "#F5F5F5"), ("Dark", "#1E1E1E"))
-METHODS = ("choose", "verdict", "comment", "delete", "note")
+METHODS = ("choose", "verdict", "comment", "delete", "note", "accept", "reopen")
 MAX_BODY = 200_000
 LOCAL_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost):\d+$")
 
@@ -222,11 +224,6 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .update { position:fixed; left:0; right:0; top:0; }
 /* The top bar stays umber, the n14n brand block; each control pairs its icon with a short label. Pickers (one of
    several) are segmented and fill the chosen option; switches (on or off) have no fill and a box that is ticked. */
-.tog { border:0; background:transparent; color:var(--cream); cursor:pointer; display:inline-flex; align-items:center; gap:8px;
-  padding:6px 4px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; }
-.tog[hidden] { display:none; }
-.tog::before { content:""; width:14px; height:14px; border:1.5px solid var(--cream); box-sizing:border-box; }
-.tog[aria-checked="true"]::before { background:var(--cream) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='%235C4033' stroke-width='2'/%3E%3C/svg%3E") center/12px no-repeat; }
 body.app .seg button.ico { gap:6px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; }
 .thread > li.msg .body { font-size:14px; line-height:1.45; }
 body.app main .pick { align-self:flex-start; margin:0 0 10px; border-color:var(--ink); }
@@ -251,6 +248,15 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
 .progress.done { color:var(--moss-dark); }
 .progress.done .bars i.on { background:var(--moss-dark); }
+.progress.accepted { color:var(--moss-dark); }
+.progress.accepted .bars i.on { background:var(--moss-dark); }
+.progress.accepted::after { content:"\2713"; font-size:12px; }
+.progress.reopened { color:#9A3B2A; }
+.progress.reopened .bars i { background:var(--terracotta); opacity:.5; }
+.accept { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; padding-top:8px; border-top:1px dashed var(--line);
+  font-size:13px; }
+.accept span { margin-right:auto; }
+.btn--sm { padding:5px 12px; font-size:11px; }
 @keyframes pulse-bar { 50% { opacity:.35; } }
 @media (prefers-reduced-motion: reduce) { .progress .bars i { animation:none !important; } }
 .msg .answered { font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
@@ -284,8 +290,14 @@ JS = r"""
   var main = document.querySelector('main'), hint = document.querySelector('.hint');
   var labels = JSON.parse(main.dataset.labels), current = 0;
   var viewButtons = document.querySelectorAll('[data-view]'), pickButtons = document.querySelectorAll('[data-pick]');
-  var pick = document.querySelector('.pick'), together = document.querySelector('#together');
-  together.addEventListener('click', function () { together.setAttribute('aria-checked', String(together.getAttribute('aria-checked') !== 'true')); });
+  // Every setting in the toolbar is one segmented choice between options; the chosen one is filled.
+  var pick = document.querySelector('.pick'), linked = true, scrollSeg = document.querySelector('[aria-label="Scroll"]');
+  function choose(attr, value) {
+    document.querySelectorAll('button[' + attr + ']').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value)); });
+  }
+  document.querySelectorAll('button[data-scroll]').forEach(function (b) {
+    b.addEventListener('click', function () { linked = b.dataset.scroll === 'linked'; choose('data-scroll', b.dataset.scroll); });
+  });
   // Each render fills the space it has: scaled down to fit the width, and as tall as the stage, so it scrolls inside
   // its own frame while the page itself does not scroll.
   function fit() {
@@ -349,11 +361,11 @@ JS = r"""
     } catch (e) {}
   }
   function follow(frame) {
-    if (together.getAttribute('aria-checked') !== 'true' || (quietUntil.get(frame) || 0) > Date.now()) return;
+    if (!linked || (quietUntil.get(frame) || 0) > Date.now()) return;
     frame.closest('.row').querySelectorAll('iframe').forEach(function (other) { if (other !== frame) match(frame, other); });
   }
   function bind(frame) {
-    try { frame.contentWindow.addEventListener('scroll', function () { follow(frame); }); } catch (e) { together.hidden = true; }
+    try { frame.contentWindow.addEventListener('scroll', function () { follow(frame); }); } catch (e) { if (scrollSeg) scrollSeg.hidden = true; }
   }
   var bound = new WeakSet();
   function bindOnce(frame) {
@@ -470,13 +482,15 @@ JS = r"""
   });
 
   // Comment mode: hovering a version outlines the element under the pointer; a click opens the comment box for it.
-  var modeBtn = document.querySelector('#comment'), commenting = true, pop = document.querySelector('.pop'), draft = null;
+  var commenting = true, pop = document.querySelector('.pop'), draft = null;
   function setMode(on) {
-    commenting = on; modeBtn.setAttribute('aria-checked', String(on)); main.classList.toggle('commenting', on);
+    commenting = on; choose('data-mode', on ? 'comment' : 'use'); main.classList.toggle('commenting', on);
     document.querySelectorAll('iframe').forEach(function (f) { try { f.contentDocument.documentElement.classList.toggle('db-commenting', on); } catch (e) {} });
   }
   main.classList.add('commenting');
-  modeBtn.addEventListener('click', function () { setMode(!commenting); });
+  document.querySelectorAll('button[data-mode]').forEach(function (b) {
+    b.addEventListener('click', function () { setMode(b.dataset.mode === 'comment'); });
+  });
   document.addEventListener('keydown', function (e) {
     if ((e.key === 'c' || e.key === 'C') && !/INPUT|TEXTAREA/.test(e.target.tagName) && !e.metaKey && !e.ctrlKey) setMode(!commenting);
     if (e.key === 'Escape' && !pop.hidden) closePop();
@@ -654,11 +668,16 @@ JS = r"""
     r.append(h, el('p', 'body', e.text));
     return r;
   }
-  var STEPS = ['seen', 'working', 'done'], LABEL = { seen: 'Seen', working: 'Working on it', done: 'Done' };
+  var STEPS = ['seen', 'working', 'done', 'accepted'],
+      LABEL = { seen: 'Seen', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
   function renderThread() {
     var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
     var entries = [], byKey = {}, state = {};
-    log.forEach(function (e) { if (e.action === 'status') state[e.to] = e.status; });
+    log.forEach(function (e) {
+      if (e.action === 'status') state[e.to] = e.status;
+      else if (e.action === 'accept') state[e.to] = 'accepted';
+      else if (e.action === 'reopen') state[e.to] = 'reopened';
+    });
     log.forEach(function (e, i) {
       if (e.action === 'comment' || e.action === 'delete') {
         var c = byKey[e.id];
@@ -677,10 +696,19 @@ JS = r"""
         var st = state[e.id];
         if (!st) { if (c.replies.length) h.append(el('span', 'answered', 'Answered')); return; }
         var k = STEPS.indexOf(st), chip = el('span', 'progress ' + st), bars = el('span', 'bars');
-        for (var j = 0; j < 3; j++) bars.append(el('i', j <= k ? 'on' : ''));
+        for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
         chip.append(bars, el('span', '', LABEL[st]));
-        chip.title = 'Agent: ' + LABEL[st].toLowerCase();
         h.append(chip);
+      }
+      // Once the agent marks an item done, the user accepts it or reopens it.
+      function verdictRow(target) {
+        if (state[e.id] !== 'done') return;
+        var row = el('div', 'accept'), ok = el('button', 'btn btn--sm', 'Accept'), no = el('button', 'btn btn--sm btn--quiet', 'Reopen');
+        ok.type = no.type = 'button';
+        ok.addEventListener('click', function () { send('accept', { to: e.id }, 'Acceptance'); });
+        no.addEventListener('click', function () { send('reopen', { to: e.id }, 'Reopening'); noteBox.focus(); });
+        row.append(el('span', '', 'Is this done as you wanted?'), ok, no);
+        target.append(row);
       }
       if (c.kind === 'comment') {
         li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
@@ -711,6 +739,7 @@ JS = r"""
         li = el('li', 'sys', t + ', ' + time(e.at));
       } else return;
       c.replies.forEach(function (r) { li.append(replyBlock(r)); });
+      if (c.kind === 'comment' || c.kind === 'note') verdictRow(li);
       thread.appendChild(li);
     });
     if (stick) thread.scrollTop = thread.scrollHeight;
@@ -839,8 +868,13 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
             + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                       for i, label in enumerate(labels)) + '</div>') if len(labels) > 1 else ""
     side_hint = ""
-    controls += (f'<button type="button" class="tog" id="comment" role="switch" aria-checked="true" title="Comment (C)"><span>Comment</span></button>'
-                 f'<button type="button" class="tog" id="together" role="switch" aria-checked="true" title="Scroll versions together"><span>Scroll together</span></button>'
+    controls += ('<div class="seg" role="group" aria-label="Mode">'
+                 f'<button type="button" class="ico" data-mode="comment" aria-pressed="true" title="Click a version to comment on it (C)">{ICONS["comment"]}<span>Comment</span></button>'
+                 f'<button type="button" class="ico" data-mode="use" aria-pressed="false" title="Use the versions as pages (C)">{ICONS["use"]}<span>Use</span></button></div>'
+                 + ('<div class="seg" role="group" aria-label="Scroll">'
+                    f'<button type="button" class="ico" data-scroll="linked" aria-pressed="true" title="Versions scroll together">{ICONS["together"]}<span>Linked</span></button>'
+                    f'<button type="button" class="ico" data-scroll="free" aria-pressed="false" title="Each version scrolls on its own">{ICONS["free"]}<span>Free</span></button></div>'
+                    if len(labels) > 1 else '') +
                  '<div class="seg" role="group" aria-label="Background">' + "".join(
                      f'<button type="button" class="ico sw" data-bg="{c}" aria-pressed="{str(c == BACKGROUNDS[0][1]).lower()}" '
                      f'title="{n} background" aria-label="{n} background"><span class="chip" style="background:{c}"></span><span>{n}</span></button>'
@@ -1055,7 +1089,8 @@ def set_status(folder: Path, state: str, ids: list) -> None:
 
 
 def pending(folder: Path) -> None:
-    """Print each comment and message not marked done, in its latest form, so work can resume after an interruption."""
+    """Print each comment and message that is neither done nor accepted, in its latest form, including those the
+    user reopened, so work can resume after an interruption."""
     items, order, state = {}, [], {}
     for e in read_log(folder):
         a, i = e.get("action"), e.get("id")
@@ -1067,7 +1102,10 @@ def pending(folder: Path) -> None:
             items[i] = None
         elif a == "status":
             state[e.get("to")] = e.get("status")
-    open_items = [items[i] for i in order if items.get(i) and state.get(i) != "done"]
+        elif a in ("accept", "reopen"):
+            state[e.get("to")] = "accepted" if a == "accept" else "reopened"
+    # Done waits for the user; accepted is finished; reopened is work again.
+    open_items = [items[i] for i in order if items.get(i) and state.get(i) not in ("done", "accepted")]
     for e in open_items:
         print(json.dumps({**e, "status": state.get(e["id"], "new")}, ensure_ascii=False))
     print(f"{len(open_items)} not done.")
