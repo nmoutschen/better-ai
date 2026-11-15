@@ -223,12 +223,11 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .update { position:fixed; left:0; right:0; top:0; }
 /* The top bar stays umber, the n14n brand block; each control pairs its icon with a short label. Pickers (one of
    several) are segmented and fill the chosen option; switches (on or off) have no fill and a box that is ticked. */
-body.app .seg button.ico { gap:5px; font:700 10px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:4px 8px; }
-body.app .seg button.ico svg { width:15px; height:15px; }
+body.app .seg button.ico { gap:6px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; }
 .more { position:relative; }
 .morebtn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--cream); background:transparent; color:var(--cream);
-  padding:4px 8px; cursor:pointer; font:700 10px var(--sans); letter-spacing:.06em; text-transform:uppercase; }
-.morebtn svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; }
+  padding:6px 10px; cursor:pointer; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; }
+.morebtn svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; }
 .morebtn[aria-expanded="true"] { background:var(--cream); color:var(--umber); }
 .menu { position:absolute; right:0; top:calc(100% + 6px); z-index:4; background:var(--umber); border:1px solid var(--cream);
   padding:10px 12px 12px; box-shadow:0 8px 24px rgba(28,26,23,.3); display:grid; gap:4px; min-width:12rem; }
@@ -259,7 +258,7 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .progress.done .bars i.on { background:var(--moss-dark); }
 .progress.accepted { color:var(--moss-dark); }
 .progress.accepted .bars i.on { background:var(--moss-dark); }
-.progress.accepted::after { content:"\2713"; font-size:12px; }
+.progress.accepted::after { content:"\\2713"; font-size:12px; }
 .progress.reopened { color:#9A3B2A; }
 .progress.reopened .bars i { background:var(--terracotta); opacity:.5; }
 .thread .reply.mine { background:#fff; border-left-color:var(--terracotta); }
