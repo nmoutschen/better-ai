@@ -111,3 +111,18 @@ GIVE each script subcommands for its separate tasks, such as `lesson.py check`, 
 KEEP each skill's purpose distinct from the other skills', and WRITE a description that says when to use it. Agents confuse skills whose purposes overlap or whose descriptions are vague.
 
 WHEN two skills cover the same kind of work, such as `/write-better` and a user's `write-for-<name>`, SAY in both how they relate: which one applies the general method, and which one adjusts it.
+
+### 6.7. Give pages that talk to the agent one conversation
+
+WHEN a skill serves a page where the user writes to the agent, such as design-better's canvas and research-better's board, MAKE its conversation work like the others', so the user learns it once:
+
+- EACH thing the user sends, a comment on an element or a message, is an item with a state the agent sets: seen, waiting for you (the agent asked something), working, done. SHOW the state on the item with one design language, the progress bars and a short word, adapted to each page's use: a page shows only the steps its use has, such as no working step where the agent answers at once, and names them for that use, such as Answered for a question.
+- The agent's replies NEST under the item they answer. An answer from the user to a question from the agent ENDS the wait and shows as "You answered"; it is part of the item, not a new one.
+- EVERY message OFFERS Reply; a reply under a finished item puts it back with the agent. WHEN the user reviews the agent's work on the page, as in design-better, a done item also OFFERS Accept, a brown check next to Reply, and a done or accepted item CANNOT be edited. WHEN the page only shows work the user does not approve, as research-better's board, a done item is finished.
+- WHERE the user approves items, Open SHOWS the items not yet accepted and All shows everything. WHERE an answer finishes an item, the page SHOWS one list in time order, without a filter, so an answer does not vanish as it arrives. Items that wait for the user, such as a decision with a deadline, COME LAST in the same list, next to the message box, until the user answers.
+- The conversation SITS in a right-hand column of the same width, `minmax(20rem, 24rem)`, with the message box at its foot.
+- Live updates NEVER take what the user is typing: a box with text keeps its text and cursor through a redraw, and a new page version loads by itself only while the user is not typing.
+- The script GIVES the agent the same subcommands to read and answer: `wait`, `reply --to`, `status`, `pending`.
+- The pages SHARE one stylesheet, `page.css`, for the bar, the side column, the conversation, the buttons and the toast. EACH skill carries an identical copy, and the Scripts workflow fails if they differ: change it in one skill, then copy it to the others. A page's own file adds only what that page alone shows.
+
+The skill TELLS the agent the same rules for its side, in the same words: reply in the page, in one or two short sentences; mark `working` only what it is changing now; and once an answer leads to a change, mark the item done and ask the next question as a new message.

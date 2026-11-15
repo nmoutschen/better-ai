@@ -9,18 +9,22 @@ A board is a directory. Each entry is its own small file, so several agents can 
   claims/<id>.md
   sources/<id>.md
   logs/<agent>.md
+  decisions/<id>.md
+  conversation.jsonl   (written by board.py: the user's messages and your replies)
 ```
 
 ## IDs and ownership
 
 - An ID is a prefix, the agent's name, and a counter: `Q-w2-4` is the fourth question that agent `w2` created. Use `coordinator` as your name when you coordinate. IDs never collide, so no agent needs to ask for one.
-- Create new files freely. Edit only the files you created, the `owner`, `status`, and `summary` lines of a question you own, and your own log.
+- Create new files freely. Edit only the files you created, the `owner`, `status`, `summary` and `gist` lines of a question you own, and your own log.
 - The coordinator may edit any file to verify, merge, delete, or reprioritize.
 
 ## brief.md
 
 ```
 topic: <TOPIC as the user stated it>
+title: <the topic in at most eight plain words, for the page's heading>
+short: <the topic in two or three words, for the centre of the map>
 meaning: <the confirmed MEANING>
 goal: <what the user must understand, learn, decide, or do>
 limit: <a limit the user stated, or none>
@@ -37,6 +41,7 @@ status: <running | checking | stopped>
 ```
 id: Q-<agent>-<n>
 question: <one question>
+title: <the question in at most six plain words>
 priority: <high | medium | low>
 status: <proposed | open | in progress | answered | contested | not found | unclear | out of scope>
 owner: <agent name, or none>
@@ -46,8 +51,25 @@ stakes: <which conclusion for the GOAL the answer could change>
 done-when: <the evidence that would answer the question>
 answer: <claim IDs, or none>
 summary: <two or three sentences answering the question from the evidence, or none>
+gist: <the answer in one plain sentence of at most 20 words, or none>
 note: <why it was closed, rewritten, or dropped, or none>
 ```
+
+## decisions/<id>.md
+
+A choice only the user can make, asked during the run without stopping it. The coordinator writes it.
+
+```
+id: D-coordinator-<n>
+at: <ISO time you asked it>
+asked: <what came up, in one short sentence>
+default: <what you will do if the user does not answer, in one short sentence>
+deadline: <ISO time, such as 2026-11-15T16:50:00, when the default applies>
+status: <pending | default | changed>
+answer: <the user's answer, or none>
+```
+
+`pending`: waiting for the user until the deadline; the user can answer, or accept the default at once. `default`: the deadline passed and you applied the default. `changed`: you applied the user's answer.
 
 ## claims/<id>.md
 

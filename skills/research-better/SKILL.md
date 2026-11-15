@@ -21,7 +21,7 @@ This skill names capabilities, not tools: search and page reads in a COLLECTION,
 
 A COLLECTION is a set of documents a tool can search or read: the web, or an internal one such as a wiki (Confluence, Notion), a ticket tracker, a code host, a document drive or a chat archive. CHOOSE the COLLECTIONs from the TOPIC and the context. IF the TOPIC concerns the user's organisation, such as its systems, projects, teams or decisions, SEARCH the internal COLLECTIONs your harness gives you access to, not only the web. Everything this skill says about pages applies to documents in any COLLECTION.
 
-DO NOT fail open. IF a COLLECTION the TOPIC needs cannot be searched, because the tool is missing, asks for a login, returns an error, or returns nothing where documents should exist, DO NOT continue as if it had been searched. DO NOT fill the gap from another COLLECTION or from your training data: public pages do not describe internal systems. TELL the user which COLLECTION is missing, and ASK whether to wait for access, to continue without it, or to give you the sources to read, such as files, pages or papers. IF you continue, RECORD the gap in the board's brief and STATE in the findings what the research does not cover.
+DO NOT fail open. IF a COLLECTION the TOPIC needs cannot be searched, because the tool is missing, asks for a login, returns an error, or returns nothing where documents should exist, DO NOT continue as if it had been searched. DO NOT fill the gap from another COLLECTION or from your training data: public pages do not describe internal systems. BEFORE the research runs, TELL the user which COLLECTION is missing, and ASK whether to wait for access, to continue without it, or to give you the sources to read, such as files, pages or papers. ONCE it runs, RECORD a decision instead of waiting (section 3). IF you continue without it, RECORD the gap in the board's brief and STATE in the findings what the research does not cover.
 
 DO NOT carry internal information into an external COLLECTION. A COLLECTION is external when it runs outside the user's organisation, such as web search or a public page; a query or URL sent to it can be logged and seen by others. WRITE external queries only from public terms: the general concepts, public products and standards the TOPIC involves. DO NOT put internal names, such as project, system, team, customer or people names, or text from internal documents, in an external query or in a URL you fetch. IF a question cannot be searched externally without them, SEARCH it only in internal COLLECTIONs. This rule also applies to the first searches in section 1.
 
@@ -65,6 +65,14 @@ TELL the user the board's path once.
 
 IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the live view: `python3 scripts/board.py watch <board-path>` from this skill's directory. It opens the user's browser, prints its address, and exits by itself once the board's status is stopped. GIVE the user the address. IF the harness can only run commands in the foreground, DO NOT start it. TELL the user they can run it themselves instead.
 
+The live view shows the board as a map of the questions, the agents at work, and the decisions waiting for the user or taken without them. The user asks about a question or an agent, writes to you, and changes your decisions there. `watch` prints each action as one JSON line and saves it in the board's `conversation.jsonl`.
+
+- READ the user's open items with `python3 scripts/board.py pending <board-path>` each time you re-read the board (section 7.2), and when you resume a board. ACT on each one as the user's instruction for the GOAL, unless it asks for an answer you expect: steering by the user is not a prior to avoid, but a question the user adds goes through the same review as a worker's (section 7.2, step 1).
+- TRACK each item with `python3 scripts/board.py status <board-path> seen|asked|done <id>...`: MARK it `seen` when it arrives, `asked` when you asked the user something and wait for the answer, and `done` once you answered it or the change is on the board. READ a note the user adds under an item as part of that item's thread, ordered by the `at` time on each entry, the user's and yours (`pending` prints the thread with its times): it may answer your question, clarify what they asked, or react to your last reply. DO NOT take it as the answer to your question unless it answers it; IF you cannot tell, ASK in one sentence. WHEN the user's answer leads to a change, MARK the item `done` once the change is on the board, and PUT your next question in a new message. An item is finished once you answered it or made the change: the user does not approve your work here. A follow-up from the user under it is work again.
+- REPLY in the page with `python3 scripts/board.py reply <board-path> "<what you changed, or your answer>" --to <id>`. KEEP each reply to one or two short sentences, from the board's evidence, not from your training data. WHILE the user works in the page, PUT everything for them there, and DO NOT repeat page events in the chat.
+
+DO NOT stop the research to wait for the user: the user often leaves a run alone. WHEN something only the user can decide comes up during the run, such as a COLLECTION that asks for a login, CHOOSE the default that keeps the research honest, such as continuing without that COLLECTION and recording the gap, and RECORD the decision in `decisions/` with status `pending` and a deadline 10 minutes ahead, or sooner if the research will likely end before then, so a decision never delays the end of the run (see the board format). WHEN the stop rules apply while a decision is pending, APPLY its default and CONTINUE to stop. WORK on other questions meanwhile. EACH time you re-read the board, APPLY the user's answer if one came (status `changed`), the default if the user accepted it (an answer with `default: true`) or once the deadline has passed (status `default`). EACH time, REPLY under the decision, with `--to` the id of the user's answer or, if none came, the decision's own id, so the page shows what happened in the same thread. WHEN the user changes a decision after that, APPLY the change, SET the status to `changed`, and SET the board's status back to running if it had stopped.
+
 IF the user has no live view, REPORT progress in the chat each time a question is closed: one line with the question, its status, and how many questions remain open.
 
 IF you cannot write files, KEEP the board in your working notes and RESTATE it in full after every few results.
@@ -75,7 +83,7 @@ WRITE several ways to express the MEANING. IF the topic has sources in other lan
 
 ## 5. Seed the open questions
 
-ADD open questions that came from the user's question, the identified MEANING, and the broadening searches. RECORD the origin of each question, and `seed` as its kind.
+ADD open questions that came from the user's question, the identified MEANING, and the broadening searches. RECORD the origin of each question, `seed` as its kind, and a `title` of at most six plain words.
 
 Starter questions:
 
@@ -112,13 +120,13 @@ After each search or page read, WRITE to the board before the next step:
 - New claims, each with its source and a verbatim quote. That a source does not report something is not a claim, because no quote can show it: WRITE it in the question's summary or as a gap. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
 - New terms, and new questions (section 6.3).
 
-WHEN the question's `done-when` holds, STOP searching it, even if more searches are possible. SET its status and WRITE its summary: two or three sentences that answer the question from the evidence, including where sources disagree or evidence is thin.
+WHEN the question's `done-when` holds, STOP searching it, even if more searches are possible. SET its status and WRITE its summary: two or three sentences that answer the question from the evidence, including where sources disagree or evidence is thin. ALSO WRITE its `gist`: the answer in one plain sentence of at most 20 words, for a person glancing at the board.
 
 ### 6.3. Add questions
 
 The research grows from questions that sources raise during the run, not from the first questions. ADD a question whenever a source opens a line of inquiry within the TOPIC and MEANING, and RUN the three checks below each time you close a question, before you take the next one.
 
-EACH new question RECORDS its origin (the source or question that raised it), its `kind`, its `stakes` (which conclusion for the GOAL its answer could change), its `done-when`, and a priority set from its own stakes, not from the priority of the question or source that raised it. IF you cannot name a conclusion it could change, SET its priority to low. DO NOT add a question that an open or answered question already covers. DO NOT add a question to check details of a source you already have: read the source now, or record a gap.
+EACH new question RECORDS a `title` of at most six plain words that a person can read at a glance, its origin (the source or question that raised it), its `kind`, its `stakes` (which conclusion for the GOAL its answer could change), its `done-when`, and a priority set from its own stakes, not from the priority of the question or source that raised it. IF you cannot name a conclusion it could change, SET its priority to low. DO NOT add a question that an open or answered question already covers. DO NOT add a question to check details of a source you already have: read the source now, or record a gap.
 
 IF other agents work on the board, ADD each new question with the status `proposed`. The coordinator admits it (section 7.2).
 
@@ -185,7 +193,7 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 5. **Close obsolete questions**: CLOSE open questions that new findings made irrelevant, as out of scope, and RECORD why.
 6. **Rewrite unclear questions**: REWRITE questions with the status unclear, and REOPEN them.
 7. **Reprioritize** as findings change what matters for the GOAL.
-8. **Revise summaries**: REWRITE a question's summary when verification or new evidence changes what it says.
+8. **Revise summaries**: REWRITE a question's summary and gist when verification or new evidence changes what they say.
 9. **Review gaps**: EACH time a few questions close, COMPARE the board with the GOAL. ADD a question, kind `gap`, for each part of the GOAL that no question covers, with `goal` as origin.
 10. **Check the three checks**: CHECK that each answered high-priority question that is not of kind `challenge` has a challenge question, and that its primary sources have a chain question. ADD the missing ones. IF a worker's log shows no frontier check after a closed question, ADD the frontier questions its sources point to.
 
