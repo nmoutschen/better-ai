@@ -289,8 +289,10 @@ body.app .notes .notes-top h2 { padding:0; margin:0; }
 .thread .reply.mine.answer-note { border-left-color:var(--umber); }
 .btn--sm { padding:3px 10px; font-size:10px; }
 .msg .head { flex-wrap:wrap; row-gap:2px; }
-.thread .foot { display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; margin-top:10px; }
-.thread .reply + .foot { margin-top:20px; }
+.thread .foot { display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; margin:6px 0 -4px; }
+/* A reply pulls its bottom edge 10px down; 16px leaves the same 6px gap as without one. */
+.thread .reply + .foot { margin-top:16px; }
+.thread .reply:has(+ .foot) { padding-bottom:4px; }
 .thread .foot .answer { margin-left:auto; }
 .thread .foot .mini:first-of-type { margin-left:auto; }
 /* The item's left edge carries its state too, so it reads at a glance in a long thread. */
