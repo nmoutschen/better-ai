@@ -218,7 +218,13 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .composer textarea { min-height:3.2em; }
 .copy[hidden] { display:none; }
 .update { position:fixed; left:0; right:0; top:0; }
-/* The top bar stays umber, the n14n brand block; each control pairs its icon with a short label. */
+/* The top bar stays umber, the n14n brand block; each control pairs its icon with a short label. Pickers (one of
+   several) are segmented and fill the chosen option; switches (on or off) have no fill and a box that is ticked. */
+.tog { border:0; background:transparent; color:var(--cream); cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+  padding:6px 4px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; }
+.tog[hidden] { display:none; }
+.tog::before { content:""; width:14px; height:14px; border:1.5px solid var(--cream); box-sizing:border-box; }
+.tog[aria-checked="true"]::before { background:var(--cream) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='%235C4033' stroke-width='2'/%3E%3C/svg%3E") center/12px no-repeat; }
 body.app .seg button.ico { gap:6px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; }
 .thread > li.msg .body { font-size:14px; line-height:1.45; }
 /* A thin neutral outline on each frame keeps the background from changing how the version's own edges read. */
@@ -243,7 +249,7 @@ JS = r"""
   var labels = JSON.parse(main.dataset.labels), current = 0;
   var viewButtons = document.querySelectorAll('[data-view]'), pickButtons = document.querySelectorAll('[data-pick]');
   var pick = document.querySelector('.pick'), together = document.querySelector('#together');
-  together.addEventListener('click', function () { together.setAttribute('aria-pressed', String(together.getAttribute('aria-pressed') !== 'true')); });
+  together.addEventListener('click', function () { together.setAttribute('aria-checked', String(together.getAttribute('aria-checked') !== 'true')); });
   // Each render fills the space it has: scaled down to fit the width, and as tall as the stage, so it scrolls inside
   // its own frame while the page itself does not scroll.
   function fit() {
@@ -307,11 +313,11 @@ JS = r"""
     } catch (e) {}
   }
   function follow(frame) {
-    if (together.getAttribute('aria-pressed') !== 'true' || (quietUntil.get(frame) || 0) > Date.now()) return;
+    if (together.getAttribute('aria-checked') !== 'true' || (quietUntil.get(frame) || 0) > Date.now()) return;
     frame.closest('.row').querySelectorAll('iframe').forEach(function (other) { if (other !== frame) match(frame, other); });
   }
   function bind(frame) {
-    try { frame.contentWindow.addEventListener('scroll', function () { follow(frame); }); } catch (e) { together.parentElement.hidden = true; }
+    try { frame.contentWindow.addEventListener('scroll', function () { follow(frame); }); } catch (e) { together.hidden = true; }
   }
   var bound = new WeakSet();
   function bindOnce(frame) {
@@ -430,7 +436,7 @@ JS = r"""
   // Comment mode: hovering a version outlines the element under the pointer; a click opens the comment box for it.
   var modeBtn = document.querySelector('#comment'), commenting = true, pop = document.querySelector('.pop'), draft = null;
   function setMode(on) {
-    commenting = on; modeBtn.setAttribute('aria-pressed', String(on)); main.classList.toggle('commenting', on);
+    commenting = on; modeBtn.setAttribute('aria-checked', String(on)); main.classList.toggle('commenting', on);
     document.querySelectorAll('iframe').forEach(function (f) { try { f.contentDocument.documentElement.classList.toggle('db-commenting', on); } catch (e) {} });
   }
   main.classList.add('commenting');
@@ -771,8 +777,8 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
     side_hint = ""
-    controls += (f'<div class="seg"><button type="button" class="ico" id="comment" aria-pressed="true" title="Comment (C)" aria-label="Comment">{ICONS["comment"]}<span>Comment</span></button></div>'
-                 f'<div class="seg"><button type="button" class="ico" id="together" aria-pressed="true" title="Scroll versions together" aria-label="Scroll versions together">{ICONS["together"]}<span>Scroll together</span></button></div>'
+    controls += (f'<button type="button" class="tog" id="comment" role="switch" aria-checked="true" title="Comment (C)"><span>Comment</span></button>'
+                 f'<button type="button" class="tog" id="together" role="switch" aria-checked="true" title="Scroll versions together"><span>Scroll together</span></button>'
                  '<div class="seg" role="group" aria-label="Background">' + "".join(
                      f'<button type="button" class="ico sw" data-bg="{c}" aria-pressed="{str(c == BACKGROUNDS[0][1]).lower()}" '
                      f'title="{n} background" aria-label="{n} background"><span class="chip" style="background:{c}"></span><span>{n}</span></button>'
