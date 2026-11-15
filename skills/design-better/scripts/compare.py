@@ -313,6 +313,12 @@ JS = r"""
     });
   });
   dialog.querySelector('.close').addEventListener('click', function () { dialog.close(); });
+  // A click on the backdrop, outside the dialog's box, closes it.
+  dialog.addEventListener('click', function (e) {
+    if (e.target !== dialog) return;
+    var r = dialog.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
+  });
   dialog.addEventListener('close', function () { closePop(); document.body.append(pop, toast); });
   document.body.classList.add('scaled');
   window.addEventListener('resize', fit);
@@ -624,10 +630,12 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     before_after = [label.lower() for label in labels] == ["before", "after"]
     rows = []
     for k, (w, h) in enumerate(sizes):
+        # With two versions, choosing one says all a verdict would; verdicts help only to sort three or more.
         figures = "".join(
             f'<figure data-i="{i}"><div class="label"><b>{esc(label)}</b><span class="acts">'
-            f'<button type="button" class="vbtn" data-v="{i}" data-verdict="up" aria-pressed="false" aria-label="Good: {esc(label)}">{THUMB_UP}</button>'
-            f'<button type="button" class="vbtn" data-v="{i}" data-verdict="down" aria-pressed="false" aria-label="Not good: {esc(label)}">{THUMB_DOWN}</button>'
+            + (f'<button type="button" class="vbtn" data-v="{i}" data-verdict="up" aria-pressed="false" aria-label="Good: {esc(label)}">{THUMB_UP}</button>'
+               f'<button type="button" class="vbtn" data-v="{i}" data-verdict="down" aria-pressed="false" aria-label="Not good: {esc(label)}">{THUMB_DOWN}</button>'
+               if len(loaded) > 2 else '') +
             f'<button type="button" class="vbtn pickv" data-v="{i}" aria-pressed="false">Choose</button>'
             f'<button type="button" class="full">Full size</button></span></div>'
             f'<div class="stage"><div class="screen"><iframe data-i="{i}" title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
@@ -649,7 +657,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
-    side_hint = "Press C to switch commenting off and use the versions as pages."
+    side_hint = ""
     controls += ('<div class="seg seg--terra"><button type="button" id="comment" aria-pressed="true">Comment</button></div>'
                  '<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
                  'Scroll together</button></div>')
