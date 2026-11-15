@@ -98,8 +98,7 @@ h1 { font:700 28px/1.2 var(--serif); color:var(--cream); margin:0 0 8px; }
 .seg[hidden] { display:none; }
 .seg button.ico { padding:5px 9px; display:inline-flex; align-items:center; opacity:.8; }
 .seg button.ico[aria-pressed="true"] { opacity:1; }
-.seg button.sw span { width:16px; height:16px; border:1px solid var(--sand); display:block; }
-.seg button.sw[aria-pressed="true"] span { outline:2px solid var(--umber); outline-offset:1px; }
+.seg button.sw .chip { width:14px; height:14px; border:1px solid var(--sand); display:block; }
 main.on-dark .label b, main.on-dark .full { color:var(--cream); }
 main.on-dark .vbtn { color:var(--cream); border-color:var(--cream); }
 .crumb { display:block; }
@@ -219,16 +218,9 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .composer textarea { min-height:3.2em; }
 .copy[hidden] { display:none; }
 .update { position:fixed; left:0; right:0; top:0; }
-/* A quiet toolbar: cream with ink, so the chrome draws less attention than the versions. */
-body.app > header { background:var(--cream); color:var(--ink); border-bottom:1px solid var(--line); }
-body.app h1 { color:var(--heading); }
-body.app .question { color:var(--ink); }
-body.app .seg { border-color:var(--line); }
-body.app .seg button { color:var(--ink); }
-body.app .seg button + button { border-left-color:var(--line); }
-body.app .seg button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
-body.app .seg button.sw[aria-pressed="true"] { background:transparent; }
-body.app .hint { color:var(--muted); }
+/* The top bar stays umber, the n14n brand block; each control pairs its icon with a short label. */
+body.app .seg button.ico { gap:6px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; }
+.thread > li.msg .body { font-size:14px; line-height:1.45; }
 /* A thin neutral outline on each frame keeps the background from changing how the version's own edges read. */
 body.app .screen { border:1px solid #BDBDBD; }
 main.on-dark .screen { border-color:#5A5A5A; }
@@ -768,22 +760,22 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
         names = [f"{w} × {h}" for w, h in sizes]
     sizes_html = ('<div class="seg" role="group" aria-label="Screen">' + "".join(
         f'<button type="button" class="ico" data-size="{k}" aria-pressed="{str(k == 0).lower()}" title="{esc(n)}, {w} × {h} px" '
-        f'aria-label="{esc(n)}, {w} × {h} px">{ICONS.get(n) or esc(n)}</button>'
+        f'aria-label="{esc(n)}, {w} × {h} px">{ICONS.get(n, "")}<span>{esc(n)}</span></button>'
         for k, ((w, h), n) in enumerate(zip(sizes, names))) + '</div>') if len(sizes) > 1 else ""
     controls = sizes_html
     if len(labels) > 1:
         controls += ('<div class="seg" role="group" aria-label="View">'
-                     f'<button type="button" class="ico" data-view="side" aria-pressed="true" title="Side by side" aria-label="Side by side">{ICONS["side"]}</button>'
-                     f'<button type="button" class="ico" data-view="switch" aria-pressed="false" title="Switch in place (Space)" aria-label="Switch in place">{ICONS["switch"]}</button></div>'
+                     f'<button type="button" class="ico" data-view="side" aria-pressed="true" title="Side by side" aria-label="Side by side">{ICONS["side"]}<span>Side by side</span></button>'
+                     f'<button type="button" class="ico" data-view="switch" aria-pressed="false" title="Switch in place (Space)" aria-label="Switch in place">{ICONS["switch"]}<span>Switch</span></button></div>'
                      '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
     side_hint = ""
-    controls += (f'<div class="seg"><button type="button" class="ico" id="comment" aria-pressed="true" title="Comment (C)" aria-label="Comment">{ICONS["comment"]}</button>'
-                 f'<button type="button" class="ico" id="together" aria-pressed="true" title="Scroll versions together" aria-label="Scroll versions together">{ICONS["together"]}</button></div>'
+    controls += (f'<div class="seg"><button type="button" class="ico" id="comment" aria-pressed="true" title="Comment (C)" aria-label="Comment">{ICONS["comment"]}<span>Comment</span></button></div>'
+                 f'<div class="seg"><button type="button" class="ico" id="together" aria-pressed="true" title="Scroll versions together" aria-label="Scroll versions together">{ICONS["together"]}<span>Scroll together</span></button></div>'
                  '<div class="seg" role="group" aria-label="Background">' + "".join(
                      f'<button type="button" class="ico sw" data-bg="{c}" aria-pressed="{str(c == BACKGROUNDS[0][1]).lower()}" '
-                     f'title="{n} background" aria-label="{n} background"><span style="background:{c}"></span></button>'
+                     f'title="{n} background" aria-label="{n} background"><span class="chip" style="background:{c}"></span><span>{n}</span></button>'
                      for n, c in BACKGROUNDS) + '</div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
     notes = ('<aside class="notes" aria-labelledby="notes-h"><h2 id="notes-h">Conversation</h2>'
