@@ -251,10 +251,9 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .progress.accepted::after { content:"\2713"; font-size:12px; }
 .progress.reopened { color:#9A3B2A; }
 .progress.reopened .bars i { background:var(--terracotta); opacity:.5; }
-.accept { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; padding-top:8px; border-top:1px dashed var(--line);
-  font-size:13px; }
-.accept span { margin-right:auto; }
-.btn--sm { padding:5px 12px; font-size:11px; }
+.mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
+  font:700 12px/18px var(--sans); }
+.mini:hover { border-color:var(--ink); }
 @keyframes pulse-bar { 50% { opacity:.35; } }
 @media (prefers-reduced-motion: reduce) { .progress .bars i { animation:none !important; } }
 .msg .answered { font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
@@ -694,16 +693,14 @@ JS = r"""
         for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
         chip.append(bars, el('span', '', LABEL[st]));
         h.append(chip);
-      }
-      // Once the agent marks an item done, the user accepts it or reopens it.
-      function verdictRow(target) {
-        if (state[e.id] !== 'done') return;
-        var row = el('div', 'accept'), ok = el('button', 'btn btn--sm', 'Accept'), no = el('button', 'btn btn--sm btn--quiet', 'Reopen');
-        ok.type = no.type = 'button';
-        ok.addEventListener('click', function () { send('accept', { to: e.id }, 'Acceptance'); });
-        no.addEventListener('click', function () { send('reopen', { to: e.id }, 'Reopening'); noteBox.focus(); });
-        row.append(el('span', '', 'Is this done as you wanted?'), ok, no);
-        target.append(row);
+        // Once the agent marks an item done, two small equal buttons beside the state let the user accept or reopen it.
+        if (st === 'done') {
+          [['accept', '\u2713', 'Accept'], ['reopen', '\u21BA', 'Reopen']].forEach(function (a) {
+            var b = el('button', 'mini', a[1]); b.type = 'button'; b.title = a[2]; b.setAttribute('aria-label', a[2]);
+            b.addEventListener('click', function () { send(a[0], { to: e.id }, a[2] === 'Accept' ? 'Acceptance' : 'Reopening'); if (a[0] === 'reopen') noteBox.focus(); });
+            h.append(b);
+          });
+        }
       }
       if (c.kind === 'comment') {
         li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
@@ -734,7 +731,6 @@ JS = r"""
         li = el('li', 'sys', t + ', ' + time(e.at));
       } else return;
       c.replies.forEach(function (r) { li.append(replyBlock(r)); });
-      if (c.kind === 'comment' || c.kind === 'note') verdictRow(li);
       thread.appendChild(li);
     });
     if (stick) thread.scrollTop = thread.scrollHeight;
