@@ -260,7 +260,7 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .progress .bars i { width:10px; height:4px; background:var(--line); }
 .progress.seen .bars i.on { background:var(--sand); }
 .progress.working { color:var(--umber); }
-.progress.asked { color:var(--heading); background:var(--linen); padding:1px 6px; outline:1px solid var(--umber); }
+.progress.asked { color:var(--umber); }
 .progress.asked .bars i.on { background:var(--umber); }
 .progress.working .bars i.on { background:var(--terracotta); }
 .progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
@@ -288,7 +288,9 @@ body.app .notes .notes-top h2 { padding:0; margin:0; }
 .thread > li.locatable:hover { border-color:var(--sand); }
 .thread .reply.mine.answer-note { border-left-color:var(--umber); }
 .btn--sm { padding:3px 10px; font-size:10px; }
-.msg .head .answer { margin-left:auto; }
+.msg .head { flex-wrap:wrap; row-gap:2px; }
+.thread .answer { margin-top:10px; }
+.thread .reply + .answer { margin-top:20px; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
   font:700 12px/18px var(--sans); }
 .mini:hover { border-color:var(--ink); }
@@ -790,11 +792,6 @@ JS = r"""
         for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
         chip.append(bars, el('span', '', LABEL[st]));
         h.append(chip);
-        if (st === 'asked') {
-          var ans = el('button', 'btn btn--sm answer', 'Answer'); ans.type = 'button';
-          ans.addEventListener('click', function () { reasonBox(h.closest('li'), e.id, true); });
-          h.append(ans);
-        }
         // Once the agent marks an item done, two small equal buttons beside the state let the user accept or reopen it.
         if (st === 'done') {
           [['accept', '\u2713', 'Accept'], ['reopen', '\u21BA', 'Reopen']].forEach(function (a) {
@@ -838,6 +835,12 @@ JS = r"""
         li = el('li', 'sys', t + ', ' + time(e.at));
       } else return;
       c.replies.forEach(function (r) { li.append(replyBlock(r)); });
+      // An item waiting for the user ends with an Answer button, under the question it answers.
+      if ((c.kind === 'comment' || c.kind === 'note') && state[e.id] === 'asked') {
+        var ans = el('button', 'btn btn--sm answer', 'Answer'); ans.type = 'button';
+        ans.addEventListener('click', function () { reasonBox(li, e.id, true); });
+        li.append(ans);
+      }
       thread.appendChild(li);
     });
     if (filter === 'open' && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
