@@ -1,8 +1,27 @@
 # `/design-better`
 
-Designs, builds and reviews an interface or page so the people who use it can do what they came for. It agrees the audience and their tasks with you, shows you versions side by side before it builds, and checks the result by walking each task in the rendered page.
+Designs, builds and reviews an interface so the people who use it can do what they came for.
 
-## When to use it
+![The compare page: two versions of an orders list side by side, "A, one list" and "B, late orders first", with a conversation panel on the right](img/design-better-compare.png)
+*You compare versions on one page, and click any part of a version to comment on it or Decide.*
+
+## What it does that a plain agent doesn't
+
+- **Shows versions, not descriptions.** For a new page or a layout change, two or three rough directions side by side, before it builds.
+- **Agrees the tasks first.** A short brief: who uses the page and what they come to do, as scenarios with real data.
+- **Checks by using the page.** It walks each scenario by pointer, by keyboard and on a small screen. A screenshot that looks good is not a check.
+- **Keeps your design language.** A clash with a rule, such as contrast, is reported to you, never quietly fixed.
+
+For example, to get late orders found first:
+
+```
+/design-better the orders page
+```
+
+## Reference
+
+<details>
+<summary><b>When to use it</b></summary>
 
 - To design, build or change an interface: a web page, an app screen, a rendered report.
 - To review an interface, yours or someone else's.
@@ -15,7 +34,10 @@ Use something else nearby:
 
 Being invoked does not mean a redesign. A run can end with a brief and a few questions for you, or with a report that the interface already works for its audience.
 
-## How to run it
+</details>
+
+<details>
+<summary><b>How to run it</b></summary>
 
 ```
 /design-better <interface or task>
@@ -33,7 +55,10 @@ It picks one of three modes from the task:
 
 Without an argument, it reviews the interface the conversation is building, then continues or corrects the work. If there is none, it asks which interface or design language to work on, and whether to build, review or change it.
 
-## What happens
+</details>
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It reads first.** It reads the existing interface, its styles, components and design files, the content, and the project's instructions. It does not ask you what these already answer.
 2. **It writes a brief.** For anything more than a small change, it writes the goal, the audience, a few scenarios (one task each, from start to an end you can observe, with real data), and the pages and what each holds. It asks whether each page or part should stay, merge or go.
@@ -48,7 +73,10 @@ Without an argument, it reviews the interface the conversation is building, then
 7. **It checks by walking.** It operates the rendered interface for each scenario: with a pointer, by keyboard only, and at the smallest screen width. It reads the labels and headings without the visual page, runs an accessibility checker if one is available, and stops fixing after about three rounds or when a fix breaks a scenario that passed.
 8. **A separate reviewer reviews it.** The reviewer gets the interface, the brief and your decisions, not the builder's reasoning. A finding counts only if it names a scenario step where a person is stopped or slowed.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - A brief, from `templates/brief.md`, in the project or in the reply.
 - A compare page at `.design/<slug>/index.html`, with your feedback appended to `answers.jsonl` next to it. It is not committed unless you ask.
@@ -62,7 +90,10 @@ Without an argument, it reviews the interface the conversation is building, then
 
 The report keeps three claims apart: the scenarios can be completed, the checks pass, and the audience can use the interface. Only a test with people shows the last one.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 - [`/code-better`](code-better.md) for the code that implements the interface.
 - [`/ask-better`](ask-better.md) for the questions before building.
@@ -71,7 +102,10 @@ The report keeps three claims apart: the scenarios can be completed, the checks 
 - [`/do-better`](do-better.md) when you reject the result.
 - `/review-better` uses `/design-better`'s checks when it reviews an interface or a design language.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 | Capability | Without it |
 |---|---|
@@ -83,3 +117,5 @@ The report keeps three claims apart: the scenarios can be completed, the checks 
 | An accessibility checker | It says none ran, and relies on the walks and reading the markup. |
 | Sub-agents | It reviews in a separate pass after building, re-reading the brief first. |
 | Writing files | It puts the brief and the design language in its reply. |
+
+</details>
