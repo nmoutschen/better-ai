@@ -293,6 +293,8 @@ body.app .notes .notes-top h2 { padding:0; margin:0; }
 /* A reply pulls its bottom edge 10px down; 16px leaves the same 6px gap as without one. */
 .thread .reply + .foot { margin-top:16px; }
 .thread .reply:has(+ .foot) { padding-bottom:4px; }
+/* Inside an item, the item's own left edge already marks it: a reply shows by its background and label, not a second bar. */
+.thread > li.msg .reply, .thread > li.msg .reply.mine { border-left:0; padding-left:16px; }
 .thread .foot .answer { margin-left:auto; }
 .thread .foot .mini:first-of-type { margin-left:auto; }
 /* The item's left edge carries its state too, so it reads at a glance in a long thread. */
