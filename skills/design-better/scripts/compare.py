@@ -728,7 +728,7 @@ JS = r"""
     r.append(h, el('p', 'body', e.action === 'reopen' ? e.reason : e.action === 'note' ? e.note : e.text));
     return r;
   }
-  var filter = 'all';
+  var filter = 'open';
   document.querySelectorAll('[data-filter]').forEach(function (b) {
     b.addEventListener('click', function () {
       filter = b.dataset.filter;
@@ -894,6 +894,7 @@ JS = r"""
   }
   noteBtn.addEventListener('click', sendNote);
   noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNote(); } });
+  renderThread();
   if (served) (function stream(after) {
     fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
       r.events.forEach(function (e) { log.push(e); apply(e, false); });
@@ -1009,8 +1010,8 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      for n, c in BACKGROUNDS) + '</div></div></div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
     notes = ('<aside class="notes" aria-labelledby="notes-h"><div class="notes-top"><h2 id="notes-h">Conversation</h2>'
-             '<div class="seg filter" role="group" aria-label="Show"><button type="button" data-filter="all" aria-pressed="true">All</button>'
-             '<button type="button" data-filter="open" aria-pressed="false">Open</button></div></div>'
+             '<div class="seg filter" role="group" aria-label="Show"><button type="button" data-filter="all" aria-pressed="false">All</button>'
+             '<button type="button" data-filter="open" aria-pressed="true">Open</button></div></div>'
              '<p class="empty">Nothing yet. Click any part of a version to comment on it, or write to the agent below.</p>'
              '<ol class="thread" aria-live="polite"></ol>'
              '<div class="composer"><label for="note">Message to the agent</label><textarea id="note"></textarea>'
