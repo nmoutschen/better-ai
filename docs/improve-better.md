@@ -1,0 +1,58 @@
+# `/improve-better`
+
+Improves what your agent carries from one session to the next, such as its memory, instructions files, skills and workflows. It looks for changes in past sessions, tests each one, and proposes the changes that pass for you to approve. It can also propose a change it could not test, marked as untested with the reason.
+
+The aim is that you repeat yourself, correct the agent and wait less in later sessions. A run can end with no proposal, and it says so in one sentence.
+
+## When to use it
+
+- You keep giving the agent the same instruction, or correcting the same mistake.
+- You want to find routines the agent repeats by hand, or rules and skills that nobody uses, contradict each other or repeat each other.
+- You want to improve one area, such as memory, one skill or one workflow.
+
+Use [`/do-better`](do-better.md) instead when you are pointing at a defect in the work in front of you. Use [`/interview-me`](interview-me.md) when you want the agent to learn how you read, review and want it to work by asking you.
+
+## How to run it
+
+```
+/improve-better [area to improve]
+```
+
+- Without an argument, it looks over recent sessions and your whole setup.
+- With an argument, it limits the run to that area.
+
+Example: `/improve-better memory`
+
+## What happens
+
+1. **It reads the evidence.** It reads past sessions, if your tool keeps them, plus memory, instructions files, the record of past runs, and the files it may change. If it cannot read past sessions, it says so and works from the current session and these files.
+2. **It finds candidates.** Each candidate starts from evidence it can cite, such as an instruction you gave more than once, a correction no rule covers yet, or a rule no session used. Removing, merging and shortening rules count as much as adding them. It keeps only a handful of candidates.
+3. **It tests each candidate.** Where it can, it replays past tasks the candidate was not built from, with and without the change, and counts what got worse as well as what got better. Otherwise it checks the change against what you accepted in past sessions. A separate check judges the change, not the step that wrote it. Changes that pass alone are then tested together.
+4. **It keeps the setup small.** If a file would grow, it proposes what to remove or merge, with evidence that it is unused or repeated. It does not remove safety or permission rules on the strength of a replay test.
+5. **It proposes.** You see at most five proposals, most important first. Conflicts between rules come before proposals, so you can settle them. Each proposal shows:
+   - the exact change, as a diff or full text
+   - the evidence it came from
+   - the test and its result, including anything that got worse, or "untested" with the reason
+   - how to undo it
+6. **It asks you to decide on each one.** Only an explicit approval counts. Silence, or approval of a different proposal, does not.
+7. **It applies and records.** It applies each approved change exactly as proposed, then checks that nothing else changed.
+
+## What you get
+
+- Proposals with their evidence, test results and undo steps.
+- Changes to the files you approved, and nothing else.
+- A record of each run: the date, each proposal, its evidence and test result, and your decision. It keeps the record in its persistent memory if it has one, otherwise in a file in your working directory, whose path it tells you. Later runs read the record and don't re-propose a change you rejected unless there is new evidence.
+
+## Works with
+
+- [`/ask-better`](ask-better.md) for how it asks you to approve or reject each proposal.
+- It can change your personal skills, such as the `write-for-<name>` skill from [`/interview-me`](interview-me.md).
+- It can change a skill whose source is in the repository you work in, following that repository's rules for changing skills.
+
+## What it needs
+
+- **Past session logs** for the strongest evidence. Without them, it uses the current session and your persistent files, and says so.
+- **Sub-agents** to judge changes apart from the step that wrote them. Without them, it writes the check before it writes the change and does not edit the check afterwards.
+- **File access** to apply changes and keep the record. Without it, it gives you the record at the end and asks you to provide it to the next run.
+
+It may propose, but never applies, changes to your tool's configuration, such as permissions, hooks or scheduled runs. If you want runs to start on their own, for example on a schedule or at the end of a session, it proposes how and sets it up only after you approve. A run that starts while you are away applies nothing and keeps its proposals for when you are back.

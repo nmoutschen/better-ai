@@ -1,0 +1,56 @@
+# `/do-better`
+
+Fixes work the agent gave you that misses what you wanted. It works out your goal and what is actually wrong, then hands back the corrected work, not an apology or a plan.
+
+## When to use it
+
+- The agent's answer, document, design or code does not do what you asked, and you want it fixed now.
+- You rephrased or repeated a request, and the result still misses.
+- The agent finds a defect in work it already delivered. It checks that the defect is real, tells you in one sentence what is wrong and what it affects, then fixes it.
+
+Use [`/improve-better`](improve-better.md) instead when you want the fix to last across later sessions, for example in memory, instructions or a skill. `/do-better` corrects the work in front of you.
+
+## How to run it
+
+```
+/do-better [what is wrong]
+```
+
+- Without an argument, the agent looks over its previous work and finds the mismatch itself.
+- With an argument, it treats your description as evidence of what is wrong, not as a full diagnosis.
+
+Example: `/do-better the summary dropped the cost comparison I asked for`
+
+## What happens
+
+1. **It rereads the context.** It reads your original request, later corrections, your preferences and memories, and examples you accepted or rejected. It does not ask you to repeat what is already there.
+2. **It names your goal.** It separates what you need to understand, decide or do from the deliverable itself, and keeps unknowns as unknowns.
+3. **It finds the mismatch.** It compares the work with your request, for example a changed scope, missing information, an assumption stated as fact, or an approach you had rejected. It keeps what was right and changes only what the mismatch affects.
+4. **It checks disputed facts.** If your complaint states a fact, it writes down what its work claimed and why, then checks against a source, a test or your earlier words. It changes the work for a fact that holds. If your fact is wrong, it says so once, with the evidence, and follows your decision.
+5. **It asks only when it must.** If two readings of your request lead to different fixes, it asks one short question before redoing the work, often with two to four choices you can answer with a word or a number.
+6. **It fixes and checks.** It revises the work and checks the fix against your goal and requirements. For code, an interface or text, it checks the fix the way `/code-better`, `/design-better` or `/write-better` check that kind of work. It does not call the fix done until a check has run.
+7. **It replies.** It leads with the corrected result, adds one sentence on what changed, and owns its error in plain words, such as "I misread X". It does not blame you, the request or the tools.
+
+If you run `/do-better` again on the same task, it treats the last revision as failed. It lists every requirement from the original request and each correction, checks the work against all of them, and changes its approach at the step where the work went wrong.
+
+## What you get
+
+- The corrected work, in the same form you asked for.
+- One sentence naming what changed.
+- Any assumption it made, when that assumption affects how you should judge the result.
+- What it did not read, run or change, when it says the fix is complete.
+
+It writes no separate files or records.
+
+## Works with
+
+- [`/ask-better`](ask-better.md) for the one question it asks when a decision blocks the fix.
+- [`/code-better`](code-better.md), [`/design-better`](design-better.md) and [`/write-better`](write-better.md) for checking a fixed piece of code, interface or text.
+- `/code-better`, `/design-better` and [`/review-better`](review-better.md) send you here when you reject their result.
+
+## What it needs
+
+Nothing beyond what the original task used. It reads the conversation and any files the work touched, and checks with the sources, tests or tools available.
+
+- If a tool or permission blocks part of the fix, it delivers what it can and names the blocker in one sentence.
+- Running `/do-better` does not let it publish, send messages, delete work or act outside the scope you already gave it.
