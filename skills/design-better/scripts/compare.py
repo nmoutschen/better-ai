@@ -289,8 +289,17 @@ body.app .notes .notes-top h2 { padding:0; margin:0; }
 .thread .reply.mine.answer-note { border-left-color:var(--umber); }
 .btn--sm { padding:3px 10px; font-size:10px; }
 .msg .head { flex-wrap:wrap; row-gap:2px; }
-.thread .answer { margin-top:10px; }
-.thread .reply + .answer { margin-top:20px; }
+.thread .foot { display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; margin-top:10px; }
+.thread .reply + .foot { margin-top:20px; }
+.thread .foot .answer { margin-left:auto; }
+.thread .foot .mini:first-of-type { margin-left:auto; }
+/* The item's left edge carries its state too, so it reads at a glance in a long thread. */
+.thread > li.msg[data-state] { border-left-width:4px; }
+.thread > li.msg[data-state="seen"] { border-left-color:var(--sand); }
+.thread > li.msg[data-state="asked"] { border-left-color:var(--umber); }
+.thread > li.msg[data-state="working"] { border-left-color:var(--terracotta); }
+.thread > li.msg[data-state="done"], .thread > li.msg[data-state="accepted"] { border-left-color:var(--moss-dark); }
+.thread > li.msg[data-state="reopened"] { border-left-color:#9A3B2A; }
 .decide { border:1px solid var(--sand); background:#fff; padding:8px 10px; margin-bottom:10px; }
 .decide .menu-h { color:var(--muted); margin:0 0 6px; }
 .dopt { display:flex; align-items:center; gap:6px; font-size:14px; margin:4px 0; cursor:pointer; }
@@ -815,7 +824,6 @@ JS = r"""
       if (c.kind === 'comment') {
         li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
         head = el('div', 'head'); head.append(el('span', 'n', e.n || '?'), el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
-        answered(head);
         var it = byId(e.id);
         if (it && !c.deleted) {
           var del = el('button', 'link', 'Delete'); del.type = 'button'; del.setAttribute('aria-label', 'Delete comment ' + e.n);
@@ -833,11 +841,9 @@ JS = r"""
         li.append(body);
       } else if (c.kind === 'note') {
         li = el('li', 'msg me'); head = el('div', 'head'); head.append(el('span', 'who', 'You'), el('span', 'when', time(e.at)));
-        answered(head);
         li.append(head, el('p', 'body', e.note));
       } else if (c.kind === 'decide') {
         li = el('li', 'msg me decision'); head = el('div', 'head'); head.append(el('span', 'who', 'You decided'), el('span', 'when', time(e.at)));
-        answered(head);
         var d = el('p', 'body'); d.append(el('strong', '', e.label || e.option));
         if (e.carries && e.carries.length) d.append(el('span', 'with', ' with comments ' + e.carries.map(function (id) { var x = log.filter(function (y) { return y.id === id; })[0]; return x && x.n ? x.n : '?'; }).join(', ')));
         li.append(head, d); if (e.note) li.append(el('p', 'body', e.note));
@@ -849,11 +855,16 @@ JS = r"""
         li = el('li', 'sys', t + ', ' + time(e.at));
       } else return;
       c.replies.forEach(function (r) { li.append(replyBlock(r)); });
-      // An item waiting for the user ends with an Answer button, under the question it answers.
-      if ((c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') && state[e.id] === 'asked') {
-        var ans = el('button', 'btn btn--sm answer', 'Answer'); ans.type = 'button';
-        ans.addEventListener('click', function () { reasonBox(li, e.id, true); });
-        li.append(ans);
+      // The state and what the user can do with it close the item, after the latest reply, where the eye ends.
+      if (c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') {
+        var foot = el('div', 'foot'); answered(foot);
+        if (state[e.id] === 'asked') {
+          var ans = el('button', 'btn btn--sm answer', 'Answer'); ans.type = 'button';
+          ans.addEventListener('click', function () { reasonBox(li, e.id, true); });
+          foot.append(ans);
+        }
+        if (foot.childNodes.length) li.append(foot);
+        if (state[e.id]) li.dataset.state = state[e.id];
       }
       thread.appendChild(li);
     });
