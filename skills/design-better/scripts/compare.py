@@ -407,6 +407,22 @@ JS = r"""
     while (b < text.length && !/[.!?\n]/.test(text[b])) b++;
     return text.slice(a, b + 1).replace(/\s+/g, ' ').trim().slice(0, 200) || null;
   }
+  // Where the clicked element sits, in words: version › parents › the element and what it says.
+  var ROLE = { h1: 'Heading', h2: 'Heading', h3: 'Heading', h4: 'Heading', h5: 'Heading', h6: 'Heading', p: 'Paragraph',
+    img: 'Image', svg: 'Image', picture: 'Image', button: 'Button', a: 'Link', input: 'Field', textarea: 'Field', select: 'Menu',
+    label: 'Label', table: 'Table', tr: 'Row', td: 'Cell', th: 'Column heading', ul: 'List', ol: 'List', li: 'List item',
+    header: 'Header', footer: 'Footer', nav: 'Navigation', main: 'Main', aside: 'Sidebar', section: 'Section',
+    article: 'Article', form: 'Form', figure: 'Figure', figcaption: 'Caption', blockquote: 'Quote', span: 'Text' };
+  function crumb(version, t) {
+    var parts = [version];
+    (t.parents || []).slice().reverse().forEach(function (x) {
+      if (/^(tbody|thead|tfoot)$/.test(x.tag)) return;
+      parts.push(ROLE[x.tag] || (x.id ? '#' + x.id : 'Block'));
+    });
+    var said = t.image ? (t.image.alt || 'no alt text') : (t.words || t.text || '');
+    parts.push((ROLE[t.tag] || 'Block') + (said ? ' \u201C' + said.slice(0, 70) + (said.length > 70 ? '\u2026' : '') + '\u201D' : ''));
+    return parts.join(' \u203A ');
+  }
   function describe(el, cx, cy) {
     var doc = el.ownerDocument, win = doc.defaultView, r = el.getBoundingClientRect(), d = brief(el);
     // The nearest heading above the element in reading order, or the element itself if it is a heading.
@@ -460,8 +476,7 @@ JS = r"""
     draft = existing ? { item: existing, version: existing.version, target: existing.target, verdict: existing.verdict }
       : { version: labels[+frame.dataset.i], screen: frame.getAttribute('width') + 'x' + frame.getAttribute('height'),
           target: describe(el, cx, cy), at: at, verdict: null };
-    pop.querySelector('.target').textContent = (existing ? 'Comment ' + existing.n + ' on ' : '') + draft.version + ': ' +
-      (draft.target.words || draft.target.text || (draft.target.image ? 'image' : '<' + draft.target.tag + '>')).slice(0, 80);
+    pop.querySelector('.target').textContent = (existing ? 'Comment ' + existing.n + ': ' : '') + crumb(draft.version, draft.target);
     pop.querySelector('textarea').value = existing ? existing.comment || '' : '';
     pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === draft.verdict)); });
     pop.querySelector('.remove').hidden = !existing;
@@ -535,7 +550,7 @@ JS = r"""
           del = document.createElement('button');
       n.className = 'n'; n.textContent = it.n;
       var what = document.createElement('div'); what.className = 'what';
-      what.textContent = it.version + ', ' + (it.target.text ? '“' + it.target.text.slice(0, 60) + '”' : '<' + it.target.tag + '>');
+      what.textContent = crumb(it.version, it.target);
       var say_ = document.createElement('div');
       say_.textContent = (it.verdict ? (it.verdict === 'up' ? 'Good' : 'Not good') + (it.comment ? ': ' : '') : '') + (it.comment || '');
       body.append(what, say_);
