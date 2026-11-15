@@ -5,12 +5,12 @@ Designs, builds and reviews an interface so the people who use it can do what th
 ![The compare page: two versions of an orders list side by side, "A, one list" and "B, late orders first", with a conversation panel on the right](img/design-better-compare.png)
 *You compare versions on one page, and click any part of a version to comment on it or Decide.*
 
-## What it does that a plain agent doesn't
+## What it does
 
-- **Shows versions, not descriptions.** For a new page or a layout change, two or three rough directions side by side, before it builds.
+- **Shows you versions to choose from.** For a new page or a layout change, it puts two or three rough directions side by side on one page, before it builds.
 - **Agrees the tasks first.** A short brief: who uses the page and what they come to do, as scenarios with real data.
-- **Checks by using the page.** It walks each scenario by pointer, by keyboard and on a small screen. A screenshot that looks good is not a check.
-- **Keeps your design language.** A clash with a rule, such as contrast, is reported to you, never quietly fixed.
+- **Checks by using the page.** It walks each scenario by pointer, by keyboard and on a small screen.
+- **Keeps your design language.** When a rule, such as text contrast, clashes with it, it tells you and follows your decision.
 
 For example, to get late orders found first:
 
