@@ -251,6 +251,11 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .progress.accepted::after { content:"\2713"; font-size:12px; }
 .progress.reopened { color:#9A3B2A; }
 .progress.reopened .bars i { background:var(--terracotta); opacity:.5; }
+.thread .reply.mine { background:#fff; border-left-color:var(--terracotta); }
+.thread .reply.mine .who { color:var(--heading); }
+.why { margin-top:10px; }
+.why textarea { width:100%; min-height:3em; font:400 14px/1.45 var(--sans); border:1px solid var(--sand); padding:6px 8px; }
+.why .row2 { display:flex; gap:8px; margin-top:6px; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
   font:700 12px/18px var(--sans); }
 .mini:hover { border-color:var(--ink); }
@@ -657,13 +662,25 @@ JS = r"""
   function time(at) { return (at || '').slice(11, 16); }
   // A reply that names the message it answers is shown under that message, so the user sees what was answered.
   function replyBlock(e) {
-    var r = el('div', 'reply'), h = el('div', 'head');
-    h.append(el('span', 'who', 'Agent'), el('span', 'when', time(e.at)));
-    r.append(h, el('p', 'body', e.text));
+    var mine = e.action === 'reopen', r = el('div', mine ? 'reply mine' : 'reply'), h = el('div', 'head');
+    h.append(el('span', 'who', mine ? 'You' : 'Agent'), el('span', 'when', time(e.at)));
+    if (mine) h.append(el('span', 'progress reopened', 'Reopened'));
+    r.append(h, el('p', 'body', mine ? e.reason : e.text));
     return r;
   }
   var STEPS = ['seen', 'working', 'done', 'accepted'],
       LABEL = { seen: 'Seen', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
+  // Reopening asks why, in a small box under the item; the reason goes with the reopen.
+  function reasonBox(li, id) {
+    if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
+    var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'), ok = el('button', 'btn', 'Reopen'), no = el('button', 'btn btn--quiet', 'Cancel');
+    ta.setAttribute('aria-label', 'Why reopen it?'); ta.placeholder = 'What is still wrong?';
+    ok.type = no.type = 'button';
+    function go() { var r = ta.value.trim(); if (!r) return ta.focus(); send('reopen', { to: id, reason: r }, 'Reopening'); box.remove(); }
+    ok.addEventListener('click', go); no.addEventListener('click', function () { box.remove(); });
+    ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); go(); } if (k.key === 'Escape') box.remove(); });
+    row.append(ok, no); box.append(ta, row); li.append(box); ta.focus();
+  }
   function renderThread() {
     var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
     var entries = [], byKey = {}, state = {};
@@ -678,7 +695,8 @@ JS = r"""
         if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
         else if (e.action === 'delete') c.deleted = true;
         else { c.e = e; c.edited = true; c.deleted = false; }
-      } else if (e.action === 'reply' && e.to && byKey[e.to]) byKey[e.to].replies.push(e);
+      } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason)) && e.to && byKey[e.to]) byKey[e.to].replies.push(e);
+      else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
       else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
     });
     thread.replaceChildren();
@@ -697,7 +715,10 @@ JS = r"""
         if (st === 'done') {
           [['accept', '\u2713', 'Accept'], ['reopen', '\u21BA', 'Reopen']].forEach(function (a) {
             var b = el('button', 'mini', a[1]); b.type = 'button'; b.title = a[2]; b.setAttribute('aria-label', a[2]);
-            b.addEventListener('click', function () { send(a[0], { to: e.id }, a[2] === 'Accept' ? 'Acceptance' : 'Reopening'); if (a[0] === 'reopen') noteBox.focus(); });
+            b.addEventListener('click', function () {
+              if (a[0] === 'accept') return send('accept', { to: e.id }, 'Acceptance');
+              reasonBox(h.closest('li'), e.id);
+            });
             h.append(b);
           });
         }
@@ -1082,7 +1103,7 @@ def set_status(folder: Path, state: str, ids: list) -> None:
 def pending(folder: Path) -> None:
     """Print each comment and message that is neither done nor accepted, in its latest form, including those the
     user reopened, so work can resume after an interruption."""
-    items, order, state = {}, [], {}
+    items, order, state, reasons = {}, [], {}, {}
     for e in read_log(folder):
         a, i = e.get("action"), e.get("id")
         if a in ("comment", "note") and i:
@@ -1095,10 +1116,13 @@ def pending(folder: Path) -> None:
             state[e.get("to")] = e.get("status")
         elif a in ("accept", "reopen"):
             state[e.get("to")] = "accepted" if a == "accept" else "reopened"
+            if a == "reopen":
+                reasons[e.get("to")] = e.get("reason")
     # Done waits for the user; accepted is finished; reopened is work again.
     open_items = [items[i] for i in order if items.get(i) and state.get(i) not in ("done", "accepted")]
     for e in open_items:
-        print(json.dumps({**e, "status": state.get(e["id"], "new")}, ensure_ascii=False))
+        extra = {"reopened_because": reasons[e["id"]]} if state.get(e["id"]) == "reopened" and reasons.get(e["id"]) else {}
+        print(json.dumps({**e, "status": state.get(e["id"], "new"), **extra}, ensure_ascii=False))
     print(f"{len(open_items)} not done.")
 
 
