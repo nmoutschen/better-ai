@@ -123,7 +123,6 @@ dialog .screen { margin:0 16px 16px; max-height:calc(100vh - 100px); }
 .vbtn.pickv[aria-pressed="true"] { background:var(--umber); border-color:var(--umber); color:var(--cream); }
 .seg--terra { border-color:var(--terracotta); }
 .seg--terra button[aria-pressed="true"] { background:var(--terracotta); color:var(--heading); }
-main.commenting .screen { outline:3px solid var(--terracotta); outline-offset:2px; }
 .pop { position:fixed; z-index:5; width:min(22rem, calc(100vw - 24px)); background:var(--cream); color:var(--ink);
   border:2px solid var(--ink); box-shadow:0 8px 24px rgba(28,26,23,.25); padding:12px; }
 .pop[hidden] { display:none; }
@@ -157,6 +156,35 @@ main.commenting .screen { outline:3px solid var(--terracotta); outline-offset:2p
 .toast.ok { background:var(--moss-dark); }
 .toast.error { background:#9A3B2A; }
 .toast[hidden] { display:none; }
+/* App layout: one window, no page scroll. The top bar holds the question and the controls; the versions fill the
+   space left of the comments, and each render scrolls inside its own frame. */
+html { height:100%; }
+body.app { height:100%; display:flex; flex-direction:column; overflow:hidden; }
+body.app > header { flex:none; display:flex; flex-wrap:wrap; gap:10px 32px; align-items:center; justify-content:space-between;
+  padding:12px 20px; }
+body.app h1 { font-size:20px; margin:0; }
+body.app .question { font-size:15px; line-height:1.4; margin:4px 0 0; }
+body.app .controls { position:static; padding:0; background:none; }
+.work { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(16rem, 22rem); }
+body.app main { min-height:0; overflow:hidden; padding:12px 20px 10px; display:flex; flex-direction:column; }
+main > section { flex:1; min-height:0; display:flex; flex-direction:column; }
+main > section[hidden] { display:none; }
+body.app .row { flex:1; min-height:0; align-items:stretch; gap:20px; }
+body.app figure { display:flex; flex-direction:column; min-height:0; position:relative; }
+.stage { flex:1; min-height:0; display:flex; justify-content:center; align-items:flex-start; }
+body.app .screen { overflow:hidden; flex:none; }
+body.app figcaption { margin-top:6px; padding-top:4px; }
+main.switch figure:not(.current) { position:absolute; inset:0; }
+body.app .notes { overflow:auto; border-top:0; border-left:2px solid var(--ink); padding:16px 20px; }
+body.app .notes li { grid-template-columns:2rem 1fr; }
+body.app .notes li .btn { grid-column:2; justify-self:start; padding:4px 10px; }
+.update { position:fixed; left:0; right:0; top:0; }
+@media (max-width:900px) {
+  body.app { height:auto; overflow:auto; }
+  .work { grid-template-columns:1fr; }
+  body.app main { height:85vh; }
+  body.app .notes { border-left:0; border-top:2px solid var(--ink); }
+}
 .update { position:sticky; top:0; z-index:3; background:var(--moss-dark); color:var(--cream); padding:10px var(--pad);
   display:flex; gap:16px; align-items:center; }
 .update[hidden] { display:none; }
@@ -171,27 +199,33 @@ JS = r"""
   var viewButtons = document.querySelectorAll('[data-view]'), pickButtons = document.querySelectorAll('[data-pick]');
   var pick = document.querySelector('.pick'), together = document.querySelector('#together');
   together.addEventListener('click', function () { together.setAttribute('aria-pressed', String(together.getAttribute('aria-pressed') !== 'true')); });
+  // Each render fills the space it has: scaled down to fit the width, and as tall as the stage, so it scrolls inside
+  // its own frame while the page itself does not scroll.
   function fit() {
-    document.querySelectorAll('main .row').forEach(function (row) {
-      var frames = row.querySelectorAll('figure:not([hidden]) iframe'), n = main.classList.contains('switch') ? 1 : frames.length;
-      var w = +frames[0].getAttribute('width');
-      row.classList.toggle('packed', n * w + (n - 1) * 32 + n * 2 <= row.clientWidth);
-      row.classList.toggle('pair', labels.length === 2);
-    });
-    document.querySelectorAll('main .screen').forEach(function (box) {
-      var frame = box.firstElementChild, w = +frame.getAttribute('width'), h = +frame.getAttribute('height');
-      var row = box.closest('.row'), packed = row.classList.contains('packed');
-      var room = packed ? w + 2 : box.parentElement.clientWidth;
-      if (room <= 0) return;
-      var scale = Math.min(1, (room - 2) / w);
+    document.querySelectorAll('main > section:not([hidden]) .stage').forEach(function (stage) {
+      var frame = stage.querySelector('iframe'), box = stage.firstElementChild, w = +frame.getAttribute('width');
+      var sw = stage.clientWidth, sh = stage.clientHeight;
+      if (sw <= 0 || sh <= 0) return;
+      var scale = Math.min(1, (sw - 2) / w);
+      frame.style.width = w + 'px';
+      frame.style.height = Math.floor((sh - 2) / scale) + 'px';
       frame.style.transform = 'scale(' + scale + ')';
-      try { frame.contentDocument.documentElement.style.setProperty('--db-s', String(1 / scale)); } catch (e) {}
       box.style.width = Math.ceil(w * scale + 2) + 'px';
-      box.style.height = Math.ceil(h * scale + 2) + 'px';
-      box.parentElement.querySelector('figcaption').textContent =
-        w + ' × ' + h + ' px, ' + (scale < 1 ? 'shown at ' + Math.round(scale * 100) + '%' : 'actual size');
+      box.style.height = sh + 'px';
+      try { frame.contentDocument.documentElement.style.setProperty('--db-s', String(1 / scale)); } catch (e) {}
+      if (typeof movePins === 'function') movePins(frame);
+      stage.closest('figure').querySelector('figcaption').textContent =
+        w + ' px wide, ' + (scale < 1 ? 'shown at ' + Math.round(scale * 100) + '%' : 'actual size');
     });
   }
+  // Screen size: one size at a time, chosen in the top bar.
+  document.querySelectorAll('[data-size]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('[data-size]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      document.querySelectorAll('main > section').forEach(function (sec) { sec.hidden = sec.dataset.size !== b.dataset.size; });
+      fit();
+    });
+  });
   // Scrolling: frames of one screen size scroll together. The position is matched between elements with the
   // same id in both versions, such as headings, so versions of different length stay on the same section.
   // This works only for versions embedded from files; a page loaded from an address cannot be followed.
@@ -267,7 +301,7 @@ JS = r"""
   document.querySelectorAll('figure .full').forEach(function (b) {
     b.addEventListener('click', function () {
       var src = b.closest('figure').querySelector('iframe'), copy = src.cloneNode(false);
-      copy.style.transform = '';
+      copy.style.transform = ''; copy.style.height = copy.getAttribute('height') + 'px';
       dialog.querySelector('.bar b').textContent = src.title;
       var box = dialog.querySelector('.screen'); box.replaceChildren(copy);
       box.style.width = ''; box.style.height = '';
@@ -332,7 +366,7 @@ JS = r"""
   var modeBtn = document.querySelector('#comment'), commenting = true, pop = document.querySelector('.pop'), draft = null;
   function setMode(on) {
     commenting = on; modeBtn.setAttribute('aria-pressed', String(on)); main.classList.toggle('commenting', on);
-    if (!on) document.querySelectorAll('iframe').forEach(function (f) { try { clearHover(f.contentDocument); } catch (e) {} });
+    document.querySelectorAll('iframe').forEach(function (f) { try { f.contentDocument.documentElement.classList.toggle('db-commenting', on); } catch (e) {} });
   }
   main.classList.add('commenting');
   modeBtn.addEventListener('click', function () { setMode(!commenting); });
@@ -340,7 +374,6 @@ JS = r"""
     if ((e.key === 'c' || e.key === 'C') && !/INPUT|TEXTAREA/.test(e.target.tagName) && !e.metaKey && !e.ctrlKey) setMode(!commenting);
     if (e.key === 'Escape' && !pop.hidden) closePop();
   });
-  function clearHover(doc) { var h = doc.querySelector('[data-db-hover]'); if (h) h.removeAttribute('data-db-hover'); }
   function selectorOf(el) {
     var parts = [];
     while (el && el.nodeType === 1 && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
@@ -352,17 +385,39 @@ JS = r"""
     }
     return parts.join(' > ') || 'body';
   }
-  function describe(el) {
-    var text = (el.getAttribute('aria-label') || el.getAttribute('alt') || el.getAttribute('placeholder') ||
-                el.innerText || el.value || '').replace(/\s+/g, ' ').trim();
+  // What a click points at, in enough detail for the agent to find it without the user picking an exact element:
+  // the element and its parents, the words under the pointer, an image's source, and where the click fell.
+  function brief(x) {
+    var t = (x.getAttribute('aria-label') || x.getAttribute('alt') || x.getAttribute('placeholder') ||
+             x.innerText || x.value || '').replace(/\s+/g, ' ').trim();
+    return { tag: x.tagName.toLowerCase(), id: x.id || null, cls: (x.getAttribute('class') || '').trim() || null, text: t.slice(0, 120) };
+  }
+  function wordsAt(doc, x, y) {
+    var r = doc.caretRangeFromPoint ? doc.caretRangeFromPoint(x, y) : null;
+    if (!r && doc.caretPositionFromPoint) { var c = doc.caretPositionFromPoint(x, y); if (c) { r = doc.createRange(); r.setStart(c.offsetNode, c.offset); } }
+    if (!r || r.startContainer.nodeType !== 3) return null;
+    var text = r.startContainer.textContent, i = r.startOffset, a = i, b = i;
+    while (a > 0 && !/[.!?\n]/.test(text[a - 1])) a--;
+    while (b < text.length && !/[.!?\n]/.test(text[b])) b++;
+    return text.slice(a, b + 1).replace(/\s+/g, ' ').trim().slice(0, 200) || null;
+  }
+  function describe(el, cx, cy) {
+    var doc = el.ownerDocument, win = doc.defaultView, r = el.getBoundingClientRect(), d = brief(el);
     // The nearest heading above the element in reading order, or the element itself if it is a heading.
     var heading = null;
-    el.ownerDocument.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(function (x) {
+    doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(function (x) {
       if (x === el || x.contains(el) || (x.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) heading = x.innerText.trim();
     });
-    return { selector: selectorOf(el), tag: el.tagName.toLowerCase(), text: text.slice(0, 120), heading: heading };
+    var parents = [], up = el.parentElement;
+    while (up && up.tagName !== 'BODY' && parents.length < 4) { parents.push(brief(up)); up = up.parentElement; }
+    var img = el.tagName === 'IMG' ? el : null, image = null;
+    if (img) image = { src: (img.currentSrc || img.getAttribute('src') || '').slice(0, 300), alt: img.getAttribute('alt') };
+    else { var bg = win.getComputedStyle(el).backgroundImage; if (bg && bg !== 'none') image = { src: bg.slice(0, 300), alt: null }; }
+    return { selector: selectorOf(el), tag: d.tag, text: d.text, heading: heading, words: wordsAt(doc, cx, cy), image: image,
+             parents: parents, point: { x: Math.round(cx + win.scrollX), y: Math.round(cy + win.scrollY) },
+             box: { x: Math.round(r.left + win.scrollX), y: Math.round(r.top + win.scrollY), w: Math.round(r.width), h: Math.round(r.height) } };
   }
-  var PIN_CSS = '[data-db-hover]{outline:2px solid #E8725C!important;outline-offset:2px;cursor:crosshair!important}' +
+  var PIN_CSS = 'html.db-commenting, html.db-commenting *{cursor:crosshair!important}' +
     '.db-pin{position:absolute;z-index:2147483647;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;' +
     'background:#E8725C;color:#1C1A17;font:700 12px/24px sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFCF7;cursor:pointer;transform:scale(var(--db-s,1))}' +
     '.db-pin.db-new{animation:db-pulse 1.2s ease-out 2}' +
@@ -372,10 +427,7 @@ JS = r"""
     if (!doc || !doc.body || doc.documentElement.dataset.dbReady) return;
     doc.documentElement.dataset.dbReady = '1';
     var style = doc.createElement('style'); style.textContent = PIN_CSS; doc.head.appendChild(style);
-    doc.addEventListener('mouseover', function (e) {
-      if (!commenting) return; clearHover(doc);
-      if (!e.target.classList.contains('db-pin')) e.target.setAttribute('data-db-hover', '');
-    }, true);
+    doc.documentElement.classList.toggle('db-commenting', commenting);
     doc.addEventListener('click', function (e) {
       var pin = e.target.closest && e.target.closest('.db-pin');
       if (pin) {
@@ -401,9 +453,9 @@ JS = r"""
     var box = frame.getBoundingClientRect(), scale = box.width / +frame.getAttribute('width');
     draft = existing ? { item: existing, version: existing.version, target: existing.target, verdict: existing.verdict }
       : { version: labels[+frame.dataset.i], screen: frame.getAttribute('width') + 'x' + frame.getAttribute('height'),
-          target: describe(el), at: at, verdict: null };
+          target: describe(el, cx, cy), at: at, verdict: null };
     pop.querySelector('.target').textContent = (existing ? 'Comment ' + existing.n + ' on ' : '') + draft.version + ': ' +
-      (draft.target.text || '<' + draft.target.tag + '>');
+      (draft.target.words || draft.target.text || (draft.target.image ? 'image' : '<' + draft.target.tag + '>')).slice(0, 80);
     pop.querySelector('textarea').value = existing ? existing.comment || '' : '';
     pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === draft.verdict)); });
     pop.querySelector('.remove').hidden = !existing;
@@ -446,6 +498,17 @@ JS = r"""
     items = items.filter(function (x) { return x !== it; }); renderList();
     document.querySelectorAll('iframe').forEach(function (f) { try { var p = f.contentDocument.querySelector('.db-pin[data-id="' + it.id + '"]'); if (p) p.remove(); } catch (e) {} });
     send('delete', { id: it.id }, 'Deletion of comment ' + it.n);
+  }
+  function movePins(frame) {
+    var doc; try { doc = frame.contentDocument; } catch (e) { return; }
+    if (!doc) return;
+    doc.querySelectorAll('.db-pin').forEach(function (pin) {
+      var it = items.filter(function (x) { return x.id === pin.dataset.id; })[0];
+      var el = it && doc.querySelector(it.target.selector); if (!el) return;
+      var r = el.getBoundingClientRect(), win = frame.contentWindow;
+      pin.style.left = (r.left + win.scrollX + it.at.fx * r.width) + 'px';
+      pin.style.top = (r.top + win.scrollY + it.at.fy * r.height) + 'px';
+    });
   }
   function placePin(frame, it, fresh) {
     if (labels[+frame.dataset.i] !== it.version) return;
@@ -550,24 +613,35 @@ def frame_source(source: str, warnings: list) -> str:
     return f'srcdoc="{esc(doc)}"'
 
 
+def screen_name(w: int, h: int) -> str:
+    return "Desktop" if w >= 1024 else "Tablet" if w >= 600 else "Mobile"
+
+
 def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     warnings = []
     loaded = [(label, frame_source(source, warnings)) for label, source in versions]
     labels = [label for label, _ in loaded]
     before_after = [label.lower() for label in labels] == ["before", "after"]
     rows = []
-    for w, h in sizes:
+    for k, (w, h) in enumerate(sizes):
         figures = "".join(
             f'<figure data-i="{i}"><div class="label"><b>{esc(label)}</b><span class="acts">'
             f'<button type="button" class="vbtn" data-v="{i}" data-verdict="up" aria-pressed="false" aria-label="Good: {esc(label)}">{THUMB_UP}</button>'
             f'<button type="button" class="vbtn" data-v="{i}" data-verdict="down" aria-pressed="false" aria-label="Not good: {esc(label)}">{THUMB_DOWN}</button>'
             f'<button type="button" class="vbtn pickv" data-v="{i}" aria-pressed="false">Choose</button>'
             f'<button type="button" class="full">Full size</button></span></div>'
-            f'<div class="screen"><iframe data-i="{i}" title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
-            f'{attr}></iframe></div><figcaption>{w} × {h} px</figcaption></figure>'
+            f'<div class="stage"><div class="screen"><iframe data-i="{i}" title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
+            f'{attr}></iframe></div></div><figcaption>{w} px wide</figcaption></figure>'
             for i, (label, attr) in enumerate(loaded))
-        rows.append(f'<section><h2>Screen {w} × {h} px</h2><div class="row" style="--n:{len(loaded)}">{figures}</div></section>')
-    controls = ""
+        rows.append(f'<section data-size="{k}" aria-label="Screen {w} × {h} px"{" hidden" if k else ""}>'
+                    f'<div class="row" style="--n:{len(loaded)}">{figures}</div></section>')
+    names = [screen_name(w, h) for w, h in sizes]
+    if len(set(names)) < len(names):
+        names = [f"{w} × {h}" for w, h in sizes]
+    sizes_html = ('<div class="seg" role="group" aria-label="Screen">' + "".join(
+        f'<button type="button" data-size="{k}" aria-pressed="{str(k == 0).lower()}" title="{w} × {h} px">{esc(n)}</button>'
+        for k, ((w, h), n) in enumerate(zip(sizes, names))) + '</div>') if len(sizes) > 1 else ""
+    controls = sizes_html
     if before_after:
         controls += ('<div class="seg" role="group" aria-label="View">'
                      '<button type="button" data-view="side" aria-pressed="true">Side by side</button>'
@@ -575,17 +649,15 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
-        side_hint = "Click any part of a version to comment on it. Press C to switch commenting off and use the versions as pages."
-    else:
-        side_hint = "Click any part of a version to comment on it. Press C to switch commenting off and use the versions as pages."
+    side_hint = "Press C to switch commenting off and use the versions as pages."
     controls += ('<div class="seg seg--terra"><button type="button" id="comment" aria-pressed="true">Comment</button></div>'
                  '<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
                  'Scroll together</button></div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
-    notes = ('<section class="notes" aria-labelledby="notes-h"><h2 id="notes-h">Your comments</h2>'
-             '<p class="empty">No comments yet. Press Comment, then click any part of a version.</p><ol></ol>'
+    notes = ('<aside class="notes" aria-labelledby="notes-h"><h2 id="notes-h">Your comments</h2>'
+             '<p class="empty">No comments yet. Click any part of a version to comment on it.</p><ol></ol>'
              '<div class="general"><label for="note">Note to the agent</label><textarea id="note"></textarea></div>'
-             '<div class="send"><button type="button" class="btn">Send note</button><p class="status" role="status"></p></div></section>')
+             '<div class="send"><button type="button" class="btn">Send note</button><p class="status" role="status"></p></div></aside>')
     pop = ('<div class="pop" role="dialog" aria-label="Comment" hidden><p class="target"></p><div class="verdicts">'
            f'<button type="button" class="vbtn" data-verdict="up" aria-pressed="false" aria-label="Good">{THUMB_UP}</button>'
            f'<button type="button" class="vbtn" data-verdict="down" aria-pressed="false" aria-label="Not good">{THUMB_DOWN}</button></div>'
@@ -599,15 +671,13 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
 <title>{esc(title)}</title>
 <link href="{FONTS}" rel="stylesheet">
 <style>{CSS}</style></head>
-<body><div class="update" role="status" hidden>The agent sent new versions. <button type="button">Load them</button></div>
-<div class="band"></div>
-<header><h1>{esc(title)}</h1>{question_html}</header>
-<div class="controls">{controls}<p class="hint" data-side="{esc(side_hint)}">{esc(side_hint)}</p></div>
-<main data-labels="{esc(json.dumps(labels))}" data-question="{esc(question)}">{"".join(rows)}</main>
-{notes}
-{pop}
+<body class="app"><div class="update" role="status" hidden>The agent sent new versions. <button type="button">Load them</button></div>
 <div class="band band--thin"></div>
-<p class="foot">design-better by n14n.dev</p>
+<header><div class="ttl"><h1>{esc(title)}</h1>{question_html}</div>
+<div class="controls">{controls}<p class="hint" data-side="{esc(side_hint)}">{esc(side_hint)}</p></div></header>
+<div class="work"><main data-labels="{esc(json.dumps(labels))}" data-question="{esc(question)}">{"".join(rows)}</main>
+{notes}</div>
+{pop}
 <dialog aria-label="Full size"><div class="bar"><b></b><button type="button" class="full close">Close</button></div><div class="screen"></div></dialog>
 <script>{JS}</script>
 </body></html>
