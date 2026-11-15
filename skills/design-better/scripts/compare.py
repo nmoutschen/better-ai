@@ -327,8 +327,11 @@ JS = r"""
   function describe(el) {
     var text = (el.getAttribute('aria-label') || el.getAttribute('alt') || el.getAttribute('placeholder') ||
                 el.innerText || el.value || '').replace(/\s+/g, ' ').trim();
-    var heading = null, h = el.closest('section, article, main, body');
-    while (h && !heading) { var x = h.querySelector('h1, h2, h3, h4'); if (x && x !== el) heading = x.innerText.trim(); h = h.parentElement && h.parentElement.closest('section, article, main, body'); }
+    // The nearest heading above the element in reading order, or the element itself if it is a heading.
+    var heading = null;
+    el.ownerDocument.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(function (x) {
+      if (x === el || x.contains(el) || (x.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) heading = x.innerText.trim();
+    });
     return { selector: selectorOf(el), tag: el.tagName.toLowerCase(), text: text.slice(0, 120), heading: heading };
   }
   var PIN_CSS = '[data-db-hover]{outline:2px solid #E8725C!important;outline-offset:2px;cursor:crosshair!important}' +
