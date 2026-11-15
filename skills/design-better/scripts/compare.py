@@ -5,6 +5,8 @@ Usage:
   python3 compare.py VERSION... --out FILE [--title T] [--question Q] [--width WxH ...] [--open] [--serve [--port N]]
   python3 compare.py --wait DIR [--timeout S]
   python3 compare.py --reply DIR TEXT [--to COMMENT_ID]
+  python3 compare.py --status DIR seen|working|done ID...
+  python3 compare.py --pending DIR
 
 VERSION is LABEL=SOURCE or SOURCE. SOURCE is an HTML file, embedded into the page, or an http(s) address, loaded
 when the page is viewed. Without a LABEL, versions are labelled A, B, C in order.
@@ -239,6 +241,18 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .thread .reply .who { color:var(--moss-dark); }
 .thread .reply .body { font-size:14px; line-height:1.45; margin:2px 0 0; }
 .thread > li.msg.agent .reply { margin:-10px -12px; border:0; background:none; }
+.progress { display:inline-flex; align-items:center; gap:6px; font:700 10px var(--sans); letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted); }
+.progress .bars { display:inline-flex; gap:2px; }
+.progress .bars i { width:10px; height:4px; background:var(--line); }
+.progress.seen .bars i.on { background:var(--sand); }
+.progress.working { color:var(--umber); }
+.progress.working .bars i.on { background:var(--terracotta); }
+.progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
+.progress.done { color:var(--moss-dark); }
+.progress.done .bars i.on { background:var(--moss-dark); }
+@keyframes pulse-bar { 50% { opacity:.35; } }
+@media (prefers-reduced-motion: reduce) { .progress .bars i { animation:none !important; } }
 .msg .answered { font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
 /* In the conversation, where a comment points is a small quote above the user's words, so every message reads alike. */
 .thread .crumb { margin:2px 0 0; padding-left:8px; border-left:2px solid var(--line); }
@@ -640,9 +654,11 @@ JS = r"""
     r.append(h, el('p', 'body', e.text));
     return r;
   }
+  var STEPS = ['seen', 'working', 'done'], LABEL = { seen: 'Seen', working: 'Working on it', done: 'Done' };
   function renderThread() {
     var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
-    var entries = [], byKey = {};
+    var entries = [], byKey = {}, state = {};
+    log.forEach(function (e) { if (e.action === 'status') state[e.to] = e.status; });
     log.forEach(function (e, i) {
       if (e.action === 'comment' || e.action === 'delete') {
         var c = byKey[e.id];
@@ -656,7 +672,16 @@ JS = r"""
     document.querySelector('.notes .empty').hidden = entries.length > 0;
     entries.forEach(function (c) {
       var e = c.e, li, head;
-      function answered(h) { if (c.replies.length) h.append(el('span', 'answered', 'Answered')); }
+      // Progress on the user's item: three short bars fill as the agent sees it, works on it and finishes it.
+      function answered(h) {
+        var st = state[e.id];
+        if (!st) { if (c.replies.length) h.append(el('span', 'answered', 'Answered')); return; }
+        var k = STEPS.indexOf(st), chip = el('span', 'progress ' + st), bars = el('span', 'bars');
+        for (var j = 0; j < 3; j++) bars.append(el('i', j <= k ? 'on' : ''));
+        chip.append(bars, el('span', '', LABEL[st]));
+        chip.title = 'Agent: ' + LABEL[st].toLowerCase();
+        h.append(chip);
+      }
       if (c.kind === 'comment') {
         li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
         head = el('div', 'head'); head.append(el('span', 'n', e.n || '?'), el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
@@ -980,7 +1005,7 @@ def wait(folder: Path, timeout: float) -> int:
         except OSError:
             sys.exit("error: the page's server is not answering. Is it still running?")
         if total > seen:
-            lines = [line for line in log.read_text(encoding="utf-8").splitlines()[seen:total] if '"action": "reply"' not in line]
+            lines = [line for line in log.read_text(encoding="utf-8").splitlines()[seen:total] if '"action": "reply"' not in line and '"action": "status"' not in line]
             cursor.write_text(str(total), encoding="utf-8")
             if not lines:
                 seen = total
@@ -1001,6 +1026,53 @@ def reply(folder: Path, text: str, to: str | None) -> None:
     print("Reply shown in the page.")
 
 
+STATES = ("seen", "working", "done")
+
+
+def read_log(folder: Path) -> list:
+    log = folder / "answers.jsonl"
+    events = []
+    for line in (log.read_text(encoding="utf-8").splitlines() if log.exists() else []):
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            pass
+    return events
+
+
+def set_status(folder: Path, state: str, ids: list) -> None:
+    """Mark the user's comments or messages as seen, being worked on, or done; the page shows it on each one."""
+    if state not in STATES:
+        sys.exit(f"error: the state must be one of {', '.join(STATES)}")
+    known = {e.get("id") for e in read_log(folder) if e.get("action") in ("comment", "note")}
+    unknown = [i for i in ids if i not in known]
+    if unknown:
+        sys.exit(f"error: no comment or message with id {', '.join(unknown)}. Run --pending to see the ids.")
+    with (folder / "answers.jsonl").open("a", encoding="utf-8") as f:
+        for i in ids:
+            f.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "action": "status", "to": i, "status": state}) + "\n")
+    print(f"Marked {state}: {', '.join(ids)}")
+
+
+def pending(folder: Path) -> None:
+    """Print each comment and message not marked done, in its latest form, so work can resume after an interruption."""
+    items, order, state = {}, [], {}
+    for e in read_log(folder):
+        a, i = e.get("action"), e.get("id")
+        if a in ("comment", "note") and i:
+            if i not in items:
+                order.append(i)
+            items[i] = e
+        elif a == "delete" and i in items:
+            items[i] = None
+        elif a == "status":
+            state[e.get("to")] = e.get("status")
+    open_items = [items[i] for i in order if items.get(i) and state.get(i) != "done"]
+    for e in open_items:
+        print(json.dumps({**e, "status": state.get(e["id"], "new")}, ensure_ascii=False))
+    print(f"{len(open_items)} not done.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Put versions of a screen side by side on one page.")
     parser.add_argument("versions", nargs="*", metavar="VERSION", help="LABEL=SOURCE or SOURCE: an HTML file or an http(s) address")
@@ -1016,10 +1088,19 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=3600, help="seconds --wait waits (default: 3600)")
     parser.add_argument("--reply", nargs=2, metavar=("DIR", "TEXT"), help="show a reply from the agent in the page served from DIR")
     parser.add_argument("--to", metavar="ID", help="with --reply: the id of the comment the reply answers")
+    parser.add_argument("--status", nargs="+", metavar=("DIR STATE", "ID"),
+                        help="DIR STATE ID...: mark comments or messages as seen, working or done")
+    parser.add_argument("--pending", metavar="DIR", help="list the comments and messages not marked done")
     args = parser.parse_args()
 
     if args.wait:
         sys.exit(wait(Path(args.wait).expanduser().resolve(), args.timeout))
+    if args.status:
+        if len(args.status) < 3:
+            parser.error("--status needs DIR, a STATE and at least one ID")
+        return set_status(Path(args.status[0]).expanduser().resolve(), args.status[1], args.status[2:])
+    if args.pending:
+        return pending(Path(args.pending).expanduser().resolve())
     if args.reply:
         return reply(Path(args.reply[0]).expanduser().resolve(), args.reply[1], args.to)
     if not args.versions or not args.out:
