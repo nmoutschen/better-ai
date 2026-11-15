@@ -146,7 +146,10 @@
     if (e.key === 'Escape' && main.classList.contains('switch') && pop.hidden && !e.target.closest('textarea')) view('side');
   });
   window.addEventListener('resize', fit);
-  view('side');
+  // Four or more versions side by side are too small to read: start by switching between them in place.
+  // Side by side when each version stays at half size or more; otherwise one at a time, switched in place.
+  var firstFrame = document.querySelector('main iframe'), perVersion = (main.clientWidth - 20 * (labels.length - 1)) / labels.length;
+  view(labels.length > 3 || (labels.length > 1 && firstFrame && perVersion / +firstFrame.getAttribute('width') < 0.5) ? 'switch' : 'side');
 
   // Feedback. Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the
   // agent's replies. The page streams that log: it rebuilds the conversation and the pins from it, so a reload or new
@@ -172,8 +175,8 @@
       .then(function (r) { return r.json(); })
       .then(function (r) { if (r.error) throw new Error(r.error.message);
         flash('✓ ' + what + ' sent to the agent', 'ok'); say(''); if (done) done(); })
-      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The page lost its connection to the agent.', 'error');
-        say('Not sent. The page lost its connection to the agent: copy your message into the chat.', true); });
+      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The canvas is closed.', 'error');
+        say('Not sent: the canvas is closed. Ask the agent to restart it.', true); });
   }
   function apply(e, fresh) {
     if (e.action === 'comment') {
@@ -305,7 +308,7 @@
     'background:#E8725C;color:#1C1A17;font:700 12px/24px sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFCF7;cursor:pointer;transform:scale(var(--db-s,1))}' +
     '.db-pin.db-new{animation:db-pulse 1.2s ease-out 2}' +
     // A pin shows its comment's progress in the colours of the conversation panel.
-    '.db-pin[data-state=seen]{background:#C4B69C}' +
+    '.db-pin[data-state=seen],.db-pin[data-state=replied]{background:#C4B69C}' +
     '.db-pin[data-state=asked]{background:#FFFCF7;color:#5C4033;box-shadow:0 0 0 2px #5C4033}' +
     '.db-pin[data-state=working]{background:#E8725C;animation:db-pulse 1.4s ease-out infinite}' +
     '.db-pin[data-state=done]{background:#66795A;color:#FFFCF7}' +
@@ -330,7 +333,9 @@
         // A pin opens its comment, to read, change or delete it, whether or not comment mode is on.
         e.preventDefault(); e.stopPropagation();
         var found = items.filter(function (x) { return x.id === pin.dataset.id; })[0];
-        if (found) openPop(frame, null, null, e.clientX, e.clientY, found);
+        // A finished comment is not edited: it is reopened, with what is still wrong, from the conversation.
+        if (found && (pinState[found.id] === 'done' || pinState[found.id] === 'accepted')) reopenFromThread(found.id);
+        else if (found) openPop(frame, null, null, e.clientX, e.clientY, found);
         return;
       }
       if (!commenting) return;
@@ -364,6 +369,12 @@
   // The comment box returns focus to what opened it, so keyboard users keep their place.
   var opener = null;
   document.addEventListener('mousedown', function (e) { if (!pop.hidden && !pop.contains(e.target)) closePop(); });
+  document.querySelectorAll('.vcomment').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var frame = document.querySelector('main > section:not([hidden]) iframe[data-i="' + b.dataset.v + '"]');
+      try { openPop(frame, frame.contentDocument.body, { fx: 0.5, fy: 0 }, 24, 24); } catch (e) {}
+    });
+  });
   function closePop() { pop.hidden = true; draft = null; if (opener && document.contains(opener)) opener.focus(); opener = null; }
   function openEdit(it, from) {
     var r = from.getBoundingClientRect();
@@ -438,7 +449,7 @@
     r.append(h, el('p', 'body', e.action === 'reopen' ? e.reason : e.action === 'note' ? e.note : e.text));
     return r;
   }
-  var filter = 'open';
+  var filter = 'open', scrolledOnce = false;
   document.querySelectorAll('[data-filter]').forEach(function (b) {
     b.addEventListener('click', function () {
       filter = b.dataset.filter;
@@ -447,23 +458,35 @@
     });
   });
   var STEPS = ['seen', 'working', 'done', 'accepted'],
-      LABEL = { seen: 'Seen', asked: 'Waiting for you', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
+      LABEL = { seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
   // Reopening asks why, in a small box under the item; the reason goes with the reopen.
-  function reasonBox(li, id, answer) {
+  // The box for an answer or a reply, under the item: the same field and small Send and Cancel as the board's. The
+  // button that opened it hides in place while it is open, and the box goes only once the message is sent.
+  function reasonBox(li, id, label, opener) {
     if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
     var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'),
-        ok = el('button', 'btn', answer ? 'Send' : 'Reopen'), no = el('button', 'btn btn--quiet', 'Cancel');
-    ta.setAttribute('aria-label', answer ? 'Your answer' : 'Why reopen it?'); ta.placeholder = answer ? 'Your answer' : 'What is still wrong?';
+        ok = el('button', 'btn btn--sm', 'Send'), no = el('button', 'btn btn--quiet btn--sm', 'Cancel');
+    ta.setAttribute('aria-label', label); ta.placeholder = label;
     ok.type = no.type = 'button';
+    if (opener) opener.style.visibility = 'hidden';
+    function close() { box.remove(); if (opener) opener.style.visibility = ''; }
     function go() {
       var r = ta.value.trim(); if (!r) return ta.focus();
-      if (answer) send('note', { id: 'm-' + Date.now().toString(36), to: id, note: r }, 'Answer');
-      else send('reopen', { to: id, reason: r }, 'Reopening');
-      box.remove();
+      send('note', { id: 'm-' + Date.now().toString(36), to: id, note: r }, label === 'Your answer' ? 'Answer' : 'Reply', function () {
+        close(); li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true });
+      });
     }
-    ok.addEventListener('click', go); no.addEventListener('click', function () { box.remove(); });
-    ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); go(); } if (k.key === 'Escape') box.remove(); });
-    row.append(ok, no); box.append(ta, row); li.append(box); ta.focus();
+    ok.addEventListener('click', go); no.addEventListener('click', close);
+    ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); go(); } if (k.key === 'Escape') close(); });
+    row.append(ok, no); box.append(ta, row); li.append(box); box.scrollIntoView({ block: 'nearest' }); ta.focus();
+  }
+  // The progress mark: four short bars fill as the agent sees an item, works on it, finishes it and the user accepts it.
+  // Before the agent sets a state, the bars are empty and the word is Sent.
+  function progressChip(st) {
+    var k = !st ? -1 : st === 'asked' || st === 'replied' || st === 'followup' ? 0 : STEPS.indexOf(st), chip = el('span', 'progress' + (st ? ' ' + st : '')), bars = el('span', 'bars');
+    for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
+    chip.append(bars, el('span', '', st ? LABEL[st] : 'Sent'));
+    return chip;
   }
   function renderThread() {
     var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
@@ -472,6 +495,10 @@
       if (e.action === 'status') state[e.to] = e.status;
       else if (e.action === 'accept') state[e.to] = 'accepted';
       else if (e.action === 'reopen') state[e.to] = 'reopened';
+      // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
+      else if (e.action === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
+      // A reply under a finished item is a follow-up: the item goes back to the agent.
+      else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
     });
     log.forEach(function (e, i) {
       if (e.action === 'comment' || e.action === 'delete') {
@@ -479,7 +506,7 @@
         if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
         else if (e.action === 'delete') c.deleted = true;
         else { c.e = e; c.edited = true; c.deleted = false; }
-      } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && e.to)) && e.to && byKey[e.to]) byKey[e.to].replies.push(e);
+      } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && e.to)) && e.to && byKey[e.to]) { byKey[e.to].replies.push(e); if (e.id) byKey[e.id] = byKey[e.to]; }
       else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
       else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
     });
@@ -488,6 +515,12 @@
     var openBtn = document.querySelector('[data-filter="open"]');
     openBtn.textContent = 'Open (' + open.length + ')';
     if (filter === 'open') entries = open;
+    // A box the user is typing in (an answer or a reason to reopen) survives the redraw, with its text and cursor.
+    var kept = {};
+    thread.querySelectorAll('li[data-id] > .why').forEach(function (box) {
+      var ta = box.querySelector('textarea');
+      kept[box.parentNode.dataset.id] = { box: box, focus: document.activeElement === ta, start: ta.selectionStart, end: ta.selectionEnd };
+    });
     thread.replaceChildren();
     // Before anything is sent, both views say how to start; after, Open says when nothing is left.
     var started = log.some(function (x) { return x.action && x.action !== 'status'; });
@@ -497,28 +530,13 @@
       // Progress on the user's item: three short bars fill as the agent sees it, works on it and finishes it.
       function answered(h) {
         var st = state[e.id];
-        if (!st) { if (c.replies.length) h.append(el('span', 'answered', 'Answered')); return; }
-        var k = st === 'asked' ? 0 : STEPS.indexOf(st), chip = el('span', 'progress ' + st), bars = el('span', 'bars');
-        for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
-        chip.append(bars, el('span', '', LABEL[st]));
-        h.append(chip);
-        // Once the agent marks an item done, two small equal buttons beside the state let the user accept or reopen it.
-        if (st === 'done') {
-          [['accept', '\u2713', 'Accept'], ['reopen', '\u21BA', 'Reopen']].forEach(function (a) {
-            var b = el('button', 'mini', a[1]); b.type = 'button'; b.title = a[2]; b.setAttribute('aria-label', a[2]);
-            b.addEventListener('click', function () {
-              if (a[0] === 'accept') return send('accept', { to: e.id }, 'Acceptance');
-              reasonBox(h.closest('li'), e.id);
-            });
-            h.append(b);
-          });
-        }
+        h.append(progressChip(st));
       }
       if (c.kind === 'comment') {
         li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
         head = el('div', 'head'); head.append(el('span', 'n', e.n || '?'), el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
         var it = byId(e.id);
-        if (it && !c.deleted) {
+        if (it && !c.deleted && state[e.id] !== 'done' && state[e.id] !== 'accepted') {
           var del = el('button', 'link', 'Delete'); del.type = 'button'; del.setAttribute('aria-label', 'Delete comment ' + e.n);
           del.addEventListener('click', function () { removeItem(it); });
           var where = el('button', 'link', 'Show'), edit = el('button', 'link', 'Edit');
@@ -551,22 +569,56 @@
         li = el('li', 'sys', t + ', ' + time(e.at));
       } else return;
       c.replies.forEach(function (r) { li.append(replyBlock(r)); });
+      if (c.kind === 'reply' && e.id) {  // the agent's own messages can be answered too; the state row closes them
+        var rf = el('div', 'foot'), mine = c.replies.filter(function (r) { return r.action === 'note'; }), last = mine[mine.length - 1];
+        if (last) rf.append(progressChip(state[last.id]));
+        var rb = el('button', 'btn btn--quiet btn--sm answer', 'Reply'); rb.type = 'button';
+        rb.addEventListener('click', function () { reasonBox(li, e.id, 'Your reply', rb); });
+        rf.append(rb); li.append(rf);
+      }
       // The state and what the user can do with it close the item, after the latest reply, where the eye ends.
       if (c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') {
         var foot = el('div', 'foot'); answered(foot);
-        if (state[e.id] === 'asked') {
-          var ans = el('button', 'btn btn--sm answer', 'Answer'); ans.type = 'button';
-          ans.addEventListener('click', function () { reasonBox(li, e.id, true); });
-          foot.append(ans);
+        // Every message can be answered: Answer when the agent asked something, Reply otherwise.
+        // A done item is accepted with the brown check next to Reply; replying instead puts it back with the agent.
+        if (state[e.id] === 'done') {
+          var ok = el('button', 'btn btn--sm answer', '\u2713'); ok.type = 'button'; ok.title = 'Accept'; ok.setAttribute('aria-label', 'Accept');
+          ok.addEventListener('click', function () { send('accept', { to: e.id }, 'Acceptance', function () { li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); }); });
+          foot.append(ok);
         }
+        var asked = state[e.id] === 'asked', ans = el('button', 'btn btn--sm answer' + (asked ? '' : ' btn--quiet'), asked ? 'Answer' : 'Reply');
+        ans.type = 'button';
+        ans.addEventListener('click', function () { reasonBox(li, e.id, asked ? 'Your answer' : 'Your reply', ans); });
+        foot.append(ans);
         if (foot.childNodes.length) li.append(foot);
         if (state[e.id]) li.dataset.state = state[e.id];
       }
+      if (e.id) {
+        li.dataset.id = e.id;
+        var k = kept[e.id];
+        if (k) { li.append(k.box); li.querySelectorAll('.foot .answer').forEach(function (b) { b.style.visibility = 'hidden'; }); }
+      }
       thread.appendChild(li);
     });
+    // Focus only once the box is back in the page: a detached element cannot take it.
+    Object.keys(kept).forEach(function (id) {
+      var k = kept[id], ta = k.box.querySelector('textarea');
+      if (k.focus && document.contains(ta)) { ta.focus({ preventScroll: true }); ta.setSelectionRange(k.start, k.end); }
+    });
     if (filter === 'open' && started && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
-    if (stick) thread.scrollTop = thread.scrollHeight;
+    // The conversation opens on its latest message, and follows new ones while the user is at the bottom. The scroll
+    // repeats on the next frame and once fonts load, which can make the thread taller after this render.
+    if (stick || !scrolledOnce) {
+      var bottom = function () { thread.scrollTop = thread.scrollHeight; };
+      bottom(); requestAnimationFrame(bottom); if (document.fonts) document.fonts.ready.then(bottom);
+      if (log.length) scrolledOnce = true;
+    }
     pinState = state; syncPins();
+  }
+  function reopenFromThread(id) {
+    if (filter === 'open' && pinState[id] === 'accepted') document.querySelector('[data-filter="all"]').click();
+    var li = thread.querySelector('li[data-id="' + id + '"]'); if (!li) return;
+    li.scrollIntoView({ block: 'nearest' }); reasonBox(li, id, 'Your reply');
   }
   // Show a comment where it was made: its screen size, its version, scrolled to its pin, which flashes.
   function reveal(e) {
@@ -583,7 +635,7 @@
     frame.contentWindow.scrollTo({ top: Math.max(0, parseFloat(pin.style.top) - frame.contentWindow.innerHeight / 3), behavior: 'smooth' });
     setTimeout(function () { pin.classList.remove('db-flash'); }, 2800);
   }
-  var pinState = {}, STATE_WORD = { asked: 'waiting for you', seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
+  var pinState = {}, STATE_WORD = { asked: 'waiting for you', replied: 'answered, back with the agent', followup: 'you replied, back with the agent', seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
   function syncPins() {
     document.querySelectorAll('iframe').forEach(function (f) {
       try { f.contentDocument.querySelectorAll('.db-pin').forEach(function (pin) {
@@ -657,23 +709,46 @@
   noteBtn.addEventListener('click', function () { if (deciding) sendDecision(); else sendNote(); });
   noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !deciding) { e.preventDefault(); sendNote(); } });
   renderThread();
+  // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
+  var offline = document.querySelector('.offline'), misses = 0;
+  function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
   if (served) (function stream(after) {
     fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
+      connected(true);
       r.events.forEach(function (e) { log.push(e); apply(e, false); });
       // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
       if (after > 0) r.events.forEach(function (e) { if (e.action === 'reply') flash('Agent: ' + e.text.slice(0, 120), 'ok'); });
       if (r.events.length) renderThread();
       stream(r.total);
-    }).catch(function () { setTimeout(function () { stream(after); }, 2000); });
+    }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
   })(0);
-  // New versions from the agent: offer to load them instead of reloading, so typed notes are not lost.
+  // New versions from the agent load by themselves, as soon as the user is not typing: a comment, a message or an
+  // answer in progress would be lost. The page comes back on the same screen size, view and version.
+  var KEY = 'canvas-view:' + location.pathname;
+  function busy() {
+    return !pop.hidden || !!noteBox.value.trim() ||
+      Array.prototype.some.call(document.querySelectorAll('.why textarea'), function (t) { return !!t.value.trim(); });
+  }
   if (served) {
-    var rev = null, bar = document.querySelector('.update');
-    bar.querySelector('button').addEventListener('click', function () { location.reload(); });
+    var rev = null;
     (function poll() {
       fetch('/rev').then(function (r) { return r.text(); }).then(function (t) {
-        if (rev === null) rev = t; else if (t !== rev) bar.hidden = false;
+        if (rev === null) rev = t;
+        else if (t !== rev && !busy()) {
+          var size = document.querySelector('button[data-size][aria-pressed="true"]');
+          sessionStorage.setItem(KEY, JSON.stringify({ view: main.classList.contains('switch') ? 'switch' : 'side', current: current, size: size && size.dataset.size }));
+          location.reload();
+        }
       }).catch(function () {}).then(function () { setTimeout(poll, 2000); });
     })();
+    try {
+      var kept = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+      sessionStorage.removeItem(KEY);
+      if (kept) {
+        var sb = kept.size && document.querySelector('button[data-size="' + kept.size + '"]'); if (sb) sb.click();
+        if (kept.current < labels.length) current = kept.current;
+        view(labels.length > 1 ? kept.view : 'side'); show(current);
+      }
+    } catch (e) {}
   }
 })();

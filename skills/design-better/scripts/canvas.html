@@ -10,7 +10,6 @@
 </style>
 </head>
 <body class="app">
-<div class="update" role="status" hidden>The agent sent new versions. <button type="button">Load them</button></div>
 <div class="band"></div>
 <header>
   <div class="ttl"><h1>{{TITLE}}</h1>{{QUESTION}}</div>
@@ -40,6 +39,7 @@
     </div>
   </div>
 </header>
+<p class="offline" role="status" hidden>The canvas is closed. Ask the agent to restart it.</p>
 <div class="work">
   <main data-labels="{{LABELS}}" data-question="{{QUESTION_TEXT}}">{{TABS}}{{ROWS}}</main>
   <aside class="notes" aria-labelledby="notes-h">

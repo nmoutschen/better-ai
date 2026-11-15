@@ -61,3 +61,8 @@ jobs:
             echo "$js"
             node --check "$js"
           done
+      - name: Shared page look is identical in every skill
+        run: |
+          # page.css is the look shared by the skills' pages that talk to the agent; each skill carries a copy.
+          set -- skills/*/scripts/page.css
+          for css in "$@"; do cmp "$1" "$css"; done

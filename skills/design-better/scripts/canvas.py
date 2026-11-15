@@ -15,21 +15,21 @@ when the page is viewed. Without a LABEL, versions are labelled A, B, C in order
 The page fills one window: the versions sit side by side at one screen size at a time, each scaled to fit and
 scrolling inside its own frame, with a conversation with the agent on the right. With two or more versions, the page
 also offers to switch between them in the same place, which shows small changes at one spot better than looking from
-one to the other. The page styles only its own controls: each version keeps the styles it brings.
+one to the other; with four or more, it opens that way, since side by side they are too small to read. The page styles only its own controls: each version keeps the styles it brings.
 
 On the page, the user clicks any part of a version to comment on it, gives each version a thumbs up or down when
 there are three or more, writes to the agent, and decides with Decide. `show --serve` serves the page on 127.0.0.1
 and keeps running. Each action is a JSON-RPC call from the page (comment, delete, note, verdict, decide, accept,
 reopen); the script appends it to answers.jsonl next to the page and prints it to stdout as one JSON line, so a
 harness that streams a command's output delivers it to the agent as it arrives. Running `show` again with the same
---out, without --serve and --open, updates the served page: the open page offers to load the new versions.
+--out, without --serve and --open, updates the served page: the open page loads the new versions once the user is not typing.
 
 `wait` blocks until the served page receives actions the agent has not seen, prints them and exits, for harnesses
 that only notify when a command ends. `reply` shows the agent's reply in the page's conversation, `status` marks each
 item seen, asked, working, done or accepted, and `pending` lists what is not finished. Without a server, Copy all
 copies the feedback as text for the user to paste in the chat. Comments work on versions embedded from files only.
 
-canvas.html, canvas.css and canvas.js, next to this script, are the page; the script fills in the versions.
+canvas.html, page.css, canvas.css and canvas.js, next to this script, are the page; the script fills in the versions.
 """
 
 import argparse
@@ -48,7 +48,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TEMPLATE = (HERE / "canvas.html").read_text(encoding="utf-8")
-CSS = (HERE / "canvas.css").read_text(encoding="utf-8")
+# page.css is the look shared with research-better's board; canvas.css adds what only the canvas shows.
+CSS = (HERE / "page.css").read_text(encoding="utf-8") + (HERE / "canvas.css").read_text(encoding="utf-8")
 JS = (HERE / "canvas.js").read_text(encoding="utf-8")
 
 DEFAULT_WIDTHS = ("1280x800", "375x700")
@@ -143,7 +144,9 @@ def figure(i: int, label: str, attr: str, w: int, h: int, verdicts: bool, full: 
         else ""
     )
     return (
-        f'<figure data-i="{i}"><div class="label"><b>{esc(label)}</b><span class="acts">{buttons}'
+        f'<figure data-i="{i}"><div class="label"><b title="{esc(label)}">{esc(label)}</b><span class="acts">{buttons}'
+        # Keyboard users comment on a whole version with this button; it shows only when focused.
+        f'<button type="button" class="vcomment" data-v="{i}">Comment on {esc(label)}</button>'
         + ('<button type="button" class="full">Full size</button>' if full else "")
         + "</span></div>"
         f'<div class="stage"><div class="screen"><iframe data-i="{i}" title="{esc(label)}, {w} × {h} px" '
@@ -440,14 +443,28 @@ def wait(folder: Path, timeout: float) -> int:
 def reply(folder: Path, text: str, to: str | None) -> None:
     """Show the agent's reply in the served page's conversation, under the item it answers."""
     served(folder)
-    append(folder, {"action": "reply", "text": text[:5000], "to": to})
+    # Each reply has an id, so the user can answer any message, the agent's own included.
+    append(folder, {"action": "reply", "id": "r-" + str(time.time_ns()), "text": text[:5000], "to": to})
     print("Reply shown in the page.")
 
 
 def set_status(folder: Path, state: str, ids: list) -> None:
     """Mark the user's items as seen, asked, working or done. Accepted records an acceptance the user gave in words,
     the same as the page's Accept button."""
-    known = {e.get("id") for e in read_log(folder) if e.get("action") in ITEMS}
+    events = read_log(folder)
+    owned = {
+        e.get("id") for e in events if e.get("action") in ITEMS and not (e.get("action") == "note" and e.get("to"))
+    }
+    # An answer under one of the user's items is part of it; an answer to the agent's own message is an item itself.
+    answers = {e.get("id"): e.get("to") for e in events if e.get("action") == "note" and e.get("to") in owned}
+    misplaced = [i for i in ids if i in answers]
+    if misplaced:  # an answer is part of the item it answers, which carries the state
+        sys.exit(
+            "error: "
+            + ", ".join(f"{i} answers {answers[i]}" for i in misplaced)
+            + ". Mark the item it answers instead."
+        )
+    known = {e.get("id") for e in events if e.get("action") in ITEMS}
     unknown = [i for i in ids if i not in known]
     if unknown:
         sys.exit(f"error: no comment or message with id {', '.join(unknown)}. Run `pending` to see the ids.")
@@ -469,8 +486,17 @@ def pending(folder: Path) -> None:
     items, order, state, reasons, thread = {}, [], {}, {}, {}
     for e in read_log(folder):
         a, i, to = e.get("action"), e.get("id"), e.get("to")
-        if a == "note" and to:  # the user's answer belongs to the item it answers
+        if (
+            a == "note" and to and to not in items
+        ):  # an answer to the agent's own message is a new item, about that message
+            order.append(i)
+            items[i] = e
+        elif a == "note" and to:  # the user's answer belongs to the item it answers
             thread.setdefault(to, []).append({"from": "user", "at": e.get("at"), "text": e.get("note")})
+            if state.get(to) == "asked":  # the answer ends the wait: the item is the agent's again
+                state[to] = "answered by the user"
+            elif state.get(to) in ("done", "accepted"):  # a follow-up under a finished item is work again
+                state[to] = "follow-up from the user"
         elif a == "reply" and to:
             thread.setdefault(to, []).append({"from": "agent", "at": e.get("at"), "text": e.get("text")})
         elif a in ITEMS and i:
@@ -519,7 +545,9 @@ def show(args) -> None:
     if args.serve:
         serve(out.resolve(), args.port, args.open)
     elif args.open and (out.parent / ADDRESS).exists():
-        print("The page is already served: the open page offers to load the new versions, so no tab was opened.")
+        print(
+            "The page is already served: the open page loads the new versions once the user is not typing, so no tab was opened."
+        )
     elif args.open and not webbrowser.open(out.resolve().as_uri()):
         print("Could not open a browser on this machine. Give the user the path instead.")
 
