@@ -1231,7 +1231,7 @@ def pending(folder: Path) -> None:
     items, order, state, reasons = {}, [], {}, {}
     for e in read_log(folder):
         a, i = e.get("action"), e.get("id")
-        if a in ("comment", "note") and i:
+        if a in ("comment", "note") and i and not e.get("to"):  # an answer belongs to the item it answers
             if i not in items:
                 order.append(i)
             items[i] = e
