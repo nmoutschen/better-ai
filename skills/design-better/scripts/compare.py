@@ -16,15 +16,16 @@ scrolling inside its own frame. Each can be shown alone at full width. The page 
 between the versions in the same place, which shows small changes at one spot better than looking from one to the
 other; side by side suits comparing whole screens. The page styles only its own controls: each version keeps the styles it brings.
 
-On the page, the user gives each version a thumbs up or down, chooses one, and in comment mode clicks any part of
-a version to comment on it. With --serve, the script serves the page on 127.0.0.1 and keeps running. Each action is a
-JSON-RPC call from the page (choose, verdict, comment, delete, note); the script appends it to answers.jsonl next to
-the page and prints it to stdout as one JSON line, so a harness that streams a command's output delivers it to the
-agent as it arrives. Writing the page again with the same --out, without --serve, updates the served page: the open
-page offers to load the new versions. --wait blocks until the served page receives actions the agent has not seen
-yet, prints them and exits, for harnesses that only notify when a command ends. --reply shows the agent's reply in
-the page's conversation panel, which lists everything the user sent and every reply, and survives a reload. Without a server, Copy all copies
-the feedback as text for the user to paste in the chat. Comments work on versions embedded from files only.
+On the page, the user clicks any part of a version to comment on it, gives each version a thumbs up or down when
+there are three or more, and decides with Decide. With --serve, the script serves the page on 127.0.0.1 and keeps
+running. Each action is a JSON-RPC call from the page (comment, delete, note, verdict, decide, accept, reopen); the
+script appends it to answers.jsonl next to the page and prints it to stdout as one JSON line, so a harness that
+streams a command's output delivers it to the agent as it arrives. Writing the page again with the same --out,
+without --serve and --open, updates the served page: the open page offers to load the new versions. --wait blocks
+until the served page receives actions the agent has not seen yet, prints them and exits, for harnesses that only
+notify when a command ends. --reply shows the agent's reply in the page's conversation, --status marks each item seen,
+asked, working, done or accepted, and --pending lists what is not finished. Without a server, Copy all copies the
+feedback as text for the user to paste in the chat. Comments work on versions embedded from files only.
 """
 
 import argparse
@@ -69,9 +70,8 @@ ICONS = {
 # default, as in design tools; dark is for versions meant for a dark context. A mid-grey is left out: judgment is
 # sharpest near the surround's own lightness, so mid-grey favours mid-tones.
 BACKGROUNDS = (("Light", "#F5F5F5"), ("Dark", "#1E1E1E"))
-METHODS = ("choose", "verdict", "comment", "delete", "note", "accept", "reopen", "decide")
+METHODS = ("verdict", "comment", "delete", "note", "accept", "reopen", "decide")
 MAX_BODY = 200_000
-LOCAL_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost):\d+$")
 
 FONTS = ("https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400"
          "&family=Space+Grotesk:wght@400;500;700&display=swap")
@@ -149,7 +149,6 @@ main.switch figure:not(.current) { position:absolute; top:0; left:0; width:100%;
 .vbtn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; }
 .vbtn[data-verdict="up"][aria-pressed="true"] { background:var(--moss-dark); border-color:var(--moss-dark); color:var(--cream); }
 .vbtn[data-verdict="down"][aria-pressed="true"] { background:var(--terracotta); border-color:var(--terracotta); color:var(--heading); }
-.vbtn.pickv[aria-pressed="true"] { background:var(--umber); border-color:var(--umber); color:var(--cream); }
 .seg--terra { border-color:var(--terracotta); }
 .seg--terra button[aria-pressed="true"] { background:var(--terracotta); color:var(--heading); }
 .pop { position:fixed; z-index:5; width:min(22rem, calc(100vw - 24px)); background:var(--cream); color:var(--ink);
@@ -215,6 +214,7 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .msg.agent .who { color:var(--moss-dark); }
 .msg .re { font-style:italic; }
 .msg .body { margin:4px 0 0; white-space:pre-wrap; }
+.msg .head .link + .link { margin-left:8px; }
 .msg .link { margin-left:auto; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
 .sys { font-size:12px; color:var(--muted); text-align:center; }
 .composer { border-top:1px solid var(--line); padding:12px 20px 14px; background:var(--cream); }
@@ -284,8 +284,6 @@ body.app .notes .notes-top h2 { padding:0; margin:0; }
 .notes .filter button { color:var(--ink); padding:4px 10px; font-size:11px; }
 .notes .filter button + button { border-left-color:var(--ink); }
 .notes .filter button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
-.thread > li.locatable { cursor:pointer; }
-.thread > li.locatable:hover { border-color:var(--sand); }
 .thread .reply.mine.answer-note { border-left-color:var(--umber); }
 .btn--sm { padding:3px 10px; font-size:10px; }
 .msg .head { flex-wrap:wrap; row-gap:2px; }
@@ -472,6 +470,8 @@ JS = r"""
   pickButtons.forEach(function (b) { b.addEventListener('click', function () { show(+b.dataset.pick); }); });
   document.addEventListener('keydown', function (e) {
     if (!main.classList.contains('switch')) return;
+    // Space and the arrows switch versions only outside fields, so the user can type and pick options.
+    if (e.target.closest('input, textarea, select, [contenteditable]')) return;
     if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       if (e.target.tagName === 'BUTTON' && e.key === ' ') return;
       show((current + 1) % labels.length); e.preventDefault();
@@ -495,7 +495,7 @@ JS = r"""
   // Feedback. Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the
   // agent's replies. The page streams that log: it rebuilds the conversation and the pins from it, so a reload or new
   // versions lose nothing. State changes are also applied at once, and applying the same event twice changes nothing.
-  var served = location.protocol === 'http:', rpcId = 0, seq = 0, items = [], verdicts = {}, choice = null, log = [];
+  var served = location.protocol === 'http:', rpcId = 0, seq = 0, items = [], verdicts = {}, log = [];
   var status = document.querySelector('.notes .status');
   function say(text, error) { status.textContent = text; status.classList.toggle('error', !!error); }
   // Every action shows a toast at the bottom of the window: sending, then sent or failed.
@@ -531,22 +531,19 @@ JS = r"""
     } else if (e.action === 'delete') {
       items = items.filter(function (x) { return x.id !== e.id; });
       document.querySelectorAll('iframe').forEach(function (f) { try { var p = f.contentDocument.querySelector('.db-pin[data-id="' + e.id + '"]'); if (p) p.remove(); } catch (x) {} });
-    } else if (e.action === 'choose') { choice = e.version || null; syncVersionButtons(); }
-    else if (e.action === 'verdict') { verdicts[e.version] = e.verdict || null; syncVersionButtons(); }
+    } else if (e.action === 'verdict') { verdicts[e.version] = e.verdict || null; syncVersionButtons(); }
   }
   function byId(id) { return items.filter(function (x) { return x.id === id; })[0]; }
   function syncVersionButtons() {
     document.querySelectorAll('.vbtn[data-v]').forEach(function (b) {
       var v = labels[+b.dataset.v];
-      b.setAttribute('aria-pressed', String(b.classList.contains('pickv') ? choice === v : verdicts[v] === b.dataset.verdict));
+      b.setAttribute('aria-pressed', String(verdicts[v] === b.dataset.verdict));
     });
   }
   document.querySelectorAll('.vbtn[data-v]').forEach(function (b) {
     b.addEventListener('click', function () {
       var v = labels[+b.dataset.v];
-      if (b.classList.contains('pickv')) { var c = choice === v ? null : v;
-        send('choose', { version: c }, c ? 'Choice of ' + v : 'Choice withdrawn'); }
-      else { var d = verdicts[v] === b.dataset.verdict ? null : b.dataset.verdict;
+      { var d = verdicts[v] === b.dataset.verdict ? null : b.dataset.verdict;
         send('verdict', { version: v, verdict: d }, d ? (d === 'up' ? 'Thumbs up' : 'Thumbs down') + ' for ' + v : 'Verdict on ' + v + ' withdrawn'); }
     });
   });
@@ -683,13 +680,27 @@ JS = r"""
     pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === draft.verdict)); });
     pop.querySelector('.remove').hidden = !existing;
     pop.querySelector('.ok').textContent = existing ? 'Update' : 'Send';
-    pop.hidden = false;
+    pop.hidden = false; opener = document.activeElement !== document.body ? document.activeElement : null;
     var x = box.left + cx * scale + 12, y = box.top + cy * scale + 12;
     pop.style.left = Math.max(12, Math.min(x, innerWidth - pop.offsetWidth - 12)) + 'px';
     pop.style.top = Math.max(12, Math.min(y, innerHeight - pop.offsetHeight - 12)) + 'px';
     pop.querySelector('textarea').focus();
   }
-  function closePop() { pop.hidden = true; draft = null; }
+  // The comment box returns focus to what opened it, so keyboard users keep their place.
+  var opener = null;
+  function closePop() { pop.hidden = true; draft = null; if (opener && document.contains(opener)) opener.focus(); opener = null; }
+  function openEdit(it, from) {
+    var r = from.getBoundingClientRect();
+    draft = { item: it, version: it.version, target: it.target, verdict: it.verdict };
+    pop.querySelector('.target').replaceChildren(crumb(it.version, it.target));
+    pop.querySelector('textarea').value = it.comment || '';
+    pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === draft.verdict)); });
+    pop.querySelector('.remove').hidden = false; pop.querySelector('.ok').textContent = 'Update';
+    pop.hidden = false; opener = from;
+    pop.style.left = Math.max(12, r.right - pop.offsetWidth) + 'px';
+    pop.style.top = Math.max(12, Math.min(r.bottom + 8, innerHeight - pop.offsetHeight - 12)) + 'px';
+    pop.querySelector('textarea').focus();
+  }
   pop.querySelectorAll('.vbtn').forEach(function (b) {
     b.addEventListener('click', function () {
       draft.verdict = draft.verdict === b.dataset.verdict ? null : b.dataset.verdict;
@@ -831,11 +842,15 @@ JS = r"""
         var it = byId(e.id);
         if (it && !c.deleted) {
           var del = el('button', 'link', 'Delete'); del.type = 'button'; del.setAttribute('aria-label', 'Delete comment ' + e.n);
-          del.addEventListener('click', function () { removeItem(it); }); head.append(del);
+          del.addEventListener('click', function () { removeItem(it); });
+          var where = el('button', 'link', 'Show'), edit = el('button', 'link', 'Edit');
+          where.type = edit.type = 'button';
+          where.setAttribute('aria-label', 'Show where comment ' + e.n + ' is'); edit.setAttribute('aria-label', 'Edit comment ' + e.n);
+          where.addEventListener('click', function () { reveal(e); });
+          edit.addEventListener('click', function () { reveal(e); openEdit(it, edit); });
+          head.append(where, edit, del);
         }
         li.append(head, crumb(e.version, e.target || {}));
-        li.classList.add('locatable'); li.title = 'Show where this comment is';
-        li.addEventListener('click', function (ev) { if (!ev.target.closest('button, textarea, .why')) reveal(e); });
         var body = el('p', 'body');
         if (c.deleted) body.textContent = 'Deleted';
         else {
@@ -853,9 +868,8 @@ JS = r"""
         li.append(head, d); if (e.note) li.append(el('p', 'body', e.note));
       } else if (c.kind === 'reply') {
         li = el('li', 'msg agent'); li.append(replyBlock(e));
-      } else if (c.kind === 'choose' || c.kind === 'verdict') {
-        var t = c.kind === 'choose' ? (e.version ? 'You chose ' + e.version : 'You withdrew your choice')
-              : (e.verdict ? (e.verdict === 'up' ? 'Thumbs up for ' : 'Thumbs down for ') + e.version : 'You withdrew your verdict on ' + e.version);
+      } else if (c.kind === 'verdict') {
+        var t = (e.verdict ? (e.verdict === 'up' ? 'Thumbs up for ' : 'Thumbs down for ') + e.version : 'You withdrew your verdict on ' + e.version);
         li = el('li', 'sys', t + ', ' + time(e.at));
       } else return;
       c.replies.forEach(function (r) { li.append(replyBlock(r)); });
@@ -903,7 +917,9 @@ JS = r"""
   }
   function asText() {
     var lines = [];
-    if (choice) lines.push('I choose ' + choice + '.');
+    var dec = log.filter(function (x) { return x.action === 'decide'; }).pop();
+    if (dec) lines.push('I decide: ' + (dec.label || dec.option) + (dec.carries && dec.carries.length ? ', with comments ' +
+      dec.carries.map(function (id) { var x = byId(id); return x ? x.n : '?'; }).join(', ') : '') + '.' + (dec.note ? ' ' + dec.note : ''));
     labels.forEach(function (v) { if (verdicts[v]) lines.push(v + ': ' + (verdicts[v] === 'up' ? 'good' : 'not good') + '.'); });
     items.forEach(function (it) {
       var t = it.target || {};
@@ -966,6 +982,8 @@ JS = r"""
   if (served) (function stream(after) {
     fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
       r.events.forEach(function (e) { log.push(e); apply(e, false); });
+      // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
+      if (after > 0) r.events.forEach(function (e) { if (e.action === 'reply') flash('Agent: ' + e.text.slice(0, 120), 'ok'); });
       if (r.events.length) renderThread();
       stream(r.total);
     }).catch(function () { setTimeout(function () { stream(after); }, 2000); });
@@ -1081,7 +1099,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
              '<div class="seg filter" role="group" aria-label="Show"><button type="button" data-filter="all" aria-pressed="false">All</button>'
              '<button type="button" data-filter="open" aria-pressed="true">Open</button></div></div>'
              '<p class="empty">Nothing yet. Click any part of a version to comment on it, or write to the agent below.</p>'
-             '<ol class="thread" aria-live="polite"></ol>'
+             '<ol class="thread"></ol>'
              '<div class="composer"><div class="decide" hidden><p class="menu-h">Your decision</p><div class="dopts" role="radiogroup" aria-label="Decision"></div>'
              '<div class="carry"></div></div>'
              '<label for="note">Message to the agent</label><textarea id="note"></textarea>'
@@ -1166,7 +1184,7 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
                 after, deadline = int(self.path.split("=", 1)[1] or 0), time.time() + 20
                 while count() <= after and time.time() < deadline:
                     time.sleep(0.25)
-                lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+                lines = log.read_text(encoding="utf-8").split("\n")[:-1] if log.exists() else []
                 events = []
                 for line in lines[after:]:
                     try:
@@ -1185,7 +1203,7 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
 
         def do_POST(self):
             # Only this page may send answers: same host, and a JSON body that a cross-site form cannot send.
-            if not self.local() or self.path != "/rpc" or not LOCAL_ORIGIN.match(self.headers.get("Origin", "")):
+            if not self.local() or self.path != "/rpc" or self.headers.get("Origin", "") != "http://" + (self.headers.get("Host") or ""):
                 return self.send_error(403)
             if not (self.headers.get("Content-Type") or "").startswith("application/json"):
                 return self.send_error(415)
@@ -1201,7 +1219,7 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
                 return self.rpc(msg.get("id") if isinstance(msg, dict) else None,
                                 error={"code": -32601, "message": "Unknown method"})
             event = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "action": msg["method"], **clean(msg["params"])}
-            line = json.dumps(event, ensure_ascii=False)
+            line = json.dumps(event)  # ASCII only: a raw U+2028 in a message would split the line for some readers
             with lock:
                 with log.open("a", encoding="utf-8") as f:
                     f.write(line + "\n")
@@ -1241,7 +1259,13 @@ def wait(folder: Path, timeout: float) -> int:
         except OSError:
             sys.exit("error: the page's server is not answering. Is it still running?")
         if total > seen:
-            lines = [line for line in log.read_text(encoding="utf-8").splitlines()[seen:total] if '"action": "reply"' not in line and '"action": "status"' not in line]
+            def from_user(line):
+                try:
+                    e = json.loads(line)
+                except ValueError:
+                    return False
+                return e.get("action") not in ("reply", "status") and "by" not in e
+            lines = [line for line in log.read_text(encoding="utf-8").split("\n")[seen:total] if line and from_user(line)]
             cursor.write_text(str(total), encoding="utf-8")
             if not lines:
                 seen = total
@@ -1258,7 +1282,7 @@ def reply(folder: Path, text: str, to: str | None) -> None:
         sys.exit(f"error: no page is served from {folder}. Start it with --serve first.")
     event = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "action": "reply", "text": text[:5000], "to": to}
     with (folder / "answers.jsonl").open("a", encoding="utf-8") as f:
-        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        f.write(json.dumps(event) + "\n")
     print("Reply shown in the page.")
 
 
@@ -1268,7 +1292,9 @@ STATES = ("seen", "asked", "working", "done", "accepted")
 def read_log(folder: Path) -> list:
     log = folder / "answers.jsonl"
     events = []
-    for line in (log.read_text(encoding="utf-8").splitlines() if log.exists() else []):
+    for line in (log.read_text(encoding="utf-8").split("\n") if log.exists() else []):
+        if not line:
+            continue
         try:
             events.append(json.loads(line))
         except ValueError:
@@ -1296,10 +1322,16 @@ def set_status(folder: Path, state: str, ids: list) -> None:
 def pending(folder: Path) -> None:
     """Print each comment and message that is neither done nor accepted, in its latest form, including those the
     user reopened, so work can resume after an interruption."""
-    items, order, state, reasons = {}, [], {}, {}
+    items, order, state, reasons, thread = {}, [], {}, {}, {}
     for e in read_log(folder):
         a, i = e.get("action"), e.get("id")
-        if a in ("comment", "note", "decide") and i and not e.get("to"):  # an answer belongs to the item it answers
+        if a == "note" and e.get("to"):  # the user's answer belongs to the item it answers
+            thread.setdefault(e["to"], []).append({"from": "user", "at": e.get("at"), "text": e.get("note")})
+        elif a == "reply" and e.get("to"):
+            thread.setdefault(e["to"], []).append({"from": "agent", "at": e.get("at"), "text": e.get("text")})
+        elif a in ("comment", "note", "decide") and i:
+            if i in items and state.get(i) in ("done", "accepted"):
+                state[i] = "edited"  # the user changed it after it was finished: it is work again
             if i not in items:
                 order.append(i)
             items[i] = e
@@ -1315,6 +1347,8 @@ def pending(folder: Path) -> None:
     open_items = [items[i] for i in order if items.get(i) and state.get(i) not in ("done", "accepted")]
     for e in open_items:
         extra = {"reopened_because": reasons[e["id"]]} if state.get(e["id"]) == "reopened" and reasons.get(e["id"]) else {}
+        if thread.get(e["id"]):
+            extra["thread"] = thread[e["id"]]
         print(json.dumps({**e, "status": state.get(e["id"], "new"), **extra}, ensure_ascii=False))
     print(f"{len(open_items)} not done.")
 
@@ -1369,7 +1403,9 @@ def main() -> None:
     print(f"wrote {out}")
     if args.serve:
         return serve(out.resolve(), args.port, args.open)
-    if args.open and not webbrowser.open(out.resolve().as_uri()):
+    if args.open and (out.parent / ".server").exists():
+        print("The page is already served: the open page offers to load the new versions, so no new tab was opened.")
+    elif args.open and not webbrowser.open(out.resolve().as_uri()):
         print("Could not open a browser on this machine. Give the user the path instead.")
 
 
