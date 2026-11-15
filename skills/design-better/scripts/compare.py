@@ -69,7 +69,7 @@ ICONS = {
 # default, as in design tools; dark is for versions meant for a dark context. A mid-grey is left out: judgment is
 # sharpest near the surround's own lightness, so mid-grey favours mid-tones.
 BACKGROUNDS = (("Light", "#F5F5F5"), ("Dark", "#1E1E1E"))
-METHODS = ("choose", "verdict", "comment", "delete", "note", "accept", "reopen")
+METHODS = ("choose", "verdict", "comment", "delete", "note", "accept", "reopen", "decide")
 MAX_BODY = 200_000
 LOCAL_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost):\d+$")
 
@@ -291,6 +291,14 @@ body.app .notes .notes-top h2 { padding:0; margin:0; }
 .msg .head { flex-wrap:wrap; row-gap:2px; }
 .thread .answer { margin-top:10px; }
 .thread .reply + .answer { margin-top:20px; }
+.decide { border:1px solid var(--sand); background:#fff; padding:8px 10px; margin-bottom:10px; }
+.decide .menu-h { color:var(--muted); margin:0 0 6px; }
+.dopt { display:flex; align-items:center; gap:6px; font-size:14px; margin:4px 0; cursor:pointer; }
+.dopt input { accent-color:var(--umber); }
+.carry .menu-h { margin-top:8px; }
+.carried { margin:2px 0; font-size:13px; color:var(--ink); }
+.msg.decision { border-left:4px solid var(--umber); }
+.msg .with { color:var(--muted); }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
   font:700 12px/18px var(--sans); }
 .mini:hover { border-color:var(--ink); }
@@ -776,7 +784,7 @@ JS = r"""
       else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
     });
     // Open: only the user's comments and messages that are not yet accepted, with what was said under them.
-    var open = entries.filter(function (c) { return (c.kind === 'comment' || c.kind === 'note') && c.e.id && !c.deleted && state[c.e.id] !== 'accepted'; });
+    var open = entries.filter(function (c) { return (c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') && c.e.id && !c.deleted && state[c.e.id] !== 'accepted'; });
     var openBtn = document.querySelector('[data-filter="open"]');
     openBtn.textContent = 'Open (' + open.length + ')';
     if (filter === 'open') entries = open;
@@ -827,6 +835,12 @@ JS = r"""
         li = el('li', 'msg me'); head = el('div', 'head'); head.append(el('span', 'who', 'You'), el('span', 'when', time(e.at)));
         answered(head);
         li.append(head, el('p', 'body', e.note));
+      } else if (c.kind === 'decide') {
+        li = el('li', 'msg me decision'); head = el('div', 'head'); head.append(el('span', 'who', 'You decided'), el('span', 'when', time(e.at)));
+        answered(head);
+        var d = el('p', 'body'); d.append(el('strong', '', e.label || e.option));
+        if (e.carries && e.carries.length) d.append(el('span', 'with', ' with comments ' + e.carries.map(function (id) { var x = log.filter(function (y) { return y.id === id; })[0]; return x && x.n ? x.n : '?'; }).join(', ')));
+        li.append(head, d); if (e.note) li.append(el('p', 'body', e.note));
       } else if (c.kind === 'reply') {
         li = el('li', 'msg agent'); li.append(replyBlock(e));
       } else if (c.kind === 'choose' || c.kind === 'verdict') {
@@ -836,7 +850,7 @@ JS = r"""
       } else return;
       c.replies.forEach(function (r) { li.append(replyBlock(r)); });
       // An item waiting for the user ends with an Answer button, under the question it answers.
-      if ((c.kind === 'comment' || c.kind === 'note') && state[e.id] === 'asked') {
+      if ((c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') && state[e.id] === 'asked') {
         var ans = el('button', 'btn btn--sm answer', 'Answer'); ans.type = 'button';
         ans.addEventListener('click', function () { reasonBox(li, e.id, true); });
         li.append(ans);
@@ -895,8 +909,44 @@ JS = r"""
     if (!note) { noteBox.focus(); return; }
     send('note', { id: 'm-' + Date.now().toString(36), note: note }, 'Message', function () { noteBox.value = ''; });
   }
-  noteBtn.addEventListener('click', sendNote);
-  noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNote(); } });
+  // Decide: one confirmed decision, sent with the open comments that come with it and the message as its note.
+  // The Send button becomes Confirm while the decision panel is open, so the same place sends both.
+  var decideBtn = document.querySelector('.decide-btn'), panel = document.querySelector('.decide'), deciding = false;
+  var beforeAfter = labels.length === 2 && labels[0].toLowerCase() === 'before' && labels[1].toLowerCase() === 'after';
+  var OPTIONS = beforeAfter ? [['Ship After', 'After'], ['Keep Before', 'Before']]
+    : labels.map(function (l) { return ['Build ' + l, l]; }).concat([['Combine versions (say how below)', 'combine']]);
+  OPTIONS.push(['None of these (say why below)', 'none']);
+  function openItems() {
+    return items.filter(function (it) { return pinState[it.id] !== 'accepted' && pinState[it.id] !== 'done'; });
+  }
+  function setDeciding(on) {
+    deciding = on; panel.hidden = !on; decideBtn.setAttribute('aria-expanded', String(on));
+    decideBtn.textContent = on ? 'Cancel' : 'Decide\u2026';
+    noteBtn.textContent = on ? 'Confirm decision' : 'Send';
+    if (!on) return;
+    var box = panel.querySelector('.dopts'); box.replaceChildren();
+    OPTIONS.forEach(function (o, k) {
+      var lab = el('label', 'dopt'), r = el('input'); r.type = 'radio'; r.name = 'decision'; r.value = o[1]; if (!k) r.checked = true;
+      lab.append(r, ' ' + o[0]); box.append(lab);
+    });
+    var open = openItems(), carry = panel.querySelector('.carry'); carry.replaceChildren();
+    if (open.length) {
+      carry.append(el('p', 'menu-h', 'Comes with your open comments'));
+      open.forEach(function (it) { carry.append(el('p', 'carried', it.n + '. ' + (it.comment || (it.verdict === 'up' ? 'Good' : 'Not good')))); });
+    }
+    noteBox.focus();
+  }
+  decideBtn.addEventListener('click', function () { setDeciding(!deciding); });
+  function sendDecision() {
+    var pick = panel.querySelector('input[name="decision"]:checked'), note = noteBox.value.trim();
+    if ((pick.value === 'combine' || pick.value === 'none') && !note) { say('Say how to combine them, or why none fits, in the message.', true); return noteBox.focus(); }
+    var label = pick.parentElement.textContent.trim();
+    send('decide', { id: 'd-' + Date.now().toString(36), option: pick.value, label: label,
+                     carries: openItems().map(function (it) { return it.id; }), note: note || null },
+         'Decision', function () { noteBox.value = ''; setDeciding(false); });
+  }
+  noteBtn.addEventListener('click', function () { if (deciding) sendDecision(); else sendNote(); });
+  noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !deciding) { e.preventDefault(); sendNote(); } });
   renderThread();
   if (served) (function stream(after) {
     fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
@@ -973,7 +1023,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
             + (f'<button type="button" class="vbtn" data-v="{i}" data-verdict="up" aria-pressed="false" aria-label="Good: {esc(label)}">{THUMB_UP}</button>'
                f'<button type="button" class="vbtn" data-v="{i}" data-verdict="down" aria-pressed="false" aria-label="Not good: {esc(label)}">{THUMB_DOWN}</button>'
                if len(loaded) > 2 else '') +
-            f'<button type="button" class="vbtn pickv" data-v="{i}" aria-pressed="false">Choose</button>'
+
             f'<button type="button" class="full">Full size</button></span></div>'
             f'<div class="stage"><div class="screen"><iframe data-i="{i}" title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
             f'{attr}></iframe></div></div></figure>'
@@ -1017,8 +1067,11 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
              '<button type="button" data-filter="open" aria-pressed="true">Open</button></div></div>'
              '<p class="empty">Nothing yet. Click any part of a version to comment on it, or write to the agent below.</p>'
              '<ol class="thread" aria-live="polite"></ol>'
-             '<div class="composer"><label for="note">Message to the agent</label><textarea id="note"></textarea>'
+             '<div class="composer"><div class="decide" hidden><p class="menu-h">Your decision</p><div class="dopts" role="radiogroup" aria-label="Decision"></div>'
+             '<div class="carry"></div></div>'
+             '<label for="note">Message to the agent</label><textarea id="note"></textarea>'
              '<div class="send"><button type="button" class="btn">Send</button>'
+             '<button type="button" class="btn btn--quiet decide-btn" aria-expanded="false">Decide…</button>'
              '<button type="button" class="btn btn--quiet copy">Copy all</button>'
              '<p class="status" role="status"></p></div></div></aside>')
     pop = ('<div class="pop" role="dialog" aria-label="Comment" hidden><p class="target"></p><div class="verdicts">'
@@ -1212,7 +1265,7 @@ def set_status(folder: Path, state: str, ids: list) -> None:
     """Mark the user's comments or messages as seen, being worked on, or done; the page shows it on each one."""
     if state not in STATES:
         sys.exit(f"error: the state must be one of {', '.join(STATES)}")
-    known = {e.get("id") for e in read_log(folder) if e.get("action") in ("comment", "note")}
+    known = {e.get("id") for e in read_log(folder) if e.get("action") in ("comment", "note", "decide")}
     unknown = [i for i in ids if i not in known]
     if unknown:
         sys.exit(f"error: no comment or message with id {', '.join(unknown)}. Run --pending to see the ids.")
@@ -1231,7 +1284,7 @@ def pending(folder: Path) -> None:
     items, order, state, reasons = {}, [], {}, {}
     for e in read_log(folder):
         a, i = e.get("action"), e.get("id")
-        if a in ("comment", "note") and i and not e.get("to"):  # an answer belongs to the item it answers
+        if a in ("comment", "note", "decide") and i and not e.get("to"):  # an answer belongs to the item it answers
             if i not in items:
                 order.append(i)
             items[i] = e
