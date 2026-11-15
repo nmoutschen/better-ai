@@ -58,6 +58,7 @@ ICONS = {
     "Tablet": icon('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/>'),
     "Mobile": icon('<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'),
     "comment": icon('<path d="M4 4h16v12H9l-5 4z"/>'),
+    "settings": icon('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'),
     "use": icon('<path d="M5 3l14 8-6 2-3 6z"/>'),
     "free": icon('<path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4"/>'),
     "together": icon('<path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4M7 12h10"/>'),
@@ -222,7 +223,17 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .update { position:fixed; left:0; right:0; top:0; }
 /* The top bar stays umber, the n14n brand block; each control pairs its icon with a short label. Pickers (one of
    several) are segmented and fill the chosen option; switches (on or off) have no fill and a box that is ticked. */
-body.app .seg button.ico { gap:6px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; }
+body.app .seg button.ico { gap:5px; font:700 10px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:4px 8px; }
+body.app .seg button.ico svg { width:15px; height:15px; }
+.more { position:relative; }
+.morebtn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--cream); background:transparent; color:var(--cream);
+  padding:4px 8px; cursor:pointer; font:700 10px var(--sans); letter-spacing:.06em; text-transform:uppercase; }
+.morebtn svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; }
+.morebtn[aria-expanded="true"] { background:var(--cream); color:var(--umber); }
+.menu { position:absolute; right:0; top:calc(100% + 6px); z-index:4; background:var(--umber); border:1px solid var(--cream);
+  padding:10px 12px 12px; box-shadow:0 8px 24px rgba(28,26,23,.3); display:grid; gap:4px; min-width:12rem; }
+.menu[hidden] { display:none; }
+.menu-h { margin:4px 0 2px; font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--cream); opacity:.8; }
 .thread > li.msg .body { font-size:14px; line-height:1.45; }
 body.app main .pick { align-self:flex-start; margin:0 0 10px; border-color:var(--ink); }
 body.app main .pick button { color:var(--ink); }
@@ -254,6 +265,8 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .thread .reply.mine { background:#fff; border-left-color:var(--terracotta); }
 .thread .reply.mine .who { color:var(--heading); }
 .why { margin-top:10px; }
+/* A reply above pulls its bottom edge down by the item's padding; give that space back. */
+.thread .reply + .why { margin-top:20px; }
 .why textarea { width:100%; min-height:3em; font:400 14px/1.45 var(--sans); border:1px solid var(--sand); padding:6px 8px; }
 .why .row2 { display:flex; gap:8px; margin-top:6px; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
@@ -317,6 +330,12 @@ JS = r"""
       if (typeof movePins === 'function') movePins(frame);
     });
   }
+  // The Display menu opens under its button and closes on a click outside it or on Escape.
+  var moreBtn = document.querySelector('.morebtn'), menu = document.querySelector('.menu');
+  function openMenu(on) { menu.hidden = !on; moreBtn.setAttribute('aria-expanded', String(on)); }
+  moreBtn.addEventListener('click', function (e) { e.stopPropagation(); openMenu(menu.hidden); });
+  document.addEventListener('click', function (e) { if (!menu.hidden && !menu.contains(e.target)) openMenu(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) { openMenu(false); moreBtn.focus(); } });
   // Background behind the versions, kept for the next visit.
   function setBg(c) {
     main.style.setProperty('--surround', c);
@@ -571,6 +590,7 @@ JS = r"""
     var style = doc.createElement('style'); style.textContent = PIN_CSS; doc.head.appendChild(style);
     doc.documentElement.classList.toggle('db-commenting', commenting);
     doc.addEventListener('click', function (e) {
+      if (!menu.hidden) openMenu(false);
       var pin = e.target.closest && e.target.closest('.db-pin');
       if (pin) {
         // A pin opens its comment, to read, change or delete it, whether or not comment mode is on.
@@ -883,14 +903,17 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     controls += ('<div class="seg" role="group" aria-label="Mode">'
                  f'<button type="button" class="ico" data-mode="comment" aria-pressed="true" title="Click a version to comment on it (C)">{ICONS["comment"]}<span>Comment</span></button>'
                  f'<button type="button" class="ico" data-mode="use" aria-pressed="false" title="Use the versions as pages (C)">{ICONS["use"]}<span>Use</span></button></div>'
-                 + ('<div class="seg" role="group" aria-label="Scroll">'
+                 # Settings changed rarely sit in a Display menu, so the bar keeps to what is used on every visit.
+                 + '<div class="more"><button type="button" class="morebtn" aria-expanded="false" aria-haspopup="true">'
+                 f'{ICONS["settings"]}<span>Display</span></button><div class="menu" hidden>'
+                 + ('<p class="menu-h">Scroll</p><div class="seg" role="group" aria-label="Scroll">'
                     f'<button type="button" class="ico" data-scroll="linked" aria-pressed="true" title="Versions scroll together">{ICONS["together"]}<span>Linked</span></button>'
                     f'<button type="button" class="ico" data-scroll="free" aria-pressed="false" title="Each version scrolls on its own">{ICONS["free"]}<span>Free</span></button></div>'
                     if len(labels) > 1 else '') +
-                 '<div class="seg" role="group" aria-label="Background">' + "".join(
+                 '<p class="menu-h">Background</p><div class="seg" role="group" aria-label="Background">' + "".join(
                      f'<button type="button" class="ico sw" data-bg="{c}" aria-pressed="{str(c == BACKGROUNDS[0][1]).lower()}" '
                      f'title="{n} background" aria-label="{n} background"><span class="chip" style="background:{c}"></span><span>{n}</span></button>'
-                     for n, c in BACKGROUNDS) + '</div>')
+                     for n, c in BACKGROUNDS) + '</div></div></div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
     notes = ('<aside class="notes" aria-labelledby="notes-h"><h2 id="notes-h">Conversation</h2>'
              '<p class="empty">Nothing yet. Click any part of a version to comment on it, or write to the agent below.</p>'
