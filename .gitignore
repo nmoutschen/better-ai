@@ -5,3 +5,4 @@ __pycache__/
 .design
 .worktrees
 .claude/worktrees
+node_modules

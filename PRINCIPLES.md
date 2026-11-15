@@ -100,9 +100,9 @@ ADD a script only when a step must produce the same form whatever the content, s
 
 WRITE scripts with the Python standard library only, so they run with `python3` and need no installs or network access.
 
-SUPPORT Python 3.10 and newer. KEEP each script passing `ruff check` and `ruff format --check` with the settings in `pyproject.toml`: the Python workflow runs them, and runs every script with `--help` on the oldest and newest supported Python. Ruff is a development tool only: DO NOT make a script import it or anything else outside the standard library.
+SUPPORT Python 3.10 and newer. KEEP each script passing `ruff check` and `ruff format --check` with the settings in `pyproject.toml`: the Scripts workflow runs them, and runs every script with `--help` on the oldest and newest supported Python. Ruff is a development tool only: DO NOT make a script import it or anything else outside the standard library.
 
-PUT a page's HTML, CSS and JavaScript in files next to the script that renders it, such as `show.css` and `show.js` next to `show.py`, not in strings inside the script. The script reads them and fills in the content. DO NOT build markup in Python beyond the parts that depend on the content.
+PUT a page's HTML, CSS and JavaScript in files next to the script that renders it, such as `show.css` and `show.js` next to `show.py`, not in strings inside the script. The script reads them and fills in the content. DO NOT build markup in Python beyond the parts that depend on the content. KEEP those files passing stylelint and html-validate with the repo's `.stylelintrc.json` and `.htmlvalidate.json`, and the JavaScript passing `node --check`: the workflow runs them.
 
 GIVE each script subcommands for its separate tasks, such as `lesson.py check`, `serve` and `wait`, not flags that change what the script does.
 

@@ -1,4 +1,4 @@
-name: Python
+name: Scripts
 
 on:
   pull_request:
@@ -37,7 +37,25 @@ jobs:
             echo "$script"
             python -I "$script" --help > /dev/null
           done
-      - name: Check the pages' JavaScript
+
+  pages:
+    # The page files the scripts fill in: CSS with stylelint's recommended rules (errors such as invalid values,
+    # unknown properties and duplicate selectors, not layout preferences), HTML with html-validate's recommended
+    # rules, and the JavaScript's syntax.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install the linters
+        # Installed into the checkout, so .stylelintrc.json can find the rule set it extends.
+        run: npm install --no-save --no-package-lock stylelint@16 stylelint-config-recommended@14 html-validate@9
+      - name: CSS
+        run: npx stylelint "skills/*/scripts/*.css"
+      - name: HTML
+        run: npx html-validate "skills/*/scripts/*.html"
+      - name: JavaScript syntax
         run: |
           for js in skills/*/scripts/*.js; do
             echo "$js"
