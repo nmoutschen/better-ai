@@ -598,6 +598,13 @@ JS = r"""
     '.db-pin{position:absolute;z-index:2147483647;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;' +
     'background:#E8725C;color:#1C1A17;font:700 12px/24px sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFCF7;cursor:pointer;transform:scale(var(--db-s,1))}' +
     '.db-pin.db-new{animation:db-pulse 1.2s ease-out 2}' +
+    // A pin shows its comment's progress in the colours of the conversation panel.
+    '.db-pin[data-state=seen]{background:#C4B69C}' +
+    '.db-pin[data-state=working]{background:#E8725C;animation:db-pulse 1.4s ease-out infinite}' +
+    '.db-pin[data-state=done]{background:#66795A;color:#FFFCF7}' +
+    '.db-pin[data-state=accepted]{background:#66795A;color:#FFFCF7;opacity:.45}' +
+    '.db-pin[data-state=reopened]{background:#E8725C;box-shadow:0 0 0 2px #FFFCF7,0 0 0 4px #9A3B2A}' +
+    '@media (prefers-reduced-motion: reduce){.db-pin{animation:none!important}}' +
     '@keyframes db-pulse{0%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 0 rgba(232,114,92,.9)}100%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 18px rgba(232,114,92,0)}}';
   function instrument(frame) {
     var doc; try { doc = frame.contentDocument; } catch (e) { return; }
@@ -687,6 +694,7 @@ JS = r"""
     if (!el) return;
     var r = el.getBoundingClientRect(), win = frame.contentWindow, pin = doc.createElement('span');
     pin.className = 'db-pin' + (fresh ? ' db-new' : ''); pin.dataset.id = it.id; pin.textContent = it.n;
+    pin.dataset.state = pinState[it.id] || 'new';
     pin.title = 'Comment ' + it.n + ': open to change or delete';
     pin.style.left = (r.left + win.scrollX + it.spot.fx * r.width) + 'px';
     pin.style.top = (r.top + win.scrollY + it.spot.fy * r.height) + 'px';
@@ -791,6 +799,17 @@ JS = r"""
       thread.appendChild(li);
     });
     if (stick) thread.scrollTop = thread.scrollHeight;
+    pinState = state; syncPins();
+  }
+  var pinState = {}, STATE_WORD = { seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
+  function syncPins() {
+    document.querySelectorAll('iframe').forEach(function (f) {
+      try { f.contentDocument.querySelectorAll('.db-pin').forEach(function (pin) {
+        var st = pinState[pin.dataset.id] || 'new', it = byId(pin.dataset.id);
+        pin.dataset.state = st;
+        pin.title = 'Comment ' + (it ? it.n : '') + ': ' + (STATE_WORD[st] || 'new') + '. Click to open it.';
+      }); } catch (e) {}
+    });
   }
   function asText() {
     var lines = [];
