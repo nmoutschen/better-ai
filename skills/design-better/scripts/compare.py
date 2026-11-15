@@ -5,7 +5,7 @@ Usage:
   python3 compare.py VERSION... --out FILE [--title T] [--question Q] [--width WxH ...] [--open] [--serve [--port N]]
   python3 compare.py --wait DIR [--timeout S]
   python3 compare.py --reply DIR TEXT [--to COMMENT_ID]
-  python3 compare.py --status DIR seen|working|done ID...
+  python3 compare.py --status DIR seen|asked|working|done ID...
   python3 compare.py --pending DIR
 
 VERSION is LABEL=SOURCE or SOURCE. SOURCE is an HTML file, embedded into the page, or an http(s) address, loaded
@@ -260,6 +260,8 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .progress .bars i { width:10px; height:4px; background:var(--line); }
 .progress.seen .bars i.on { background:var(--sand); }
 .progress.working { color:var(--umber); }
+.progress.asked { color:var(--heading); background:var(--linen); padding:1px 6px; outline:1px solid var(--umber); }
+.progress.asked .bars i.on { background:var(--umber); }
 .progress.working .bars i.on { background:var(--terracotta); }
 .progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
 .progress.done { color:var(--moss-dark); }
@@ -608,6 +610,7 @@ JS = r"""
     '.db-pin.db-new{animation:db-pulse 1.2s ease-out 2}' +
     // A pin shows its comment's progress in the colours of the conversation panel.
     '.db-pin[data-state=seen]{background:#C4B69C}' +
+    '.db-pin[data-state=asked]{background:#FFFCF7;color:#5C4033;box-shadow:0 0 0 2px #5C4033}' +
     '.db-pin[data-state=working]{background:#E8725C;animation:db-pulse 1.4s ease-out infinite}' +
     '.db-pin[data-state=done]{background:#66795A;color:#FFFCF7}' +
     // An accepted comment's pin goes away; showing it from the conversation brings it back for a moment.
@@ -731,7 +734,7 @@ JS = r"""
     });
   });
   var STEPS = ['seen', 'working', 'done', 'accepted'],
-      LABEL = { seen: 'Seen', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
+      LABEL = { seen: 'Seen', asked: 'Waiting for you', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
   // Reopening asks why, in a small box under the item; the reason goes with the reopen.
   function reasonBox(li, id) {
     if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
@@ -774,7 +777,7 @@ JS = r"""
       function answered(h) {
         var st = state[e.id];
         if (!st) { if (c.replies.length) h.append(el('span', 'answered', 'Answered')); return; }
-        var k = STEPS.indexOf(st), chip = el('span', 'progress ' + st), bars = el('span', 'bars');
+        var k = st === 'asked' ? 0 : STEPS.indexOf(st), chip = el('span', 'progress ' + st), bars = el('span', 'bars');
         for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
         chip.append(bars, el('span', '', LABEL[st]));
         h.append(chip);
@@ -842,7 +845,7 @@ JS = r"""
     frame.contentWindow.scrollTo({ top: Math.max(0, parseFloat(pin.style.top) - frame.contentWindow.innerHeight / 3), behavior: 'smooth' });
     setTimeout(function () { pin.classList.remove('db-flash'); }, 2800);
   }
-  var pinState = {}, STATE_WORD = { seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
+  var pinState = {}, STATE_WORD = { asked: 'waiting for you', seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
   function syncPins() {
     document.querySelectorAll('iframe').forEach(function (f) {
       try { f.contentDocument.querySelectorAll('.db-pin').forEach(function (pin) {
@@ -1173,7 +1176,7 @@ def reply(folder: Path, text: str, to: str | None) -> None:
     print("Reply shown in the page.")
 
 
-STATES = ("seen", "working", "done")
+STATES = ("seen", "asked", "working", "done")
 
 
 def read_log(folder: Path) -> list:
@@ -1243,7 +1246,7 @@ def main() -> None:
     parser.add_argument("--reply", nargs=2, metavar=("DIR", "TEXT"), help="show a reply from the agent in the page served from DIR")
     parser.add_argument("--to", metavar="ID", help="with --reply: the id of the comment the reply answers")
     parser.add_argument("--status", nargs="+", metavar=("DIR STATE", "ID"),
-                        help="DIR STATE ID...: mark comments or messages as seen, working or done")
+                        help="DIR STATE ID...: mark comments or messages as seen, asked (waiting for the user), working or done")
     parser.add_argument("--pending", metavar="DIR", help="list the comments and messages not marked done")
     args = parser.parse_args()
 
