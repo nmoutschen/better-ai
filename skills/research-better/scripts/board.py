@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import http.server
 import json
-import os
 import sys
 import time
 import webbrowser

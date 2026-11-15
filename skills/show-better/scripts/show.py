@@ -24,7 +24,6 @@ import webbrowser
 from html.parser import HTMLParser
 from pathlib import Path
 
-
 HERE = Path(__file__).resolve().parent  # show.css and show.js, inlined into every page, sit next to this script
 KINDS = (
     "map",
@@ -208,7 +207,9 @@ def wrap(text: str, chars: int, max_lines: int = 3) -> list[str]:
 def text_el(x, y, lines, size=12, weight=500, fill=None, anchor="start", italic=False, gap=None) -> str:
     gap = gap or size * 1.3
     style = ' font-style="italic"' if italic else ""
-    spans = "".join(f'<tspan x="{x:.1f}" dy="{0 if i == 0 else gap:.1f}">{esc(l)}</tspan>' for i, l in enumerate(lines))
+    spans = "".join(
+        f'<tspan x="{x:.1f}" dy="{0 if i == 0 else gap:.1f}">{esc(line)}</tspan>' for i, line in enumerate(lines)
+    )
     return (
         f'<text x="{x:.1f}" y="{y:.1f}" font-family="{SANS}" font-size="{size}" font-weight="{weight}" '
         f'fill="{fill or C["ink"]}" text-anchor="{anchor}"{style}>{spans}</text>'
@@ -311,7 +312,7 @@ def tbox(lines, width, g, hl=False):
     top = g["tl"] + (g["hl"] if hl else g["h"]) + g["h"] * (width - 3) + g["tr"]
     out = (
         [top]
-        + [f"{g['v']} {tcut(l, inner):<{inner}} {g['v']}" for l in lines]
+        + [f"{g['v']} {tcut(line, inner):<{inner}} {g['v']}" for line in lines]
         + [g["bl"] + g["h"] * (width - 2) + g["br"]]
     )
     return out
@@ -332,7 +333,8 @@ def table_lines(header, rows, W, g, right=frozenset(), hl=frozenset()):
 
     def line(cells, mark=" "):
         return mark + sep.join(
-            tcut(c, w).rjust(w) if i in right else tcut(c, w).ljust(w) for i, (c, w) in enumerate(zip(cells, widths))
+            tcut(c, w).rjust(w) if i in right else tcut(c, w).ljust(w)
+            for i, (c, w) in enumerate(zip(cells, widths, strict=False))
         )
 
     out = [line([str(h).upper() for h in header]), " " + sep.join(g["h"] * w for w in widths)]
@@ -463,7 +465,10 @@ def v_map(p, spec=None):
     hl_ids = set(_as_list(p.get("highlight")))
     n = len(secs)
     body = []
-    stroke = lambda hl: HL_STROKE if hl else ""
+
+    def stroke(hl):
+        return HL_STROKE if hl else ""
+
     if n <= 5:  # a row of parts, each with its gist inside the box
         gap = 14
         bw = (W - gap * (n - 1)) / n
@@ -634,7 +639,7 @@ def v_concept(p):
             f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{2.2 if hl else 1.5}" marker-end="url(#ah{"h" if hl else ""})"/>'
         )
         lab = wrap(e["label"], 24 if e in long_edges else lab_chars, 4)
-        lw = max(len(l) for l in lab) * 7.2 + 10
+        lw = max(len(part) for part in lab) * 7.2 + 10
         my -= (len(lab) - 1) * 8  # centre a multi-line label on its edge
         labels.append(
             f'<rect x="{mx - lw / 2:.1f}" y="{my - 13:.1f}" width="{lw:.1f}" height="{len(lab) * 16 + 6}" rx="3" fill="{C["cream"]}"/>'
@@ -698,7 +703,7 @@ def flow_boxes(labels, notes, hls, W, g, arrow_word):
     out = []
     if n <= 4 and bw >= 14:
         boxes = []
-        for lab, hl in zip(labels, hls):
+        for lab, hl in zip(labels, hls, strict=False):
             boxes.append(tbox(twrap(lab, bw - 4), bw, g, hl))
         h = max(len(b) for b in boxes)
         for b in boxes:
@@ -718,7 +723,7 @@ def flow_boxes(labels, notes, hls, W, g, arrow_word):
                 out += twrap(f"{k + 1}. {note}", W)
     else:
         width = min(W, 48)
-        for k, (lab, note, hl) in enumerate(zip(labels, notes, hls)):
+        for k, (lab, note, hl) in enumerate(zip(labels, notes, hls, strict=False)):
             out += tbox(twrap(lab, width - 4) + (twrap(note, width - 4) if note else []), width, g, hl)
             if k < n - 1:
                 out.append(" " * (width // 2) + g["down"])
@@ -925,8 +930,13 @@ def v_tree(p):
     D = depth(root)
     rootw = 130 if D > 1 else W  # the root carries no comparison, so give the levels below it the room
     cw = (W - rootw) / (D - 1) if D > 1 else W
-    colx = lambda d: 0 if d == 0 else rootw + (d - 1) * cw
-    colw = lambda d: rootw if d == 0 else cw
+
+    def colx(d):
+        return 0 if d == 0 else rootw + (d - 1) * cw
+
+    def colw(d):
+        return rootw if d == 0 else cw
+
     H = 420
     body, rows = [], []
     unit = p.get("unit", "")
@@ -1138,7 +1148,9 @@ def check_matrix(p, where, errors, warnings, digest):
             out.append(mark or "–")
         n_hl += 1 if r.get("highlight") else 0
         group = f"{r['group']} / " if r.get("group") else ""
-        digest.append(f"    {group}{r['label']}: " + ", ".join(f"{_label(col)}={m}" for col, m in zip(cols, out)))
+        digest.append(
+            f"    {group}{r['label']}: " + ", ".join(f"{_label(col)}={m}" for col, m in zip(cols, out, strict=False))
+        )
     if n_hl > LIMITS["highlights"]:
         warnings.append(
             f"{where}: {n_hl} highlighted rows or cells; emphasis works when it marks the one or two that carry the point"
@@ -1182,7 +1194,7 @@ def v_matrix(p):
             group = r["group"]
             out.append(f'<div class="mgroup" role="row"><span role="rowheader">{esc(group)}</span></div>')
         cells = []
-        for c, col in zip(r["cells"], cols):
+        for c, col in zip(r["cells"], cols, strict=False):
             mark = _mark(c)
             hl = isinstance(c, dict) and c.get("highlight")
             word = words.get(mark, blank) if mark else blank
@@ -1349,7 +1361,7 @@ def t_effects(p, W, g):
         cells[zone[r["effect"]]] = sym[r["effect"]].center(cw)
         mark = g["hl"] if r.get("highlight") else " "
         out.append(f"{mark}{lines[0]:<{lw}}" + "".join(cells))
-        out += [f" {l}" for l in lines[1:]]
+        out += [f" {line}" for line in lines[1:]]
     return out + ["", effect_legend({r["effect"] for r in p["rows"]}, g)]
 
 
@@ -1405,18 +1417,18 @@ def v_pairs(p):
         hl = r.get("highlight")
         sides = [r.get("left") or [], r.get("right") or []]
         lines = [[wrap(c["label"], int((cw - 50) / 8), 2) for c in s] for s in sides]
-        heights = [sum(10 + 19 * len(l) for l in s) for s in lines]
+        heights = [sum(10 + 19 * len(cell) for cell in s) for s in lines]
         lab = wrap(r["label"], 24, 3)
         rh = max(heights + [19 * len(lab)]) + 16
         body.append(text_el(0, y + 26, lab, 16, 700, C["heading"] if not hl else C["umber"], gap=19))
-        for k, (s, ls) in enumerate(zip(sides, lines)):
+        for k, (s, ls) in enumerate(zip(sides, lines, strict=False)):
             yy = y + 8
             x = left + cw * k
-            for c, l in zip(s, ls):
-                h = 10 + 19 * len(l)
+            for c, cell_lines in zip(s, ls, strict=False):
+                h = 10 + 19 * len(cell_lines)
                 if c.get("effect"):
                     body.append(mark_shape(x + 16, yy + h / 2, c["effect"]))
-                body.append(text_el(x + 40, yy + 18, l, 15, 600 if hl else 500, C["ink"], gap=19))
+                body.append(text_el(x + 40, yy + 18, cell_lines, 15, 600 if hl else 500, C["ink"], gap=19))
                 yy += h
         body.append(f'<line x1="0" y1="{y + rh:.1f}" x2="{W}" y2="{y + rh:.1f}" stroke="{C["line"]}"/>')
         y += rh
@@ -1447,7 +1459,7 @@ def t_pairs(p, W, g):
         " " * lw + "  " + (ha[k] if k < len(ha) else "").ljust(cw) + (hb[k] if k < len(hb) else "")
         for k in range(max(len(ha), len(hb)))
     ]
-    out = [l.rstrip() for l in out] + [g["h"] * W]
+    out = [line.rstrip() for line in out] + [g["h"] * W]
     used = set()
     for r in p["rows"]:
         cols = []
@@ -1457,7 +1469,7 @@ def t_pairs(p, W, g):
                 used.add(c.get("effect"))
                 w = twrap(c["label"], cw - 4)
                 lines.append(f"{sym[c.get('effect')]} {w[0]}")
-                lines += [f"  {l}" for l in w[1:]]
+                lines += [f"  {line}" for line in w[1:]]
             cols.append(lines or ["–"])
         lab = twrap(r["label"], lw - 1)
         n = max(len(cols[0]), len(cols[1]), len(lab))
@@ -1499,8 +1511,13 @@ def check_quadrant(p, where, errors, warnings, digest):
 def v_quadrant(p):
     """Items placed on two judged dimensions, with the four regions named."""
     left, top, pw, ph = 40, 30, W - 80, 400
-    X = lambda v: left + v * pw
-    Y = lambda v: top + ph - v * ph
+
+    def X(v):
+        return left + v * pw
+
+    def Y(v):
+        return top + ph - v * ph
+
     body = [
         f'<rect x="{left}" y="{top}" width="{pw}" height="{ph}" fill="none" stroke="{C["line"]}" stroke-width="1.5"/>',
         f'<line x1="{left + pw / 2}" y1="{top}" x2="{left + pw / 2}" y2="{top + ph}" stroke="{C["sand"]}" stroke-width="1.5"/>',
@@ -1573,8 +1590,8 @@ def t_quadrant(p, W, g):
         h = max(len(L), len(R), 3)
         L += [""] * (h - len(L))
         R += [""] * (h - len(R))
-        for l, r in zip(L, R):
-            out.append(f" {l:<{half}}{g['v']} {r}")
+        for left_text, r in zip(L, R, strict=False):
+            out.append(f" {left_text:<{half}}{g['v']} {r}")
         if a == "top_left":
             out.append(" " + g["h"] * half + g["cross"] + g["h"] * half)
     out.append(f"{g['dn']} {ya['low']}")
@@ -1650,7 +1667,7 @@ def v_units(p):
     for it in parts:
         styles.append(("terracotta", None) if it.get("highlight") else plain.pop(0) if plain else ("linen", "sand"))
     body, k, spans = [], 0, []
-    for it, (fill, stroke) in zip(parts, styles):
+    for it, (fill, stroke) in zip(parts, styles, strict=False):
         start = k
         for _ in range(it["count"]):
             r, c = divmod(k, cols)
@@ -1675,7 +1692,7 @@ def v_units(p):
             hl = it.get("highlight")
             mid = (x1 + x2) / 2
             lines = wrap(f"{it['count']} {it['label']}", max(int((x2 - x1) / 8.5), 10), 3)
-            half = max(len(l) for l in lines) * 4.6
+            half = max(len(line) for line in lines) * 4.6
             mid = min(max(mid, half), W - half)
             body.append(text_el(mid, y + 24, lines, 17, 700 if hl else 500, C["heading"], "middle", gap=21))
         h = (
@@ -1689,7 +1706,7 @@ def v_units(p):
         )
     else:  # a legend below the grid
         y = h + 28
-        for (fill, stroke), it in zip(styles, parts):
+        for (fill, stroke), it in zip(styles, parts, strict=False):
             attrs = (f'fill="{C[fill]}"' if fill else 'fill="none"') + (
                 f' stroke="{C[stroke]}" stroke-width="2"' if stroke else ""
             )
@@ -1717,10 +1734,10 @@ def t_units(p, W, g):
         marks.append(g["box"] if it.get("highlight") else (plain.pop(0) if plain else g["box3"]))
     total = sum(it["count"] for it in p["parts"])
     per_row = 20 if total > 20 else total
-    cells = "".join(m * it["count"] for m, it in zip(marks, p["parts"]))
+    cells = "".join(m * it["count"] for m, it in zip(marks, p["parts"], strict=False))
     out = [" ".join(cells[i : i + per_row]) for i in range(0, len(cells), per_row)]
     out.append("")
-    for m, it in zip(marks, p["parts"]):
+    for m, it in zip(marks, p["parts"], strict=False):
         out += twrap(f"{m} {it['count']} {it['label']}", W)
     if p.get("unit"):
         out.append(f"Each mark is one of {total} {p['unit']}.")
@@ -1845,7 +1862,10 @@ def v_slope(p):
     hi = max(vals)
     top, ph = 44, 300
     x1, x2 = 250, W - 250
-    Y = lambda v: top + ph - (v - lo) / ((hi - lo) or 1) * ph
+
+    def Y(v):
+        return top + ph - (v - lo) / ((hi - lo) or 1) * ph
+
     body = [
         text_el(x1, 18, [str(p["from"])], 14, 700, C["muted"], "middle"),
         text_el(x2, 18, [str(p["to"])], 14, 700, C["muted"], "middle"),
@@ -1856,7 +1876,7 @@ def v_slope(p):
     def spread(ys):  # keep labels on one side from overlapping
         order = sorted(range(len(ys)), key=lambda k: ys[k])
         out = list(ys)
-        for a, b in zip(order, order[1:]):
+        for a, b in zip(order, order[1:], strict=False):
             out[b] = max(out[b], out[a] + 20)
         return out
 
@@ -1941,7 +1961,10 @@ def v_dots(p):
     lo, hi = ticks[0], ticks[-1]
     left, right = 170, 20
     pw = W - left - right
-    X = lambda v: left + (v - lo) / ((hi - lo) or 1) * pw
+
+    def X(v):
+        return left + (v - lo) / ((hi - lo) or 1) * pw
+
     nbins = 50
     bw = pw / nbins
     r = min(bw / 2 - 0.5, 6)
@@ -1955,7 +1978,7 @@ def v_dots(p):
     tallest = max(max(len(v) for v in b.values()) for b in stacks)
     rh = max(60, tallest * 2 * r + 30)
     body, y = [], 10
-    for g, bins in zip(groups, stacks):
+    for g, bins in zip(groups, stacks, strict=False):
         hl = g.get("highlight")
         base = y + rh - 18
         body.append(
@@ -2053,8 +2076,13 @@ def v_scatter(p):
     xt = nice_ticks(axis_start(p, "x", xs), max(xs), 5)
     yt = nice_ticks(axis_start(p, "y", ys), max(ys), 4)
     left, top, pw, ph = 64, 40, W - 64 - 30, 360
-    X = lambda v: left + (v - xt[0]) / ((xt[-1] - xt[0]) or 1) * pw
-    Y = lambda v: top + ph - (v - yt[0]) / ((yt[-1] - yt[0]) or 1) * ph
+
+    def X(v):
+        return left + (v - xt[0]) / ((xt[-1] - xt[0]) or 1) * pw
+
+    def Y(v):
+        return top + ph - (v - yt[0]) / ((yt[-1] - yt[0]) or 1) * ph
+
     body = []
     for t in yt:
         body.append(f'<line x1="{left}" y1="{Y(t):.1f}" x2="{left + pw}" y2="{Y(t):.1f}" stroke="{C["line"]}"/>')
@@ -2151,11 +2179,17 @@ def v_line(p):
     numeric = all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in xs_all)
     if numeric:
         xlo, xhi = min(xs_all), max(xs_all)
-        xpos = lambda x: (x - xlo) / ((xhi - xlo) or 1)
+
+        def xpos(x):
+            return (x - xlo) / ((xhi - xlo) or 1)
+
         xticks = sorted(set(xs_all)) if len(set(xs_all)) <= 8 else nice_ticks(xlo, xhi, 5)
     else:
         order = list(dict.fromkeys(xs_all))
-        xpos = lambda x: order.index(x) / ((len(order) - 1) or 1)
+
+        def xpos(x):
+            return order.index(x) / ((len(order) - 1) or 1)
+
         xticks = order
     ys = [pt[1] for s in series for pt in s["points"]]
     lo = axis_start(p, "y", ys)
@@ -2164,8 +2198,13 @@ def v_line(p):
     unit = p.get("unit", "")
     left, right, top, plot_h = 56, 190, 30, 260
     plot_w = W - left - right
-    X = lambda x: left + xpos(x) * plot_w
-    Y = lambda y: top + plot_h - (y - ylo) / ((yhi - ylo) or 1) * plot_h
+
+    def X(x):
+        return left + xpos(x) * plot_w
+
+    def Y(y):
+        return top + plot_h - (y - ylo) / ((yhi - ylo) or 1) * plot_h
+
     body = []
     for t in ticks:
         body.append(
@@ -2192,7 +2231,7 @@ def v_line(p):
     ends.sort()
     for i in range(1, len(ends)):  # keep end labels from overlapping
         ends[i][0] = max(ends[i][0], ends[i - 1][0] + 38)
-    for y, name, val, hl, color in ends:
+    for y, name, val, hl, _color in ends:
         body.append(
             text_el(
                 left + plot_w + 12,
@@ -2295,7 +2334,7 @@ def v_timeline(p):
             f'<line x1="{x:.1f}" y1="{axis_y + (-10 if up else 10)}" x2="{x:.1f}" y2="{axis_y + (-24 if up else 24)}" stroke="{C["line"]}" stroke-width="1"/>'
         )
         lines = wrap(e["label"], chars, 3)
-        half = max(len(l) for l in lines + [str(e["date"])]) * 4.3
+        half = max(len(line) for line in lines + [str(e["date"])]) * 4.3
         tx = min(max(x, half + 2), W - half - 2)  # keep the label inside the frame
         if up:
             y0 = axis_y - 30 - len(lines) * 18
@@ -2704,7 +2743,7 @@ def render_text(spec, width=72, ascii=False, markdown=False):
         out.append("")
     if spec.get("source"):
         out += twrap(plain(spec["source"], markdown), W)
-    return "\n".join(l.rstrip() for l in out) + "\n"
+    return "\n".join(line.rstrip() for line in out) + "\n"
 
 
 # ---------- screen-reader text ----------
@@ -2739,9 +2778,7 @@ class _Linear(HTMLParser):
         elif tag in ("ol", "ul"):
             self.flush()
             self.lists.append([tag, 0])
-        elif tag == "li":
-            self.flush()
-        elif tag in ("p", "div", "br"):
+        elif tag == "li" or tag in ("p", "div", "br"):
             self.flush()
 
     def handle_endtag(self, tag):
@@ -2760,7 +2797,7 @@ class _Linear(HTMLParser):
             elif tag == "table":
                 head = t["head"]
                 for cells, hl in t["rows"]:
-                    named = [f"{h}: {c}" if h else c for h, c in zip(head[1:], cells[1:]) if c]
+                    named = [f"{h}: {c}" if h else c for h, c in zip(head[1:], cells[1:], strict=False) if c]
                     label = cells[0] if cells else ""
                     line = f"{label}. {'; '.join(named)}" if label and named else (label or "; ".join(named))
                     self.lines.append(line + (" (highlighted)" if hl else ""))
@@ -2845,7 +2882,7 @@ def render_screen_reader(spec, width=72):
         out.append("")
     if spec.get("source"):
         out += twrap(plain(spec["source"]), W)
-    return "\n".join(l.rstrip() for l in out) + "\n"
+    return "\n".join(line.rstrip() for line in out) + "\n"
 
 
 def main() -> None:
