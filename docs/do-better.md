@@ -1,8 +1,28 @@
 # `/do-better`
 
-Fixes work the agent gave you that misses what you wanted. It works out your goal and what is actually wrong, then hands back the corrected work, not an apology or a plan.
+Corrects work the agent gave you that misses what you wanted, and hands back the corrected work.
 
-## When to use it
+> I stopped the page too early, sorry. Both items were accepted and I took that to mean you were done. Restarting it now with the built page so you can send your feedback again.
+
+*A correction from building these docs, in the form this skill asks for: own the error in plain words, say what changes, and fix it.*
+
+## What it does
+
+- **Works out your goal** from the request, your feedback and the context.
+- **Finds what is actually wrong** before changing anything, and checks competing explanations.
+- **Hands back the corrected work**, with one sentence on what changed. It checks a fix to code, an interface or text the way the skill for that work would.
+- **Asks only when a decision blocks the fix**, with a few concrete choices.
+
+For example, after a result that misses:
+
+```
+/do-better the summary buries the decision
+```
+
+## Reference
+
+<details>
+<summary><b>When to use it</b></summary>
 
 - The agent's answer, document, design or code does not do what you asked, and you want it fixed now.
 - You rephrased or repeated a request, and the result still misses.
@@ -10,7 +30,10 @@ Fixes work the agent gave you that misses what you wanted. It works out your goa
 
 Use [`/improve-better`](improve-better.md) instead when you want the fix to last across later sessions, for example in memory, instructions or a skill. `/do-better` corrects the work in front of you.
 
-## How to run it
+</details>
+
+<details>
+<summary><b>How to run it</b></summary>
 
 ```
 /do-better [what is wrong]
@@ -21,7 +44,10 @@ Use [`/improve-better`](improve-better.md) instead when you want the fix to last
 
 Example: `/do-better the summary dropped the cost comparison I asked for`
 
-## What happens
+</details>
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It rereads the context.** It reads your original request, later corrections, your preferences and memories, and examples you accepted or rejected. It does not ask you to repeat what is already there.
 2. **It names your goal.** It separates what you need to understand, decide or do from the deliverable itself, and keeps unknowns as unknowns.
@@ -33,7 +59,10 @@ Example: `/do-better the summary dropped the cost comparison I asked for`
 
 If you run `/do-better` again on the same task, it treats the last revision as failed. It lists every requirement from the original request and each correction, checks the work against all of them, and changes its approach at the step where the work went wrong.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - The corrected work, in the same form you asked for.
 - One sentence naming what changed.
@@ -42,15 +71,23 @@ If you run `/do-better` again on the same task, it treats the last revision as f
 
 It writes no separate files or records.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 - [`/ask-better`](ask-better.md) for the one question it asks when a decision blocks the fix.
 - [`/code-better`](code-better.md), [`/design-better`](design-better.md) and [`/write-better`](write-better.md) for checking a fixed piece of code, interface or text.
 - `/code-better`, `/design-better` and [`/review-better`](review-better.md) send you here when you reject their result.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 Nothing beyond what the original task used. It reads the conversation and any files the work touched, and checks with the sources, tests or tools available.
 
 - If a tool or permission blocks part of the fix, it delivers what it can and names the blocker in one sentence.
 - Running `/do-better` does not let it publish, send messages, delete work or act outside the scope you already gave it.
+
+</details>

@@ -1,8 +1,32 @@
 # `/write-better`
 
-Writes or rewrites text so you understand it and can act on it: an answer, a report, a message or a document. It puts the main point first, cuts what you don't need, and uses plain, specific words.
+Writes or rewrites text so you understand it and can act on it: an answer, a report, a message or a document.
 
-## When to use it
+**Before**
+> Following a review of the various handoff points between the skills, it appears there may be a few gaps that could be worth considering at some point.
+
+**After**
+> Two skills skip a handoff: design-better shows directions before reviewing them, and do-better drops the checks of the skill that made the work.
+
+*An example rewrite: the main point first, in specific words.*
+
+## What it does
+
+- **Names your goal** for the text: understand, decide, do or learn.
+- **Puts the main point first** and cuts what you don't need.
+- **Uses plain, specific words**, one term per idea, and adds a table or diagram when the text describes how things relate.
+- **Follows your `write-for-<name>` guide** when you have one.
+
+For example:
+
+```
+/write-better the summary above
+```
+
+## Reference
+
+<details>
+<summary><b>When to use it</b></summary>
 
 - An agent's answer or report is hard to read or act on.
 - You have a document you want rewritten for its readers.
@@ -13,7 +37,10 @@ Use a neighbouring skill instead when:
 - You want to learn a topic over several turns: use [`/teach-better`](teach-better.md).
 - A long, dense document needs visual panels before it: use [`/show-better`](show-better.md).
 
-## How to run it
+</details>
+
+<details>
+<summary><b>How to run it</b></summary>
 
 - `/write-better` with no argument rewrites the agent's previous output.
 - `/write-better <document>` rewrites that document.
@@ -23,7 +50,10 @@ Example: `/write-better docs/onboarding.md`
 
 Running it does not mean the text needs large changes. A text that already meets the rules keeps its length and structure.
 
-## What happens
+</details>
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It looks up who will read the text**, from the conversation, project files and memories.
    - If you have a writing guide, such as `write-for-<name>`, it follows it. Where the two conflict, your guide wins.
@@ -44,7 +74,10 @@ Running it does not mean the text needs large changes. A text that already meets
    - It checks that the opening carries the main point.
    - It checks that you saw each thing the text mentions, or that the text says what it is.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - The rewritten text, or the new text.
 - A one-sentence statement of the goal it assumed, if it had to choose one.
@@ -52,7 +85,10 @@ Running it does not mean the text needs large changes. A text that already meets
 
 It reports only the checks it performed. It does not claim the text is clearer because it reads more fluently.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 It calls:
 
@@ -73,8 +109,13 @@ It is called by most skills, for the text you read:
 - [`/interview-me`](interview-me.md) for the wording of your guides.
 - [`/do-better`](do-better.md) to check a correction to text.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 - **Reading the conversation, project files and memories** to know the reader.
 - **Asking you.** With a structured question tool, it asks through it. Otherwise, it asks in plain text at the end of its response.
 - **Editing the document**, for rewrites of a file.
+
+</details>

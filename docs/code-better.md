@@ -1,8 +1,34 @@
 # `/code-better`
 
-Makes the agent build the code you need, not a plausible guess at it. It agrees requirements with you as concrete scenarios, keeps the change small, checks the code against those scenarios, and reports what it decided and assumed.
+Writes, checks and reviews code so it builds what you need, and leaves you able to understand and maintain it.
 
-## When to use it
+```markdown
+### Late orders first
+
+- Given: 142 orders, of which #4821 is 2 days late and #4830 is 1 day late
+- When: support opens the orders page
+- Then: #4821 and #4830 appear above the list, under "Late now"
+- Source: user
+```
+*A scenario from the requirements it agrees with you before writing code. It checks the finished code against each one.*
+
+## What it does
+
+- **Agrees requirements as scenarios** with concrete data you can check, separate from the design and the plan.
+- **Keeps the change small.** It changes only what the task needs, and never weakens a test to make it pass.
+- **Checks the code against the scenarios**, with a limit on fix attempts, and has a separate reviewer read the diff.
+- **Reports its decisions, assumptions and checks**, so you can maintain the code.
+
+For example:
+
+```
+/code-better show late orders first on the orders page
+```
+
+## Reference
+
+<details>
+<summary><b>When to use it</b></summary>
 
 - You want the agent to write or change code.
 - You want the agent to check coding work already done in the conversation.
@@ -14,7 +40,10 @@ Use a neighbouring skill instead when:
 - You only want a review of finished work of any kind: [`/review-better`](review-better.md) runs the review, and `/code-better` adds what to look for in code.
 - You rejected a result and want it corrected: use [`/do-better`](do-better.md).
 
-## How to run it
+</details>
+
+<details>
+<summary><b>How to run it</b></summary>
 
 - `/code-better <task>` does that task.
 - `/code-better` with no argument checks the coding work in the current conversation, then continues or corrects it.
@@ -24,7 +53,10 @@ Example: `/code-better add a --dry-run flag to the deploy script`
 
 Running it does not mean code gets written right away. It can stop at requirements and questions, or at a report that the request works against your goal.
 
-## What happens
+</details>
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It names your goal.** If your request names a solution, such as "add a cache", it names the need behind it. If that solution works against the need, it says so once, with one alternative, then follows your decision.
 2. **It reads first.** It reads the code the change touches, its callers and tests, and the project's instruction and contribution files. It does not ask you what those files answer.
@@ -37,7 +69,10 @@ Running it does not mean code gets written right away. It can stop at requiremen
 9. **It gets a separate review.** The reviewer sees only the diff, the requirements and the code, not the agent's reasoning.
 10. **It reports back** and offers to explain how the change works.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - The code change, kept to one purpose.
 - When the change needs them, these files, from the skill's templates:
@@ -52,7 +87,10 @@ Running it does not mean code gets written right away. It can stop at requiremen
 
   The report keeps three things apart: meeting the requirements, passing the checks, and your acceptance.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 It calls:
 
@@ -67,9 +105,14 @@ It is called by:
 - [`/review-better`](review-better.md) when the work under review is code, a diff or a pull request.
 - [`/do-better`](do-better.md) to check a correction to code.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 - **Reading files and running commands and tests.** Without running code, it says so, describes no results it did not see, and lists the checks you should run.
 - **Writing files.** Without it, it puts the requirements in its reply.
 - **Asking you.**
 - **Sub-agents.** It uses them for the review and for independent reading. Without them, it rereads the requirements and reads the diff as if someone else wrote it.
+
+</details>

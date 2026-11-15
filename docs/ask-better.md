@@ -1,24 +1,54 @@
 # `/ask-better`
 
-Decides whether the agent should ask you a question before working, and how to ask it. It asks only what only you can answer. It finds the rest itself, and tells you about conflicting instructions instead of picking one silently.
+Decides whether the agent should ask you a question before working, and how to ask it.
 
-## When to use it
+> **Who should the docs serve first?**
+>
+> 1. **Deciding to install**: someone sizing up the plugin: what each skill does and why it is different.
+> 2. **Already installed**: someone using a skill: how to run it, what happens, what they get.
+> 3. **Both equally**: pages serve both readers.
+
+*A question from planning these docs, in the form this skill asks for: one decision only the user could make, with what each option means.*
+
+## What it does
+
+- **Looks things up first.** It reads the code, documents, earlier conversation and memory, and asks you nothing these answer.
+- **Asks only what only you know**, when the answer changes the result and a wrong guess would be costly. Otherwise it goes ahead and states its assumption.
+- **Asks early and all at once**, with each question answerable in a few words or by choosing.
+- **Raises conflicting instructions** to you instead of picking one.
+
+For example, before a task with an unclear target:
+
+```
+/ask-better clean up the old branches
+```
+
+## Reference
+
+<details>
+<summary><b>When to use it</b></summary>
 
 - Before the agent starts a task that may be unclear.
 - When an agent guessed wrong on an earlier task, or asked you things it could have looked up.
 
 Running it does not mean a question is needed. It often ends with the agent going ahead and stating its assumptions.
 
-Other skills use it at the point where they ask you something, so you rarely need to call it yourself (see [Works with](#works-with)).
+Other skills use it at the point where they ask you something, so you rarely need to call it yourself (see Works with below).
 
-## How to run it
+</details>
+
+<details>
+<summary><b>How to run it</b></summary>
 
 - `/ask-better <request>` checks that request before starting it.
 - `/ask-better` with no argument checks the current task before more work is done on it.
 
 Example: `/ask-better clean up the old branches`
 
-## What happens
+</details>
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It lists what the result depends on**: your goal, the exact target, the scope, how you will judge the result, and constraints such as format or deadlines. It treats its own assumptions as unknown.
 2. **It looks up what it can.** It reads the code, documents, earlier conversation, memories and instruction files. It does not ask you where a file is or how the project is built.
@@ -38,14 +68,20 @@ Example: `/ask-better clean up the old branches`
    - Each says why it is asked, so it makes sense on its own.
 6. **During the task**, it asks new questions between steps, not in the middle of one. While it waits, it continues only work that does not depend on the answer and is easy to undo.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - Either the work, with each assumption stated next to the result it affects,
 - or a short set of questions with options, through a structured question tool if there is one.
 - A note when two of your instructions conflict, quoting both.
 - One list of requirements that combines your request and your answers. The agent keeps it for the whole task and does not ask again about what you answered.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 It calls no other skill.
 
@@ -58,7 +94,12 @@ It is called by:
 - [`/write-better`](write-better.md) when it must ask about the goal of a text.
 - [`/improve-better`](improve-better.md) when it asks you to approve or reject each proposal.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 - **Reading files, the conversation, memories and instruction files**, to look up what it can.
 - **Asking you.** With a structured question tool, such as `AskUserQuestion`, it asks through it. Otherwise, it asks in plain text at the end of its response.
+
+</details>

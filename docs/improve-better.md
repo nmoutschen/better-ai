@@ -1,10 +1,34 @@
 # `/improve-better`
 
-Improves what your agent carries from one session to the next, such as its memory, instructions files, skills and workflows. It looks for changes in past sessions, tests each one, and proposes the changes that pass for you to approve. It can also propose a change it could not test, marked as untested with the reason.
+Improves what your agent carries from one session to the next: memory, instructions files, skills and workflows.
 
-The aim is that you repeat yourself, correct the agent and wait less in later sessions. A run can end with no proposal, and it says so in one sentence.
+```diff
+ 3. LOOK at the rendered page before you show it, and FIX each version that does not load, overlaps or is cut off.
++   FOR new directions, ALSO REVIEW them with modes/review.md before you show them, and FIX or DROP what the review confirms.
+```
+- **Evidence:** in one session the user asked by hand to review directions before seeing them.
+- **Test:** checked against recorded sessions; in another session it would have added a review round.
+- **Undo:** delete the added line.
 
-## When to use it
+*A proposal from the run that led to these docs: the change, its evidence, its test result and how to undo it.*
+
+## What it does
+
+- **Finds candidate changes in past sessions**: instructions you repeated, corrections no rule covers, and rules nothing uses.
+- **Tests each change** on past tasks it was not built from, or against what you accepted before.
+- **Proposes at most five changes**, each with its evidence, test result and how to undo it, and marks any it could not test.
+- **Applies only what you approve**, and keeps a record so later runs can undo or retire a change.
+
+For example, to look at one area:
+
+```
+/improve-better memory
+```
+
+## Reference
+
+<details>
+<summary><b>When to use it</b></summary>
 
 - You keep giving the agent the same instruction, or correcting the same mistake.
 - You want to find routines the agent repeats by hand, or rules and skills that nobody uses, contradict each other or repeat each other.
@@ -12,7 +36,10 @@ The aim is that you repeat yourself, correct the agent and wait less in later se
 
 Use [`/do-better`](do-better.md) instead when you are pointing at a defect in the work in front of you. Use [`/interview-me`](interview-me.md) when you want the agent to learn how you read, review and want it to work by asking you.
 
-## How to run it
+</details>
+
+<details>
+<summary><b>How to run it</b></summary>
 
 ```
 /improve-better [area to improve]
@@ -23,7 +50,10 @@ Use [`/do-better`](do-better.md) instead when you are pointing at a defect in th
 
 Example: `/improve-better memory`
 
-## What happens
+</details>
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It reads the evidence.** It reads past sessions, if your tool keeps them, plus memory, instructions files, the record of past runs, and the files it may change. If it cannot read past sessions, it says so and works from the current session and these files.
 2. **It finds candidates.** Each candidate starts from evidence it can cite, such as an instruction you gave more than once, a correction no rule covers yet, or a rule no session used. Removing, merging and shortening rules count as much as adding them. It keeps only a handful of candidates.
@@ -37,22 +67,33 @@ Example: `/improve-better memory`
 6. **It asks you to decide on each one.** Only an explicit approval counts. Silence, or approval of a different proposal, does not.
 7. **It applies and records.** It applies each approved change exactly as proposed, then checks that nothing else changed.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - Proposals with their evidence, test results and undo steps.
 - Changes to the files you approved, and nothing else.
 - A record of each run: the date, each proposal, its evidence and test result, and your decision. It keeps the record in its persistent memory if it has one, otherwise in a file in your working directory, whose path it tells you. Later runs read the record and don't re-propose a change you rejected unless there is new evidence.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 - [`/ask-better`](ask-better.md) for how it asks you to approve or reject each proposal.
 - It can change your personal skills, such as the `write-for-<name>` skill from [`/interview-me`](interview-me.md).
 - It can change a skill whose source is in the repository you work in, following that repository's rules for changing skills.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 - **Past session logs** for the strongest evidence. Without them, it uses the current session and your persistent files, and says so.
 - **Sub-agents** to judge changes apart from the step that wrote them. Without them, it writes the check before it writes the change and does not edit the check afterwards.
 - **File access** to apply changes and keep the record. Without it, it gives you the record at the end and asks you to provide it to the next run.
 
 It may propose, but never applies, changes to your tool's configuration, such as permissions, hooks or scheduled runs. If you want runs to start on their own, for example on a schedule or at the end of a session, it proposes how and sets it up only after you approve. A run that starts while you are away applies nothing and keeps its proposals for when you are back.
+
+</details>

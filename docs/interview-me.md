@@ -1,10 +1,33 @@
 # `/interview-me`
 
-Interviews you about how you read, how you review work, and how you want AI agents to work for you. It writes what it learns as personal guides that agents use from then on, so you explain and correct less.
+Interviews you about how you read, how you review work, and how you want agents to work for you, then writes personal guides agents follow.
 
-It works from your real documents, reviews and corrections, and from side-by-side samples you choose between, not from general questions about your preferences.
+```markdown
+### 3. Put the question for the reader first
 
-## When to use it
+- Applies: any reply that needs a decision
+- Does not apply: none found
+- Evidence: chose — picked the version that opened with the question in 3 of 3 comparisons
+```
+*An example rule in the `write-for-<name>` guide it writes. Each rule records whether you chose it, showed it or only said it.*
+
+## What it does
+
+- **Works from your real material**: documents you liked, reviews you wrote, corrections you made.
+- **Asks you to compare concrete samples** instead of asking general questions about your preferences.
+- **Writes `write-for-<name>` and `review-for-<name>`**, which `/write-better` and `/review-better` follow, and a short profile you can paste into any AI tool.
+- **Shows you each guide before saving it**, so you can correct or delete rules.
+
+For example, to run only the reading interview:
+
+```
+/interview-me write
+```
+
+## Reference
+
+<details>
+<summary><b>When to use it</b></summary>
 
 - Agents' text often needs rewriting before you can act on it.
 - Agents check work differently from how you would.
@@ -13,7 +36,10 @@ It works from your real documents, reviews and corrections, and from side-by-sid
 
 Use [`/improve-better`](improve-better.md) instead to improve memory, instructions or skills from evidence in past sessions, without an interview.
 
-## How to run it
+</details>
+
+<details>
+<summary><b>How to run it</b></summary>
 
 ```
 /interview-me [write | review | profile | path to an existing guide]
@@ -27,7 +53,10 @@ Use [`/improve-better`](improve-better.md) instead to improve memory, instructio
 
 Example: `/interview-me write`
 
-## What happens
+</details>
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It reads what is already known.** It reads your memories, project instructions and any existing guides, and skips what they already answer. If a guide already covers the interview, it updates that guide instead.
 2. **It asks for real material, in one message:**
@@ -43,7 +72,10 @@ Example: `/interview-me write`
 
 It does not ask about any condition, diagnosis or who you are, and does not guess your ability from how you write.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - **`write-for-<name>`**: a skill with rules for writing text you understand and act on. You save it where your tool loads personal skills, or in a project's skills folder.
 - **`review-for-<name>`**: a skill with your review criteria, split into blocking criteria and preferences. Saved the same way.
@@ -55,17 +87,25 @@ Each rule records its scope, one example, and whether you chose it in a comparis
 
 The profile is loaded into every conversation and can make agents agree with you more. You can remove a rule at any time with `/interview-me <path of the record>`.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 - [`/write-better`](write-better.md) reads your `write-for-<name>` skill and follows it on top of its own rules. The guide also applies to [`/show-better`](show-better.md) panels and [`/teach-better`](teach-better.md) lessons.
 - [`/review-better`](review-better.md) adds your `review-for-<name>` criteria to every review, and treats your blocking criteria as blocking findings.
 - It uses `/write-better` to word the guides.
 - [`/improve-better`](improve-better.md) can later propose changes to these personal skills.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 - **Your material.** Without it, the guides rest on comparisons and what you say.
 - **A question tool**, if your tool has one, for offering options. Otherwise it asks in plain text.
 - **File access** to save the guides. Without it, it gives each file in a code block with the path to save it to.
 
 It never changes a tool's settings itself. You paste the profile instructions.
+
+</details>

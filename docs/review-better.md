@@ -1,8 +1,34 @@
 # `/review-better`
 
-Reviews work, such as text, code, an interface, a plan or a research report, so that each finding leads to an action: a fix, an answer or a decision. It reviews your work, its own, another agent's or another person's.
+Reviews work, such as text, code, an interface, a plan or a research report, so that each finding leads to a fix, an answer or a decision.
 
-## When to use it
+```markdown
+- Scenario and step: See it, the caption under the screenshot
+- What I did: compared the caption with the image and with SKILL.md 1.5
+- What happened: the caption names thumbs up or down; the image shows two
+  versions and no thumbs controls (they appear with three or more)
+- Why it slows the person: the caption names a control they cannot find
+- Proposed fix: drop the thumbs from the caption
+```
+*A finding from the review of these docs. Each finding names the check behind it and an action.*
+
+## What it does
+
+- **Agrees what the review is for**, and looks for the few problems that would stop the work reaching its goal.
+- **Uses a separate reviewer**, from a different model when it can, and backs each finding with a check it ran.
+- **Fixes what is simple, asks what only the author knows**, and lays out the options when there are several.
+- **Adds your `review-for-<name>` criteria** when you have them.
+
+For example:
+
+```
+/review-better docs/design-better.md
+```
+
+## Reference
+
+<details>
+<summary><b>When to use it</b></summary>
 
 - You want a review of a file, a diff, a pull request, a link or work in the conversation.
 - You want findings you can act on, not a long list of remarks.
@@ -19,7 +45,10 @@ For a plan, a specification or a research report, it writes three to six kinds o
 
 If you rejected a review and want it corrected, use [`/do-better`](do-better.md).
 
-## How to run it
+</details>
+
+<details>
+<summary><b>How to run it</b></summary>
 
 - `/review-better <work>` reviews that work. The work can be a file, a diff, a pull request or a link.
 - `/review-better` with no argument reviews the work in the current conversation. If there is none, it asks you what to review.
@@ -28,7 +57,10 @@ Example: `/review-better https://github.com/acme/app/pull/42`
 
 A review can end with no findings. It then says so in one sentence, with what it checked and how.
 
-## What happens
+</details>
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It names two goals.** One is what the review must let the author do, such as ship, decide or improve. The other is what the work's own reader must do. It reads what the work answers to: the request, requirements, brief, sources, and decisions already made. A decision already made is not a finding. If the work's goal is unclear and nothing answers it, it asks you one question.
 2. **It names the author.** If the work belongs to someone other than you or the agent, it proposes changes instead of making them, unless you ask.
@@ -42,7 +74,10 @@ A review can end with no findings. It then says so in one sentence, with what it
    - anything else: it proposes a specific change
 7. **It holds a finding you dispute without evidence.** It changes a finding only when your argument adds evidence or shows the finding misread the work. It opens any source you cite before counting it.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 A report that leads with whether the work reaches its goal, and what blocks it if not. Then it lists:
 
@@ -53,7 +88,10 @@ A report that leads with whether the work reaches its goal, and what blocks it i
 
 It ends with what it did not read, run or check. It adds no praise to soften findings. It names what works only when a fix could remove it.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 It calls:
 
@@ -69,9 +107,14 @@ It is called by:
 - [`/design-better`](design-better.md)'s review mode.
 - [`/write-better`](write-better.md) when you ask for a review of a text without a rewrite.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 - **Reading files, running commands and opening sources** to confirm findings.
 - **Sub-agents, and choosing their model.** Without sub-agents, it reviews in a separate pass after the work is done. It rereads the goal and the list first, then reads the work as if someone else made it.
 - **Asking you.**
 - **Editing the work**, for simple fixes in work it may change.
+
+</details>
