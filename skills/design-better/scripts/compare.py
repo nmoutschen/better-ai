@@ -289,10 +289,10 @@ body.app .notes .notes-top h2 { padding:0; margin:0; }
 .thread .reply.mine.answer-note { border-left-color:var(--umber); }
 .btn--sm { padding:3px 10px; font-size:10px; }
 .msg .head { flex-wrap:wrap; row-gap:2px; }
-.thread .foot { display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; margin:6px 0 -4px; }
-/* A reply pulls its bottom edge 10px down; 16px leaves the same 6px gap as without one. */
-.thread .reply + .foot { margin-top:16px; }
-.thread .reply:has(+ .foot) { padding-bottom:4px; }
+.thread .foot { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; margin:2px 0 -6px; }
+/* A reply pulls its bottom edge 10px down; 12px leaves the same 2px gap as without one. */
+.thread .reply + .foot { margin-top:12px; }
+.thread .reply:has(+ .foot) { padding-bottom:2px; }
 /* Inside an item, the item's own left edge already marks it: a reply shows by its background and label, not a second bar. */
 .thread > li.msg .reply, .thread > li.msg .reply.mine { border-left:0; padding-left:16px; }
 .thread .foot .answer { margin-left:auto; }
