@@ -76,6 +76,11 @@ svg.map { display:block; width:100%; height:100%; }
 .thread > li.msg.decision { border-left:4px solid var(--umber); }
 .thread > li.msg.decision > .head .who { color:var(--umber); }
 .thread > li.msg.decision > .head .when { color:var(--umber); font-weight:700; }
+/* A worker's message when it closes a question: white like the user's, with a sand edge, so the coordinator's stay distinct. */
+.thread > li.msg.worker { border-left:4px solid var(--sand); }
+.msg .what { margin:2px 0 0; font:700 12px/1.4 var(--sans); color:var(--ink); }
+.msg .qlink { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; text-align:left; }
+.msg .added { margin:4px 0 0; font-size:12px; color:var(--muted); }
 .agentsec { flex:none; max-height:30vh; overflow-y:auto; border-bottom:1px solid var(--line); padding:0 20px 12px; margin-bottom:16px; }
 .agentsec h2 { margin:0 0 8px; font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
 .agents { list-style:none; margin:0; padding:0; }
@@ -304,10 +309,11 @@ function conversation(d) {
     if (e.action === "status") state[e.to] = e.status;
     else if (e.action === "accept") state[e.to] = "accepted";
     else if (e.action === "reopen") state[e.to] = "reopened";
+    else if (e.action === "closed" && e.id) { const it = {e, replies: [], closed: true}; byId[e.id] = it; items.push(it); }
     else if (e.action === "reply" && e.to && byId[e.to]) {
       const it = byId[e.to], host = it.e.action === "answer" && byId[it.e.decision] ? byId[it.e.decision] : it;
       host.replies.push({mine: false, text: e.text, at: e.at}); if (e.id) byId[e.id] = host; }
-    else if (e.action === "note" && e.to && byId[e.to]) { const host = byId[e.to]; host.replies.push({mine: true, text: e.text, at: e.at}); if (host.agent) host.lastNote = e.id;
+    else if (e.action === "note" && e.to && byId[e.to]) { const host = byId[e.to]; host.replies.push({mine: true, text: e.text, at: e.at}); if (host.agent || host.closed) host.lastNote = e.id;
       if (e.id) byId[e.id] = host;  // a reply to this answer belongs to the same message
       if (state[e.to] === "asked") state[e.to] = "replied"; else if (state[e.to] === "done" || state[e.to] === "accepted") state[e.to] = "followup"; }
     else if (["comment", "note"].includes(e.action) && e.id) { const it = {e, replies: []}; byId[e.id] = it; items.push(it); }
@@ -359,6 +365,7 @@ function drawRight(d, conv) {
     if (it.agent) return `<li class="msg agent" data-id="${esc(e.id || "")}">${replyHTML({mine: false, text: e.text, at: e.at})}${it.replies.map(replyHTML).join("")}
       ${e.id && !SNAPSHOT ? `<div class="foot">${it.lastNote ? progress(conv.state[it.lastNote]) : ""}<button type="button" class="btn btn--quiet btn--sm answer" data-answer="${esc(e.id)}">Reply</button></div>` : ""}</li>`;
     if (it.decision) return decisionHTML(it, conv);
+    if (it.closed) return closedHTML(it, conv, d);
     return itemHTML(it, conv, true); }).join(""));
   $("empty").hidden = conv.items.length > 0;
   // As in the canvas: open on the latest message, and follow new ones while the user is at the bottom.
@@ -367,6 +374,18 @@ function drawRight(d, conv) {
     bottom(); requestAnimationFrame(bottom); document.fonts?.ready.then(bottom);
     if (conv.items.length) SCROLLED = true;
   }
+}
+// A worker's message when it closes a question. The title and the count of new questions are read from the board now,
+// so a later rewrite or a question added after the close shows; the answer is the gist as the worker wrote it.
+const CLOSEWORD = {answered: "Answered", contested: "Contested", "not found": "Not found", unclear: "Unclear"};
+function closedHTML(it, conv, d) {
+  const e = it.e, q = d.byId[e.q], n = d.qs.filter(x => x.parent === e.q).length;
+  const title = q ? `<button type="button" class="qlink" data-open="question:${esc(e.q)}">${esc(q.label)}</button>` : esc(e.q);
+  const more = n ? `<p class="added">Raised ${plural(n, "new question")}.</p>` : "";
+  return `<li class="msg worker" data-id="${esc(e.id)}">${head(esc(e.by || "A worker"), e.at)}
+    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p><p class="body" dir="auto">${esc(e.text)}</p>${more}
+    ${it.replies.map(replyHTML).join("")}
+    ${SNAPSHOT ? "" : `<div class="foot">${it.lastNote ? progress(conv.state[it.lastNote]) : ""}<button type="button" class="btn btn--quiet btn--sm answer" data-answer="${esc(e.id)}">Reply</button></div>`}</li>`;
 }
 function decisionHTML(it, conv) {
   const e = it.e;
