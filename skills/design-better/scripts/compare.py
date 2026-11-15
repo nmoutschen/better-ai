@@ -35,6 +35,8 @@ import threading
 import time
 import urllib.request
 import json
+import mimetypes
+import urllib.parse
 import re
 import sys
 import webbrowser
@@ -1032,7 +1034,7 @@ def frame_source(source: str, warnings: list) -> str:
         sys.exit(f"error: {source} is not a file or an http(s) address")
     doc = path.read_text(encoding="utf-8", errors="replace")
     if RELATIVE_REF.search(doc):
-        warnings.append(f"{source} links files by relative path: the page shows them only on this machine.")
+        warnings.append(f"{source} links files by relative path: the page shows them only on this machine, served or opened as a file.")
         base = f'<base href="{esc(path.resolve().parent.as_uri())}/">'
         m = HEAD.search(doc)
         doc = doc[:m.end()] + base + doc[m.end():] if m else base + doc
@@ -1150,6 +1152,18 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
     """Serve the page from disk, so a rewrite shows on reload, and record each answer the page sends."""
     log, cursor = page.parent / "answers.jsonl", page.parent / ".answers-seen"
     lock = threading.Lock()
+    # A version that links files by relative path carries a file:// base, which a page served over http may not load.
+    # The served page points that base at /files/<n>/ instead, and the server answers only inside that folder.
+    folders: list = []
+    base_uri = re.compile(r'(base href=&quot;)(file://[^&"]+?)/(&quot;)')
+
+    def served_page() -> bytes:
+        def swap(m):
+            root = Path(urllib.request.url2pathname(urllib.parse.urlparse(urllib.parse.unquote(html.unescape(m.group(2)))).path)).resolve()
+            if root not in folders:
+                folders.append(root)
+            return f"{m.group(1)}/files/{folders.index(root)}/{m.group(3)}"
+        return base_uri.sub(swap, page.read_text(encoding="utf-8")).encode("utf-8")
 
     def count() -> int:
         return sum(1 for _ in log.open(encoding="utf-8")) if log.exists() else 0
@@ -1172,11 +1186,25 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
             body.update({"error": error} if error else {"result": result})
             self.reply(200, json.dumps(body).encode(), "application/json")
 
+        def version_file(self):
+            """A file a version links by relative path, read only from inside that version's own folder."""
+            parts = urllib.parse.unquote(self.path.split("?", 1)[0]).split("/", 3)  # "", "files", index, path
+            if len(parts) < 4 or not parts[2].isdigit() or int(parts[2]) >= len(folders):
+                return self.send_error(404)
+            root = folders[int(parts[2])]
+            target = (root / parts[3]).resolve()
+            if not target.is_relative_to(root) or not target.is_file():
+                return self.send_error(404)
+            kind = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+            return self.reply(200, target.read_bytes(), kind)
+
         def do_GET(self):
             if not self.local():
                 return self.send_error(403)
             if self.path in ("/", "/index.html"):
-                return self.reply(200, page.read_bytes(), "text/html; charset=utf-8")
+                return self.reply(200, served_page(), "text/html; charset=utf-8")
+            if self.path.startswith("/files/"):
+                return self.version_file()
             if self.path == "/rev":
                 return self.reply(200, str(page.stat().st_mtime_ns).encode(), "text/plain")
             if self.path.startswith("/events?after="):
