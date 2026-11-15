@@ -149,6 +149,14 @@ main.commenting .screen { outline:3px solid var(--terracotta); outline-offset:2p
 .notes .send { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; margin-top:12px; }
 .status { margin:0; font-size:14px; }
 .status.error { color:#9A3B2A; font-weight:700; }
+.pop .remove { margin-left:auto; }
+.pop .remove[hidden] { display:none; }
+.toast { position:fixed; z-index:6; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(36rem, calc(100vw - 32px));
+  background:var(--umber); color:var(--cream); padding:12px 20px; font:700 15px/1.4 var(--sans);
+  box-shadow:0 8px 24px rgba(28,26,23,.3); }
+.toast.ok { background:var(--moss-dark); }
+.toast.error { background:#9A3B2A; }
+.toast[hidden] { display:none; }
 .update { position:sticky; top:0; z-index:3; background:var(--moss-dark); color:var(--cream); padding:10px var(--pad);
   display:flex; gap:16px; align-items:center; }
 .update[hidden] { display:none; }
@@ -263,10 +271,15 @@ JS = r"""
       dialog.querySelector('.bar b').textContent = src.title;
       var box = dialog.querySelector('.screen'); box.replaceChildren(copy);
       box.style.width = ''; box.style.height = '';
+      // The copy gets comment mode too. A modal dialog makes the rest of the page inert, so the comment box and
+      // the toast move into it while it is open.
+      copy.addEventListener('load', function () { instrument(copy); });
+      dialog.append(pop, toast);
       dialog.showModal();
     });
   });
   dialog.querySelector('.close').addEventListener('click', function () { dialog.close(); });
+  dialog.addEventListener('close', function () { closePop(); document.body.append(pop, toast); });
   document.body.classList.add('scaled');
   window.addEventListener('resize', fit);
   view('side');
@@ -276,14 +289,26 @@ JS = r"""
   var served = location.protocol === 'http:', rpcId = 0, seq = 0, items = [], verdicts = {}, choice = null;
   var status = document.querySelector('.notes .status');
   function say(text, error) { status.textContent = text; status.classList.toggle('error', !!error); }
-  function send(method, params) {
-    if (!served) { say('Saved on this page. Use Copy all to paste your feedback in the chat.'); return; }
+  // Every action shows a toast where the eye already is, at the bottom of the window: sending, then sent or failed.
+  var toast = document.querySelector('.toast'), toastTimer = null;
+  function flash(text, kind) {
+    clearTimeout(toastTimer);
+    toast.textContent = text; toast.className = 'toast ' + (kind || ''); toast.hidden = false;
+    if (kind !== 'error' && kind !== 'busy') toastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
+  }
+  function send(method, params, what, done) {
+    if (!served) { flash(what + ' saved on this page. Use Copy all to paste it in the chat.', 'ok');
+                   say('Saved on this page. Use Copy all to paste your feedback in the chat.'); if (done) done(); return; }
+    flash('Sending ' + what.toLowerCase() + '…', 'busy');
     fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
       .then(function (r) { return r.json(); })
       .then(function (r) { if (r.error) throw new Error(r.error.message);
-        say('Sent at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '. The agent gets it at its next step.'); })
-      .catch(function () { say('Not sent: the page lost its connection to the agent. Use Copy all and paste it in the chat.', true); });
+        flash('✓ ' + what + ' sent to the agent', 'ok');
+        say('Last sent at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ': ' + what.toLowerCase() + '.');
+        if (done) done(); })
+      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The page lost its connection to the agent. Use Copy all and paste it in the chat.', 'error');
+        say('Not sent. Use Copy all and paste it in the chat.', true); });
   }
   function syncVersionButtons() {
     document.querySelectorAll('.vbtn[data-v]').forEach(function (b) {
@@ -294,8 +319,11 @@ JS = r"""
   document.querySelectorAll('.vbtn[data-v]').forEach(function (b) {
     b.addEventListener('click', function () {
       var v = labels[+b.dataset.v];
-      if (b.classList.contains('pickv')) { choice = choice === v ? null : v; send('choose', { version: choice }); }
-      else { verdicts[v] = verdicts[v] === b.dataset.verdict ? null : b.dataset.verdict; send('verdict', { version: v, verdict: verdicts[v] }); }
+      if (b.classList.contains('pickv')) { choice = choice === v ? null : v;
+        send('choose', { version: choice }, choice ? 'Choice of ' + v : 'Choice withdrawn'); }
+      else { verdicts[v] = verdicts[v] === b.dataset.verdict ? null : b.dataset.verdict;
+        send('verdict', { version: v, verdict: verdicts[v] },
+             verdicts[v] ? (verdicts[v] === 'up' ? 'Thumbs up' : 'Thumbs down') + ' for ' + v : 'Verdict on ' + v + ' withdrawn'); }
       syncVersionButtons();
     });
   });
@@ -304,7 +332,7 @@ JS = r"""
   var modeBtn = document.querySelector('#comment'), commenting = true, pop = document.querySelector('.pop'), draft = null;
   function setMode(on) {
     commenting = on; modeBtn.setAttribute('aria-pressed', String(on)); main.classList.toggle('commenting', on);
-    if (!on) document.querySelectorAll('main iframe').forEach(function (f) { try { clearHover(f.contentDocument); } catch (e) {} });
+    if (!on) document.querySelectorAll('iframe').forEach(function (f) { try { clearHover(f.contentDocument); } catch (e) {} });
   }
   main.classList.add('commenting');
   modeBtn.addEventListener('click', function () { setMode(!commenting); });
@@ -336,14 +364,27 @@ JS = r"""
   }
   var PIN_CSS = '[data-db-hover]{outline:2px solid #E8725C!important;outline-offset:2px;cursor:crosshair!important}' +
     '.db-pin{position:absolute;z-index:2147483647;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;' +
-    'background:#E8725C;color:#1C1A17;font:700 12px/24px sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFCF7;pointer-events:none;transform:scale(var(--db-s,1))}';
+    'background:#E8725C;color:#1C1A17;font:700 12px/24px sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFCF7;cursor:pointer;transform:scale(var(--db-s,1))}' +
+    '.db-pin.db-new{animation:db-pulse 1.2s ease-out 2}' +
+    '@keyframes db-pulse{0%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 0 rgba(232,114,92,.9)}100%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 18px rgba(232,114,92,0)}}';
   function instrument(frame) {
     var doc; try { doc = frame.contentDocument; } catch (e) { return; }
     if (!doc || !doc.body || doc.documentElement.dataset.dbReady) return;
     doc.documentElement.dataset.dbReady = '1';
     var style = doc.createElement('style'); style.textContent = PIN_CSS; doc.head.appendChild(style);
-    doc.addEventListener('mouseover', function (e) { if (!commenting) return; clearHover(doc); e.target.setAttribute('data-db-hover', ''); }, true);
+    doc.addEventListener('mouseover', function (e) {
+      if (!commenting) return; clearHover(doc);
+      if (!e.target.classList.contains('db-pin')) e.target.setAttribute('data-db-hover', '');
+    }, true);
     doc.addEventListener('click', function (e) {
+      var pin = e.target.closest && e.target.closest('.db-pin');
+      if (pin) {
+        // A pin opens its comment, to read, change or delete it, whether or not comment mode is on.
+        e.preventDefault(); e.stopPropagation();
+        var found = items.filter(function (x) { return x.id === pin.dataset.id; })[0];
+        if (found) openPop(frame, null, null, e.clientX, e.clientY, found);
+        return;
+      }
       if (!commenting) return;
       e.preventDefault(); e.stopPropagation();
       var el = e.target, r = el.getBoundingClientRect();
@@ -356,13 +397,17 @@ JS = r"""
     frame.addEventListener('load', function () { instrument(frame); });
     try { if (frame.contentDocument.readyState === 'complete') instrument(frame); } catch (e) {}
   });
-  function openPop(frame, el, at, cx, cy) {
-    var fig = frame.closest('figure'), box = frame.getBoundingClientRect(), scale = box.width / +frame.getAttribute('width');
-    draft = { frame: frame, version: labels[+fig.dataset.i], screen: frame.getAttribute('width') + 'x' + frame.getAttribute('height'),
-              target: describe(el), at: at, verdict: null };
-    pop.querySelector('.target').textContent = draft.version + ': ' + (draft.target.text || '<' + draft.target.tag + '>');
-    pop.querySelector('textarea').value = '';
-    pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+  function openPop(frame, el, at, cx, cy, existing) {
+    var box = frame.getBoundingClientRect(), scale = box.width / +frame.getAttribute('width');
+    draft = existing ? { item: existing, version: existing.version, target: existing.target, verdict: existing.verdict }
+      : { version: labels[+frame.dataset.i], screen: frame.getAttribute('width') + 'x' + frame.getAttribute('height'),
+          target: describe(el), at: at, verdict: null };
+    pop.querySelector('.target').textContent = (existing ? 'Comment ' + existing.n + ' on ' : '') + draft.version + ': ' +
+      (draft.target.text || '<' + draft.target.tag + '>');
+    pop.querySelector('textarea').value = existing ? existing.comment || '' : '';
+    pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === draft.verdict)); });
+    pop.querySelector('.remove').hidden = !existing;
+    pop.querySelector('.ok').textContent = existing ? 'Update' : 'Send';
     pop.hidden = false;
     var x = box.left + cx * scale + 12, y = box.top + cy * scale + 12;
     pop.style.left = Math.max(12, Math.min(x, innerWidth - pop.offsetWidth - 12)) + 'px';
@@ -377,6 +422,7 @@ JS = r"""
     });
   });
   pop.querySelector('.cancel').addEventListener('click', closePop);
+  pop.querySelector('.remove').addEventListener('click', function () { var it = draft && draft.item; closePop(); if (it) removeItem(it); });
   pop.querySelector('textarea').addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); }
   });
@@ -384,18 +430,30 @@ JS = r"""
   function submitComment() {
     var text = pop.querySelector('textarea').value.trim();
     if (!draft || (!text && !draft.verdict)) { pop.querySelector('textarea').focus(); return; }
-    var it = { id: 'c' + (++seq), n: seq, version: draft.version, screen: draft.screen, target: draft.target,
-               at: draft.at, verdict: draft.verdict, comment: text || null };
-    items.push(it); closePop(); renderList();
-    document.querySelectorAll('main figure[data-i="' + labels.indexOf(it.version) + '"] iframe').forEach(function (f) { placePin(f, it); });
-    send('comment', { id: it.id, version: it.version, screen: it.screen, target: it.target, verdict: it.verdict, comment: it.comment });
+    var it = draft.item, isNew = !it;
+    if (isNew) {
+      it = { id: 'c' + (++seq), n: seq, version: draft.version, screen: draft.screen, target: draft.target, at: draft.at };
+      items.push(it);
+    }
+    it.verdict = draft.verdict; it.comment = text || null;
+    closePop(); renderList();
+    if (isNew) document.querySelectorAll('iframe[data-i="' + labels.indexOf(it.version) + '"]').forEach(function (f) { placePin(f, it, true); });
+    // An update reuses the comment's id, so the agent replaces the earlier version of it.
+    send('comment', { id: it.id, version: it.version, screen: it.screen, target: it.target, verdict: it.verdict, comment: it.comment },
+         'Comment ' + it.n + (isNew ? '' : ' (updated)'));
   }
-  function placePin(frame, it) {
-    if (labels[+frame.closest('figure').dataset.i] !== it.version) return;
+  function removeItem(it) {
+    items = items.filter(function (x) { return x !== it; }); renderList();
+    document.querySelectorAll('iframe').forEach(function (f) { try { var p = f.contentDocument.querySelector('.db-pin[data-id="' + it.id + '"]'); if (p) p.remove(); } catch (e) {} });
+    send('delete', { id: it.id }, 'Deletion of comment ' + it.n);
+  }
+  function placePin(frame, it, fresh) {
+    if (labels[+frame.dataset.i] !== it.version) return;
     var doc; try { doc = frame.contentDocument; } catch (e) { return; }
     var el = doc && doc.querySelector(it.target.selector); if (!el) return;
     var r = el.getBoundingClientRect(), win = frame.contentWindow, pin = doc.createElement('span');
-    pin.className = 'db-pin'; pin.dataset.id = it.id; pin.textContent = it.n;
+    pin.className = 'db-pin' + (fresh ? ' db-new' : ''); pin.dataset.id = it.id; pin.textContent = it.n;
+    pin.title = 'Comment ' + it.n + ': open to change or delete';
     pin.style.left = (r.left + win.scrollX + it.at.fx * r.width) + 'px';
     pin.style.top = (r.top + win.scrollY + it.at.fy * r.height) + 'px';
     doc.body.appendChild(pin);
@@ -414,11 +472,7 @@ JS = r"""
       body.append(what, say_);
       del.type = 'button'; del.className = 'btn btn--quiet'; del.textContent = 'Delete';
       del.setAttribute('aria-label', 'Delete comment ' + it.n);
-      del.addEventListener('click', function () {
-        items = items.filter(function (x) { return x !== it; }); renderList();
-        document.querySelectorAll('main iframe').forEach(function (f) { try { var p = f.contentDocument.querySelector('.db-pin[data-id="' + it.id + '"]'); if (p) p.remove(); } catch (e) {} });
-        send('delete', { id: it.id });
-      });
+      del.addEventListener('click', function () { removeItem(it); });
       li.append(n, body, del); list.appendChild(li);
     });
   }
@@ -443,7 +497,7 @@ JS = r"""
     }
     var note = document.querySelector('#note').value.trim();
     if (!note) return say('Write a note first.', true);
-    send('note', { note: note });
+    send('note', { note: note }, 'Note', function () { document.querySelector('#note').value = ''; });
   });
   // New versions from the agent: offer to load them instead of reloading, so typed notes are not lost.
   if (served) {
@@ -509,7 +563,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
             f'<button type="button" class="vbtn" data-v="{i}" data-verdict="down" aria-pressed="false" aria-label="Not good: {esc(label)}">{THUMB_DOWN}</button>'
             f'<button type="button" class="vbtn pickv" data-v="{i}" aria-pressed="false">Choose</button>'
             f'<button type="button" class="full">Full size</button></span></div>'
-            f'<div class="screen"><iframe title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
+            f'<div class="screen"><iframe data-i="{i}" title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
             f'{attr}></iframe></div><figcaption>{w} × {h} px</figcaption></figure>'
             for i, (label, attr) in enumerate(loaded))
         rows.append(f'<section><h2>Screen {w} × {h} px</h2><div class="row" style="--n:{len(loaded)}">{figures}</div></section>')
@@ -536,7 +590,9 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
            f'<button type="button" class="vbtn" data-verdict="up" aria-pressed="false" aria-label="Good">{THUMB_UP}</button>'
            f'<button type="button" class="vbtn" data-verdict="down" aria-pressed="false" aria-label="Not good">{THUMB_DOWN}</button></div>'
            '<textarea aria-label="Comment"></textarea><div class="row2"><button type="button" class="btn ok">Send</button>'
-           '<button type="button" class="btn btn--quiet cancel">Cancel</button></div></div>')
+           '<button type="button" class="btn btn--quiet cancel">Cancel</button>'
+           '<button type="button" class="btn btn--quiet remove" hidden>Delete</button></div></div>'
+           '<div class="toast" role="status" aria-live="polite" hidden></div>')
     page = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
