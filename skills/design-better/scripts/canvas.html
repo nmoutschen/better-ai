@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+{{CSS}}
+</style>
+</head>
+<body class="app">
+<div class="update" role="status" hidden>The agent sent new versions. <button type="button">Load them</button></div>
+<div class="band"></div>
+<header>
+  <div class="ttl"><h1>{{TITLE}}</h1>{{QUESTION}}</div>
+  <div class="controls">
+    {{SCREENS}}{{VIEWS}}
+    <div class="seg cycle" role="group" aria-label="Mode">
+      <button type="button" class="ico" data-mode="comment" aria-pressed="true" title="Click a version to comment on it (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z"/></svg><span>Comment</span></button>
+      <button type="button" class="ico" data-mode="use" aria-pressed="false" title="Use the versions as pages (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg><span>Use</span></button>
+    </div>
+    <!-- Settings changed rarely sit in a Display menu, so the bar keeps to what is used on every visit. -->
+    <div class="more">
+      <button type="button" class="morebtn" aria-expanded="false" aria-haspopup="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Display</span></button>
+      <div class="menu" hidden>
+        <div class="scroll-setting">
+          <p class="menu-h">Scroll</p>
+          <div class="seg" role="group" aria-label="Scroll">
+            <button type="button" class="ico" data-scroll="linked" aria-pressed="true" title="Versions scroll together"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4M7 12h10"/></svg><span>Linked</span></button>
+            <button type="button" class="ico" data-scroll="free" aria-pressed="false" title="Each version scrolls on its own"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4"/></svg><span>Free</span></button>
+          </div>
+        </div>
+        <p class="menu-h">Background</p>
+        <div class="seg" role="group" aria-label="Background">
+          <button type="button" class="ico sw" data-bg="#F5F5F5" aria-pressed="true" title="Light background" aria-label="Light background"><span class="chip" style="background:#F5F5F5"></span><span>Light</span></button>
+          <button type="button" class="ico sw" data-bg="#1E1E1E" aria-pressed="false" title="Dark background" aria-label="Dark background"><span class="chip" style="background:#1E1E1E"></span><span>Dark</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+<div class="work">
+  <main data-labels="{{LABELS}}" data-question="{{QUESTION_TEXT}}">{{TABS}}{{ROWS}}</main>
+  <aside class="notes" aria-labelledby="notes-h">
+    <div class="notes-top">
+      <h2 id="notes-h">Conversation</h2>
+      <div class="seg filter" role="group" aria-label="Show">
+        <button type="button" data-filter="all" aria-pressed="false">All</button>
+        <button type="button" data-filter="open" aria-pressed="true">Open</button>
+      </div>
+    </div>
+    <p class="empty">Nothing yet. Click any part of a version to comment on it, or write to the agent below.</p>
+    <ol class="thread"></ol>
+    <div class="composer">
+      <div class="decide" hidden>
+        <p class="menu-h">Your decision</p>
+        <div class="dopts" role="radiogroup" aria-label="Decision"></div>
+        <div class="carry"></div>
+      </div>
+      <label for="note">Message to the agent</label>
+      <textarea id="note"></textarea>
+      <div class="send">
+        <button type="button" class="btn">Send</button>
+        <button type="button" class="btn btn--quiet decide-btn" aria-expanded="false">Decide…</button>
+        <button type="button" class="btn btn--quiet copy">Copy all</button>
+        <p class="status" role="status"></p>
+      </div>
+    </div>
+  </aside>
+</div>
+<div class="pop" role="dialog" aria-label="Comment" hidden>
+  <p class="target"></p>
+  <div class="verdicts">
+    <button type="button" class="vbtn" data-verdict="up" aria-pressed="false" aria-label="Good"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7"/></svg></button>
+    <button type="button" class="vbtn" data-verdict="down" aria-pressed="false" aria-label="Not good"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 14V3h4v11zM17 14l-4 8a3 3 0 0 1-3-3v-4H4a2 2 0 0 1-2-2.3l1.4-8A2 2 0 0 1 5.4 3H17"/></svg></button>
+  </div>
+  <textarea aria-label="Comment"></textarea>
+  <div class="row2">
+    <button type="button" class="btn ok">Send</button>
+    <button type="button" class="btn btn--quiet cancel">Cancel</button>
+    <button type="button" class="btn btn--quiet remove" hidden>Delete</button>
+  </div>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+<script>
+{{JS}}
+</script>
+</body>
+</html>
