@@ -4,6 +4,7 @@
 Usage:
   python3 compare.py VERSION... --out FILE [--title T] [--question Q] [--width WxH ...] [--open] [--serve [--port N]]
   python3 compare.py --wait DIR [--timeout S]
+  python3 compare.py --reply DIR TEXT [--to COMMENT_ID]
 
 VERSION is LABEL=SOURCE or SOURCE. SOURCE is an HTML file, embedded into the page, or an http(s) address, loaded
 when the page is viewed. Without a LABEL, versions are labelled A, B, C in order.
@@ -19,7 +20,8 @@ JSON-RPC call from the page (choose, verdict, comment, delete, note); the script
 the page and prints it to stdout as one JSON line, so a harness that streams a command's output delivers it to the
 agent as it arrives. Writing the page again with the same --out, without --serve, updates the served page: the open
 page offers to load the new versions. --wait blocks until the served page receives actions the agent has not seen
-yet, prints them and exits, for harnesses that only notify when a command ends. Without a server, Copy all copies
+yet, prints them and exits, for harnesses that only notify when a command ends. --reply shows the agent's reply in
+the page's conversation panel, which lists everything the user sent and every reply, and survives a reload. Without a server, Copy all copies
 the feedback as text for the user to paste in the chat. Comments work on versions embedded from files only.
 """
 
@@ -45,6 +47,22 @@ THUMB_UP = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v11H3V10z
             'l-1.4 8A2 2 0 0 1 18.6 21H7"/></svg>')
 THUMB_DOWN = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 14V3h4v11zM17 14l-4 8a3 3 0 0 1-3-3v-4H4a2 2 0 0 1-2-2.3'
               'l1.4-8A2 2 0 0 1 5.4 3H17"/></svg>')
+def icon(path: str) -> str:
+    return f'<svg viewBox="0 0 24 24" aria-hidden="true">{path}</svg>'
+
+
+ICONS = {
+    "Desktop": icon('<rect x="2" y="4" width="20" height="13" rx="1"/><path d="M8 21h8M12 17v4"/>'),
+    "Tablet": icon('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/>'),
+    "Mobile": icon('<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'),
+    "comment": icon('<path d="M4 4h16v12H9l-5 4z"/>'),
+    "together": icon('<path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4M7 12h10"/>'),
+    "side": icon('<rect x="3" y="4" width="8" height="16"/><rect x="13" y="4" width="8" height="16"/>'),
+    "switch": icon('<rect x="5" y="4" width="14" height="16"/><path d="M9 12h6M13 9l3 3-3 3"/>'),
+}
+# Backgrounds behind the versions: grey is the default (a neutral mid surround); white and dark let the user see a
+# version against the background it will sit on.
+BACKGROUNDS = (("White", "#FFFFFF"), ("Grey", "#C9C9C9"), ("Dark", "#2B2925"))
 METHODS = ("choose", "verdict", "comment", "delete", "note")
 MAX_BODY = 200_000
 LOCAL_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost):\d+$")
@@ -78,6 +96,18 @@ h1 { font:700 28px/1.2 var(--serif); color:var(--cream); margin:0 0 8px; }
 .seg button + button { border-left:1px solid var(--cream); }
 .seg button[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
 .seg[hidden] { display:none; }
+.seg button.ico { padding:5px 9px; display:inline-flex; align-items:center; opacity:.8; }
+.seg button.ico[aria-pressed="true"] { opacity:1; }
+.seg button.sw span { width:16px; height:16px; border:1px solid var(--sand); display:block; }
+.seg button.sw[aria-pressed="true"] span { outline:2px solid var(--umber); outline-offset:1px; }
+main.on-dark .label b, main.on-dark .full { color:var(--cream); }
+main.on-dark .vbtn { color:var(--cream); border-color:var(--cream); }
+.crumb { display:block; }
+.crumb .path { display:block; font:400 12px/1.4 var(--sans); color:var(--muted); }
+.crumb .el { display:block; font:400 15px/1.4 var(--serif); color:var(--heading); margin-top:2px; }
+.crumb .role { font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--umber); margin-right:8px; }
+.seg button.ico svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
+body.app .controls { gap:8px 12px; }
 /* Scroll together is a separate setting from the view, so it uses moss instead of umber. */
 .seg--moss { border-color:var(--moss-dark); }
 .seg--moss button { color:var(--cream); }
@@ -106,11 +136,6 @@ main.switch .row { grid-template-columns:minmax(0, 1fr); }
 main.switch .row { position:relative; }
 /* The hidden version stays laid out, so it keeps scrolling with the shown one. */
 main.switch figure:not(.current) { position:absolute; top:0; left:0; width:100%; visibility:hidden; }
-dialog { border:0; padding:0; max-width:calc(100vw - 32px); max-height:calc(100vh - 32px); background:var(--cream); }
-dialog::backdrop { background:rgba(28,26,23,.6); }
-dialog .bar { display:flex; justify-content:space-between; align-items:baseline; gap:16px; padding:10px 16px; }
-dialog .bar b { font:700 15px var(--sans); color:var(--heading); }
-dialog .screen { margin:0 16px 16px; max-height:calc(100vh - 100px); }
 .foot { padding:6px var(--pad); font-size:12px; color:var(--muted); }
 /* Feedback: verdicts and Choose in each version's label, comments pinned on the versions, the list after them. */
 .label .acts { display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
@@ -173,11 +198,26 @@ body.app .row { flex:1; min-height:0; align-items:stretch; gap:20px; }
 body.app figure { display:flex; flex-direction:column; min-height:0; position:relative; }
 .stage { flex:1; min-height:0; display:flex; justify-content:center; align-items:flex-start; }
 body.app .screen { overflow:hidden; flex:none; }
-body.app figcaption { margin-top:6px; padding-top:4px; }
 main.switch figure:not(.current) { position:absolute; inset:0; }
-body.app .notes { overflow:auto; border-top:0; border-left:2px solid var(--ink); padding:16px 20px; }
-body.app .notes li { grid-template-columns:2rem 1fr; }
-body.app .notes li .btn { grid-column:2; justify-self:start; padding:4px 10px; }
+main.focus .row { grid-template-columns:minmax(0, 1fr); }
+main.focus figure.aside { display:none; }
+body.app .notes { overflow:hidden; border-top:0; border-left:2px solid var(--ink); padding:16px 0 0; display:flex; flex-direction:column; min-height:0; }
+body.app .notes h2, body.app .notes .empty { padding:0 20px; }
+.notes .thread { flex:1; min-height:0; overflow:auto; list-style:none; margin:0; padding:0 20px 12px; max-width:none; }
+.thread > li { display:block; margin:0 0 12px; }
+.thread > li.msg { padding:10px 12px; background:#fff; border:1px solid var(--line); }
+.thread > li.msg.agent { background:var(--linen); border-color:var(--sand); border-left:4px solid var(--moss-dark); }
+.msg.deleted { opacity:.55; }
+.msg .head { display:flex; gap:8px; align-items:center; margin-bottom:4px; font-size:12px; color:var(--muted); }
+.msg .who { font-weight:700; color:var(--heading); }
+.msg.agent .who { color:var(--moss-dark); }
+.msg .re { font-style:italic; }
+.msg .body { margin:4px 0 0; white-space:pre-wrap; }
+.msg .link { margin-left:auto; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
+.sys { font-size:12px; color:var(--muted); text-align:center; }
+.composer { border-top:1px solid var(--line); padding:12px 20px 14px; background:var(--cream); }
+.composer textarea { min-height:3.2em; }
+.copy[hidden] { display:none; }
 .update { position:fixed; left:0; right:0; top:0; }
 @media (max-width:900px) {
   body.app { height:auto; overflow:auto; }
@@ -214,14 +254,21 @@ JS = r"""
       box.style.height = sh + 'px';
       try { frame.contentDocument.documentElement.style.setProperty('--db-s', String(1 / scale)); } catch (e) {}
       if (typeof movePins === 'function') movePins(frame);
-      stage.closest('figure').querySelector('figcaption').textContent =
-        w + ' px wide, ' + (scale < 1 ? 'shown at ' + Math.round(scale * 100) + '%' : 'actual size');
     });
   }
+  // Background behind the versions, kept for the next visit.
+  function setBg(c) {
+    main.style.setProperty('--surround', c);
+    main.classList.toggle('on-dark', c === '#2B2925');
+    document.querySelectorAll('.sw').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.bg === c)); });
+    try { localStorage.setItem('compare-bg', c); } catch (e) {}
+  }
+  document.querySelectorAll('.sw').forEach(function (b) { b.addEventListener('click', function () { setBg(b.dataset.bg); }); });
+  try { var savedBg = localStorage.getItem('compare-bg'); if (savedBg && document.querySelector('.sw[data-bg="' + savedBg + '"]')) setBg(savedBg); } catch (e) {}
   // Screen size: one size at a time, chosen in the top bar.
-  document.querySelectorAll('[data-size]').forEach(function (b) {
+  document.querySelectorAll('button[data-size]').forEach(function (b) {
     b.addEventListener('click', function () {
-      document.querySelectorAll('[data-size]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      document.querySelectorAll('button[data-size]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
       document.querySelectorAll('main > section').forEach(function (sec) { sec.hidden = sec.dataset.size !== b.dataset.size; });
       fit();
     });
@@ -291,45 +338,38 @@ JS = r"""
   viewButtons.forEach(function (b) { b.addEventListener('click', function () { view(b.dataset.view); }); });
   pickButtons.forEach(function (b) { b.addEventListener('click', function () { show(+b.dataset.pick); }); });
   document.addEventListener('keydown', function (e) {
-    if (!main.classList.contains('switch') || document.querySelector('dialog[open]')) return;
+    if (!main.classList.contains('switch')) return;
     if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       if (e.target.tagName === 'BUTTON' && e.key === ' ') return;
       show((current + 1) % labels.length); e.preventDefault();
     }
   });
-  var dialog = document.querySelector('dialog');
+  // Full size: one version fills the viewer, the others step aside; the same button brings them back.
+  var focused = null;
+  function focusOn(i) {
+    focused = focused === i ? null : i;
+    main.classList.toggle('focus', focused !== null);
+    document.querySelectorAll('main figure').forEach(function (f) { f.classList.toggle('aside', focused !== null && +f.dataset.i !== focused); });
+    document.querySelectorAll('figure .full').forEach(function (b) { b.textContent = focused === null ? 'Full size' : 'Back to all'; });
+    fit();
+  }
   document.querySelectorAll('figure .full').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var src = b.closest('figure').querySelector('iframe'), copy = src.cloneNode(false);
-      copy.style.transform = ''; copy.style.height = copy.getAttribute('height') + 'px';
-      dialog.querySelector('.bar b').textContent = src.title;
-      var box = dialog.querySelector('.screen'); box.replaceChildren(copy);
-      box.style.width = ''; box.style.height = '';
-      // The copy gets comment mode too. A modal dialog makes the rest of the page inert, so the comment box and
-      // the toast move into it while it is open.
-      copy.addEventListener('load', function () { instrument(copy); });
-      dialog.append(pop, toast);
-      dialog.showModal();
-    });
+    b.addEventListener('click', function () { focusOn(+b.closest('figure').dataset.i); });
   });
-  dialog.querySelector('.close').addEventListener('click', function () { dialog.close(); });
-  // A click on the backdrop, outside the dialog's box, closes it.
-  dialog.addEventListener('click', function (e) {
-    if (e.target !== dialog) return;
-    var r = dialog.getBoundingClientRect();
-    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && focused !== null && pop.hidden) focusOn(focused);
   });
-  dialog.addEventListener('close', function () { closePop(); document.body.append(pop, toast); });
   document.body.classList.add('scaled');
   window.addEventListener('resize', fit);
   view('side');
 
-  // Feedback. Every action is sent as it happens, as one JSON-RPC call: the agent gets each verdict, choice and
-  // comment with what it points at, and the latest verdict or choice for a version replaces earlier ones.
-  var served = location.protocol === 'http:', rpcId = 0, seq = 0, items = [], verdicts = {}, choice = null;
+  // Feedback. Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the
+  // agent's replies. The page streams that log: it rebuilds the conversation and the pins from it, so a reload or new
+  // versions lose nothing. State changes are also applied at once, and applying the same event twice changes nothing.
+  var served = location.protocol === 'http:', rpcId = 0, seq = 0, items = [], verdicts = {}, choice = null, log = [];
   var status = document.querySelector('.notes .status');
   function say(text, error) { status.textContent = text; status.classList.toggle('error', !!error); }
-  // Every action shows a toast where the eye already is, at the bottom of the window: sending, then sent or failed.
+  // Every action shows a toast at the bottom of the window: sending, then sent or failed.
   var toast = document.querySelector('.toast'), toastTimer = null;
   function flash(text, kind) {
     clearTimeout(toastTimer);
@@ -337,19 +377,35 @@ JS = r"""
     if (kind !== 'error' && kind !== 'busy') toastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
   }
   function send(method, params, what, done) {
-    if (!served) { flash(what + ' saved on this page. Use Copy all to paste it in the chat.', 'ok');
-                   say('Saved on this page. Use Copy all to paste your feedback in the chat.'); if (done) done(); return; }
+    var event = Object.assign({ action: method, at: new Date().toISOString().slice(0, 19) }, params);
+    apply(event, true);
+    if (!served) { log.push(event); renderThread(); flash(what + ' saved on this page. Use Copy all to paste it in the chat.', 'ok');
+                   if (done) done(); return; }
     flash('Sending ' + what.toLowerCase() + '…', 'busy');
     fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
       .then(function (r) { return r.json(); })
       .then(function (r) { if (r.error) throw new Error(r.error.message);
-        flash('✓ ' + what + ' sent to the agent', 'ok');
-        say('Last sent at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ': ' + what.toLowerCase() + '.');
-        if (done) done(); })
-      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The page lost its connection to the agent. Use Copy all and paste it in the chat.', 'error');
-        say('Not sent. Use Copy all and paste it in the chat.', true); });
+        flash('✓ ' + what + ' sent to the agent', 'ok'); say(''); if (done) done(); })
+      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The page lost its connection to the agent.', 'error');
+        say('Not sent. The page lost its connection to the agent: copy your message into the chat.', true); });
   }
+  function apply(e, fresh) {
+    if (e.action === 'comment') {
+      var it = byId(e.id);
+      if (!it) {
+        it = { id: e.id, n: e.n || seq + 1, version: e.version, screen: e.screen, target: e.target || {}, spot: e.spot || { fx: 0.5, fy: 0.5 } };
+        seq = Math.max(seq, it.n); items.push(it);
+        document.querySelectorAll('iframe[data-i="' + labels.indexOf(it.version) + '"]').forEach(function (f) { placePin(f, it, fresh); });
+      }
+      it.verdict = e.verdict || null; it.comment = e.comment || null;
+    } else if (e.action === 'delete') {
+      items = items.filter(function (x) { return x.id !== e.id; });
+      document.querySelectorAll('iframe').forEach(function (f) { try { var p = f.contentDocument.querySelector('.db-pin[data-id="' + e.id + '"]'); if (p) p.remove(); } catch (x) {} });
+    } else if (e.action === 'choose') { choice = e.version || null; syncVersionButtons(); }
+    else if (e.action === 'verdict') { verdicts[e.version] = e.verdict || null; syncVersionButtons(); }
+  }
+  function byId(id) { return items.filter(function (x) { return x.id === id; })[0]; }
   function syncVersionButtons() {
     document.querySelectorAll('.vbtn[data-v]').forEach(function (b) {
       var v = labels[+b.dataset.v];
@@ -359,12 +415,10 @@ JS = r"""
   document.querySelectorAll('.vbtn[data-v]').forEach(function (b) {
     b.addEventListener('click', function () {
       var v = labels[+b.dataset.v];
-      if (b.classList.contains('pickv')) { choice = choice === v ? null : v;
-        send('choose', { version: choice }, choice ? 'Choice of ' + v : 'Choice withdrawn'); }
-      else { verdicts[v] = verdicts[v] === b.dataset.verdict ? null : b.dataset.verdict;
-        send('verdict', { version: v, verdict: verdicts[v] },
-             verdicts[v] ? (verdicts[v] === 'up' ? 'Thumbs up' : 'Thumbs down') + ' for ' + v : 'Verdict on ' + v + ' withdrawn'); }
-      syncVersionButtons();
+      if (b.classList.contains('pickv')) { var c = choice === v ? null : v;
+        send('choose', { version: c }, c ? 'Choice of ' + v : 'Choice withdrawn'); }
+      else { var d = verdicts[v] === b.dataset.verdict ? null : b.dataset.verdict;
+        send('verdict', { version: v, verdict: d }, d ? (d === 'up' ? 'Thumbs up' : 'Thumbs down') + ' for ' + v : 'Verdict on ' + v + ' withdrawn'); }
     });
   });
 
@@ -413,15 +467,21 @@ JS = r"""
     label: 'Label', table: 'Table', tr: 'Row', td: 'Cell', th: 'Column heading', ul: 'List', ol: 'List', li: 'List item',
     header: 'Header', footer: 'Footer', nav: 'Navigation', main: 'Main', aside: 'Sidebar', section: 'Section',
     article: 'Article', form: 'Form', figure: 'Figure', figcaption: 'Caption', blockquote: 'Quote', span: 'Text' };
+  // Two lines: the path to the element, small and muted, then what the element is and what it says.
   function crumb(version, t) {
-    var parts = [version];
+    var path = [version];
     (t.parents || []).slice().reverse().forEach(function (x) {
       if (/^(tbody|thead|tfoot)$/.test(x.tag)) return;
-      parts.push(ROLE[x.tag] || (x.id ? '#' + x.id : 'Block'));
+      path.push(ROLE[x.tag] || (x.id ? '#' + x.id : 'Block'));
     });
     var said = t.image ? (t.image.alt || 'no alt text') : (t.words || t.text || '');
-    parts.push((ROLE[t.tag] || 'Block') + (said ? ' \u201C' + said.slice(0, 70) + (said.length > 70 ? '\u2026' : '') + '\u201D' : ''));
-    return parts.join(' \u203A ');
+    var box = document.createElement('span'), a = document.createElement('span'), b = document.createElement('span'), r = document.createElement('span');
+    box.className = 'crumb'; a.className = 'path'; b.className = 'el'; r.className = 'role';
+    a.textContent = path.join(' › ');
+    r.textContent = ROLE[t.tag] || 'Block';
+    b.append(r, said ? '“' + said.slice(0, 90) + (said.length > 90 ? '…' : '') + '”' : '');
+    box.append(a, b);
+    return box;
   }
   function describe(el, cx, cy) {
     var doc = el.ownerDocument, win = doc.defaultView, r = el.getBoundingClientRect(), d = brief(el);
@@ -475,8 +535,8 @@ JS = r"""
     var box = frame.getBoundingClientRect(), scale = box.width / +frame.getAttribute('width');
     draft = existing ? { item: existing, version: existing.version, target: existing.target, verdict: existing.verdict }
       : { version: labels[+frame.dataset.i], screen: frame.getAttribute('width') + 'x' + frame.getAttribute('height'),
-          target: describe(el, cx, cy), at: at, verdict: null };
-    pop.querySelector('.target').textContent = (existing ? 'Comment ' + existing.n + ': ' : '') + crumb(draft.version, draft.target);
+          target: describe(el, cx, cy), spot: at, verdict: null };
+    pop.querySelector('.target').replaceChildren(crumb(draft.version, draft.target));
     pop.querySelector('textarea').value = existing ? existing.comment || '' : '';
     pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === draft.verdict)); });
     pop.querySelector('.remove').hidden = !existing;
@@ -503,23 +563,15 @@ JS = r"""
   function submitComment() {
     var text = pop.querySelector('textarea').value.trim();
     if (!draft || (!text && !draft.verdict)) { pop.querySelector('textarea').focus(); return; }
-    var it = draft.item, isNew = !it;
-    if (isNew) {
-      it = { id: 'c' + (++seq), n: seq, version: draft.version, screen: draft.screen, target: draft.target, at: draft.at };
-      items.push(it);
-    }
-    it.verdict = draft.verdict; it.comment = text || null;
-    closePop(); renderList();
-    if (isNew) document.querySelectorAll('iframe[data-i="' + labels.indexOf(it.version) + '"]').forEach(function (f) { placePin(f, it, true); });
+    var it = draft.item, id = it ? it.id : 'c' + (seq + 1) + '-' + Date.now().toString(36), n = it ? it.n : seq + 1;
+    var params = it ? { id: id, n: n, version: it.version, screen: it.screen, target: it.target, spot: it.spot }
+                    : { id: id, n: n, version: draft.version, screen: draft.screen, target: draft.target, spot: draft.spot };
+    params.verdict = draft.verdict; params.comment = text || null;
+    closePop();
     // An update reuses the comment's id, so the agent replaces the earlier version of it.
-    send('comment', { id: it.id, version: it.version, screen: it.screen, target: it.target, verdict: it.verdict, comment: it.comment },
-         'Comment ' + it.n + (isNew ? '' : ' (updated)'));
+    send('comment', params, 'Comment ' + n + (it ? ' (updated)' : ''));
   }
-  function removeItem(it) {
-    items = items.filter(function (x) { return x !== it; }); renderList();
-    document.querySelectorAll('iframe').forEach(function (f) { try { var p = f.contentDocument.querySelector('.db-pin[data-id="' + it.id + '"]'); if (p) p.remove(); } catch (e) {} });
-    send('delete', { id: it.id }, 'Deletion of comment ' + it.n);
-  }
+  function removeItem(it) { send('delete', { id: it.id, n: it.n }, 'Deletion of comment ' + it.n); }
   function movePins(frame) {
     var doc; try { doc = frame.contentDocument; } catch (e) { return; }
     if (!doc) return;
@@ -527,62 +579,102 @@ JS = r"""
       var it = items.filter(function (x) { return x.id === pin.dataset.id; })[0];
       var el = it && doc.querySelector(it.target.selector); if (!el) return;
       var r = el.getBoundingClientRect(), win = frame.contentWindow;
-      pin.style.left = (r.left + win.scrollX + it.at.fx * r.width) + 'px';
-      pin.style.top = (r.top + win.scrollY + it.at.fy * r.height) + 'px';
+      pin.style.left = (r.left + win.scrollX + it.spot.fx * r.width) + 'px';
+      pin.style.top = (r.top + win.scrollY + it.spot.fy * r.height) + 'px';
     });
   }
   function placePin(frame, it, fresh) {
     if (labels[+frame.dataset.i] !== it.version) return;
     var doc; try { doc = frame.contentDocument; } catch (e) { return; }
-    var el = doc && doc.querySelector(it.target.selector); if (!el) return;
+    if (!doc || !doc.documentElement.dataset.dbReady || doc.querySelector('.db-pin[data-id="' + it.id + '"]')) return;
+    var el; try { el = doc.querySelector(it.target.selector); } catch (e) { return; }
+    if (!el) return;
     var r = el.getBoundingClientRect(), win = frame.contentWindow, pin = doc.createElement('span');
     pin.className = 'db-pin' + (fresh ? ' db-new' : ''); pin.dataset.id = it.id; pin.textContent = it.n;
     pin.title = 'Comment ' + it.n + ': open to change or delete';
-    pin.style.left = (r.left + win.scrollX + it.at.fx * r.width) + 'px';
-    pin.style.top = (r.top + win.scrollY + it.at.fy * r.height) + 'px';
+    pin.style.left = (r.left + win.scrollX + it.spot.fx * r.width) + 'px';
+    pin.style.top = (r.top + win.scrollY + it.spot.fy * r.height) + 'px';
     doc.body.appendChild(pin);
   }
-  function renderList() {
-    var list = document.querySelector('.notes ol'); list.replaceChildren();
-    document.querySelector('.notes .empty').hidden = items.length > 0;
-    items.forEach(function (it) {
-      var li = document.createElement('li'), n = document.createElement('span'), body = document.createElement('div'),
-          del = document.createElement('button');
-      n.className = 'n'; n.textContent = it.n;
-      var what = document.createElement('div'); what.className = 'what';
-      what.textContent = crumb(it.version, it.target);
-      var say_ = document.createElement('div');
-      say_.textContent = (it.verdict ? (it.verdict === 'up' ? 'Good' : 'Not good') + (it.comment ? ': ' : '') : '') + (it.comment || '');
-      body.append(what, say_);
-      del.type = 'button'; del.className = 'btn btn--quiet'; del.textContent = 'Delete';
-      del.setAttribute('aria-label', 'Delete comment ' + it.n);
-      del.addEventListener('click', function () { removeItem(it); });
-      li.append(n, body, del); list.appendChild(li);
+  // The conversation: everything sent and every reply, in order. A comment shows once, in its latest state.
+  var thread = document.querySelector('.thread');
+  function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
+  function time(at) { return (at || '').slice(11, 16); }
+  function renderThread() {
+    var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
+    var entries = [], firsts = {};
+    log.forEach(function (e) {
+      if (e.action === 'comment' || e.action === 'delete') {
+        var c = firsts[e.id];
+        if (!c) { if (e.action === 'delete') return; c = firsts[e.id] = { kind: 'comment', e: e, edited: false, deleted: false }; entries.push(c); }
+        else if (e.action === 'delete') c.deleted = true;
+        else { c.e = e; c.edited = true; c.deleted = false; }
+      } else entries.push({ kind: e.action, e: e });
     });
+    thread.replaceChildren();
+    document.querySelector('.notes .empty').hidden = entries.length > 0;
+    entries.forEach(function (c) {
+      var e = c.e, li;
+      if (c.kind === 'comment') {
+        li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
+        var head = el('div', 'head'); head.append(el('span', 'n', e.n || '?'), el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
+        var it = byId(e.id);
+        if (it && !c.deleted) {
+          var del = el('button', 'link', 'Delete'); del.type = 'button'; del.setAttribute('aria-label', 'Delete comment ' + e.n);
+          del.addEventListener('click', function () { removeItem(it); }); head.append(del);
+        }
+        li.append(head, crumb(e.version, e.target || {}));
+        var said = (e.verdict ? (e.verdict === 'up' ? 'Good' : 'Not good') + (e.comment ? ': ' : '') : '') + (e.comment || '');
+        li.append(el('p', 'body', c.deleted ? 'Deleted' : said));
+      } else if (c.kind === 'note') {
+        li = el('li', 'msg me'); var h = el('div', 'head'); h.append(el('span', 'who', 'You'), el('span', 'when', time(e.at)));
+        li.append(h, el('p', 'body', e.note));
+      } else if (c.kind === 'reply') {
+        li = el('li', 'msg agent'); var h2 = el('div', 'head'); h2.append(el('span', 'who', 'Agent'), el('span', 'when', time(e.at)));
+        var to = e.to && log.filter(function (x) { return x.id === e.to; })[0];
+        if (to) h2.append(el('span', 're', 'on comment ' + (to.n || '?')));
+        li.append(h2, el('p', 'body', e.text));
+      } else if (c.kind === 'choose' || c.kind === 'verdict') {
+        var t = c.kind === 'choose' ? (e.version ? 'You chose ' + e.version : 'You withdrew your choice')
+              : (e.verdict ? (e.verdict === 'up' ? 'Thumbs up for ' : 'Thumbs down for ') + e.version : 'You withdrew your verdict on ' + e.version);
+        li = el('li', 'sys', t + ', ' + time(e.at));
+      } else return;
+      thread.appendChild(li);
+    });
+    if (stick) thread.scrollTop = thread.scrollHeight;
   }
   function asText() {
     var lines = [];
     if (choice) lines.push('I choose ' + choice + '.');
     labels.forEach(function (v) { if (verdicts[v]) lines.push(v + ': ' + (verdicts[v] === 'up' ? 'good' : 'not good') + '.'); });
     items.forEach(function (it) {
-      lines.push(it.n + '. ' + it.version + ', ' + (it.target.text ? '"' + it.target.text.slice(0, 60) + '"' : it.target.selector) + ': ' +
+      var t = it.target || {};
+      lines.push(it.n + '. ' + it.version + ', ' + (t.words || t.text ? '"' + (t.words || t.text).slice(0, 60) + '"' : t.selector) + ': ' +
                  (it.verdict ? (it.verdict === 'up' ? 'good' : 'not good') + (it.comment ? ', ' : '') : '') + (it.comment || ''));
     });
-    var note = document.querySelector('#note').value.trim(); if (note) lines.push(note);
+    log.forEach(function (e) { if (e.action === 'note') lines.push(e.note); });
     return lines.join('\n');
   }
-  var noteBtn = document.querySelector('.notes .send .btn');
-  if (!served) noteBtn.textContent = 'Copy all';
-  noteBtn.addEventListener('click', function () {
-    if (!served) {
-      navigator.clipboard.writeText(asText()).then(function () { say('Copied. Paste it in the chat with the agent.'); },
-        function () { say('Could not copy. Select the list and copy it by hand.', true); });
-      return;
-    }
-    var note = document.querySelector('#note').value.trim();
-    if (!note) return say('Write a note first.', true);
-    send('note', { note: note }, 'Note', function () { document.querySelector('#note').value = ''; });
+  var noteBox = document.querySelector('#note'), noteBtn = document.querySelector('.notes .send .btn'), copyBtn = document.querySelector('.notes .copy');
+  copyBtn.hidden = served;
+  copyBtn.addEventListener('click', function () {
+    navigator.clipboard.writeText(asText()).then(function () { say('Copied. Paste it in the chat with the agent.'); },
+      function () { say('Could not copy. Select the conversation and copy it by hand.', true); });
   });
+  function sendNote() {
+    var note = noteBox.value.trim();
+    if (!note) { noteBox.focus(); return; }
+    send('note', { note: note }, 'Message', function () { noteBox.value = ''; });
+  }
+  noteBtn.addEventListener('click', sendNote);
+  noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNote(); } });
+  if (served) (function stream(after) {
+    fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
+      r.events.forEach(function (e) { log.push(e); apply(e, false); });
+      if (r.events.length) renderThread();
+      stream(r.total);
+    }).catch(function () { setTimeout(function () { stream(after); }, 2000); });
+  })(0);
   // New versions from the agent: offer to load them instead of reloading, so typed notes are not lost.
   if (served) {
     var rev = null, bar = document.querySelector('.update');
@@ -654,7 +746,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
             f'<button type="button" class="vbtn pickv" data-v="{i}" aria-pressed="false">Choose</button>'
             f'<button type="button" class="full">Full size</button></span></div>'
             f'<div class="stage"><div class="screen"><iframe data-i="{i}" title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
-            f'{attr}></iframe></div></div><figcaption>{w} px wide</figcaption></figure>'
+            f'{attr}></iframe></div></div></figure>'
             for i, (label, attr) in enumerate(loaded))
         rows.append(f'<section data-size="{k}" aria-label="Screen {w} × {h} px"{" hidden" if k else ""}>'
                     f'<div class="row" style="--n:{len(loaded)}">{figures}</div></section>')
@@ -662,25 +754,32 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     if len(set(names)) < len(names):
         names = [f"{w} × {h}" for w, h in sizes]
     sizes_html = ('<div class="seg" role="group" aria-label="Screen">' + "".join(
-        f'<button type="button" data-size="{k}" aria-pressed="{str(k == 0).lower()}" title="{w} × {h} px">{esc(n)}</button>'
+        f'<button type="button" class="ico" data-size="{k}" aria-pressed="{str(k == 0).lower()}" title="{esc(n)}, {w} × {h} px" '
+        f'aria-label="{esc(n)}, {w} × {h} px">{ICONS.get(n) or esc(n)}</button>'
         for k, ((w, h), n) in enumerate(zip(sizes, names))) + '</div>') if len(sizes) > 1 else ""
     controls = sizes_html
     if before_after:
         controls += ('<div class="seg" role="group" aria-label="View">'
-                     '<button type="button" data-view="side" aria-pressed="true">Side by side</button>'
-                     '<button type="button" data-view="switch" aria-pressed="false">Switch in place</button></div>'
+                     f'<button type="button" class="ico" data-view="side" aria-pressed="true" title="Side by side" aria-label="Side by side">{ICONS["side"]}</button>'
+                     f'<button type="button" class="ico" data-view="switch" aria-pressed="false" title="Switch in place (Space)" aria-label="Switch in place">{ICONS["switch"]}</button></div>'
                      '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
     side_hint = ""
-    controls += ('<div class="seg seg--terra"><button type="button" id="comment" aria-pressed="true">Comment</button></div>'
-                 '<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
-                 'Scroll together</button></div>')
+    controls += (f'<div class="seg"><button type="button" class="ico" id="comment" aria-pressed="true" title="Comment (C)" aria-label="Comment">{ICONS["comment"]}</button>'
+                 f'<button type="button" class="ico" id="together" aria-pressed="true" title="Scroll versions together" aria-label="Scroll versions together">{ICONS["together"]}</button></div>'
+                 '<div class="seg" role="group" aria-label="Background">' + "".join(
+                     f'<button type="button" class="ico sw" data-bg="{c}" aria-pressed="{str(c == BACKGROUNDS[1][1]).lower()}" '
+                     f'title="{n} background" aria-label="{n} background"><span style="background:{c}"></span></button>'
+                     for n, c in BACKGROUNDS) + '</div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
-    notes = ('<aside class="notes" aria-labelledby="notes-h"><h2 id="notes-h">Your comments</h2>'
-             '<p class="empty">No comments yet. Click any part of a version to comment on it.</p><ol></ol>'
-             '<div class="general"><label for="note">Note to the agent</label><textarea id="note"></textarea></div>'
-             '<div class="send"><button type="button" class="btn">Send note</button><p class="status" role="status"></p></div></aside>')
+    notes = ('<aside class="notes" aria-labelledby="notes-h"><h2 id="notes-h">Conversation</h2>'
+             '<p class="empty">Nothing yet. Click any part of a version to comment on it, or write to the agent below.</p>'
+             '<ol class="thread" aria-live="polite"></ol>'
+             '<div class="composer"><label for="note">Message to the agent</label><textarea id="note"></textarea>'
+             '<div class="send"><button type="button" class="btn">Send</button>'
+             '<button type="button" class="btn btn--quiet copy">Copy all</button>'
+             '<p class="status" role="status"></p></div></div></aside>')
     pop = ('<div class="pop" role="dialog" aria-label="Comment" hidden><p class="target"></p><div class="verdicts">'
            f'<button type="button" class="vbtn" data-verdict="up" aria-pressed="false" aria-label="Good">{THUMB_UP}</button>'
            f'<button type="button" class="vbtn" data-verdict="down" aria-pressed="false" aria-label="Not good">{THUMB_DOWN}</button></div>'
@@ -701,7 +800,6 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
 <div class="work"><main data-labels="{esc(json.dumps(labels))}" data-question="{esc(question)}">{"".join(rows)}</main>
 {notes}</div>
 {pop}
-<dialog aria-label="Full size"><div class="bar"><b></b><button type="button" class="full close">Close</button></div><div class="screen"></div></dialog>
 <script>{JS}</script>
 </body></html>
 """
@@ -724,7 +822,7 @@ def clean(value, depth=0):
 def serve(page: Path, port: int, open_browser: bool) -> None:
     """Serve the page from disk, so a rewrite shows on reload, and record each answer the page sends."""
     log, cursor = page.parent / "answers.jsonl", page.parent / ".answers-seen"
-    lock, arrived = threading.Lock(), threading.Condition()
+    lock = threading.Lock()
 
     def count() -> int:
         return sum(1 for _ in log.open(encoding="utf-8")) if log.exists() else 0
@@ -754,11 +852,25 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
                 return self.reply(200, page.read_bytes(), "text/html; charset=utf-8")
             if self.path == "/rev":
                 return self.reply(200, str(page.stat().st_mtime_ns).encode(), "text/plain")
+            if self.path.startswith("/events?after="):
+                # Long poll for the page: every logged event after the first `after`, including the agent's replies.
+                after, deadline = int(self.path.split("=", 1)[1] or 0), time.time() + 20
+                while count() <= after and time.time() < deadline:
+                    time.sleep(0.25)
+                lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+                events = []
+                for line in lines[after:]:
+                    try:
+                        events.append(json.loads(line))
+                    except ValueError:
+                        events.append({})
+                return self.reply(200, json.dumps({"total": len(lines), "events": events}).encode(), "application/json")
             if self.path.startswith("/wait?after="):
                 # Long poll for --wait: answer as soon as there are more than `after` answers, or after 25 s.
                 after = int(self.path.split("=", 1)[1] or 0)
-                with arrived:
-                    arrived.wait_for(lambda: count() > after, timeout=25)
+                deadline = time.time() + 25
+                while count() <= after and time.time() < deadline:
+                    time.sleep(0.25)
                 return self.reply(200, str(count()).encode(), "text/plain")
             self.send_error(404)
 
@@ -785,8 +897,6 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
                 with log.open("a", encoding="utf-8") as f:
                     f.write(line + "\n")
                 print(line, flush=True)
-            with arrived:
-                arrived.notify_all()
             self.rpc(msg.get("id"), result="saved")
 
         def log_message(self, *args):
@@ -822,12 +932,25 @@ def wait(folder: Path, timeout: float) -> int:
         except OSError:
             sys.exit("error: the page's server is not answering. Is it still running?")
         if total > seen:
-            lines = log.read_text(encoding="utf-8").splitlines()[seen:total]
-            print("\n".join(lines), flush=True)
+            lines = [line for line in log.read_text(encoding="utf-8").splitlines()[seen:total] if '"action": "reply"' not in line]
             cursor.write_text(str(total), encoding="utf-8")
+            if not lines:
+                seen = total
+                continue
+            print("\n".join(lines), flush=True)
             return 0
     print("No new answer before the timeout.", flush=True)
     return 2
+
+
+def reply(folder: Path, text: str, to: str | None) -> None:
+    """Show the agent's reply in the served page's conversation. The page streams it from answers.jsonl."""
+    if not (folder / ".server").exists():
+        sys.exit(f"error: no page is served from {folder}. Start it with --serve first.")
+    event = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "action": "reply", "text": text[:5000], "to": to}
+    with (folder / "answers.jsonl").open("a", encoding="utf-8") as f:
+        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    print("Reply shown in the page.")
 
 
 def main() -> None:
@@ -843,10 +966,14 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=0, help="port to serve on (default: any free port)")
     parser.add_argument("--wait", metavar="DIR", help="wait for new answers to the page served from DIR, print them and exit")
     parser.add_argument("--timeout", type=float, default=3600, help="seconds --wait waits (default: 3600)")
+    parser.add_argument("--reply", nargs=2, metavar=("DIR", "TEXT"), help="show a reply from the agent in the page served from DIR")
+    parser.add_argument("--to", metavar="ID", help="with --reply: the id of the comment the reply answers")
     args = parser.parse_args()
 
     if args.wait:
         sys.exit(wait(Path(args.wait).expanduser().resolve(), args.timeout))
+    if args.reply:
+        return reply(Path(args.reply[0]).expanduser().resolve(), args.reply[1], args.to)
     if not args.versions or not args.out:
         parser.error("give at least one VERSION and --out")
 
