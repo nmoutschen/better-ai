@@ -105,6 +105,38 @@ def stamp_logs(board: Path, initial: bool) -> None:
             FIRST_SEEN.setdefault((path.stem, i, line), None if initial else now)
 
 
+CLOSED = ("answered", "contested", "not found", "unclear")  # the statuses a worker sets when it finishes a question
+ANNOUNCED: set = set()  # (question, worker, status) closes already in the log or present when the viewer started
+
+
+def announce_closes(board: Path, initial: bool) -> None:
+    """Post a message from the worker each time it closes a question, once its one-line answer (gist) is written.
+    On a board's first viewer, questions already closed get no message, so an old board does not flood the
+    conversation; a resumed viewer posts the closes it missed while it was away."""
+    events = read_log(board)
+    ANNOUNCED.update((e.get("q"), e.get("by"), e.get("status")) for e in events if e.get("action") == "closed")
+    first = initial and not any(e.get("action") == "closed" for e in events)
+    for path in md_files(board / "questions"):
+        q = read_entry(path)
+        status, gist = q.get("status", "").lower(), q.get("gist", "")
+        key = (q["id"], q.get("owner", "none"), status)
+        if status not in CLOSED or not gist or gist.lower() == "none" or key in ANNOUNCED:
+            continue
+        ANNOUNCED.add(key)
+        if not first:
+            append(
+                board,
+                {
+                    "action": "closed",
+                    "id": "c-" + str(time.time_ns()),
+                    "by": key[1],
+                    "q": key[0],
+                    "status": status,
+                    "text": gist[:500],
+                },
+            )
+
+
 def board_stopped(board: Path) -> bool:
     brief = board / "brief.md"
     return brief.exists() and read_entry(brief).get("status") == "stopped"
@@ -143,7 +175,7 @@ def append(board: Path, *events: dict) -> list:
 
 def from_user(event: dict) -> bool:
     """An event the user made in the page, as opposed to the coordinator's replies, statuses and recorded acceptances."""
-    return bool(event) and event.get("action") not in ("reply", "status") and "by" not in event
+    return bool(event) and event.get("action") not in ("reply", "status", "closed") and "by" not in event
 
 
 def clean(value, depth=0):
@@ -236,6 +268,8 @@ def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
             pass
 
     stamp_logs(board, initial=True)
+    with lock:
+        announce_closes(board, initial=True)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     (board / ADDRESS).write_text(url, encoding="utf-8")
@@ -255,6 +289,8 @@ def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
         while True:
             time.sleep(1)
             stamp_logs(board, initial=False)
+            with lock:  # the page's actions append to the same log
+                announce_closes(board, initial=False)
             if stopped_at is None and board_stopped(board):
                 stopped_at = time.time()
             if stopped_at is not None and not board_stopped(board):
@@ -341,14 +377,19 @@ def set_status(board: Path, state: str, ids: list) -> None:
 def pending(board: Path) -> None:
     """Print each item not yet done, with the answers and replies under it, so a resumed run can act on what the user
     wrote while no agent was running. A follow-up from the user under a done item makes it work again."""
-    items, order, state, reasons, thread = {}, [], {}, {}, {}
+    items, order, state, reasons, thread, closes = {}, [], {}, {}, {}, {}
     for e in read_log(board):
         a, i, to = e.get("action"), e.get("id"), e.get("to")
-        if (
+        if a == "closed":  # a worker's message: the user can reply to it, and the reply goes to the coordinator
+            closes[i] = e
+        elif (
             a == "note" and to and to not in items
         ):  # an answer to the agent's own message is a new item, about that message
             order.append(i)
             items[i] = e
+            if to in closes:  # the worker cannot read the page: say which question the user replied about
+                c = closes[to]
+                items[i] = {**e, "about": f"{c.get('by')} closed {c.get('q')} as {c.get('status')}: {c.get('text')}"}
         elif a == "note" and to:  # the user's answer belongs to the item it answers
             thread.setdefault(to, []).append({"from": "user", "at": e.get("at"), "text": e.get("text")})
             if state.get(to) == "asked":  # the answer ends the wait: the item is the coordinator's again
