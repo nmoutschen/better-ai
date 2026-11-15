@@ -276,6 +276,14 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .thread .reply + .why { margin-top:20px; }
 .why textarea { width:100%; min-height:3em; font:400 14px/1.45 var(--sans); border:1px solid var(--sand); padding:6px 8px; }
 .why .row2 { display:flex; gap:8px; margin-top:6px; }
+.notes-top { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:0 20px; margin-bottom:12px; }
+body.app .notes .notes-top h2 { padding:0; margin:0; }
+.notes .filter { border-color:var(--ink); }
+.notes .filter button { color:var(--ink); padding:4px 10px; font-size:11px; }
+.notes .filter button + button { border-left-color:var(--ink); }
+.notes .filter button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
+.thread > li.locatable { cursor:pointer; }
+.thread > li.locatable:hover { border-color:var(--sand); }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
   font:700 12px/18px var(--sans); }
 .mini:hover { border-color:var(--ink); }
@@ -602,7 +610,9 @@ JS = r"""
     '.db-pin[data-state=seen]{background:#C4B69C}' +
     '.db-pin[data-state=working]{background:#E8725C;animation:db-pulse 1.4s ease-out infinite}' +
     '.db-pin[data-state=done]{background:#66795A;color:#FFFCF7}' +
-    '.db-pin[data-state=accepted]{background:#66795A;color:#FFFCF7;opacity:.45}' +
+    // An accepted comment's pin goes away; showing it from the conversation brings it back for a moment.
+    '.db-pin[data-state=accepted]{display:none;background:#66795A;color:#FFFCF7}' +
+    '.db-pin.db-flash{display:block!important;animation:db-pulse .9s ease-out 3!important}' +
     '.db-pin[data-state=reopened]{background:#E8725C;box-shadow:0 0 0 2px #FFFCF7,0 0 0 4px #9A3B2A}' +
     '@media (prefers-reduced-motion: reduce){.db-pin{animation:none!important}}' +
     '@keyframes db-pulse{0%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 0 rgba(232,114,92,.9)}100%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 18px rgba(232,114,92,0)}}';
@@ -712,6 +722,14 @@ JS = r"""
     r.append(h, el('p', 'body', mine ? e.reason : e.text));
     return r;
   }
+  var filter = 'all';
+  document.querySelectorAll('[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      filter = b.dataset.filter;
+      document.querySelectorAll('[data-filter]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      renderThread();
+    });
+  });
   var STEPS = ['seen', 'working', 'done', 'accepted'],
       LABEL = { seen: 'Seen', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
   // Reopening asks why, in a small box under the item; the reason goes with the reopen.
@@ -743,8 +761,13 @@ JS = r"""
       else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
       else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
     });
+    // Open: only the user's comments and messages that are not yet accepted, with what was said under them.
+    var open = entries.filter(function (c) { return (c.kind === 'comment' || c.kind === 'note') && c.e.id && !c.deleted && state[c.e.id] !== 'accepted'; });
+    var openBtn = document.querySelector('[data-filter="open"]');
+    openBtn.textContent = 'Open (' + open.length + ')';
+    if (filter === 'open') entries = open;
     thread.replaceChildren();
-    document.querySelector('.notes .empty').hidden = entries.length > 0;
+    document.querySelector('.notes .empty').hidden = entries.length > 0 || filter === 'open';
     entries.forEach(function (c) {
       var e = c.e, li, head;
       // Progress on the user's item: three short bars fill as the agent sees it, works on it and finishes it.
@@ -777,6 +800,8 @@ JS = r"""
           del.addEventListener('click', function () { removeItem(it); }); head.append(del);
         }
         li.append(head, crumb(e.version, e.target || {}));
+        li.classList.add('locatable'); li.title = 'Show where this comment is';
+        li.addEventListener('click', function (ev) { if (!ev.target.closest('button, textarea, .why')) reveal(e); });
         var body = el('p', 'body');
         if (c.deleted) body.textContent = 'Deleted';
         else {
@@ -798,8 +823,24 @@ JS = r"""
       c.replies.forEach(function (r) { li.append(replyBlock(r)); });
       thread.appendChild(li);
     });
+    if (filter === 'open' && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
     if (stick) thread.scrollTop = thread.scrollHeight;
     pinState = state; syncPins();
+  }
+  // Show a comment where it was made: its screen size, its version, scrolled to its pin, which flashes.
+  function reveal(e) {
+    var sec = Array.prototype.filter.call(document.querySelectorAll('main > section'), function (x) {
+      var f = x.querySelector('iframe'); return f && f.getAttribute('width') + 'x' + f.getAttribute('height') === e.screen;
+    })[0];
+    if (sec && sec.hidden) { var sb = document.querySelector('button[data-size="' + sec.dataset.size + '"]'); if (sb) sb.click(); }
+    var i = labels.indexOf(e.version); if (i < 0) return;
+    if (main.classList.contains('switch')) show(i);
+    var frame = (sec || main).querySelector('iframe[data-i="' + i + '"]'); if (!frame) return;
+    var doc; try { doc = frame.contentDocument; } catch (x) { return; }
+    var pin = doc.querySelector('.db-pin[data-id="' + e.id + '"]'); if (!pin) return;
+    pin.classList.remove('db-flash'); void pin.offsetWidth; pin.classList.add('db-flash');
+    frame.contentWindow.scrollTo({ top: Math.max(0, parseFloat(pin.style.top) - frame.contentWindow.innerHeight / 3), behavior: 'smooth' });
+    setTimeout(function () { pin.classList.remove('db-flash'); }, 2800);
   }
   var pinState = {}, STATE_WORD = { seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
   function syncPins() {
@@ -950,7 +991,9 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      f'title="{n} background" aria-label="{n} background"><span class="chip" style="background:{c}"></span><span>{n}</span></button>'
                      for n, c in BACKGROUNDS) + '</div></div></div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
-    notes = ('<aside class="notes" aria-labelledby="notes-h"><h2 id="notes-h">Conversation</h2>'
+    notes = ('<aside class="notes" aria-labelledby="notes-h"><div class="notes-top"><h2 id="notes-h">Conversation</h2>'
+             '<div class="seg filter" role="group" aria-label="Show"><button type="button" data-filter="all" aria-pressed="true">All</button>'
+             '<button type="button" data-filter="open" aria-pressed="false">Open</button></div></div>'
              '<p class="empty">Nothing yet. Click any part of a version to comment on it, or write to the agent below.</p>'
              '<ol class="thread" aria-live="polite"></ol>'
              '<div class="composer"><label for="note">Message to the agent</label><textarea id="note"></textarea>'
