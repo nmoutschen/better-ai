@@ -5,7 +5,7 @@ Usage:
   python3 compare.py VERSION... --out FILE [--title T] [--question Q] [--width WxH ...] [--open] [--serve [--port N]]
   python3 compare.py --wait DIR [--timeout S]
   python3 compare.py --reply DIR TEXT [--to COMMENT_ID]
-  python3 compare.py --status DIR seen|asked|working|done ID...
+  python3 compare.py --status DIR seen|asked|working|done|accepted ID...
   python3 compare.py --pending DIR
 
 VERSION is LABEL=SOURCE or SOURCE. SOURCE is an HTML file, embedded into the page, or an http(s) address, loaded
@@ -1194,7 +1194,7 @@ def reply(folder: Path, text: str, to: str | None) -> None:
     print("Reply shown in the page.")
 
 
-STATES = ("seen", "asked", "working", "done")
+STATES = ("seen", "asked", "working", "done", "accepted")
 
 
 def read_log(folder: Path) -> list:
@@ -1218,7 +1218,10 @@ def set_status(folder: Path, state: str, ids: list) -> None:
         sys.exit(f"error: no comment or message with id {', '.join(unknown)}. Run --pending to see the ids.")
     with (folder / "answers.jsonl").open("a", encoding="utf-8") as f:
         for i in ids:
-            f.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "action": "status", "to": i, "status": state}) + "\n")
+            # The user accepting in words is recorded as their accept, the same as the page's Accept button.
+            event = {"action": "accept", "to": i, "by": "agent, from the user's words"} if state == "accepted" else \
+                    {"action": "status", "to": i, "status": state}
+            f.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), **event}) + "\n")
     print(f"Marked {state}: {', '.join(ids)}")
 
 
@@ -1264,7 +1267,7 @@ def main() -> None:
     parser.add_argument("--reply", nargs=2, metavar=("DIR", "TEXT"), help="show a reply from the agent in the page served from DIR")
     parser.add_argument("--to", metavar="ID", help="with --reply: the id of the comment the reply answers")
     parser.add_argument("--status", nargs="+", metavar=("DIR STATE", "ID"),
-                        help="DIR STATE ID...: mark comments or messages as seen, asked (waiting for the user), working or done")
+                        help="DIR STATE ID...: mark comments or messages as seen, asked (waiting for the user), working or done; accepted only when the user accepted it in words")
     parser.add_argument("--pending", metavar="DIR", help="list the comments and messages not marked done")
     args = parser.parse_args()
 
