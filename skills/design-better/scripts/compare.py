@@ -32,6 +32,11 @@ URL = re.compile(r"^https?://", re.I)
 # A relative href or src: not absolute, not a fragment, not a data: or mailto: link.
 RELATIVE_REF = re.compile(r"""(?:href|src)\s*=\s*["'](?![a-z][a-z0-9+.-]*:|//|#)[^"']+["']""", re.I)
 HEAD = re.compile(r"<head[^>]*>", re.I)
+THUMB_UP = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3'
+            'l-1.4 8A2 2 0 0 1 18.6 21H7"/></svg>')
+THUMB_DOWN = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 14V3h4v11zM17 14l-4 8a3 3 0 0 1-3-3v-4H4a2 2 0 0 1-2-2.3'
+              'l1.4-8A2 2 0 0 1 5.4 3H17"/></svg>')
+METHODS = ("choose", "verdict", "comment", "delete", "note")
 MAX_BODY = 200_000
 LOCAL_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost):\d+$")
 
@@ -98,24 +103,43 @@ dialog .bar { display:flex; justify-content:space-between; align-items:baseline;
 dialog .bar b { font:700 15px var(--sans); color:var(--heading); }
 dialog .screen { margin:0 16px 16px; max-height:calc(100vh - 100px); }
 .foot { padding:6px var(--pad); font-size:12px; color:var(--muted); }
-/* The answer form: a cream block after the versions, in the page's own type. */
-.answer { background:var(--cream); color:var(--ink); padding:28px var(--pad) 32px; border-top:2px solid var(--ink); }
-.answer h2 { border:0; padding:0; margin:0 0 6px; }
-.answer .ask { font:400 17px/1.6 var(--serif); margin:0 0 18px; max-width:65ch; }
-.answer .opts { display:grid; grid-template-columns:repeat(auto-fit, minmax(16rem, 1fr)); gap:16px 32px; }
-.answer fieldset { border:0; border-top:1px solid var(--ink); margin:0; padding:10px 0 0; min-width:0; }
-.answer legend { font:700 15px var(--sans); color:var(--heading); padding:0; }
-.answer label { display:block; font-size:14px; margin:8px 0 4px; }
-.answer .choose { display:flex; gap:8px; align-items:center; margin:8px 0 0; font-size:15px; }
-.answer input[type="radio"] { accent-color:var(--umber); width:18px; height:18px; margin:0; }
-.answer textarea { width:100%; min-height:5.5em; font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff;
+/* Feedback: verdicts and Choose in each version's label, comments pinned on the versions, the list after them. */
+.label .acts { display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+.vbtn { border:1px solid var(--ink); background:transparent; color:var(--ink); height:30px; min-width:30px; padding:0 8px;
+  cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; font:700 12px var(--sans);
+  letter-spacing:.08em; text-transform:uppercase; }
+.vbtn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; }
+.vbtn[data-verdict="up"][aria-pressed="true"] { background:var(--moss-dark); border-color:var(--moss-dark); color:var(--cream); }
+.vbtn[data-verdict="down"][aria-pressed="true"] { background:var(--terracotta); border-color:var(--terracotta); color:var(--heading); }
+.vbtn.pickv[aria-pressed="true"] { background:var(--umber); border-color:var(--umber); color:var(--cream); }
+.seg--terra { border-color:var(--terracotta); }
+.seg--terra button[aria-pressed="true"] { background:var(--terracotta); color:var(--heading); }
+main.commenting .screen { outline:3px solid var(--terracotta); outline-offset:2px; }
+.pop { position:fixed; z-index:5; width:min(22rem, calc(100vw - 24px)); background:var(--cream); color:var(--ink);
+  border:2px solid var(--ink); box-shadow:0 8px 24px rgba(28,26,23,.25); padding:12px; }
+.pop[hidden] { display:none; }
+.pop .target { margin:0 0 8px; font-size:13px; color:var(--muted); overflow-wrap:anywhere; }
+.pop .verdicts { display:flex; gap:6px; margin-bottom:8px; }
+.pop textarea, .notes textarea { width:100%; min-height:4.5em; font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff;
   border:1px solid var(--sand); padding:8px 10px; resize:vertical; }
-.answer .general { margin-top:20px; max-width:65ch; }
-.answer .send { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; margin-top:18px; }
-.answer .send button { border:0; background:var(--umber); color:var(--cream); padding:10px 20px; cursor:pointer;
-  font:700 13px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
-.answer .status { margin:0; font-size:14px; }
-.answer .status.error { color:#9A3B2A; font-weight:700; }
+.pop .row2 { display:flex; gap:8px; align-items:center; margin-top:8px; }
+.btn { border:0; background:var(--umber); color:var(--cream); padding:8px 16px; cursor:pointer;
+  font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.btn--quiet { background:transparent; color:var(--ink); border:1px solid var(--ink); }
+.notes { background:var(--cream); color:var(--ink); padding:28px var(--pad) 32px; border-top:2px solid var(--ink); }
+.notes h2 { border:0; padding:0; margin:0 0 12px; }
+.notes ol { margin:0 0 16px; padding:0; list-style:none; max-width:80ch; }
+.notes li { display:grid; grid-template-columns:2rem 1fr auto; gap:4px 10px; align-items:start; padding:10px 0;
+  border-top:1px solid var(--line); }
+.notes .n { display:inline-flex; width:24px; height:24px; border-radius:50%; background:var(--terracotta); color:var(--heading);
+  font:700 12px var(--sans); align-items:center; justify-content:center; }
+.notes .what { font-size:13px; color:var(--muted); }
+.notes .empty { margin:0 0 16px; }
+.notes label { display:block; font-size:14px; margin:8px 0 4px; }
+.notes .general { max-width:65ch; }
+.notes .send { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; margin-top:12px; }
+.status { margin:0; font-size:14px; }
+.status.error { color:#9A3B2A; font-weight:700; }
 .update { position:sticky; top:0; z-index:3; background:var(--moss-dark); color:var(--cream); padding:10px var(--pad);
   display:flex; gap:16px; align-items:center; }
 .update[hidden] { display:none; }
@@ -123,7 +147,7 @@ dialog .screen { margin:0 16px 16px; max-height:calc(100vh - 100px); }
   font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
 """
 
-JS = """
+JS = r"""
 (function () {
   var main = document.querySelector('main'), hint = document.querySelector('.hint');
   var labels = JSON.parse(main.dataset.labels), current = 0;
@@ -144,6 +168,7 @@ JS = """
       if (room <= 0) return;
       var scale = Math.min(1, (room - 2) / w);
       frame.style.transform = 'scale(' + scale + ')';
+      try { frame.contentDocument.documentElement.style.setProperty('--db-s', String(1 / scale)); } catch (e) {}
       box.style.width = Math.ceil(w * scale + 2) + 'px';
       box.style.height = Math.ceil(h * scale + 2) + 'px';
       box.parentElement.querySelector('figcaption').textContent =
@@ -237,42 +262,175 @@ JS = """
   window.addEventListener('resize', fit);
   view('side');
 
-  // The answer: one message per Send, with the choice and every note, so the agent gets the whole answer at once.
-  var form = document.querySelector('form.answer'), status = form.querySelector('.status');
-  var served = location.protocol === 'http:', rpcId = 0;
-  if (!served) form.querySelector('.send button').textContent = 'Copy answer';
-  function answer() {
-    var data = new FormData(form), notes = {};
-    labels.forEach(function (l, i) { var t = (data.get('note-' + i) || '').trim(); if (t) notes[l] = t; });
-    return { question: main.dataset.question, versions: labels, choice: data.get('choice') || null,
-             notes: notes, note: (data.get('note') || '').trim() || null };
-  }
-  function asText(a) {
-    var lines = [];
-    if (a.choice) lines.push('I choose ' + a.choice + '.');
-    a.versions.forEach(function (l) { if (a.notes[l]) lines.push(l + ': ' + a.notes[l]); });
-    if (a.note) lines.push(a.note);
-    return lines.join('\\n');
-  }
+  // Feedback. Every action is sent as it happens, as one JSON-RPC call: the agent gets each verdict, choice and
+  // comment with what it points at, and the latest verdict or choice for a version replaces earlier ones.
+  var served = location.protocol === 'http:', rpcId = 0, seq = 0, items = [], verdicts = {}, choice = null;
+  var status = document.querySelector('.notes .status');
   function say(text, error) { status.textContent = text; status.classList.toggle('error', !!error); }
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var a = answer();
-    if (!a.choice && !a.note && !Object.keys(a.notes).length) return say('Choose a version or write a note first.', true);
+  function send(method, params) {
+    if (!served) { say('Saved on this page. Use Copy all to paste your feedback in the chat.'); return; }
+    fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
+      .then(function (r) { return r.json(); })
+      .then(function (r) { if (r.error) throw new Error(r.error.message);
+        say('Sent at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '. The agent gets it at its next step.'); })
+      .catch(function () { say('Not sent: the page lost its connection to the agent. Use Copy all and paste it in the chat.', true); });
+  }
+  function syncVersionButtons() {
+    document.querySelectorAll('.vbtn[data-v]').forEach(function (b) {
+      var v = labels[+b.dataset.v];
+      b.setAttribute('aria-pressed', String(b.classList.contains('pickv') ? choice === v : verdicts[v] === b.dataset.verdict));
+    });
+  }
+  document.querySelectorAll('.vbtn[data-v]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var v = labels[+b.dataset.v];
+      if (b.classList.contains('pickv')) { choice = choice === v ? null : v; send('choose', { version: choice }); }
+      else { verdicts[v] = verdicts[v] === b.dataset.verdict ? null : b.dataset.verdict; send('verdict', { version: v, verdict: verdicts[v] }); }
+      syncVersionButtons();
+    });
+  });
+
+  // Comment mode: hovering a version outlines the element under the pointer; a click opens the comment box for it.
+  var modeBtn = document.querySelector('#comment'), commenting = false, pop = document.querySelector('.pop'), draft = null;
+  function setMode(on) {
+    commenting = on; modeBtn.setAttribute('aria-pressed', String(on)); main.classList.toggle('commenting', on);
+    if (!on) document.querySelectorAll('main iframe').forEach(function (f) { try { clearHover(f.contentDocument); } catch (e) {} });
+  }
+  modeBtn.addEventListener('click', function () { setMode(!commenting); });
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'c' || e.key === 'C') && !/INPUT|TEXTAREA/.test(e.target.tagName) && !e.metaKey && !e.ctrlKey) setMode(!commenting);
+    if (e.key === 'Escape' && !pop.hidden) closePop();
+  });
+  function clearHover(doc) { var h = doc.querySelector('[data-db-hover]'); if (h) h.removeAttribute('data-db-hover'); }
+  function selectorOf(el) {
+    var parts = [];
+    while (el && el.nodeType === 1 && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
+      if (el.id) { parts.unshift('#' + CSS.escape(el.id)); break; }
+      var tag = el.tagName.toLowerCase(), n = 1, sib = el;
+      while ((sib = sib.previousElementSibling)) if (sib.tagName === el.tagName) n++;
+      parts.unshift(tag + ':nth-of-type(' + n + ')');
+      el = el.parentElement;
+    }
+    return parts.join(' > ') || 'body';
+  }
+  function describe(el) {
+    var text = (el.getAttribute('aria-label') || el.getAttribute('alt') || el.getAttribute('placeholder') ||
+                el.innerText || el.value || '').replace(/\s+/g, ' ').trim();
+    var heading = null, h = el.closest('section, article, main, body');
+    while (h && !heading) { var x = h.querySelector('h1, h2, h3, h4'); if (x && x !== el) heading = x.innerText.trim(); h = h.parentElement && h.parentElement.closest('section, article, main, body'); }
+    return { selector: selectorOf(el), tag: el.tagName.toLowerCase(), text: text.slice(0, 120), heading: heading };
+  }
+  var PIN_CSS = '[data-db-hover]{outline:2px solid #E8725C!important;outline-offset:2px;cursor:crosshair!important}' +
+    '.db-pin{position:absolute;z-index:2147483647;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;' +
+    'background:#E8725C;color:#1C1A17;font:700 12px/24px sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFCF7;pointer-events:none;transform:scale(var(--db-s,1))}';
+  function instrument(frame) {
+    var doc; try { doc = frame.contentDocument; } catch (e) { return; }
+    if (!doc || !doc.body || doc.documentElement.dataset.dbReady) return;
+    doc.documentElement.dataset.dbReady = '1';
+    var style = doc.createElement('style'); style.textContent = PIN_CSS; doc.head.appendChild(style);
+    doc.addEventListener('mouseover', function (e) { if (!commenting) return; clearHover(doc); e.target.setAttribute('data-db-hover', ''); }, true);
+    doc.addEventListener('click', function (e) {
+      if (!commenting) return;
+      e.preventDefault(); e.stopPropagation();
+      var el = e.target, r = el.getBoundingClientRect();
+      openPop(frame, el, { fx: (e.clientX - r.left) / Math.max(1, r.width), fy: (e.clientY - r.top) / Math.max(1, r.height) }, e.clientX, e.clientY);
+    }, true);
+    items.forEach(function (it) { placePin(frame, it); });
+    fit();
+  }
+  document.querySelectorAll('main iframe').forEach(function (frame) {
+    frame.addEventListener('load', function () { instrument(frame); });
+    try { if (frame.contentDocument.readyState === 'complete') instrument(frame); } catch (e) {}
+  });
+  function openPop(frame, el, at, cx, cy) {
+    var fig = frame.closest('figure'), box = frame.getBoundingClientRect(), scale = box.width / +frame.getAttribute('width');
+    draft = { frame: frame, version: labels[+fig.dataset.i], screen: frame.getAttribute('width') + 'x' + frame.getAttribute('height'),
+              target: describe(el), at: at, verdict: null };
+    pop.querySelector('.target').textContent = draft.version + ': ' + (draft.target.text || '<' + draft.target.tag + '>');
+    pop.querySelector('textarea').value = '';
+    pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+    pop.hidden = false;
+    var x = box.left + cx * scale + 12, y = box.top + cy * scale + 12;
+    pop.style.left = Math.max(12, Math.min(x, innerWidth - pop.offsetWidth - 12)) + 'px';
+    pop.style.top = Math.max(12, Math.min(y, innerHeight - pop.offsetHeight - 12)) + 'px';
+    pop.querySelector('textarea').focus();
+  }
+  function closePop() { pop.hidden = true; draft = null; }
+  pop.querySelectorAll('.vbtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      draft.verdict = draft.verdict === b.dataset.verdict ? null : b.dataset.verdict;
+      pop.querySelectorAll('.vbtn').forEach(function (o) { o.setAttribute('aria-pressed', String(o.dataset.verdict === draft.verdict)); });
+    });
+  });
+  pop.querySelector('.cancel').addEventListener('click', closePop);
+  pop.querySelector('textarea').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); }
+  });
+  pop.querySelector('.ok').addEventListener('click', submitComment);
+  function submitComment() {
+    var text = pop.querySelector('textarea').value.trim();
+    if (!draft || (!text && !draft.verdict)) { pop.querySelector('textarea').focus(); return; }
+    var it = { id: 'c' + (++seq), n: seq, version: draft.version, screen: draft.screen, target: draft.target,
+               at: draft.at, verdict: draft.verdict, comment: text || null };
+    items.push(it); closePop(); renderList();
+    document.querySelectorAll('main figure[data-i="' + labels.indexOf(it.version) + '"] iframe').forEach(function (f) { placePin(f, it); });
+    send('comment', { id: it.id, version: it.version, screen: it.screen, target: it.target, verdict: it.verdict, comment: it.comment });
+  }
+  function placePin(frame, it) {
+    if (labels[+frame.closest('figure').dataset.i] !== it.version) return;
+    var doc; try { doc = frame.contentDocument; } catch (e) { return; }
+    var el = doc && doc.querySelector(it.target.selector); if (!el) return;
+    var r = el.getBoundingClientRect(), win = frame.contentWindow, pin = doc.createElement('span');
+    pin.className = 'db-pin'; pin.dataset.id = it.id; pin.textContent = it.n;
+    pin.style.left = (r.left + win.scrollX + it.at.fx * r.width) + 'px';
+    pin.style.top = (r.top + win.scrollY + it.at.fy * r.height) + 'px';
+    doc.body.appendChild(pin);
+  }
+  function renderList() {
+    var list = document.querySelector('.notes ol'); list.replaceChildren();
+    document.querySelector('.notes .empty').hidden = items.length > 0;
+    items.forEach(function (it) {
+      var li = document.createElement('li'), n = document.createElement('span'), body = document.createElement('div'),
+          del = document.createElement('button');
+      n.className = 'n'; n.textContent = it.n;
+      var what = document.createElement('div'); what.className = 'what';
+      what.textContent = it.version + ', ' + (it.target.text ? '“' + it.target.text.slice(0, 60) + '”' : '<' + it.target.tag + '>');
+      var say_ = document.createElement('div');
+      say_.textContent = (it.verdict ? (it.verdict === 'up' ? 'Good' : 'Not good') + (it.comment ? ': ' : '') : '') + (it.comment || '');
+      body.append(what, say_);
+      del.type = 'button'; del.className = 'btn btn--quiet'; del.textContent = 'Delete';
+      del.setAttribute('aria-label', 'Delete comment ' + it.n);
+      del.addEventListener('click', function () {
+        items = items.filter(function (x) { return x !== it; }); renderList();
+        document.querySelectorAll('main iframe').forEach(function (f) { try { var p = f.contentDocument.querySelector('.db-pin[data-id="' + it.id + '"]'); if (p) p.remove(); } catch (e) {} });
+        send('delete', { id: it.id });
+      });
+      li.append(n, body, del); list.appendChild(li);
+    });
+  }
+  function asText() {
+    var lines = [];
+    if (choice) lines.push('I choose ' + choice + '.');
+    labels.forEach(function (v) { if (verdicts[v]) lines.push(v + ': ' + (verdicts[v] === 'up' ? 'good' : 'not good') + '.'); });
+    items.forEach(function (it) {
+      lines.push(it.n + '. ' + it.version + ', ' + (it.target.text ? '"' + it.target.text.slice(0, 60) + '"' : it.target.selector) + ': ' +
+                 (it.verdict ? (it.verdict === 'up' ? 'good' : 'not good') + (it.comment ? ', ' : '') : '') + (it.comment || ''));
+    });
+    var note = document.querySelector('#note').value.trim(); if (note) lines.push(note);
+    return lines.join('\n');
+  }
+  var noteBtn = document.querySelector('.notes .send .btn');
+  if (!served) noteBtn.textContent = 'Copy all';
+  noteBtn.addEventListener('click', function () {
     if (!served) {
-      navigator.clipboard.writeText(asText(a)).then(function () { say('Copied. Paste it in the chat with the agent.'); },
-        function () { say('Could not copy. Select your notes and copy them by hand.', true); });
+      navigator.clipboard.writeText(asText()).then(function () { say('Copied. Paste it in the chat with the agent.'); },
+        function () { say('Could not copy. Select the list and copy it by hand.', true); });
       return;
     }
-    fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: 'answer', params: a }) })
-      .then(function (r) { return r.json(); })
-      .then(function (r) {
-        if (r.error) throw new Error(r.error.message);
-        say('Sent at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
-            '. The agent gets it at its next step. You can change your answer and send it again.');
-      })
-      .catch(function () { say('Not sent: the page lost its connection to the agent. Copy your notes into the chat instead.', true); });
+    var note = document.querySelector('#note').value.trim();
+    if (!note) return say('Write a note first.', true);
+    send('note', { note: note });
   });
   // New versions from the agent: offer to load them instead of reloading, so typed notes are not lost.
   if (served) {
@@ -333,8 +491,11 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     rows = []
     for w, h in sizes:
         figures = "".join(
-            f'<figure data-i="{i}"><div class="label"><b>{esc(label)}</b>'
-            f'<button type="button" class="full">Full size</button></div>'
+            f'<figure data-i="{i}"><div class="label"><b>{esc(label)}</b><span class="acts">'
+            f'<button type="button" class="vbtn" data-v="{i}" data-verdict="up" aria-pressed="false" aria-label="Good: {esc(label)}">{THUMB_UP}</button>'
+            f'<button type="button" class="vbtn" data-v="{i}" data-verdict="down" aria-pressed="false" aria-label="Not good: {esc(label)}">{THUMB_DOWN}</button>'
+            f'<button type="button" class="vbtn pickv" data-v="{i}" aria-pressed="false">Choose</button>'
+            f'<button type="button" class="full">Full size</button></span></div>'
             f'<div class="screen"><iframe title="{esc(label)}, {w} × {h} px" width="{w}" height="{h}" '
             f'{attr}></iframe></div><figcaption>{w} × {h} px</figcaption></figure>'
             for i, (label, attr) in enumerate(loaded))
@@ -347,23 +508,22 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
                      '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
                      + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                                for i, label in enumerate(labels)) + '</div>')
-        side_hint = ""
+        side_hint = "Press C to switch comments on or off."
     else:
-        side_hint = "Every version has the same screen size and scale. Full size shows one version at its real size."
-    controls += ('<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
+        side_hint = "Press C to switch comments on or off."
+    controls += ('<div class="seg seg--terra"><button type="button" id="comment" aria-pressed="false">Comment</button></div>'
+                 '<div class="seg seg--moss"><button type="button" id="together" aria-pressed="true">'
                  'Scroll together</button></div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
-    fieldsets = "".join(
-        f'<fieldset><legend>{esc(label)}</legend>'
-        f'<label class="choose"><input type="radio" name="choice" value="{esc(label)}"> Choose {esc(label)}</label>'
-        f'<label for="note-{i}">What is wrong with {esc(label)}?</label>'
-        f'<textarea id="note-{i}" name="note-{i}"></textarea></fieldset>'
-        for i, label in enumerate(labels))
-    form = (f'<form class="answer"><h2>Your answer</h2>'
-            f'<p class="ask">{esc(question) if question else "Which version do you choose, and what is wrong with each one?"}</p>'
-            f'<div class="opts">{fieldsets}</div>'
-            f'<div class="general"><label for="note">Anything else</label><textarea id="note" name="note"></textarea></div>'
-            f'<div class="send"><button type="submit">Send to the agent</button><p class="status" role="status"></p></div></form>')
+    notes = ('<section class="notes" aria-labelledby="notes-h"><h2 id="notes-h">Your comments</h2>'
+             '<p class="empty">No comments yet. Press Comment, then click any part of a version.</p><ol></ol>'
+             '<div class="general"><label for="note">Note to the agent</label><textarea id="note"></textarea></div>'
+             '<div class="send"><button type="button" class="btn">Send note</button><p class="status" role="status"></p></div></section>')
+    pop = ('<div class="pop" role="dialog" aria-label="Comment" hidden><p class="target"></p><div class="verdicts">'
+           f'<button type="button" class="vbtn" data-verdict="up" aria-pressed="false" aria-label="Good">{THUMB_UP}</button>'
+           f'<button type="button" class="vbtn" data-verdict="down" aria-pressed="false" aria-label="Not good">{THUMB_DOWN}</button></div>'
+           '<textarea aria-label="Comment"></textarea><div class="row2"><button type="button" class="btn ok">Send</button>'
+           '<button type="button" class="btn btn--quiet cancel">Cancel</button></div></div>')
     page = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -375,7 +535,8 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
 <header><h1>{esc(title)}</h1>{question_html}</header>
 <div class="controls">{controls}<p class="hint" data-side="{esc(side_hint)}">{esc(side_hint)}</p></div>
 <main data-labels="{esc(json.dumps(labels))}" data-question="{esc(question)}">{"".join(rows)}</main>
-{form}
+{notes}
+{pop}
 <div class="band band--thin"></div>
 <p class="foot">design-better by n14n.dev</p>
 <dialog aria-label="Full size"><div class="bar"><b></b><button type="button" class="full close">Close</button></div><div class="screen"></div></dialog>
@@ -383,6 +544,19 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
 </body></html>
 """
     return page, warnings
+
+
+def clean(value, depth=0):
+    """Keep only JSON values a page can legitimately send, with long text cut, so the log stays readable."""
+    if isinstance(value, str):
+        return value[:5000]
+    if isinstance(value, bool) or value is None or isinstance(value, (int, float)):
+        return value
+    if depth < 4 and isinstance(value, dict):
+        return {str(k)[:100]: clean(v, depth + 1) for k, v in list(value.items())[:50]}
+    if depth < 4 and isinstance(value, list):
+        return [clean(v, depth + 1) for v in value[:50]]
+    return None
 
 
 def serve(page: Path, port: int, open_browser: bool) -> None:
@@ -439,15 +613,11 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
                 msg = json.loads(self.rfile.read(size))
             except ValueError:
                 return self.rpc(None, error={"code": -32700, "message": "Parse error"})
-            if not isinstance(msg, dict) or msg.get("jsonrpc") != "2.0" or msg.get("method") != "answer" \
+            if not isinstance(msg, dict) or msg.get("jsonrpc") != "2.0" or msg.get("method") not in METHODS \
                     or not isinstance(msg.get("params"), dict):
                 return self.rpc(msg.get("id") if isinstance(msg, dict) else None,
-                                error={"code": -32601, "message": "Only the answer method exists"})
-            p = msg["params"]
-            event = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "action": "answer",
-                     "question": str(p.get("question") or ""), "choice": p.get("choice"),
-                     "notes": {str(k): str(v)[:5000] for k, v in (p.get("notes") or {}).items()},
-                     "note": str(p["note"])[:5000] if p.get("note") else None}
+                                error={"code": -32601, "message": "Unknown method"})
+            event = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "action": msg["method"], **clean(msg["params"])}
             line = json.dumps(event, ensure_ascii=False)
             with lock:
                 with log.open("a", encoding="utf-8") as f:
