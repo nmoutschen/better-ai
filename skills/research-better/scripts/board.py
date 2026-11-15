@@ -65,8 +65,13 @@ def load(board: Path) -> dict:
         for i, line in enumerate(lines):
             key = (path.stem, i, line)
             stamped.append([FIRST_SEEN.get(key), line])
-        data["logs"][path.stem] = {"last": lines[-1] if lines else "", "lines": stamped[-60:], "count": len(lines),
-                                   "_born": born(path), "_changed": path.stat().st_mtime}
+        data["logs"][path.stem] = {
+            "last": lines[-1] if lines else "",
+            "lines": stamped[-60:],
+            "count": len(lines),
+            "_born": born(path),
+            "_changed": path.stat().st_mtime,
+        }
     return data
 
 
@@ -123,7 +128,10 @@ def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
     print(f"Watching {board} at {url}", flush=True)
     print("Stops by itself once the board's status is stopped (or press Ctrl+C).", flush=True)
     if open_browser and not webbrowser.open(url):
-        print("Could not open a browser on this machine. If the user's browser runs on another machine, this address does not reach it.", flush=True)
+        print(
+            "Could not open a browser on this machine. If the user's browser runs on another machine, this address does not reach it.",
+            flush=True,
+        )
     stopped_at = None
     try:
         while True:
