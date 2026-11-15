@@ -1,0 +1,13 @@
+# Tooling for the Python scripts in skills/*/scripts. The scripts themselves use the standard library only.
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+# The formatter sets line length for code; long strings and comments it cannot break are left alone.
+ignore = [
+  "E501",
+  # A word list kept as one split string reads better than a list of quoted words.
+  "SIM905",
+]

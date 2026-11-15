@@ -50,6 +50,8 @@ h1 { font:700 20px/1.2 var(--serif); color:var(--cream); margin:0; }
 .seg button.ico[aria-pressed="true"] { opacity:1; }
 .seg button.ico svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
 .seg button.sw .chip { width:14px; height:14px; border:1px solid var(--sand); display:block; }
+.chip--light { background:#F5F5F5; }
+.chip--dark { background:#1E1E1E; }
 
 /* In the bar, a two-option setting is one button that shows the current option. Both options share one cell, so
    the button keeps the width of the longer one; the first option is cream and the second umber, so the colour also

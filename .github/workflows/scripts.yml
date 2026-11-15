@@ -1,0 +1,63 @@
+name: Scripts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: check
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: format --check
+
+  scripts:
+    # Every script must run on the oldest and newest supported Python with the standard library only:
+    # -I ignores installed packages and the user's site directory.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.x"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Compile
+        run: python -m compileall -q skills
+      - name: Run each script's help
+        run: |
+          for script in skills/*/scripts/*.py; do
+            echo "$script"
+            python -I "$script" --help > /dev/null
+          done
+
+  pages:
+    # The page files the scripts fill in: CSS with stylelint's recommended rules (errors such as invalid values,
+    # unknown properties and duplicate selectors, not layout preferences), HTML with html-validate's recommended
+    # rules, and the JavaScript's syntax.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install the linters
+        # Installed into the checkout, so .stylelintrc.json can find the rule set it extends.
+        run: npm install --no-save --no-package-lock stylelint@16 stylelint-config-recommended@14 html-validate@9
+      - name: CSS
+        run: npx stylelint "skills/*/scripts/*.css"
+      - name: HTML
+        run: npx html-validate "skills/*/scripts/*.html"
+      - name: JavaScript syntax
+        run: |
+          for js in skills/*/scripts/*.js; do
+            echo "$js"
+            node --check "$js"
+          done

@@ -104,19 +104,17 @@ tr.hl td:first-child { box-shadow:inset 4px 0 0 var(--terracotta); padding-left:
 .paged .page { display:none; }
 .paged .page.current { display:block; }
 /* Each page fills the screen like a slide: the visual is centred in the space below the headline. */
-.paged main { display:flex; flex-direction:column; }
+.paged main { display:flex; flex-direction:column; padding-top:8px; }
 .paged section.panel.current { display:flex; flex-direction:column; flex:1; }
 .paged .panel .body { flex:1; align-content:center; padding-bottom:4vh; }
 .paged figure svg { max-height:58vh; }
 .paged.on-cover header.top { margin-top:auto; padding-top:3vh; }
-.paged.on-cover .controls { margin-bottom:auto; padding-bottom:3vh; }
+.paged.on-cover .controls { margin-bottom:auto; padding-top:6px; padding-bottom:3vh; }
 .paged:not(.on-cover) .slim { display:flex; gap:12px; align-items:baseline; padding:18px 0 0; font:700 12px var(--sans);
   letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
 .slim a { color:var(--muted); text-decoration:none; } .slim a:hover { color:var(--terracotta); }
 .paged section.panel { border-top:0; padding-top:clamp(8px, 3vh, 32px); }
-.paged main { padding-top:8px; }
 .paged .controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; font:700 13px var(--sans); padding:14px 0 0; }
-.paged.on-cover .controls { padding-top:6px; }
 .paged.on-cover main { padding:0; }
 .controls button { font:700 13px var(--sans); letter-spacing:.06em; text-transform:uppercase; border:0; padding:10px 16px;
   background:var(--linen); color:var(--heading); cursor:pointer; }

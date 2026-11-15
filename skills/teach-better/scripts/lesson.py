@@ -36,6 +36,7 @@ MAX_BODY = 40_000
 
 # ---------- reading ----------
 
+
 def filled(value) -> bool:
     """A string with something other than whitespace in it."""
     return isinstance(value, str) and bool(value.strip())
@@ -63,7 +64,12 @@ def attempts(lesson: Path) -> list[dict]:
 
 
 def load(lesson: Path) -> dict:
-    return {"lesson": read_json(lesson / "lesson.json", {}), "attempts": attempts(lesson), "now": time.time(), "version": VERSION}
+    return {
+        "lesson": read_json(lesson / "lesson.json", {}),
+        "attempts": attempts(lesson),
+        "now": time.time(),
+        "version": VERSION,
+    }
 
 
 DEFAULT_FIELDS = [{"id": "answer", "type": "text", "label": "Your answer, and how you got it"}]
@@ -80,6 +86,7 @@ def answerable(spec: dict) -> dict:
 
 
 # ---------- check ----------
+
 
 def check(spec) -> tuple[list[str], list[str], list[str]]:
     errors, warnings, digest = [], [], []
@@ -163,7 +170,11 @@ def check_fields(fields, where, errors, warnings, digest):
         else:
             opts = f.get("options")
             least = 3 if kind == "rank" else 2
-            if not isinstance(opts, list) or len(opts) < least or not all(isinstance(o, str) and o.strip() for o in opts):
+            if (
+                not isinstance(opts, list)
+                or len(opts) < least
+                or not all(isinstance(o, str) and o.strip() for o in opts)
+            ):
                 errors.append(f"{where}: field {f['id']} needs 'options': a list of at least {least} non-empty strings")
             elif len(set(opts)) != len(opts):
                 errors.append(f"{where}: field {f['id']} has duplicate options")
@@ -200,7 +211,9 @@ def check_card(card, where, errors, warnings, digest, seen_cards):
                 else:
                     digest.append(f"    {t['term']}: {t['means']}")
             if len(terms) > 7:
-                warnings.append(f"{where}: {len(terms)} terms on one card; split them so each is used soon after it is named")
+                warnings.append(
+                    f"{where}: {len(terms)} terms on one card; split them so each is used soon after it is named"
+                )
     if kind == "practice":
         pid = card.get("id")
         if not isinstance(pid, str) or not ID.match(pid) or pid in seen_cards:
@@ -253,7 +266,9 @@ def check_block(b, where, errors, warnings, digest):
             warnings.append(f"{where}: {len(rows)} rows; a table this long is hard to follow on one card")
         digest.append("    " + " | ".join(map(str, cols)))
         hl = set(b.get("highlight", []))
-        digest += ["    " + " | ".join(map(str, r)) + ("   <- highlighted" if i in hl else "") for i, r in enumerate(rows)]
+        digest += [
+            "    " + " | ".join(map(str, r)) + ("   <- highlighted" if i in hl else "") for i, r in enumerate(rows)
+        ]
     elif t == "steps":
         items = b.get("items")
         if not isinstance(items, list) or not items:
@@ -301,7 +316,7 @@ def check_timeline(b, where, errors, warnings, digest):
     if len(events) > 40:
         warnings.append(f"{where}: {len(events)} events; the markers will crowd")
     if b.get("legend") and not isinstance(b["legend"], dict):
-        errors.append(f"{where}: 'legend' must map marks to words, such as {{\"allow\": \"allowed\"}}")
+        errors.append(f'{where}: \'legend\' must map marks to words, such as {{"allow": "allowed"}}')
 
 
 # ---------- page ----------
@@ -314,6 +329,7 @@ PAGE = PAGE.replace("__VERSION__", VERSION)
 
 
 # ---------- server ----------
+
 
 def read_field(f: dict, raw) -> tuple[dict, str]:
     """Turn one submitted field into the record written to answers/, or return why it is refused.
@@ -369,8 +385,15 @@ def save_answer(lesson: Path, payload: dict) -> tuple[int, str]:
     folder.mkdir(exist_ok=True)
     (lesson / "feedback").mkdir(exist_ok=True)
     n = 1 + sum(1 for _ in folder.glob(f"{pid}.*.json"))
-    record = {"id": pid, "attempt": n, "quiz": quiz, "answer": answer[:20000], "fields": answers,
-              "confidence": confidence, "at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    record = {
+        "id": pid,
+        "attempt": n,
+        "quiz": quiz,
+        "answer": answer[:20000],
+        "fields": answers,
+        "confidence": confidence,
+        "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
     (folder / f"{pid}.{n}.json").write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
     return 200, "saved"
 
@@ -402,7 +425,11 @@ def serve(lesson: Path, port: int, open_browser: bool, linger: float) -> None:
         def do_POST(self):
             # Only this page may write answers: same host, and a JSON body that a cross-site form cannot send.
             origin = self.headers.get("Origin", "")
-            if not self.local() or self.path != "/answer" or not re.match(r"^http://(127\.0\.0\.1|localhost):\d+$", origin):
+            if (
+                not self.local()
+                or self.path != "/answer"
+                or not re.match(r"^http://(127\.0\.0\.1|localhost):\d+$", origin)
+            ):
                 return self.send_error(403)
             if not (self.headers.get("Content-Type") or "").startswith("application/json"):
                 return self.send_error(415)
@@ -425,7 +452,10 @@ def serve(lesson: Path, port: int, open_browser: bool, linger: float) -> None:
     print(f"Serving {lesson} at {url}", flush=True)
     print('Stops by itself once lesson.json has "status": "ended" (or press Ctrl+C).', flush=True)
     if open_browser and not webbrowser.open(url):
-        print("Could not open a browser on this machine. If the user's browser runs on another machine, this address does not reach it.", flush=True)
+        print(
+            "Could not open a browser on this machine. If the user's browser runs on another machine, this address does not reach it.",
+            flush=True,
+        )
     ended_at = None
     try:
         while True:
