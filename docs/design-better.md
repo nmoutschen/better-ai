@@ -68,7 +68,9 @@ Without an argument, it reviews the interface the conversation is building, then
    - Click any part of a version to comment on it.
    - Give each version a thumbs up or down when there are three or more.
    - Choose one version, a combination or none with Decide.
-   - The agent replies in the page and marks each item seen, working or done. You accept or reopen each item it marks done.
+   - The agent replies under your comment and marks it seen, working or done. Accept a done item with the ✓ next to Reply, or reply under it to send it back.
+   - Every message, the agent's included, can be answered with Reply. The conversation opens at the latest message, and what you are typing survives new replies.
+   - New versions load by themselves once you stop typing. If the agent's server stops, a strip under the bar says the canvas is closed.
 6. **It builds.** It keeps your design language. If a rule such as text contrast conflicts with it, the agent reports the conflict once and follows your decision. It changes a few visual things at a time and shows each batch before and after. It decides empty, loading, error and other edge states.
 7. **It checks by walking.** It operates the rendered interface for each scenario: with a pointer, by keyboard only, and at the smallest screen width. It reads the labels and headings without the visual page, runs an accessibility checker if one is available, and stops fixing after about three rounds or when a fix breaks a scenario that passed.
 8. **A separate reviewer reviews it.** The reviewer gets the interface, the brief and your decisions, not the builder's reasoning. A finding counts only if it names a scenario step where a person is stopped or slowed.
@@ -80,7 +82,7 @@ Without an argument, it reviews the interface the conversation is building, then
 
 - A brief, from `templates/brief.md`, in the project or in the reply.
 - A compare page at `.design/<slug>/index.html`, with your feedback appended to `answers.jsonl` next to it. It is not committed unless you ask.
-- The built or changed interface. When a change alters how it looks, a page showing each changed screen before and after.
+- The built or changed interface. When a change alters how it looks, a page showing each changed screen before and after, and the same screenshots in the pull request when the change goes into one.
 - A short report:
   - which scenarios it walked and how, and which failed or could not be walked
   - the decisions that are yours: conflicts with the design language, and assumptions that changed the build

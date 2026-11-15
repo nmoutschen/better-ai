@@ -2,6 +2,9 @@
 
 Researches a topic from sources instead of the model's training data, and writes a report with citations. It tracks questions, sources and claims on a research board, lets cheaper worker agents research in parallel, and has separate agents check each claim against the source page.
 
+![The live research board: a map of the questions in slices around the topic, figures for questions closed, workers, time left and decisions waiting, the agents at work, and a conversation with the coordinator on the right](img/research-better-board.png)
+*The live board: the questions as a map, the agents at work, and a conversation with the coordinator.*
+
 ## When to use it
 
 - To answer a question from sources: a topic to understand, a choice to make, a review of what is known.
@@ -27,7 +30,7 @@ Without an argument, it resumes from an existing research board, or restarts the
 
 1. **It searches before asking.** It runs a search or two with the topic's own words to see which meanings sources use. If the topic still has several meanings, it explains each and asks which one you meant.
 2. **It picks the depth.** It chooses a goal and a stop level: `high` for a quick decision, `medium` by default, or `low` for an exhaustive review from what you need. It does not ask you for a budget, and says what it chose so you can correct it.
-3. **It opens a board** in `.research/<topic-slug>/` and tells you the path. If it can, it opens a live view of the board in your browser.
+3. **It opens a board** in `.research/<topic-slug>/` and tells you the path. If it can, it opens the live board in your browser (see [The live board](#the-live-board)).
 4. **It seeds questions** from your question and from broad searches, including searches in other languages when the topic has sources there. Each question says what evidence would answer it.
 5. **Workers research the questions.** Each records every query, source and claim on the board as it goes, with a verbatim quote for each claim. As they read, they add questions:
    - newer work, origins, other fields, other regions and critics
@@ -37,14 +40,27 @@ Without an argument, it resumes from an existing research board, or restarts the
 7. **It stops** when no question at the stop level is still open, or when results stop adding anything new after one change of strategy. It does not stop because it found the answer it expected.
 8. **It presents the findings** with APA citations, a reference list built only from the board, what each challenge question found, and the questions that remain open.
 
-If a source it needs is unreachable (a missing tool, a login, an error), it does not fill the gap from other sources or from memory. It tells you and asks whether to wait, continue without it, or read sources you give it. It never puts internal names or text in a web search.
+If a source it needs is unreachable (a missing tool, a login, an error), it does not fill the gap from other sources or from memory. Before the research runs, it tells you and asks whether to wait, continue without it, or read sources you give it. Once it runs, it does not stop to wait for you: it records a decision with a safe default and a deadline (see below) and keeps working. It never puts internal names or text in a web search.
 
 Without a live view, it posts one line in the chat each time a question closes.
 
+## The live board
+
+The board fills one window and updates as the agents write:
+
+- **The figures** at the top: questions closed, workers busy, time left at the current pace, decisions waiting for you, and how long it has run.
+- **The map:** each first question is a slice, named at the edge; each ring out is a question raised one step further. A dot's colour and outline show its state, and the key explains each one. Scroll, use the buttons or double-click to zoom; drag to move; Fit brings the whole map back.
+- **Pop-ups:** click a question for its short answer, its evidence and the full question with its claims; click an agent for its latest searches. You can ask about either from the pop-up.
+- **The agents** at work, each with its question. An agent that keeps searching without finding anything new says so in red.
+- **The conversation** with the coordinating agent: write to it, reply to any message, and see each message move from seen to answered. Questions and answers on the board have short titles and one-line answers written for a quick read.
+- **Decisions waiting for you.** When something only you can decide comes up mid-run, the coordinator posts it at the bottom of the conversation with its default and a deadline (10 minutes at most, never past the expected end). Accept the default with ✓, answer differently, or let the deadline pass. You can change a decision later; that reopens a stopped board.
+
+When the board's server stops, a strip says the board is closed; ask the agent to restart it. The coordinator reads what you wrote while it was away when it resumes the board.
+
 ## What you get
 
-- A research board in `.research/<topic-slug>/`: the questions, sources, claims with quotes, search logs and verification results. It is not committed unless you ask, and a later session can resume from it.
-- A live board page while the research runs, or progress lines in the chat.
+- A research board in `.research/<topic-slug>/`: the questions, sources, claims with quotes, search logs, verification results, the decisions taken during the run, and your conversation with the coordinator (`conversation.jsonl`). It is not committed unless you ask, and a later session can resume from it.
+- A live board while the research runs, or progress lines in the chat.
 - A report: the answer first, where sources disagree or evidence is weak, citations in APA style (7th edition), a reference list, and open questions or blocked sources that could change the answer.
 
 ## Works with
