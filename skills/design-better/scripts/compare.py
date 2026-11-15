@@ -12,6 +12,15 @@ Every version is shown side by side, in a frame of each screen size, scaled down
 version can also be opened at full size. When the two versions are labelled Before and After, the page also offers
 a view that switches between them in the same place, which shows small changes at one spot better than looking
 from one to the other. The page styles only its own labels: each version keeps the styles it brings.
+
+On the page, the user gives each version a thumbs up or down, chooses one, and in comment mode clicks any part of
+a version to comment on it. With --serve, the script serves the page on 127.0.0.1 and keeps running. Each action is a
+JSON-RPC call from the page (choose, verdict, comment, delete, note); the script appends it to answers.jsonl next to
+the page and prints it to stdout as one JSON line, so a harness that streams a command's output delivers it to the
+agent as it arrives. Writing the page again with the same --out, without --serve, updates the served page: the open
+page offers to load the new versions. --wait blocks until the served page receives actions the agent has not seen
+yet, prints them and exits, for harnesses that only notify when a command ends. Without a server, Copy all copies
+the feedback as text for the user to paste in the chat. Comments work on versions embedded from files only.
 """
 
 import argparse
