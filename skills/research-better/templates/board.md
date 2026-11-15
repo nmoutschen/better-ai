@@ -31,6 +31,7 @@ limit: <a limit the user stated, or none>
 stop-at: <high | medium | low>
 collections: <the COLLECTIONs to search, such as web, or the name of a wiki>
 missing: <COLLECTIONs the TOPIC needs that could not be searched, or none>
+changes: <changes the coordinator made to the scope or method during the run, newest first, separated by " | ", or none>
 status: <running | checking | stopped>
 ```
 
