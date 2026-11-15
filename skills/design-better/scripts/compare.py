@@ -254,7 +254,7 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .thread .reply .who { color:var(--moss-dark); }
 .thread .reply .body { font-size:14px; line-height:1.45; margin:2px 0 0; }
 .thread > li.msg.agent .reply { margin:-10px -12px; border:0; background:none; }
-.progress { display:inline-flex; align-items:center; gap:6px; font:700 10px var(--sans); letter-spacing:.08em;
+.progress { white-space:nowrap; display:inline-flex; align-items:center; gap:6px; font:700 10px var(--sans); letter-spacing:.08em;
   text-transform:uppercase; color:var(--muted); }
 .progress .bars { display:inline-flex; gap:2px; }
 .progress .bars i { width:10px; height:4px; background:var(--line); }
@@ -286,6 +286,9 @@ body.app .notes .notes-top h2 { padding:0; margin:0; }
 .notes .filter button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
 .thread > li.locatable { cursor:pointer; }
 .thread > li.locatable:hover { border-color:var(--sand); }
+.thread .reply.mine.answer-note { border-left-color:var(--umber); }
+.btn--sm { padding:3px 10px; font-size:10px; }
+.msg .head .answer { margin-left:auto; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
   font:700 12px/18px var(--sans); }
 .mini:hover { border-color:var(--ink); }
@@ -719,10 +722,10 @@ JS = r"""
   function time(at) { return (at || '').slice(11, 16); }
   // A reply that names the message it answers is shown under that message, so the user sees what was answered.
   function replyBlock(e) {
-    var mine = e.action === 'reopen', r = el('div', mine ? 'reply mine' : 'reply'), h = el('div', 'head');
+    var mine = e.action === 'reopen' || e.action === 'note', r = el('div', mine ? 'reply mine' + (e.action === 'note' ? ' answer-note' : '') : 'reply'), h = el('div', 'head');
     h.append(el('span', 'who', mine ? 'You' : 'Agent'), el('span', 'when', time(e.at)));
-    if (mine) h.append(el('span', 'progress reopened', 'Reopened'));
-    r.append(h, el('p', 'body', mine ? e.reason : e.text));
+    if (e.action === 'reopen') h.append(el('span', 'progress reopened', 'Reopened'));
+    r.append(h, el('p', 'body', e.action === 'reopen' ? e.reason : e.action === 'note' ? e.note : e.text));
     return r;
   }
   var filter = 'all';
@@ -736,12 +739,18 @@ JS = r"""
   var STEPS = ['seen', 'working', 'done', 'accepted'],
       LABEL = { seen: 'Seen', asked: 'Waiting for you', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
   // Reopening asks why, in a small box under the item; the reason goes with the reopen.
-  function reasonBox(li, id) {
+  function reasonBox(li, id, answer) {
     if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
-    var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'), ok = el('button', 'btn', 'Reopen'), no = el('button', 'btn btn--quiet', 'Cancel');
-    ta.setAttribute('aria-label', 'Why reopen it?'); ta.placeholder = 'What is still wrong?';
+    var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'),
+        ok = el('button', 'btn', answer ? 'Send' : 'Reopen'), no = el('button', 'btn btn--quiet', 'Cancel');
+    ta.setAttribute('aria-label', answer ? 'Your answer' : 'Why reopen it?'); ta.placeholder = answer ? 'Your answer' : 'What is still wrong?';
     ok.type = no.type = 'button';
-    function go() { var r = ta.value.trim(); if (!r) return ta.focus(); send('reopen', { to: id, reason: r }, 'Reopening'); box.remove(); }
+    function go() {
+      var r = ta.value.trim(); if (!r) return ta.focus();
+      if (answer) send('note', { id: 'm-' + Date.now().toString(36), to: id, note: r }, 'Answer');
+      else send('reopen', { to: id, reason: r }, 'Reopening');
+      box.remove();
+    }
     ok.addEventListener('click', go); no.addEventListener('click', function () { box.remove(); });
     ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); go(); } if (k.key === 'Escape') box.remove(); });
     row.append(ok, no); box.append(ta, row); li.append(box); ta.focus();
@@ -760,7 +769,7 @@ JS = r"""
         if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
         else if (e.action === 'delete') c.deleted = true;
         else { c.e = e; c.edited = true; c.deleted = false; }
-      } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason)) && e.to && byKey[e.to]) byKey[e.to].replies.push(e);
+      } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && e.to)) && e.to && byKey[e.to]) byKey[e.to].replies.push(e);
       else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
       else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
     });
@@ -781,6 +790,11 @@ JS = r"""
         for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
         chip.append(bars, el('span', '', LABEL[st]));
         h.append(chip);
+        if (st === 'asked') {
+          var ans = el('button', 'btn btn--sm answer', 'Answer'); ans.type = 'button';
+          ans.addEventListener('click', function () { reasonBox(h.closest('li'), e.id, true); });
+          h.append(ans);
+        }
         // Once the agent marks an item done, two small equal buttons beside the state let the user accept or reopen it.
         if (st === 'done') {
           [['accept', '\u2713', 'Accept'], ['reopen', '\u21BA', 'Reopen']].forEach(function (a) {
