@@ -227,6 +227,28 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .tog[aria-checked="true"]::before { background:var(--cream) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='%235C4033' stroke-width='2'/%3E%3C/svg%3E") center/12px no-repeat; }
 body.app .seg button.ico { gap:6px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; }
 .thread > li.msg .body { font-size:14px; line-height:1.45; }
+body.app main .pick { align-self:flex-start; margin:0 0 10px; border-color:var(--ink); }
+body.app main .pick button { color:var(--ink); }
+body.app main .pick button + button { border-left-color:var(--ink); }
+body.app main .pick button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
+main.on-dark .pick, main.on-dark .pick button + button { border-color:var(--cream); }
+main.on-dark .pick button { color:var(--cream); }
+main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:var(--heading); }
+.thread .reply { margin:10px -12px -10px; padding:8px 12px 10px 12px; background:var(--linen); border-top:1px solid var(--line);
+  border-left:4px solid var(--moss-dark); }
+.thread .reply .who { color:var(--moss-dark); }
+.thread .reply .body { font-size:14px; line-height:1.45; margin:2px 0 0; }
+.thread > li.msg.agent .reply { margin:-10px -12px; border:0; background:none; }
+.msg .answered { font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
+/* In the conversation, where a comment points is a small quote above the user's words, so every message reads alike. */
+.thread .crumb { margin:2px 0 0; padding-left:8px; border-left:2px solid var(--line); }
+.thread .crumb .path { font-size:11px; }
+.thread .crumb .el { font:400 13px/1.4 var(--sans); color:var(--muted); margin-top:0; }
+.thread .crumb .role { font-size:10px; color:var(--muted); margin-right:6px; }
+.verdict { display:inline-block; font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; padding:1px 6px;
+  margin-right:8px; vertical-align:1px; }
+.verdict.up { background:var(--moss-dark); color:var(--cream); }
+.verdict.down { background:var(--terracotta); color:var(--heading); }
 /* A thin neutral outline on each frame keeps the background from changing how the version's own edges read. */
 body.app .screen { border:1px solid #BDBDBD; }
 main.on-dark .screen { border-color:#5A5A5A; }
@@ -611,45 +633,59 @@ JS = r"""
   var thread = document.querySelector('.thread');
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
   function time(at) { return (at || '').slice(11, 16); }
+  // A reply that names the message it answers is shown under that message, so the user sees what was answered.
+  function replyBlock(e) {
+    var r = el('div', 'reply'), h = el('div', 'head');
+    h.append(el('span', 'who', 'Agent'), el('span', 'when', time(e.at)));
+    r.append(h, el('p', 'body', e.text));
+    return r;
+  }
   function renderThread() {
     var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
-    var entries = [], firsts = {};
-    log.forEach(function (e) {
+    var entries = [], byKey = {};
+    log.forEach(function (e, i) {
       if (e.action === 'comment' || e.action === 'delete') {
-        var c = firsts[e.id];
-        if (!c) { if (e.action === 'delete') return; c = firsts[e.id] = { kind: 'comment', e: e, edited: false, deleted: false }; entries.push(c); }
+        var c = byKey[e.id];
+        if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
         else if (e.action === 'delete') c.deleted = true;
         else { c.e = e; c.edited = true; c.deleted = false; }
-      } else entries.push({ kind: e.action, e: e });
+      } else if (e.action === 'reply' && e.to && byKey[e.to]) byKey[e.to].replies.push(e);
+      else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
     });
     thread.replaceChildren();
     document.querySelector('.notes .empty').hidden = entries.length > 0;
     entries.forEach(function (c) {
-      var e = c.e, li;
+      var e = c.e, li, head;
+      function answered(h) { if (c.replies.length) h.append(el('span', 'answered', 'Answered')); }
       if (c.kind === 'comment') {
         li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
-        var head = el('div', 'head'); head.append(el('span', 'n', e.n || '?'), el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
+        head = el('div', 'head'); head.append(el('span', 'n', e.n || '?'), el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
+        answered(head);
         var it = byId(e.id);
         if (it && !c.deleted) {
           var del = el('button', 'link', 'Delete'); del.type = 'button'; del.setAttribute('aria-label', 'Delete comment ' + e.n);
           del.addEventListener('click', function () { removeItem(it); }); head.append(del);
         }
         li.append(head, crumb(e.version, e.target || {}));
-        var said = (e.verdict ? (e.verdict === 'up' ? 'Good' : 'Not good') + (e.comment ? ': ' : '') : '') + (e.comment || '');
-        li.append(el('p', 'body', c.deleted ? 'Deleted' : said));
+        var body = el('p', 'body');
+        if (c.deleted) body.textContent = 'Deleted';
+        else {
+          if (e.verdict) body.append(el('span', 'verdict ' + e.verdict, e.verdict === 'up' ? 'Good' : 'Not good'));
+          if (e.comment) body.append(e.comment);
+        }
+        li.append(body);
       } else if (c.kind === 'note') {
-        li = el('li', 'msg me'); var h = el('div', 'head'); h.append(el('span', 'who', 'You'), el('span', 'when', time(e.at)));
-        li.append(h, el('p', 'body', e.note));
+        li = el('li', 'msg me'); head = el('div', 'head'); head.append(el('span', 'who', 'You'), el('span', 'when', time(e.at)));
+        answered(head);
+        li.append(head, el('p', 'body', e.note));
       } else if (c.kind === 'reply') {
-        li = el('li', 'msg agent'); var h2 = el('div', 'head'); h2.append(el('span', 'who', 'Agent'), el('span', 'when', time(e.at)));
-        var to = e.to && log.filter(function (x) { return x.id === e.to; })[0];
-        if (to) h2.append(el('span', 're', 'on comment ' + (to.n || '?')));
-        li.append(h2, el('p', 'body', e.text));
+        li = el('li', 'msg agent'); li.append(replyBlock(e));
       } else if (c.kind === 'choose' || c.kind === 'verdict') {
         var t = c.kind === 'choose' ? (e.version ? 'You chose ' + e.version : 'You withdrew your choice')
               : (e.verdict ? (e.verdict === 'up' ? 'Thumbs up for ' : 'Thumbs down for ') + e.version : 'You withdrew your verdict on ' + e.version);
         li = el('li', 'sys', t + ', ' + time(e.at));
       } else return;
+      c.replies.forEach(function (r) { li.append(replyBlock(r)); });
       thread.appendChild(li);
     });
     if (stick) thread.scrollTop = thread.scrollHeight;
@@ -675,7 +711,7 @@ JS = r"""
   function sendNote() {
     var note = noteBox.value.trim();
     if (!note) { noteBox.focus(); return; }
-    send('note', { note: note }, 'Message', function () { noteBox.value = ''; });
+    send('note', { id: 'm-' + Date.now().toString(36), note: note }, 'Message', function () { noteBox.value = ''; });
   }
   noteBtn.addEventListener('click', sendNote);
   noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNote(); } });
@@ -772,10 +808,11 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     if len(labels) > 1:
         controls += ('<div class="seg" role="group" aria-label="View">'
                      f'<button type="button" class="ico" data-view="side" aria-pressed="true" title="Side by side" aria-label="Side by side">{ICONS["side"]}<span>Side by side</span></button>'
-                     f'<button type="button" class="ico" data-view="switch" aria-pressed="false" title="Switch in place (Space)" aria-label="Switch in place">{ICONS["switch"]}<span>Switch</span></button></div>'
-                     '<div class="seg pick" role="group" aria-label="Version shown" hidden>'
-                     + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
-                               for i, label in enumerate(labels)) + '</div>')
+                     f'<button type="button" class="ico" data-view="switch" aria-pressed="false" title="Switch in place (Space)" aria-label="Switch in place">{ICONS["switch"]}<span>Switch</span></button></div>')
+    # In switch view, the version shown is picked from tabs inside the viewer, so the toolbar keeps its layout.
+    tabs = ('<div class="seg pick" role="group" aria-label="Version shown" hidden>'
+            + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
+                      for i, label in enumerate(labels)) + '</div>') if len(labels) > 1 else ""
     side_hint = ""
     controls += (f'<button type="button" class="tog" id="comment" role="switch" aria-checked="true" title="Comment (C)"><span>Comment</span></button>'
                  f'<button type="button" class="tog" id="together" role="switch" aria-checked="true" title="Scroll versions together"><span>Scroll together</span></button>'
@@ -808,7 +845,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
 <div class="band band--thin"></div>
 <header><div class="ttl"><h1>{esc(title)}</h1>{question_html}</div>
 <div class="controls">{controls}<p class="hint" data-side="{esc(side_hint)}">{esc(side_hint)}</p></div></header>
-<div class="work"><main data-labels="{esc(json.dumps(labels))}" data-question="{esc(question)}">{"".join(rows)}</main>
+<div class="work"><main data-labels="{esc(json.dumps(labels))}" data-question="{esc(question)}">{tabs}{"".join(rows)}</main>
 {notes}</div>
 {pop}
 <script>{JS}</script>
