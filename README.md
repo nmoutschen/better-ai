@@ -33,96 +33,22 @@ Codex, Cursor, Gemini CLI, OpenCode and other harnesses:
 npx skills add nmoutschen/better-ai -g
 ```
 
-## `/ask-better`
+## Start here
 
-Decides when the agent should ask you a question, and how to ask it.
+Run `/interview-me` first, then work as usual. See [Getting started](docs/getting-started.md).
 
-- Looks up what it can find itself, and asks only about what only you know.
-- Raises conflicting instructions instead of resolving them silently.
+## Skills
 
-## `/code-better`
-
-Writes, checks and reviews code so it builds what you need.
-
-- Writes requirements as concrete scenarios you can check, separate from the design and the plan.
-- Changes only what the task needs, and never weakens tests.
-- Checks the code against the requirements and fixes it, with a limit on attempts. Reviews it without the reasoning that wrote it.
-- Reports its decisions, assumptions and checks, so you can still understand and maintain the code.
-
-## `/design-better`
-
-Designs, builds and checks an interface or page so the people who use it can do what they came for.
-
-- Agrees the audience and their tasks with you as scenarios, and shows two or three rough directions before building.
-- Shows visual choices, and each visual change before and after, as rendered versions side by side on one page, not as text descriptions.
-- Keeps your existing design language.
-- Checks the result by walking each scenario in the rendered page, by pointer, by keyboard and on a small screen. Automated checks and good looks do not show that people can use it.
-- Reviews without the builder's reasoning, keeps only findings tied to a step where a person is stopped, and offers a short test with real people instead of simulating them.
-- Creates or reviews a design language: colours, type, spacing and components as named values, checked against what was built.
-
-## `/do-better`
-
-Corrects work that doesn't meet your intent.
-
-- Recovers your goal, finds what is actually wrong, and fixes it.
-- Asks only when a decision blocks the work.
-
-## `/improve-better`
-
-Improves what persists across the agent's sessions, such as its memory, instruction files, skills and workflows, without waiting for a failure.
-
-- Finds candidate changes in past sessions, including rules to remove.
-- Tests each change on past tasks it was not built from, then tests the passing changes together.
-- Proposes only tested changes, each with its evidence, test result and how to undo it, and applies only what you approve.
-
-## `/interview-me`
-
-Interviews you about how you read, how you review work, and how you want AI agents to work for you.
-
-- Writes two personal skills: `write-for-<name>`, so agents write text you understand, and `review-for-<name>`, so they check work against your own criteria.
-- Writes short profile instructions you can paste into any AI tool's always-on instructions, such as Claude's profile preferences: when to ask, how to source, how to state uncertainty and when to disagree.
-- Works from your real documents, reviews and corrections, and from comparisons of concrete samples, not from general questions about your preferences.
-- Records for each rule whether you chose it, showed it, or only said it.
-
-Each interview runs on its own: `/interview-me write`, `/interview-me review` or `/interview-me profile`.
-
-## `/research-better`
-
-Researches a topic from sources instead of the model's training data, and writes a report.
-
-- Tracks open questions and sources on a shared research board, and lets cheaper worker agents research in parallel.
-- Workers add questions as they go: what sources point to in newer work, origins, other fields, other regions and critics; the works that key sources cite and that cite them; and a challenge question that looks for evidence against each key answer.
-- Separate verifier agents check each claim: they open the source page, copy the passage the claim rests on, and judge the claim from it. The coordinating agent reads only their flags and compares key claims with the copied passages.
-
-## `/review-better`
-
-Reviews work, such as text, code, an interface, a plan or a research report, so each finding leads to an action.
-
-- Agrees what the review is for, and looks for a short list of problems that would stop the work from reaching its goal.
-- Uses a separate reviewer, from a different model when it can, and backs each finding with a check it ran. Keeps findings it cannot confirm, marked as unconfirmed.
-- Fixes what is simple, asks what only the author knows, and explains the options when there are several. In someone else's work, proposes changes instead of making them.
-- Keeps a finding when the author pushes back without evidence.
-- Holds the review method that `/code-better`, `/design-better` and `/write-better` add their checks to.
-
-## `/show-better`
-
-Introduces a dense document, such as a research paper, a strategy or a design doc, with a short sequence of visual panels you read before the document.
-
-- Each panel shows a relation you would otherwise work out from the prose, in a form chosen from a wide range: concept maps, set diagrams, slope charts, distributions, hierarchies, quadrants and more.
-- Renders as an HTML page or as plain text for a terminal.
-- Checks every value against the source.
-
-## `/teach-better`
-
-Teaches you a new topic so you can use it later without AI.
-
-- Gives hints and worked examples instead of answers, tests understanding with practice you do alone, and handles pushback when you want the answer.
-- Picks extra teaching tools by your goal and the moment in the lesson: questions before the lesson, "why" prompts, "does it apply?" checks with near misses, example comparisons, question stems, mixed quizzes, and decision practice compared with cited experts.
-- Introduces terms where they are needed, and builds examples and practice from the situations where you will use the topic.
-- Ends with your own plans for when to use it, and a take-away to keep open while you do: when to use each rule, the steps, and practice tasks.
-
-## `/write-better`
-
-Rewrites the agent's output so you can understand and act on it.
-
-- Names your goal, cuts what you don't need, puts the main point first, and uses plain, specific words.
+| Skill | What it does |
+|---|---|
+| [`/interview-me`](docs/interview-me.md) | Interviews you about how you read, review and want agents to work, and writes personal guides other skills follow. |
+| [`/ask-better`](docs/ask-better.md) | Decides when the agent should ask you a question, and how to ask it. |
+| [`/code-better`](docs/code-better.md) | Writes, checks and reviews code so it builds what you need. |
+| [`/design-better`](docs/design-better.md) | Designs, builds and checks an interface or page, and shows you versions side by side on a live page. |
+| [`/do-better`](docs/do-better.md) | Corrects work that doesn't meet your intent. |
+| [`/improve-better`](docs/improve-better.md) | Improves the agent's memory, instructions and skills and proposes changes for you to approve, each with its test result. |
+| [`/research-better`](docs/research-better.md) | Researches a topic from sources on a shared board, with verified claims, and writes a report. |
+| [`/review-better`](docs/review-better.md) | Reviews text, code, an interface, a plan or a report so each finding leads to an action. |
+| [`/show-better`](docs/show-better.md) | Introduces a dense document with a short sequence of visual panels. |
+| [`/teach-better`](docs/teach-better.md) | Teaches you a topic so you can use it later without AI. |
+| [`/write-better`](docs/write-better.md) | Writes or rewrites text so you can understand and act on it. |

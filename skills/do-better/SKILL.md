@@ -107,6 +107,8 @@ DO NOT add length, citations, features, or formatting as a substitute for correc
 
 COMPARE the revision with the same GOAL and requirements used to identify the mismatch. FIX remaining observable defects. DO NOT change the requirements to make your result pass.
 
+FOR code, an interface or text, CHECK the correction the way `/code-better`, `/design-better` or `/write-better` checks that kind of work, if available.
+
 CHECK factual claims against sources and check changed behavior or artifact content when relevant. DO NOT call the correction complete until a check of it ran. REPORT only checks you performed. DO NOT claim that another rewrite or self-review proves correctness.
 
 IF you say the correction is complete, NAME next to that claim what you did not read, run, or change.
