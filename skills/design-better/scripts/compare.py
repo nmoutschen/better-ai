@@ -224,6 +224,14 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 /* The top bar stays umber, the n14n brand block; each control pairs its icon with a short label. Pickers (one of
    several) are segmented and fill the chosen option; switches (on or off) have no fill and a box that is ticked. */
 body.app .seg button.ico { gap:6px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; }
+/* Experiment: in the bar, each two-option setting is one button that shows the current option; a click switches. */
+/* Both options share one cell, so the button keeps the width of the longer one; the first option is cream, the
+   second umber, so the colour also tells which is on. */
+.controls > .seg.cycle { display:inline-grid; }
+.controls > .seg.cycle button { grid-area:1 / 1; justify-content:center; border:0; }
+.controls > .seg.cycle button[aria-pressed="false"] { visibility:hidden; }
+.controls > .seg.cycle button:first-child[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
+.controls > .seg.cycle button:last-child[aria-pressed="true"] { background:transparent; color:var(--cream); }
 .more { position:relative; }
 .morebtn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--cream); background:transparent; color:var(--cream);
   padding:6px 10px; cursor:pointer; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; }
@@ -304,6 +312,15 @@ JS = r"""
   var main = document.querySelector('main'), hint = document.querySelector('.hint');
   var labels = JSON.parse(main.dataset.labels), current = 0;
   var viewButtons = document.querySelectorAll('[data-view]'), pickButtons = document.querySelectorAll('[data-pick]');
+  // In the bar, a two-option setting shows only its current option; clicking it picks the other one.
+  document.querySelectorAll('.controls > .seg.cycle').forEach(function (seg) {
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b || b.getAttribute('aria-pressed') !== 'true' || seg.dataset.cycling) return;
+      var other = Array.prototype.filter.call(seg.querySelectorAll('button'), function (x) { return x !== b; })[0];
+      if (!other) return;
+      e.stopImmediatePropagation(); seg.dataset.cycling = '1'; other.click(); delete seg.dataset.cycling; other.focus();
+    }, true);
+  });
   // Every setting in the toolbar is one segmented choice between options; the chosen one is filled.
   var pick = document.querySelector('.pick'), linked = true, scrollSeg = document.querySelector('[aria-label="Scroll"]');
   function choose(attr, value) {
@@ -885,13 +902,13 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     names = [screen_name(w, h) for w, h in sizes]
     if len(set(names)) < len(names):
         names = [f"{w} × {h}" for w, h in sizes]
-    sizes_html = ('<div class="seg" role="group" aria-label="Screen">' + "".join(
+    sizes_html = ('<div class="seg cycle" role="group" aria-label="Screen">' + "".join(
         f'<button type="button" class="ico" data-size="{k}" aria-pressed="{str(k == 0).lower()}" title="{esc(n)}, {w} × {h} px" '
         f'aria-label="{esc(n)}, {w} × {h} px">{ICONS.get(n, "")}<span>{esc(n)}</span></button>'
         for k, ((w, h), n) in enumerate(zip(sizes, names))) + '</div>') if len(sizes) > 1 else ""
     controls = sizes_html
     if len(labels) > 1:
-        controls += ('<div class="seg" role="group" aria-label="View">'
+        controls += ('<div class="seg cycle" role="group" aria-label="View">'
                      f'<button type="button" class="ico" data-view="side" aria-pressed="true" title="Side by side" aria-label="Side by side">{ICONS["side"]}<span>Side by side</span></button>'
                      f'<button type="button" class="ico" data-view="switch" aria-pressed="false" title="Switch in place (Space)" aria-label="Switch in place">{ICONS["switch"]}<span>Switch</span></button></div>')
     # In switch view, the version shown is picked from tabs inside the viewer, so the toolbar keeps its layout.
@@ -899,7 +916,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
             + "".join(f'<button type="button" data-pick="{i}" aria-pressed="false">{esc(label)}</button>'
                       for i, label in enumerate(labels)) + '</div>') if len(labels) > 1 else ""
     side_hint = ""
-    controls += ('<div class="seg" role="group" aria-label="Mode">'
+    controls += ('<div class="seg cycle" role="group" aria-label="Mode">'
                  f'<button type="button" class="ico" data-mode="comment" aria-pressed="true" title="Click a version to comment on it (C)">{ICONS["comment"]}<span>Comment</span></button>'
                  f'<button type="button" class="ico" data-mode="use" aria-pressed="false" title="Use the versions as pages (C)">{ICONS["use"]}<span>Use</span></button></div>'
                  # Settings changed rarely sit in a Display menu, so the bar keeps to what is used on every visit.
