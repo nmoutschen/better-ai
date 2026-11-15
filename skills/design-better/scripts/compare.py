@@ -9,10 +9,10 @@ Usage:
 VERSION is LABEL=SOURCE or SOURCE. SOURCE is an HTML file, embedded into the page, or an http(s) address, loaded
 when the page is viewed. Without a LABEL, versions are labelled A, B, C in order.
 
-Every version is shown side by side, in a frame of each screen size, scaled down by the same amount to fit. Each
-version can also be opened at full size. When the two versions are labelled Before and After, the page also offers
-a view that switches between them in the same place, which shows small changes at one spot better than looking
-from one to the other. The page styles only its own labels: each version keeps the styles it brings.
+The page fills one window: the versions sit side by side at one screen size at a time, each scaled to fit and
+scrolling inside its own frame. Each can be shown alone at full width. The page also offers a view that switches
+between the versions in the same place, which shows small changes at one spot better than looking from one to the
+other; side by side suits comparing whole screens. The page styles only its own controls: each version keeps the styles it brings.
 
 On the page, the user gives each version a thumbs up or down, chooses one, and in comment mode clicks any part of
 a version to comment on it. With --serve, the script serves the page on 127.0.0.1 and keeps running. Each action is a
@@ -60,9 +60,10 @@ ICONS = {
     "side": icon('<rect x="3" y="4" width="8" height="16"/><rect x="13" y="4" width="8" height="16"/>'),
     "switch": icon('<rect x="5" y="4" width="14" height="16"/><path d="M9 12h6M13 9l3 3-3 3"/>'),
 }
-# Backgrounds behind the versions: grey is the default (a neutral mid surround); white and dark let the user see a
-# version against the background it will sit on.
-BACKGROUNDS = (("White", "#FFFFFF"), ("Grey", "#C9C9C9"), ("Dark", "#2B2925"))
+# Backgrounds behind the versions: untinted, because a tinted surround shifts what looks neutral. Near-white is the
+# default, as in design tools; dark is for versions meant for a dark context. A mid-grey is left out: judgment is
+# sharpest near the surround's own lightness, so mid-grey favours mid-tones.
+BACKGROUNDS = (("Light", "#F5F5F5"), ("Dark", "#1E1E1E"))
 METHODS = ("choose", "verdict", "comment", "delete", "note")
 MAX_BODY = 200_000
 LOCAL_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost):\d+$")
@@ -74,8 +75,7 @@ FONTS = ("https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0
 CSS = """
 :root { --cream:#FFFCF7; --linen:#F2EDE5; --sand:#C4B69C; --terracotta:#E8725C; --umber:#5C4033;
   --moss-dark:#66795A; --ink:#33302B;
-  /* ISO 3664 asks for a neutral, matte surround when judging colour: Munsell N8 grey behind the versions. */
-  --surround:#C9C9C9; --heading:#1C1A17; --muted:#78736B; --line:#DDD6CA;
+  --surround:#F5F5F5; --heading:#1C1A17; --muted:#78736B; --line:#DDD6CA;
   --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
   --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E"); }
 * { box-sizing:border-box; }
@@ -219,6 +219,19 @@ body.app .notes h2, body.app .notes .empty { padding:0 20px; }
 .composer textarea { min-height:3.2em; }
 .copy[hidden] { display:none; }
 .update { position:fixed; left:0; right:0; top:0; }
+/* A quiet toolbar: cream with ink, so the chrome draws less attention than the versions. */
+body.app > header { background:var(--cream); color:var(--ink); border-bottom:1px solid var(--line); }
+body.app h1 { color:var(--heading); }
+body.app .question { color:var(--ink); }
+body.app .seg { border-color:var(--line); }
+body.app .seg button { color:var(--ink); }
+body.app .seg button + button { border-left-color:var(--line); }
+body.app .seg button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
+body.app .seg button.sw[aria-pressed="true"] { background:transparent; }
+body.app .hint { color:var(--muted); }
+/* A thin neutral outline on each frame keeps the background from changing how the version's own edges read. */
+body.app .screen { border:1px solid #BDBDBD; }
+main.on-dark .screen { border-color:#5A5A5A; }
 @media (max-width:900px) {
   body.app { height:auto; overflow:auto; }
   .work { grid-template-columns:1fr; }
@@ -259,7 +272,7 @@ JS = r"""
   // Background behind the versions, kept for the next visit.
   function setBg(c) {
     main.style.setProperty('--surround', c);
-    main.classList.toggle('on-dark', c === '#2B2925');
+    main.classList.toggle('on-dark', c === '#1E1E1E');
     document.querySelectorAll('.sw').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.bg === c)); });
     try { localStorage.setItem('compare-bg', c); } catch (e) {}
   }
@@ -332,7 +345,7 @@ JS = r"""
     main.classList.toggle('switch', name === 'switch');
     viewButtons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.view === name)); });
     if (pick) pick.hidden = name !== 'switch';
-    hint.textContent = name === 'switch' ? 'Press Space to switch between ' + labels.join(' and ') + '.' : hint.dataset.side;
+    hint.textContent = hint.dataset.side;
     show(current);
   }
   viewButtons.forEach(function (b) { b.addEventListener('click', function () { view(b.dataset.view); }); });
@@ -758,7 +771,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
         f'aria-label="{esc(n)}, {w} × {h} px">{ICONS.get(n) or esc(n)}</button>'
         for k, ((w, h), n) in enumerate(zip(sizes, names))) + '</div>') if len(sizes) > 1 else ""
     controls = sizes_html
-    if before_after:
+    if len(labels) > 1:
         controls += ('<div class="seg" role="group" aria-label="View">'
                      f'<button type="button" class="ico" data-view="side" aria-pressed="true" title="Side by side" aria-label="Side by side">{ICONS["side"]}</button>'
                      f'<button type="button" class="ico" data-view="switch" aria-pressed="false" title="Switch in place (Space)" aria-label="Switch in place">{ICONS["switch"]}</button></div>'
@@ -769,7 +782,7 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     controls += (f'<div class="seg"><button type="button" class="ico" id="comment" aria-pressed="true" title="Comment (C)" aria-label="Comment">{ICONS["comment"]}</button>'
                  f'<button type="button" class="ico" id="together" aria-pressed="true" title="Scroll versions together" aria-label="Scroll versions together">{ICONS["together"]}</button></div>'
                  '<div class="seg" role="group" aria-label="Background">' + "".join(
-                     f'<button type="button" class="ico sw" data-bg="{c}" aria-pressed="{str(c == BACKGROUNDS[1][1]).lower()}" '
+                     f'<button type="button" class="ico sw" data-bg="{c}" aria-pressed="{str(c == BACKGROUNDS[0][1]).lower()}" '
                      f'title="{n} background" aria-label="{n} background"><span style="background:{c}"></span></button>'
                      for n, c in BACKGROUNDS) + '</div>')
     question_html = f'<p class="question">{esc(question)}</p>' if question else ""
