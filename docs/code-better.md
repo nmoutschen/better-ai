@@ -65,7 +65,7 @@ Running it does not mean code gets written right away. It can stop at requiremen
 5. **It shows the design when the change adds structure.** This applies to a new module, data model, dependency or migration. If you will maintain the code, it shows you the decisions that change behaviour, cost or risk before building.
 6. **It writes a plan only for long or shared work.** This means work over several sessions or agents.
 7. **It writes the code.** It changes only what the task needs, and lists other things worth changing instead of changing them.
-8. **It checks the code.** It runs the affected tests, a check per scenario, a smoke check, and the project's existing static checks. It stops after about three rounds of fixes, or when the same check fails twice for the same reason, and reports what fails. It never edits or skips tests to make them pass.
+8. **It checks the code.** It runs the affected tests, a check per scenario, a smoke check, and the project's existing static checks. It stops after about three rounds of fixes, or when the same check fails twice for the same reason, and reports what fails. It never edits or skips tests to make them pass. When you add or change a requirement, it re-runs the checks of every earlier scenario.
 9. **It gets a separate review.** The reviewer sees only the diff, the requirements and the code, not the agent's reasoning.
 10. **It reports back** and offers to explain how the change works.
 

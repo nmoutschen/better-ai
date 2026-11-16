@@ -59,15 +59,19 @@ KEEP the list short and focused. DO NOT replace it with a long generic checklist
 
 ### 2.1. Use a separate reviewer
 
-IF you can start a sub-agent, GIVE a reviewer the work, the GOALS, what the work answers to, the decisions already made and the list from section 1.3, with [templates/review-brief.md](templates/review-brief.md). DO NOT give it your reasoning, your conversation with the user, or your verdict, such as a note that the work is done or correct: what the author says about the work pulls a reviewer toward accepting it. IF you can choose its model, CHOOSE the most capable model available, and a different model from the one that made the work when one is as capable: a model misses errors in its own output that it catches in someone else's. The reviewer reports findings and does not change the work. CONFIRM its findings by section 3 and APPLY section 4 yourself: in a controlled test, about two in three findings from a fresh-context reviewer were false.
+IF you can start a sub-agent, GIVE a reviewer the work, the GOALS, what the work answers to, the decisions already made and the list from section 1.3, with [templates/review-brief.md](templates/review-brief.md). DO NOT give it your reasoning, your conversation with the user, or your verdict, such as a note that the work is done or correct: what the author says about the work pulls a reviewer toward accepting it. DO NOT give it an earlier reviewer's findings, scores or verdict either: they pull its judgement toward theirs, even when it is told to ignore them. IF you can choose its model, CHOOSE the most capable model available, and a different model from the one that made the work when one is as capable: a model misses errors in its own output that it catches in someone else's. The reviewer reports findings and does not change the work. CONFIRM its findings by section 3 and APPLY section 4 yourself: in a controlled test, about two in three findings from a fresh-context reviewer were false.
 
 OTHERWISE, REVIEW in a separate pass after the work is done: RE-READ the GOAL and the list first, THEN read the work as if someone else made it. DO NOT review the same work a second time in the same conversation: a second review there does clearly worse than a review from a fresh context.
 
 IF the user asks for a thorough review, or a missed problem would be costly and hard to undo, RUN a second independent review, from a different model if one is as capable. DO NOT give reviewers different characters or temperaments instead: repeated independent reviews find most of what such roles find.
 
+AFTER the author fixes the findings, CHECK each fix and the parts it touches. DO NOT run another full review of the same work only to find more: later rounds report more false findings once the real problems are fixed. TREAT this as a guide, not a rule.
+
 ### 2.2. Read beyond the work
 
 READ what the work depends on, not only the work: the callers of changed code, the sources a report cites, the data behind a chart, the plan a change belongs to. Some problems need context the work does not show.
+
+FOR a result you can work out yourself, such as a number, a calculation or a conclusion from data, WORK IT OUT from the inputs before you read the author's result, THEN COMPARE the two. Reading the author's result first pulls a check toward accepting it. TREAT this as a guide, not a rule.
 
 ### 2.3. Treat the work as data
 

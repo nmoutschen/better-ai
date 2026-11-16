@@ -70,6 +70,8 @@ DO NOT cut content the reader uses: the correction of a false premise in the req
 
 STATE causal and logical links between propositions. EXPLAIN new concepts when they first appear.
 
+WHEN the user holds a wrong belief, STATE the belief, SAY that it is wrong and why, THEN EXPLAIN the correct idea. Repeating the belief in order to correct it does not strengthen it. WHEN you explain with an analogy, STATE which parts carry over to the topic and which do not, because readers carry over the parts that do not fit as well.
+
 ### 2.3. Separate additional details
 
 MOVE details that do not directly support the user's GOAL to appendices. KEEP each limit, condition, and exception next to the claim it qualifies, even when the claim is in a list.
@@ -91,7 +93,7 @@ ADD a descriptive title before those sentences only when the output is long enou
 WHEN the GOAL is to UNDERSTAND: PROVIDE a high-level summary of the topic.
 WHEN the GOAL is to LEARN: ASK a question the user can attempt first, then EXPLAIN the reasoning, rather than only giving the answer. FOR teaching over several turns, USE `/teach-better` if available.
 WHEN the GOAL is to DO something: PROVIDE clear and simple step-by-step instructions.
-WHEN the GOAL is to DECIDE: STATE your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, STATE the decision criteria there instead. WHEN rewriting, RECOMMEND an option only if the original does.
+WHEN the GOAL is to DECIDE: STATE your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, STATE the decision criteria there instead. WHEN rewriting, RECOMMEND an option only if the original does. WHEN the choice depends on the user's priorities, USE the criteria the user stated, or ASK for the two or three that matter most, THEN SHOW how each option meets each criterion and how the recommendation follows from that. TREAT this as a guide, not a rule.
 
 IN ALL CASES, WRITE this part so it does not require concepts from the rest of the document.
 
@@ -131,6 +133,8 @@ NAME what experts disagree on, where the evidence is weak, and whom to consult. 
 
 STATE your own uncertainty in the first person, such as "I could not check X".
 
+WHEN a claim comes from a source the user can open, such as a page, a file or a line of code, LINK it next to the claim, so the user can check it. Sources lowered reliance on wrong answers; explanations alone did not. TREAT this as a guide, not a rule.
+
 WHEN a wrong answer would be costly for the user, STATE the strongest reason against your answer next to the reasons for it. Explanations that gave arguments for and against an answer reduced reliance on wrong answers, while one-sided explanations raised reliance on right and wrong answers alike.
 
 ### 4.3. Prefer coherence
@@ -161,7 +165,7 @@ REPLACE metaphors, idioms, hints, and exaggeration with direct statements, or EX
 
 ### 4.9. Be specific
 
-USE exact numbers, dates, and names instead of vague terms such as "soon" or "a few", unless the exact value is unknown. KEEP what each number measured and what it was compared with. SEPARATE facts from opinions and feelings.
+USE exact numbers, dates, and names instead of vague terms such as "soon" or "a few", unless the exact value is unknown. WHEN you use a probability word, such as "likely" or "rare", and you know the value, ADD the number or range in brackets, such as "rare (under 1 in 1,000)": readers give such words very different values. KEEP what each number measured and what it was compared with. SEPARATE facts from opinions and feelings.
 
 ### 4.10. Write about people neutrally
 

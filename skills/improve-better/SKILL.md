@@ -83,7 +83,7 @@ KEEP at most a handful of candidates, the ones with the most evidence of saving 
 TEST each candidate before you propose it. CHOOSE the strongest test you can run:
 
 1. Replay held-out past tasks: tasks from past sessions that the candidate was not built from, including some that went well. RUN them with and without the change, and COMPARE the results.
-2. IF you cannot replay tasks, CHECK the change against the recorded outcome of past sessions: would the change have produced what the user accepted, and would it have changed anything the user accepted?
+2. IF you cannot replay tasks, CHECK the change against the recorded outcome of past sessions: would the change have produced what the user accepted, and would it have changed anything the user accepted? IF you can start a sub-agent, GIVE it the past request and the changed file, and COMPARE its output with the recorded outcome, instead of asking a judge to predict the output from the text: a judge's reading of instructions does not predict how they work in use.
 3. IF neither is possible, the candidate is untested.
 
 INCLUDE held-out tasks of more than one kind when the sessions have them, because a gain on one kind of task often does not carry over. IF all held-out tasks are of one kind, SAY so in the test result.

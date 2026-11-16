@@ -88,7 +88,7 @@ Without an argument, it reviews the interface the conversation is building, then
   - which scenarios it walked and how, and which failed or could not be walked
   - the decisions that are yours: conflicts with the design language, and assumptions that changed the build
   - review findings it could not confirm
-- For a new interface or a changed main flow that other people will use, an offer of a short test: you watch three to five people from the audience try the scenarios.
+- For a new interface or a changed main flow that other people will use, an offer of a short test: you watch three to five people from the audience try the scenarios. When the pages or their names change, it offers a tree test instead, and after a test leads to changes, a second short round.
 - In language mode, a design language document with values in tables, one name per value shared by the document and the code.
 
 The report keeps three claims apart: the scenarios can be completed, the checks pass, and the audience can use the interface. Only a test with people shows the last one.

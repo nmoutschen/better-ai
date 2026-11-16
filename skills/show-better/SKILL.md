@@ -99,7 +99,7 @@ PREFER a kind that shows the relation through position, length, count or shape o
 - MOVE from general to specific: the overview before its parts, the main result before its conditions.
 - PUT the question before its answer. IN a business document, the complication comes before the proposal.
 - KEEP one structure across slides: the same kind for the same kind of point, and the same order of items.
-- STATE limits in the `source` or the `detail` of the claim they qualify.
+- STATE limits in the `source` or the `detail` of the claim they qualify. A limit that changes the slide's point goes in the headline or the `source`, not only in the `detail`.
 
 ## 4. Design each slide
 
@@ -109,7 +109,7 @@ WRITE the headline as a full sentence that states what the reader should conclud
 
 MAKE the headline's point the most prominent part of the visual. MARK with `highlight` the one or two items that carry the point, and leave the rest neutral. HIGHLIGHT only items the headline names. IF the point is a small feature of the data, CHANGE the visual so that feature stands out, such as by sorting, filtering or showing the difference itself.
 
-KEEP the first view light: PUT what an item is, its source and the strength of its evidence in the item's `detail`, which the reader opens by clicking it. GIVE `evidence` on items of `dots`, `effects`, `fork` and `lanes`, so their marks show it.
+KEEP the first view light: PUT what an item is, its source and the strength of its evidence in the item's `detail`, which the reader opens by clicking it. Most readers never open a `detail`, so WRITE each slide so its point can be read without one, and PUT in `detail` only what a reader may want to check. GIVE `evidence` on items of `dots`, `effects`, `fork` and `lanes`, so their marks show it.
 
 ### 4.2. Keep to the vocabulary
 

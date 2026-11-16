@@ -111,7 +111,7 @@ TREAT the rules in this section as guides, not rules, because their effect depen
 ### 2.2. Text and colour
 
 - DO NOT use small body text. No single size is right for everyone: larger text helps up to a point.
-- AVOID very short lines of running text. AIM for about 55 to 70 characters per line. TREAT this as a guide, not a rule.
+- AVOID very short lines of running text. AIM for about 55 to 70 characters per line. ALIGN running text to the start of the line; DO NOT justify it, although people often prefer justified text. TREAT this as a guide, not a rule.
 - KEEP the contrast between text and background high, at least the conventional 4.5 to 1 for normal text. Low contrast costs most for people with low vision and for small text.
 - PREFER dark text on a light background for small text.
 - DO NOT use colour as the only signal. ADD text, an icon or a shape.
@@ -136,6 +136,7 @@ Generated interfaces fail here more than anywhere else.
 - WRITE alt text that says what the image shows or does in this place. GIVE decorative images empty alt text. DO NOT add a description to every image.
 - SET the language of the page.
 - MAKE every action possible by keyboard, in an order that follows the task, with a visible focus.
+- GIVE content that moves by itself for more than five seconds a way to pause it. HONOUR the reduced-motion setting for motion that the person's actions trigger.
 
 WRITE names, labels and descriptions from the scenarios, because no checker can judge whether they mean anything.
 
@@ -191,6 +192,8 @@ DISTINGUISH three things, and DO NOT claim one from another: the scenarios can b
 
 WHEN the interface is new or its main flow changed, and people other than the user will use it, OFFER a short test: the user watches three to five people from the AUDIENCE try the scenarios without help, and notes where each one hesitates or fails. GIVE the scenarios as tasks worded without the labels the interface uses. IF the AUDIENCE has distinct groups, SUGGEST a few people from each.
 
-SAY that such a test finds the common problems, not all of them. IF the user has said they do not want this, FOLLOW that instead.
+WHEN the change is to which pages exist, how they are grouped or what they are called, OFFER a tree test instead: people look for items in a text-only list of the structure. DO NOT count on an agent finding every item as a result: agents find paths far more often than people do. An item the agent cannot find is a likely problem for people too.
+
+SAY that such a test finds the common problems, not all of them. WHEN a test leads to changes, OFFER a second short round on the changed flow, because fixes can create new problems. TREAT this as a guide, not a rule. IF the user has said they do not want this, FOLLOW that instead.
 
 IF the user rejects the result, USE `/do-better` if available. OTHERWISE, FIND what the result misses from the user's feedback and the brief, and CORRECT it.

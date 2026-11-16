@@ -103,13 +103,15 @@ HANDLE invalid input and failures as the requirements' scenarios say. IF they do
 RUN, in this order:
 
 1. The existing tests that the change affects. FIND them from the code you changed, not by running a generic test-first procedure.
-2. A check for each scenario in the requirements. IF the project would keep the test, THEN ADD it next to the existing tests, in their style. OTHERWISE, RUN a command or the program and record the result. DO NOT add test helpers, fixtures or frameworks the project does not already use.
+2. A check for each scenario in the requirements. EACH check COMPARES the result with the scenario's expected outcome, such as an assertion on the exact value. A check that only runs the code, or only shows that it does not crash, does not check the scenario. IF the project would keep the test, THEN ADD it next to the existing tests, in their style. OTHERWISE, RUN a command or the program and record the result. DO NOT add test helpers, fixtures or frameworks the project does not already use.
 3. A smoke check that the program starts and its main path works.
 4. Static analysis, type checks and security checks that the project already uses.
 
 PREFER narrow checks tied to the requirements over broad generic end-to-end suites, which often reject working code.
 
 IF you cannot run code, SAY so. DO NOT describe results you did not observe. LIST the checks the user should run.
+
+WHEN the user adds or changes a requirement after earlier scenarios were met, RE-RUN the checks of every earlier scenario, not only those the new change touches. IF one fails, UNDO the change that broke it, THEN make the new change another way or REPORT the conflict between the two requirements. New code often breaks behaviour that earlier requirements set.
 
 ### 5.2. Bound the repair loop
 
@@ -134,6 +136,8 @@ COMPARE the finished behaviour with each scenario in the requirements, using the
 ## 6. Review
 
 FOLLOW `/review-better` if available to run the review, confirm findings and hand them back, with section 6.1 as what to look for. OTHERWISE, IF you can start a sub-agent, GIVE a separate reviewer only the diff, the requirements and access to the code, from the most capable model you can choose, and not your reasoning, your conversation with the user, or your verdict. IF you cannot, RE-READ the requirements, THEN read the diff as if someone else wrote it. ALSO CHECK the blocking criteria of the user's review guide, if there is one. KEEP a finding you cannot confirm as unconfirmed, ORDER findings by effect, and REPORT each with its location, the input that triggers it, its effect, and a fix.
+
+IF the diff is large, such as over about 150 changed lines, SPLIT the review by purpose, such as one part per feature or per layer, and review each part on its own. Reviewers, model or human, find far fewer problems in large diffs. TREAT this as a guide, not a rule.
 
 ### 6.1. What to look for in code
 
@@ -177,5 +181,7 @@ WHEN you hand work to another agent or session, GIVE it the requirements, the de
 ### 8.3. Keep long runs on track
 
 FOR work that spans several sessions, KEEP the plan file current, COMMIT a working state after each task, and BEGIN each session by reading the requirements, the design, and the plan.
+
+IN a session long enough that the harness may compact or summarize the conversation, WRITE each constraint and prohibition the user gives to the requirements file, or to a notes file if there is none, when they give it, and RE-READ that file after each compaction. Summaries drop prohibitions far more often than build specifications.
 
 AT each checkpoint, RE-CHECK the result against the requirements' scenarios and REVIEW the structure for growing duplication or complexity. Agent code erodes in structure as it grows while still passing tests. Requests for quality did not stop erosion.
