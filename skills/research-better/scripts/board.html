@@ -8,6 +8,9 @@
 /* What only the board shows; the shared look (bar, side column, conversation, buttons, toast) is page.css above. */
 /* The board's bar holds figures on the right, so it never wraps; its title and goal cut off instead. */
 header.bar--stats { flex-wrap:nowrap; align-items:flex-end; }
+/* Above the message box when no `wait` is connected, so a note sent while the coordinator is not watching is not lost in silence. */
+.unwatched { margin:0 0 12px; padding:8px 12px; background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:500 13px/1.45 var(--sans); }
+.unwatched[hidden] { display:none; }
 header.bar--stats > div { min-width:0; }
 header.bar--stats h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .stat.wait b { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
@@ -121,6 +124,7 @@ svg.map { display:block; width:100%; height:100%; }
     <p class="empty" id="empty">Nothing yet. Click a question or an agent to ask about it, or write to the coordinator below.</p>
     <ol class="thread" id="thread"></ol>
     <form class="composer" id="noteform">
+      <p class="unwatched" id="unwatched" role="status" hidden>The coordinator is not watching this page right now. What you send is saved, but it reads it only when it next looks: tell it in the chat.</p>
       <label for="note">Message to the coordinator</label>
       <textarea id="note"></textarea>
       <div class="send"><button type="submit" class="btn">Send</button></div>
@@ -571,8 +575,8 @@ function render(d) {
 let fails = 0;
 function tick() {
   return fetch("board.json", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(d => { fails = 0; CLOSED_PAGE = false; $("offline").hidden = true; render(d); },
-      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("offline").hidden = false; if (D) render(D); } });
+    .then(d => { fails = 0; CLOSED_PAGE = false; $("offline").hidden = true; $("unwatched").hidden = d.listening !== false; render(d); },
+      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("offline").hidden = false; $("unwatched").hidden = true; if (D) render(D); } });
 }
 if (SNAPSHOT) { render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
 else { tick(); setInterval(tick, 2000); }
