@@ -93,7 +93,9 @@ def board_page(snapshot: dict | None) -> str:
     """The page, read on each request, so a fix to board.html or page.css shows on reload without restarting the viewer."""
     embedded = "null" if snapshot is None else json.dumps(snapshot).replace("</", "<\\/")
     shared = (HERE / "page.css").read_text(encoding="utf-8")  # the look shared with design-better's canvas
+    script = (HERE / "page.js").read_text(encoding="utf-8")  # the conversation shared with the canvas and the slides
     html = (HERE / "board.html").read_text(encoding="utf-8").replace("/*__PAGE_CSS__*/", shared)
+    html = html.replace("/*__PAGE_JS__*/", script)
     return html.replace("__SNAPSHOT__", embedded)
 
 

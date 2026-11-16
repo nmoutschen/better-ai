@@ -133,6 +133,7 @@ svg.map { display:block; width:100%; height:100%; }
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <script>
+/*__PAGE_JS__*/
 const SNAPSHOT = __SNAPSHOT__;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -296,61 +297,75 @@ addEventListener("pointermove", ev => { if (!drag) return; const r = svg.getBoun
   vb[0] = drag[2] - (ev.clientX - drag[0]) * s; vb[1] = drag[3] - (ev.clientY - drag[1]) * s; setView(); });
 addEventListener("pointerup", () => { drag = null; wrapEl.classList.remove("drag"); });
 
-// ---------- The conversation log: the user's items, the coordinator's replies and states ----------
-function conversation(d) {
-  const items = [], byId = {}, state = {};
-  // A decision the coordinator took without the user is a message from it, placed where it happened.
+// ---------- The conversation: page.js, shared with the canvas and the slides; the board adds decisions and workers ----------
+// A decision the coordinator took without the user is a message from it, placed where it happened. Its time is its `at`
+// line; the file's own time moves whenever the coordinator edits it, and may be in another time zone than the log. So
+// nothing comes before what it answers: an answer before its decision, a reply before the answer it replies to. The log
+// is in the order things happened, so what an event answers is already timed when the event is read.
+function events(d) {
   const at = e => Date.parse(e.at) / 1000 || 0;
-  // A decision's time is its `at` line; the file's own time moves whenever the coordinator edits it. Every decision is
-  // known before the events are read, so an answer always finds its decision whatever the order.
-  const events = (d.conversation || []).map(e => ({...e, _t: at(e)}))
-    .concat((d.decisions || []).map(x => ({action: "decision", id: x.id, x, _t: Date.parse(x.at) / 1000 || x._born})))
-    .sort((a, z) => a._t - z._t);
-  events.filter(e => e.action === "decision").forEach(e => { byId[e.id] = {e, replies: [], decision: true}; });
-  events.forEach(e => {
-    if (e.action === "decision") { items.push(byId[e.id]); return; }
-    if (e.action === "answer" && byId[e.decision]) { const it = {e, replies: []}; byId[e.id] = it; byId[e.decision].replies.push({mine: true, text: e.text, id: e.id, at: e.at}); byId[e.decision].answer = it; return; }
-    if (e.action === "status") state[e.to] = e.status;
-    else if (e.action === "accept") state[e.to] = "accepted";
-    else if (e.action === "reopen") state[e.to] = "reopened";
-    else if (e.action === "closed" && e.id) { const it = {e, replies: [], closed: true}; byId[e.id] = it; items.push(it); }
-    else if (e.action === "reply" && e.to && byId[e.to]) {
-      const it = byId[e.to], host = it.e.action === "answer" && byId[it.e.decision] ? byId[it.e.decision] : it;
-      host.replies.push({mine: false, text: e.text, at: e.at}); if (e.id) byId[e.id] = host; }
-    else if (e.action === "note" && e.to && byId[e.to]) { const host = byId[e.to]; host.replies.push({mine: true, text: e.text, at: e.at}); if (host.agent || host.closed) host.lastNote = e.id;
-      if (e.id) byId[e.id] = host;  // a reply to this answer belongs to the same message
-      if (state[e.to] === "asked") state[e.to] = "replied"; else if (state[e.to] === "done" || state[e.to] === "accepted") state[e.to] = "followup"; }
-    else if (["comment", "note"].includes(e.action) && e.id) { const it = {e, replies: []}; byId[e.id] = it; items.push(it); }
-    else if (e.action === "reply") { const it = {e, replies: [], agent: true}; if (e.id) byId[e.id] = it; items.push(it); }
-  });
-  return {items, state};
+  const decisions = (d.decisions || []).map(x => ({action: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || x._born}));
+  const when = Object.fromEntries(decisions.map(e => [e.id, e._t]));
+  return (d.conversation || []).map(e => {
+    const _t = Math.max(at(e), when[e.action === "answer" ? e.decision : e.to] || 0);
+    if (e.id) when[e.id] = _t;
+    return {...e, _t}; })
+    .concat(decisions).sort((a, z) => a._t - z._t || (z.action === "decision") - (a.action === "decision"));
 }
-const STEPS = ["seen", "done"];  // no "working" on the board: the coordinator answers most messages from the board at once
-function progress(st) {
-  if (!st) return `<span class="progress"><span class="bars" aria-hidden="true"><i></i><i></i></span>Sent</span>`;
-  const shown = st === "working" ? "seen" : st === "accepted" ? "done" : st;  // the board has no working or accept step
-  const k = ["asked", "replied", "followup"].includes(shown) ? 0 : STEPS.indexOf(shown);
-  return `<span class="progress ${esc(shown)}"><span class="bars" aria-hidden="true">${[0, 1].map(j => `<i${j <= k ? ' class="on"' : ""}></i>`).join("")}</span>${esc(LABEL[shown] || shown)}</span>`;
-}
-const LABEL = { seen: "Seen", asked: "Waiting for you", replied: "You answered", working: "Working on it", done: "Answered", accepted: "Answered", followup: "You replied" };
-// The same markup as design-better's canvas: an item with a head, a body, the replies under it and a foot.
+const decisionStatus = x => String(x.status || "pending").trim().toLowerCase();
+const answerOf = c => c.replies.filter(r => r.action === "answer").pop();
 const clock = at => String(at || "").slice(11, 16);
-const head = (who, at, extra) => `<div class="head"><span class="who">${who}</span><span class="when">${esc(extra || clock(at))}</span></div>`;
-const replyHTML = r => `<div class="reply${r.mine ? " mine" : ""}">${head(r.mine ? "You" : "Coordinator", r.at)}<p class="body" dir="auto">${esc(r.text)}</p></div>`;
-function itemHTML(it, conv, withActions) {
-  const e = it.e, st = conv.state[e.id];
-  const crumb = e.on ? `<span class="crumb"><span class="path">on</span><span class="el"><button type="button" data-open="${esc(e.on.kind)}:${esc(e.on.id)}">${esc(e.on.title || e.on.id)}</button></span></span>` : "";
-  const actions = !withActions || SNAPSHOT ? "" : st === "asked" ? `<button type="button" class="btn btn--sm answer" data-answer="${esc(e.id)}">Answer</button>`
-    : `<button type="button" class="btn btn--quiet btn--sm answer" data-answer="${esc(e.id)}">Reply</button>`;
-  return `<li class="msg" data-id="${esc(e.id)}" data-state="${esc(st || "")}">${head("You", e.at)}${crumb}<p class="body" dir="auto">${esc(e.text)}</p>
-    ${it.replies.map(replyHTML).join("")}<div class="foot">${progress(st)}${actions}</div></li>`;
+const headHTML = (who, at, extra) => `<div class="head"><span class="who">${who}</span><span class="when">${esc(extra || clock(at))}</span></div>`;
+function li(cls, html) { const x = document.createElement("li"); x.className = cls; x.innerHTML = html; return x; }
+// A worker's message when it closes a question. The title and the count of new questions are read from the board now,
+// so a later rewrite or a question added after the close shows; the answer is the gist as the worker wrote it.
+const CLOSEWORD = {answered: "Answered", contested: "Contested", "not found": "Not found", unclear: "Unclear"};
+function closedItem(c) {
+  const e = c.e, q = D.byId[e.q], n = D.qs.filter(x => x.parent === e.q).length;
+  const title = q ? `<button type="button" class="qlink" data-open="question:${esc(e.q)}">${esc(q.label)}</button>` : esc(e.q);
+  const more = n ? `<p class="added">Raised ${plural(n, "new question")}.</p>` : "";
+  return li("msg worker", `${headHTML(esc(e.by || "A worker"), e.at)}
+    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p><p class="body" dir="auto">${esc(e.text)}</p>${more}`);
 }
-function threadFor(conv, match) {  // the items about one question or agent, for its pop-up
-  return conv.items.filter(it => !it.agent && !it.decision && match(it.e)).map(it => itemHTML(it, conv, false)).join("");
+// A decision waiting for the user: Use the default (the check) or Answer; once answered or decided, Reply.
+function decisionItem(c, state, actions) {
+  const x = c.e.x, status = decisionStatus(x), answer = answerOf(c), ast = answer && state[answer.id];
+  const def = has(x.default) ? x.default : x.chose || "", left = (Date.parse(x.deadline) / 1000 || 0) - D.now;
+  const label = status === "changed" ? "changed by you" : status === "default" ? (answer ? "default, chosen by you" : "decided without you")
+    : answer ? (answer.default ? "default accepted, waiting for the coordinator" : "answered, waiting for the coordinator")
+    : left > 0 ? `default in ${left < 90 ? "under 2 min" : Math.round(left / 60) + " min"}` : "default due now";
+  const item = li(`msg decision ${status}`, `${headHTML("Coordinator", "", label)}<p class="body" dir="auto">${esc(x.asked || "")} ${status === "pending" ? "If you don't answer: " : ""}${esc(def)}</p>`);
+  item.dataset.d = x.id;
+  item.dataset.state = status === "changed" ? "done" : ast || (status === "pending" ? "asked" : "");
+  const foot = document.createElement("div"); foot.className = "foot";
+  if (answer) foot.append(conv.progress(ast)); else if (status === "pending") foot.append(conv.progress("asked"));
+  if (actions) foot.insertAdjacentHTML("beforeend", !answer && status === "pending"
+    ? `<button type="button" class="btn btn--sm answer" data-default="${esc(x.id)}" title="Use the default" aria-label="Use the default">✓</button><button type="button" class="btn btn--quiet btn--sm change">Answer</button>`
+    : `<button type="button" class="btn btn--quiet btn--sm answer change">Reply</button>`);
+  return [item, foot];
 }
+function crumb(e) {
+  const x = document.createElement("span");
+  if (e.on) { x.className = "crumb"; x.innerHTML = `<span class="path">on</span><span class="el"><button type="button" data-open="${esc(e.on.kind)}:${esc(e.on.id)}">${esc(e.on.title || e.on.id)}</button></span>`; }
+  return x;
+}
+function commentBody(e) { const p = document.createElement("p"); p.className = "body"; p.dir = "auto"; p.textContent = e.text; return p; }
+const conv = pageConversation({
+  served: !SNAPSHOT, readOnly: !!SNAPSHOT, stream: false, name: "board", agent: "Coordinator", thread: $("thread"),
+  agentKinds: ["reply", "closed"], kinds: {decision: decisionItem, closed: closedItem}, crumb, commentBody,
+  // No working or accept step on the board: the coordinator answers most messages from the board at once, and an
+  // answered item is finished.
+  steps: ["seen", "done"], labels: {done: "Answered"}, shown: st => st === "working" ? "seen" : st === "accepted" ? "done" : st,
+  accept: false, filter: false,
+  // A decision waiting for the user comes last, next to the message box, until they answer it; so does a message of
+  // theirs that the coordinator asked about.
+  waiting: (c, state) => c.kind === "decision" ? !answerOf(c) && decisionStatus(c.e.x) === "pending" : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
+  afterSend: () => tick(),
+});
+const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
 // ---------- The right column ----------
-function drawRight(d, conv) {
+function drawAgents(d) {
   const working = d.qs.filter(q => q.view === "in progress");
   const checkers = {}; d.claims.forEach(c => { if (has(c.checker) && !/^(un)?verified$/i.test(String(c.verified || "").trim())) checkers[c.checker] = c; });
   const dry = name => { const l = ((d.logs || {})[name] || {}).searches || []; let n = 0;  // searches in a row that found no new term
@@ -359,62 +374,8 @@ function drawRight(d, conv) {
     return `<li><button type="button" data-a="${esc(who)}" data-for="${esc(q.id)}"><b>${esc(who)}</b><span dir="auto">${esc(q.label)}</span>${n >= 5 ? `<em class="dry">${n} searches with nothing new</em>` : ""}</button></li>`; })
     .concat(Object.keys(checkers).sort().map(v => `<li><button type="button" class="verifier" data-a="${esc(v)}"><b>${esc(v)}</b><span>Checking claims</span></button></li>`));
   setHTML($("agents"), rows.join("") || `<li class="muted">${d.brief.status === "stopped" ? "The run has stopped." : "No agent is working right now."}</li>`);
-  const stick = $("thread").scrollHeight - $("thread").scrollTop - $("thread").clientHeight < 40;
-  // One list in time order, in one scroll. A decision waiting for the user comes last, next to the message box, until they answer it.
-  const waiting = it => it.decision ? !it.answer && String(it.e.x.status || "pending").trim().toLowerCase() === "pending"
-    : !it.agent && conv.state[it.e.id] === "asked";
-  const shown = conv.items.filter(it => !waiting(it)).concat(conv.items.filter(waiting));  // waiting ones last, in the same scroll
-  keepTyping($("thread"), shown.map(it => {
-    const e = it.e;
-    if (it.agent) return `<li class="msg agent" data-id="${esc(e.id || "")}">${replyHTML({mine: false, text: e.text, at: e.at})}${it.replies.map(replyHTML).join("")}
-      ${e.id && !SNAPSHOT ? `<div class="foot">${it.lastNote ? progress(conv.state[it.lastNote]) : ""}<button type="button" class="btn btn--quiet btn--sm answer" data-answer="${esc(e.id)}">Reply</button></div>` : ""}</li>`;
-    if (it.decision) return decisionHTML(it, conv);
-    if (it.closed) return closedHTML(it, conv, d);
-    return itemHTML(it, conv, true); }).join(""));
-  $("empty").hidden = conv.items.length > 0;
-  // As in the canvas: open on the latest message, and follow new ones while the user is at the bottom.
-  if (stick || !SCROLLED) {
-    const bottom = () => { $("thread").scrollTop = $("thread").scrollHeight; };
-    bottom(); requestAnimationFrame(bottom); document.fonts?.ready.then(bottom);
-    if (conv.items.length) SCROLLED = true;
-  }
 }
-// A worker's message when it closes a question. The title and the count of new questions are read from the board now,
-// so a later rewrite or a question added after the close shows; the answer is the gist as the worker wrote it.
-const CLOSEWORD = {answered: "Answered", contested: "Contested", "not found": "Not found", unclear: "Unclear"};
-function closedHTML(it, conv, d) {
-  const e = it.e, q = d.byId[e.q], n = d.qs.filter(x => x.parent === e.q).length;
-  const title = q ? `<button type="button" class="qlink" data-open="question:${esc(e.q)}">${esc(q.label)}</button>` : esc(e.q);
-  const more = n ? `<p class="added">Raised ${plural(n, "new question")}.</p>` : "";
-  return `<li class="msg worker" data-id="${esc(e.id)}">${head(esc(e.by || "A worker"), e.at)}
-    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p><p class="body" dir="auto">${esc(e.text)}</p>${more}
-    ${it.replies.map(replyHTML).join("")}
-    ${SNAPSHOT ? "" : `<div class="foot">${it.lastNote ? progress(conv.state[it.lastNote]) : ""}<button type="button" class="btn btn--quiet btn--sm answer" data-answer="${esc(e.id)}">Reply</button></div>`}</li>`;
-}
-function decisionHTML(it, conv) {
-  const e = it.e;
-      const x = e.x, status = String(x.status || "pending").trim().toLowerCase(), ast = it.answer && conv.state[it.answer.e.id];
-      const def = has(x.default) ? x.default : x.chose || "", left = (Date.parse(x.deadline) / 1000 || 0) - D.now;
-      const label = status === "changed" ? "changed by you" : status === "default" ? (it.answer ? "default, chosen by you" : "decided without you")
-        : it.answer ? (it.answer.e.default ? "default accepted, waiting for the coordinator" : "answered, waiting for the coordinator")
-        : left > 0 ? `default in ${left < 90 ? "under 2 min" : Math.round(left / 60) + " min"}` : "default due now";
-      const action = SNAPSHOT ? "" : it.answer || status === "changed" ? `<button type="button" class="btn btn--quiet btn--sm answer change">Reply</button>`
-        : status === "pending" ? `<button type="button" class="btn btn--sm answer" data-default="${esc(x.id)}" title="Use the default" aria-label="Use the default">\u2713</button><button type="button" class="btn btn--quiet btn--sm change">Answer</button>`
-        : `<button type="button" class="btn btn--quiet btn--sm answer change">Reply</button>`;
-      return `<li class="msg decision ${esc(status)}" data-d="${esc(x.id)}" data-state="${status === "changed" ? "done" : esc(ast || (status === "pending" ? "asked" : ""))}">
-        ${head("Coordinator", "", label)}<p class="body" dir="auto">${esc(x.asked || "")} ${status === "pending" ? "If you don't answer: " : ""}${esc(def)}</p>
-        ${it.replies.map(replyHTML).join("")}<div class="foot">${it.answer ? progress(ast) : status === "pending" ? progress("asked") : ""}${action}</div></li>`;
-    }
-// Live updates must not take away what the user is typing: a box with text in it survives a redraw.
-function keepTyping(el, html) {
-  if (el._html === html) return;
-  const kept = [...el.querySelectorAll("[data-id] form.why textarea, [data-d] form.why textarea")]
-    .map(t => ({key: t.closest("[data-id]") ? `[data-id="${t.closest("[data-id]").dataset.id}"]` : `[data-d="${t.closest("[data-d]").dataset.d}"]`,
-      box: t.closest(".why"), focus: document.activeElement === t}));
-  el.innerHTML = el._html = html;
-  kept.forEach(k => { const host = el.querySelector(k.key); if (!host) return;
-    host.querySelectorAll(".foot .answer, .foot .change").forEach(c => { c.style.visibility = "hidden"; }); host.append(k.box); if (k.focus) k.box.querySelector("textarea").focus({preventScroll: true}); });
-}
+
 function setHTML(el, html) { if (el._html !== html) el.innerHTML = el._html = html; }
 
 // ---------- Pop-ups ----------
@@ -439,8 +400,8 @@ function placePop(anchor) {
 function fillPop() {
   const el = $("pop"); if (!el || !D) return;
   const ta = el.querySelector("textarea"), typed = ta ? ta.value : "", focused = ta && document.activeElement === ta;
-  const conv = conversation(D), {kind, id} = OPEN;
-  let html;
+  const {kind, id} = OPEN;
+  let html, match;
   if (kind === "question") {
     const q = D.byId[id]; if (!q) return closePop();
     const [word, cls] = stateOf(q), n = q.claimsList.length, ver = q.claimsList.filter(c => /^verified$/i.test(String(c.verified || "").trim())).length;
@@ -456,7 +417,8 @@ function fillPop() {
       ${q.claimsList.length ? `<ul>${q.claimsList.map(c => { const s = (D.sources.find(x => x.id === c.source) || {});
         const v = String(c.verified || "").trim().toLowerCase(), mark = v === "verified" ? "✓" : v === "unverified" ? "✗" : "○";
         return `<li dir="auto"><span aria-label="${v === "verified" ? "verified" : v === "unverified" ? "failed" : "not checked yet"}">${mark}</span> ${esc(c.claim)} <span class="muted">${esc(s.author || s.publisher || c.source)}${has(s.date) ? ` (${esc(s.date)})` : ""}</span></li>`; }).join("")}</ul>` : ""}</details>
-      <ul class="thread">${threadFor(conv, e => e.on && e.on.kind === "question" && e.on.id === id)}</ul>`;
+      <ul class="thread"></ul>`;
+    match = e => e.on && e.on.kind === "question" && e.on.id === id;
   } else if (D.claims.some(c => c.checker === id)) {
     const mine = D.claims.filter(c => c.checker === id), v = x => String(x.verified || "").trim().toLowerCase();
     const holding = mine.filter(c => !["verified", "unverified"].includes(v(c))), failed = mine.filter(c => v(c) === "unverified");
@@ -464,7 +426,8 @@ function fillPop() {
       <p>Checked ${plural(mine.length - holding.length, "claim")}: ${mine.filter(c => v(c) === "verified").length} verified, ${failed.length} failed.</p>
       ${holding.length ? `<h2>Checking now</h2><ul class="searches">${holding.map(c => `<li dir="auto">${esc(c.claim)}</li>`).join("")}</ul>` : ""}
       ${failed.length ? `<h2>Failed</h2><ul class="searches">${failed.map(c => `<li dir="auto">${esc(c.claim)} <span class="muted">${esc(has(c.reason) ? c.reason : "")}</span></li>`).join("")}</ul>` : ""}
-      <ul class="thread">${threadFor(conv, e => e.on && e.on.kind === "agent" && e.on.id === id)}</ul>`;
+      <ul class="thread"></ul>`;
+    match = e => e.on && e.on.kind === "agent" && e.on.id === id;
   } else {
     const log = (D.logs || {})[id] || {}, q = D.byId[(D.qs.find(x => x.view === "in progress" && x.owner === id) || {}).id];
     // Repeated searches collapse into one line with a count, so an agent going in circles shows at a glance.
@@ -473,52 +436,31 @@ function fillPop() {
     const s = [...counts].slice(0, 5).map(([q, n]) => n > 1 ? `${q} (${n} times)` : q);
     html = `<p class="meta"><span class="chip now">working</span></p><h3>${esc(id)}${q ? " on " + esc(q.label) : ""}</h3><h2>Latest searches</h2>
       <ul class="searches">${s.map(x => `<li dir="auto">${esc(x)}</li>`).join("") || "<li>None logged yet.</li>"}</ul>
-      <ul class="thread">${threadFor(conv, e => e.on && e.on.kind === "agent" && e.on.id === id)}</ul>`;
+      <ul class="thread"></ul>`;
+    match = e => e.on && e.on.kind === "agent" && e.on.id === id;
   }
   const label = kind === "question" ? "Ask or comment on this question" : `Message about ${id}'s work`;
   html = `<button type="button" class="x" aria-label="Close">×</button>` + html + (SNAPSHOT ? "" :
     `<form class="ask popask"><textarea aria-label="${esc(label)}" placeholder="${esc(label)}"></textarea><button type="submit" class="btn">Send</button></form>`);
-  if (el._html === html) return;
+  const mine = conv.nodes(match), key = html + mine.map(n => n.outerHTML).join("");
+  if (el._html === key) return;
   const wasOpen = el.querySelector("details")?.open;
-  el.innerHTML = el._html = html;
+  el.innerHTML = html; el._html = key;
+  el.querySelector("ul.thread").append(...mine);
   const h3 = el.querySelector("h3"); if (h3) { h3.id = "pop-title"; h3.setAttribute("tabindex", "-1"); }
   if (wasOpen) el.querySelector("details")?.setAttribute("open", "");
   const t = el.querySelector("textarea"); if (t) { t.value = typed; if (focused) t.focus({preventScroll: true}); }
   placePop(OPEN && OPEN.anchor);
 }
 
-// ---------- Sending to the coordinator ----------
-const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-function send(method, params, what) {
-  if (SNAPSHOT) return Promise.reject();
-  flash(`Sending ${what.toLowerCase()}\u2026`, "busy");
-  return fetch("rpc", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: uid("r"), method, params})})
-    .then(r => r.json()).then(r => { if (r.error) throw new Error(r.error.message); flash(`\u2713 ${what} sent to the coordinator`, "ok"); tick(); },
-      err => { flash(`Not sent: ${what.toLowerCase()}. The board is closed.`, "error"); throw err; });
-}
-let toastTimer = null;
-function flash(text, kind) {  // as on the canvas: busy and errors stay up, the rest fades after a moment
-  const t = $("toast"); t.textContent = text; t.className = "toast" + (kind ? " " + kind : ""); t.hidden = false;
-  clearTimeout(toastTimer); if (kind !== "error" && kind !== "busy") toastTimer = setTimeout(() => { t.hidden = true; }, 2500);
-}
-
+// ---------- Sending to the coordinator: the message box and replies are page.js's; the pop-ups and decisions are the board's ----------
 document.addEventListener("submit", ev => {
   ev.preventDefault();
-  const f = ev.target, ta = f.querySelector("textarea"), text = ta.value.trim(); if (!text) return ta.focus();
-  const kept = () => {};  // a failed send keeps the box and its text
-  if (f.id === "noteform") send("note", {id: uid("m"), text}, "Message").then(() => { ta.value = ""; }, kept);
-  else if (f.classList.contains("popask")) {
-    const q = OPEN.kind === "question" ? D.byId[OPEN.id] : null;
-    send("comment", {id: uid("c"), on: {kind: OPEN.kind, id: OPEN.id, title: q ? q.label : OPEN.id}, text}, "Comment").then(() => { ta.value = ""; fillPop(); }, kept);
-  } else if (f.dataset.answer) send("note", {id: uid("m"), to: f.dataset.answer, text}, "Answer").then(() => f.remove(), kept);
-  else if (f.dataset.decision) send("answer", {id: uid("a"), decision: f.dataset.decision, text}, "Answer").then(() => f.remove(), kept);
+  const f = ev.target; if (!f.classList.contains("popask")) return;
+  const ta = f.querySelector("textarea"), text = ta.value.trim(); if (!text) return ta.focus();
+  const q = OPEN.kind === "question" ? D.byId[OPEN.id] : null;  // a failed send keeps the box and its text
+  conv.send("comment", {id: uid("c"), on: {kind: OPEN.kind, id: OPEN.id, title: q ? q.label : OPEN.id}, text}, "Comment", () => { ta.value = ""; fillPop(); });
 });
-function inlineBox(host, attr, value, label) {  // the canvas's answer box: a field, Send and Cancel, under the item
-  if (host.querySelector("form.why")) return host.querySelector("form.why textarea").focus();
-  const f = document.createElement("form"); f.className = "why"; f.dataset[attr] = value;
-  f.innerHTML = `<textarea aria-label="${esc(label)}" placeholder="${esc(label)}"></textarea><div class="row2"><button type="submit" class="btn btn--sm">Send</button><button type="button" class="btn btn--quiet btn--sm cancel">Cancel</button></div>`;
-  host.append(f); f.scrollIntoView({block: "nearest"}); f.querySelector("textarea").focus();
-}
 document.addEventListener("click", ev => {
   const t = ev.target;
   if (t.closest("#goal")) { $("goal").classList.toggle("open"); return; }
@@ -527,18 +469,16 @@ document.addEventListener("click", ev => {
   const g = t.closest(".map .q"); if (g) return openPop("question", g.dataset.q, g);
   const a = t.closest("[data-a]"); if (a) return openPop("agent", a.dataset.a, a);
   const o = t.closest("[data-open]"); if (o) { const [kind, id] = o.dataset.open.split(/:(.*)/s); return openPop(kind, id, o); }
-  const cancel = t.closest("form.why .cancel"); if (cancel) { cancel.closest("form").remove(); $("thread")._html = null; return drawRight(D, conversation(D)); }
   const ud = t.closest("[data-default]"); if (ud) { ud.disabled = true;  // the run applies its default now instead of at the deadline
-    return send("answer", {id: uid("a"), decision: ud.dataset.default, text: "Use the default.", default: true}, "Answer").catch(() => { ud.disabled = false; }); }
-  const ch = t.closest(".thread .change"); if (ch) { const li = ch.closest("li"); ch.style.visibility = "hidden"; return inlineBox(li, "decision", li.dataset.d, "What should the run do?"); }  // hidden, not removed, so the state row does not move
-  const an = t.closest("[data-answer]"); if (an) { an.style.visibility = "hidden"; } if (an) return inlineBox(an.closest("li"), "answer", an.dataset.answer, an.textContent === "Reply" ? "Your reply" : "Your answer");
-  if ($("pop") && !t.closest("form")) closePop();
+    return conv.send("answer", {id: uid("a"), decision: ud.dataset.default, text: "Use the default.", default: true}, "Answer", null, () => { ud.disabled = false; }); }
+  const ch = t.closest(".thread .change"); if (ch) { const d = ch.closest("li").dataset.d;  // hidden, not removed, so the state row does not move
+    return conv.box(ch.closest("li"), d, "What should the run do?", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text}, "Answer", done)); }
+  if ($("pop") && !t.closest("form, .why")) closePop();
 });
 document.addEventListener("keydown", ev => {
-  if (ev.key === "Escape" && ev.target.closest && ev.target.closest("form.why")) { ev.preventDefault(); ev.target.closest("form.why").querySelector(".cancel").click(); return; }
-  if (ev.key === "Escape" && $("pop")) { ev.preventDefault(); closePop(); }
+  if (ev.key === "Escape" && $("pop") && !(ev.target.closest && ev.target.closest(".why"))) { ev.preventDefault(); closePop(); }
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".map .q")) { ev.preventDefault(); openPop("question", ev.target.dataset.q, ev.target); }
-  if (ev.key === "Enter" && !ev.shiftKey && ev.target.matches && ev.target.matches("form textarea")) { ev.preventDefault(); ev.target.form.requestSubmit(); }
+  if (ev.key === "Enter" && !ev.shiftKey && ev.target.matches && ev.target.matches("form.popask textarea")) { ev.preventDefault(); ev.target.form.requestSubmit(); }
 });
 
 // ---------- Render ----------
@@ -566,9 +506,12 @@ function render(d) {
   const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, OPEN && OPEN.id === q.id]).concat([b.short]));
   if (key !== LAYOUT) { LAYOUT = key; drawMap(D); if (FITTED) fit(); }
   const replies = (d.conversation || []).filter(e => e.action === "reply");
-  if (REPLIES >= 0 && replies.length > REPLIES) flash("Coordinator: " + replies[replies.length - 1].text.slice(0, 120), "ok");
+  if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + replies[replies.length - 1].text.slice(0, 120), "ok");
   REPLIES = replies.length;
-  drawRight(D, conversation(D));
+  drawAgents(D);
+  // Redraw when the log changes, when a question a worker's message names changes, and every half minute while a
+  // decision counts down to its default.
+  conv.setLog(events(D), [waitingN ? Math.round(now / 30) : 0, D.qs.map(q => [q.id, q.label, q.parent])]);
   if (OPEN) fillPop();
 }
 
