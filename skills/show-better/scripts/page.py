@@ -296,8 +296,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             or not isinstance(msg.get("params"), dict)
         ):
             return self.send_json(rpc_error(rid, -32601, "Unknown method"))
+        # The page sets only its own fields: the action is the method, the time is the server's, and "by" marks the
+        # agent's events, so a page cannot write an event as the agent's or hide one from `wait`.
+        params = {k: v for k, v in clean(msg["params"]).items() if k not in ("action", "at", "by")}
         with self.conversation.lock:
-            (line,) = self.conversation.append({"action": msg["method"], **clean(msg["params"])})
+            (line,) = self.conversation.append({"action": msg["method"], **params})
             print(line, flush=True)
         self.send_json({"jsonrpc": "2.0", "id": rid, "result": "saved"})
 

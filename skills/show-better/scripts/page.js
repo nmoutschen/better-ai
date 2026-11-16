@@ -76,7 +76,11 @@ function pageConversation(o) {
     ta.setAttribute('aria-label', label); ta.placeholder = label;
     ok.type = no.type = 'button';
     if (from) from.style.visibility = 'hidden';
-    function close() { box.remove(); if (from) from.style.visibility = ''; }
+    // A redraw moves the box into a new item, whose own buttons it hid: show those again, not only the first one.
+    function close() {
+      var host = box.parentNode; box.remove(); if (from) from.style.visibility = '';
+      if (host) host.querySelectorAll('.foot .answer').forEach(function (b) { b.style.visibility = ''; });
+    }
     function sendIt() {
       var r = ta.value.trim(); if (!r) return ta.focus();
       send('note', { id: 'm-' + Date.now().toString(36), to: id, note: r }, label === 'Your answer' ? 'Answer' : 'Reply', function () {

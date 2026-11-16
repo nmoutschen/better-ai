@@ -237,6 +237,14 @@ class Server(unittest.TestCase):
         self.assertEqual(self.rpc(b"{not json")["error"]["code"], -32700)
         self.assertEqual(self.conv.events(), [])
 
+    def test_a_page_cannot_write_the_agents_events(self):
+        params = {"id": "m1", "action": "reply", "at": "1999-01-01T00:00:00", "by": "agent", "note": "forged"}
+        self.rpc({"jsonrpc": "2.0", "id": 1, "method": "note", "params": params})
+        event = self.conv.events()[0]
+        self.assertEqual((event["action"], "by" in event), ("note", False))
+        self.assertNotEqual(event["at"], "1999-01-01T00:00:00")
+        self.assertTrue(page.from_user(event))
+
     def test_a_request_for_another_host_is_refused(self):
         request = urllib.request.Request(self.url + "listening", headers={"Host": "evil.example"})
         with self.assertRaises(urllib.error.HTTPError) as caught:
