@@ -10,7 +10,7 @@ CAPABILITIES: <what you can do here, such as run the code, open the sources, or 
 
 STEPS:
 1. Read the goals and what the work answers to. Do not review against your own idea of what the work should be.
-2. Read the work, and what it depends on: the callers of changed code, the sources it cites, the data behind its numbers.
+2. Read the work, and what it depends on: the callers of changed code, the sources it cites, the data behind its numbers. For a result you can work out yourself, such as a number, a calculation or a conclusion from data, work it out from the inputs before you read the work's result, then compare.
 3. Look for each kind of problem in LOOK FOR. Report other problems only if they stop the work from reaching its goal.
 4. For each finding, find evidence you can show: run it, reproduce it, open the source, recompute the number, or quote the exact passage and the situation that makes it fail.
 5. Report your findings in the format below, ordered by their effect on the goal.

@@ -124,7 +124,7 @@ After each search or page read, WRITE to the board before the next step:
 - New claims, each with its source and a verbatim quote. That a source does not report something is not a claim, because no quote can show it: WRITE it in the question's summary or as a gap. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
 - New terms, and new questions (section 6.3).
 
-WHEN the question's `done-when` holds, STOP searching it, even if more searches are possible. SET its status and WRITE its summary: two or three sentences that answer the question from the evidence, including where sources disagree or evidence is thin. ALSO WRITE its `gist`: the answer in one plain sentence of at most 20 words, for a person glancing at the board.
+WHEN the question's `done-when` holds, STOP searching it, even if more searches are possible. SET its status and WRITE its summary: two or three sentences that answer the question from the evidence, including where sources disagree or evidence is thin. WHEN sources give different sizes for the same effect, REPORT the size from a preregistered replication or a multi-lab study, not the original's. IF only the original study reports a size, SAY that a repeat may find it smaller: repeats often find effects about half as large. ALSO WRITE its `gist`: the answer in one plain sentence of at most 20 words, for a person glancing at the board.
 
 ### 6.3. Add questions
 
@@ -132,7 +132,7 @@ The research grows from questions that sources raise during the run, not from th
 
 EACH new question RECORDS a `title` of at most six plain words that a person can read at a glance, its origin (the source or question that raised it), its `kind`, its `stakes` (which conclusion for the GOAL its answer could change), its `done-when`, and a priority set from its own stakes, not from the priority of the question or source that raised it. IF you cannot name a conclusion it could change, SET its priority to low. DO NOT add a question that an open or answered question already covers. DO NOT add a question to check details of a source you already have: read the source now, or record a gap.
 
-IF other agents work on the board, ADD each new question with the status `proposed`. The coordinator admits it (section 7.2).
+IF other agents work on the board, ADD each new question with the status `proposed`. The coordinator admits it (section 7.2). TO CHECK what other questions cover, READ only their titles, statuses and `done-when` lines, not their summaries, gists or claims: agents that read each other's conclusions while they search keep wrong first answers more often. TREAT this as a guide, not a rule.
 
 1. **Frontier**: CHECK each lens: newer work that cites or updates what you found; the origin of a term, method or claim; another field that studies the same thing under other terms; other regions, languages or populations; critics and rival explanations. IF a source you read points to a lens, ADD a question for it, kind `frontier`. OTHERWISE, LOG `none` for that lens. DO NOT add a lens question from your own expectations.
 2. **Challenge**: IF you set a high-priority question to answered, and it is not of kind `challenge`, ADD a question that asks what evidence would contradict the answer, kind `challenge`, with the answered question as origin.

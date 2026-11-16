@@ -49,6 +49,8 @@ APPLY these rules on top of SKILL.md section 3.
 
 WRITE each rule as something the agent does, with its scope. DO NOT describe the user's role, background, or views, even in one line. Context that lets a model infer the user's views made it agree more. IF a rule depends on what the user knows, WRITE it as a behaviour with its scope, such as "skip definitions of standard terms in <field>".
 
+WRITE a rule about disagreeing as when to disagree and what evidence to give, such as "when you think my approach will not reach my goal, say why once, with the evidence". DO NOT write it as a general stance, such as "don't be sycophantic" or "push back more": such instructions made some models disagree with the user whether or not the user was right.
+
 ### 5.2. Keep it short, most important rule first
 
 KEEP only rules that change what an agent would do in most conversations. MOVE a rule that applies to one kind of task to the `write-for` or `review-for` skill, or to a project's instructions, instead. PUT the rules whose omission would cost the user most first. Earlier rules held better as the number of rules grew.
