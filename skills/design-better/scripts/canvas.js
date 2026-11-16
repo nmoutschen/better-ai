@@ -510,8 +510,15 @@
       else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
       else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
     });
-    // Open: only the user's comments and messages that are not yet accepted, with what was said under them.
-    var open = entries.filter(function (c) { return (c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') && c.e.id && !c.deleted && state[c.e.id] !== 'accepted'; });
+    // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
+    // comes last, next to the message box.
+    function waiting(c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); }
+    entries = entries.filter(function (c) { return !waiting(c); }).concat(entries.filter(waiting));
+    // Open: the user's comments and messages not yet accepted, with what was said under them, and the agent's waiting
+    // questions.
+    var open = entries.filter(function (c) {
+      return ((c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waiting(c);
+    });
     var openBtn = document.querySelector('[data-filter="open"]');
     openBtn.textContent = 'Open (' + open.length + ')';
     if (filter === 'open') entries = open;
