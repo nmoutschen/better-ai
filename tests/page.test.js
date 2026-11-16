@@ -100,3 +100,31 @@ test("a page's own item kinds count under Open", () => {
   assert.deepEqual(ids(thread(log).open), []);
   assert.deepEqual(ids(thread(log, ['comment', 'note', 'decide']).open), ['d1']);
 });
+
+test("an answer to a decision nests under it, and so does the coordinator's reply to that answer", () => {
+  const t = thread([
+    { action: 'decision', id: 'D-1', x: { status: 'pending' } },
+    { action: 'answer', id: 'a1', decision: 'D-1', text: 'Use the default.' },
+    { action: 'reply', id: 'r1', to: 'a1', text: 'Applied.' },
+  ]);
+  assert.deepEqual(ids(t.entries), ['D-1']);
+  assert.deepEqual(Array.from(t.entries[0].replies, r => r.id), ['a1', 'r1']);
+});
+
+test("a page's own rule for what waits for the user puts those entries last", () => {
+  const waiting = (c, state) => c.kind === 'decision' ? !c.replies.length : c.kind === 'note' && state[c.e.id] === 'asked';
+  const log = [
+    { action: 'decision', id: 'D-1', x: {} },
+    { action: 'note', id: 'm1', text: 'a question' },
+    { action: 'status', to: 'm1', status: 'asked' },
+    { action: 'note', id: 'm2', text: 'later' },
+  ];
+  assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'D-1', 'm1']);
+  const answered = log.concat([{ action: 'answer', id: 'a1', decision: 'D-1', text: 'yes' }]);
+  assert.deepEqual(ids(context.pageThread(answered, ITEMS, waiting).entries), ['D-1', 'm2', 'm1']);
+});
+
+test("a message's words are its note, or its text on the board before it shared page.js", () => {
+  assert.equal(context.pageWords({ note: 'new' }), 'new');
+  assert.equal(context.pageWords({ text: 'old' }), 'old');
+});
