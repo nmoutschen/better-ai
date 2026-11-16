@@ -186,6 +186,7 @@ def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
             "this address does not reach it.",
             flush=True,
         )
+    page.stop_like_ctrl_c()
     threading.Thread(target=server.serve_forever, daemon=True).start()
     stopped_at = None
     try:

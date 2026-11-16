@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import http.server
 import json
+import signal
 import sys
 import threading
 import time
@@ -43,6 +44,18 @@ def clean(value, depth=0):
 def from_user(event: dict) -> bool:
     """An event the user made in the page, as opposed to the agent's replies, statuses and recorded acceptances."""
     return bool(event) and event.get("action") not in AGENT_ACTIONS and "by" not in event
+
+
+def stop_like_ctrl_c() -> None:
+    """Stop the server on SIGTERM or SIGHUP as on Ctrl+C, so the script still removes its address file when the
+    harness ends the command or the terminal closes. A SIGKILL cannot be caught: `reply` checks the server instead."""
+
+    def stop(signum, frame):
+        raise KeyboardInterrupt
+
+    for name in ("SIGTERM", "SIGHUP"):
+        if hasattr(signal, name):  # Windows has no SIGHUP
+            signal.signal(getattr(signal, name), stop)
 
 
 def rpc_error(rid, code: int, message: str) -> dict:
@@ -110,6 +123,16 @@ class Conversation:
                 self.waiters["open"] -= 1
                 self.waiters["last"] = time.time()
 
+    def answering(self) -> bool:
+        """Whether a server answers at the address file's address: the file stays when the server is killed."""
+        if not self.address.exists():
+            return False
+        try:
+            with urllib.request.urlopen(f"{self.address.read_text().strip()}listening", timeout=2):
+                return True
+        except OSError:
+            return False
+
     # ---------- The agent's side: wait, reply, status, pending ----------
 
     def wait(self, timeout: float) -> int:
@@ -141,7 +164,7 @@ class Conversation:
         a resumed run can answer what the user wrote while no agent was running."""
         # Each reply has an id, so the user can answer any message, the agent's own included.
         self.append({"action": "reply", "id": "r-" + str(time.time_ns()), "text": text[:5000], "to": to})
-        print("Reply shown in the page." if self.address.exists() else "Reply saved; the page shows it when served.")
+        print("Reply shown in the page." if self.answering() else "Reply saved; the page shows it when served.")
 
     def set_status(self, state: str, ids: list) -> None:
         """Mark the user's items as seen, asked, working or done. Accepted records an acceptance the user gave in

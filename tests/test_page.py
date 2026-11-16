@@ -274,6 +274,12 @@ class Server(unittest.TestCase):
         self.assertEqual(lines, ["Reply saved; the page shows it when served."])
         self.assertEqual([e["text"] for e in self.conv.events()], ["ok", "later"])
 
+    def test_reply_after_a_killed_server_does_not_claim_the_page_shows_it(self):
+        self.server.shutdown()
+        self.server.server_close()  # the address file stays, as after a SIGKILL
+        lines, _ = run(self.conv.reply, "ok", None)
+        self.assertEqual(lines, ["Reply saved; the page shows it when served."])
+
 
 class Scripts(unittest.TestCase):
     """Each script that serves a page, run as the agent runs it: serve, the user sends, wait, reply, status, pending."""
@@ -303,7 +309,7 @@ class Scripts(unittest.TestCase):
             out = subprocess.run([*agent, "pending", str(folder)], capture_output=True, text=True)
             self.assertEqual(out.stdout.strip(), "0 not done.")
         finally:
-            server.send_signal(signal.SIGINT)  # as Ctrl+C: the script then removes .server
+            server.send_signal(signal.SIGTERM)  # as a harness ends a command: the script still removes .server
             server.communicate(timeout=10)
         self.assertFalse((folder / ".server").exists())
 
