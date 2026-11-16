@@ -3976,6 +3976,7 @@ def serve(path: Path, port: int, open_browser: bool) -> None:
             "this address does not reach it.",
             flush=True,
         )
+    page.stop_like_ctrl_c()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
