@@ -37,6 +37,9 @@ jobs:
             echo "$script"
             python -I "$script" --help > /dev/null
           done
+      - name: Tests
+        # tests/ checks page.py, the conversation the pages share, and runs each serving script as the agent would.
+        run: python -I -m unittest discover tests
 
   pages:
     # The page files the scripts fill in: CSS with stylelint's recommended rules (errors such as invalid values,
@@ -61,6 +64,9 @@ jobs:
             echo "$js"
             node --check "$js"
           done
+      - name: JavaScript tests
+        # page.js's thread model: each item's state and what Open lists, with Node's own test runner.
+        run: node --test tests/*.test.js
       - name: Shared page files are identical in every skill
         run: |
           # The skills' pages that talk to the agent share page.css (the look), page.py (the log, the server's

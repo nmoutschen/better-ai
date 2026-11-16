@@ -97,41 +97,14 @@ function pageConversation(o) {
   }
   function renderThread() {
     var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
-    var entries = [], byKey = {};
-    state = {};
-    log.forEach(function (e) {
-      if (e.action === 'status') state[e.to] = e.status;
-      else if (e.action === 'accept') state[e.to] = 'accepted';
-      else if (e.action === 'reopen') state[e.to] = 'reopened';
-      // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
-      else if (e.action === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
-      // A reply under a finished item is a follow-up: the item goes back to the agent.
-      else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
-    });
-    log.forEach(function (e) {
-      if (e.action === 'comment' || e.action === 'delete') {
-        var c = byKey[e.id];
-        if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
-        else if (e.action === 'delete') c.deleted = true;
-        else { c.e = e; c.edited = true; c.deleted = false; }
-      } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && e.to)) && e.to && byKey[e.to]) { byKey[e.to].replies.push(e); if (e.id) byKey[e.id] = byKey[e.to]; }
-      else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
-      else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
-    });
-    // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
-    // comes last, next to the message box.
-    function waiting(c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); }
-    entries = entries.filter(function (c) { return !waiting(c); }).concat(entries.filter(waiting));
+    var model = pageThread(log, itemKinds), entries = model.entries, open = model.open;
+    state = model.state;
     // A box the user is typing in survives the redraw, with its text and cursor, and keeps its item on the page until
     // it is sent or cancelled, even when the item has left Open meanwhile.
     var kept = {};
     thread.querySelectorAll('li[data-id] > .why').forEach(function (box) {
       var ta = box.querySelector('textarea');
       kept[box.parentNode.dataset.id] = { box: box, focus: document.activeElement === ta, start: ta.selectionStart, end: ta.selectionEnd };
-    });
-    // Open: the user's items not yet accepted, with what was said under them, and the agent's waiting questions.
-    var open = entries.filter(function (c) {
-      return (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waiting(c);
     });
     document.querySelector('[data-filter="open"]').textContent = 'Open (' + open.length + ')';
     if (filter === 'open') entries = entries.filter(function (c) { return open.indexOf(c) >= 0 || (c.e.id && kept[c.e.id]); });
@@ -276,4 +249,38 @@ function pageConversation(o) {
     send: send, say: say, flash: flash, reopen: reopen, render: renderThread, start: start, noteBox: noteBox, noteBtn: noteBtn,
     log: function () { return log; }, state: function () { return state; }
   };
+}
+
+// The thread as the log makes it, without the page: each item's state, the entries in the order they show, with the
+// replies under them, and the entries Open lists. Kept apart from the drawing so it can be tested without a browser.
+function pageThread(log, itemKinds) {
+  var entries = [], byKey = {}, state = {};
+  log.forEach(function (e) {
+    if (e.action === 'status') state[e.to] = e.status;
+    else if (e.action === 'accept') state[e.to] = 'accepted';
+    else if (e.action === 'reopen') state[e.to] = 'reopened';
+    // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
+    else if (e.action === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
+    // A reply under a finished item is a follow-up: the item goes back to the agent.
+    else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
+  });
+  log.forEach(function (e) {
+    if (e.action === 'comment' || e.action === 'delete') {
+      var c = byKey[e.id];
+      if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
+      else if (e.action === 'delete') c.deleted = true;
+      else { c.e = e; c.edited = true; c.deleted = false; }
+    } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && e.to)) && e.to && byKey[e.to]) { byKey[e.to].replies.push(e); if (e.id) byKey[e.id] = byKey[e.to]; }
+    else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
+    else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
+  });
+  // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
+  // comes last, next to the message box.
+  function waiting(c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); }
+  entries = entries.filter(function (c) { return !waiting(c); }).concat(entries.filter(waiting));
+  // Open: the user's items not yet accepted, with what was said under them, and the agent's waiting questions.
+  var open = entries.filter(function (c) {
+    return (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waiting(c);
+  });
+  return { state: state, entries: entries, open: open };
 }

@@ -256,9 +256,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return int(value) if value.isdigit() else 0
 
     def conversation_get(self) -> bool:
-        """Answer the conversation's own GET paths; False when the path is the page's."""
+        """Answer the conversation's own GET paths; False when the path is the page's. A request addressed to another
+        host is refused here too, so a page cannot forget the check."""
         c = self.conversation
-        if self.path == "/listening":
+        if not self.local():
+            self.send_error(403)
+        elif self.path == "/listening":
             self.send_json(c.listening())
         elif self.path.startswith("/events?after="):
             # Long poll for the page: every event after the first `after`, the agent's included.
