@@ -1,42 +1,536 @@
+(function () {
+  function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
 
-(() => {
-  const pages = [...document.querySelectorAll(".page")];  // pages[0] is the cover
-  const n = pages.length - 1;
-  if (n < 2) return;
-  const root = document.documentElement, ctrl = document.querySelector(".controls");
-  const prev = ctrl.querySelector(".prev"), next = ctrl.querySelector(".next"), pos = ctrl.querySelector(".pos");
-  const all = ctrl.querySelector(".all"), dots = ctrl.querySelector(".dots");
-  const links = [...document.querySelectorAll("nav.toc a")];
-  dots.innerHTML = pages.slice(1).map(() => "<span></span>").join("");
-  let i = Math.max(0, pages.findIndex(p => p.id && "#" + p.id === location.hash));
-  function show(k, focus) {
-    i = Math.min(Math.max(k, 0), n);
-    pages.forEach((p, j) => p.classList.toggle("current", j === i));
-    root.classList.toggle("on-cover", i === 0);
-    [...dots.children].forEach((d, j) => d.classList.toggle("on", j < i));
-    prev.disabled = i === 0; next.disabled = i === n;
-    next.textContent = i === 0 ? "Start →" : "Next →";
-    pos.textContent = i === 0 ? `${n} panels` : `${i} / ${n}`;
-    history.replaceState(null, "", i === 0 ? location.pathname : "#" + pages[i].id);
-    window.scrollTo(0, 0);
-    if (focus) pages[i].querySelector("h1, h2").focus({ preventScroll: true });
+  // ---------- Details: a label, mark or row that has a detail opens it under the visual ----------
+  // The renderer writes data-d, the detail's number in the slide, on every label, mark and text-version row of an item
+  // that has a detail, so two items with the same label keep their own details.
+  function attachDetails(slide) {
+    slide.querySelectorAll('[data-d]').forEach(function (node) {
+      if (node.closest('.sr, .dts')) return;
+      node.classList.add('has-detail'); node.dataset.dk = node.getAttribute('data-d');
+      // Labels and rows take the keyboard; marks and boxes, drawn next to them, take only the pointer.
+      if (node instanceof SVGGeometryElement || node.tagName.toLowerCase() === 'g') return;
+      var d = slide.querySelector('.dts > .dt[data-k="' + node.dataset.dk + '"]');
+      node.setAttribute('tabindex', '0'); node.setAttribute('role', 'button');
+      if (d) node.setAttribute('aria-label', d.dataset.label + ': show detail');
+    });
   }
-  function paged(on) {
-    root.classList.toggle("paged", on);
-    all.textContent = on ? "Show all panels" : "One panel at a time";
-    if (on) show(i); else root.classList.remove("on-cover");
+  function openDetail(slide, node) {
+    var box = slide.querySelector('.detail'), k = node.dataset.dk, d = slide.querySelector('.dts > .dt[data-k="' + k + '"]');
+    if (!box || !d) return;
+    var again = !box.hidden && box.dataset.k === k;
+    slide.querySelectorAll('.has-detail.sel').forEach(function (x) { x.classList.remove('sel'); });
+    if (again) { box.hidden = true; box.dataset.k = ''; return; }
+    box.replaceChildren.apply(box, Array.prototype.map.call(d.childNodes, function (c) { return c.cloneNode(true); }));
+    box.dataset.k = k; box.hidden = false;
+    slide.querySelectorAll('[data-dk="' + k + '"]').forEach(function (x) { x.classList.add('sel'); });
   }
-  prev.onclick = () => show(i - 1, true);
-  next.onclick = () => show(i + 1, true);
-  all.onclick = () => paged(!root.classList.contains("paged"));
-  document.querySelector(".slim a").onclick = e => { e.preventDefault(); show(0, true); };
-  links.forEach((a, k) => a.onclick = e => { if (root.classList.contains("paged")) { e.preventDefault(); show(k + 1, true); } });
-  document.addEventListener("keydown", e => {
-    if (!root.classList.contains("paged") || e.target.closest("input, textarea, summary")) return;
-    // Space pages forward and Shift+Space back, except on a focused button, which Space already presses.
-    const space = e.key === " " && !e.target.closest("button, a");
-    if (e.key === "ArrowRight" || e.key === "PageDown" || (space && !e.shiftKey)) { e.preventDefault(); show(i + 1, true); }
-    if (e.key === "ArrowLeft" || e.key === "PageUp" || (space && e.shiftKey)) { e.preventDefault(); show(i - 1, true); }
+  function detailKeys(root, current, after) {
+    root.addEventListener('keydown', function (e) {
+      var h = e.target.closest && e.target.closest('[data-dk]');
+      if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); openDetail(current(), h); if (after) after(); }
+    });
+  }
+
+  // ---------- The exported presentation: the slides alone, one filling the window ----------
+  if (document.body.classList.contains('present')) {
+    var deck = Array.prototype.slice.call(document.querySelectorAll('.deck > .slide')), at = 0, count = document.querySelector('.pcount');
+    deck.forEach(attachDetails);
+    var fit = function () {
+      var s = deck[at]; s.style.transform = 'translate(-50%, -50%)';
+      var k = Math.min(innerWidth / s.offsetWidth, innerHeight / s.offsetHeight) * 0.94;
+      s.style.transform = 'translate(-50%, -50%) scale(' + k + ')';
+    };
+    var show = function (i) {
+      at = Math.max(0, Math.min(deck.length - 1, i));
+      deck.forEach(function (s, j) { s.classList.toggle('current', j === at); });
+      count.textContent = (at + 1) + ' of ' + deck.length;
+      history.replaceState(null, '', '#' + (at + 1));
+      fit();
+    };
+    document.addEventListener('keydown', function (e) {
+      if (e.target.closest && e.target.closest('[data-dk]') && (e.key === 'Enter' || e.key === ' ')) return;
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].indexOf(e.key) >= 0) { e.preventDefault(); show(at + 1); }
+      else if (['ArrowLeft', 'ArrowUp', 'PageUp'].indexOf(e.key) >= 0) { e.preventDefault(); show(at - 1); }
+      else if (e.key === 'Home') show(0);
+      else if (e.key === 'End') show(deck.length - 1);
+      else if (e.key === 'f' || e.key === 'F') {
+        if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+      }
+    });
+    detailKeys(document, function () { return deck[at]; }, fit);
+    document.addEventListener('click', function (e) {
+      var go = e.target.closest('[data-go]');
+      if (go) { e.preventDefault(); return show(+go.dataset.go - 1); }
+      var h = e.target.closest('[data-dk]');
+      if (h) { openDetail(deck[at], h); return fit(); }  // a detail makes the slide taller: fit it again
+      if (e.target.closest('a, .detail')) return;
+      if (e.clientX < innerWidth / 3) show(at - 1); else if (e.clientX > innerWidth * 2 / 3) show(at + 1);
+    });
+    window.addEventListener('resize', fit);
+    show((parseInt(location.hash.slice(1), 10) || 1) - 1);
+    return;
+  }
+
+  // ---------- The page: the strip and one slide at a time ----------
+  var body = document.body, served = location.protocol === 'http:';
+  if (served) body.classList.add('live');
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.stage > .slide')), cur = 0;
+  slides.forEach(attachDetails);
+  var strip = document.querySelector('.strip'), groups = [];
+  slides.forEach(function (s, i) {
+    var g = groups[groups.length - 1], part = s.dataset.part || '';
+    if (g && g.part === part) g.idx.push(i); else groups.push({ part: part, idx: [i] });
   });
-  paged(true);
+  groups.forEach(function (g) {
+    var li = el('li', 'grp'), segs = el('span', 'segs');
+    li.style.flexGrow = g.idx.length;
+    li.append(el('span', 'pname', g.part), segs);
+    g.idx.forEach(function (i) {
+      var b = el('button', '', String(i + 1)); b.type = 'button';
+      b.title = slides[i].dataset.headline;
+      b.setAttribute('aria-label', 'Slide ' + (i + 1) + ': ' + slides[i].dataset.headline);
+      b.addEventListener('click', function () { go(i); });
+      segs.append(b);
+    });
+    g.el = li; strip.append(li);
+  });
+  var segButtons = strip.querySelectorAll('.segs button'), prev = document.querySelector('.route .prev'), next = document.querySelector('.route .next');
+  var count = document.querySelector('.route .count'), stage = document.querySelector('.stage');
+  function go(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function (s, j) { s.classList.toggle('current', j === cur); });
+    segButtons.forEach(function (b, j) { if (j === cur) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
+    groups.forEach(function (g) { g.el.classList.toggle('on', g.idx.indexOf(cur) >= 0); });
+    count.textContent = (cur + 1) + ' of ' + slides.length;
+    prev.disabled = cur === 0; next.disabled = cur === slides.length - 1;
+    history.replaceState(null, '', '#' + (cur + 1));
+    stage.scrollTop = 0;
+    if (segButtons[cur].scrollIntoView) segButtons[cur].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  prev.addEventListener('click', function () { go(cur - 1); });
+  next.addEventListener('click', function () { go(cur + 1); });
+  function typing(t) { return t.closest && t.closest('input, textarea, select, [contenteditable]'); }
+  document.addEventListener('keydown', function (e) {
+    if (typing(e.target) || !pop.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); go(cur + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(cur - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); go(0); }
+    else if (e.key === 'End') { e.preventDefault(); go(slides.length - 1); }
+    else if ((e.key === 'c' || e.key === 'C') && served) setMode(!commenting);
+  });
+  detailKeys(stage, function () { return slides[cur]; });
+
+  // Export: the slides alone as one HTML presentation, with this page's styles and script, so it works offline
+  // apart from the fonts.
+  document.querySelector('.export').addEventListener('click', function () {
+    var copies = slides.map(function (s) {
+      var c = s.cloneNode(true);
+      c.querySelectorAll('.pin').forEach(function (p) { p.remove(); });
+      c.querySelectorAll('.sel').forEach(function (x) { x.classList.remove('sel'); });
+      var d = c.querySelector('.detail'); if (d) { d.hidden = true; d.replaceChildren(); }
+      c.classList.remove('current');
+      return c.outerHTML;
+    }).join('');
+    var font = document.querySelector('link[rel="stylesheet"]'), title = document.title;
+    var page = '<!DOCTYPE html>\n<html lang="' + document.documentElement.lang + '"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1"><title></title>' + (font ? font.outerHTML : '') +
+      '<style>' + document.querySelector('style').textContent + '</style></head><body class="present"><main class="deck">' + copies +
+      '</main><p class="pcount" aria-live="polite"></p><script>' + document.querySelector('script').textContent + '<\/script></body></html>';
+    var doc = new DOMParser().parseFromString(page, 'text/html');
+    doc.title = title;
+    var blob = new Blob(['<!DOCTYPE html>\n' + doc.documentElement.outerHTML], { type: 'text/html' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'slides') + '.html';
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    flash('Slides downloaded as one presentation', 'ok');
+  });
+
+  // ---------- Read and Comment ----------
+  var commenting = false, pop = document.querySelector('.pop'), draft = null, opener = null;
+  function choose(attr, value) {
+    document.querySelectorAll('button[' + attr + ']').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value)); });
+  }
+  // In the bar, a two-option setting shows only its current option; clicking it picks the other one.
+  document.querySelectorAll('.controls > .seg.cycle').forEach(function (seg) {
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b || b.getAttribute('aria-pressed') !== 'true' || seg.dataset.cycling) return;
+      var other = Array.prototype.filter.call(seg.querySelectorAll('button'), function (x) { return x !== b; })[0];
+      if (!other) return;
+      e.stopImmediatePropagation(); seg.dataset.cycling = '1'; other.click(); delete seg.dataset.cycling; other.focus();
+    }, true);
+  });
+  function setMode(on) { commenting = on; choose('data-mode', on ? 'comment' : 'read'); body.classList.toggle('commenting', on); }
+  document.querySelectorAll('button[data-mode]').forEach(function (b) {
+    b.addEventListener('click', function () { setMode(b.dataset.mode === 'comment'); });
+  });
+  stage.addEventListener('click', function (e) {
+    var slide = e.target.closest('.slide'); if (!slide) return;
+    var pin = e.target.closest('.pin');
+    if (pin) {  // a pin opens its comment, to read, change or delete it, in either mode
+      e.preventDefault();
+      var found = byId(pin.dataset.id);
+      if (found && (pinState[found.id] === 'done' || pinState[found.id] === 'accepted')) reopenFromThread(found.id);
+      else if (found) openEdit(found, pin);
+      return;
+    }
+    if (commenting) {
+      e.preventDefault(); e.stopPropagation();
+      if (!pop.hidden) return closePop();
+      return openPop(slide, e.target, e.clientX, e.clientY);
+    }
+    var goto = e.target.closest('[data-go]');
+    if (goto) { e.preventDefault(); return go(+goto.dataset.go - 1); }
+    var h = e.target.closest('[data-dk]');
+    if (h) openDetail(slide, h);
+  }, true);
+  function selectorOf(node, root) {
+    var parts = [];
+    while (node && node.nodeType === 1 && node !== root) {
+      if (node.id) { parts.unshift('#' + CSS.escape(node.id)); break; }
+      var tag = node.tagName.toLowerCase(), n = 1, sib = node;
+      while ((sib = sib.previousElementSibling)) if (sib.tagName === node.tagName) n++;
+      parts.unshift(tag + ':nth-of-type(' + n + ')');
+      node = node.parentElement;
+    }
+    return parts.join(' > ');
+  }
+  // The label of the drawn item nearest the click: its own label when it has a detail, else the closest text.
+  function nearestItem(target, x, y) {
+    var h = target.closest('[data-dk]'), slide = target.closest('.slide');
+    if (h) { var dt = slide.querySelector('.dts > .dt[data-k="' + h.dataset.dk + '"]'); if (dt) return dt.dataset.label; }
+    var svg = target.closest('svg'); if (!svg) return null;
+    var best = null, dist = Infinity;
+    svg.querySelectorAll('text').forEach(function (t) {
+      var r = t.getBoundingClientRect(), dx = Math.max(r.left - x, 0, x - r.right), dy = Math.max(r.top - y, 0, y - r.bottom), k = dx * dx + dy * dy;
+      if (k < dist && t.textContent.trim()) { dist = k; best = t.textContent.replace(/\s+/g, ' ').trim(); }
+    });
+    return best;
+  }
+  function describe(slide, target, x, y) {
+    var r = slide.getBoundingClientRect(), n = slides.indexOf(slide) + 1;
+    return {
+      slide: n, part: slide.dataset.part || '', headline: slide.dataset.headline || '',
+      target: { tag: target.tagName.toLowerCase(), text: (target.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+                item: nearestItem(target, x, y), selector: selectorOf(target, slide) },
+      // Where the click fell, as fractions of the slide's width and height; yw, the height over the width, places the
+      // pin so it stays on its spot when a detail opened below makes the slide taller.
+      spot: { fx: Math.round((x - r.left) / Math.max(1, r.width) * 1000) / 1000, fy: Math.round((y - r.top) / Math.max(1, r.height) * 1000) / 1000,
+              yw: Math.round((y - r.top) / Math.max(1, r.width) * 1000) / 1000 }
+    };
+  }
+  // Two lines: where the comment is, small and muted, then what was clicked.
+  function crumb(c) {
+    var box = el('span', 'crumb'), t = c.target || {}, said = t.item || t.text || c.headline || '';
+    box.append(el('span', 'path', 'Slide ' + c.slide + (c.part ? ' › ' + c.part : '')),
+               el('span', 'el', said ? '“' + said.slice(0, 90) + (said.length > 90 ? '…' : '') + '”' : 'the slide'));
+    return box;
+  }
+  function placePop(x, y) {
+    pop.hidden = false;
+    pop.style.left = Math.max(12, Math.min(x + 12, innerWidth - pop.offsetWidth - 12)) + 'px';
+    pop.style.top = Math.max(12, Math.min(y + 12, innerHeight - pop.offsetHeight - 12)) + 'px';
+    pop.querySelector('textarea').focus();
+  }
+  function openPop(slide, target, x, y) {
+    draft = describe(slide, target, x, y);
+    opener = document.activeElement !== document.body ? document.activeElement : null;
+    pop.querySelector('.target').replaceChildren(crumb(draft));
+    pop.querySelector('textarea').value = '';
+    pop.querySelector('.remove').hidden = true; pop.querySelector('.ok').textContent = 'Send';
+    placePop(x, y);
+  }
+  function openEdit(it, from) {
+    var r = from.getBoundingClientRect();
+    draft = { item: it, slide: it.slide, part: it.part, headline: it.headline, target: it.target, spot: it.spot };
+    opener = from;
+    pop.querySelector('.target').replaceChildren(crumb(it));
+    pop.querySelector('textarea').value = it.comment || '';
+    pop.querySelector('.remove').hidden = false; pop.querySelector('.ok').textContent = 'Update';
+    placePop(r.left, r.bottom);
+  }
+  function closePop() { pop.hidden = true; draft = null; if (opener && document.contains(opener)) opener.focus(); opener = null; }
+  document.addEventListener('mousedown', function (e) { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('.slide')) closePop(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pop.hidden) closePop(); });
+  pop.querySelector('.cancel').addEventListener('click', closePop);
+  pop.querySelector('.remove').addEventListener('click', function () { var it = draft && draft.item; closePop(); if (it) removeItem(it); });
+  pop.querySelector('textarea').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } });
+  pop.querySelector('.ok').addEventListener('click', submitComment);
+  function submitComment() {
+    var text = pop.querySelector('textarea').value.trim();
+    if (!draft || !text) { pop.querySelector('textarea').focus(); return; }
+    var it = draft.item, n = it ? it.n : seq + 1, id = it ? it.id : 'c' + n + '-' + Date.now().toString(36);
+    var params = { id: id, n: n, slide: draft.slide, part: draft.part, headline: draft.headline, target: draft.target, spot: draft.spot, comment: text };
+    closePop();
+    // An update reuses the comment's id, so the agent replaces the earlier version of it.
+    send('comment', params, 'Comment ' + n + (it ? ' (updated)' : ''));
+  }
+  function removeItem(it) { send('delete', { id: it.id, n: it.n }, 'Deletion of comment ' + it.n); }
+
+  // ---------- The conversation, as on design-better's canvas ----------
+  // Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the agent's
+  // replies. The page streams that log and rebuilds the conversation and the pins from it, so a reload loses nothing.
+  var rpcId = 0, seq = 0, items = [], log = [], pinState = {};
+  var status = document.querySelector('.notes .status');
+  function say(text, error) { status.textContent = text; status.classList.toggle('error', !!error); }
+  var toast = document.querySelector('.toast'), toastTimer = null;
+  function flash(text, kind) {
+    clearTimeout(toastTimer);
+    toast.textContent = text; toast.className = 'toast ' + (kind || ''); toast.hidden = false;
+    if (kind !== 'error' && kind !== 'busy') toastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
+  }
+  function send(method, params, what, done) {
+    apply(Object.assign({ action: method }, params), true);
+    flash('Sending ' + what.toLowerCase() + '…', 'busy');
+    fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
+      .then(function (r) { return r.json(); })
+      .then(function (r) { if (r.error) throw new Error(r.error.message);
+        flash('✓ ' + what + ' sent to the agent', 'ok'); say(''); if (done) done(); })
+      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The page is closed.', 'error');
+        say('Not sent: the page is closed. Ask the agent to restart it.', true); });
+  }
+  function byId(id) { return items.filter(function (x) { return x.id === id; })[0]; }
+  function apply(e, fresh) {
+    if (e.action === 'comment') {
+      var it = byId(e.id);
+      if (!it) { it = { id: e.id, n: e.n || seq + 1 }; seq = Math.max(seq, it.n); items.push(it); }
+      Object.assign(it, { slide: e.slide, part: e.part, headline: e.headline, target: e.target || {}, spot: e.spot || { fx: 0.5, fy: 0.5 }, comment: e.comment || '' });
+      placePin(it, fresh);
+    } else if (e.action === 'delete') {
+      items = items.filter(function (x) { return x.id !== e.id; });
+      document.querySelectorAll('.pin[data-id="' + e.id + '"]').forEach(function (p) { p.remove(); });
+    }
+  }
+  function placePin(it, fresh) {
+    var slide = slides[(it.slide || 1) - 1]; if (!slide) return;
+    var pin = slide.querySelector('.pin[data-id="' + it.id + '"]');
+    if (!pin) { pin = el('span', 'pin'); pin.dataset.id = it.id; slide.append(pin); }
+    pin.textContent = it.n;
+    pin.style.left = (it.spot.fx * 100) + '%';
+    pin.style.top = it.spot.yw != null ? (it.spot.yw * 100) + 'cqw' : (it.spot.fy * 100) + '%';
+    pin.dataset.state = pinState[it.id] || 'new';
+    pin.title = 'Comment ' + it.n + ': click to open it';
+    if (fresh) { pin.classList.remove('flash'); void pin.offsetWidth; pin.classList.add('flash'); }
+  }
+  var thread = document.querySelector('.thread');
+  function time(at) { return (at || '').slice(11, 16); }
+  // A reply that names the message it answers is shown under that message, so the user sees what was answered.
+  function replyBlock(e) {
+    var mine = e.action === 'reopen' || e.action === 'note', r = el('div', mine ? 'reply mine' : 'reply'), h = el('div', 'head');
+    h.append(el('span', 'who', mine ? 'You' : 'Agent'), el('span', 'when', time(e.at)));
+    if (e.action === 'reopen') h.append(el('span', 'progress reopened', 'Reopened'));
+    r.append(h, el('p', 'body', e.action === 'reopen' ? e.reason : e.action === 'note' ? e.note : e.text));
+    return r;
+  }
+  var filter = 'open', scrolledOnce = false;
+  document.querySelectorAll('[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      filter = b.dataset.filter;
+      document.querySelectorAll('[data-filter]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      renderThread();
+    });
+  });
+  var STEPS = ['seen', 'working', 'done', 'accepted'],
+      LABEL = { seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
+  // The box for an answer or a reply, under the item. The button that opened it hides while it is open, and the box
+  // goes only once the message is sent.
+  function reasonBox(li, id, label, from) {
+    if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
+    var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'),
+        ok = el('button', 'btn btn--sm', 'Send'), no = el('button', 'btn btn--quiet btn--sm', 'Cancel');
+    ta.setAttribute('aria-label', label); ta.placeholder = label;
+    ok.type = no.type = 'button';
+    if (from) from.style.visibility = 'hidden';
+    function close() { box.remove(); if (from) from.style.visibility = ''; }
+    function sendIt() {
+      var r = ta.value.trim(); if (!r) return ta.focus();
+      send('note', { id: 'm-' + Date.now().toString(36), to: id, note: r }, label === 'Your answer' ? 'Answer' : 'Reply', function () {
+        close(); li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true });
+      });
+    }
+    ok.addEventListener('click', sendIt); no.addEventListener('click', close);
+    ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); sendIt(); } if (k.key === 'Escape') close(); });
+    row.append(ok, no); box.append(ta, row); li.append(box); box.scrollIntoView({ block: 'nearest' }); ta.focus();
+  }
+  // The progress mark: four short bars fill as the agent sees an item, works on it, finishes it and the user accepts it.
+  function progressChip(st) {
+    var k = !st ? -1 : st === 'asked' || st === 'replied' || st === 'followup' ? 0 : STEPS.indexOf(st), chip = el('span', 'progress' + (st ? ' ' + st : '')), bars = el('span', 'bars');
+    for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
+    chip.append(bars, el('span', '', st ? LABEL[st] : 'Sent'));
+    return chip;
+  }
+  function renderThread() {
+    var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
+    var entries = [], byKey = {}, state = {};
+    log.forEach(function (e) {
+      if (e.action === 'status') state[e.to] = e.status;
+      else if (e.action === 'accept') state[e.to] = 'accepted';
+      else if (e.action === 'reopen') state[e.to] = 'reopened';
+      // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
+      else if (e.action === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
+      // A reply under a finished item is a follow-up: the item goes back to the agent.
+      else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
+    });
+    log.forEach(function (e) {
+      if (e.action === 'comment' || e.action === 'delete') {
+        var c = byKey[e.id];
+        if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
+        else if (e.action === 'delete') c.deleted = true;
+        else { c.e = e; c.edited = true; c.deleted = false; }
+      } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && e.to)) && e.to && byKey[e.to]) { byKey[e.to].replies.push(e); if (e.id) byKey[e.id] = byKey[e.to]; }
+      else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
+      else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
+    });
+    // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
+    // comes last, next to the message box.
+    function waiting(c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); }
+    entries = entries.filter(function (c) { return !waiting(c); }).concat(entries.filter(waiting));
+    // A box the user is typing in survives the redraw, with its text and cursor, and keeps its item on the page until
+    // it is sent or cancelled, even when the item has left Open meanwhile.
+    var kept = {};
+    thread.querySelectorAll('li[data-id] > .why').forEach(function (box) {
+      var ta = box.querySelector('textarea');
+      kept[box.parentNode.dataset.id] = { box: box, focus: document.activeElement === ta, start: ta.selectionStart, end: ta.selectionEnd };
+    });
+    // Open: the user's comments and messages not yet accepted, with what was said under them, and the agent's waiting
+    // questions.
+    var open = entries.filter(function (c) {
+      return ((c.kind === 'comment' || c.kind === 'note') && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waiting(c);
+    });
+    document.querySelector('[data-filter="open"]').textContent = 'Open (' + open.length + ')';
+    if (filter === 'open') entries = entries.filter(function (c) { return open.indexOf(c) >= 0 || (c.e.id && kept[c.e.id]); });
+    thread.replaceChildren();
+    var started = log.some(function (x) { return x.action && x.action !== 'status'; });
+    document.querySelector('.notes .empty').hidden = started;
+    entries.forEach(function (c) {
+      var e = c.e, li, head;
+      if (c.kind === 'comment') {
+        li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
+        head = el('div', 'head'); head.append(el('span', 'n', e.n || '?'), el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
+        var it = byId(e.id);
+        if (it && !c.deleted && state[e.id] !== 'done' && state[e.id] !== 'accepted') {
+          var where = el('button', 'link', 'Show'), edit = el('button', 'link', 'Edit'), del = el('button', 'link', 'Delete');
+          where.type = edit.type = del.type = 'button';
+          where.setAttribute('aria-label', 'Show comment ' + e.n + ' on its slide'); edit.setAttribute('aria-label', 'Edit comment ' + e.n); del.setAttribute('aria-label', 'Delete comment ' + e.n);
+          where.addEventListener('click', function () { reveal(e); });
+          edit.addEventListener('click', function () { reveal(e); openEdit(it, edit); });
+          del.addEventListener('click', function () { removeItem(it); });
+          head.append(where, edit, del);
+        }
+        li.append(head, crumb(e), el('p', 'body', c.deleted ? 'Deleted' : e.comment));
+      } else if (c.kind === 'note') {
+        li = el('li', 'msg me'); head = el('div', 'head'); head.append(el('span', 'who', 'You'), el('span', 'when', time(e.at)));
+        li.append(head, el('p', 'body', e.note));
+      } else if (c.kind === 'reply') {
+        li = el('li', 'msg agent'); li.append(replyBlock(e));
+      } else return;
+      c.replies.forEach(function (r) { li.append(replyBlock(r)); });
+      if (c.kind === 'reply' && e.id) {  // the agent's own messages can be answered too; the state row closes them
+        var rf = el('div', 'foot'), mine = c.replies.filter(function (r) { return r.action === 'note'; }), last = mine[mine.length - 1];
+        if (last) rf.append(progressChip(state[last.id]));
+        var rb = el('button', 'btn btn--quiet btn--sm answer', 'Reply'); rb.type = 'button';
+        rb.addEventListener('click', function () { reasonBox(li, e.id, 'Your reply', rb); });
+        rf.append(rb); li.append(rf);
+      }
+      // The state and what the user can do with it close the item, after the latest reply.
+      if (c.kind === 'comment' || c.kind === 'note') {
+        var foot = el('div', 'foot');
+        foot.append(progressChip(state[e.id]));
+        // A done item is accepted with the brown check next to Reply; replying instead puts it back with the agent.
+        if (state[e.id] === 'done') {
+          var ok = el('button', 'btn btn--sm answer', '✓'); ok.type = 'button'; ok.title = 'Accept'; ok.setAttribute('aria-label', 'Accept');
+          ok.addEventListener('click', function () { send('accept', { to: e.id }, 'Acceptance', function () { li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); }); });
+          foot.append(ok);
+        }
+        var asked = state[e.id] === 'asked', ans = el('button', 'btn btn--sm answer' + (asked ? '' : ' btn--quiet'), asked ? 'Answer' : 'Reply');
+        ans.type = 'button';
+        ans.addEventListener('click', function () { reasonBox(li, e.id, asked ? 'Your answer' : 'Your reply', ans); });
+        foot.append(ans);
+        li.append(foot);
+        if (state[e.id]) li.dataset.state = state[e.id];
+      }
+      if (e.id) {
+        li.dataset.id = e.id;
+        var k = kept[e.id];
+        if (k) { li.append(k.box); li.querySelectorAll('.foot .answer').forEach(function (b) { b.style.visibility = 'hidden'; }); }
+      }
+      thread.appendChild(li);
+    });
+    Object.keys(kept).forEach(function (id) {
+      var k = kept[id], ta = k.box.querySelector('textarea');
+      if (k.focus && document.contains(ta)) { ta.focus({ preventScroll: true }); ta.setSelectionRange(k.start, k.end); }
+    });
+    if (filter === 'open' && started && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
+    if (stick || !scrolledOnce) {
+      var bottom = function () { thread.scrollTop = thread.scrollHeight; };
+      bottom(); requestAnimationFrame(bottom); if (document.fonts) document.fonts.ready.then(bottom);
+      if (log.length) scrolledOnce = true;
+    }
+    pinState = state;
+    items.forEach(function (it) { placePin(it, false); });
+  }
+  function reopenFromThread(id) {
+    if (filter === 'open' && pinState[id] === 'accepted') document.querySelector('[data-filter="all"]').click();
+    var li = thread.querySelector('li[data-id="' + id + '"]'); if (!li) return;
+    li.scrollIntoView({ block: 'nearest' }); reasonBox(li, id, 'Your reply');
+  }
+  // Show a comment where it was made: its slide, with its pin flashing.
+  function reveal(e) {
+    go((e.slide || 1) - 1);
+    var pin = slides[cur].querySelector('.pin[data-id="' + e.id + '"]'); if (!pin) return;
+    pin.classList.remove('flash'); void pin.offsetWidth; pin.classList.add('flash');
+    pin.scrollIntoView({ block: 'nearest' });
+  }
+  var noteBox = document.querySelector('#note'), noteBtn = document.querySelector('.notes .send .btn');
+  function sendNote() {
+    var note = noteBox.value.trim();
+    if (!note) { noteBox.focus(); return; }
+    send('note', { id: 'm-' + Date.now().toString(36), note: note, slide: cur + 1, part: slides[cur].dataset.part || '' }, 'Message', function () { noteBox.value = ''; });
+  }
+  noteBtn.addEventListener('click', sendNote);
+  noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNote(); } });
+
+  var KEY = 'show-mode:' + location.pathname;
+  try { if (sessionStorage.getItem(KEY) === 'comment' && served) setMode(true); sessionStorage.removeItem(KEY); } catch (e) {}
+  go((parseInt(location.hash.slice(1), 10) || 1) - 1);
+  if (!served) return;
+  renderThread();
+  // After two failed polls in a row, a strip under the bar says the server stopped; it goes when it answers again.
+  var offline = document.querySelector('.offline'), misses = 0;
+  function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
+  (function stream(after) {
+    fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
+      connected(true);
+      r.events.forEach(function (e) { log.push(e); apply(e, false); });
+      // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
+      if (after > 0) r.events.forEach(function (e) { if (e.action === 'reply') flash('Agent: ' + e.text.slice(0, 120), 'ok'); });
+      if (r.events.length) renderThread();
+      stream(r.total);
+    }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
+  })(0);
+  // New slides from the agent load by themselves, as soon as the user is not typing, on the same slide and mode.
+  function busy() {
+    return !pop.hidden || !!noteBox.value.trim() ||
+      Array.prototype.some.call(document.querySelectorAll('.why textarea'), function (t) { return !!t.value.trim(); });
+  }
+  var rev = null;
+  (function poll() {
+    fetch('/rev').then(function (r) { return r.text(); }).then(function (t) {
+      if (rev === null) rev = t;
+      else if (t !== rev && !busy()) {
+        try { sessionStorage.setItem(KEY, commenting ? 'comment' : 'read'); } catch (e) {}
+        location.reload();
+      }
+    }).catch(function () {}).then(function () { setTimeout(poll, 2000); });
+  })();
+  // Once the agent has used `wait`, a note above the message box says when no `wait` is connected.
+  var unwatched = document.querySelector('.unwatched');
+  (function watch() {
+    fetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
+      unwatched.hidden = on !== false;
+    }).catch(function () { unwatched.hidden = true; }).then(function () { setTimeout(watch, 2000); });
+  })();
 })();
