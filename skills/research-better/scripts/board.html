@@ -144,6 +144,7 @@ const mins = s => s < 90 ? "under 2 min" : `${Math.round(s / 60)} min`;
 const STATE = { "answered": ["answered", "ok"], "in progress": ["working", "now"], "open": ["to do", "todo"], "proposed": ["proposed", "todo"],
   "contested": ["contested", "bad"], "not found": ["not found", "bad"], "unclear": ["unclear", "bad"] };
 const FILL = { ok: "#6B7F5E", now: "#5C4033", todo: "#C4B69C", bad: "#E8725C" };
+const SIZE = { high: 10, medium: 7, low: 4.5 };  // dot radius by priority; a question without one is drawn as medium
 const CLOSED = new Set(["answered", "contested", "not found"]);
 let D = null, LAYOUT = "", OPEN = null, REPLIES = -1, SCROLLED = false, CLOSED_PAGE = false;  // OPEN: what the open pop-up shows, as {kind, id}
 
@@ -160,6 +161,7 @@ function prepare(d) {
     q.label = has(q.title) ? q.title : shorten(q.question || q.id);
     q.claimsList = d.claims.filter(c => c.question === q.id);
     q.searches = searches[q.id] || 0;
+    const pr = String(q.priority || "").trim().toLowerCase(); q.prio = ["high", "medium", "low"].includes(pr) ? pr : "";
     let o = String(q.origin || "").split(/[ ,;(]/)[0];
     if (o.startsWith("S-")) o = qOfSource[o];
     q.parent = ids.has(o) && o !== q.id ? o : null;
@@ -210,7 +212,7 @@ function drawMap(d) {
   out.push(`<circle cx="${CX}" cy="${CY}" r="44" fill="#5C4033"/>` + (center ? wrap(center, 14, 2).map((t, i, l) =>
     `<text x="${CX}" y="${CY + 5 + (i - (l.length - 1) / 2) * 15}" text-anchor="middle" style="fill:#FFFCF7;font-weight:700;font-size:13px">${esc(t)}</text>`).join("") : ""));
   d.qs.forEach(q => {
-    const [x, y, a, dp] = pos[q.id], [word, cls] = stateOf(q), r = 7;  // one size: the key explains every mark, and size is not in it
+    const [x, y, a, dp] = pos[q.id], [word, cls] = stateOf(q), r = SIZE[q.prio] || SIZE.medium;  // size is priority; the pop-up and tooltip name it
     // Hollow marks: proposed (sand), not found (terracotta), unclear (terracotta, dashed). Filled: the rest, by colour.
     const hollow = (stroke, dash) => `<circle class="dot" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r - 1}" fill="#FFFCF7" stroke="${stroke}" stroke-width="2.5"${dash ? ' stroke-dasharray="3 2"' : ""}/>`;
     const dot = q.view === "proposed" ? hollow("#78736B") : q.view === "not found" ? hollow("#9A3B2A") : q.view === "unclear" ? hollow("#9A3B2A", true)
@@ -218,7 +220,7 @@ function drawMap(d) {
     const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#5C4033" stroke-dasharray="3 2"/>` : "";
     const right = x >= CX, far = dp > 1 ? `<text class="far" x="${(x + (r + 4) * (right ? 1 : -1)).toFixed(0)}" y="${(y + 4).toFixed(0)}" text-anchor="${right ? "start" : "end"}">${esc(q.label)}</text>` : "";
     const who = q.view === "in progress" && has(q.owner) ? `, ${q.owner} on it` : "";
-    out.push(`<g class="q${OPEN && OPEN.id === q.id ? " sel" : ""}" data-q="${esc(q.id)}" tabindex="0" role="button" aria-label="${esc(q.label)}: ${word}${esc(who)}"><title>${esc(q.label)}</title>${ring}${dot}${far}</g>`);
+    out.push(`<g class="q${OPEN && OPEN.id === q.id ? " sel" : ""}" data-q="${esc(q.id)}" tabindex="0" role="button" aria-label="${esc(q.label)}: ${word}${q.prio ? ", " + q.prio + " priority" : ""}${esc(who)}"><title>${esc(q.label)}${q.prio ? ` (${q.prio} priority)` : ""}</title>${ring}${dot}${far}</g>`);
   });
   seeds.forEach(s => {  // each slice's name, at the edge, outside every dot
     const a = pos[s.id][2], lx = CX + (RMAX + 26) * Math.cos(a), ly = CY + (RMAX + 26) * Math.sin(a);
@@ -409,7 +411,7 @@ function fillPop() {
     const parent = q.parent ? D.byId[q.parent] : null, srcs = new Set(q.claimsList.map(c => c.source)).size;
     const gist = has(q.gist) ? q.gist : has(q.summary) ? q.summary : "";
     // Three text styles only: the small label line, the title, and body text.
-    html = `<p class="meta"><span class="chip ${cls}">${word}${q.view === "in progress" && has(q.owner) ? " · " + esc(q.owner) : ""}</span> · ${plural(n, "claim")} from ${plural(srcs, "source")}${n ? `, ${ver} verified${failed ? `, ${failed} failed` : ""}` : ""}</p>
+    html = `<p class="meta"><span class="chip ${cls}">${word}${q.view === "in progress" && has(q.owner) ? " · " + esc(q.owner) : ""}</span>${q.prio ? ` · ${q.prio} priority` : ""} · ${plural(n, "claim")} from ${plural(srcs, "source")}${n ? `, ${ver} verified${failed ? `, ${failed} failed` : ""}` : ""}</p>
       <h3 dir="auto">${esc(q.label)}</h3>
       ${gist ? `<p dir="auto">${esc(gist)}</p>` : ""}${parent ? `<p class="muted" dir="auto">Raised by: ${esc(parent.label)}</p>` : ""}
       <details><summary>Full question and claims</summary><p class="muted" dir="auto">${esc(q.question || "")}</p>
