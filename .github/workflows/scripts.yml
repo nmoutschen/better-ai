@@ -61,8 +61,12 @@ jobs:
             echo "$js"
             node --check "$js"
           done
-      - name: Shared page look is identical in every skill
+      - name: Shared page files are identical in every skill
         run: |
-          # page.css is the look shared by the skills' pages that talk to the agent; each skill carries a copy.
-          set -- skills/*/scripts/page.css
-          for css in "$@"; do cmp "$1" "$css"; done
+          # The skills' pages that talk to the agent share page.css (the look), page.py (the log, the server's
+          # conversation endpoints, and wait, reply, status and pending) and page.js (the conversation on the page);
+          # each skill carries a copy of the ones it uses.
+          for name in page.css page.py page.js; do
+            set -- skills/*/scripts/$name
+            for f in "$@"; do cmp "$1" "$f"; done
+          done
