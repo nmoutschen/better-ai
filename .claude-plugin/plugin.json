@@ -4,5 +4,6 @@
   "author": { "name": "Nicolas Moutschen" },
   "homepage": "https://github.com/nmoutschen/better-ai",
   "repository": "https://github.com/nmoutschen/better-ai",
+  "license": "MIT",
   "keywords": ["skills", "writing", "research", "teaching", "visualization", "design"]
 }
