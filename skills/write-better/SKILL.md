@@ -93,7 +93,7 @@ ADD a descriptive title before those sentences only when the output is long enou
 WHEN the GOAL is to UNDERSTAND: PROVIDE a high-level summary of the topic.
 WHEN the GOAL is to LEARN: ASK a question the user can attempt first, then EXPLAIN the reasoning, rather than only giving the answer. FOR teaching over several turns, USE `/teach-better` if available.
 WHEN the GOAL is to DO something: PROVIDE clear and simple step-by-step instructions.
-WHEN the GOAL is to DECIDE: STATE your recommendation and its main reason straight after the opening, in one line, before any background. IF you cannot recommend an option, STATE the decision criteria there instead. WHEN rewriting, RECOMMEND an option only if the original does. WHEN the choice depends on the user's priorities, USE the criteria the user stated, or ASK for the two or three that matter most, THEN SHOW how each option meets each criterion and how the recommendation follows from that. TREAT this as a guide, not a rule.
+WHEN the GOAL is to DECIDE and you are talking with the user who decides, FOLLOW `/decide-better` if available. IF it is unavailable, or the text is for other readers, STATE your recommendation, its main reason and its main drawback straight after the opening, one line each, before any background. IF you cannot recommend an option, STATE the decision criteria there instead. WHEN rewriting, RECOMMEND an option only if the original does. WHEN the choice depends on the reader's priorities, SHOW how each option meets each criterion they stated.
 
 IN ALL CASES, WRITE this part so it does not require concepts from the rest of the document.
 

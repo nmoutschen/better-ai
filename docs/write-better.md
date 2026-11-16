@@ -94,6 +94,7 @@ It calls:
 
 - Your `write-for-<name>` guide, if you have one from [`/interview-me`](interview-me.md).
 - [`/ask-better`](ask-better.md) if it must ask about the goal.
+- [`/decide-better`](decide-better.md) when the text is for a decision you make.
 - [`/review-better`](review-better.md) to review a text without rewriting it.
 - [`/teach-better`](teach-better.md) when the goal is to learn over several turns.
 - [`/show-better`](show-better.md) to introduce a long, dense document with visual panels.

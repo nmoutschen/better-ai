@@ -96,7 +96,7 @@ OFFER two to four concrete options taken from the context, so the user can answe
 
 ASK one thing per question. SPLIT a question that asks for several things into numbered parts.
 
-IF you recommend an option, LIST it first and say that you recommend it.
+IF you recommend an option, LIST it first, say that you recommend it, and GIVE its main drawback in the same line. IF the question asks the user to make a decision they own, such as a choice of approach, plan or tool, FOLLOW `/decide-better` if available: it sizes the decision and gets the user's leaning before your recommendation.
 
 FOR a preference about how to present the result, OFFER choices about the output, such as "a diagram" or "a shorter version". DO NOT ask about the user's abilities or ask them to disclose a condition: preference settings can reveal a disability the user did not choose to share.
 

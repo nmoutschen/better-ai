@@ -110,7 +110,7 @@ FOR each finding:
 
 1. IF the fix is simple and has one right answer, FIX it, and LIST the fix with the other findings so the author can check it. IF you may not change the work (section 1.2), GIVE the exact change instead.
 2. IF only the author can settle the finding, such as what they meant or a fact only they know, ASK the question.
-3. IF the finding has several reasonable fixes, EXPLAIN the alternatives and what each one changes, RECOMMEND one, and ASK the author to choose. FOLLOW `/ask-better` for the question if available.
+3. IF the finding has several reasonable fixes and the user owns the choice, FOLLOW `/decide-better` if available. OTHERWISE, EXPLAIN the alternatives and what each one changes, RECOMMEND one with its main drawback, and ASK the author to choose. FOLLOW `/ask-better` for the question if available.
 4. OTHERWISE, PROPOSE a solution: the change you would make, specifically enough to apply.
 
 IF the user has said they want to find fixes themselves, FOLLOW that instead: SAY where the problem is and why, and GIVE the fix only when they ask.

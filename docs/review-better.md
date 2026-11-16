@@ -97,7 +97,7 @@ It calls:
 
 - [`/code-better`](code-better.md), [`/design-better`](design-better.md) or [`/write-better`](write-better.md) for what to look for, by kind of work.
 - Your `review-for-<name>` guide, if you have one from [`/interview-me`](interview-me.md). Its criteria are added, and its blocking criteria become blocking findings.
-- [`/ask-better`](ask-better.md) to ask you to choose between fixes.
+- [`/decide-better`](decide-better.md) and [`/ask-better`](ask-better.md) when you must choose between fixes.
 - [`/write-better`](write-better.md) for the report.
 - [`/do-better`](do-better.md) when you reject the review.
 

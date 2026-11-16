@@ -96,6 +96,7 @@ It calls:
 
 - [`/ask-better`](ask-better.md) when it checks requirements with you.
 - [`/review-better`](review-better.md) to run the review, with `/code-better`'s list of what to look for in code.
+- [`/decide-better`](decide-better.md) when it shows you design decisions before building.
 - [`/write-better`](write-better.md) for the final report and for explanations.
 - [`/do-better`](do-better.md) when you reject the result.
 

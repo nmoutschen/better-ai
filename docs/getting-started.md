@@ -27,6 +27,7 @@ See [`/interview-me`](interview-me.md).
 | Research a topic from sources | [`/research-better`](research-better.md) |
 | Learn a topic so you can use it without AI | [`/teach-better`](teach-better.md) |
 | Get a dense document introduced with visual panels | [`/show-better`](show-better.md) |
+| Make a decision you will live with | [`/decide-better`](decide-better.md) |
 | Review text, code, an interface or a plan | [`/review-better`](review-better.md) |
 | Get text you can understand and act on | [`/write-better`](write-better.md) |
 
@@ -35,6 +36,7 @@ You rarely need to call these yourself:
 - [`/ask-better`](ask-better.md) decides when to ask you a question, and how to ask it.
 - [`/write-better`](write-better.md) writes the reports the other skills hand back.
 - [`/review-better`](review-better.md) runs the reviews in `/code-better` and `/design-better`.
+- [`/decide-better`](decide-better.md) runs the choices other skills bring you.
 
 ## 3. When the result is wrong, use `/do-better`
 
