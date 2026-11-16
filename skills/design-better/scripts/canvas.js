@@ -151,33 +151,9 @@
   var firstFrame = document.querySelector('main iframe'), perVersion = (main.clientWidth - 20 * (labels.length - 1)) / labels.length;
   view(labels.length > 3 || (labels.length > 1 && firstFrame && perVersion / +firstFrame.getAttribute('width') < 0.5) ? 'switch' : 'side');
 
-  // Feedback. Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the
-  // agent's replies. The page streams that log: it rebuilds the conversation and the pins from it, so a reload or new
-  // versions lose nothing. State changes are also applied at once, and applying the same event twice changes nothing.
-  var served = location.protocol === 'http:', rpcId = 0, seq = 0, items = [], verdicts = {}, log = [];
-  var status = document.querySelector('.notes .status');
-  function say(text, error) { status.textContent = text; status.classList.toggle('error', !!error); }
-  // Every action shows a toast at the bottom of the window: sending, then sent or failed.
-  var toast = document.querySelector('.toast'), toastTimer = null;
-  function flash(text, kind) {
-    clearTimeout(toastTimer);
-    toast.textContent = text; toast.className = 'toast ' + (kind || ''); toast.hidden = false;
-    if (kind !== 'error' && kind !== 'busy') toastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
-  }
-  function send(method, params, what, done) {
-    var event = Object.assign({ action: method, at: new Date().toISOString().slice(0, 19) }, params);
-    apply(event, true);
-    if (!served) { log.push(event); renderThread(); flash(what + ' saved on this page. Use Copy all to paste it in the chat.', 'ok');
-                   if (done) done(); return; }
-    flash('Sending ' + what.toLowerCase() + '…', 'busy');
-    fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
-      .then(function (r) { return r.json(); })
-      .then(function (r) { if (r.error) throw new Error(r.error.message);
-        flash('✓ ' + what + ' sent to the agent', 'ok'); say(''); if (done) done(); })
-      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The canvas is closed.', 'error');
-        say('Not sent: the canvas is closed. Ask the agent to restart it.', true); });
-  }
+  // Feedback goes through the conversation in page.js, shared with the other pages that talk to the agent. The canvas
+  // keeps its own model of comments, for the pins in each version, and of the verdicts, for the thumbs.
+  var served = location.protocol === 'http:', seq = 0, items = [], verdicts = {};
   function apply(e, fresh) {
     if (e.action === 'comment') {
       var it = byId(e.id);
@@ -334,7 +310,7 @@
         e.preventDefault(); e.stopPropagation();
         var found = items.filter(function (x) { return x.id === pin.dataset.id; })[0];
         // A finished comment is not edited: it is reopened, with what is still wrong, from the conversation.
-        if (found && (pinState[found.id] === 'done' || pinState[found.id] === 'accepted')) reopenFromThread(found.id);
+        if (found && (pinState[found.id] === 'done' || pinState[found.id] === 'accepted')) conv.reopen(found.id);
         else if (found) openPop(frame, null, null, e.clientX, e.clientY, found);
         return;
       }
@@ -437,196 +413,9 @@
     pin.style.top = (r.top + win.scrollY + it.spot.fy * r.height) + 'px';
     doc.body.appendChild(pin);
   }
-  // The conversation: everything sent and every reply, in order. A comment shows once, in its latest state.
-  var thread = document.querySelector('.thread');
+  // ---------- The conversation: page.js, shared with the other pages; the canvas adds verdicts and Decide ----------
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
   function time(at) { return (at || '').slice(11, 16); }
-  // A reply that names the message it answers is shown under that message, so the user sees what was answered.
-  function replyBlock(e) {
-    var mine = e.action === 'reopen' || e.action === 'note', r = el('div', mine ? 'reply mine' + (e.action === 'note' ? ' answer-note' : '') : 'reply'), h = el('div', 'head');
-    h.append(el('span', 'who', mine ? 'You' : 'Agent'), el('span', 'when', time(e.at)));
-    if (e.action === 'reopen') h.append(el('span', 'progress reopened', 'Reopened'));
-    r.append(h, el('p', 'body', e.action === 'reopen' ? e.reason : e.action === 'note' ? e.note : e.text));
-    return r;
-  }
-  var filter = 'open', scrolledOnce = false;
-  document.querySelectorAll('[data-filter]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      filter = b.dataset.filter;
-      document.querySelectorAll('[data-filter]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
-      renderThread();
-    });
-  });
-  var STEPS = ['seen', 'working', 'done', 'accepted'],
-      LABEL = { seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
-  // Reopening asks why, in a small box under the item; the reason goes with the reopen.
-  // The box for an answer or a reply, under the item: the same field and small Send and Cancel as the board's. The
-  // button that opened it hides in place while it is open, and the box goes only once the message is sent.
-  function reasonBox(li, id, label, opener) {
-    if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
-    var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'),
-        ok = el('button', 'btn btn--sm', 'Send'), no = el('button', 'btn btn--quiet btn--sm', 'Cancel');
-    ta.setAttribute('aria-label', label); ta.placeholder = label;
-    ok.type = no.type = 'button';
-    if (opener) opener.style.visibility = 'hidden';
-    function close() { box.remove(); if (opener) opener.style.visibility = ''; }
-    function go() {
-      var r = ta.value.trim(); if (!r) return ta.focus();
-      send('note', { id: 'm-' + Date.now().toString(36), to: id, note: r }, label === 'Your answer' ? 'Answer' : 'Reply', function () {
-        close(); li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true });
-      });
-    }
-    ok.addEventListener('click', go); no.addEventListener('click', close);
-    ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); go(); } if (k.key === 'Escape') close(); });
-    row.append(ok, no); box.append(ta, row); li.append(box); box.scrollIntoView({ block: 'nearest' }); ta.focus();
-  }
-  // The progress mark: four short bars fill as the agent sees an item, works on it, finishes it and the user accepts it.
-  // Before the agent sets a state, the bars are empty and the word is Sent.
-  function progressChip(st) {
-    var k = !st ? -1 : st === 'asked' || st === 'replied' || st === 'followup' ? 0 : STEPS.indexOf(st), chip = el('span', 'progress' + (st ? ' ' + st : '')), bars = el('span', 'bars');
-    for (var j = 0; j < 4; j++) bars.append(el('i', j <= k ? 'on' : ''));
-    chip.append(bars, el('span', '', st ? LABEL[st] : 'Sent'));
-    return chip;
-  }
-  function renderThread() {
-    var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
-    var entries = [], byKey = {}, state = {};
-    log.forEach(function (e) {
-      if (e.action === 'status') state[e.to] = e.status;
-      else if (e.action === 'accept') state[e.to] = 'accepted';
-      else if (e.action === 'reopen') state[e.to] = 'reopened';
-      // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
-      else if (e.action === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
-      // A reply under a finished item is a follow-up: the item goes back to the agent.
-      else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
-    });
-    log.forEach(function (e, i) {
-      if (e.action === 'comment' || e.action === 'delete') {
-        var c = byKey[e.id];
-        if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
-        else if (e.action === 'delete') c.deleted = true;
-        else { c.e = e; c.edited = true; c.deleted = false; }
-      } else if ((e.action === 'reply' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && e.to)) && e.to && byKey[e.to]) { byKey[e.to].replies.push(e); if (e.id) byKey[e.id] = byKey[e.to]; }
-      else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
-      else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
-    });
-    // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
-    // comes last, next to the message box.
-    function waiting(c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); }
-    entries = entries.filter(function (c) { return !waiting(c); }).concat(entries.filter(waiting));
-    // Open: the user's comments and messages not yet accepted, with what was said under them, and the agent's waiting
-    // questions.
-    var open = entries.filter(function (c) {
-      return ((c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waiting(c);
-    });
-    var openBtn = document.querySelector('[data-filter="open"]');
-    openBtn.textContent = 'Open (' + open.length + ')';
-    if (filter === 'open') entries = open;
-    // A box the user is typing in (an answer or a reason to reopen) survives the redraw, with its text and cursor.
-    var kept = {};
-    thread.querySelectorAll('li[data-id] > .why').forEach(function (box) {
-      var ta = box.querySelector('textarea');
-      kept[box.parentNode.dataset.id] = { box: box, focus: document.activeElement === ta, start: ta.selectionStart, end: ta.selectionEnd };
-    });
-    thread.replaceChildren();
-    // Before anything is sent, both views say how to start; after, Open says when nothing is left.
-    var started = log.some(function (x) { return x.action && x.action !== 'status'; });
-    document.querySelector('.notes .empty').hidden = started;
-    entries.forEach(function (c) {
-      var e = c.e, li, head;
-      // Progress on the user's item: three short bars fill as the agent sees it, works on it and finishes it.
-      function answered(h) {
-        var st = state[e.id];
-        h.append(progressChip(st));
-      }
-      if (c.kind === 'comment') {
-        li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
-        head = el('div', 'head'); head.append(el('span', 'n', e.n || '?'), el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
-        var it = byId(e.id);
-        if (it && !c.deleted && state[e.id] !== 'done' && state[e.id] !== 'accepted') {
-          var del = el('button', 'link', 'Delete'); del.type = 'button'; del.setAttribute('aria-label', 'Delete comment ' + e.n);
-          del.addEventListener('click', function () { removeItem(it); });
-          var where = el('button', 'link', 'Show'), edit = el('button', 'link', 'Edit');
-          where.type = edit.type = 'button';
-          where.setAttribute('aria-label', 'Show where comment ' + e.n + ' is'); edit.setAttribute('aria-label', 'Edit comment ' + e.n);
-          where.addEventListener('click', function () { reveal(e); });
-          edit.addEventListener('click', function () { reveal(e); openEdit(it, edit); });
-          head.append(where, edit, del);
-        }
-        li.append(head, crumb(e.version, e.target || {}));
-        var body = el('p', 'body');
-        if (c.deleted) body.textContent = 'Deleted';
-        else {
-          if (e.verdict) body.append(el('span', 'verdict ' + e.verdict, e.verdict === 'up' ? 'Good' : 'Not good'));
-          if (e.comment) body.append(e.comment);
-        }
-        li.append(body);
-      } else if (c.kind === 'note') {
-        li = el('li', 'msg me'); head = el('div', 'head'); head.append(el('span', 'who', 'You'), el('span', 'when', time(e.at)));
-        li.append(head, el('p', 'body', e.note));
-      } else if (c.kind === 'decide') {
-        li = el('li', 'msg me decision'); head = el('div', 'head'); head.append(el('span', 'who', 'You decided'), el('span', 'when', time(e.at)));
-        var d = el('p', 'body'); d.append(el('strong', '', e.label || e.option));
-        if (e.carries && e.carries.length) d.append(el('span', 'with', ' with comments ' + e.carries.map(function (id) { var x = log.filter(function (y) { return y.id === id; })[0]; return x && x.n ? x.n : '?'; }).join(', ')));
-        li.append(head, d); if (e.note) li.append(el('p', 'body', e.note));
-      } else if (c.kind === 'reply') {
-        li = el('li', 'msg agent'); li.append(replyBlock(e));
-      } else if (c.kind === 'verdict') {
-        var t = (e.verdict ? (e.verdict === 'up' ? 'Thumbs up for ' : 'Thumbs down for ') + e.version : 'You withdrew your verdict on ' + e.version);
-        li = el('li', 'sys', t + ', ' + time(e.at));
-      } else return;
-      c.replies.forEach(function (r) { li.append(replyBlock(r)); });
-      if (c.kind === 'reply' && e.id) {  // the agent's own messages can be answered too; the state row closes them
-        var rf = el('div', 'foot'), mine = c.replies.filter(function (r) { return r.action === 'note'; }), last = mine[mine.length - 1];
-        if (last) rf.append(progressChip(state[last.id]));
-        var rb = el('button', 'btn btn--quiet btn--sm answer', 'Reply'); rb.type = 'button';
-        rb.addEventListener('click', function () { reasonBox(li, e.id, 'Your reply', rb); });
-        rf.append(rb); li.append(rf);
-      }
-      // The state and what the user can do with it close the item, after the latest reply, where the eye ends.
-      if (c.kind === 'comment' || c.kind === 'note' || c.kind === 'decide') {
-        var foot = el('div', 'foot'); answered(foot);
-        // Every message can be answered: Answer when the agent asked something, Reply otherwise.
-        // A done item is accepted with the brown check next to Reply; replying instead puts it back with the agent.
-        if (state[e.id] === 'done') {
-          var ok = el('button', 'btn btn--sm answer', '\u2713'); ok.type = 'button'; ok.title = 'Accept'; ok.setAttribute('aria-label', 'Accept');
-          ok.addEventListener('click', function () { send('accept', { to: e.id }, 'Acceptance', function () { li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); }); });
-          foot.append(ok);
-        }
-        var asked = state[e.id] === 'asked', ans = el('button', 'btn btn--sm answer' + (asked ? '' : ' btn--quiet'), asked ? 'Answer' : 'Reply');
-        ans.type = 'button';
-        ans.addEventListener('click', function () { reasonBox(li, e.id, asked ? 'Your answer' : 'Your reply', ans); });
-        foot.append(ans);
-        if (foot.childNodes.length) li.append(foot);
-        if (state[e.id]) li.dataset.state = state[e.id];
-      }
-      if (e.id) {
-        li.dataset.id = e.id;
-        var k = kept[e.id];
-        if (k) { li.append(k.box); li.querySelectorAll('.foot .answer').forEach(function (b) { b.style.visibility = 'hidden'; }); }
-      }
-      thread.appendChild(li);
-    });
-    // Focus only once the box is back in the page: a detached element cannot take it.
-    Object.keys(kept).forEach(function (id) {
-      var k = kept[id], ta = k.box.querySelector('textarea');
-      if (k.focus && document.contains(ta)) { ta.focus({ preventScroll: true }); ta.setSelectionRange(k.start, k.end); }
-    });
-    if (filter === 'open' && started && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
-    // The conversation opens on its latest message, and follows new ones while the user is at the bottom. The scroll
-    // repeats on the next frame and once fonts load, which can make the thread taller after this render.
-    if (stick || !scrolledOnce) {
-      var bottom = function () { thread.scrollTop = thread.scrollHeight; };
-      bottom(); requestAnimationFrame(bottom); if (document.fonts) document.fonts.ready.then(bottom);
-      if (log.length) scrolledOnce = true;
-    }
-    pinState = state; syncPins();
-  }
-  function reopenFromThread(id) {
-    if (filter === 'open' && pinState[id] === 'accepted') document.querySelector('[data-filter="all"]').click();
-    var li = thread.querySelector('li[data-id="' + id + '"]'); if (!li) return;
-    li.scrollIntoView({ block: 'nearest' }); reasonBox(li, id, 'Your reply');
-  }
   // Show a comment where it was made: its screen size, its version, scrolled to its pin, which flashes.
   function reveal(e) {
     var sec = Array.prototype.filter.call(document.querySelectorAll('main > section'), function (x) {
@@ -652,8 +441,44 @@
       }); } catch (e) {}
     });
   }
+  function commentBody(e) {
+    var body = el('p', 'body');
+    if (e.verdict) body.append(el('span', 'verdict ' + e.verdict, e.verdict === 'up' ? 'Good' : 'Not good'));
+    if (e.comment) body.append(e.comment);
+    return body;
+  }
+  function decisionItem(c) {
+    var e = c.e, li = el('li', 'msg me decision'), head = el('div', 'head');
+    head.append(el('span', 'who', 'You decided'), el('span', 'when', time(e.at)));
+    var d = el('p', 'body'); d.append(el('strong', '', e.label || e.option));
+    if (e.carries && e.carries.length) d.append(el('span', 'with', ' with comments ' + e.carries.map(function (id) { var x = conv.log().filter(function (y) { return y.id === id; })[0]; return x && x.n ? x.n : '?'; }).join(', ')));
+    li.append(head, d); if (e.note) li.append(el('p', 'body', e.note));
+    return li;
+  }
+  function verdictItem(c) {
+    var e = c.e, t = (e.verdict ? (e.verdict === 'up' ? 'Thumbs up for ' : 'Thumbs down for ') + e.version : 'You withdrew your verdict on ' + e.version);
+    return el('li', 'sys', t + ', ' + time(e.at));
+  }
+  // New versions from the agent load on the same screen size, view and version.
+  var KEY = 'canvas-view:' + location.pathname, deciding = false;
+  var conv = pageConversation({
+    served: served, name: 'canvas', unsent: 'Use Copy all to paste it in the chat.', apply: apply, byId: byId,
+    reveal: reveal, edit: openEdit, remove: removeItem,
+    showLabel: function (n) { return 'Show where comment ' + n + ' is'; },
+    crumb: function (e) { return crumb(e.version, e.target || {}); }, commentBody: commentBody,
+    kinds: { decide: decisionItem, verdict: verdictItem }, itemKinds: ['comment', 'note', 'decide'],
+    sendMode: function () { return deciding ? sendDecision : null; },
+    busy: function () { return !pop.hidden; },
+    beforeReload: function () {
+      var size = document.querySelector('button[data-size][aria-pressed="true"]');
+      sessionStorage.setItem(KEY, JSON.stringify({ view: main.classList.contains('switch') ? 'switch' : 'side', current: current, size: size && size.dataset.size }));
+    },
+    rendered: function (state) { pinState = state; syncPins(); }
+  });
+  function send(method, params, what, done) { conv.send(method, params, what, done); }
+  var say = conv.say, noteBox = conv.noteBox, noteBtn = conv.noteBtn;
   function asText() {
-    var lines = [];
+    var lines = [], log = conv.log();
     var dec = log.filter(function (x) { return x.action === 'decide'; }).pop();
     if (dec) lines.push('I decide: ' + (dec.label || dec.option) + (dec.carries && dec.carries.length ? ', with comments ' +
       dec.carries.map(function (id) { var x = byId(id); return x ? x.n : '?'; }).join(', ') : '') + '.' + (dec.note ? ' ' + dec.note : ''));
@@ -666,20 +491,15 @@
     log.forEach(function (e) { if (e.action === 'note') lines.push(e.note); });
     return lines.join('\n');
   }
-  var noteBox = document.querySelector('#note'), noteBtn = document.querySelector('.notes .send .btn'), copyBtn = document.querySelector('.notes .copy');
+  var copyBtn = document.querySelector('.notes .copy');
   copyBtn.hidden = served;
   copyBtn.addEventListener('click', function () {
     navigator.clipboard.writeText(asText()).then(function () { say('Copied. Paste it in the chat with the agent.'); },
       function () { say('Could not copy. Select the conversation and copy it by hand.', true); });
   });
-  function sendNote() {
-    var note = noteBox.value.trim();
-    if (!note) { noteBox.focus(); return; }
-    send('note', { id: 'm-' + Date.now().toString(36), note: note }, 'Message', function () { noteBox.value = ''; });
-  }
   // Decide: one confirmed decision, sent with the open comments that come with it and the message as its note.
   // The Send button becomes Confirm while the decision panel is open, so the same place sends both.
-  var decideBtn = document.querySelector('.decide-btn'), panel = document.querySelector('.decide'), deciding = false;
+  var decideBtn = document.querySelector('.decide-btn'), panel = document.querySelector('.decide');
   var beforeAfter = labels.length === 2 && labels[0].toLowerCase() === 'before' && labels[1].toLowerCase() === 'after';
   var OPTIONS = beforeAfter ? [['Ship After', 'After'], ['Keep Before', 'Before']]
     : labels.map(function (l) { return ['Build ' + l, l]; }).concat([['Combine versions (say how below)', 'combine']]);
@@ -689,7 +509,7 @@
   }
   function setDeciding(on) {
     deciding = on; panel.hidden = !on; decideBtn.setAttribute('aria-expanded', String(on));
-    decideBtn.textContent = on ? 'Cancel' : 'Decide\u2026';
+    decideBtn.textContent = on ? 'Cancel' : 'Decide…';
     noteBtn.textContent = on ? 'Confirm decision' : 'Send';
     if (!on) return;
     var box = panel.querySelector('.dopts'); box.replaceChildren();
@@ -713,49 +533,8 @@
                      carries: openItems().map(function (it) { return it.id; }), note: note || null },
          'Decision', function () { noteBox.value = ''; setDeciding(false); });
   }
-  noteBtn.addEventListener('click', function () { if (deciding) sendDecision(); else sendNote(); });
-  noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !deciding) { e.preventDefault(); sendNote(); } });
-  renderThread();
-  // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
-  var offline = document.querySelector('.offline'), misses = 0;
-  function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
-  if (served) (function stream(after) {
-    fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
-      connected(true);
-      r.events.forEach(function (e) { log.push(e); apply(e, false); });
-      // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
-      if (after > 0) r.events.forEach(function (e) { if (e.action === 'reply') flash('Agent: ' + e.text.slice(0, 120), 'ok'); });
-      if (r.events.length) renderThread();
-      stream(r.total);
-    }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
-  })(0);
-  // New versions from the agent load by themselves, as soon as the user is not typing: a comment, a message or an
-  // answer in progress would be lost. The page comes back on the same screen size, view and version.
-  var KEY = 'canvas-view:' + location.pathname;
-  function busy() {
-    return !pop.hidden || !!noteBox.value.trim() ||
-      Array.prototype.some.call(document.querySelectorAll('.why textarea'), function (t) { return !!t.value.trim(); });
-  }
+  conv.start();
   if (served) {
-    var rev = null;
-    (function poll() {
-      fetch('/rev').then(function (r) { return r.text(); }).then(function (t) {
-        if (rev === null) rev = t;
-        else if (t !== rev && !busy()) {
-          var size = document.querySelector('button[data-size][aria-pressed="true"]');
-          sessionStorage.setItem(KEY, JSON.stringify({ view: main.classList.contains('switch') ? 'switch' : 'side', current: current, size: size && size.dataset.size }));
-          location.reload();
-        }
-      }).catch(function () {}).then(function () { setTimeout(poll, 2000); });
-    })();
-    // Once the agent has used `wait`, a note above the message box says when no `wait` is connected: what the user
-    // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more.
-    var unwatched = document.querySelector('.unwatched');
-    (function watch() {
-      fetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
-        unwatched.hidden = on !== false;
-      }).catch(function () { unwatched.hidden = true; }).then(function () { setTimeout(watch, 2000); });
-    })();
     try {
       var kept = JSON.parse(sessionStorage.getItem(KEY) || 'null');
       sessionStorage.removeItem(KEY);
