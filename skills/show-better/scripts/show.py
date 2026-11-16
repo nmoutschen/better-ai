@@ -1,30 +1,50 @@
-"""Render a short visual presentation from a JSON spec, as one self-contained HTML page.
+"""Render a short visual introduction to a document from a JSON spec, as a slide page or as text.
 
 Usage:
   python3 show.py check SPEC                  validate the spec and print every value it will show
-  python3 show.py render SPEC --out FILE      check, then write the page (add --open to open it)
+  python3 show.py render SPEC --out FILE      check, then write the page (--open to open it, --serve to serve it)
+  python3 show.py wait DIR [--timeout S]
+  python3 show.py reply DIR TEXT [--to ID]
+  python3 show.py status DIR seen|asked|working|done|accepted ID...
+  python3 show.py pending DIR
 
-SPEC is a JSON file described in templates/spec.md. Panels are shown one at a time, and the reader
-steps through them with buttons or the arrow keys. Without JavaScript, or when printed, all panels
-are shown in order.
+SPEC is a JSON file described in templates/spec.md. The page shows one 16:9 slide at a time, with a strip above that
+groups the slides under the story's parts. The reader moves with the buttons, the strip or the arrow keys, and clicks
+a label or a mark to see its detail. Export downloads the slides alone as one presentation.
 
-render --format text or md draws the same panels as plain text; --format text --screen-reader writes them as
+`render --serve` serves the page on 127.0.0.1 and keeps running. The page then shows a conversation with the agent:
+the user comments on any part of a slide in Comment mode or writes a message. Each action is a JSON-RPC call from the
+page (comment, delete, note, accept, reopen); the script appends it to answers.jsonl next to the page and prints it to
+stdout as one JSON line. Running `render` again with the same --out, without --serve, updates the served page: the open
+page loads the new slides once the user is not typing. `wait` blocks until the page receives actions the agent has not
+seen, prints them and exits. `reply` shows the agent's reply in the page, `status` marks each item seen, asked, working,
+done or accepted, and `pending` lists what is not finished. Opened as a file, the page shows the slides without the
+conversation: that is the copy to publish.
+
+render --format text or md draws the same slides as plain text; --format text --screen-reader writes them as
 sentences and value lists, without box drawing, for screen readers. Every layout is computed here, so the agent
 never draws a text diagram by hand: language models read text diagrams far better than they construct them.
+
+show.html, page.css, show.css and show.js, next to this script, are the page; the script fills in the slides.
 """
 
 import argparse
+import contextlib
 import html
+import http.server
 import json
 import math
 import re
 import sys
 import textwrap
+import threading
+import time
+import urllib.request
 import webbrowser
 from html.parser import HTMLParser
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent  # show.css and show.js, inlined into every page, sit next to this script
+HERE = Path(__file__).resolve().parent  # show.html, page.css, show.css and show.js sit next to this script
 KINDS = (
     "map",
     "concept",
@@ -47,7 +67,16 @@ KINDS = (
     "table",
     "text",
     "svg",
+    "lanes",
+    "fork",
 )
+TEMPLATES = ("visual", "compare", "statement", "title")
+OVERVIEW_KINDS = ("flow", "timeline", "concept", "groups")  # kinds that can be the deck's overview
+SHARED_SCALE = ("bars", "dots", "slope", "line", "scatter")  # in a compare, both sides of one of these share a scale
+EVIDENCE = ("strong", "moderate", "weak", "stated")
+EVIDENCE_WORDS = {"strong": "strong evidence", "moderate": "moderate evidence", "weak": "weak evidence"}
+MARKED_KINDS = ("dots", "effects", "fork", "lanes")  # one mark per item: an item's evidence sets the mark's fill
+OUTCOMES = {"helps": ("up", "helps"), "hurts": ("dn", "hurts"), "never": ("x", "never"), "neutral": ("same", "neutral")}
 
 
 LIMITS = {
@@ -66,6 +95,16 @@ LIMITS = {
     "unit_parts": 3,
     "matrix_rows": 10,
     "matrix_cols": 5,
+    "part_chars": 28,
+    "lanes_actors": 5,
+    "lanes_steps": 10,
+    "fork_branches": 4,
+    # Characters a label may use before the drawing cuts it with an ellipsis; check warns past them.
+    "quadrant_label": 26,
+    "slope_label": 22,
+    "dots_label": 40,
+    "series_name": 20,
+    "fork_label": 34,
 }
 
 
@@ -87,7 +126,6 @@ C = {
 
 
 SANS = "Space Grotesk, -apple-system, sans-serif"
-HL_STROKE = f' stroke="{C["terracotta"]}" stroke-width="2.5"'  # the outline of a highlighted box
 
 
 W = 800  # SVG viewBox width
@@ -122,6 +160,7 @@ GLYPHS = {
         "blank": "·",
         "cross": "┼",
         "seg": "━",
+        "x": "✕",
     },
     "ascii": {
         "h": "-",
@@ -151,6 +190,7 @@ GLYPHS = {
         "blank": ".",
         "cross": "+",
         "seg": "=",
+        "x": "x",
     },
 }
 
@@ -177,6 +217,11 @@ def plain(value, keep_links=False) -> str:
     return str(value) if keep_links else LINK.sub(lambda m: f"{m.group(1)} <{m.group(2)}>", str(value))
 
 
+def stop(text) -> str:
+    """The full stop after a sentence's last words, unless they already end one: no "arrive?." or "2026.."."""
+    return "" if str(text).rstrip()[-1:] in (".", "?", "!") else "."
+
+
 def esc(value) -> str:
     return html.escape(str(value), quote=True)
 
@@ -186,6 +231,10 @@ def num(value) -> str:
     if isinstance(value, float) and not value.is_integer():
         return f"{value:,.2f}".rstrip("0").rstrip(".")
     return f"{int(value):,}"
+
+
+# While `check` renders the slides, the labels the drawings cut with an ellipsis, so it can warn about each.
+CUTS: list | None = None
 
 
 def wrap(text: str, chars: int, max_lines: int = 3) -> list[str]:
@@ -199,14 +248,18 @@ def wrap(text: str, chars: int, max_lines: int = 3) -> list[str]:
     if cur:
         lines.append(cur)
     if len(lines) > max_lines:
+        if CUTS is not None:
+            CUTS.append((str(text), chars * max_lines))
         lines = lines[:max_lines]
         lines[-1] = lines[-1][: max(chars - 1, 1)].rstrip() + "…"
     return lines
 
 
-def text_el(x, y, lines, size=12, weight=500, fill=None, anchor="start", italic=False, gap=None) -> str:
+def text_el(x, y, lines, size=12, weight=500, fill=None, anchor="start", italic=False, gap=None, d=None) -> str:
+    """SVG text, one tspan per line. d is the item the text labels, so a click on it opens the item's detail."""
     gap = gap or size * 1.3
     style = ' font-style="italic"' if italic else ""
+    style += dattr(d) if d is not None else ""
     spans = "".join(
         f'<tspan x="{x:.1f}" dy="{0 if i == 0 else gap:.1f}">{esc(line)}</tspan>' for i, line in enumerate(lines)
     )
@@ -239,10 +292,11 @@ def svg_wrap(body: str, height: float, label: str) -> str:
     )
 
 
-def table_html(columns, rows, num_cols=frozenset(), highlight=frozenset()) -> str:
+def table_html(columns, rows, num_cols=frozenset(), highlight=frozenset(), items=None) -> str:
+    """A table; items, one per row, lets a row open its item's detail."""
     head = "".join(f'<th class="{"n" if i in num_cols else ""}">{esc(c)}</th>' for i, c in enumerate(columns))
     body = "".join(
-        f'<tr class="{"hl" if r in highlight else ""}">'
+        f'<tr class="{"hl" if r in highlight else ""}"{dattr(items[r]) if items and r < len(items) else ""}>'
         + "".join(f'<td class="{"n" if i in num_cols else ""}">{esc(c)}</td>' for i, c in enumerate(row))
         + "</tr>"
         for r, row in enumerate(rows)
@@ -250,24 +304,22 @@ def table_html(columns, rows, num_cols=frozenset(), highlight=frozenset()) -> st
     return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
 
-def arrow(x1, y1, x2, y2, color):
+def arrow(x1, y1, x2, y2, color, width=1.2):
+    """A thin connector with a small arrowhead at its end."""
     ang = math.atan2(y2 - y1, x2 - x1)
-    tip = (x2, y2)
-    a = (x2 - 10 * math.cos(ang) + 5 * math.sin(ang), y2 - 10 * math.sin(ang) - 5 * math.cos(ang))
-    b = (x2 - 10 * math.cos(ang) - 5 * math.sin(ang), y2 - 10 * math.sin(ang) + 5 * math.cos(ang))
+    a = (x2 - 7 * math.cos(ang) + 3.5 * math.sin(ang), y2 - 7 * math.sin(ang) - 3.5 * math.cos(ang))
+    b = (x2 - 7 * math.cos(ang) - 3.5 * math.sin(ang), y2 - 7 * math.sin(ang) + 3.5 * math.cos(ang))
     return (
-        f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2 - 9 * math.cos(ang):.1f}" y2="{y2 - 9 * math.sin(ang):.1f}" stroke="{color}" stroke-width="1.5"/>'
-        f'<polygon points="{tip[0]:.1f},{tip[1]:.1f} {a[0]:.1f},{a[1]:.1f} {b[0]:.1f},{b[1]:.1f}" fill="{color}"/>'
+        f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2 - 6 * math.cos(ang):.1f}" y2="{y2 - 6 * math.sin(ang):.1f}" stroke="{color}" stroke-width="{width}"/>'
+        f'<polygon points="{x2:.1f},{y2:.1f} {a[0]:.1f},{a[1]:.1f} {b[0]:.1f},{b[1]:.1f}" fill="{color}"/>'
     )
 
 
-def node(x, y, w, h, label, hl, chars):
-    lines = wrap(label, chars, 3)
-    stroke = HL_STROKE if hl else ""
-    ty = y + h / 2 - (len(lines) - 1) * 9 + 5
-    return f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h}" rx="4" fill="{C["linen"]}"{stroke}/>' + text_el(
-        x + w / 2, ty, lines, 15, 700 if hl else 600, C["heading"], "middle", gap=18
-    )
+def dot(cx, cy, item=None, hl=False):
+    """A node's mark: a small muted dot, or, for the point of the slide, a larger terracotta one."""
+    if hl:
+        return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="6" fill="{C["terracotta"]}"{dattr(item)}/>'
+    return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="3.5" fill="{C["muted"]}"{dattr(item)}/>'
 
 
 def _is_num(v):
@@ -303,6 +355,8 @@ def twrap(text, width, indent=""):
 
 def tcut(text, n):
     text = str(text)
+    if len(text) > n and CUTS is not None:
+        CUTS.append((text, n))
     return text if len(text) <= n else text[: max(n - 1, 1)] + "…"
 
 
@@ -361,34 +415,56 @@ def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
         warnings.append(
             f"{len(panels)} panels: more than {LIMITS['panels']} is long for one introduction; split it or cut panels"
         )
+    if spec.get("kicker"):
+        warnings.append("'kicker' is not shown: put the reader's question in 'question', the opening slide's kicker")
+    if not spec.get("question"):
+        warnings.append("no 'question': the opening slide asks the reader's question, and the title answers it")
     digest.append(f"TITLE: {spec.get('title', '')}")
-    if spec.get("summary"):
-        digest.append(f"SUMMARY: {spec['summary']}")
+    for key in ("question", "summary", "source"):
+        if spec.get(key):
+            digest.append(f"{key.upper()}: {spec[key]}")
     doc = spec.get("document")
     if doc is not None:
-        secs = doc.get("sections") if isinstance(doc, dict) else None
-        if (
-            not isinstance(secs, list)
-            or not secs
-            or not all(isinstance(x, dict) and x.get("id") is not None and x.get("label") for x in secs)
-        ):
-            errors.append("'document' needs 'sections', each with an 'id' and a 'label'")
+        if not isinstance(doc, dict) or not doc.get("title"):
+            errors.append("'document' needs a 'title', and may have an 'address' and 'sections'")
         else:
-            digest.append(f"DOCUMENT: {doc.get('title', '')} — " + " · ".join(f"{x['id']} {x['label']}" for x in secs))
-            for x in secs:
+            address = doc.get("address")
+            if address is not None and not re.match(r"https?://\S+$", str(address)):
+                errors.append("document: 'address' must be the document's http(s) URL")
+            secs = doc.get("sections")
+            if secs is not None and (
+                not isinstance(secs, list)
+                or not secs
+                or not all(isinstance(x, dict) and x.get("id") is not None and x.get("label") for x in secs)
+            ):
+                errors.append("document: 'sections' needs a list of sections, each with an 'id' and a 'label'")
+                secs = None
+            digest.append(
+                f"DOCUMENT: {doc['title']}{(' <' + str(address) + '>') if address else ''}"
+                + (" — " + " · ".join(f"{x['id']} {x['label']}" for x in secs) if secs else "")
+            )
+            for x in secs or []:
                 if len(str(x.get("gist", ""))) > 50:
                     warnings.append(
                         f"document: the gist of '{x['label']}' is {len(x['gist'])} characters; keep it under 50, a few words"
                     )
+    overview = None  # (panel number, its labels) once a panel sets overview
     for i, p in enumerate(panels, 1):
         where = f"panel {i}"
         if not isinstance(p, dict):
             errors.append(f"{where}: must be an object")
             continue
-        kind, head = p.get("kind"), str(p.get("headline", "")).strip()
-        if kind not in KINDS:
-            errors.append(f"{where}: kind must be one of {', '.join(KINDS)}")
+        for old in ("note", "read"):
+            if old in p:
+                errors.append(
+                    f"{where}: '{old}' is no longer used: move it into 'source', the one line at the foot of each slide "
+                    "that says what the slide rests on and where to read it"
+                )
+        template = p.get("template", "visual")
+        if template not in TEMPLATES:
+            errors.append(f"{where}: template must be one of {', '.join(TEMPLATES)}")
             continue
+        head = str(p.get("headline", "")).strip()
         if not head:
             errors.append(f"{where}: missing 'headline' (a full sentence that states the panel's point)")
         else:
@@ -400,19 +476,272 @@ def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
                 warnings.append(
                     f"{where}: headline is {len(head)} characters; keep it under {LIMITS['headline_chars']}"
                 )
-        digest.append(f"\n[{i}] {kind.upper()}: {head}")
+        part = p.get("part")
+        if part is not None and not isinstance(part, str):
+            errors.append(f"{where}: 'part' must be a short question, such as 'Does it arrive?'")
+        elif part and len(part) > LIMITS["part_chars"]:
+            warnings.append(
+                f"{where}: part '{part}' is {len(part)} characters; keep it under {LIMITS['part_chars']}, two to five words"
+            )
+        label = template.upper() + (f" {str(p.get('kind', '')).upper()}" if template == "visual" else "")
+        digest.append(f"\n[{i}] {label}: {head}")
+        if part:
+            digest.append(f"    part: {part}")
         try:
-            if kind == "map":
-                check_map(p, where, errors, warnings, digest, spec)
+            if template == "visual":
+                check_kind(p, where, spec, errors, warnings, digest)
+            elif template == "compare":
+                check_compare(p, where, spec, errors, warnings, digest)
+            elif template == "statement":
+                check_statement(p, where, errors, warnings, digest)
             else:
-                PANEL_CHECKS[kind](p, where, errors, warnings, digest)
-            if p.get("part") is not None and not spec.get("document"):
-                warnings.append(f"{where}: 'part' is set but there is no top-level 'document' to show it in")
+                check_title(p, where, len(panels), errors, digest)
         except (TypeError, ValueError, KeyError, AttributeError) as exc:
-            errors.append(f"{where}: malformed {kind} data ({exc})")
-        if p.get("note"):
-            digest.append(f"    note: {p['note']}")
+            errors.append(f"{where}: malformed {template} data ({exc})")
+        check_source(p, where, spec, errors, warnings, digest)
+        check_details(p, where, errors, digest)
+        if p.get("overview"):
+            if overview:
+                errors.append(f"{where}: only one panel may set 'overview'; panel {overview[0]} already does")
+            elif template != "visual" or p.get("kind") not in OVERVIEW_KINDS:
+                errors.append(f"{where}: the overview must be a visual panel of kind {', '.join(OVERVIEW_KINDS)}")
+            else:
+                try:
+                    overview = (i, overview_labels(p))
+                    digest.append("    overview: later panels may mark their place in it with 'focus'")
+                except (TypeError, KeyError, AttributeError):
+                    pass  # the kind's own check has reported the malformed data
+        if p.get("focus") is not None:
+            focus = _as_list(p["focus"])
+            if overview is None:
+                errors.append(f"{where}: 'focus' needs an earlier panel with \"overview\": true")
+            else:
+                for lab in focus:
+                    if lab not in overview[1]:
+                        errors.append(
+                            f"{where}: focus '{lab}' is not a label in the overview (panel {overview[0]}): "
+                            + ", ".join(overview[1])
+                        )
+                digest.append(f"    where we are: {', '.join(map(str, focus))}")
+    check_style(spec, errors, digest)
+    if not errors:
+        check_cuts(spec, warnings)
     return errors, warnings, digest
+
+
+def check_style(spec, errors, digest):
+    style = spec.get("style")
+    if style is None:
+        return
+    if not isinstance(style, dict):
+        errors.append('\'style\' must be an object, such as {"point": "#0055AA", "serif": "Georgia, serif"}')
+        return
+    for k, v in style.items():
+        if k not in STYLE_KEYS:
+            errors.append(f"style: '{k}' is not a slide variable; use {', '.join(STYLE_KEYS)}")
+        elif k in ("serif", "sans"):
+            if not (isinstance(v, str) and FONT_STACK.fullmatch(v)):
+                errors.append(f"style: '{k}' must be a font stack, such as \"'Inter', sans-serif\"")
+        elif not (isinstance(v, str) and COLOUR.fullmatch(v.strip())):
+            errors.append(f"style: '{k}' must be a CSS colour, such as #1C1A17 or rgb(28, 26, 23)")
+    digest.append("STYLE: " + ", ".join(f"{k}={v}" for k, v in style.items()))
+
+
+def check_cuts(spec, warnings):
+    """Render each slide and warn about every label its drawing cuts with an ellipsis: the same limits as the page."""
+    global CUTS
+    ov = overview_of(spec)
+    total = len(spec["panels"]) + 1
+    for i, p in enumerate(spec["panels"], 1):
+        CUTS = []
+        # A malformed panel is reported by its own check.
+        with contextlib.suppress(TypeError, ValueError, KeyError, AttributeError, IndexError):
+            slide_panel(spec, p, i, total, ov)
+        cuts, CUTS = CUTS, None
+        for text, n in dict.fromkeys(cuts):
+            warnings.append(
+                f"panel {i}: '{text}' is cut to fit the drawing; shorten it to about {n} characters, or move the rest into a detail"
+            )
+
+
+def check_kind(p, where, spec, errors, warnings, digest):
+    """Check a visual's kind and its data: a visual panel, or one side of a compare."""
+    kind = p.get("kind")
+    if kind not in KINDS:
+        errors.append(f"{where}: kind must be one of {', '.join(KINDS)}")
+        return
+    if kind == "map":
+        check_map(p, where, errors, warnings, digest, spec)
+    else:
+        PANEL_CHECKS[kind](p, where, errors, warnings, digest)
+
+
+def check_compare(p, where, spec, errors, warnings, digest):
+    sides = []
+    for side in ("a", "b"):
+        s = p.get(side)
+        if not isinstance(s, dict) or not s.get("label"):
+            errors.append(f"{where}: '{side}' needs a 'label' and a 'kind' with that kind's fields")
+            continue
+        digest.append(f"    {side.upper()}: {s['label']} ({s.get('kind')})")
+        check_kind(s, f"{where}, side {side}", spec, errors, warnings, digest)
+        sides.append(s.get("kind"))
+    if len(sides) == 2 and sides[0] == sides[1] and sides[0] in SHARED_SCALE:
+        digest.append("    both sides drawn on one scale")
+
+
+def check_statement(p, where, errors, warnings, digest):
+    for key in ("figure", "sentence"):
+        if not p.get(key):
+            errors.append(f"{where}: a statement needs '{key}'")
+    if len(str(p.get("figure", ""))) > 14:
+        warnings.append(f"{where}: figure '{p.get('figure')}' is long; a statement shows one short figure")
+    if not p.get("compare"):
+        warnings.append(
+            f"{where}: no 'compare': a figure alone does not say whether it is large; give what it is compared to, "
+            "such as 'against 89% before', or use another template"
+        )
+    digest.append(f"    {p.get('figure')} {p.get('sentence')}" + (f" ({p['compare']})" if p.get("compare") else ""))
+
+
+def check_title(p, where, n_panels, errors, digest):
+    if p.get("body") is not None and not isinstance(p["body"], str):
+        errors.append(f"{where}: 'body' must be a string")
+    if p.get("body"):
+        digest.append(f"    {p['body']}")
+    actions = p.get("actions") or []
+    if not isinstance(actions, list):
+        errors.append(f"{where}: 'actions' must be a list")
+        return
+    for k, a in enumerate(actions, 1):
+        target = a.get("panel") if isinstance(a, dict) else None
+        if not isinstance(a, dict) or not a.get("text") or not isinstance(target, int) or isinstance(target, bool):
+            errors.append(f"{where}: each action needs 'text' and 'panel', the number of the panel it points to")
+            continue
+        if not 1 <= target <= n_panels:
+            errors.append(f"{where}: action '{a['text']}' points to panel {target}; there are {n_panels} panels")
+            continue
+        digest.append(f"    {k}. {a['text']} → panel {target} (slide {target + 1})")
+
+
+def check_source(p, where, spec, errors, warnings, digest):
+    src = p.get("source")
+    if not src:
+        warnings.append(f"{where}: no 'source': say what the slide's claim rests on, and where to read it")
+        return
+    if isinstance(src, dict):
+        if not src.get("text") and not src.get("section"):
+            errors.append(f"{where}: 'source' needs 'text', and may have 'section'")
+            return
+        if src.get("section") and not (spec.get("document") or {}).get("address"):
+            warnings.append(
+                f"{where}: source section '{src['section']}' is shown without a link: the 'document' has no 'address'"
+            )
+        digest.append(
+            f"    source: {src.get('text', '')}" + (f" [read: {src['section']}]" if src.get("section") else "")
+        )
+    elif isinstance(src, str):
+        digest.append(f"    source: {src}")
+    else:
+        errors.append(f"{where}: 'source' must be a string or an object with 'text' and 'section'")
+
+
+def check_details(p, where, errors, digest):
+    for lab, d in collect_details(p):
+        if not isinstance(d, dict) or not d.get("text"):
+            errors.append(f"{where}: the detail of '{lab}' needs 'text', and may have 'source' and 'evidence'")
+            continue
+        if d.get("evidence") is not None and d["evidence"] not in EVIDENCE:
+            errors.append(f"{where}: the evidence of '{lab}' must be one of {', '.join(EVIDENCE)}")
+        digest.append(
+            f"    detail, {lab}: {d['text']}"
+            + (f" ({d['source']})" if d.get("source") else "")
+            + (f" [{d['evidence']}]" if d.get("evidence") else "")
+        )
+
+
+def collect_details(p):
+    """Every (label, detail) in a panel: any item with a 'label' may carry a 'detail'."""
+    found = []
+
+    def walk(o):
+        if isinstance(o, dict):
+            if o.get("label") and "detail" in o:
+                found.append((str(o["label"]), o["detail"]))
+            for k, v in o.items():
+                if k != "detail":
+                    walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(p)
+    return found
+
+
+def dattr(item):
+    """The attribute that ties a drawn label, mark or row to its item's detail: the detail's number in the slide."""
+    k = item.get("_dk") if isinstance(item, dict) else None
+    return f' data-d="{k}"' if k is not None else ""
+
+
+def keyed(p):
+    """A copy of a panel in which each item with a detail carries _dk, its detail's number, in collect_details order,
+    so two items with the same label keep their own details."""
+    n = [0]
+
+    def walk(o):
+        if isinstance(o, dict):
+            out = dict(o)
+            if o.get("label") and "detail" in o:
+                out["_dk"] = n[0]
+                n[0] += 1
+            for k, v in o.items():
+                if k != "detail":
+                    out[k] = walk(v)
+            return out
+        if isinstance(o, list):
+            return [walk(v) for v in o]
+        return o
+
+    return walk(p)
+
+
+def keyed_details(p):
+    """(number, label, detail) for each item of a keyed panel or side."""
+    found = []
+
+    def walk(o):
+        if isinstance(o, dict):
+            if "_dk" in o:
+                found.append((o["_dk"], str(o["label"]), o["detail"]))
+            for k, v in o.items():
+                if k != "detail":
+                    walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(p)
+    return found
+
+
+def ev_of(item):
+    """An item's evidence strength, or None."""
+    d = item.get("detail") if isinstance(item, dict) else None
+    return d.get("evidence") if isinstance(d, dict) and d.get("evidence") in EVIDENCE_WORDS else None
+
+
+def overview_labels(p):
+    """The labels a later panel's 'focus' may name."""
+    kind = p["kind"]
+    if kind == "flow":
+        return [s["label"] for s in p["steps"]]
+    if kind == "timeline":
+        return [e["label"] for e in p["events"]]
+    if kind == "concept":
+        return [n["label"] for n in p["nodes"]]
+    return [x for g in p["groups"] for x in [g["label"], *map(str, g.get("items") or [])]]
 
 
 def need_list(p, key, where, errors, limit=None, warnings=None, what="items"):
@@ -460,53 +789,60 @@ def check_map(p, where, errors, warnings, digest, spec=None):
 
 
 def v_map(p, spec=None):
-    """The document's parts in order: the organizer the reader returns to."""
+    """The document's parts in order, as segments of one rule: the organizer the reader returns to."""
     secs = p.get("sections") or spec["document"]["sections"]
     hl_ids = set(_as_list(p.get("highlight")))
     n = len(secs)
     body = []
-
-    def stroke(hl):
-        return HL_STROKE if hl else ""
-
-    if n <= 5:  # a row of parts, each with its gist inside the box
+    if n <= 5:  # one rule, a segment per part: label above, gist below
         gap = 14
         bw = (W - gap * (n - 1)) / n
-        glines = {
-            k: wrap(sec.get("gist", ""), int(bw / 7.4), 3) if sec.get("gist") else [] for k, sec in enumerate(secs)
-        }
-        llines = {k: wrap(sec["label"], int(bw / 9), 2) for k, sec in enumerate(secs)}
-        bh = 26 + 19 * max(len(v) for v in llines.values()) + 17 * max(len(v) for v in glines.values())
+        llines = [wrap(sec["label"], int(bw / 8.8), 2) for sec in secs]
+        glines = [wrap(sec.get("gist", ""), int(bw / 7.2), 3) if sec.get("gist") else [] for sec in secs]
+        y = 18 + 19 * max(len(lab) for lab in llines)
         for k, sec in enumerate(secs):
             x = k * (bw + gap)
             hl = sec.get("highlight") or sec.get("id") in hl_ids
             body.append(
-                f'<rect x="{x:.1f}" y="1" width="{bw:.1f}" height="{bh}" rx="4" fill="{C["linen"]}"{stroke(hl)}/>'
+                text_el(
+                    x,
+                    y - 14 - 19 * (len(llines[k]) - 1),
+                    llines[k],
+                    15.5,
+                    700 if hl else 500,
+                    C["heading"],
+                    gap=19,
+                    d=sec,
+                )
             )
-            body.append(text_el(x + 14, 30, llines[k], 16, 700, C["heading"], gap=19))
-            if glines[k]:
-                body.append(text_el(x + 14, 30 + 19 * len(llines[k]) + 6, glines[k], 13, 500, C["muted"], gap=17))
-        h = bh + 2
-    else:  # one row per part: id, label, and its gist on the same line
-        rh = 50
-        for k, sec in enumerate(secs):
-            y = k * rh
-            hl = sec.get("highlight") or sec.get("id") in hl_ids
             body.append(
-                f'<rect x="1" y="{y + 1}" width="{W - 2}" height="{rh - 8}" rx="4" fill="{C["linen"]}"{stroke(hl)}/>'
+                f'<line x1="{x:.1f}" y1="{y:.1f}" x2="{x + bw:.1f}" y2="{y:.1f}" stroke="{C["terracotta"] if hl else C["ink"]}" stroke-width="{3 if hl else 1}"{dattr(sec)}/>'
             )
-            body.append(text_el(18, y + 28, wrap(sec["label"], 34, 1), 16, 700, C["heading"]))
+            if glines[k]:
+                body.append(text_el(x, y + 22, glines[k], 13, 500, C["muted"], gap=17))
+        h = y + 22 + 17 * max([len(gl) for gl in glines] + [0])
+    else:  # one row per part, on hairlines
+        rh = 40
+        for k, sec in enumerate(secs):
+            y = 26 + k * rh
+            hl = sec.get("highlight") or sec.get("id") in hl_ids
+            body.append(dot(10, y - 5, sec, hl))
+            body.append(text_el(30, y, wrap(sec["label"], 34, 1), 15.5, 700 if hl else 500, C["heading"], d=sec))
             if sec.get("gist"):
-                body.append(text_el(370, y + 28, wrap(sec["gist"], 52, 1), 14, 500, C["muted"]))
-        h = n * rh - 6
+                body.append(text_el(370, y, wrap(sec["gist"], 52, 1), 13.5, 500, C["muted"]))
+            body.append(
+                f'<line x1="0" y1="{y + 13:.1f}" x2="{W}" y2="{y + 13:.1f}" stroke="{C["line"]}" stroke-width="1"/>'
+            )
+        h = 26 + n * rh - 20
     text = (
         "<ol>"
         + "".join(
-            f"<li><b>{esc(sec['label'])}</b>{(': ' + esc(sec['gist'])) if sec.get('gist') else ''}</li>" for sec in secs
+            f"<li{dattr(sec)}><b>{esc(sec['label'])}</b>{(': ' + esc(sec['gist'])) if sec.get('gist') else ''}</li>"
+            for sec in secs
         )
         + "</ol>"
     )
-    return svg_wrap("".join(body), h + 2, p["headline"]), text
+    return svg_wrap("".join(body), h + 4, p["headline"]), text
 
 
 def t_map(p, W, g, spec=None):
@@ -636,32 +972,34 @@ def v_concept(p):
             path = f"M{sx:.1f} {sy:.1f} C{cx:.1f} {sy:.1f} {cx:.1f} {ty:.1f} {tx - 7:.1f} {ty:.1f}"
             mx, my = cx, (sy + ty) / 2
         body.append(
-            f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{2.2 if hl else 1.5}" marker-end="url(#ah{"h" if hl else ""})"/>'
+            f'<path d="{path}" fill="none" stroke="{color}" stroke-width="{2 if hl else 1.2}" marker-end="url(#ah{"h" if hl else ""})"/>'
         )
         lab = wrap(e["label"], 24 if e in long_edges else lab_chars, 4)
         lw = max(len(part) for part in lab) * 7.2 + 10
         my -= (len(lab) - 1) * 8  # centre a multi-line label on its edge
         labels.append(
             f'<rect x="{mx - lw / 2:.1f}" y="{my - 13:.1f}" width="{lw:.1f}" height="{len(lab) * 16 + 6}" rx="3" fill="{C["cream"]}"/>'
-            + text_el(mx, my + 1, lab, 13, 600 if hl else 500, C["umber"] if hl else C["muted"], "middle", True, 16)
+            + text_el(mx, my + 1, lab, 13, 600 if hl else 500, C["heading"] if hl else C["muted"], "middle", True, 16)
         )
     for i, (x, y, w, h) in box.items():
         n = by_id[i]
         hl = n.get("highlight")
         body.append(
-            f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h}" rx="4" fill="{C["linen"]}"'
-            + (HL_STROKE if hl else f' stroke="{C["sand"]}" stroke-width="1"')
-            + "/>"
+            f'<line x1="{x:.1f}" y1="{y + h - 4:.1f}" x2="{x + w:.1f}" y2="{y + h - 4:.1f}" '
+            f'stroke="{C["terracotta"] if hl else C["ink"]}" stroke-width="{3 if hl else 1}"{dattr(n)}/>'
         )
-        body.append(text_el(x + w / 2, y + 26, lines_of[i], 15, 700 if hl else 600, C["heading"], "middle", gap=18))
+        body.append(
+            text_el(x + w / 2, y + 26, lines_of[i], 15, 700 if hl else 600, C["heading"], "middle", gap=18, d=n)
+        )
     defs = (
-        f'<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{C["ink"]}"/></marker>'
-        f'<marker id="ahh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{C["terracotta"]}"/></marker></defs>'
+        f'<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="{C["ink"]}"/></marker>'
+        f'<marker id="ahh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="{C["terracotta"]}"/></marker></defs>'
     )
     text = (
         "<ul>"
         + "".join(
-            f"<li>{esc(by_id[e['from']]['label'])} <i>{esc(e['label'])}</i> {esc(by_id[e['to']]['label'])}</li>"
+            f"<li><span{dattr(by_id[e['from']])}>{esc(by_id[e['from']]['label'])}</span> <i>{esc(e['label'])}</i> "
+            f"<span{dattr(by_id[e['to']])}>{esc(by_id[e['to']]['label'])}</span></li>"
             for e in edges
         )
         + "</ul>"
@@ -746,49 +1084,59 @@ def check_flow(p, where, errors, warnings, digest):
 
 
 def v_flow(p):
+    """Steps as marks on one line, each labelled on the drawing, joined by thin arrows."""
     steps = p["steps"]
     n = len(steps)
     body = []
     if n <= 5:  # one row, left to right
-        gap = 44
-        bw = (W - gap * (n - 1)) / n
-        bh = 76
+        cw = W / n
+        chars = max(int((cw - 16) / 8.4), 8)
+        labels = [wrap(s["label"], chars, 3) for s in steps]
+        y = 20 + 19 * max(len(lab) for lab in labels)
         for i, s in enumerate(steps):
-            x = i * (bw + gap)
-            body.append(node(x, 10, bw, bh, s["label"], s.get("highlight"), int(bw / 9)))
+            x = cw * (i + 0.5)
+            hl = s.get("highlight")
+            body.append(
+                text_el(
+                    x,
+                    y - 16 - 19 * (len(labels[i]) - 1),
+                    labels[i],
+                    15,
+                    700 if hl else 500,
+                    C["heading"],
+                    "middle",
+                    gap=19,
+                    d=s,
+                )
+            )
+            body.append(dot(x, y, s, hl))
             if s.get("note"):
                 body.append(
                     text_el(
-                        x + bw / 2,
-                        10 + bh + 24,
-                        wrap(s["note"], int(bw / 7.4), 3),
-                        13,
-                        500,
-                        C["muted"],
-                        "middle",
-                        True,
-                        17,
+                        x, y + 28, wrap(s["note"], int((cw - 16) / 7.2), 3), 13, 500, C["muted"], "middle", True, 17
                     )
                 )
             if i < n - 1:
-                body.append(arrow(x + bw + 4, 10 + bh / 2, x + bw + gap - 4, 10 + bh / 2, C["ink"]))
-        h = 10 + bh + (82 if any(s.get("note") for s in steps) else 14)
+                body.append(arrow(x + 12, y, x + cw - 12, y, C["ink"]))
+        h = y + (28 + 17 * 3 if any(s.get("note") for s in steps) else 16)
     else:  # one column, top to bottom
-        bw, bh, gap = 320, 56, 30
+        rh = 58
         for i, s in enumerate(steps):
-            y = 6 + i * (bh + gap)
-            body.append(node(0, y, bw, bh, s["label"], s.get("highlight"), 34))
+            y = 14 + i * rh
+            hl = s.get("highlight")
+            body.append(dot(12, y, s, hl))
+            body.append(text_el(34, y + 5, wrap(s["label"], 40, 1), 15, 700 if hl else 500, C["heading"], d=s))
             if s.get("note"):
-                body.append(
-                    text_el(bw + 22, y + bh / 2 + 5, wrap(s["note"], 54, 2), 14, 500, C["muted"], italic=True, gap=17)
-                )
+                body.append(text_el(34, y + 24, wrap(s["note"], 80, 1), 13, 500, C["muted"], italic=True))
             if i < n - 1:
-                body.append(arrow(bw / 2, y + bh + 3, bw / 2, y + bh + gap - 3, C["ink"]))
-        h = 6 + n * (bh + gap) - gap + 8
+                body.append(arrow(12, y + 10, 12, y + rh - 10, C["ink"]))
+        h = 14 + (n - 1) * rh + 34
     legend = f'<p class="legend"><span class="arrow">→</span> {esc(p["arrow"])}</p>'
     steps_text = (
         "<ol>"
-        + "".join(f"<li>{esc(s['label'])}{(' — ' + esc(s['note'])) if s.get('note') else ''}</li>" for s in steps)
+        + "".join(
+            f"<li{dattr(s)}>{esc(s['label'])}{(' — ' + esc(s['note'])) if s.get('note') else ''}</li>" for s in steps
+        )
         + "</ol>"
     )
     return svg_wrap("".join(body), h, p["headline"]) + legend, steps_text
@@ -819,42 +1167,46 @@ def check_groups(p, where, errors, warnings, digest):
 
 
 def v_groups(p):
+    """Categories as thin outlines, each item a small mark with its label."""
     groups = p["groups"]
     n = len(groups)
     gap = 24
     gw = (W - gap * (n - 1)) / n
-    ih, igap, pad = 46, 10, 14
-    rows = max(len(g.get("items") or []) for g in groups)
-    gh = 42 + rows * (ih + igap) + pad
+    chars = max(int((gw - 50) / 7.6), 8)
+    item_lines = [[wrap(str(it), chars, 2) for it in g.get("items") or []] for g in groups]
+    gh = 52 + max(sum(10 + 18 * len(lines) for lines in col) for col in item_lines)
     body = []
     for i, g in enumerate(groups):
         x = i * (gw + gap)
         hl = g.get("highlight")
-        stroke = C["terracotta"] if hl else C["sand"]
         body.append(
-            f'<rect x="{x + 1:.1f}" y="1" width="{gw - 2:.1f}" height="{gh}" fill="none" stroke="{stroke}" stroke-width="{2 if hl else 1.25}" stroke-dasharray="6 4"/>'
+            f'<rect x="{x + 0.5:.1f}" y="0.5" width="{gw - 1:.1f}" height="{gh:.1f}" fill="none" stroke="{C["terracotta"] if hl else C["line"]}" stroke-width="{1.5 if hl else 1}"/>'
         )
         body.append(
             text_el(
-                x + 14,
-                27,
-                wrap(str(g.get("label", "")).upper(), int(gw / 10), 1),
-                13,
+                x + 16,
+                26,
+                wrap(str(g.get("label", "")).upper(), int(gw / 9.5), 1),
+                12.5,
                 700,
-                C["umber"] if hl else C["muted"],
+                C["heading"] if hl else C["muted"],
+                d=g,
             )
         )
-        for j, item in enumerate(g.get("items") or []):
-            body.append(node(x + pad, 42 + j * (ih + igap), gw - 2 * pad, ih, item, False, int((gw - 2 * pad) / 8.6)))
+        y = 50
+        for lines in item_lines[i]:
+            body.append(dot(x + 20, y - 5, None, False))
+            body.append(text_el(x + 34, y, lines, 14.5, 500, C["heading"], gap=18))
+            y += 10 + 18 * len(lines)
     text = (
         "<ul>"
         + "".join(
-            f"<li><b>{esc(g.get('label', ''))}</b>: {esc(', '.join(map(str, g.get('items') or [])))}</li>"
+            f"<li{dattr(g)}><b>{esc(g.get('label', ''))}</b>: {esc(', '.join(map(str, g.get('items') or [])))}</li>"
             for g in groups
         )
         + "</ul>"
     )
-    return svg_wrap("".join(body), gh + 4, p["headline"]), text
+    return svg_wrap("".join(body), gh + 2, p["headline"]), text
 
 
 def t_groups(p, W, g):
@@ -937,22 +1289,28 @@ def v_tree(p):
     def colw(d):
         return rootw if d == 0 else cw
 
-    H = 420
-    body, rows = [], []
+    H = 300
+    body, rows, row_items = [], [], []
     unit = p.get("unit", "")
 
     def draw(n, d, y, h, path):
         hl = n.get("highlight")
         x, w = colx(d), colw(d)
         body.append(
-            f'<rect x="{x + 1:.1f}" y="{y + 1:.1f}" width="{w - 2:.1f}" height="{max(h - 2, 0.5):.1f}" fill="{C["terracotta"] if hl else (C["linen"] if d else C["sand"])}"/>'
+            f'<rect x="{x + 1:.1f}" y="{y + 1:.1f}" width="{w - 2:.1f}" height="{max(h - 2, 0.5):.1f}" fill="none" stroke="{C["line"]}" stroke-width="1"{dattr(n)}/>'
+            + (
+                f'<rect x="{x + 1:.1f}" y="{y + 1:.1f}" width="4" height="{max(h - 2, 0.5):.1f}" fill="{C["terracotta"]}"/>'
+                if hl
+                else ""
+            )
         )
         if h >= 22:
             lines = wrap(n["label"], int(w / 8), max(1, min(3, int((h - 6) / 17))))
             if _is_num(n.get("value")) and h >= 22 + 17 * len(lines):
                 lines = lines + [num(n["value"]) + (f" {unit}" if unit else "")]
-            body.append(text_el(x + 10, y + 19, lines, 13.5, 700 if hl else 500, C["heading"], gap=17))
+            body.append(text_el(x + 10, y + 19, lines, 13.5, 700 if hl else 500, C["heading"], gap=17, d=n))
         rows.append([" / ".join(path + [n["label"]]), num(val(n))])
+        row_items.append(n)
         kids = n.get("children") or []
         tot = sum(val(k) for k in kids) or 1
         yy = y
@@ -962,7 +1320,7 @@ def v_tree(p):
             yy += kh
 
     draw(root, 0, 0, H, [])
-    data = table_html(["Node", f"Value{f' ({unit})' if unit else ''}"], rows, num_cols={1})
+    data = table_html(["Node", f"Value{f' ({unit})' if unit else ''}"], rows, num_cols={1}, items=row_items)
     return svg_wrap("".join(body), H + 4, p["headline"]), data
 
 
@@ -1036,12 +1394,8 @@ def v_sets(p):
         r = regions[k]
         x = left + j * cw
         hl = r.get("highlight")
-        if hl:
-            body.append(
-                f'<rect x="{x + 1:.1f}" y="4" width="{cw - 2:.1f}" height="{top + len(sets) * rh:.1f}" fill="{C["linen"]}"/>'
-            )
         lab = wrap(r.get("label", ""), int(cw / 7.2), 3)
-        body.append(text_el(x + cw / 2, 20, lab, 12.5, 700 if hl else 500, C["heading"], "middle", gap=16))
+        body.append(text_el(x + cw / 2, 20, lab, 12.5, 700 if hl else 500, C["heading"], "middle", gap=16, d=r))
         if "count" in r:
             body.append(
                 text_el(
@@ -1050,7 +1404,7 @@ def v_sets(p):
                     [num(r["count"])],
                     14,
                     700,
-                    C["umber"] if hl else C["ink"],
+                    C["heading"] if hl else C["ink"],
                     "middle",
                 )
             )
@@ -1061,8 +1415,7 @@ def v_sets(p):
             f'<line x1="{left}" y1="{y + rh / 2:.1f}" x2="{W}" y2="{y + rh / 2:.1f}" stroke="{C["line"]}" stroke-width="1"/>'
         )
         if not any(s in r["in"] for r in regions):
-            body.append(f'<rect x="{left + 8}" y="{y + rh / 2 - 10:.1f}" width="86" height="20" fill="{C["cream"]}"/>')
-            body.append(text_el(left + 12, y + rh / 2 + 5, ["none found"], 13, 600, C["umber"], italic=True))
+            body.append(text_el(left + 12, y + rh / 2 + 5, ["none found"], 13, 600, C["ink"], italic=True))
         j = 0
         while j < n:  # merge adjacent columns into one bar
             if s in regions[order[j]]["in"]:
@@ -1072,11 +1425,11 @@ def v_sets(p):
                 for jj in range(start, j + 1):
                     hl = regions[order[jj]].get("highlight")
                     body.append(
-                        f'<rect x="{left + jj * cw + (3 if jj == start else 0):.1f}" y="{y + rh / 2 - 7:.1f}" width="{cw - (3 if jj == start else 0) - (3 if jj == j else 0):.1f}" height="14" fill="{C["terracotta"] if hl else C["moss"]}"/>'
+                        f'<rect x="{left + jj * cw + (3 if jj == start else 0):.1f}" y="{y + rh / 2 - 4:.1f}" width="{cw - (3 if jj == start else 0) - (3 if jj == j else 0):.1f}" height="8" fill="{C["terracotta"] if hl else C["muted"]}"/>'
                     )
             j += 1
     rows = [[r.get("label", ""), " & ".join(r["in"]), num(r["count"]) if "count" in r else ""] for r in regions]
-    data = table_html(["Region", "In sets", "Count"], rows, num_cols={2})
+    data = table_html(["Region", "In sets", "Count"], rows, num_cols={2}, items=regions)
     return svg_wrap("".join(body), top + len(sets) * rh + 8, p["headline"]), data
 
 
@@ -1116,17 +1469,18 @@ def _label(col):
 
 
 def mark_svg(mark, hl):
-    """A cell mark whose shape carries the meaning; colour only repeats it."""
-    ring = f'<circle cx="24" cy="24" r="22.5" fill="none" stroke="{C["terracotta"]}" stroke-width="3"/>' if hl else ""
+    """A cell mark whose shape carries the meaning, drawn in lines so it does not look like an evidence mark; colour
+    only repeats it. The point of the slide is underlined in terracotta."""
+    ring = f'<path d="M10 44h28" stroke="{C["terracotta"]}" stroke-width="3"/>' if hl else ""
     shapes = {
-        "yes": f'<circle cx="24" cy="24" r="16" fill="{C["moss"]}"/><path d="M16.5 24.5l5 5 10-11" fill="none" stroke="{C["cream"]}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>',
-        "no": f'<circle cx="24" cy="24" r="15" fill="none" stroke="{C["muted"]}" stroke-width="2"/><path d="M18.5 18.5l11 11M29.5 18.5l-11 11" stroke="{C["muted"]}" stroke-width="2.6" stroke-linecap="round"/>',
-        "up": f'<path d="M24 9 L39 35 H9 Z" fill="{C["moss"]}"/>',
-        "down": f'<path d="M24 39 L39 13 H9 Z" fill="{C["umber"]}"/>',
-        "same": f'<circle cx="24" cy="24" r="15" fill="none" stroke="{C["sand"]}" stroke-width="2.5"/><path d="M17 20.5h14M17 27.5h14" stroke="{C["ink"]}" stroke-width="2.6" stroke-linecap="round"/>',
+        "yes": f'<path d="M14 25l7 7 13-15" fill="none" stroke="{C["moss"]}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
+        "no": f'<path d="M17 17l14 14M31 17l-14 14" stroke="{C["muted"]}" stroke-width="2.4" stroke-linecap="round"/>',
+        "up": f'<path d="M24 14 L34 31 H14 Z" fill="{C["moss"]}"/>',
+        "down": f'<path d="M24 34 L34 17 H14 Z" fill="{C["ink"]}"/>',
+        "same": f'<path d="M15 20.5h18M15 27.5h18" stroke="{C["ink"]}" stroke-width="2.4" stroke-linecap="round"/>',
     }
     if mark is None:
-        return f'<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 24h12" stroke="{C["line"]}" stroke-width="2.5" stroke-linecap="round"/>{ring}</svg>'
+        return f'<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M20 24h8" stroke="{C["line"]}" stroke-width="2" stroke-linecap="round"/>{ring}</svg>'
     return f'<svg viewBox="0 0 48 48" aria-hidden="true">{shapes[mark]}{ring}</svg>'
 
 
@@ -1207,7 +1561,7 @@ def v_matrix(p):
                 f"{f'<small>{esc(text)}</small>' if text else ''}</span>"
             )
         out.append(
-            f'<div class="mrow{" hl" if r.get("highlight") else ""}" role="row"><span role="rowheader" class="mlab">{esc(r["label"])}</span>{"".join(cells)}</div>'
+            f'<div class="mrow{" hl" if r.get("highlight") else ""}" role="row"><span role="rowheader" class="mlab"{dattr(r)}>{esc(r["label"])}</span>{"".join(cells)}</div>'
         )
         rows_text.append(
             [(f"{r['group']}: " if r.get("group") else "") + r["label"]]
@@ -1219,7 +1573,7 @@ def v_matrix(p):
         for m in [m for m in MARKS if m in used] + ([None] if None in used else [])
     )
     out.append(f'<p class="mlegend">{legend}</p>')
-    return "".join(out), table_html([""] + [c["label"] for c in cols], rows_text)
+    return "".join(out), table_html([""] + [c["label"] for c in cols], rows_text, items=p["rows"])
 
 
 def t_matrix(p, W, g):
@@ -1256,22 +1610,105 @@ def t_matrix(p, W, g):
     return out
 
 
+def ev_circle(cx, cy, r, ev, fill, hl=False, item=None, evmode=False):
+    """One item's mark on a kind that shows evidence. Its evidence sets the fill: strong filled ink, moderate half
+    filled, weak hollow. On a slide that shows evidence, an item without it gets a small muted dot ("no evidence
+    given"). On a slide that shows none, the mark takes the kind's own fill. The point of the slide is terracotta: a
+    ring around an evidence mark or the small dot, or a terracotta fill when the slide shows no evidence."""
+    tag = dattr(item)
+    ring = f' stroke="{C["terracotta"]}" stroke-width="2.5"' if hl else f' stroke="{C["ink"]}" stroke-width="1.5"'
+    if ev == "strong":
+        return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{C["ink"]}"{ring}{tag}/>'
+    if ev == "moderate":
+        return (
+            f'<g{tag}><circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{C["cream"]}"{ring}/>'
+            f'<path d="M{cx:.1f} {cy - r:.1f}A{r:.1f} {r:.1f} 0 0 0 {cx:.1f} {cy + r:.1f}Z" fill="{C["ink"]}"/></g>'
+        )
+    if ev == "weak":
+        return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{C["cream"]}"{ring}{tag}/>'
+    if evmode:
+        point = (
+            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="none" stroke="{C["terracotta"]}" stroke-width="2.5"/>'
+            if hl
+            else ""
+        )
+        return (
+            f'<g{tag}><circle cx="{cx:.1f}" cy="{cy:.1f}" r="{max(r * 0.5, 2.5):.1f}" fill="{C["muted"]}"/>{point}</g>'
+        )
+    if hl:
+        return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{C["terracotta"]}"{tag}/>'
+    return f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r * (0.6 if fill == C["muted"] and r > 6 else 1):.1f}" fill="{fill}"{tag}/>'
+
+
+def marked_items(p):
+    """The items of a kind that draws one mark per item and can show evidence on it."""
+    key = {"dots": "groups", "effects": "rows", "fork": "branches", "lanes": "steps"}.get(p.get("kind"))
+    return [it for it in p.get(key) or [] if isinstance(it, dict)] if key else []
+
+
+def evidence_used(p):
+    """The entries of a panel's key: each evidence strength drawn, "none" when some marks have no evidence, and
+    "point" when a mark is the point of the slide. Empty when the panel shows no evidence."""
+    items = marked_items(p)
+    used = {ev_of(it) for it in items} & set(EVIDENCE_WORDS)
+    if not used:
+        return set()
+    if any(ev_of(it) is None for it in items):
+        used.add("none")
+    if any(it.get("highlight") for it in items):
+        used.add("point")
+    return used
+
+
+KEY_WORDS = {**EVIDENCE_WORDS, "none": "no evidence given", "point": "the slide's point"}
+
+
+def evidence_key(used):
+    """The key for the marks, in a fixed order, drawn once per slide: every fill and ring the marks use."""
+    icon = {ev: ev_circle(8, 8, 5.5, ev, C["sand"]) for ev in EVIDENCE_WORDS}
+    icon["none"] = ev_circle(8, 8, 5.5, None, C["sand"], evmode=True)
+    icon["point"] = ev_circle(8, 8, 5.5, None, C["sand"], hl=True, evmode=True)
+    return "".join(
+        f'<span><svg viewBox="0 0 16 16" aria-hidden="true">{icon[k]}</svg>{KEY_WORDS[k]}</span>'
+        for k in KEY_WORDS
+        if k in used
+    )
+
+
 # ---------- effects and pairs: shared mark ----------
 
 EFFECTS = ("up", "down", "same")
 EFFECT_WORDS = {"up": "raises", "down": "lowers", "same": "no clear effect"}
 
 
-def mark_shape(cx, cy, m):
-    """An effect mark inside an SVG: the shape carries the meaning, colour only repeats it."""
-    if m == "up":
-        return f'<path d="M{cx:.1f} {cy - 12:.1f} L{cx + 13:.1f} {cy + 10:.1f} H{cx - 13:.1f} Z" fill="{C["moss"]}"/>'
-    if m == "down":
-        return f'<path d="M{cx:.1f} {cy + 12:.1f} L{cx + 13:.1f} {cy - 10:.1f} H{cx - 13:.1f} Z" fill="{C["umber"]}"/>'
+def mark_shape(cx, cy, m, ev=None, item=None, evmode=False, hl=False):
+    """See _mark_shape; the point of the slide also gets a terracotta ring, as in the key."""
+    mark = _mark_shape(cx, cy, m, ev, item, evmode)
+    if not hl or (m == "same" and (ev or evmode)):
+        return mark if not hl else ev_circle(cx, cy, 6, ev, C["sand"], True, item, evmode)
     return (
-        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="11" fill="none" stroke="{C["sand"]}" stroke-width="2.5"/>'
-        f'<path d="M{cx - 5.5:.1f} {cy - 3:.1f}h11M{cx - 5.5:.1f} {cy + 3:.1f}h11" stroke="{C["ink"]}" stroke-width="2.2"/>'
+        mark + f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="12" fill="none" stroke="{C["terracotta"]}" stroke-width="2"/>'
     )
+
+
+def _mark_shape(cx, cy, m, ev=None, item=None, evmode=False):
+    """An effect mark: the shape carries the effect (▲ raises, ▼ lowers, = no clear effect), colour only repeats it.
+    On a slide that shows evidence, the fill shows its strength instead, and an item without evidence is muted."""
+    tag = dattr(item)
+    if m == "same":
+        if ev or evmode:
+            return ev_circle(cx, cy, 6, ev, C["sand"], False, item, evmode)
+        return f'<path d="M{cx - 6:.1f} {cy - 3:.1f}h12M{cx - 6:.1f} {cy + 3:.1f}h12" stroke="{C["ink"]}" stroke-width="1.8"{tag}/>'
+    tip, base = (cy - 8, cy + 6) if m == "up" else (cy + 8, cy - 6)
+    d = f"M{cx:.1f} {tip:.1f} L{cx + 8:.1f} {base:.1f} H{cx - 8:.1f} Z"
+    if ev is None:
+        fill = C["muted"] if evmode else (C["moss"] if m == "up" else C["ink"])
+        return f'<path d="{d}" fill="{fill}"{tag}/>'
+    outline = (
+        f'<path d="{d}" fill="{C["ink"] if ev == "strong" else C["cream"]}" stroke="{C["ink"]}" stroke-width="1.3"/>'
+    )
+    half = f'<path d="M{cx:.1f} {tip:.1f} V{base:.1f} H{cx - 8:.1f} Z" fill="{C["ink"]}"/>' if ev == "moderate" else ""
+    return f"<g{tag}>{outline}{half}</g>"
 
 
 def effect_legend(used, g=None):
@@ -1307,7 +1744,11 @@ def v_effects(p):
     left = 360
     zw = (W - left) / 3
     zone = {"down": 0, "same": 1, "up": 2}
-    body = [f'<rect x="{left + zw:.1f}" y="0" width="{zw:.1f}" height="__H__" fill="{C["linen"]}"/>']
+    evm = bool(evidence_used(p))
+    body = [
+        f'<line x1="{left + zw * k:.1f}" y1="30" x2="{left + zw * k:.1f}" y2="__H__" stroke="{C["line"]}" stroke-width="1"/>'
+        for k in (1, 2)
+    ]
     for k, h in enumerate(heads):
         body.append(text_el(left + zw * k + zw / 2, 20, [h.upper()], 12, 700, C["muted"], "middle"))
     y, group = 40, None
@@ -1315,23 +1756,27 @@ def v_effects(p):
         if r.get("group") and r["group"] != group:
             group = r["group"]
             y += 22
-            body.append(text_el(0, y, [group.upper()], 12.5, 700, C["umber"]))
+            body.append(text_el(0, y, [group.upper()], 12.5, 700, C["heading"]))
             y += 8
         hl = r.get("highlight")
         lab = wrap(r["label"], 40, 2)
         out = wrap("on " + r["outcome"], 46, 2) if r.get("outcome") else []
         rh = 14 + 19 * len(lab) + 16 * len(out)
-        body.append(text_el(0, y + 18, lab, 16, 700 if hl else 600, C["heading"], gap=19))
+        body.append(text_el(0, y + 18, lab, 16, 700 if hl else 600, C["heading"], gap=19, d=r))
         if out:
             body.append(text_el(0, y + 18 + 19 * len(lab) - 2, out, 13, 500, C["muted"], italic=True, gap=16))
-        body.append(mark_shape(left + zw * zone[r["effect"]] + zw / 2, y + rh / 2, r["effect"]))
+        body.append(
+            mark_shape(
+                left + zw * zone[r["effect"]] + zw / 2, y + rh / 2, r["effect"], ev_of(r), r, evm, r.get("highlight")
+            )
+        )
         body.append(f'<line x1="0" y1="{y + rh:.1f}" x2="{W}" y2="{y + rh:.1f}" stroke="{C["line"]}"/>')
         y += rh
     H = y + 8
     text = (
         "<ul>"
         + "".join(
-            f"<li>{esc(r.get('group', ''))}{': ' if r.get('group') else ''}{esc(r['label'])}"
+            f"<li{dattr(r)}>{esc(r.get('group', ''))}{': ' if r.get('group') else ''}{esc(r['label'])}"
             f"{(' on ' + esc(r['outcome'])) if r.get('outcome') else ''}: {EFFECT_WORDS[r['effect']]}</li>"
             for r in rows
         )
@@ -1420,15 +1865,15 @@ def v_pairs(p):
         heights = [sum(10 + 19 * len(cell) for cell in s) for s in lines]
         lab = wrap(r["label"], 24, 3)
         rh = max(heights + [19 * len(lab)]) + 16
-        body.append(text_el(0, y + 26, lab, 16, 700, C["heading"] if not hl else C["umber"], gap=19))
+        body.append(text_el(0, y + 26, lab, 16, 700, C["heading"], gap=19, d=r))
         for k, (s, ls) in enumerate(zip(sides, lines, strict=False)):
             yy = y + 8
             x = left + cw * k
             for c, cell_lines in zip(s, ls, strict=False):
                 h = 10 + 19 * len(cell_lines)
                 if c.get("effect"):
-                    body.append(mark_shape(x + 16, yy + h / 2, c["effect"]))
-                body.append(text_el(x + 40, yy + 18, cell_lines, 15, 600 if hl else 500, C["ink"], gap=19))
+                    body.append(mark_shape(x + 16, yy + h / 2, c["effect"], None, c))
+                body.append(text_el(x + 40, yy + 18, cell_lines, 15, 600 if hl else 500, C["ink"], gap=19, d=c))
                 yy += h
         body.append(f'<line x1="0" y1="{y + rh:.1f}" x2="{W}" y2="{y + rh:.1f}" stroke="{C["line"]}"/>')
         y += rh
@@ -1445,6 +1890,7 @@ def v_pairs(p):
             ]
             for r in p["rows"]
         ],
+        items=p["rows"],
     )
     return svg_wrap("".join(body), y + 6, p["headline"]), text
 
@@ -1510,7 +1956,7 @@ def check_quadrant(p, where, errors, warnings, digest):
 
 def v_quadrant(p):
     """Items placed on two judged dimensions, with the four regions named."""
-    left, top, pw, ph = 40, 30, W - 80, 400
+    left, top, pw, ph = 40, 30, W - 80, 290
 
     def X(v):
         return left + v * pw
@@ -1519,9 +1965,8 @@ def v_quadrant(p):
         return top + ph - v * ph
 
     body = [
-        f'<rect x="{left}" y="{top}" width="{pw}" height="{ph}" fill="none" stroke="{C["line"]}" stroke-width="1.5"/>',
-        f'<line x1="{left + pw / 2}" y1="{top}" x2="{left + pw / 2}" y2="{top + ph}" stroke="{C["sand"]}" stroke-width="1.5"/>',
-        f'<line x1="{left}" y1="{top + ph / 2}" x2="{left + pw}" y2="{top + ph / 2}" stroke="{C["sand"]}" stroke-width="1.5"/>',
+        f'<line x1="{left + pw / 2}" y1="{top}" x2="{left + pw / 2}" y2="{top + ph}" stroke="{C["line"]}" stroke-width="1"/>',
+        f'<line x1="{left}" y1="{top + ph / 2}" x2="{left + pw}" y2="{top + ph / 2}" stroke="{C["line"]}" stroke-width="1"/>',
     ]
     q = p.get("quadrants") or {}
     corners = {
@@ -1546,9 +1991,7 @@ def v_quadrant(p):
     for it in sorted(p["items"], key=lambda i: bool(i.get("highlight"))):
         hl = it.get("highlight")
         cx, cy = X(it["x"]), Y(it["y"])
-        body.append(
-            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{8 if hl else 6}" fill="{C["terracotta"] if hl else C["moss"]}"/>'
-        )
+        body.append(dot(cx, cy, it, hl))
         anchor = "end" if cx > left + pw * 0.72 else "start"
         ty = cy + 5
         for px, py in placed:  # nudge labels that would sit on top of each other
@@ -1559,16 +2002,17 @@ def v_quadrant(p):
             text_el(
                 cx + (-13 if anchor == "end" else 13),
                 ty,
-                wrap(it["label"], 26, 1),
+                wrap(it["label"], LIMITS["quadrant_label"], 1),
                 14,
                 700 if hl else 500,
                 C["heading"],
                 anchor,
+                d=it,
             )
         )
     rows = [[it["label"], f"{it['x']:.2f}", f"{it['y']:.2f}"] for it in p["items"]]
     data = f"<p>{esc(p['basis'])}</p>" + table_html(
-        ["Item", xa["label"] + " (0–1)", ya["label"] + " (0–1)"], rows, num_cols={1, 2}
+        ["Item", xa["label"] + " (0–1)", ya["label"] + " (0–1)"], rows, num_cols={1, 2}, items=p["items"]
     )
     return svg_wrap("".join(body), top + ph + 50, p["headline"]), data
 
@@ -1615,7 +2059,7 @@ def check_numbers(p, where, errors, warnings, digest):
 def v_numbers(p):
     cells = "".join(
         f'<div class="fig{" hl" if it.get("highlight") else ""}"><div class="val">{esc(it["value"])}</div>'
-        f'<div class="lab">{esc(it["label"])}</div></div>'
+        f'<div class="lab"{dattr(it)}>{esc(it["label"])}</div></div>'
         for it in p["figures"]
     )
     return f'<div class="figures">{cells}</div>', ""
@@ -1660,10 +2104,10 @@ def v_units(p):
     cols = total if total <= 20 else (10 if total <= 50 else 20)
     nrows = math.ceil(total / cols)
     gap = 10 if cols <= 20 else 6
-    size = min(72, (W - gap * (cols - 1)) / cols)
+    size = min(26, (W - gap * (cols - 1)) / cols)
     # Fill and shape both mark the part, so colour is not the only signal: highlighted parts are solid
     # terracotta, the others solid moss, then outlined.
-    styles, plain = [], [("moss", None), (None, "muted"), ("linen", "sand")]
+    styles, plain = [], [("muted", None), (None, "muted"), ("linen", "sand")]
     for it in parts:
         styles.append(("terracotta", None) if it.get("highlight") else plain.pop(0) if plain else ("linen", "sand"))
     body, k, spans = [], 0, []
@@ -1677,7 +2121,7 @@ def v_units(p):
                 attrs += f' stroke="{C[stroke]}" stroke-width="2"'
             inset = 1 if stroke else 0
             body.append(
-                f'<rect x="{x + inset:.1f}" y="{y + inset:.1f}" width="{size - 2 * inset:.1f}" height="{size - 2 * inset:.1f}" rx="3" {attrs}/>'
+                f'<rect x="{x + inset:.1f}" y="{y + inset:.1f}" width="{size - 2 * inset:.1f}" height="{size - 2 * inset:.1f}" rx="3" {attrs}{dattr(it)}/>'
             )
             k += 1
         spans.append((start, k - 1, it))
@@ -1694,7 +2138,7 @@ def v_units(p):
             lines = wrap(f"{it['count']} {it['label']}", max(int((x2 - x1) / 8.5), 10), 3)
             half = max(len(line) for line in lines) * 4.6
             mid = min(max(mid, half), W - half)
-            body.append(text_el(mid, y + 24, lines, 17, 700 if hl else 500, C["heading"], "middle", gap=21))
+            body.append(text_el(mid, y + 24, lines, 17, 700 if hl else 500, C["heading"], "middle", gap=21, d=it))
         h = (
             y
             + 24
@@ -1712,7 +2156,9 @@ def v_units(p):
             )
             body.append(f'<rect x="1" y="{y - 15}" width="18" height="18" rx="2" {attrs}/>')
             body.append(
-                text_el(30, y, [f"{it['count']} {it['label']}"], 17, 700 if it.get("highlight") else 500, C["heading"])
+                text_el(
+                    30, y, [f"{it['count']} {it['label']}"], 17, 700 if it.get("highlight") else 500, C["heading"], d=it
+                )
             )
             y += 28
         h = y - 10
@@ -1723,6 +2169,7 @@ def v_units(p):
         ["Part", f"Count{f' ({unit})' if unit else ''}"],
         [[it["label"], it["count"]] for it in parts] + [["Total", total]],
         num_cols={1},
+        items=parts,
     )
     return svg_wrap("".join(body), h + 4, p["headline"]), data
 
@@ -1781,16 +2228,19 @@ def v_bars(p):
         hl = " hl" if it.get("highlight") else ""
         pct = max(it["value"] / vmax * 100, 0.4)
         rows.append(
-            f'<div class="brow{hl}"><div class="blab">{esc(it["label"])}</div>'
-            f'<div class="btrack"><div class="bar" style="width:{pct:.2f}%"></div>'
+            f'<div class="brow{hl}"><div class="blab"{dattr(it)}>{esc(it["label"])}</div>'
+            f'<div class="btrack"><div class="bar" style="width:{pct:.2f}%"{dattr(it)}></div>'
             f'<span class="bval" style="left:calc({pct:.2f}% + 10px)">{esc(num(it["value"]))}{f" <small>{esc(unit)}</small>" if unit else ""}</span></div></div>'
         )
-    valw = max(len(num(it["value"])) for it in items) * 0.85 + len(unit) * 0.5 + 1.2
-    chart = f'<div class="bars" style="--valw:{valw:.1f}em" role="img" aria-label="{esc(p["headline"])}">{"".join(rows)}</div>'
+    # The value column's width: with a set 'max', from it too, so two panels that share a scale share the frame.
+    valw = max(len(num(v)) for v in [it["value"] for it in items] + ([p["max"]] if "max" in p else [])) * 0.85
+    valw += len(unit) * 0.5 + 1.2
+    chart = f'<div class="bars" style="--valw:{valw:.1f}em" role="group" aria-label="{esc(p["headline"])}">{"".join(rows)}</div>'
     data = table_html(
         ["Item", f"Value{f' ({unit})' if unit else ''}"],
         [[it["label"], num(it["value"])] for it in items],
         num_cols={1},
+        items=items,
     )
     return chart, data
 
@@ -1858,8 +2308,7 @@ def v_slope(p):
     items = sorted(p["items"], key=lambda it: bool(it.get("highlight")))
     unit = p.get("unit", "")
     vals = [v for it in items for v in (it["before"], it["after"])]
-    lo = axis_start(p, "y", vals)
-    hi = max(vals)
+    lo, hi = p.get("_range") or (axis_start(p, "y", vals), max(vals))
     top, ph = 44, 300
     x1, x2 = 250, W - 250
 
@@ -1889,26 +2338,42 @@ def v_slope(p):
             f'<line x1="{x1}" y1="{Y(it["before"]):.1f}" x2="{x2}" y2="{Y(it["after"]):.1f}" stroke="{color}" stroke-width="{3 if hl else 1.75}"/>'
         )
         for x, v in ((x1, it["before"]), (x2, it["after"])):
-            body.append(f'<circle cx="{x}" cy="{Y(v):.1f}" r="{5 if hl else 4}" fill="{color}"/>')
+            body.append(f'<circle cx="{x}" cy="{Y(v):.1f}" r="{5 if hl else 4}" fill="{color}"{dattr(it)}/>')
         weight, fill = (700, C["heading"]) if hl else (500, C["ink"])
         body.append(
             text_el(
-                x1 - 12, ly[k] + 5, [f"{wrap(it['label'], 22, 1)[0]}  {num(it['before'])}"], 14, weight, fill, "end"
+                x1 - 12,
+                ly[k] + 5,
+                [f"{wrap(it['label'], LIMITS['slope_label'], 1)[0]}  {num(it['before'])}"],
+                14,
+                weight,
+                fill,
+                "end",
+                d=it,
             )
         )
         body.append(
-            text_el(x2 + 12, ry[k] + 5, [f"{num(it['after'])}  {wrap(it['label'], 22, 1)[0]}"], 14, weight, fill)
+            text_el(
+                x2 + 12,
+                ry[k] + 5,
+                [f"{num(it['after'])}  {wrap(it['label'], LIMITS['slope_label'], 1)[0]}"],
+                14,
+                weight,
+                fill,
+                d=it,
+            )
         )
     h = max([top + ph + 16] + [y + 12 for y in ly + ry])
     if unit:
         body.append(text_el(W / 2, 18, [unit], 13, 500, C["muted"], "middle"))
     if p.get("y_note"):
-        body.append(text_el(W / 2, h + 14, [p["y_note"]], 13, 600, C["umber"], "middle"))
+        body.append(text_el(W / 2, h + 14, [p["y_note"]], 13, 600, C["ink"], "middle"))
         h += 24
     data = table_html(
         ["Item", f"{p['from']}", f"{p['to']}"],
         [[it["label"], num(it["before"]), num(it["after"])] for it in p["items"]],
         num_cols={1, 2},
+        items=p["items"],
     )
     return svg_wrap("".join(body), h + 4, p["headline"]), data
 
@@ -1957,7 +2422,7 @@ def v_dots(p):
     """Every value as a dot, stacked where values are close, so the spread is visible."""
     groups, unit = p["groups"], p.get("unit", "")
     allv = [v for g in groups for v in g["values"]]
-    ticks = nice_ticks(axis_start(p, "x", allv), max(allv), 5)
+    ticks = nice_ticks(*(p.get("_range") or (axis_start(p, "x", allv), max(allv))), 5)
     lo, hi = ticks[0], ticks[-1]
     left, right = 170, 20
     pw = W - left - right
@@ -1988,19 +2453,31 @@ def v_dots(p):
             text_el(
                 left - 14,
                 base - 4,
-                wrap(g["label"], 20, 2),
+                wrap(g["label"], LIMITS["dots_label"] // 2, 2),
                 14,
                 700 if hl else 500,
                 C["heading"] if hl else C["ink"],
                 "end",
                 gap=17,
+                d=g,
             )
         )
+        ev = ev_of(g)
+        evm = bool(evidence_used(p))
         for b, vs in bins.items():
             cx = left + (b + 0.5) * bw
             for j in range(len(vs)):
                 body.append(
-                    f'<circle cx="{cx:.1f}" cy="{base - j * 2 * r:.1f}" r="{r:.1f}" fill="{C["terracotta"] if hl else C["moss"]}"/>'
+                    ev_circle(
+                        cx,
+                        base - j * 2 * r,
+                        r - (0.6 if ev else 0),
+                        ev,
+                        C["terracotta"] if hl else C["muted"],
+                        hl,
+                        g,
+                        evm,
+                    )
                 )
         if p.get("marker", "median") == "median":
             s = sorted(g["values"])
@@ -2016,15 +2493,14 @@ def v_dots(p):
     if unit:
         body.append(text_el(left + pw, y + 38, [unit], 13, 600, C["muted"], "end"))
     rows = [[g["label"], len(g["values"]), num(min(g["values"])), num(max(g["values"]))] for g in groups]
-    data = table_html(["Group", "n", "Min", "Max"], rows, num_cols={1, 2, 3})
+    data = table_html(["Group", "n", "Min", "Max"], rows, num_cols={1, 2, 3}, items=groups)
     return svg_wrap("".join(body), y + 46, p["headline"]), data
 
 
 def t_dots(p, W, g):
     groups = p["groups"]
     allv = [v for grp in groups for v in grp["values"]]
-    lo = axis_start(p, "x", allv)
-    hi = max(allv)
+    lo, hi = p.get("_range") or (axis_start(p, "x", allv), max(allv))
     lw = min(max(len(grp["label"]) for grp in groups), int(W * 0.3))
     nb = max(W - lw - 4, 20)
     out = []
@@ -2073,9 +2549,9 @@ def check_scatter(p, where, errors, warnings, digest):
 def v_scatter(p):
     pts = p["points"]
     xs, ys = [pt["x"] for pt in pts], [pt["y"] for pt in pts]
-    xt = nice_ticks(axis_start(p, "x", xs), max(xs), 5)
-    yt = nice_ticks(axis_start(p, "y", ys), max(ys), 4)
-    left, top, pw, ph = 64, 40, W - 64 - 30, 360
+    xt = nice_ticks(*(p.get("_xrange") or (axis_start(p, "x", xs), max(xs))), 5)
+    yt = nice_ticks(*(p.get("_yrange") or (axis_start(p, "y", ys), max(ys))), 4)
+    left, top, pw, ph = 64, 40, W - 64 - 30, 270
 
     def X(v):
         return left + (v - xt[0]) / ((xt[-1] - xt[0]) or 1) * pw
@@ -2094,7 +2570,7 @@ def v_scatter(p):
     for pt in sorted(pts, key=lambda q: bool(q.get("highlight"))):
         hl = pt.get("highlight")
         body.append(
-            f'<circle cx="{X(pt["x"]):.1f}" cy="{Y(pt["y"]):.1f}" r="{7 if hl else 5}" fill="{C["terracotta"] if hl else C["moss"]}" fill-opacity="{1 if hl else 0.75}"/>'
+            f'<circle cx="{X(pt["x"]):.1f}" cy="{Y(pt["y"]):.1f}" r="{7 if hl else 5}" fill="{C["terracotta"] if hl else C["muted"]}" fill-opacity="{1 if hl else 0.75}"{dattr(pt)}/>'
         )
         if pt.get("label"):
             anchor = "end" if X(pt["x"]) > left + pw * 0.75 else "start"
@@ -2107,12 +2583,14 @@ def v_scatter(p):
                     700 if hl else 500,
                     C["heading"],
                     anchor,
+                    d=pt,
                 )
             )
     data = table_html(
         ["Point", p["x_label"], p["y_label"]],
         [[pt.get("label", ""), num(pt["x"]), num(pt["y"])] for pt in pts],
         num_cols={1, 2},
+        items=pts,
     )
     return svg_wrap("".join(body), top + ph + 56, p["headline"]), data
 
@@ -2192,8 +2670,7 @@ def v_line(p):
 
         xticks = order
     ys = [pt[1] for s in series for pt in s["points"]]
-    lo = axis_start(p, "y", ys)
-    ticks = nice_ticks(lo, max(ys), 4)
+    ticks = nice_ticks(*(p.get("_range") or (axis_start(p, "y", ys), max(ys))), 4)
     ylo, yhi = ticks[0], ticks[-1]
     unit = p.get("unit", "")
     left, right, top, plot_h = 56, 190, 30, 260
@@ -2213,7 +2690,8 @@ def v_line(p):
         body.append(text_el(left - 10, Y(t) + 5, [num(t)], 13, 500, C["muted"], "end"))
     step = max(1, math.ceil(len(xticks) / 8))
     for x in xticks[::step]:
-        body.append(text_el(X(x), top + plot_h + 22, [num(x) if numeric else str(x)], 13, 500, C["muted"], "middle"))
+        tick = (str(int(x)) if float(x).is_integer() else num(x)) if numeric else str(x)  # 2020, not 2,020
+        body.append(text_el(X(x), top + plot_h + 22, [tick], 13, 500, C["muted"], "middle"))
     if unit:
         body.append(text_el(0, top - 8, [unit], 13, 600, C["muted"]))
     ends = []
@@ -2221,7 +2699,7 @@ def v_line(p):
         hl = s.get("highlight") or len(series) == 1
         color = C["terracotta"] if hl else C["muted"]
         pts = " ".join(f"{X(x):.1f},{Y(y):.1f}" for x, y in s["points"])
-        dash = "" if hl else ' stroke-dasharray="5 3"'
+        dash = ""
         body.append(
             f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="{3 if hl else 1.75}"{dash} stroke-linejoin="round"/>'
         )
@@ -2236,7 +2714,7 @@ def v_line(p):
             text_el(
                 left + plot_w + 12,
                 y + 4,
-                wrap(name, 20, 1) + [val + (f" {unit}" if unit else "")],
+                wrap(name, LIMITS["series_name"], 1) + [val + (f" {unit}" if unit else "")],
                 14,
                 700 if hl else 500,
                 C["heading"] if hl else C["ink"],
@@ -2269,7 +2747,7 @@ def v_line(p):
             )
         )
     if p.get("y_note"):
-        body.append(text_el(left, top + plot_h + 46, [p["y_note"]], 13, 600, C["umber"]))
+        body.append(text_el(left, top + plot_h + 46, [p["y_note"]], 13, 600, C["ink"]))
     h = top + plot_h + (58 if p.get("y_note") else 34)
     head = ["x"] + [s.get("name", "") for s in series]
     keys = list(dict.fromkeys(xs_all))
@@ -2282,14 +2760,14 @@ def t_line(p, W, g):
     series = p["series"]
     unit = p.get("unit", "")
     ys = [pt[1] for s in series for pt in s["points"]]
-    lo = axis_start(p, "y", ys)
+    lo, hi = p.get("_range") or (axis_start(p, "y", ys), max(ys))
     nw = min(max(len(s["name"]) for s in series), 22)
     out = []
     for s in series:
         vals = [pt[1] for pt in s["points"]]
         mark = g["hl"] if s.get("highlight") else " "
         out.append(
-            f"{mark}{tcut(s['name'], nw):<{nw}}  {spark(vals, g, lo, max(ys))}  {tfmt(vals[0])} {g['arrow']} {tfmt(vals[-1])} {unit}".rstrip()
+            f"{mark}{tcut(s['name'], nw):<{nw}}  {spark(vals, g, lo, hi)}  {tfmt(vals[0])} {g['arrow']} {tfmt(vals[-1])} {unit}".rstrip()
         )
     xs = [pt[0] for pt in series[0]["points"]]
     out.append(f" {'':<{nw}}  {tfmt(xs[0])} … {tfmt(xs[-1])}" + (f"  ({p['x_label']})" if p.get("x_label") else ""))
@@ -2323,13 +2801,12 @@ def v_timeline(p):
     up_lines = max([len(wrap(e["label"], chars, 3)) for k, e in enumerate(events) if k % 2 == 0] or [1])
     down_lines = max([len(wrap(e["label"], chars, 3)) for k, e in enumerate(events) if k % 2 == 1] or [0])
     axis_y = 50 + up_lines * 18
-    body = [f'<line x1="20" y1="{axis_y}" x2="{W - 20}" y2="{axis_y}" stroke="{C["ink"]}" stroke-width="1.5"/>']
+    body = [f'<line x1="20" y1="{axis_y}" x2="{W - 20}" y2="{axis_y}" stroke="{C["ink"]}" stroke-width="1"/>']
     for i, e in enumerate(events):
         x = pad + (span * i / (n - 1) if n > 1 else span / 2)
         hl = e.get("highlight")
         up = i % 2 == 0
-        color = C["terracotta"] if hl else C["moss"]
-        body.append(f'<circle cx="{x:.1f}" cy="{axis_y}" r="{8 if hl else 6}" fill="{color}"/>')
+        body.append(dot(x, axis_y, e, hl))
         body.append(
             f'<line x1="{x:.1f}" y1="{axis_y + (-10 if up else 10)}" x2="{x:.1f}" y2="{axis_y + (-24 if up else 24)}" stroke="{C["line"]}" stroke-width="1"/>'
         )
@@ -2338,12 +2815,12 @@ def v_timeline(p):
         tx = min(max(x, half + 2), W - half - 2)  # keep the label inside the frame
         if up:
             y0 = axis_y - 30 - len(lines) * 18
-            body.append(text_el(tx, y0, [str(e["date"])], 14, 700, C["umber"], "middle"))
-            body.append(text_el(tx, y0 + 19, lines, 14, 700 if hl else 500, C["heading"], "middle", gap=18))
+            body.append(text_el(tx, y0, [str(e["date"])], 14, 700, C["ink"], "middle"))
+            body.append(text_el(tx, y0 + 19, lines, 14, 700 if hl else 500, C["heading"], "middle", gap=18, d=e))
         else:
-            body.append(text_el(tx, axis_y + 44, [str(e["date"])], 14, 700, C["umber"], "middle"))
-            body.append(text_el(tx, axis_y + 63, lines, 14, 700 if hl else 500, C["heading"], "middle", gap=18))
-    text = "<ul>" + "".join(f"<li><b>{esc(e['date'])}</b>: {esc(e['label'])}</li>" for e in events) + "</ul>"
+            body.append(text_el(tx, axis_y + 44, [str(e["date"])], 14, 700, C["ink"], "middle"))
+            body.append(text_el(tx, axis_y + 63, lines, 14, 700 if hl else 500, C["heading"], "middle", gap=18, d=e))
+    text = "<ul>" + "".join(f"<li{dattr(e)}><b>{esc(e['date'])}</b>: {esc(e['label'])}</li>" for e in events) + "</ul>"
     return svg_wrap("".join(body), axis_y + (50 + down_lines * 18 if down_lines else 12), p["headline"]), text
 
 
@@ -2516,6 +2993,187 @@ def t_svg(p, W, g):
     return twrap("[Diagram] " + p["alt"], W)
 
 
+# ---------- lanes: check, HTML, text ----------
+
+
+def check_lanes(p, where, errors, warnings, digest):
+    actors = need_list(p, "actors", where, errors, LIMITS["lanes_actors"], warnings, "actors")
+    steps = need_list(p, "steps", where, errors, LIMITS["lanes_steps"], warnings, "steps")
+    count_highlights(steps, where, warnings)
+    names = set(map(str, actors))
+    prev = None
+    for s in steps:
+        if not isinstance(s, dict) or not s.get("label") or str(s.get("actor")) not in names:
+            errors.append(f"{where}: each step needs a 'label' and an 'actor' from 'actors'")
+            continue
+        hand = f"  (hand-off from {prev})" if prev is not None and prev != str(s["actor"]) else ""
+        digest.append(f"    {s['actor']}: {s['label']}{hand}{'  [highlight]' if s.get('highlight') else ''}")
+        prev = str(s["actor"])
+
+
+def v_lanes(p):
+    """Actors as rows, steps in one shared order along them. A hand-off turns between two columns, so it crosses no
+    label."""
+    actors, steps = [str(a) for a in p["actors"]], p["steps"]
+    evm = bool(evidence_used(p))
+    left, rh, pad = 170, 92, 10
+    n = len(steps)
+    cw = (W - left - pad) / max(n, 1)
+    chars = max(int((cw - 18) / 7.4), 6)
+
+    def X(k):
+        return left + cw * (k + 0.5)
+
+    def Y(actor):
+        return 18 + actors.index(str(actor)) * rh + rh - 26
+
+    body = []
+    for a in actors:
+        y = Y(a)
+        body.append(text_el(0, y + 5, wrap(a, 20, 2), 15, 700, C["heading"], gap=18))
+        body.append(
+            f'<line x1="{left - 10}" y1="{y:.1f}" x2="{W}" y2="{y:.1f}" stroke="{C["line"]}" stroke-width="1"/>'
+        )
+    for k in range(1, n):
+        a, b = steps[k - 1], steps[k]
+        x1, y1, x2, y2 = X(k - 1), Y(a["actor"]), X(k), Y(b["actor"])
+        hl = b.get("highlight")
+        color, width = (C["terracotta"], 2.5) if hl else (C["ink"], 1.5)
+        if y1 == y2:
+            body.append(
+                f'<line x1="{x1 + 8:.1f}" y1="{y1:.1f}" x2="{x2 - 8:.1f}" y2="{y2:.1f}" stroke="{color}" stroke-width="{width}"/>'
+            )
+        else:  # a hand-off: along the lane to the column's edge, across to the other lane, then on to the step
+            mid = x1 + cw / 2
+            body.append(
+                f'<path d="M{x1 + 8:.1f} {y1:.1f}H{mid:.1f}V{y2:.1f}" fill="none" stroke="{color}" stroke-width="{width}"/>'
+            )
+            body.append(arrow(mid, y2, x2 - 9, y2, color))
+    for k, s in enumerate(steps):
+        hl = s.get("highlight")
+        x, y = X(k), Y(s["actor"])
+        lines = wrap(s["label"], chars, 3)
+        body.append(
+            text_el(
+                x, y - 16 - 17 * (len(lines) - 1), lines, 13.5, 700 if hl else 500, C["heading"], "middle", gap=17, d=s
+            )
+        )
+        body.append(ev_circle(x, y, 7, ev_of(s), C["muted"], hl, s, evm))
+    text = "<ol>" + "".join(f"<li{dattr(s)}>{esc(s['actor'])}: {esc(s['label'])}</li>" for s in steps) + "</ol>"
+    return svg_wrap("".join(body), 26 + len(actors) * rh, p["headline"]), text
+
+
+def t_lanes(p, W, g):
+    steps = p["steps"]
+    aw = min(max(len(str(a)) for a in p["actors"]), 18)
+    out, prev = [], None
+    for k, s in enumerate(steps, 1):
+        actor = str(s["actor"])
+        if prev is not None and actor != prev:
+            out.append(f"{'':>{aw}}    {g['down']} hand-off to {actor}")
+        mark = g["hl"] if s.get("highlight") else " "
+        out += twrap(f"{mark}{tcut(actor, aw):>{aw}} {g['v']} {k}. {s['label']}", W)
+        prev = actor
+    return out
+
+
+# ---------- fork: check, HTML, text ----------
+
+
+def check_fork(p, where, errors, warnings, digest):
+    for key in ("input", "decider"):
+        if not p.get(key):
+            errors.append(f"{where}: a fork needs '{key}'")
+    branches = need_list(p, "branches", where, errors, LIMITS["fork_branches"], warnings, "branches")
+    if len(branches) < 2:
+        errors.append(f"{where}: a fork needs two to four branches")
+    count_highlights(branches, where, warnings)
+    digest.append(f"    {p.get('input')} → {p.get('decider')}")
+    for b in branches:
+        if not isinstance(b, dict) or not b.get("label") or b.get("outcome") not in OUTCOMES:
+            errors.append(f"{where}: each branch needs a 'label' and an 'outcome' of {', '.join(OUTCOMES)}")
+            continue
+        digest.append(
+            f"      {b['label']}: {b['outcome']}{(' (' + b['note'] + ')') if b.get('note') else ''}"
+            + ("  [highlight]" if b.get("highlight") else "")
+        )
+
+
+def outcome_glyph(x, y, outcome):
+    """An outcome's glyph, so the outcome does not rest on colour: ▲ helps, ▼ hurts, ✕ never, = neutral. None is a
+    circle, so no outcome looks like an evidence mark."""
+    if outcome == "helps":
+        return f'<path d="M{x:.1f} {y - 7:.1f}L{x + 7:.1f} {y + 5:.1f}H{x - 7:.1f}Z" fill="{C["moss"]}"/>'
+    if outcome == "hurts":
+        return f'<path d="M{x:.1f} {y + 7:.1f}L{x + 7:.1f} {y - 5:.1f}H{x - 7:.1f}Z" fill="{C["ink"]}"/>'
+    if outcome == "never":
+        return f'<path d="M{x - 6:.1f} {y - 6:.1f}l12 12M{x + 6:.1f} {y - 6:.1f}l-12 12" stroke="{C["ink"]}" stroke-width="2.4"/>'
+    return f'<path d="M{x - 6:.1f} {y - 3:.1f}h12M{x - 6:.1f} {y + 3:.1f}h12" stroke="{C["ink"]}" stroke-width="1.8"/>'
+
+
+def v_fork(p):
+    """One input meets a decider and forks into two to four branches, each with its outcome."""
+    branches = p["branches"]
+    evm = bool(evidence_used(p))
+    n = len(branches)
+    rh = 92
+    H = max(n * rh, 170)
+    cy = H / 2
+    dx = 250  # the decider
+    bx = 430  # where the branches end
+    body = [
+        text_el(
+            0, cy - 9 * (len(wrap(p["input"], 20, 3)) - 1) + 5, wrap(p["input"], 20, 3), 16, 700, C["heading"], gap=18
+        )
+    ]
+    body.append(arrow(170, cy, dx - 18, cy, C["ink"]))
+    body.append(
+        f'<path d="M{dx:.1f} {cy - 14:.1f}L{dx + 14:.1f} {cy:.1f}L{dx:.1f} {cy + 14:.1f}L{dx - 14:.1f} {cy:.1f}Z" fill="{C["cream"]}" stroke="{C["ink"]}" stroke-width="1.5"/>'
+    )
+    dec = wrap(p["decider"], 22, 2)
+    body.append(text_el(dx, cy - 26 - 15 * (len(dec) - 1), dec, 13, 500, C["muted"], "middle", True, 15))
+    for k, b in enumerate(branches):
+        hl = b.get("highlight")
+        by = rh / 2 + k * rh + (H - n * rh) / 2
+        color = C["terracotta"] if hl else C["ink"]
+        body.append(
+            f'<path d="M{dx + 14:.1f} {cy:.1f}C{dx + 90:.1f} {cy:.1f} {bx - 100:.1f} {by:.1f} {bx - 10:.1f} {by:.1f}" fill="none" stroke="{color}" stroke-width="{2.5 if hl else 1.5}"/>'
+        )
+        body.append(ev_circle(bx, by, 7, ev_of(b), C["muted"], hl, b, evm))
+        body.append(outcome_glyph(bx + 26, by, b["outcome"]))
+        word = OUTCOMES[b["outcome"]][1]
+        body.append(
+            text_el(
+                bx + 44, by + 5, wrap(b["label"], LIMITS["fork_label"], 1), 15, 700 if hl else 600, C["heading"], d=b
+            )
+        )
+        sub = word + (f": {b['note']}" if b.get("note") else "")
+        body.append(text_el(bx + 44, by + 25, wrap(sub, 44, 2), 13, 500, C["muted"], italic=True, gap=16))
+    text = (
+        f"<p>{esc(p['input'])}, depending on {esc(p['decider'])}:</p><ul>"
+        + "".join(
+            f"<li{dattr(b)}>{esc(b['label'])}: {OUTCOMES[b['outcome']][1]}{(' — ' + esc(b['note'])) if b.get('note') else ''}</li>"
+            for b in branches
+        )
+        + "</ul>"
+    )
+    return svg_wrap("".join(body), H + 10, p["headline"]), text
+
+
+def t_fork(p, W, g):
+    out = twrap(f"{p['input']}", W) + twrap(f"  {g['arrow']} {p['decider']}", W)
+    branches = p["branches"]
+    for k, b in enumerate(branches):
+        branch = g["end"] if k == len(branches) - 1 else g["tee"]
+        glyph, word = OUTCOMES[b["outcome"]]
+        mark = f" {g['hl']}" if b.get("highlight") else ""
+        out += twrap(
+            f"    {branch}{g['h']} {b['label']}: {g[glyph]} {word}{(', ' + b['note']) if b.get('note') else ''}{mark}",
+            W,
+        )
+    return out
+
+
 # ---------- registries ----------
 
 PANEL_CHECKS = {
@@ -2540,6 +3198,8 @@ PANEL_CHECKS = {
     "timeline": check_timeline,
     "text": check_text,
     "svg": check_svg,
+    "lanes": check_lanes,
+    "fork": check_fork,
 }
 
 
@@ -2565,6 +3225,8 @@ VISUALS = {
     "timeline": v_timeline,
     "text": v_text,
     "svg": v_svg,
+    "lanes": v_lanes,
+    "fork": v_fork,
 }
 
 
@@ -2590,6 +3252,8 @@ TEXT = {
     "quadrant": t_quadrant,
     "sets": t_sets,
     "tree": t_tree,
+    "lanes": t_lanes,
+    "fork": t_fork,
 }
 
 # Every kind needs a check, a visual and a text form; fail at start-up, not later in one output format.
@@ -2612,137 +3276,490 @@ def text_of(p, W, g, spec):
 
 # ---------- page ----------
 
-CSS = (HERE / "show.css").read_text(encoding="utf-8")
-
-
+TEMPLATE = (HERE / "show.html").read_text(encoding="utf-8")
+# page.css is the look shared with design-better's canvas and research-better's board; show.css adds what only this
+# page shows: the slides, the strip and the presentation.
+CSS = (HERE / "page.css").read_text(encoding="utf-8") + (HERE / "show.css").read_text(encoding="utf-8")
 JS = (HERE / "show.js").read_text(encoding="utf-8")
+HTML_KINDS = ("bars", "numbers", "table", "text")  # drawn in HTML, so they reflow on a narrow screen
+# Every other kind is an 800-wide drawing: on a phone its text would shrink below reading size, so the page shows its
+# text version there instead.
+NARROW_KINDS = tuple(k for k in KINDS if k not in HTML_KINDS)
+# CSS variables of a slide, by the colour names the drawings use. A project's `style` sets them.
+THEME = {
+    "cream": "--s-bg",
+    "linen": "--s-tint",
+    "sand": "--s-sand",
+    "terracotta": "--s-point",
+    "moss": "--s-good",
+    "umber": "--s-actor",
+    "ink": "--s-ink",
+    "heading": "--s-head",
+    "muted": "--s-muted",
+    "line": "--s-line",
+}
+HEX_VAR = {C[name].lower(): f"var({var}, {C[name]})" for name, var in THEME.items()}
+STYLE_KEYS = {
+    "background": "--s-bg",
+    "tint": "--s-tint",
+    "ink": "--s-ink",
+    "heading": "--s-head",
+    "muted": "--s-muted",
+    "line": "--s-line",
+    "point": "--s-point",
+    "serif": "--s-serif",
+    "sans": "--s-sans",
+}
+COLOUR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\([0-9.,%\s/]+\)")
+FONT_STACK = re.compile(r"[A-Za-z0-9 ,'\"-]+")
+START_TAG = re.compile(r"<([a-zA-Z][\w:-]*)((?:\s+[^\s=>/]+(?:=\"[^\"]*\")?)*)\s*(/?)>")
+PAINT = re.compile(r'\s(fill|stroke|stop-color|font-family)="([^"]*)"')
 
 
-def doc_strip(spec, p):
-    """Where this panel sits in the document it introduces: the same map on every panel keeps the reader oriented."""
-    doc = spec.get("document")
-    if not doc or p.get("part") is None:
+def themed(markup: str) -> str:
+    """Draw with the slide's variables: each palette colour and the sans font in a tag becomes var(--s-...) in its
+    style, so a project's style restyles the drawings too. Other values stay as they are."""
+
+    def fix(m):
+        attrs, decls = m.group(2), []
+
+        def take(a):
+            name, value = a.group(1), a.group(2)
+            if name == "font-family" and "Space Grotesk" in value:
+                decls.append(f"font-family:var(--s-sans, {SANS})")
+                return ""
+            if value.lower() in HEX_VAR:
+                decls.append(f"{name}:{HEX_VAR[value.lower()]}")
+                return ""
+            return a.group(0)
+
+        attrs = PAINT.sub(take, attrs)
+        if not decls:
+            return m.group(0)
+        style = re.search(r'\sstyle="([^"]*)"', attrs)
+        if style:
+            attrs = attrs.replace(style.group(0), f' style="{style.group(1).rstrip(";")};{";".join(decls)}"')
+        else:
+            attrs += f' style="{";".join(decls)}"'
+        return f"<{m.group(1)}{attrs}{m.group(3)}>"
+
+    return START_TAG.sub(fix, markup)
+
+
+def style_css(spec) -> str:
+    """The project's slide style, as CSS variables on .slide; the frame keeps the better-ai look."""
+    style = spec.get("style") or {}
+    decls = [f"{STYLE_KEYS[k]}:{v}" for k, v in style.items() if k in STYLE_KEYS]
+    return f".slide {{ {'; '.join(decls)}; }}" if decls else ""
+
+
+OPENING_PART = "The question"
+
+
+def slug(text) -> str:
+    """The anchor GitHub gives a heading: lower case, punctuation dropped, spaces as hyphens."""
+    return re.sub(r"[^\w\- ]", "", str(text).strip().lower()).replace(" ", "-")
+
+
+def section_link(spec, section):
+    """Where to read a section: a link when the document has an address, else the section's name."""
+    address = (spec.get("document") or {}).get("address")
+    if not address:
+        return esc(section), plain(section)
+    url = str(address).split("#")[0] + "#" + slug(section)
+    return f'<a href="{esc(url)}" target="_blank" rel="noopener">{esc(section)}</a>', f"{section} <{url}>"
+
+
+def source_parts(spec, src):
+    """A slide's source as (text, section)."""
+    if isinstance(src, dict):
+        return src.get("text", ""), src.get("section")
+    return src or "", None
+
+
+def source_html(spec, src):
+    text, section = source_parts(spec, src)
+    if not text and not section:
         return ""
-    parts = set(map(str, _as_list(p["part"])))
-    current = ' aria-current="true"'
-    cells = "".join(
-        f'<li class="{"on" if str(s["id"]) in parts else ""}"{current if str(s["id"]) in parts else ""}>'
-        f"{esc(s['label'])}</li>"
-        for s in doc["sections"]
+    read = f' <span class="read">Read: {section_link(spec, section)[0]}{stop(section)}</span>' if section else ""
+    return f'<p class="src">{rich(text)}{read}</p>'
+
+
+def source_text(spec, src, markdown=False):
+    text, section = source_parts(spec, src)
+    if not text and not section:
+        return ""
+    out = plain(text, markdown)
+    if section:
+        address = (spec.get("document") or {}).get("address")
+        if markdown and address:
+            out += f" Read: [{section}]({str(address).split('#')[0]}#{slug(section)}){stop(section)}"
+        else:
+            out += f" Read: {section_link(spec, section)[1]}{stop(section)}"
+    return out.strip()
+
+
+def overview_of(spec):
+    return next((p for p in spec["panels"] if isinstance(p, dict) and p.get("overview")), None)
+
+
+def mini_overview(ov, focus):
+    """A small copy of the overview with the slide's items marked: orientation only, not a control."""
+    focus = set(map(str, _as_list(focus)))
+    kind = ov["kind"]
+    MW = 340
+    body, edges = [], []
+    if kind == "groups":
+        nodes = [
+            (g["label"], g["label"] in focus or any(str(it) in focus for it in g.get("items") or []))
+            for g in ov["groups"]
+        ]
+    else:
+        nodes = [(lab, lab in focus) for lab in overview_labels(ov)]
+    n = len(nodes)
+    if kind == "concept":
+        order, _ = _layers(ov["nodes"], ov["edges"])
+        by_id = {x["id"]: x["label"] for x in ov["nodes"]}
+        rows = max(len(col) for col in order)
+        H = 22 * rows + 26
+        pos = {}
+        for k, col in enumerate(order):
+            x = 14 + (MW - 28) * (k / max(len(order) - 1, 1))
+            for j, i in enumerate(col):
+                pos[by_id[i]] = (x, 12 + (H - 34) * ((j + 0.5) / len(col)))
+        for e in ov["edges"]:
+            (x1, y1), (x2, y2) = pos[by_id[e["from"]]], pos[by_id[e["to"]]]
+            edges.append(
+                f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="{C["sand"]}" stroke-width="1"/>'
+            )
+        points = [(lab, on, *pos[lab]) for lab, on in nodes]
+        labelled = [pt for pt in points if pt[1]]
+    else:
+        H = 46
+        xs = [14 + (MW - 28) * (k / max(n - 1, 1)) if n > 1 else MW / 2 for k in range(n)]
+        points = [(lab, on, x, 12) for (lab, on), x in zip(nodes, xs, strict=True)]
+        if kind != "groups":
+            edges.append(
+                f'<line x1="{xs[0]:.1f}" y1="12" x2="{xs[-1]:.1f}" y2="12" stroke="{C["sand"]}" stroke-width="1.2"/>'
+            )
+        labelled = points if n <= 4 else [pt for pt in points if pt[1]]
+    for _lab, on, x, y in points:
+        if kind == "groups":
+            body.append(
+                f'<rect x="{x - 5:.1f}" y="{y - 5:.1f}" width="10" height="10" fill="{C["terracotta"] if on else C["cream"]}" stroke="{C["terracotta"] if on else C["muted"]}" stroke-width="1.5"/>'
+            )
+        else:
+            body.append(
+                f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{6 if on else 4.5}" fill="{C["terracotta"] if on else C["cream"]}" stroke="{C["terracotta"] if on else C["muted"]}" stroke-width="1.5"/>'
+            )
+    if kind == "concept":  # nodes sit close together: name the marked ones in one line under the drawing
+        names = ", ".join(lab for lab, on, _x, _y in labelled)
+        body.append(text_el(MW / 2, H - 4, [tcut(names, 42)], 13.5, 700, C["heading"], "middle"))
+    else:
+        # Neighbouring labels join into one, centred under its marks, and each is cut to the room up to the next.
+        runs = []
+        for pt in labelled:
+            if runs and points.index(pt) == points.index(runs[-1][-1]) + 1 and pt[1] and runs[-1][-1][1]:
+                runs[-1].append(pt)
+            else:
+                runs.append([pt])
+        centres = [sum(q[2] for q in r) / len(r) for r in runs]
+        for j, r in enumerate(runs):
+            left = centres[j] - (centres[j - 1] if j else -centres[j])
+            right = (centres[j + 1] if j + 1 < len(runs) else 2 * MW - centres[j]) - centres[j]
+            x, anchor, room = centres[j], "middle", min(left, right)
+            if x < 40:  # at the left edge: the label runs right, up to half the gap to the next label
+                anchor, room = "start", right / 2
+            elif x > MW - 40:
+                anchor, room = "end", left / 2
+            text = ", ".join(q[0] for q in r)
+            on = any(q[1] for q in r)
+            body.append(
+                text_el(
+                    x,
+                    34,
+                    [tcut(text, max(int(room / 7.8), 4))],
+                    13.5,
+                    700 if on else 500,
+                    C["heading"] if on else C["muted"],
+                    anchor,
+                )
+            )
+    marked = [lab for lab, on in nodes if on]
+    label = "Where this slide sits in the overview: " + ", ".join(marked)
+    return (
+        f'<svg class="where" viewBox="0 0 {MW} {H}" role="img" aria-label="{esc(label)}" xmlns="http://www.w3.org/2000/svg">'
+        + "".join(edges)
+        + "".join(body)
+        + "</svg>"
     )
-    return f'<nav class="docstrip" aria-label="Where this is in the document"><ol>{cells}</ol></nav>'
 
 
-def read_next(p):
-    return f'<p class="readnext"><span>Read in the document</span> {rich(p["read"])}</p>' if p.get("read") else ""
+def where_text(ov, focus, sep=" › "):
+    if not ov or focus is None:
+        return ""
+    return f"Where we are: {', '.join(map(str, _as_list(focus)))} (in the overview: {sep.join(overview_labels(ov))})"
+
+
+def details_html(p):
+    """Each item's detail, hidden and numbered as in keyed(); the page shows one under the visual when the reader
+    clicks a label, mark or row that carries its number."""
+    out = []
+    for k, lab, d in keyed_details(p):
+        if not isinstance(d, dict):
+            continue
+        foot = [(rich(d["source"]), plain(d["source"]))] if d.get("source") else []
+        if d.get("evidence"):
+            foot.append((f"Evidence: {esc(d['evidence'])}", d["evidence"]))
+        out.append(
+            f'<div class="dt" data-k="{k}" data-label="{esc(lab)}"><b>{esc(lab)}</b><p>{rich(d.get("text", ""))}</p>'
+            + (f'<p class="dsrc">{" ".join(f + stop(t) for f, t in foot)}</p>' if foot else "")
+            + "</div>"
+        )
+    return f'<div class="dts" hidden>{"".join(out)}</div>' if out else ""
+
+
+def share_scale(a, b):
+    """Copies of two compare sides of the same numeric kind, set to draw on one scale."""
+    kind = a.get("kind")
+    if kind != b.get("kind") or kind not in SHARED_SCALE:
+        return a, b
+    a, b = dict(a), dict(b)
+    if kind == "bars":
+        a["max"] = b["max"] = max(
+            [it["value"] for s in (a, b) for it in s["items"]] + [a.get("max", 0), b.get("max", 0)]
+        )
+    elif kind == "dots":
+        vals = [v for s in (a, b) for g in s["groups"] for v in g["values"]]
+        a["_range"] = b["_range"] = (min(axis_start(s, "x", vals) for s in (a, b)), max(vals))
+    elif kind in ("slope", "line"):
+        if kind == "slope":
+            vals = [v for s in (a, b) for it in s["items"] for v in (it["before"], it["after"])]
+        else:
+            vals = [pt[1] for s in (a, b) for ser in s["series"] for pt in ser["points"]]
+        a["_range"] = b["_range"] = (min(axis_start(s, "y", vals) for s in (a, b)), max(vals))
+    else:
+        xs = [pt["x"] for s in (a, b) for pt in s["points"]]
+        ys = [pt["y"] for s in (a, b) for pt in s["points"]]
+        a["_xrange"] = b["_xrange"] = (min(axis_start(s, "x", xs) for s in (a, b)), max(xs))
+        a["_yrange"] = b["_yrange"] = (min(axis_start(s, "y", ys) for s in (a, b)), max(ys))
+    return a, b
+
+
+def visual_html(p, spec):
+    """A visual's HTML and its text version, which screen readers get in place of the drawing."""
+    visual, data = visual_of(p, spec)
+    visual, data = themed(visual), themed(data)
+    if p["kind"] in NARROW_KINDS:  # on narrow screens show the text version instead of a shrunken drawing
+        visual = f'<div class="wide">{visual}</div><div class="narrow" aria-hidden="true">{data}</div>'
+    return visual, data
+
+
+def slide_open(spec, total):
+    doc = spec.get("document") or {}
+    src = rich(spec["source"]) if spec.get("source") else ""
+    if doc.get("title"):
+        name = (
+            f'<a href="{esc(doc["address"])}" target="_blank" rel="noopener">{esc(doc["title"])}</a>'
+            if doc.get("address")
+            else esc(doc["title"])
+        )
+        src += f'{" " if src else ""}<span class="read">Introduces {name}{stop(doc["title"])}</span>'
+    return (
+        f'<section class="slide t-title t-open" data-part="{esc(OPENING_PART)}" data-headline="{esc(spec["title"])}" '
+        f'aria-roledescription="slide" aria-label="1 of {total}">'
+        + (f'<p class="kicker">{esc(spec["question"])}</p>' if spec.get("question") else "")
+        + f'<h2 class="title">{esc(spec["title"])}</h2>'
+        + (f'<p class="summary">{rich(spec["summary"])}</p>' if spec.get("summary") else "")
+        + (f'<p class="src">{src}</p>' if src else "")
+        + "</section>"
+    )
+
+
+def slide_panel(spec, p, i, total, ov):
+    """One panel as a slide, laid out by its template."""
+    t = p.get("template", "visual")
+    n = i + 1
+    part = esc(p.get("part") or "")
+    head = esc(p["headline"])
+    attrs = (
+        f'class="slide t-{t}" data-part="{part}" data-headline="{head}" '
+        f'aria-roledescription="slide" aria-label="{n} of {total}"'
+    )
+    src = source_html(spec, p.get("source"))
+    p = keyed(p)
+    if t == "title":
+        kicker = p.get("part") or spec.get("question") or ""
+        actions = "".join(
+            f'<li><span>{esc(a["text"])}</span> <a href="#{a["panel"] + 1}" data-go="{a["panel"] + 1}">slide {a["panel"] + 1}</a></li>'
+            for a in p.get("actions") or []
+        )
+        return (
+            f"<section {attrs}>"
+            + (f'<p class="kicker">{esc(kicker)}</p>' if kicker else "")
+            + f'<h2 class="title">{head}</h2>'
+            + (f'<p class="body">{rich(p["body"])}</p>' if p.get("body") else "")
+            + (f'<ol class="actions">{actions}</ol>' if actions else "")
+            + src
+            + "</section>"
+        )
+    mini = themed(mini_overview(ov, p["focus"])) if ov is not None and p.get("focus") is not None else ""
+    top = f'<div class="ptop"><span class="part">{part}</span>{mini}</div><h2 class="headline">{head}</h2>'
+    if t == "statement":
+        middle = (
+            f'<div class="big"><p class="stat">{esc(p["figure"])}</p><p class="say">{rich(p["sentence"])}</p>'
+            + (f'<p class="against">{rich(p["compare"])}</p>' if p.get("compare") else "")
+            + "</div>"
+        )
+        return f"<section {attrs}>{top}{middle}{src}</section>"
+    if t == "compare":
+        a, b = share_scale({**p["a"], "headline": p["a"]["label"]}, {**p["b"], "headline": p["b"]["label"]})
+        (va, da), (vb, db) = visual_html(a, spec), visual_html(b, spec)
+        # Two drawings side by side would each shrink to half the slide and their text below reading size, so they
+        # stack, at full width and on their shared scale. Kinds drawn in HTML sit side by side in one frame.
+        side = a["kind"] in HTML_KINDS and b["kind"] in HTML_KINDS
+        frame = ""
+        if a["kind"] == b["kind"] == "bars":  # one label column, so both tracks have one length and one scale
+            longest = max(len(str(it["label"])) for q in (a, b) for it in q["items"])
+            frame = f' style="--labw:{min(longest * 0.56, 11):.1f}em"'
+        used = evidence_used(a) | evidence_used(b)
+        sides = "".join(
+            f'<figure><figcaption{dattr(q)}>{esc(q["label"])}</figcaption><div class="vis">{v}</div>'
+            f'<div class="sr">{d}</div></figure>'
+            for q, v, d in ((a, va, da), (b, vb, db))
+        )
+        key = f'<p class="key">{themed(evidence_key(used))}</p>' if used else ""
+        return (
+            f'<section {attrs}>{top}<div class="compare{"" if side else " stacked"}"{frame}>{sides}</div>{key}'
+            f'<div class="detail" hidden></div>{src}{details_html(p)}</section>'
+        )
+    visual, data = visual_html(p, spec)
+    used = evidence_used(p)
+    key = f'<p class="key">{themed(evidence_key(used))}</p>' if used else ""
+    return (
+        f'<section {attrs}>{top}<div class="vis">{visual}</div>{key}<div class="detail" hidden></div>'
+        f'{src}{details_html(p)}<div class="sr">{data}</div></section>'
+    )
 
 
 def render(spec: dict) -> str:
     panels = spec["panels"]
-    sections, toc = [], []
-    for i, p in enumerate(panels, 1):
-        visual, data = visual_of(p, spec)
-        if p["kind"] in (
-            "flow",
-            "groups",
-            "timeline",
-            "map",
-            "concept",
-            "sets",
-            "quadrant",
-            "tree",
-            "effects",
-            "pairs",
-        ):  # on narrow screens show the text version instead of a shrunken svg
-            visual = f'<div class="wide">{visual}</div><div class="narrow" aria-hidden="true">{data}</div>'
-
-        note = p.get("note")
-        note_html = ""
-        if note:
-            paras = note if isinstance(note, list) else [note]
-            note_html = '<aside class="note">' + "".join(f"<p>{rich(t)}</p>" for t in paras) + "</aside>"
-        data_html = (
-            f'<details class="data"><summary>{"Data" if p["kind"] in ("bars", "line", "units", "slope", "dots", "scatter", "tree", "sets") else "As text"}</summary><div>{data}</div></details>'
-            if data
-            else ""
-        )
-        sections.append(
-            f'<section class="panel page" id="p{i}" aria-labelledby="h{i}"><div class="count">{i} of {len(panels)}</div>'
-            f'{doc_strip(spec, p)}<h2 id="h{i}" tabindex="-1">{esc(p["headline"])}</h2>'
-            f'<div class="body{" has-note" if note_html else ""}"><figure>{visual}{data_html}</figure>{note_html}</div>'
-            f"{read_next(p)}</section>"
-        )
-        toc.append(f'<li><a href="#p{i}">{esc(p["headline"])}</a></li>')
-    source = f'<p class="source">{rich(spec["source"])}</p>' if spec.get("source") else ""
-    summary = f'<p class="summary">{rich(spec["summary"])}</p>' if spec.get("summary") else ""
-    kicker = f'<div class="kicker">{esc(spec["kicker"])}</div>' if spec.get("kicker") else ""
-    return f"""<!DOCTYPE html>
-<html lang="{esc(spec.get("lang", "en"))}"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{esc(spec["title"])}</title>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>{CSS}</style></head>
-<body><div class="band"></div>
-<div class="wrap"><header class="top page" id="cover">{kicker}<h1 tabindex="-1">{esc(spec["title"])}</h1>{summary}{source}
-<nav class="toc" aria-label="Panels"><ol>{"".join(toc)}</ol></nav></header>
-<div class="slim"><a href="#cover">{esc(spec["title"])}</a></div>
-<div class="controls" role="group" aria-label="Move between panels"><button class="prev" type="button" aria-keyshortcuts="ArrowLeft Shift+Space">← Back</button>
-<span class="pos" aria-live="polite"></span><button class="next" type="button" aria-keyshortcuts="ArrowRight Space">Next →</button><span class="dots" aria-hidden="true"></span>
-<button class="all" type="button"></button></div>
-<main>{"".join(sections)}</main>
-</div>
-<div class="band band--thin"></div>
-<footer class="foot"><span>{rich(spec.get("source", ""))}</span><span>show-better by <a href="https://n14n.dev/" target="_blank" rel="noopener">n14n.dev</a></span></footer>
-<script>{JS}</script></body></html>"""
+    total = len(panels) + 1
+    ov = overview_of(spec)
+    slides = [slide_open(spec, total)] + [slide_panel(spec, p, i, total, ov) for i, p in enumerate(panels, 1)]
+    fill = {
+        "{{CSS}}": CSS,
+        "{{STYLE}}": style_css(spec),
+        "{{JS}}": JS,
+        "{{LANG}}": esc(spec.get("lang", "en")),
+        "{{TITLE}}": esc(spec["title"]),
+        "{{QUESTION}}": f'<p class="question">{esc(spec["question"])}</p>' if spec.get("question") else "",
+        "{{SLIDES}}": "".join(slides),
+    }
+    # One pass, so a placeholder inside the content is not filled in.
+    return re.sub(r"\{\{[A-Z_]+\}\}", lambda m: fill.get(m.group(0), m.group(0)), TEMPLATE)
 
 
 # ---------- plain text ----------
 
 
-def doc_line(spec, p, g, W=72):
-    doc = spec.get("document")
-    if not doc or p.get("part") is None:
-        return []
-    parts = set(map(str, _as_list(p["part"])))
-    secs = doc["sections"]
-    here = [f"{k + 1} of {len(secs)}, {s['label']}" for k, s in enumerate(secs) if str(s["id"]) in parts]
-    return twrap("In the document: part " + "; part ".join(here), W, "")
+def panel_text(p, spec, W, g, markdown):
+    """The body of one slide in text: its visual or visuals, figure or actions."""
+    t = p.get("template", "visual")
+
+    def block(q):
+        lines = text_of(q, W, g, spec)
+        return lines if not markdown or q["kind"] == "text" else ["```text"] + lines + ["```"]
+
+    if t == "visual":
+        return block(p)
+    if t == "compare":
+        a, b = share_scale(p["a"], p["b"])
+        out = []
+        for side, s in (("A", a), ("B", b)):
+            out += ([f"**{side}: {s['label']}**", ""] if markdown else [f"{side}: {s['label']}", ""]) + block(s) + [""]
+        return out[:-1]
+    if t == "statement":
+        out = [f"**{p['figure']}**" if markdown else str(p["figure"])] + twrap(plain(p["sentence"], markdown), W)
+        return out + (twrap(plain(p["compare"], markdown), W) if p.get("compare") else [])
+    out = twrap(plain(p["body"], markdown), W) if p.get("body") else []
+    actions = p.get("actions") or []
+    if actions:
+        out += [""] if out else []
+        out += [f"{k}. {a['text']} (slide {a['panel'] + 1})" for k, a in enumerate(actions, 1)]
+    return out
+
+
+def detail_lines(p, W, markdown, prefix="Detail"):
+    out = []
+    for lab, d in collect_details(p):
+        if isinstance(d, dict):
+            extra = [plain(d["source"], markdown)] if d.get("source") else []
+            if d.get("evidence"):
+                extra.append(f"evidence: {d['evidence']}")
+            line = f"{prefix}, {lab}: {plain(d.get('text', ''), markdown)}" + (
+                f" ({'; '.join(extra)})" if extra else ""
+            )
+            out += ["- " + line] if markdown else twrap(line, W)
+    return out
 
 
 def render_text(spec, width=72, ascii=False, markdown=False):
     g = GLYPHS["ascii" if ascii else "unicode"]
     W = width
+    panels = spec["panels"]
+    total = len(panels) + 1
+    ov = overview_of(spec)
     out = []
-    n = len(spec["panels"])
+    doc = spec.get("document") or {}
     if markdown:
-        out += [f"# {spec['title']}", ""]
+        out += ([f"*{spec['question']}*", ""] if spec.get("question") else []) + [f"# {spec['title']}", ""]
         if spec.get("summary"):
             out += [spec["summary"], ""]
+        if spec.get("source"):
+            out += [spec["source"], ""]
+        if doc.get("title"):
+            name = f"[{doc['title']}]({doc['address']})" if doc.get("address") else doc["title"]
+            out += [f"Introduces {name}{stop(doc['title'])}", ""]
     else:
+        if spec.get("question"):
+            out += twrap(spec["question"], W)
         out += twrap(spec["title"].upper(), W) + [g["h"] * min(W, len(spec["title"]) + 4)]
         if spec.get("summary"):
-            out += twrap(spec["summary"], W)
+            out += twrap(plain(spec["summary"]), W)
+        if spec.get("source"):
+            out += twrap(plain(spec["source"]), W)
+        if doc.get("title"):
+            out += twrap(
+                f"Introduces {doc['title']}" + (f" <{doc['address']}>." if doc.get("address") else stop(doc["title"])),
+                W,
+            )
         out.append("")
-    for i, p in enumerate(spec["panels"], 1):
-        visual = text_of(p, W, g, spec)
-        strip = doc_line(spec, p, g, W)
+    for i, p in enumerate(panels, 1):
+        n = i + 1
+        where = where_text(ov, p.get("focus"), " > " if ascii else " › ")
         if markdown:
-            out += [f"## {i}. {p['headline']}", ""] + ([f"*{' '.join(strip)}*", ""] if strip else [])
-            out += ["```text"] + visual + ["```", ""] if p["kind"] not in ("text",) else visual + [""]
+            out += [f"## {n}. {p['headline']}", ""]
+            if p.get("part"):
+                out += [f"*{p['part']}*", ""]
+            if where:
+                out += [f"*{where}*", ""]
         else:
-            rule = f"{g['h'] * 2} {i}/{n} " + g["h"] * max(W - len(f"{i}/{n}") - 4, 0)
-            out += [rule] + strip + twrap(p["headline"], W) + [""] + visual
-        note = p.get("note")
-        if note:
-            for para in note if isinstance(note, list) else [note]:
-                out += ([""] if not markdown else []) + (
-                    twrap(plain(para), W - 4, f"{g['v']}   ") if not markdown else ["> " + para]
-                )
-        if p.get("read"):
-            out += ["", f"Read in the document: {plain(p['read'], markdown)}"]
+            rule = f"{g['h'] * 2} {n}/{total} " + (f"{p['part']} " if p.get("part") else "")
+            out += (
+                [rule + g["h"] * max(W - len(rule), 0)] + (twrap(where, W) if where else []) + twrap(p["headline"], W)
+            )
+            out.append("")
+        out += panel_text(p, spec, W, g, markdown)
+        details = detail_lines(p, W, markdown)
+        if details:
+            out += [""] + details
+        src = source_text(spec, p.get("source"), markdown)
+        if src:
+            out += (
+                ["", ("> " if markdown else "") + "Source: " + src] if markdown else [""] + twrap("Source: " + src, W)
+            )
         out.append("")
-    if spec.get("source"):
-        out += twrap(plain(spec["source"], markdown), W)
     return "\n".join(line.rstrip() for line in out) + "\n"
 
 
@@ -2852,62 +3869,366 @@ def highlighted(p, spec=None):
     return found
 
 
+def sr_visual(p, spec):
+    """A visual as sentences and value lists, with its highlighted items named."""
+    if p["kind"] == "numbers":
+        body = [f"{f['value']}: {f['label']}" + (" (highlighted)" if f.get("highlight") else "") for f in p["figures"]]
+    elif p["kind"] == "text":
+        body = [plain(b) for b in _as_list(p.get("body"))]
+    else:
+        visual, data = visual_of(p, spec)
+        body = linear_lines(data or visual)
+    hl = highlighted(p, spec) if p["kind"] not in ("numbers", "table") else []
+    return body + (["Highlighted: " + ", ".join(hl) + "."] if hl else [])
+
+
 def render_screen_reader(spec, width=72):
     """Plain sentences and value lists, with no box drawing, bars, rules or symbols that a screen reader reads aloud."""
-    W, n = width, len(spec["panels"])
-    out = twrap(spec["title"], W)
-    if spec.get("summary"):
-        out += twrap(plain(spec["summary"]), W)
+    W, panels = width, spec["panels"]
+    total = len(panels) + 1
+    ov = overview_of(spec)
+    doc = spec.get("document") or {}
+    out = twrap(f"Slide 1 of {total}.", W)
+    if spec.get("question"):
+        out += twrap(f"Question: {spec['question']}", W)
+    out += twrap(spec["title"], W)
+    for key in ("summary", "source"):
+        if spec.get(key):
+            out += twrap(plain(spec[key]), W)
+    if doc.get("title"):
+        out += twrap(
+            f"Introduces {doc['title']}" + (f" <{doc['address']}>." if doc.get("address") else stop(doc["title"])), W
+        )
     out.append("")
-    for i, p in enumerate(spec["panels"], 1):
-        out += twrap(f"Panel {i} of {n}: {p['headline']}", W) + doc_line(spec, p, GLYPHS["ascii"], W)
-        if p["kind"] == "numbers":
-            body = [
-                f"{f['value']}: {f['label']}" + (" (highlighted)" if f.get("highlight") else "") for f in p["figures"]
-            ]
-        elif p["kind"] == "text":
-            body = [plain(b) for b in _as_list(p.get("body"))]
+    for i, p in enumerate(panels, 1):
+        t = p.get("template", "visual")
+        out += twrap(
+            f"Slide {i + 1} of {total}" + (f", {p['part']}" if p.get("part") else "") + f": {p['headline']}", W
+        )
+        where = where_text(ov, p.get("focus"), ", then ")
+        if where:
+            out += twrap(where + ".", W)
+        if t == "visual":
+            body = sr_visual(p, spec)
+        elif t == "compare":
+            a, b = share_scale({**p["a"], "headline": p["a"]["label"]}, {**p["b"], "headline": p["b"]["label"]})
+            body = []
+            for side, s in (("First", a), ("Second", b)):
+                body += [f"{side}, {s['label']}:"] + sr_visual(s, spec)
+        elif t == "statement":
+            body = [f"{p['figure']}: {plain(p['sentence'])}"] + ([plain(p["compare"])] if p.get("compare") else [])
         else:
-            visual, data = visual_of(p, spec)
-            body = linear_lines(data or visual)
-        for line in body:
+            body = ([plain(p["body"])] if p.get("body") else []) + [
+                f"{k}. {a['text']}, slide {a['panel'] + 1}." for k, a in enumerate(p.get("actions") or [], 1)
+            ]
+        for line in body + detail_lines(p, W, False):
             out += twrap(line, W)
-        hl = highlighted(p, spec) if p["kind"] not in ("numbers", "table") else []
-        if hl:
-            out += twrap("Highlighted: " + ", ".join(hl) + ".", W)
-        for para in _as_list(p.get("note")):
-            out += twrap("Note: " + plain(para), W)
-        if p.get("read"):
-            out += twrap(f"Read in the document: {plain(p['read'])}", W)
+        src = source_text(spec, p.get("source"))
+        if src:
+            out += twrap(f"Source: {src}", W)
         out.append("")
-    if spec.get("source"):
-        out += twrap(plain(spec["source"]), W)
     return "\n".join(line.rstrip() for line in out) + "\n"
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Render a short visual presentation from a JSON spec.")
-    sub = parser.add_subparsers(dest="command", required=True)
-    c = sub.add_parser("check", help="validate a spec and print every value it will show")
-    c.add_argument("spec")
-    r = sub.add_parser("render", help="check a spec, then write the page (html) or print it as text (text, md)")
-    r.add_argument("spec")
-    r.add_argument(
-        "--format",
-        choices=("html", "text", "md"),
-        default="html",
-        help="html: a page to open; text: plain text for a terminal; md: Markdown with text diagrams in code blocks",
+# ---------- The log: answers.jsonl, one JSON event per line, next to the page ----------
+
+LOG, SEEN, ADDRESS = "answers.jsonl", ".answers-seen", ".server"
+METHODS = ("comment", "delete", "note", "accept", "reopen")  # what the page may send
+ITEMS = ("comment", "note")  # what the agent tracks with status
+STATES = ("seen", "asked", "working", "done", "accepted")
+MAX_BODY = 200_000
+LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the agent is not watching
+
+
+def now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def log_lines(folder: Path) -> list:
+    """The log's lines. Only "\\n" ends a line: events are ASCII JSON, so no other character can split one."""
+    log = folder / LOG
+    return log.read_text(encoding="utf-8").split("\n")[:-1] if log.exists() else []
+
+
+def read_log(folder: Path) -> list:
+    events = []
+    for line in log_lines(folder):
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            events.append({})  # keep the position, so indexes into the log stay right
+    return events
+
+
+def append(folder: Path, *events: dict) -> list:
+    """Write events to the log as ASCII JSON, so a character such as U+2028 in a message cannot split a line."""
+    lines = [json.dumps({"at": now(), **e}) for e in events]
+    with (folder / LOG).open("a", encoding="utf-8") as f:
+        f.write("".join(line + "\n" for line in lines))
+    return lines
+
+
+def from_user(event: dict) -> bool:
+    """An event the user made in the page, as opposed to the agent's replies, statuses and recorded acceptances."""
+    return bool(event) and event.get("action") not in ("reply", "status") and "by" not in event
+
+
+def clean(value, depth=0):
+    """Keep only JSON values a page can legitimately send, with long text cut, so the log stays readable."""
+    if isinstance(value, str):
+        return value[:5000]
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if depth < 4 and isinstance(value, dict):
+        return {str(k)[:100]: clean(v, depth + 1) for k, v in list(value.items())[:50]}
+    if depth < 4 and isinstance(value, list):
+        return [clean(v, depth + 1) for v in value[:50]]
+    return None
+
+
+def rpc_error(rid, code: int, message: str) -> dict:
+    return {"jsonrpc": "2.0", "id": rid, "error": {"code": code, "message": message}}
+
+
+def served(folder: Path) -> None:
+    if not (folder / ADDRESS).exists():
+        sys.exit(f"error: no page is served from {folder}. Start it with `render SPEC --out FILE --serve` first.")
+
+
+# ---------- render --serve ----------
+
+
+def serve(page: Path, port: int, open_browser: bool) -> None:
+    """Serve the page from disk, so a new render shows on reload, and record each action the page sends."""
+    folder = page.parent
+    lock = threading.Lock()
+    # Whether a `wait` is listening: None until one first connects (the agent may stream this output instead), then
+    # True while one is connected or reconnected within LISTEN_GAP seconds. The page warns the user when it is False.
+    waiters = {"open": 0, "last": None}
+
+    def listening():
+        if waiters["last"] is None:
+            return None
+        return waiters["open"] > 0 or time.time() - waiters["last"] < LISTEN_GAP
+
+    def wait_for_more(after: int, seconds: float) -> int:
+        deadline = time.time() + seconds
+        while len(log_lines(folder)) <= after and time.time() < deadline:
+            time.sleep(0.25)
+        return len(log_lines(folder))
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def local(self) -> bool:
+            # Only answer requests addressed to this machine, so a web page cannot reach it via DNS rebinding.
+            return (self.headers.get("Host") or "").rsplit(":", 1)[0] in ("127.0.0.1", "localhost")
+
+        def send(self, code: int, body: bytes, kind: str) -> None:
+            self.send_response(code)
+            self.send_header("Content-Type", kind)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def send_json(self, value) -> None:
+            self.send(200, json.dumps(value).encode(), "application/json")
+
+        def after(self) -> int:
+            value = self.path.split("=", 1)[1]
+            return int(value) if value.isdigit() else 0
+
+        def do_GET(self):
+            if not self.local():
+                return self.send_error(403)
+            if self.path in ("/", "/index.html") or self.path.startswith("/?"):
+                return self.send(200, page.read_bytes(), "text/html; charset=utf-8")
+            if self.path == "/rev":
+                return self.send(200, str(page.stat().st_mtime_ns).encode(), "text/plain")
+            if self.path == "/listening":
+                return self.send_json(listening())
+            if self.path.startswith("/events?after="):
+                # Long poll for the page: every event after the first `after`, the agent's included.
+                after = self.after()
+                total = wait_for_more(after, 20)
+                return self.send_json({"total": total, "events": read_log(folder)[after:total]})
+            if self.path.startswith("/wait?after="):
+                # Long poll for `wait`: the number of events, as soon as there are more than `after`.
+                with lock:
+                    waiters["open"] += 1
+                    waiters["last"] = time.time()
+                try:
+                    total = wait_for_more(self.after(), 25)
+                finally:
+                    with lock:
+                        waiters["open"] -= 1
+                        waiters["last"] = time.time()
+                return self.send(200, str(total).encode(), "text/plain")
+            self.send_error(404)
+
+        def do_POST(self):
+            # Only this page may send: the same host and origin, and a JSON body that a cross-site form cannot send.
+            origin = self.headers.get("Origin", "")
+            if not self.local() or self.path != "/rpc" or origin != "http://" + (self.headers.get("Host") or ""):
+                return self.send_error(403)
+            if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+                return self.send_error(415)
+            size = int(self.headers.get("Content-Length") or 0)
+            if not 0 < size <= MAX_BODY:
+                return self.send_error(413)
+            try:
+                msg = json.loads(self.rfile.read(size))
+            except ValueError:
+                return self.send_json(rpc_error(None, -32700, "Parse error"))
+            rid = msg.get("id") if isinstance(msg, dict) else None
+            if (
+                not isinstance(msg, dict)
+                or msg.get("jsonrpc") != "2.0"
+                or msg.get("method") not in METHODS
+                or not isinstance(msg.get("params"), dict)
+            ):
+                return self.send_json(rpc_error(rid, -32601, "Unknown method"))
+            with lock:
+                (line,) = append(folder, {"action": msg["method"], **clean(msg["params"])})
+                print(line, flush=True)
+            self.send_json({"jsonrpc": "2.0", "id": rid, "result": "saved"})
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    (folder / ADDRESS).write_text(url, encoding="utf-8")
+    (folder / SEEN).write_text(str(len(log_lines(folder))), encoding="utf-8")
+    print(f"Serving {page} at {url}. Each action the user takes is printed here as one JSON line.", flush=True)
+    if open_browser and not webbrowser.open(url):
+        print(
+            "Could not open a browser on this machine. If the user's browser runs on another machine, "
+            "this address does not reach it.",
+            flush=True,
+        )
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        (folder / ADDRESS).unlink(missing_ok=True)
+
+
+# ---------- wait, reply, status, pending ----------
+
+
+def wait(folder: Path, timeout: float) -> int:
+    """Print the user's actions the agent has not seen yet, waiting for the served page to receive one."""
+    served(folder)
+    cursor = folder / SEEN
+    seen = int(cursor.read_text() or 0) if cursor.exists() else 0
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(f"{(folder / ADDRESS).read_text().strip()}wait?after={seen}", timeout=30) as r:
+                total = int(r.read())
+        except OSError:
+            sys.exit("error: the page's server is not answering. Is it still running?")
+        if total <= seen:
+            continue
+        lines = log_lines(folder)[seen:total]
+        new = [line for line, event in zip(lines, read_log(folder)[seen:total], strict=True) if from_user(event)]
+        cursor.write_text(str(total), encoding="utf-8")
+        seen = total
+        if new:
+            print("\n".join(new), flush=True)
+            return 0
+    print("No new action before the timeout.", flush=True)
+    return 2
+
+
+def reply(folder: Path, text: str, to: str | None) -> None:
+    """Show the agent's reply in the served page's conversation, under the item it answers."""
+    served(folder)
+    # Each reply has an id, so the user can answer any message, the agent's own included.
+    append(folder, {"action": "reply", "id": "r-" + str(time.time_ns()), "text": text[:5000], "to": to})
+    print("Reply shown in the page.")
+
+
+def set_status(folder: Path, state: str, ids: list) -> None:
+    """Mark the user's items as seen, asked, working or done. Accepted records an acceptance the user gave in words,
+    the same as the page's Accept button."""
+    events = read_log(folder)
+    owned = {
+        e.get("id") for e in events if e.get("action") in ITEMS and not (e.get("action") == "note" and e.get("to"))
+    }
+    # An answer under one of the user's items is part of it; an answer to the agent's own message is an item itself.
+    answers = {e.get("id"): e.get("to") for e in events if e.get("action") == "note" and e.get("to") in owned}
+    misplaced = [i for i in ids if i in answers]
+    if misplaced:  # an answer is part of the item it answers, which carries the state
+        sys.exit(
+            "error: "
+            + ", ".join(f"{i} answers {answers[i]}" for i in misplaced)
+            + ". Mark the item it answers instead."
+        )
+    known = {e.get("id") for e in events if e.get("action") in ITEMS}
+    unknown = [i for i in ids if i not in known]
+    if unknown:
+        sys.exit(f"error: no comment or message with id {', '.join(unknown)}. Run `pending` to see the ids.")
+    append(
+        folder,
+        *(
+            {"action": "accept", "to": i, "by": "agent, from the user's words"}
+            if state == "accepted"
+            else {"action": "status", "to": i, "status": state}
+            for i in ids
+        ),
     )
-    r.add_argument("--out", help="file to write; required for html, otherwise the text is printed")
-    r.add_argument("--open", action="store_true", help="open the page in the default browser")
-    r.add_argument("--width", type=int, default=72, help="text width in characters (text and md)")
-    r.add_argument("--ascii", action="store_true", help="use only ASCII characters (text and md)")
-    r.add_argument(
-        "--screen-reader",
-        action="store_true",
-        help="text only: sentences and value lists, without box drawing, bars or rules that a screen reader reads aloud",
-    )
-    args = parser.parse_args()
+    print(f"Marked {state}: {', '.join(ids)}")
+
+
+def pending(folder: Path) -> None:
+    """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so work
+    can resume after an interruption. Done waits for the user; an item edited after it was finished is work again."""
+    items, order, state, reasons, thread = {}, [], {}, {}, {}
+    for e in read_log(folder):
+        a, i, to = e.get("action"), e.get("id"), e.get("to")
+        if a == "note" and to and to not in items:  # an answer to the agent's own message is a new item about it
+            order.append(i)
+            items[i] = e
+        elif a == "note" and to:  # the user's answer belongs to the item it answers
+            thread.setdefault(to, []).append({"from": "user", "at": e.get("at"), "text": e.get("note")})
+            if state.get(to) == "asked":  # the answer ends the wait: the item is the agent's again
+                state[to] = "answered by the user"
+            elif state.get(to) in ("done", "accepted"):  # a follow-up under a finished item is work again
+                state[to] = "follow-up from the user"
+        elif a == "reply" and to:
+            thread.setdefault(to, []).append({"from": "agent", "at": e.get("at"), "text": e.get("text")})
+        elif a in ITEMS and i:
+            if i in items and state.get(i) in ("done", "accepted"):
+                state[i] = "edited"
+            if i not in items:
+                order.append(i)
+            items[i] = e
+        elif a == "delete" and i in items:
+            items[i] = None
+        elif a == "status":
+            state[to] = e.get("status")
+        elif a == "accept":
+            state[to] = "accepted"
+        elif a == "reopen":
+            state[to], reasons[to] = "reopened", e.get("reason")
+    open_items = [items[i] for i in order if items.get(i) and state.get(i) not in ("done", "accepted")]
+    for e in open_items:
+        extra = {}
+        if state.get(e["id"]) == "reopened" and reasons.get(e["id"]):
+            extra["reopened_because"] = reasons[e["id"]]
+        if thread.get(e["id"]):
+            extra["thread"] = thread[e["id"]]
+        print(json.dumps({**e, "status": state.get(e["id"], "new"), **extra}, ensure_ascii=False))
+    print(f"{len(open_items)} not done.")
+
+
+# ---------- Command line ----------
+
+
+def render_command(args) -> None:
     try:
         spec = json.loads(Path(args.spec).expanduser().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -2923,6 +4244,8 @@ def main() -> None:
     if args.format != "html":
         if args.screen_reader and args.format != "text":
             sys.exit("error: --screen-reader works with --format text")
+        if args.serve:
+            sys.exit("error: --serve works with --format html")
         text = (
             render_screen_reader(spec, args.width)
             if args.screen_reader
@@ -2940,11 +4263,71 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render(spec), encoding="utf-8")
     print("\n".join(digest))
-    print(f"\nwrote {out.resolve()}")
-    if args.open and not webbrowser.open(out.resolve().as_uri()):
+    print(f"\nwrote {out.resolve()}", flush=True)
+    if args.serve:
+        serve(out.resolve(), args.port, args.open)
+    elif args.open and (out.parent / ADDRESS).exists():
+        print("The page is already served: the open page loads the new slides once the user is not typing.")
+    elif args.open and not webbrowser.open(out.resolve().as_uri()):
         print(
-            "could not open a browser on this machine: if the user's browser runs on another machine, this path does not reach it"
+            "Could not open a browser on this machine: if the user's browser runs on another machine, this path does not reach it."
         )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Render a short visual introduction to a document from a JSON spec.")
+    sub = parser.add_subparsers(dest="command", required=True)
+    c = sub.add_parser("check", help="validate a spec and print every value it will show")
+    c.add_argument("spec")
+    r = sub.add_parser("render", help="check a spec, then write the page (html) or print it as text (text, md)")
+    r.add_argument("spec")
+    r.add_argument(
+        "--format",
+        choices=("html", "text", "md"),
+        default="html",
+        help="html: a page to open; text: plain text for a terminal; md: Markdown with text diagrams in code blocks",
+    )
+    r.add_argument("--out", help="file to write; required for html, otherwise the text is printed")
+    r.add_argument("--open", action="store_true", help="open the page in the default browser")
+    r.add_argument("--serve", action="store_true", help="serve the page on 127.0.0.1 and record the user's actions")
+    r.add_argument("--port", type=int, default=0, help="port to serve on (default: any free port)")
+    r.add_argument("--width", type=int, default=72, help="text width in characters (text and md)")
+    r.add_argument("--ascii", action="store_true", help="use only ASCII characters (text and md)")
+    r.add_argument(
+        "--screen-reader",
+        action="store_true",
+        help="text only: sentences and value lists, without box drawing, bars or rules that a screen reader reads aloud",
+    )
+    w = sub.add_parser("wait", help="wait for the user's next actions on the served page, print them and exit")
+    w.add_argument("dir")
+    w.add_argument("--timeout", type=float, default=3600, help="seconds to wait (default: 3600)")
+    rp = sub.add_parser("reply", help="show a reply from the agent in the served page")
+    rp.add_argument("dir")
+    rp.add_argument("text")
+    rp.add_argument("--to", metavar="ID", help="the id of the comment or message the reply answers")
+    t = sub.add_parser(
+        "status",
+        help="mark items as seen, asked (waiting for the user), working or done; "
+        "accepted only when the user accepted in words",
+    )
+    t.add_argument("dir")
+    t.add_argument("state", choices=STATES)
+    t.add_argument("ids", nargs="+", metavar="ID")
+    pd = sub.add_parser("pending", help="list the items that are not done or accepted")
+    pd.add_argument("dir")
+    args = parser.parse_args()
+
+    if args.command in ("check", "render"):
+        return render_command(args)
+    folder = Path(args.dir).expanduser().resolve()
+    if args.command == "wait":
+        sys.exit(wait(folder, args.timeout))
+    elif args.command == "reply":
+        reply(folder, args.text, args.to)
+    elif args.command == "status":
+        set_status(folder, args.state, args.ids)
+    else:
+        pending(folder)
 
 
 if __name__ == "__main__":

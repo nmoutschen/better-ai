@@ -1,118 +1,242 @@
 # Presentation spec
 
-`scripts/show.py` renders a spec, a JSON file, as one HTML page or as plain text.
+`scripts/show.py` renders a spec, a JSON file, as a page of slides or as plain text.
 
 ```
-python3 scripts/show.py check SPEC                       # validate, print every value the page will show
-python3 scripts/show.py render SPEC --out FILE [--open]  # check, then write the HTML page
-python3 scripts/show.py render SPEC --format text        # print it as plain text for a terminal
-python3 scripts/show.py render SPEC --format md          # print it as Markdown, diagrams in code blocks
+python3 scripts/show.py check SPEC                                  # validate, print every value the slides will show
+python3 scripts/show.py render SPEC --out FILE [--open]             # check, then write the page
+python3 scripts/show.py render SPEC --out FILE --serve [--port N]   # write the page and serve it with the conversation
+python3 scripts/show.py render SPEC --format text                   # print it as plain text for a terminal
+python3 scripts/show.py render SPEC --format md                     # print it as Markdown, diagrams in code blocks
+python3 scripts/show.py wait DIR [--timeout S]                      # wait for the user's next actions on the served page
+python3 scripts/show.py reply DIR TEXT [--to ID]                    # show a reply in the page, under the item it answers
+python3 scripts/show.py status DIR seen|asked|working|done|accepted ID...
+python3 scripts/show.py pending DIR                                 # list the items not done or accepted
 ```
 
-Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only). In text output, an `svg` panel shows only its `alt`.
+Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only). `--format text --screen-reader` prints each slide as sentences and value lists, without box lines, bars, rules or symbols. In text output, an `svg` visual shows only its `alt`.
 
-`--format text --screen-reader` prints each panel as sentences and value lists, built from the same data as the page's Data and As text sections, and names the highlighted items in words. It draws no box lines, bars, rules or symbols, which a screen reader reads aloud one by one.
+`check` stops with an error when a slide cannot be drawn correctly, and prints a warning when a slide is likely hard to read. Both commands print a digest: every headline, value, label, detail and source, in order, for comparison with the document.
 
-`check` stops with an error when a panel cannot be drawn correctly, and prints a warning when a panel is likely hard to read. Both commands print a digest: every headline, value, label and note, in order, for comparison with the source.
+The page shows the opening slide, then one slide per panel. Slide N is panel N − 1.
 
 ## Top level
 
 ```json
 {
-  "title": "The overall conclusion, as a sentence or a short phrase",
-  "summary": "One or two sentences that give the answer. A reader who stops here knows the result.",
-  "kicker": "Optional small label above the title, such as the date or the topic",
-  "source": "Optional line naming where the content comes from",
-  "lang": "en",
-  "document": {"title": "The document this introduces", "sections": [{"id": "<section-id>", "label": "<section title>", "gist": "Optional, a few words"}]},
+  "title": "<the answer to the reader's question, as a sentence>",
+  "question": "<the reader's question, shown above the title>",
+  "summary": "<one or two sentences that give the answer>",
+  "source": "<where the content comes from; may contain [<text>](<https URL>) links>",
+  "document": {"title": "<the document this introduces>", "address": "<its https URL>"},
+  "lang": "<language code>",
+  "style": {"background": "<colour>", "point": "<colour>", "serif": "<font stack>"},
   "panels": [ ... ]
 }
 ```
 
-`document` is optional: the parts of the document the presentation introduces, drawn by the `map` kind and marked by each panel's `part`. A section's `id` is a key for `part` and `highlight` and is not shown; the reader sees the `label`.
+`style` is optional: the project's look for the slides and their drawings. Its keys are `background`, `tint` (fills, detail boxes), `ink` (lines, text), `heading`, `muted`, `line` (rules), `point` (the highlight), `serif` (headlines) and `sans` (labels). Colours are CSS colours, such as `#1C1A17` or `rgb(28, 26, 23)`; fonts are font stacks, such as `"'Inter', sans-serif"`. The page around the slides keeps its own look.
+
+`document.address` is optional. When it is set, the opening slide links to the document, and each slide's source links to the section it names. `document.sections`, a list of `{"id", "label", "gist"}`, is needed only by the `map` kind.
 
 ## Every panel
 
 | Field | Required | Meaning |
 |---|---|---|
-| `kind` | yes | One of the kinds below |
-| `headline` | yes | A full sentence that states what the reader should conclude from this panel |
-| `note` | no | Short text shown beside the visual: the source, a condition, a limit. A string or a list of paragraphs. Write links as `[<author> (<year>)](<url>)` |
-| `part` | no | The `document` section id, or list of ids, that this panel introduces |
-| `read` | no | Where to read the detail in the document, by section title |
+| `template` | no | `visual` (default), `compare`, `statement` or `title` |
+| `part` | no | The story part: a short question of two to five words, under 28 characters. Consecutive panels with the same part are grouped in the strip |
+| `headline` | yes | A full sentence that answers the part's question. On a `title` panel, the title |
+| `source` | yes | What the slide's claim rests on: `"<text>"`, or `{"text": "<text>", "section": "<section heading in the document>"}`. With `document.address`, the section becomes a link |
+| `overview` | no | `true` on at most one `visual` panel of kind `flow`, `timeline`, `concept` or `groups` |
+| `focus` | no | On a panel after the overview: the overview labels this slide covers, `["<label>"]`. The slide shows a small copy of the overview with them marked |
+
+`note` and `read` are not used: put both in `source`.
+
+### `visual`: one visual
+
+```json
+{"template": "visual", "part": "<part>", "headline": "<headline>", "kind": "<kind>", ...the kind's fields, "source": "<source>"}
+```
+
+### `compare`: two visuals in one frame
+
+```json
+{"template": "compare", "part": "<part>", "headline": "<headline>",
+ "a": {"label": "<what side A shows>", "kind": "<kind>", ...the kind's fields},
+ "b": {"label": "<what side B shows>", "kind": "<kind>", ...the kind's fields},
+ "source": "<source>"}
+```
+
+Both sides of the same `bars`, `dots`, `slope`, `line` or `scatter` kind are drawn on one scale, at one height, with one key. Each side must be something the document reports.
+
+### `statement`: one figure and its comparison
+
+```json
+{"template": "statement", "part": "<part>", "headline": "<headline>",
+ "figure": "<short figure>", "sentence": "<one sentence on what it counts>", "compare": "<what it is compared to>",
+ "source": "<source>"}
+```
+
+`check` warns when `compare` is missing.
+
+### `title`: kicker, title, body and actions
+
+A layout for the closing slide. The opening slide uses the same layout, drawn from the top-level `question`, `title`, `summary` and `source`.
+
+```json
+{"template": "title", "part": "<kicker>", "headline": "<the answer, restated>", "body": "<a short paragraph>",
+ "actions": [{"text": "<what to do>", "panel": <number of the panel it points to>}],
+ "source": "<source>"}
+```
+
+`part` is the kicker; without it, the kicker is the top-level `question`. Each action links to its panel's slide.
+
+## Details
+
+Any item that has a `label` may carry a detail. Clicking its label or mark opens the detail under the visual.
+
+```json
+{"label": "<item>", ..., "detail": {"text": "<what it is>", "source": "<where it comes from; may contain a link>", "evidence": "<strong|moderate|weak|stated>"}}
+```
+
+On kinds that draw one mark per item (`dots`, `effects`, `fork`, `lanes`), `evidence` sets the mark's fill: strong is filled ink, moderate half filled, weak hollow. When any item on the slide has evidence, the slide gets a key, and an item without it, or with `stated`, is drawn as a small dot, "no evidence given"; the point of the slide is ringed in terracotta. Every mark on the slide is in the key.
 
 ## Kinds
 
 ### `map`: the document's parts in order
 
 ```json
-{"kind": "map", "headline": "...", "highlight": ["<section-id>"]}
+{"kind": "map", "highlight": ["<section-id>"]}
 ```
 
-Draws the top-level `document.sections`, or its own `sections` list. `highlight` marks the parts to read first.
+Draws `document.sections`, or its own `sections` list. `highlight` marks the parts to read first.
 
 ### `concept`: how ideas relate
 
 ```json
-{"kind": "concept", "headline": "...",
+{"kind": "concept",
  "nodes": [{"id": "<node-a>", "label": "<idea>", "highlight": true}, {"id": "<node-b>", "label": "<idea>"}],
  "edges": [{"from": "<node-a>", "to": "<node-b>", "label": "<how they relate>"}]}
 ```
 
-Every edge needs a `label` that says how the two relate, in a few words; conditions go in the note. Up to about 12 nodes.
+Every edge needs a `label` that says how the two relate, in a few words. Up to about 12 nodes.
+
+### `flow`: a process or sequence
+
+```json
+{"kind": "flow", "arrow": "<what every arrow means>",
+ "steps": [{"label": "<step>", "note": "<optional detail>"}, {"label": "<step>", "highlight": true}]}
+```
+
+Up to 7 steps.
+
+### `lanes`: who does each step
+
+```json
+{"kind": "lanes", "actors": ["<actor>", "<actor>"],
+ "steps": [{"label": "<step>", "actor": "<actor>"}, {"label": "<step>", "actor": "<actor>", "highlight": true}]}
+```
+
+Actors are rows; steps follow one shared order along them. A step in another actor's lane than the one before is a hand-off, drawn as an arrow between lanes. Up to 5 actors and 10 steps.
+
+### `fork`: one input, two to four outcomes
+
+```json
+{"kind": "fork", "input": "<what comes in>", "decider": "<what decides the branch>",
+ "branches": [{"label": "<branch>", "outcome": "<helps|hurts|never|neutral>", "note": "<optional detail>", "highlight": true}]}
+```
+
+Each outcome is shown by a glyph and a word: ▲ helps, ▼ hurts, ✕ never, = neutral.
+
+### `groups`: categories and what belongs to each
+
+```json
+{"kind": "groups", "groups": [{"label": "<category>", "items": ["<item>", "<item>"], "highlight": true}]}
+```
+
+Up to 4 groups, about 15 items in total.
 
 ### `tree`: a whole broken into parts
 
 ```json
-{"kind": "tree", "headline": "...", "unit": "<unit>",
- "root": {"label": "<whole>", "children": [{"label": "<part>", "children": [{"label": "<sub-part>", "value": <number>}]}, {"label": "<part>", "value": <number>, "highlight": true}]}}
+{"kind": "tree", "unit": "<unit>",
+ "root": {"label": "<whole>", "children": [{"label": "<part>", "value": <number>}, {"label": "<part>", "value": <number>, "highlight": true}]}}
 ```
 
-A node without `value` takes the sum of its children. Children that sum to more than their parent's value are an error. Up to 4 levels.
+A node without `value` takes the sum of its children. Up to 4 levels.
 
 ### `sets`: overlapping categories
 
 ```json
-{"kind": "sets", "headline": "...", "sets": ["<set>", "<set>", "<set>"],
+{"kind": "sets", "sets": ["<set>", "<set>"],
  "regions": [{"label": "<item>", "in": ["<set>", "<set>"], "count": <number>, "highlight": true}]}
 ```
 
-Each region lists the sets it belongs to in `in`. A set with no region is shown as "none found", so it can show a gap.
+A set with no region is shown as "none found".
+
+### `matrix`: which items have which property
+
+```json
+{"kind": "matrix", "columns": ["<property>", "<property>"],
+ "rows": [{"label": "<item>", "group": "<group>", "cells": [null, "up"]}],
+ "legend": {"same": "<word for this mark>"}, "blank": "<what a blank cell means>"}
+```
+
+Each cell is `yes`, `no`, `up`, `down`, `same`, or `null`. Up to 10 rows and 5 columns.
 
 ### `pairs`: items that help in one form and not in another
 
 ```json
-{"kind": "pairs", "headline": "...", "columns": ["<first form>", "<second form>"],
+{"kind": "pairs", "columns": ["<first form>", "<second form>"],
  "rows": [{"label": "<item>", "left": [{"label": "<form>", "effect": "up"}], "right": [{"label": "<form>", "effect": "down"}]}]}
 ```
 
-One row per item, its two contrasting forms side by side. `effect` is `up`, `down` or `same`, and is optional. A side can be empty, which shows an item that never helps. Up to 7 rows.
+Up to 7 rows.
 
 ### `effects`: findings that raise or lower different outcomes
 
 ```json
-{"kind": "effects", "headline": "...",
- "rows": [{"group": "<group>", "label": "<finding>", "outcome": "<what it measured>", "effect": "up"}]}
+{"kind": "effects", "rows": [{"group": "<group>", "label": "<finding>", "outcome": "<what it measured>", "effect": "<up|down|same>"}]}
 ```
 
-One row per finding, its mark in a Lowers, No clear effect or Raises column. `outcome` names what the finding measured; use it whenever the rows measure different things. `columns` replaces the three headings. Up to 12 rows.
+Up to 12 rows.
 
 ### `quadrant`: options on two judged dimensions
 
 ```json
-{"kind": "quadrant", "headline": "...", "basis": "<where the positions come from>",
+{"kind": "quadrant", "basis": "<where the positions come from>",
  "x": {"label": "<dimension>", "low": "<low end>", "high": "<high end>"}, "y": {"label": "<dimension>", "low": "<low end>", "high": "<high end>"},
  "quadrants": {"bottom_left": "<name>", "top_right": "<name>"},
- "items": [{"label": "<option>", "x": <0 to 1>, "y": <0 to 1>, "highlight": true}]}
+ "items": [{"label": "<option>", "x": <0 to 1>, "y": <0 to 1>}]}
 ```
 
-`x` and `y` are between 0 and 1. `basis` is required.
+### `numbers`: one to three figures
+
+```json
+{"kind": "numbers", "figures": [{"value": "<formatted value>", "label": "<what it counts>"}]}
+```
+
+### `units`: a count out of a total
+
+```json
+{"kind": "units", "unit": "<what one square counts>", "parts": [{"label": "<part>", "count": <number>, "highlight": true}]}
+```
+
+Up to 3 parts and 100 units.
+
+### `bars`: values compared across items
+
+```json
+{"kind": "bars", "unit": "<unit>", "sort": "desc", "items": [{"label": "<item>", "value": <number>}]}
+```
+
+Bars start at zero. `max` sets the scale's end.
 
 ### `slope`: change between two states
 
 ```json
-{"kind": "slope", "headline": "...", "from": "<first state>", "to": "<second state>", "unit": "<unit>",
- "items": [{"label": "<item>", "before": <number>, "after": <number>, "highlight": true}]}
+{"kind": "slope", "from": "<first state>", "to": "<second state>", "unit": "<unit>",
+ "items": [{"label": "<item>", "before": <number>, "after": <number>}]}
 ```
 
 The scale starts at zero unless `"y_from_zero": false`, which requires a `y_note`.
@@ -120,126 +244,63 @@ The scale starts at zero unless `"y_from_zero": false`, which requires a `y_note
 ### `dots`: the spread of values
 
 ```json
-{"kind": "dots", "headline": "...", "unit": "<unit>",
- "groups": [{"label": "<group>", "values": [<number>, <number>]}, {"label": "<group>", "values": [<number>, <number>], "highlight": true}]}
+{"kind": "dots", "unit": "<unit>", "groups": [{"label": "<group>", "values": [<number>, <number>]}]}
 ```
-
-The median is marked; `"marker": "none"` hides it.
 
 ### `scatter`: two measures across many items
 
 ```json
-{"kind": "scatter", "headline": "...", "x_label": "<measure (unit)>", "y_label": "<measure (unit)>",
- "points": [{"x": <number>, "y": <number>, "label": "<item>", "highlight": true}, {"x": <number>, "y": <number>}]}
+{"kind": "scatter", "x_label": "<measure (unit)>", "y_label": "<measure (unit)>",
+ "points": [{"x": <number>, "y": <number>, "label": "<item>"}, {"x": <number>, "y": <number>}]}
 ```
-
-Label only the points the headline is about. Axes start at zero unless `"x_from_zero": false` or `"y_from_zero": false`.
-
-### `numbers`: one to three figures
-
-```json
-{"kind": "numbers", "headline": "...", "figures": [{"value": "<formatted value>", "label": "<what it counts>", "highlight": true}]}
-```
-
-`value` is shown as written, so format it yourself.
-
-### `units`: a count out of a total
-
-```json
-{"kind": "units", "headline": "...", "unit": "<what one square counts>",
- "parts": [{"label": "<part>", "count": <number>, "highlight": true}, {"label": "<part>", "count": <number>}]}
-```
-
-One square per counted thing. Up to 3 parts and 100 units. `unit` names what one square counts.
-
-### `matrix`: which items have which property
-
-```json
-{"kind": "matrix", "headline": "...",
- "columns": ["<property>", "<property>", "<property>"],
- "rows": [{"label": "<item>", "group": "<group>", "cells": [null, "up", {"mark": "same", "highlight": true}]}],
- "legend": {"same": "<word for this mark>"}, "blank": "<what a blank cell means>"}
-```
-
-Each cell is a mark: `yes` (✓), `no` (✗), `up` (▲, higher), `down` (▼, lower), `same` (=, no difference), or `null` for a blank cell. `legend` replaces the word shown for a mark; `blank` names what a blank cell means. Rows with the same `group` are shown under one label. A row or a cell can be highlighted. Up to 10 rows and 5 columns.
-
-### `bars`: compare values across items
-
-```json
-{"kind": "bars", "headline": "...", "unit": "<unit>", "sort": "desc",
- "items": [{"label": "<item>", "value": <number>, "highlight": true}, {"label": "<item>", "value": <number>}]}
-```
-
-Bars start at zero. Values must be zero or positive. `sort` is `desc`, `asc`, or omitted to keep the given order. `max` sets the scale's end when panels must share a scale.
 
 ### `line`: a trend over an ordered axis
 
 ```json
-{"kind": "line", "headline": "...", "unit": "<unit>", "x_label": "<axis label>",
- "series": [{"name": "<series>", "points": [["<x>", <number>], ["<x>", <number>]], "highlight": true}],
+{"kind": "line", "unit": "<unit>", "x_label": "<axis label>",
+ "series": [{"name": "<series>", "points": [["<x>", <number>], ["<x>", <number>]]}],
  "annotations": [{"series": "<series>", "x": "<x>", "text": "<what happened here>"}]}
 ```
-
-`x` values are all numbers (drawn to scale) or all labels (drawn in order). The y axis starts at zero unless `"y_from_zero": false`, which requires a `y_note` that states where it starts and why.
-
-### `table`: exact values, or items compared on several aspects
-
-```json
-{"kind": "table", "headline": "...",
- "columns": [{"label": "<column>"}, {"label": "<column>", "unit": "<unit>"}],
- "rows": [["<item>", <number>], ["<item>", <number>]], "highlight_rows": [<row number>]}
-```
-
-Give numeric columns a `unit`, or `"align": "right"`. `highlight_rows` counts from 1.
-
-### `flow`: a process or sequence
-
-```json
-{"kind": "flow", "headline": "...", "arrow": "<what every arrow means>",
- "steps": [{"label": "<step>", "note": "<optional detail>"}, {"label": "<step>", "highlight": true}]}
-```
-
-`arrow` states what every arrow means; all arrows have this one meaning. Up to 7 steps.
-
-### `groups`: categories, membership or structure
-
-```json
-{"kind": "groups", "headline": "...",
- "groups": [{"label": "<category>", "items": ["<item>", "<item>"], "highlight": true}, {"label": "<category>", "items": ["<item>"]}]}
-```
-
-Up to 4 groups, about 15 items in total.
 
 ### `timeline`: events in time
 
 ```json
-{"kind": "timeline", "headline": "...", "events": [{"date": "<date>", "label": "<event>"}, {"date": "<date>", "label": "<event>", "highlight": true}]}
+{"kind": "timeline", "events": [{"date": "<date>", "label": "<event>"}]}
 ```
 
-Events are evenly spaced, so the spacing does not show the time between them. Up to 8 events.
+Events are evenly spaced. Up to 8 events.
 
-### `text`: a point that a visual would not help
+### `table`: exact values
 
 ```json
-{"kind": "text", "headline": "...", "body": ["<short paragraph>", "<short paragraph>"]}
+{"kind": "table", "columns": [{"label": "<column>"}, {"label": "<column>", "unit": "<unit>"}],
+ "rows": [["<item>", <number>]], "highlight_rows": [<row number>]}
+```
+
+### `text`: a point no visual makes clearer
+
+```json
+{"kind": "text", "body": ["<short paragraph>"]}
 ```
 
 ### `svg`: a relation no other kind fits
 
 ```json
-{"kind": "svg", "headline": "...", "alt": "What the diagram shows, in words", "svg": "<svg viewBox=\"0 0 800 300\" ...>...</svg>"}
+{"kind": "svg", "alt": "<what the diagram shows, in words>", "svg": "<svg viewBox=\"0 0 800 <height>\">...</svg>"}
 ```
 
-The SVG must have a `viewBox`. It may contain only static drawing elements: `g`, `defs`, `desc`, `symbol`, `use`, `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `text`, `tspan`, `textPath`, `marker`, `linearGradient`, `radialGradient`, `stop`, `clipPath`, `mask` and `pattern`, with geometry, paint, text and marker attributes. Links and `url()` may only point to an `id` in the same SVG, such as `href="#box"` or `marker-end="url(#arrow)"`. No `title`, `style` element, comments, scripts, event handlers, images or animation. `alt` is required. Use only these colours:
+The SVG must have a `viewBox` and contain only static drawing elements: `g`, `defs`, `desc`, `symbol`, `use`, `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `text`, `tspan`, `textPath`, `marker`, gradients, `stop`, `clipPath`, `mask` and `pattern`. Links and `url()` may only point to an `id` in the same SVG. No `title`, `style` element, comments, scripts, event handlers, images or animation. Use only the colours of the shared vocabulary, each for its one meaning. The page draws them with the slide's `style`, so a project's style restyles the diagram too:
 
-| Colour | Hex | Use |
+| Colour | Hex | Means |
 |---|---|---|
-| Moss | `#6B7F5E` | Systems, components, ordinary nodes |
-| Terracotta | `#E8725C` | The highlighted node or path that carries the point. Not for text: its contrast on cream is below 3:1 |
-| Umber | `#5C4033` | People, teams, external actors |
+| Terracotta | `#E8725C` | The point of the slide: the highlighted item or path. Not for text |
+| Ink | `#33302B` | Normal lines and text; strong evidence |
+| Sand | `#C4B69C` | Dashed: indirect, or the deck's reading. Solid: secondary lines |
+| Moss | `#6B7F5E` | Holds, helps |
+| Umber | `#5C4033` | People and external actors |
 | Linen | `#F2EDE5` | Neutral node fill, with ink text |
-| Ink | `#33302B` | Lines and text |
-| Sand | `#C4B69C` | Secondary or dashed lines, group borders |
-| Muted | `#78736B` | Annotations, on cream only: on linen its contrast is below 4.5:1 |
+| Muted | `#78736B` | Ordinary marks and bars; annotations, on cream only |
+
+A failure or a harm shows by glyph and word, such as ▼ or ✕, not by a colour.
 
 Use `font-family="Space Grotesk, sans-serif"` and font sizes of 13 to 16 in an 800-wide `viewBox`.

@@ -1,13 +1,14 @@
 # `/show-better`
 
-Introduces a dense document, such as a research paper, a strategy or a design doc, with a short sequence of visual panels you go through before you read it. Each panel shows one relation you would otherwise work out from the prose, and every value is checked against the document.
+Introduces a dense document, such as a research paper, a strategy or a design doc, with a short story of visual slides you go through before you read it. Each slide shows one relation you would otherwise work out from the prose, every value is checked against the document, and you can ask about or correct any slide in the same page.
 
 ## When to use it
 
-- Before reading a long, dense document, to see its question, its answer and how its main ideas relate.
+- Before reading a long, dense document, to see the question it answers, its answer and how its main ideas relate.
 - After an agent wrote a long report, to add a visual introduction to it.
+- To turn that introduction into a short presentation for others.
 
-It does not turn every point into a visual. A point one sentence states well stays a sentence. The panels introduce the document; they do not replace it.
+It does not turn every point into a visual. A point one sentence states well stays a sentence. The slides introduce the document; they do not replace it.
 
 Use something else nearby:
 
@@ -27,40 +28,33 @@ Without an argument, it introduces the agent's previous output.
 ## What happens
 
 1. **It names the goal.** It works out what you must understand, learn, do or decide after reading, and what you already know. For an expert reader it shows less. If it guesses the goal, it says so when it hands over.
-2. **It reads the whole document** and writes an extract: the question and the answer, the parts, the relations between ideas, every value it might show with where it comes from, and the terms you need.
-3. **It plans 5 to 12 panels:**
-   - a cover whose title states the answer
-   - an overview of how the main ideas relate
-   - a panel or a few per important part, in the document's order, each saying where to read the detail
-   - a closing panel on what your goal needs most
-4. **It picks each panel's kind from the relation it shows.** There are more than twenty kinds, including concept maps, flows, set diagrams, matrices, slope charts, dot plots, scatter plots, timelines, quadrants and counts like "7 of 15". Code lays out every diagram.
-5. **It checks the panels.** A checker prints every headline, value, label and note. The agent compares each against the extract and the document, and checks that each headline matches its visual. It looks at the rendered page for overlaps, cut-off labels and missing highlights.
-6. **It hands over** the link or path once, with the document's answer in one or two sentences in the chat.
+2. **It reads the whole document** and writes an extract: your question and the document's answer, the parts, the relations between ideas, every value and claim with the section it comes from, and the case the document follows.
+3. **It plans a story of 5 to 12 slides.** The opening slide asks your question and answers it. Each part of the story is the next question that follows, and each headline answers it, so the headlines read in order make the argument. Every slide must answer a question in that story.
+4. **It picks a template and a visual for each slide.** Four templates: Title for the close, with each action linked to its slide; Visual for one relation; Compare for two things the document reports, on one scale; Statement for one figure with its comparison. Visuals come from more than twenty kinds, including concept maps, actor lanes with hand-offs, forks into outcomes, set diagrams, slope charts, dot plots and timelines. One vocabulary runs across every slide: terracotta marks the point, a mark's fill shows how strong its evidence is, and risk shows by glyph and word.
+5. **It checks the slides.** A checker prints every headline, value, label, detail and source. The agent compares each against the extract and the document, and looks at the rendered slides for overlaps, cut-off labels and missing highlights.
+6. **It shows you the slides** and works with you in the page until you say it is done.
 
-If your style guide conflicts with the renderer's fixed style, it tells you and asks whether to keep the renderer's style.
+If your project has its own colours and fonts, the slides and their drawings take them; the page around the slides keeps its look.
 
 ## What you get
 
-- An HTML page at `.show/<slug>/index.html`, opened in your browser or published as a link. It is not committed unless you ask.
-- The spec it was drawn from, `.show/<slug>/spec.json`.
-- Or, for a terminal or chat, the same panels as plain text or Markdown.
-- The document's answer, stated in the chat, and any assumption it made about the goal or the reader.
-
-Text output has three options:
-
-- `--ascii` keeps the text intact when pasted into plain-text files or commit messages.
-- `--screen-reader` gives sentences and value lists instead of drawn diagrams. The agent uses it if you say you read with a screen reader or find the diagrams hard to follow.
-- `--format md` gives Markdown.
+- **A live page**, served on your machine at `.show/<slug>/index.html`. One slide at a time, with a strip above that groups the slides under the story's parts; move with the buttons, the strip or the arrow keys. Click a label or a mark to see its detail: what it is, its source and how strong the evidence is. Each slide's source line links to the section of the document to read.
+- **A conversation with the agent** in the column on the right. Switch to Comment (or press C) and click any part of a slide to comment on it, or write a message. The agent replies under your message, each item shows whether it is seen, being worked on or done, and you accept a done item or reply to send it back. Changed slides load in place once you stop typing.
+- **Export**, which downloads the slides alone as one presentation file: arrow keys, space or clicks to move, F for full screen.
+- **A copy to share.** Opened as a file or published as a link, the page shows the slides and their details without the conversation.
+- **Text instead**, for a terminal or chat: plain text, Markdown, ASCII only, or sentences and value lists for a screen reader.
+- The spec the slides were drawn from, `.show/<slug>/spec.json`, not committed unless you ask, and the document's answer stated in the chat.
 
 ## Works with
 
-- [`/write-better`](write-better.md) checks the wording of the title, summary, headlines, labels and notes.
+- [`/write-better`](write-better.md) checks the wording of the title, headlines, labels, details and sources.
 - [`/write-better`](write-better.md) calls `/show-better` to introduce a long, dense document.
 
 ## What it needs
 
 | Capability | Without it |
 |---|---|
-| Python 3, and a browser that can open files on the machine or a way to publish a page | It renders text or Markdown for the terminal or chat instead. |
-| Python 3 at all | It writes the panels in Markdown by hand: tables for comparisons, lists for structure, and plain-text diagrams only for flows of four short steps or fewer. It checks every value against the document by hand. |
+| Python 3, and a browser that can reach the machine where the agent runs | It publishes the slides as a page without the conversation if it can, or renders text or Markdown for the terminal or chat. |
+| A way to hear about page actions as they happen | It asks you to say "sent" in the chat, then reads what you sent from the page's log. |
+| Python 3 at all | It writes the slides in Markdown by hand: tables for comparisons, lists for structure, and plain-text diagrams only for flows of four short steps or fewer. It checks every value against the document by hand. |
 | Viewing the page or a screenshot | It says it could not look at the result. |

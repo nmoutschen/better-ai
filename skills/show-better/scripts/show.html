@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Loaded without blocking: the page draws at once with the fallback fonts, and offline it stays readable. -->
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+{{CSS}}
+{{STYLE}}
+</style>
+</head>
+<body class="app">
+<div class="band"></div>
+<header>
+  <div class="ttl"><h1>{{TITLE}}</h1>{{QUESTION}}</div>
+  <div class="controls">
+    <div class="seg cycle live-only" role="group" aria-label="Mode">
+      <button type="button" class="ico" data-mode="read" aria-pressed="true" title="Click a label or a mark to see its detail (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg><span>Read</span></button>
+      <button type="button" class="ico" data-mode="comment" aria-pressed="false" title="Click any part of a slide to comment on it (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z"/></svg><span>Comment</span></button>
+    </div>
+    <button type="button" class="tool export" title="Download the slides alone as one presentation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>
+  </div>
+</header>
+<p class="offline" role="status" hidden>The page is closed. Ask the agent to restart it.</p>
+<div class="work">
+  <main>
+    <nav class="route" aria-label="Slides">
+      <button type="button" class="btn btn--quiet prev">Previous</button>
+      <ol class="strip"></ol>
+      <span class="count" aria-live="polite"></span>
+      <button type="button" class="btn next">Next</button>
+    </nav>
+    <div class="stage">{{SLIDES}}</div>
+  </main>
+  <aside class="notes live-only" aria-labelledby="notes-h">
+    <div class="notes-top">
+      <h2 id="notes-h">Conversation</h2>
+      <div class="seg filter" role="group" aria-label="Show">
+        <button type="button" data-filter="all" aria-pressed="false">All</button>
+        <button type="button" data-filter="open" aria-pressed="true">Open</button>
+      </div>
+    </div>
+    <p class="empty">Nothing yet. Switch to Comment and click any part of a slide to comment on it, or write to the agent below.</p>
+    <ol class="thread"></ol>
+    <div class="composer">
+      <p class="unwatched" role="status" hidden>The agent is not watching this page right now. What you send is saved, but it reads it only when it next looks: tell it in the chat.</p>
+      <label for="note">Ask about the document, or correct a slide</label>
+      <textarea id="note"></textarea>
+      <div class="send">
+        <button type="button" class="btn">Send</button>
+        <p class="status" role="status"></p>
+      </div>
+    </div>
+  </aside>
+</div>
+<div class="pop" role="dialog" aria-label="Comment" hidden>
+  <p class="target"></p>
+  <textarea aria-label="Comment"></textarea>
+  <div class="row2">
+    <button type="button" class="btn ok">Send</button>
+    <button type="button" class="btn btn--quiet cancel">Cancel</button>
+    <button type="button" class="btn btn--quiet remove" hidden>Delete</button>
+  </div>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+<script>
+{{JS}}
+</script>
+</body>
+</html>
