@@ -299,13 +299,17 @@ addEventListener("pointerup", () => { drag = null; wrapEl.classList.remove("drag
 
 // ---------- The conversation: page.js, shared with the canvas and the slides; the board adds decisions and workers ----------
 // A decision the coordinator took without the user is a message from it, placed where it happened. Its time is its `at`
-// line; the file's own time moves whenever the coordinator edits it. An answer never comes before its decision, so it
-// always finds the decision it answers.
+// line; the file's own time moves whenever the coordinator edits it, and may be in another time zone than the log. So
+// nothing comes before what it answers: an answer before its decision, a reply before the answer it replies to. The log
+// is in the order things happened, so what an event answers is already timed when the event is read.
 function events(d) {
   const at = e => Date.parse(e.at) / 1000 || 0;
   const decisions = (d.decisions || []).map(x => ({action: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || x._born}));
   const when = Object.fromEntries(decisions.map(e => [e.id, e._t]));
-  return (d.conversation || []).map(e => ({...e, _t: e.action === "answer" && e.decision in when ? Math.max(at(e), when[e.decision]) : at(e)}))
+  return (d.conversation || []).map(e => {
+    const _t = Math.max(at(e), when[e.action === "answer" ? e.decision : e.to] || 0);
+    if (e.id) when[e.id] = _t;
+    return {...e, _t}; })
     .concat(decisions).sort((a, z) => a._t - z._t || (z.action === "decision") - (a.action === "decision"));
 }
 const decisionStatus = x => String(x.status || "pending").trim().toLowerCase();
@@ -469,10 +473,10 @@ document.addEventListener("click", ev => {
     return conv.send("answer", {id: uid("a"), decision: ud.dataset.default, text: "Use the default.", default: true}, "Answer", null, () => { ud.disabled = false; }); }
   const ch = t.closest(".thread .change"); if (ch) { const d = ch.closest("li").dataset.d;  // hidden, not removed, so the state row does not move
     return conv.box(ch.closest("li"), d, "What should the run do?", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text}, "Answer", done)); }
-  if ($("pop") && !t.closest("form")) closePop();
+  if ($("pop") && !t.closest("form, .why")) closePop();
 });
 document.addEventListener("keydown", ev => {
-  if (ev.key === "Escape" && $("pop")) { ev.preventDefault(); closePop(); }
+  if (ev.key === "Escape" && $("pop") && !(ev.target.closest && ev.target.closest(".why"))) { ev.preventDefault(); closePop(); }
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".map .q")) { ev.preventDefault(); openPop("question", ev.target.dataset.q, ev.target); }
   if (ev.key === "Enter" && !ev.shiftKey && ev.target.matches && ev.target.matches("form.popask textarea")) { ev.preventDefault(); ev.target.form.requestSubmit(); }
 });
