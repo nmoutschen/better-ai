@@ -64,7 +64,7 @@ Example: `/ask-better clean up the old branches`
    Otherwise it goes ahead and states the assumption next to the result, with what you would see if it were wrong.
 5. **It asks few, specific questions.**
    - Usually no more than three, all in one message, before the work that depends on them.
-   - Each offers two to four concrete options, with its recommendation first.
+   - Each offers two to four concrete options, with its recommendation first and that option's main drawback.
    - Each says why it is asked, so it makes sense on its own.
 6. **During the task**, it asks new questions between steps, not in the middle of one. While it waits, it continues only work that does not depend on the answer and is easy to undo.
 
@@ -83,7 +83,7 @@ Example: `/ask-better clean up the old branches`
 <details>
 <summary><b>Works with</b></summary>
 
-It calls no other skill.
+It calls [`/decide-better`](decide-better.md) when a question asks you to make a decision that is yours.
 
 It is called by:
 

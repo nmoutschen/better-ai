@@ -72,7 +72,7 @@ IF the change adds or changes structure, such as a new module, data model, inter
 
 FOLLOW the existing patterns, conventions and dependencies of the codebase. IF you must depart from them, SAY why.
 
-NAME the design decisions that change behaviour, cost, risk, or how the code must be maintained, such as a new dependency, a schema change, or a trade-off between speed and simplicity. IF the user is a developer who will maintain the code, SHOW them these decisions before building. OTHERWISE, REPORT them with the result.
+NAME the design decisions that change behaviour, cost, risk, or how the code must be maintained, such as a new dependency, a schema change, or a trade-off between speed and simplicity. IF the user is a developer who will maintain the code, SHOW them these decisions before building: FOLLOW `/decide-better` if available, OTHERWISE GIVE for each your recommendation, its main reason and its main drawback. OTHERWISE, REPORT them with the result.
 
 IF design work reveals a requirement gap, such as what happens when a step fails halfway, RETURN to section 1.3 for that gap. DO NOT decide it silently in the design.
 
