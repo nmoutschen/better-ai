@@ -25,7 +25,8 @@ harness that streams a command's output delivers it to the agent as it arrives. 
 --out, without --serve and --open, updates the served page: the open page loads the new versions once the user is not typing.
 
 `wait` blocks until the served page receives actions the agent has not seen, prints them and exits, for harnesses
-that only notify when a command ends. `reply` shows the agent's reply in the page's conversation, `status` marks each
+that only notify when a command ends. Once a `wait` has connected, the page tells the user whenever none has been
+connected for a few seconds, since what they send then reaches the agent only when it next looks. `reply` shows the agent's reply in the page's conversation, `status` marks each
 item seen, asked, working, done or accepted, and `pending` lists what is not finished. Without a server, Copy all
 copies the feedback as text for the user to paste in the chat. Comments work on versions embedded from files only.
 
@@ -66,6 +67,7 @@ METHODS = ("comment", "delete", "note", "verdict", "decide", "accept", "reopen")
 ITEMS = ("comment", "note", "decide")  # what the agent tracks with status
 STATES = ("seen", "asked", "working", "done", "accepted")
 MAX_BODY = 200_000
+LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the agent is not watching
 
 
 def icon(path: str) -> str:
@@ -306,6 +308,15 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
 
         return FILE_BASE.sub(swap, page.read_text(encoding="utf-8")).encode("utf-8")
 
+    # Whether a `wait` is listening: None until one first connects (the agent may stream this output instead), then
+    # True while one is connected or reconnected within GAP seconds. The page warns the user when it is False.
+    waiters = {"open": 0, "last": None}
+
+    def listening():
+        if waiters["last"] is None:
+            return None
+        return waiters["open"] > 0 or time.time() - waiters["last"] < LISTEN_GAP
+
     def wait_for_more(after: int, seconds: float) -> int:
         deadline = time.time() + seconds
         while len(log_lines(folder)) <= after and time.time() < deadline:
@@ -352,6 +363,8 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
                 return self.version_file()
             if self.path == "/rev":
                 return self.send(200, str(page.stat().st_mtime_ns).encode(), "text/plain")
+            if self.path == "/listening":
+                return self.send_json(listening())
             if self.path.startswith("/events?after="):
                 # Long poll for the page: every event after the first `after`, the agent's included.
                 after = self.after()
@@ -359,7 +372,16 @@ def serve(page: Path, port: int, open_browser: bool) -> None:
                 return self.send_json({"total": total, "events": read_log(folder)[after:total]})
             if self.path.startswith("/wait?after="):
                 # Long poll for `wait`: the number of events, as soon as there are more than `after`.
-                return self.send(200, str(wait_for_more(self.after(), 25)).encode(), "text/plain")
+                with lock:
+                    waiters["open"] += 1
+                    waiters["last"] = time.time()
+                try:
+                    total = wait_for_more(self.after(), 25)
+                finally:
+                    with lock:
+                        waiters["open"] -= 1
+                        waiters["last"] = time.time()
+                return self.send(200, str(total).encode(), "text/plain")
             self.send_error(404)
 
         def do_POST(self):

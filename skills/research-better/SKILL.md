@@ -65,6 +65,8 @@ TELL the user the board's path once.
 
 IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the live view: `python3 scripts/board.py watch <board-path>` from this skill's directory. It opens the user's browser, prints its address, and exits by itself once the board's status is stopped. GIVE the user the address. IF the harness can only run commands in the foreground, DO NOT start it. TELL the user they can run it themselves instead.
 
+IF your harness tells you when a background command ends, ALSO RUN `python3 scripts/board.py wait <board-path>` in the background while the live view runs: it ends with the user's new actions, so a message wakes you even when you are waiting for workers. START it again at once each time it ends, before you act on what it printed. WHILE no `wait` runs, the page tells the user that you are not watching.
+
 The live view shows the board as a map of the questions, the agents at work, and the decisions waiting for the user or taken without them. The user asks about a question or an agent, writes to you, and changes your decisions there. `watch` prints each action as one JSON line and saves it in the board's `conversation.jsonl`.
 
 - READ the user's open items with `python3 scripts/board.py pending <board-path>` each time you re-read the board (section 7.2), and when you resume a board. ACT on each one as the user's instruction for the GOAL, unless it asks for an answer you expect: steering by the user is not a prior to avoid, but a question the user adds goes through the same review as a worker's (section 7.2, step 1).

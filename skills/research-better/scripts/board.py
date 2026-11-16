@@ -15,7 +15,7 @@ research, the agents at work, the decisions taken without the user, and a conver
 comments on any question, decision or agent, writes to the coordinator, or answers a decision. Each action is a
 JSON-RPC call from the page; the script appends it to conversation.jsonl in the board and prints it to stdout, so a
 harness that streams a command's output delivers it as it arrives. `wait` is for harnesses that only notify when a
-command ends. `reply` and `status` work with or without a server, so a resumed run can answer what the user wrote while
+command ends: once one has connected, the page tells the user whenever none has been connected for a few seconds. `reply` and `status` work with or without a server, so a resumed run can answer what the user wrote while
 no agent was running.
 """
 
@@ -40,6 +40,7 @@ METHODS = ("comment", "note", "answer")  # what the page may send
 ITEMS = ("comment", "note", "answer")  # what the coordinator tracks with status
 STATES = ("seen", "asked", "working", "done", "accepted")
 MAX_BODY = 200_000
+LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the coordinator is not watching
 
 
 def born(path: Path) -> float:
@@ -198,6 +199,14 @@ def rpc_error(rid, code: int, message: str) -> dict:
 
 def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
     lock = threading.Lock()
+    # Whether a `wait` is listening: None until one first connects (the coordinator may stream this output instead),
+    # then True while one is connected or reconnected within LISTEN_GAP seconds. The page warns the user when False.
+    waiters = {"open": 0, "last": None}
+
+    def listening():
+        if waiters["last"] is None:
+            return None
+        return waiters["open"] > 0 or time.time() - waiters["last"] < LISTEN_GAP
 
     def wait_for_more(after: int, seconds: float) -> int:
         deadline = time.time() + seconds
@@ -226,15 +235,22 @@ def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
                 return self.send_error(403)
             if self.path.startswith("/board.json"):
                 stamp_logs(board, initial=False)
-                return self.send_json(load(board))
+                return self.send_json({**load(board), "listening": listening()})
             if self.path in ("/", "/index.html"):
                 return self.send(200, page(None).encode(), "text/html; charset=utf-8")
             if self.path.startswith("/wait?after="):
                 # Long poll for `wait`: the number of events, as soon as there are more than `after`.
                 value = self.path.split("=", 1)[1]
-                return self.send(
-                    200, str(wait_for_more(int(value) if value.isdigit() else 0, 25)).encode(), "text/plain"
-                )
+                with lock:
+                    waiters["open"] += 1
+                    waiters["last"] = time.time()
+                try:
+                    total = wait_for_more(int(value) if value.isdigit() else 0, 25)
+                finally:
+                    with lock:
+                        waiters["open"] -= 1
+                        waiters["last"] = time.time()
+                return self.send(200, str(total).encode(), "text/plain")
             self.send_error(404)
 
         def do_POST(self):

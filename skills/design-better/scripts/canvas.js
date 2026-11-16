@@ -741,6 +741,14 @@
         }
       }).catch(function () {}).then(function () { setTimeout(poll, 2000); });
     })();
+    // Once the agent has used `wait`, a note above the message box says when no `wait` is connected: what the user
+    // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more.
+    var unwatched = document.querySelector('.unwatched');
+    (function watch() {
+      fetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
+        unwatched.hidden = on !== false;
+      }).catch(function () { unwatched.hidden = true; }).then(function () { setTimeout(watch, 2000); });
+    })();
     try {
       var kept = JSON.parse(sessionStorage.getItem(KEY) || 'null');
       sessionStorage.removeItem(KEY);

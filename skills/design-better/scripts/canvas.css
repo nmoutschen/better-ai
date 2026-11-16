@@ -96,3 +96,6 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .pop .remove[hidden] { display:none; }
 .vcomment { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .vcomment:focus { position:static; width:auto; height:30px; clip-path:none; padding:0 10px; border:1px solid var(--ink); background:var(--cream); font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+/* Above the message box when no `wait` is connected, so a note sent after the agent stopped watching is not lost in silence. */
+.unwatched { margin:0 0 12px; padding:8px 12px; background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:500 13px/1.45 var(--sans); }
+.unwatched[hidden] { display:none; }
