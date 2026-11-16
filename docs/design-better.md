@@ -70,6 +70,7 @@ Without an argument, it reviews the interface the conversation is building, then
    - Choose one version, a combination or none with Decide.
    - The agent replies under your comment and marks it seen, working or done. Accept a done item with the ✓ next to Reply, or reply under it to send it back.
    - Every message, the agent's included, can be answered with Reply. The conversation opens at the latest message, and what you are typing survives new replies.
+   - Open lists what is not accepted yet, and the agent's questions until you answer them.
    - New versions load by themselves once you stop typing. If the agent's server stops, a strip under the bar says the canvas is closed.
 6. **It builds.** It keeps your design language. If a rule such as text contrast conflicts with it, the agent reports the conflict once and follows your decision. It changes a few visual things at a time and shows each batch before and after. It decides empty, loading, error and other edge states.
 7. **It checks by walking.** It operates the rendered interface for each scenario: with a pointer, by keyboard only, and at the smallest screen width. It reads the labels and headings without the visual page, runs an accessibility checker if one is available, and stops fixing after about three rounds or when a fix breaks a scenario that passed.
