@@ -1,0 +1,8 @@
+reply: ''
+actions:
+- read: kiosk.py
+- write: kiosk.py
+  content: |
+    GREETING = "Welcome back"
+- bash: git diff
+- bash: python -m py_compile kiosk.py

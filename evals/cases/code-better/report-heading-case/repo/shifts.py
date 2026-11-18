@@ -1,0 +1,10 @@
+"""Volunteer shift export: builds the CSV file coordinators download each week."""
+
+HEADER = "Shifts"
+
+
+def export(rows):
+    """Return the CSV text: a title line, the column names, then one line per shift."""
+    lines = [HEADER, "name,day,hours"]
+    lines += [f"{name},{day},{hours}" for name, day, hours in rows]
+    return "\n".join(lines) + "\n"

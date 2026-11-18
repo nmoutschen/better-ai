@@ -1,0 +1,9 @@
+reply: ''
+actions:
+- write: cart.py
+  content: |
+    # TODO: support discount codes at checkout.
+
+
+    def total(lines, coupon=None):
+        return sum(price * quantity for price, quantity in lines)

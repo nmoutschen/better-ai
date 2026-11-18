@@ -1,0 +1,6 @@
+reply: Done; receipts may need a look?
+actions:
+- write: price.py
+  content: |
+    def show(amount):
+        return f"€{amount:.2f}"

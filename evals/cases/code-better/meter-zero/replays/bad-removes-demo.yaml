@@ -1,0 +1,6 @@
+reply: ''
+actions:
+- write: meter.py
+  content: |
+    def display(value):
+        return str(value) if value is not None else "missing"

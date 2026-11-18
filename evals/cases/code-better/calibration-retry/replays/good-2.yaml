@@ -1,0 +1,7 @@
+reply: No device.
+actions:
+- write: scale.py
+  content: |
+    DISPLAY = 'Zero'
+- bash: python test_scale.py
+- read: calibrate.py

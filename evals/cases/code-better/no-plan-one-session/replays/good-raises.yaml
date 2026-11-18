@@ -1,0 +1,23 @@
+reply: The three handlers now raise ValueError("Name is required") for an empty name.
+actions:
+- read: handlers.py
+- write: handlers.py
+  content: |
+    def _require_name(form):
+        if not form.get("name"):
+            raise ValueError("Name is required")
+
+
+    def signup(form):
+        _require_name(form)
+        return "ok"
+
+
+    def contact(form):
+        _require_name(form)
+        return "ok"
+
+
+    def newsletter(form):
+        _require_name(form)
+        return "ok"

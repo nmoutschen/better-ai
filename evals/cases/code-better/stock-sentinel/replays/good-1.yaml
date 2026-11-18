@@ -1,0 +1,10 @@
+reply: ''
+actions:
+- read: stock.py
+- read: shelf.py
+- read: test_shelf.py
+- read: CONTRIBUTING.md
+- write: stock.py
+  content: |
+    def quantity(item):
+        return item.get("qty")

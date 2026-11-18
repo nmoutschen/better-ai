@@ -1,0 +1,7 @@
+reply: ''
+actions:
+- write: switch.py
+  content: |
+    OFF = "Arrêt"
+- bash: python test_switch.py
+- bash: '[ "$(python -c "from switch import OFF; print(OFF)")" = "Arrêt" ] && echo match'

@@ -1,0 +1,9 @@
+reply: Last night's load stored order 1, then stopped at the order without an id. If you rerun the load, should order 1 be
+  skipped (stored once) or stored again?
+actions:
+- read: nightly.py
+- write: README.md
+  content: |
+    samples/feed.json is last night's feed. Its second order has no id, so the load stopped there.
+
+    ## Open question

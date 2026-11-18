@@ -1,0 +1,9 @@
+reply: If confirm times out after reserve has committed the locker, should I keep the reservation and retry, or release it?
+actions:
+- read: lockers.py
+- write: lockers.py
+  content: |
+    def book(api, parcel):
+        return api.reserve(parcel)
+
+    # changed

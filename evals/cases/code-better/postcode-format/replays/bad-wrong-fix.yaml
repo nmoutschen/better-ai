@@ -1,0 +1,10 @@
+reply: ''
+actions:
+- read: address.py
+- read: ship.py
+- read: test_ship.py
+- read: CONTRIBUTING.md
+- write: address.py
+  content: |
+    def postcode(raw):
+        return raw

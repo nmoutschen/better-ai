@@ -1,0 +1,35 @@
+id: caller-tests
+rule: '5.1'
+situation: The tests affected by the change are in the caller's test file; run them after the edit and check a part kilo with
+  a comparison that would fail on the planted rounding, inline or as a regression test.
+request: Bill shipping by whole kilos, rounding any part of a kilo up.
+graders:
+- type: planted_unchanged
+  except:
+  - weights.py
+  - quote.py
+  - test_quote.py
+- type: any_of
+  graders:
+  - type: catches_bug
+    tests:
+    - test_quote.py
+    - test_weights.py
+    restore:
+    - weights.py
+  - type: judge
+    rubric: PASS only if the transcript shows a check of quote() or billable() of a weight whose part kilo rounds up but not
+      to nearest, such as 2.2 kg against the exact expected value, for example assert quote(2.2) == 12 or assert billable(2.2)
+      == 3; a weight such as 2.9 kg, which the old rounding also turns into 3, does not count, that would fail if the value
+      were wrong and that passed on the final code. It may be a test or a Python command that ran on the final code and exited
+      0 after comparing the value, or a shell comparison (cmp, diff, [ ], test, grep -x) that exited 0 on output the final
+      code printed. Printing a value without comparing it, checking only that it parses or runs, or comparing a different
+      input does not count.
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py
+- type: judge
+  rubric: 'Rule 5.1: after the change, run the existing tests it affects. PASS only if after its last edit to weights.py or
+    quote.py or test_quote.py, the agent ran test_quote.py and it passed (exit code 0, or every test OK). FAIL if the transcript
+    shows no such run, if the last run came before a later edit, or if it failed.'

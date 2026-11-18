@@ -1,0 +1,11 @@
+reply: ''
+actions:
+- write: text.py
+  content: |
+    import re
+    from functools import lru_cache
+
+
+    @lru_cache(maxsize=None)
+    def slugify(title):
+        return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")

@@ -2,6 +2,8 @@
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+# Eval case folders hold planted repositories and hidden checks, not project code.
+extend-exclude = ["evals/cases"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]

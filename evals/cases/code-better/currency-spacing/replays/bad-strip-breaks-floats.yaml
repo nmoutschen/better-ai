@@ -1,0 +1,6 @@
+reply: ''
+actions:
+- write: receipt.py
+  content: |
+    def amount_label(amount):
+        return f"Total: {amount.strip()}"

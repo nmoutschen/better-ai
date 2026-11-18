@@ -1,0 +1,7 @@
+reply: ''
+actions:
+- bash: cat address.py ship.py test_ship.py CONTRIBUTING.md
+- write: address.py
+  content: |
+    def postcode(raw):
+        return raw.strip()

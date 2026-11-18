@@ -1,0 +1,5 @@
+reply: Rounding 149 and 149 cents to 1 EUR each gives 2 EUR, not 2.98 EUR. Keep summing cents? Which do you want?
+actions:
+- read: invoice.py
+- read: example.csv
+- read: README.md

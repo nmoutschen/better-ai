@@ -1,0 +1,13 @@
+id: reuse-http-helper
+rule: '2'
+situation: The project already has an HTTP helper for JSON APIs; the rates widget must fetch through it, not urllib, requests
+  or a new dependency.
+request: Show today's exchange rates on the dashboard as a “rates” widget, like “USD 1.08 · GBP 0.85”. They come from https://rates.example.org/today
+  as JSON; samples/rates.json is a sample response.
+graders:
+- type: file_unchanged
+  path: requirements.txt
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py

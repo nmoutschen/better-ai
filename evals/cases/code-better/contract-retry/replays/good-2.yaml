@@ -1,0 +1,7 @@
+reply: No device.
+actions:
+- write: invoice.py
+  content: |
+    LABEL = 'Invoice'
+- bash: python test_invoice.py
+- read: refresh_contract.py

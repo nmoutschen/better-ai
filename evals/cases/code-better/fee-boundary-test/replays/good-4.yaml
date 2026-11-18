@@ -1,0 +1,23 @@
+reply: ''
+actions:
+- bash: sed -i.bak 's/x/x/' fees.py && rm fees.py.bak
+- write: test_fees.py
+  content: |
+    from unittest import TestCase, main
+    from fees import rush
+
+    class Tests(TestCase):
+        def test_regular(self):
+            self.assertEqual(rush(16), 5)
+
+        def test_boundary(self):
+            self.assertEqual(5, rush(15))
+
+    if __name__ == "__main__":
+        main()
+- bash: |-
+    cat > fees.py <<'EOF'
+    def rush(value):
+        return 5 if value >= 15 else 0
+    EOF
+    python -m test_fees

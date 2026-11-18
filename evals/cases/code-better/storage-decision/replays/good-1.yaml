@@ -1,0 +1,10 @@
+reply: What zone should Ana's 08:00 reminder use?
+actions:
+- read: store.py
+- read: reminders.json
+- read: scheduler.py
+- read: README.md
+- write: docs/design.md
+  content: |
+    # Design
+    Recommend IANA zone per user. Drawback: hand migration.

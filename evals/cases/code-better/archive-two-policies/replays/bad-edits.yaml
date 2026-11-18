@@ -1,0 +1,5 @@
+reply: Archive or delete?
+actions:
+- write: mailbox_job.py
+  content: |
+    x = 1

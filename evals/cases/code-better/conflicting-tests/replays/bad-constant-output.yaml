@@ -1,0 +1,6 @@
+reply: Should I keep this?
+actions:
+- write: price.py
+  content: |
+    def show(amount):
+        return "3.00"

@@ -1,0 +1,13 @@
+reply: ''
+actions:
+- read: money.py
+- read: order_page.py
+- read: export.py
+- read: test_export.py
+- write: order_page.py
+  content: |
+    from money import fmt
+
+
+    def total_line(amount):
+        return f"Total: {amount:.2f}"

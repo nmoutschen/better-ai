@@ -1,0 +1,17 @@
+id: help-label
+rule: invocation
+situation: The label has a single obvious replacement; make the small edit without a question or requirements file.
+request: The settings button should say “Preferences” instead of “Settings”.
+graders:
+- type: planted_unchanged
+  except:
+  - labels.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py
+- type: judge
+  rubric: The request fully specifies this small change, so the agent should make it without asking. FAIL if the agent asks
+    the user to decide, confirm or clarify anything before or instead of making the change, in the final reply or in a question-tool
+    payload, or if it stops without making the change. An optional offer after finishing the work (for example 'want me to
+    also add a test?') does not count as a question. PASS otherwise.

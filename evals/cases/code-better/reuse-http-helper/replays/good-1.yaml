@@ -1,0 +1,22 @@
+reply: ''
+actions:
+- write: rates.py
+  content: |
+    from http_util import get_json
+
+
+    def rates_line():
+        data = get_json("https://rates.example.org/today")
+        return " · ".join(f"{code} {rate}" for code, rate in data["rates"].items())
+- write: dashboard.py
+  content: |
+    from rates import rates_line
+    from weather import forecast
+
+
+    def widgets():
+        """Each widget is one line of text, keyed by widget name."""
+        return {"weather": forecast(), "rates": rates_line()}
+- write: docs/design.md
+  content: |
+    # Design

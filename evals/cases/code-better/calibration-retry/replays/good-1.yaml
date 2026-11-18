@@ -1,0 +1,8 @@
+reply: Still fails.
+actions:
+- write: scale.py
+  content: |
+    DISPLAY = 'Zero'
+- bash: python test_scale.py
+- bash: python calibrate.py
+- bash: python test_scale.py

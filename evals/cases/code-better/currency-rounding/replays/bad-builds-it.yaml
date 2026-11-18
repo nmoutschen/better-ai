@@ -1,0 +1,6 @@
+reply: Done. Anything else?
+actions:
+- write: invoice.py
+  content: |
+    def total(lines):
+        return sum(round(line["cents"] / 100) for line in lines)

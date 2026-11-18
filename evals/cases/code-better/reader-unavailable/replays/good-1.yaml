@@ -1,0 +1,6 @@
+reply: ''
+actions:
+- write: sensor.py
+  content: |
+    LABEL = 'Ready'
+- bash: python test_sensor.py

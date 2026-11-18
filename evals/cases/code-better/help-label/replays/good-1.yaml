@@ -1,0 +1,5 @@
+reply: Done.
+actions:
+- write: labels.py
+  content: |
+    SETTINGS_BUTTON = "Preferences"

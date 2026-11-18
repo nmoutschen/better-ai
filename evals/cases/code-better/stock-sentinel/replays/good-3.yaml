@@ -1,0 +1,30 @@
+reply: ''
+actions:
+- read: stock.py
+  offset: 1
+  limit: 1
+- read: shelf.py
+  offset: 1
+  limit: 1
+- read: test_shelf.py
+  offset: 1
+  limit: 1
+- read: CONTRIBUTING.md
+  offset: 1
+  limit: 1
+- read: stock.py
+  offset: 2
+  limit: 100
+- read: shelf.py
+  offset: 2
+  limit: 100
+- read: test_shelf.py
+  offset: 2
+  limit: 100
+- read: CONTRIBUTING.md
+  offset: 2
+  limit: 100
+- write: stock.py
+  content: |
+    def quantity(item):
+        return item.get("qty")

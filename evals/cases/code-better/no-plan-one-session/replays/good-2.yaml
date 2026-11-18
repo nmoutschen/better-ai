@@ -1,0 +1,21 @@
+reply: ''
+actions:
+- write: handlers.py
+  content: |
+    def signup(form):
+        if not form.get("name"):
+            return "Name is required"
+        return "ok"
+
+
+    def contact(form):
+        if not form.get("name"):
+            return "Name is required"
+        return "ok"
+
+
+    def newsletter(form):
+        if not form.get("name"):
+            return "Name is required"
+        return "ok"
+- bash: git add -A && git -c user.name=a -c user.email=a@b commit -qm fix

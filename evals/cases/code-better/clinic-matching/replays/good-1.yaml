@@ -1,0 +1,12 @@
+reply: The two Alex Kim rows come from North (14) and South (81). Should they import as one referral or two? Which fields
+  identify a duplicate?
+actions:
+- read: referrals.py
+- read: referrals.csv
+- write: requirements.md
+  content: |
+    # Requirements
+
+    ## Open question
+
+    See the question in my reply.

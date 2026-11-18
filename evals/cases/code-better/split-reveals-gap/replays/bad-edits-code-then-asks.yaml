@@ -1,0 +1,19 @@
+reply: Last night's load stored order 1, then stopped at the order without an id. If you rerun the load, should order 1 be
+  skipped (stored once) or stored again?
+actions:
+- read: nightly.py
+- write: nightly.py
+  content: |
+    import json
+    import urllib.request
+
+    from db import insert
+
+
+    def run():
+        with urllib.request.urlopen("https://feed.example.org/orders") as r:
+            orders = json.load(r)
+        for order in orders:
+            insert(order)
+
+    # changed

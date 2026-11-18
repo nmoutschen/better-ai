@@ -1,0 +1,22 @@
+judge: false
+reply: ''
+actions:
+- write: weights.py
+  content: |
+    import math
+
+
+    def billable(kg):
+        return math.ceil(kg)
+- bash: python -m unittest test_quote
+- write: tests_extra/test_part_kilo.py
+  content: |
+    import unittest
+
+    from weights import billable
+
+
+    class T(unittest.TestCase):
+        def test_part(self):
+            self.assertEqual(billable(2.2), 3)
+- bash: python -m unittest tests_extra.test_part_kilo

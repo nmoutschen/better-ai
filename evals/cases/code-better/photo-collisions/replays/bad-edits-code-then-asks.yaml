@@ -1,0 +1,10 @@
+reply: Photos 7 and 9 were both taken on 2026-08-01. Should they be 2026-08-01.jpg and 2026-08-01-2.jpg, or 2026-08-01-7.jpg
+  and 2026-08-01-9.jpg?
+actions:
+- read: photos.py
+- write: photos.py
+  content: |
+    def filename(photo):
+        return f"{photo['id']}.jpg"
+
+    # changed

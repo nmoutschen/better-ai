@@ -1,0 +1,6 @@
+reply: Done. Anything else?
+actions:
+- write: booking.py
+  content: |
+    import time
+    sold = set()

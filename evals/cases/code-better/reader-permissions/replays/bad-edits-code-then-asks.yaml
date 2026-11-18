@@ -1,0 +1,10 @@
+reply: Records include mobile phones and dietary details. Should a volunteer's search show only the name and registration
+  status, or the phone and dietary details too?
+actions:
+- read: registry.py
+- write: registry.py
+  content: |
+    def search(rows, name):
+        return [row for row in rows if name.lower() in row["name"].lower()]
+
+    # changed

@@ -1,0 +1,252 @@
+# Skill evaluation
+
+Each case plants a small repository with one situation that a rule of a skill
+covers, sends Claude Code a request, and grades whether it followed that rule.
+The agent is the real Claude Code CLI, run in a Docker sandbox. Code checks
+grade the result it left in the repository; an LLM judge reads the transcript
+to grade how it worked. See `PLAN.md` for the plan behind it.
+
+## Layout
+
+```
+evals/
+  eval.py                 Inspect task: one sample per case and condition
+  skill_evals/
+    cases.py              case folders -> samples, condition prompts
+    agent.py              runs Claude Code (or the scripted fake) in the sandbox
+    transcript.py         stream-json -> Inspect messages, usage, cost, time
+    sandbox/              Dockerfile, compose.yaml, allowlist proxy
+    grading/              scorer.py, files.py (result checks), judge.py
+  tools/
+    validate_cases.py     replays good and bad runs through the result checks
+    check_coverage.py     rules covered by cases
+    report.py             pass rate per rule and condition, tokens, cost, time, judge agreement
+  cases/<skill>/...       the cases
+  judge_labels/           hand labels for judge validation
+  tests/
+```
+
+## Running
+
+Install the pinned packages from `evals/` with `uv sync --python 3.12` and
+start Docker. Run from `evals/`:
+
+```sh
+uv run inspect eval eval.py -T skill=code-better -T condition=skill --max-samples 2
+```
+
+Task options (`-T name=value`):
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `skill` | required | Skill folder name, such as `code-better`. |
+| `condition` | `no-skill` | `no-skill`, `skill`, `one-sentence`, or a list such as `no-skill,skill`. |
+| `rule`, `cases` | all | Only one rule (`-T 'rule="1.5"'`) or some case ids (`-T cases=help-label,meter-zero`). |
+| `agent` | `claude_code` | `fake` plays each case's first good replay instead; no model calls. |
+| `model` | `sonnet` | Claude Code `--model` for the agent. |
+| `judge_model` | a different model | `opus`, or `sonnet` when the agent runs Opus; `none` skips judges. The fake agent defaults to `none`. |
+| `timeout` | `1800` | Seconds for one agent run. |
+
+Inspect's own `--model` is not used: the CLI calls the API itself, so the task
+sets Inspect's `none` model. A sample whose Claude Code run ends in an error,
+such as a rate limit, is a sample error; add `--no-fail-on-error` to let the
+rest of the run continue and `inspect eval-retry` to rerun it.
+
+Conditions:
+
+- **no-skill** sends the request as is.
+- **skill** copies the skill, as is, into the agent user's
+  `~/.claude/skills/<skill>/` and sends `/<skill> <request>`.
+- **one-sentence** appends the one-sentence instruction for the case's rule
+  from `cases/<skill>/one_sentence.yaml`. Rules without a sentence there are
+  not run in this condition.
+
+Sample ids are `<case-id>-<condition>`, such as `help-label-no-skill`.
+
+### Plumbing run without a model
+
+```sh
+uv run inspect eval eval.py -T skill=code-better -T condition=no-skill,skill,one-sentence -T agent=fake --max-samples 8
+```
+
+The fake agent carries out each case's `replays/good-*.yaml` actions in the
+sandbox as the agent user, prints them as Claude Code stream-json, and the rest
+of the pipeline runs unchanged: transcript conversion, every grader except the
+judge (scored NaN), and the report. Every result check should pass.
+
+## Sandbox
+
+`skill_evals/sandbox/compose.yaml` builds one image (Python 3.12, Node, git and
+Claude Code at the version pinned in the `Dockerfile`, currently 2.1.327) and
+starts a fresh container for each sample. The sandbox sits on an internal
+network with no route out; a tinyproxy container forwards HTTPS only to the
+hosts in `proxy-allow.txt` (only `api.anthropic.com`). Claude Code runs with
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, `DISABLE_TELEMETRY`,
+`DISABLE_ERROR_REPORTING` and `DISABLE_AUTOUPDATER` set.
+
+Before the agent starts, the planted files are committed as the starting
+commit, owned by the non-root `agent` user, whose home is empty apart from the
+skill of the skill condition: no CLAUDE.md, memory or other skills. The agent runs
+`claude -p "<prompt>" --output-format stream-json --verbose` in `/work` with
+`--permission-mode bypassPermissions` and WebSearch and WebFetch disallowed.
+
+## Authentication
+
+The agent and the judge use a Claude subscription token through the real CLI.
+Put `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or
+`ANTHROPIC_AUTH_TOKEN` in `evals/.env`; Inspect loads it into its process
+environment, and the harness passes it to the CLI as `CLAUDE_CODE_OAUTH_TOKEN`.
+Anthropic's terms point automated use to API keys; a subscription token suits
+small personal runs, not large or shared ones.
+
+The token is kept out of the eval log:
+
+- it is written to a 0600 file in the user's sandbox home by a sandbox call
+  made with Inspect's event recording switched off, so the call and its input
+  are not logged;
+- the image's `run-claude` wrapper reads and deletes the file and starts
+  `claude` with the token in its environment, so the logged command has no
+  token in its arguments or environment;
+- Claude Code's output goes to a file that is read back without recording,
+  and every text from it, judge records and grader notes included, passes
+  through `transcript.redact`, which replaces `sk-ant-…` strings and the token
+  value itself.
+
+The agent's own commands inherit the token in their environment (Claude Code's
+subprocess scrubbing needs bubblewrap, which cannot create namespaces in an
+unprivileged container), so redaction is what keeps it out of the transcript
+if the agent prints its environment. After a run, check:
+`unzip -p logs/<file>.eval | grep -c sk-ant-` should print 0.
+
+## Budget and rate limits
+
+Each sample is one Claude Code session plus one judge call per judged grader.
+Earlier, ten parallel sessions hit rate limits (429), and three were still
+rate-limited with the previous harness; start with `--max-samples 2` or 3.
+Claude Code retries 429s itself; a run that still fails becomes a sample error.
+Expect the token to hit its usage cap during long runs, and plan runs so a cap
+stops a run between models rather than in the middle of one.
+
+## Case files
+
+```
+cases/<skill>/<case-id>/
+  case.yaml   id, rule, situation, request, graders, optional validation
+  repo/       the planted files, copied into the sandbox
+  checks/     hidden files that graders reference by path
+  replays/    good-*.yaml and bad-*.yaml runs for validate_cases.py and the fake agent
+```
+
+`rule` is the numbered section ID in the skill's `SKILL.md`, or `invocation`.
+`situation` records the planted fact and the expected behaviour. A grader's
+`files` map gives paths relative to the case folder; `cases.py` reads them into
+the grader specs. `checks/` is never copied into the sandbox before grading.
+
+Write the request as a user would: keep the user's real constraints and put the
+facts the agent should find in the planted files. Each case scores one rule:
+its `all` value is the score for that rule, and a case fails an agent only for
+its own rule. Cases protect only the planted files the task must not change,
+never reject new tests or notes, and accept equivalent evidence.
+
+## Graders
+
+A score holds one value per grader and `all`, which passes when every grader
+that applies passes. Repeated types get numbered keys (`judge_1`, `judge_2`).
+NaN marks a grader that does not apply, such as a judge in a run without
+judging; the task's metric averages only the samples where a grader applies.
+
+Result checks (`grading/files.py`) read the submitted tree against the
+starting commit or run a hidden check on a disposable copy of it:
+
+| Type | Fields | Pass condition |
+| --- | --- | --- |
+| `file_unchanged` | `path` | The file is in the starting commit and has no change. |
+| `file_keeps` | `path` | Every non-blank planted line is still there, in order, ignoring indentation. |
+| `file_contains`, `file_not_contains` | `path`, `pattern` | The file exists and matches, or does not match, the regex. |
+| `planted_unchanged` | optional `except` | No planted file changed, except those matching the listed patterns. New files are allowed. |
+| `notes_only` | | Every changed or new file is a Markdown note: no code or data changed. |
+| `diff_max_lines` | `max` | Added plus removed lines in planted files are within the limit. |
+| `command_passes`, `command_fails` | `cmd`, optional `files`, `timeout` | The Bash command exits zero, or nonzero, on a copy of the submitted tree. |
+| `catches_bug` | `restore` or `files`, optional `tests` | A test file the agent added or changed passes on the submitted code and fails on an assertion once the bug is back (planted files restored, or replaced by `files`). |
+| `any_of` | `graders` | The first listed grader that passes passes it; later ones, such as a judge, do not run. |
+
+Hidden commands find their files under `$GRADE_FILES` and the planted commit
+in `$START_COMMIT`. Use `PYTHONPATH=. python "$GRADE_FILES/check.py"` to let a
+hidden test import a planted module. A timeout (60 seconds or the spec's
+`timeout`) or a sandbox error scores 0 and is listed under `notes` in the
+score metadata.
+
+The judge (`type: judge`, field `rubric`, optional `observe: {cmd: ...}`)
+grades how the agent worked: what it read before editing, what it ran on the
+final code, whether a test catches the bug, whether it stopped repairing,
+asked, or reported truthfully. It is `claude -p` with no tools, run as a
+separate sandbox user with an empty home and a judge system prompt. It reads
+the request, the transcript as numbered steps (each command with its result
+and exit code, each edit, each read with its range), the final reply, the Git
+diff against the starting commit, the Markdown notes the agent wrote, and with
+`observe` the output of a command run on a copy of the tree. Its last line
+must be exactly `VERDICT: PASS` or `VERDICT: FAIL`; anything else scores 0 and
+is marked malformed. Score metadata keeps each judge's reply, verdict, model,
+tokens and cost under `judges`.
+
+Write each rubric for one case and one rule: name the rule, the planted facts,
+the numbered criteria the run must meet, and what does not count. Order
+matters only where the rule needs it; the judge is told that a check ran on the
+final code when it ran after the last edit to the files it exercises.
+
+## Judge validation
+
+Judge verdicts count only once the judge has been checked against hand labels.
+Label judged graders of real runs in `judge_labels/<skill>.yaml` (format in
+`judge_labels/README.md`), then:
+
+```sh
+uv run python -m tools.report logs/<file>.eval --labels judge_labels/code-better.yaml
+```
+
+prints the agreement per rubric and overall.
+
+## Report
+
+```sh
+uv run python -m tools.report logs/<file>.eval [more.eval ...]
+```
+
+prints the pass rate of `all` per rule and condition, one line per sample with
+tokens (input, output, cache read, cache write), agent cost, judge cost and
+time, the totals, and any sample errors.
+
+## Contributing
+
+Naming: names say what a thing is or does. Do not use letters or codes that
+stand for concepts, such as `A`/`B`/`C` for conditions or `r` for a result;
+write `no-skill`, `condition`, `sample_result`. This applies to code, case
+files, metadata keys and docs alike.
+
+### Local checks
+
+From `evals/`:
+
+```sh
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest -q
+uv run python -m tools.check_coverage code-better
+uv run python -m tools.validate_cases code-better
+```
+
+Ruff requires docstrings on every module, class and function (Google style),
+type annotations, and a complexity of at most 10 per function. Ruff and
+pytest skip `cases/`: the planted repositories and hidden checks are
+deliberately imperfect code, run only inside a sandbox.
+
+`validate_cases.py` replays every case's runs in a local temporary directory.
+Good runs must pass every result check, bad runs and a run that does nothing
+must fail one, and each hidden `command_passes` check must fail on the
+untouched repository unless `case.yaml` lists it under
+`validation.hidden_checks_pass_untouched`. Cases where only the judge can fail
+a do-nothing run, such as cases about asking first, set
+`validation.do_nothing_fails_only_by_judge`. Top-level judges are skipped; a
+judge inside `any_of` is assumed to pass, or to fail when the replay sets
+`judge: false`. Rubric wording is not checked by replays: that is what judge
+validation is for.

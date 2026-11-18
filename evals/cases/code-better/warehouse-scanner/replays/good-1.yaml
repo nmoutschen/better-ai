@@ -1,0 +1,9 @@
+reply: ''
+actions:
+- write: barcode.py
+  content: |
+    PREFIX = 'BIN'
+
+    def encode(number):
+        return f"{PREFIX}{number}"
+- bash: python test_barcode.py

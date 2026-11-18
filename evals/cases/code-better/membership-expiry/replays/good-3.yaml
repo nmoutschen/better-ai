@@ -1,0 +1,9 @@
+reply: Billing keeps invoice references to memberships. For an expired membership with an open invoice, should cleanup delete
+  it (the invoice loses its membership), keep it, or archive it?
+actions:
+- read: cleanup.py
+- write: README.md
+  content: |
+    Cleanup previews IDs only. Billing retains invoice references to membership records.
+
+    ## Open question

@@ -1,0 +1,27 @@
+reply: ''
+actions:
+- write: weights.py
+  content: |
+    import math
+
+
+    def billable(kg):
+        return math.ceil(kg)
+- write: test_quote.py
+  content: |
+    from unittest import TestCase, main
+
+    from quote import quote
+
+
+    class QuoteTests(TestCase):
+        def test_whole_kilos(self):
+            self.assertEqual(quote(3), 12)
+
+        def test_part_kilo(self):
+            self.assertEqual(quote(2.2), 12)
+
+
+    if __name__ == "__main__":
+        main()
+- bash: python -m unittest test_quote

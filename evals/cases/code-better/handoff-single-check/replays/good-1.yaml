@@ -1,0 +1,6 @@
+reply: ''
+actions:
+- write: bins.py
+  content: |
+    STATUS = "Bin is full"
+- bash: python test_bins.py

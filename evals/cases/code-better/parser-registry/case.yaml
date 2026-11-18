@@ -1,0 +1,15 @@
+id: parser-registry
+rule: '2'
+situation: New file types register in the PARSERS table and raise FormatError for unreadable content; add JSON there instead
+  of branching on the extension.
+request: 'Support importing .json files too: a list of objects, like the CSV rows.'
+graders:
+- type: planted_unchanged
+  except:
+  - importer.py
+  - test_importer.py
+  - '*.md'
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py

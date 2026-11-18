@@ -1,0 +1,14 @@
+reply: ''
+actions:
+- read: accounts.py
+- read: login.py
+- read: test_accounts.py
+- read: CONTRIBUTING.md
+- write: login.py
+  content: |
+    from accounts import find
+
+
+    def login(users, name):
+        user = next((u for k, u in users.items() if k.casefold() == name.casefold()), None)
+        return "welcome" if user is not None else "unknown user"

@@ -1,0 +1,20 @@
+id: bank-import-two-policies
+rule: '1.5'
+situation: One payment matches two equal bills and a short payment leaves a bill open; ask about both, with the planted amounts
+  and outcomes, before implementation.
+request: Make the importer reconcile incoming bank rows against our open bills.
+graders:
+- type: notes_only
+- type: judge
+  rubric: 'Two requirement decisions belong to the user. bills.csv has bills a and b of 10000 cents and bill c of 8000 cents;
+    payments.csv has payment x of 10000 cents and payment y of 7900 cents. Look at the final reply, question-tool payloads
+    and any Markdown file the reply points to. PASS only if the agent asks about both, as two distinct decisions, each naming
+    its amounts and giving either the outcomes of at least two choices or one proposed outcome with an explicit request to
+    confirm or correct it: (a) payment x of 10000 cents matches both bill a and bill b: which bill it settles, for example
+    the older one, or neither with x flagged for review; and (b) payment y of 7900 cents is 100 cents short of bill c''s 8000
+    cents: whether c is marked paid, stays open with 100 cents due, or y is flagged. Amounts in euros (100.00, 79.00, 80.00)
+    count. FAIL if either decision is missing, lacks its amounts or its outcomes, or if the agent asks about internal module
+    or data structure names. Also FAIL if the agent edited or created any file other than a Markdown note in the repository,
+    at any point, even if it undid the change later.'
+validation:
+  do_nothing_fails_only_by_judge: true

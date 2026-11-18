@@ -1,0 +1,11 @@
+reply: ''
+actions:
+- bash: git checkout -q -b prep
+- bash: cat money.py order_page.py export.py test_export.py missing.txt
+- write: order_page.py
+  content: |
+    from money import fmt
+
+
+    def total_line(amount):
+        return f"Total: {amount:.2f}"

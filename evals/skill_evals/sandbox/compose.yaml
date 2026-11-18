@@ -1,0 +1,30 @@
+# One sample: the sandbox, on a network with no route out, and a proxy that forwards only to the
+# Anthropic API. Inspect starts a fresh copy of both for each sample.
+services:
+  default:
+    build: .
+    image: better-ai-evals-sandbox:latest
+    init: true
+    command: sleep infinity
+    working_dir: /work
+    networks: [inner]
+    environment:
+      HTTPS_PROXY: http://proxy:8888
+      https_proxy: http://proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+      DISABLE_TELEMETRY: "1"
+      DISABLE_ERROR_REPORTING: "1"
+      DISABLE_AUTOUPDATER: "1"
+    depends_on: [proxy]
+  proxy:
+    build:
+      context: .
+      dockerfile: proxy.Dockerfile
+    image: better-ai-evals-proxy:latest
+    networks: [inner, outer]
+
+networks:
+  inner:
+    internal: true
+  outer: {}

@@ -1,0 +1,10 @@
+reply: ''
+actions:
+- read: money.py
+- read: order_page.py
+- read: export.py
+- read: test_export.py
+- write: money.py
+  content: |
+    def fmt(amount):
+        return f"{amount:.2f}" if isinstance(amount, int) else str(amount)

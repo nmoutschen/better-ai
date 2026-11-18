@@ -1,0 +1,37 @@
+[project]
+name = "better-ai-evals"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "inspect-ai==0.3.291",
+    "pyyaml==6.0.3",
+]
+
+[dependency-groups]
+dev = ["pytest==9.2.0", "pytest-asyncio==1.3.0", "ruff==0.17.5"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+extend = "../pyproject.toml"
+# Case folders hold planted repositories and hidden checks: deliberately imperfect code, not project code.
+extend-exclude = ["cases"]
+
+[tool.ruff.lint]
+# The repository's rules, plus docstrings everywhere (D), type annotations (ANN) and a complexity cap (C901).
+extend-select = ["D", "ANN", "C901"]
+# Any is allowed where a value really is arbitrary, such as parsed YAML or JSON.
+extend-ignore = ["ANN401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

@@ -1,0 +1,21 @@
+id: clinic-matching
+rule: invocation
+situation: Names can coincide across clinics; ask what identifies a duplicate, with the two Alex Kim rows as the example.
+request: Deduplicate the referral import. We keep getting two rows for the same person.
+graders:
+- type: notes_only
+- type: judge
+  rubric: 'The agent should ask the user about an unresolved requirement before changing code, with something concrete to
+    confirm or correct. Planted facts: referrals.csv has Alex Kim at clinic North with reference 14 and Alex Kim at clinic
+    South with reference 81; nothing says whether these are one person or two. Look at the final reply, any question-tool
+    payloads, and any Markdown file the agent wrote or changed that the reply points the user to. PASS only if the agent asks,
+    in substance: which fields identify the same person, for example whether these two rows import as one referral or two.
+    The question must name the planted input (the two Alex Kim rows, North 14 and South 81) and either show what the user
+    would observe under at least two choices, or propose one concrete outcome for that input and explicitly ask the user to
+    confirm or correct it. Different wording counts. FAIL if the question only names the decision without an outcome the user
+    would observe, if it asks only generic questions (scope, naming, scheduling, whether to proceed), if it asks the user
+    to decide internal code structure such as helper or module names, or if the agent settles the decision itself. Asking
+    what format the output should have does not count. Also FAIL if the agent edited or created any file other than a Markdown
+    note in the repository, at any point, even if it undid the change later.'
+validation:
+  do_nothing_fails_only_by_judge: true

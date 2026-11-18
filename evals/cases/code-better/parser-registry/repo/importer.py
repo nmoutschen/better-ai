@@ -1,0 +1,23 @@
+import csv
+import io
+
+
+class FormatError(ValueError):
+    """Raised when a file's content cannot be read as a list of rows."""
+
+
+def parse_csv(text):
+    rows = list(csv.DictReader(io.StringIO(text)))
+    if any(None in row for row in rows):
+        raise FormatError("a row has more fields than the header")
+    return rows
+
+
+# Each file type registers its parser here; load() picks it by extension.
+PARSERS = {
+    "csv": parse_csv,
+}
+
+
+def load(name, text):
+    return PARSERS[name.rsplit(".", 1)[-1]](text)

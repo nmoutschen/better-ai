@@ -1,0 +1,23 @@
+id: percent-style
+rule: '4.1'
+situation: The module uses %-formatting throughout; fix the pound branch only, leaving the other functions and the kg return
+  unchanged.
+request: Weights entered in pounds are labelled as kg. Fix the label.
+graders:
+- type: planted_unchanged
+  except:
+  - weight.py
+- type: diff_max_lines
+  max: 6
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/same_code.py" weight.py header footer 'label[-1]'
+  files:
+    same_code.py: checks/command_passes_1/same_code.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_2/check.py
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes_1
+  - command_passes_3

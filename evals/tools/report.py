@@ -1,0 +1,259 @@
+"""Summarise eval logs: pass rates, condition comparisons, tokens, cost and time, and judge agreement.
+
+Reads one or more Inspect `.eval` logs from `eval.py`. A case scores only its rule, so the pass rate of
+a rule in a condition is the share of its samples whose `all` score passed. When a case ran several
+times (Inspect epochs), the comparisons first average its runs per condition, then compare conditions
+case by case (a paired design): mean difference, a bootstrap 95% interval, and a sign-flip permutation
+p-value, with Holm's correction across the comparisons. Hand labels in `judge_labels/<skill>.yaml` (see
+that folder's README) give the human verdict for a judged grader of a sample; the report compares them
+with the judge's verdicts in the same logs.
+
+    uv run python -m tools.report logs/<file>.eval [more.eval ...] [--labels judge_labels/code-better.yaml]
+"""
+
+import argparse
+import math
+import random
+from collections import defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+from inspect_ai.log import EvalSample, read_eval_log
+
+from skill_evals.cases import CONDITIONS
+
+EVALS = Path(__file__).resolve().parents[1]
+
+# Each comparison is (condition, baseline): the difference is condition minus baseline.
+COMPARISONS = (("skill", "no-skill"), ("one-sentence", "no-skill"), ("skill", "one-sentence"))
+RESAMPLES = 10_000
+RANDOM_SEED = 0
+
+
+@dataclass
+class SampleResult:
+    """One sample's outcome and cost."""
+
+    sample_id: str
+    case: str
+    condition: str
+    rule: str
+    passed: float
+    tokens: dict[str, int] = field(default_factory=dict)
+    cost: float = 0.0
+    judge_cost: float = 0.0
+    seconds: float = 0.0
+    judges: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    epoch: int = 1
+
+
+def read_result(sample: EvalSample) -> SampleResult:
+    """Read one sample's case, condition, rule, `all` score, Claude Code usage and judge verdicts."""
+    metadata = sample.metadata or {}
+    score = next(iter((sample.scores or {}).values()), None)
+    values = score.value if score and isinstance(score.value, dict) else {}
+    run = metadata.get("claude_code") or {}
+    judges = (score.metadata or {}).get("judges", {}) if score else {}
+    return SampleResult(
+        sample_id=str(sample.id),
+        case=metadata.get("case", str(sample.id)),
+        condition=metadata.get("condition", "?"),
+        rule=str(metadata.get("rule", "?")),
+        passed=float(values.get("all", math.nan)),
+        epoch=int(sample.epoch or 1),
+        tokens=run.get("usage") or {},
+        cost=float(run.get("total_cost_usd") or 0.0),
+        judge_cost=sum(float(info.get("total_cost_usd") or 0.0) for info in judges.values()),
+        seconds=(run.get("duration_ms") or 0) / 1000,
+        judges=judges,
+        error=sample.error.message[:120] if sample.error else None,
+    )
+
+
+def read_results(paths: list[Path]) -> list[SampleResult]:
+    """Read every sample of every log."""
+    return [read_result(sample) for path in paths for sample in read_eval_log(str(path)).samples or []]
+
+
+def rule_key(rule: str) -> tuple[int, list[int]]:
+    """Sort invocation first, then numbered rules in numeric order."""
+    return (0, []) if rule == "invocation" else (1, [int(part) for part in rule.split(".") if part.isdigit()])
+
+
+def pass_table(results: list[SampleResult]) -> list[str]:
+    """Format the pass rate per rule (results) and condition (columns), counting only scored samples."""
+    cells: dict[tuple[str, str], list[float]] = defaultdict(list)
+    for sample in results:
+        if sample.error is None and not math.isnan(sample.passed):
+            cells[sample.rule, sample.condition].append(sample.passed)
+    conditions = [name for name in CONDITIONS if any(condition == name for _, condition in cells)]
+    lines = ["rule        " + "".join(f"{name:>16}" for name in conditions)]
+    for rule in sorted({rule for rule, _ in cells}, key=rule_key):
+        parts = []
+        for condition in conditions:
+            values = cells.get((rule, condition), [])
+            parts.append(f"{sum(values):>4.0f}/{len(values):<3} {sum(values) / len(values):>4.0%}" if values else "-")
+        lines.append(f"{rule:12}" + "".join(f"{part:>16}" for part in parts))
+    return lines
+
+
+def case_means(results: list[SampleResult]) -> dict[str, dict[str, float]]:
+    """Average each case's scored runs per condition: {condition: {case: mean of `all`}}."""
+    runs: dict[tuple[str, str], list[float]] = defaultdict(list)
+    for sample in results:
+        if sample.error is None and not math.isnan(sample.passed):
+            runs[sample.condition, sample.case].append(sample.passed)
+    means: dict[str, dict[str, float]] = defaultdict(dict)
+    for (condition, case), values in runs.items():
+        means[condition][case] = sum(values) / len(values)
+    return means
+
+
+def bootstrap_interval(differences: list[float], generator: random.Random) -> tuple[float, float]:
+    """Return a 95% bootstrap interval for the mean of the per-case differences."""
+    count = len(differences)
+    means = sorted(sum(generator.choices(differences, k=count)) / count for _ in range(RESAMPLES))
+    return means[int(0.025 * RESAMPLES)], means[int(0.975 * RESAMPLES) - 1]
+
+
+def sign_flip_p_value(differences: list[float], generator: random.Random) -> float:
+    """Return a two-sided p-value for a mean difference of zero by randomly flipping each case's sign.
+
+    Under no difference between the two conditions, each case's difference is as likely positive as
+    negative, so the observed mean is compared with the means of sign-flipped copies.
+    """
+    observed = abs(sum(differences))
+    as_extreme = sum(
+        abs(sum(value if generator.random() < 0.5 else -value for value in differences)) >= observed - 1e-12
+        for _ in range(RESAMPLES)
+    )
+    return (as_extreme + 1) / (RESAMPLES + 1)
+
+
+def holm_adjusted(p_values: list[float]) -> list[float]:
+    """Return Holm-Bonferroni adjusted p-values, in the order given."""
+    order = sorted(range(len(p_values)), key=lambda index: p_values[index])
+    adjusted, running_max = [0.0] * len(p_values), 0.0
+    for rank, index in enumerate(order):
+        running_max = max(running_max, min(1.0, (len(p_values) - rank) * p_values[index]))
+        adjusted[index] = running_max
+    return adjusted
+
+
+def comparison_lines(results: list[SampleResult]) -> list[str]:
+    """Format paired comparisons of conditions over the cases both conditions ran."""
+    means, generator, rows = case_means(results), random.Random(RANDOM_SEED), []
+    for condition, baseline in COMPARISONS:
+        shared = sorted(set(means.get(condition, {})) & set(means.get(baseline, {})))
+        if len(shared) < 2:
+            continue
+        differences = [means[condition][case] - means[baseline][case] for case in shared]
+        low, high = bootstrap_interval(differences, generator)
+        rows.append(
+            (
+                f"{condition} − {baseline}",
+                len(shared),
+                sum(differences) / len(shared),
+                low,
+                high,
+                sign_flip_p_value(differences, generator),
+            )
+        )
+    if not rows:
+        return ["not enough paired cases to compare conditions"]
+    adjusted = holm_adjusted([row[5] for row in rows])
+    lines = [f"{'comparison':28} cases  mean diff   95% interval       p    p (Holm)"]
+    for (name, count, mean, low, high, p_value), p_holm in zip(rows, adjusted, strict=True):
+        lines.append(f"{name:28} {count:5}  {mean:+9.3f}  [{low:+.3f}, {high:+.3f}]  {p_value:6.4f}  {p_holm:8.4f}")
+    lines.append(
+        "mean diff = difference in pass rate per case, averaged over cases; each case's runs are averaged first."
+    )
+    return lines
+
+
+def tokens_text(tokens: dict[str, int]) -> str:
+    """Format token counts as input/output/cache-read/cache-write."""
+    keys = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+    return "/".join(str(tokens.get(key, 0)) for key in keys)
+
+
+def case_lines(results: list[SampleResult]) -> list[str]:
+    """Format one line per sample with its result, tokens, cost and time, and the totals."""
+    lines = [f"{'sample':42} all  {'tokens in/out/cache-read/cache-write':36}  cost  judge   time"]
+    total: dict[str, int] = defaultdict(int)
+    for sample in sorted(results, key=lambda sample: (sample.case, sample.condition, sample.epoch)):
+        outcome = "ERR" if sample.error else "-" if math.isnan(sample.passed) else str(int(sample.passed))
+        lines.append(
+            f"{sample.sample_id + (f' #{sample.epoch}' if sample.epoch > 1 else ''):42} {outcome:>3}  {tokens_text(sample.tokens):36} "
+            f"{sample.cost:6.3f} {sample.judge_cost:6.3f} {sample.seconds:5.0f}s"
+        )
+        for key, value in sample.tokens.items():
+            total[key] += value
+    cost = sum(sample.cost for sample in results)
+    judge_cost = sum(sample.judge_cost for sample in results)
+    seconds = sum(sample.seconds for sample in results)
+    errors = sum(1 for sample in results if sample.error)
+    label = f"total: {len(results)} samples, {errors} errors"
+    lines.append(f"{label:46} {tokens_text(total):36} {cost:6.3f} {judge_cost:6.3f} {seconds:5.0f}s")
+    return lines
+
+
+def load_labels(path: Path) -> list[dict[str, Any]]:
+    """Read hand labels: a list of {sample, grader, verdict: PASS or FAIL, note}."""
+    labels = yaml.safe_load(path.read_text()) or []
+    for label in labels:
+        if str(label.get("verdict")).upper() not in {"PASS", "FAIL"}:
+            raise ValueError(f"Label verdict must be PASS or FAIL: {label}")
+    return labels
+
+
+def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
+    """Compare judge verdicts with hand labels, per rubric (case and grader) and overall."""
+    verdicts = {
+        (sample.sample_id, grader): info.get("verdict") for sample in results for grader, info in sample.judges.items()
+    }
+    cases = {sample.sample_id: sample.case for sample in results}
+    per_rubric: dict[tuple[str, str], list[bool]] = defaultdict(list)
+    for label in labels:
+        sample_id, grader = str(label["sample"]), str(label["grader"])
+        if (sample_id, grader) in verdicts:
+            human_passes = str(label["verdict"]).upper() == "PASS"
+            per_rubric[cases[sample_id], grader].append(verdicts[sample_id, grader] == human_passes)
+    if not per_rubric:
+        return ["no labelled judge verdicts in these logs"]
+    lines = [
+        f"{case + ' ' + grader:44} {sum(matches)}/{len(matches)} agree"
+        for (case, grader), matches in sorted(per_rubric.items())
+    ]
+    every = [match for matches in per_rubric.values() for match in matches]
+    lines.append(f"{'overall':44} {sum(every)}/{len(every)} agree ({sum(every) / len(every):.0%})")
+    return lines
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Print the report for the given logs."""
+    parser = argparse.ArgumentParser(description="Pass rates per rule and condition, cost, time and judge agreement.")
+    parser.add_argument("logs", nargs="+", type=Path)
+    parser.add_argument("--labels", type=Path, help="hand labels, such as judge_labels/code-better.yaml")
+    args = parser.parse_args(argv)
+    results = read_results(args.logs)
+    sections = [
+        ("Pass rate (all) per rule and condition", pass_table(results)),
+        ("Comparisons between conditions (paired by case)", comparison_lines(results)),
+        ("Samples", case_lines(results)),
+    ]
+    if args.labels:
+        sections.append(("Judge agreement with hand labels", agreement(results, load_labels(args.labels))))
+    for title, lines in sections:
+        print(f"\n## {title}\n" + "\n".join(lines))
+    errors = [f"{sample.sample_id}: {sample.error}" for sample in results if sample.error]
+    if errors:
+        print("\n## Sample errors\n" + "\n".join(errors))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

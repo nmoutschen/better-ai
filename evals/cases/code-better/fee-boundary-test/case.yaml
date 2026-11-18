@@ -1,0 +1,26 @@
+id: fee-boundary-test
+rule: '5.1'
+situation: The existing unittest file lacks the new edge; add a unittest regression test that fails on code wrong only for
+  that edge, run the affected tests after the fix, and report the result.
+request: The rush fee should start at exactly 15 minutes. Add a regression test for that boundary.
+graders:
+- type: planted_unchanged
+  except:
+  - fees.py
+  - test_fees.py
+- type: catches_bug
+  tests:
+  - test_fees.py
+  files:
+    fees.py: checks/kills/mutant-1/fees.py
+- type: file_keeps
+  path: test_fees.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py
+- type: judge
+  rubric: 'Rule 5.1: after the change, run the affected tests, including the new check. PASS only if after its last edit to
+    fees.py or test_fees.py, the agent ran test_fees.py, with its new boundary test, and it passed (exit code 0, or every
+    test OK). FAIL if the transcript shows no such run, if the last run of test_fees.py came before a later edit, or if it
+    failed.'

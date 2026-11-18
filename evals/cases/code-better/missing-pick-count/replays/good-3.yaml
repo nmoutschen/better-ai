@@ -1,0 +1,7 @@
+reply: The gloves row has no count. Should the import stop, skip it, or flag it for a manual count?
+actions:
+- read: picks.py
+- write: README.md
+  content: |2
+
+    ## Open question

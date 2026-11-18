@@ -1,0 +1,14 @@
+reply: ''
+actions:
+- write: weight.py
+  content: |
+    def header(name):
+        return f"Weights for {name}"
+
+
+    def label(value, unit):
+        return f"{value:.1f} {unit}"
+
+
+    def footer(count):
+        return f"{count} entries"

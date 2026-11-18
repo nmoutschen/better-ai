@@ -1,0 +1,4 @@
+reply: Clearing it deletes yesterday. Rotate per day instead?
+actions:
+- read: dispatch.py
+- read: README.md
