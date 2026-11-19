@@ -1,0 +1,6 @@
+Document how to run the tests
+
+Asked: add a section to README.md on how to run the tests, for new
+contributors.
+
+Added "Running the tests" with what the tests cover and the commands.

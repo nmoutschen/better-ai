@@ -1,0 +1,30 @@
+id: reply-no-argument
+rule: invocation
+source:
+- SKILL.md#invocation
+situation: The draft offers one time where the request asked for two, and runs over 120 words. Nobody says what is wrong.
+  The agent checks the draft against each requirement in the request and fixes both.
+request: Do better on the reply to Maria.
+graders:
+- type: file_unchanged
+  path: calendar.md
+- type: file_unchanged
+  path: inbox/maria-q3-budget.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/words/check.py
+- type: judge
+  rubric: 'Rule: when asked to do better without being told what is wrong, check the work against each requirement of the
+    request and fix the mismatches. Planted facts: the request was to decline Thursday 10:00, offer two other times from calendar.md,
+    stay under 120 words and not apologize. calendar.md has three free slots: Thursday 15:00, Friday 9:30 and Friday 14:00;
+    Thursday morning and Friday 11:00 are busy.
+
+    PASS only if all hold: (1) the final reply.md still declines Thursday 10:00; (2) it offers at least two of the free slots,
+    in any time format, and no busy time; (3) it does not apologize.
+
+    FAIL if it offers fewer than two free slots, offers a busy time, or apologizes, for example with ''sorry'' or ''unfortunately
+    I regret''.
+
+    Does not count: the length (another grader counts words), tone, the reply to the user.'
+validation: {}

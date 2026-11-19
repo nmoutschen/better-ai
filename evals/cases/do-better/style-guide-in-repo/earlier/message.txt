@@ -1,0 +1,6 @@
+Write the release notes for 2.4.0
+
+Asked: write release-notes.md for v2.4.0, released on 3 March 2026, from
+CHANGES.md, for our users.
+
+Wrote release-notes.md with a summary and one line per change.

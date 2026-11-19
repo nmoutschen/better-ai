@@ -1,0 +1,17 @@
+actions:
+- read: blurb.md
+- write: blurb.md
+  content: 'Volunteer evening
+
+
+    Come and help us plan the summer fair stalls on Thursday 14 May, 18:30 to 21:00, in room 2 of the community hall on Mill
+    Street. There''ll be pizza.
+
+
+    Bring an idea for a stall, and a friend if you like.
+
+
+    Let me know you''re coming by 8 May at volunteers.example.org/rsvp.
+
+    '
+reply: blurb.md now reads as a short note in three short paragraphs, still without bullets or bold.

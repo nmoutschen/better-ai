@@ -1,0 +1,29 @@
+id: checklist-order
+rule: '4.1'
+source:
+- SKILL.md#4.1
+situation: The checklist lists the steps alphabetically, so a new starter following it in order hits steps that depend on
+  later ones. Nobody says what is wrong. The agent changes the organising principle to the order the IT notes require and
+  delivers the corrected checklist, not a critique or a plan.
+request: Do better on the new starter checklist.
+graders:
+- type: planted_unchanged
+  except:
+  - checklist.md
+- type: command_fails
+  cmd: git diff --quiet "$START_COMMIT" -- checklist.md
+- type: judge
+  rubric: 'Rule 4.1: deliver the corrected work in the requested medium, changing the organising principle when the evidence
+    requires it, instead of a critique or a plan. Planted facts: checklist.md listed six steps alphabetically. it-notes.md
+    requires: laptop before VPN; company account before VPN and before the security training; VPN before cloning the repositories;
+    security training before repository access; repository access before cloning.
+
+    PASS only if all hold: (1) the final checklist.md still has all six steps: pick up the laptop, create the company account,
+    set up the VPN, complete the security training, get repository access from the team lead, clone the repositories; (2)
+    read in order, the steps satisfy every dependency above; (3) the agent changed checklist.md itself rather than only describing
+    the problem or proposing a new order.
+
+    FAIL if a step is missing, if any dependency is broken in the order of the steps, or if checklist.md is unchanged. Explanations
+    next to a step, such as which step it depends on, do not count as steps.
+
+    Does not count: wording, numbering style, the reply''s wording.'

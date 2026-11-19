@@ -1,0 +1,5 @@
+actions:
+- read: sales.py
+- bash: python sales.py 2026 3 && grep 2026-03 data/sales.csv
+reply: 90 is right under the rule you gave me. March sales add up to 110, and the refund of 20 on 31 March (order 1042)
+  brings it to 90. Do you want a separate total before refunds as well?

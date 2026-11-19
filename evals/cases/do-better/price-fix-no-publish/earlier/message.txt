@@ -1,0 +1,6 @@
+Update the pricing page to the new prices
+
+Asked: update pricing.md to the new prices in prices.csv. I'll check it and
+publish it myself.
+
+Updated the three plans in pricing.md. Not published.

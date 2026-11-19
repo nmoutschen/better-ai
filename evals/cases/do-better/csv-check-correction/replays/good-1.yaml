@@ -1,0 +1,10 @@
+actions:
+- write: export.py
+  content: "\"\"\"Export members to CSV.\"\"\"\nimport csv\nimport io\n\n\ndef to_csv(members):\n    \"\"\"Return the members\
+    \ as CSV text with a header row; names are trimmed and fields quoted when needed.\"\"\"\n    out = io.StringIO()\n   \
+    \ writer = csv.writer(out, lineterminator=\"\\n\")\n    writer.writerow([\"name\", \"email\"])\n    for member in members:\n\
+    \        writer.writerow([member[\"name\"].strip(), member[\"email\"]])\n    return out.getvalue()\n"
+- bash: 'python -c "from export import to_csv; import csv, io; assert list(csv.reader(io.StringIO(to_csv([{''name'': ''Lovelace,
+    Ada'', ''email'': ''a@x''}]))))[1] == [''Lovelace, Ada'', ''a@x'']"'
+reply: Names with commas are now quoted, and a parse of the output for 'Lovelace, Ada' passed. I did not check line breaks
+  inside names.

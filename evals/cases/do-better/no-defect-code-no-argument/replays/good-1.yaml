@@ -1,0 +1,5 @@
+actions:
+- read: sales.py
+- bash: python sales.py 2026 3
+reply: 'I checked the refunds change against your request: refunds reduce the total in every month, and March comes to 90
+  on data/sales.csv, as I reported. I found nothing to fix. Is there something else you want changed?'

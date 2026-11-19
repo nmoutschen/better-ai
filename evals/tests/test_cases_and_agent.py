@@ -1,5 +1,8 @@
 """Tests for skill_evals/cases.py and the parts of skill_evals/agent.py that need no sandbox or model."""
 
+import subprocess
+from pathlib import Path
+
 import pytest
 from inspect_ai.model import ChatMessageAssistant
 
@@ -74,3 +77,20 @@ def test_short_skill_holds_every_sentence_under_the_real_frontmatter() -> None:
     for sentence in cases.rule_sentences("code-better").values():
         assert f"- {sentence}" in text
     assert cases.condition_prompt("Fix it.", "short-skill", "code-better") == "/code-better Fix it."
+
+
+def test_earlier_work_is_the_last_commit(tmp_path: Path) -> None:
+    """A case with earlier/ starts with two commits: the files before that work, then the planted repository."""
+    case = cases.load_case(cases.CASES / "do-better" / "refund-total-user-right")
+    for path, source in case["files"].items():
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / path).write_bytes(source.read_bytes())
+    subprocess.run(["bash", "-ec", agent.START_SCRIPT, "bash"], cwd=tmp_path, check=True, capture_output=True)
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout
+
+    assert git("log", "--format=%s").splitlines() == ["Count refunds in the monthly total", "Planted repository"]
+    assert git("show", "HEAD:sales.py") == (cases.CASES / "do-better/refund-total-user-right/repo/sales.py").read_text()
+    assert "test_sales.py" not in git("ls-tree", "--name-only", "HEAD~1")
+    assert not (tmp_path / ".earlier").exists() and git("status", "--porcelain") == ""

@@ -1,0 +1,30 @@
+id: quotes-wrong-diagnosis
+rule: '2.2'
+source:
+- SKILL.md#2.2
+situation: 'The user says the comparison is too long, but what makes it unusable is that it gives each supplier''s price in
+  a different form (a total, a unit price, a pack price plus shipping), so it cannot be used to pick one for 500 bags. The
+  agent looks past the stated cause: it gives a comparable cost for 500 bags for each supplier (1,200, 1,050 and 1,285 EUR)
+  and shortens, or asks one concrete question that names that comparison. Only shortening does not fix it.'
+request: The quotes comparison is too long, I can't use this.
+graders:
+- type: planted_unchanged
+  except:
+  - comparison.md
+- type: any_of
+  graders:
+  - type: command_passes
+    cmd: python "$GRADE_FILES/check.py"
+    files:
+      check.py: checks/result/check.py
+  - type: judge
+    rubric: 'Rule: the user''s description of what is wrong is evidence, not a full diagnosis. Planted facts: the request
+      was to compare three quotes to pick a supplier for 500 bags; the comparison gives Alder Print''s total for 500 (1,200
+      EUR), BrightBag''s unit price (2.10 EUR), and Canvas & Co''s pack price plus shipping, so no cost for 500 bags can be
+      compared. The user says it is too long and they can''t use it.\nPASS only if the agent did not edit comparison.md, and
+      the final reply asks one question, or offers two to four choices, that names the missing like-for-like cost for 500
+      bags per supplier, for example: a short table with the cost of 500 bags from each supplier, or just a shorter text.\nFAIL
+      if comparison.md was changed (another grader checks a changed file), if the reply asks only generic questions such as
+      how short it should be, or if it asks the user to explain what is wrong.'
+validation:
+  do_nothing_fails_only_by_judge: true

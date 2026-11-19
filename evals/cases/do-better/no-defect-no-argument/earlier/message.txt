@@ -1,0 +1,8 @@
+Summarize the 3 March planning meeting
+
+Asked: summarize notes/2026-03-03-planning.md into summary.md for people who
+missed the meeting: decisions, dates and actions, one line per
+topic.
+
+Wrote summary.md with the launch date, pricing, payments, support,
+marketing, risks, actions and next meeting.

@@ -1,0 +1,8 @@
+Count refunds in the monthly total
+
+Asked: add refunds to the monthly total in sales.py. Refunds are rows with a
+negative amount, and they should reduce the month's total.
+
+monthly_total now counts refund rows, so a refund reduces the month's total.
+On data/sales.csv, March now comes to 90. Added test_sales.py with a refund
+case; it passes.

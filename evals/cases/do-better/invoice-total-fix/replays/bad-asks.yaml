@@ -1,0 +1,3 @@
+actions:
+- read: invoice.md
+reply: 'What looks off to you: the hours, the rate or the total?'

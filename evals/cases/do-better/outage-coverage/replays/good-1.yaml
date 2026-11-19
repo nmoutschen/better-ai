@@ -1,0 +1,21 @@
+actions:
+- write: explainer.md
+  content: '# What happened on 12 March
+
+
+    - 09:12: alerts fired, checkout error rate above 20%.
+
+    - 09:15: Rui confirmed payments were timing out.
+
+    - 09:21: cause found: the payment provider rotated its TLS certificate, so our pinned one stopped matching.
+
+    - 09:34: Rui deployed the updated pin; errors were under 1% by 09:40.
+
+
+    Orders: 412 failed, 380 retried on their own, and the other 32 customers were emailed.
+
+
+    Follow-up: Rui replaces certificate pinning with provider key validation by 26 March.
+
+    '
+reply: explainer.md now tells the outage in time order, then the orders and the follow-up.

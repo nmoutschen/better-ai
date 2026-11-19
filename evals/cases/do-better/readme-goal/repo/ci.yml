@@ -1,0 +1,4 @@
+# CI runs the tests the same way as `make test`.
+steps:
+  - run: pip install -r requirements-dev.txt
+  - run: make test
