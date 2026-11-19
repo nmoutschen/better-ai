@@ -13,7 +13,7 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 ## 1. Write the spec, the design and the task list
 
-WRITE the requirements of the whole change in `.code/<change>/specs.md`. READ [../templates/specs.md](../templates/specs.md) and WRITE the spec in its format. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
+READ [../templates/specs.md](../templates/specs.md). THEN WRITE the requirements of the whole change in `.code/<change>/specs.md`, in the template's format. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
 IF the change adds a module, a data model, a dependency or a migration, and no design covers it, WRITE `.code/<change>/design.md`: READ [../templates/design.md](../templates/design.md) and WRITE it in its format.
 

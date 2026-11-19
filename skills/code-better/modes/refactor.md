@@ -9,7 +9,7 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 ## 1. Update the spec
 
-WRITE the spec in `.code/<change>/specs.md`. READ [../templates/specs.md](../templates/specs.md) and WRITE it in its format. Its requirement is that observable behaviour stays the same: LIST the paths the change touches, and for a data migration, the data it moves. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
+WRITE a spec for every change, however small: a one-line change needs one requirement. READ [../templates/specs.md](../templates/specs.md). THEN WRITE the spec in `.code/<change>/specs.md`, in the template's format. Its requirement is that observable behaviour stays the same: LIST the paths the change touches, and for a data migration, the data it moves. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
 IF the design says some behaviour changes, that part is not this change: LIST it as a proposed next step, or, under a coordinator, as its own task.
 

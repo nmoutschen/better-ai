@@ -53,7 +53,7 @@ FOLLOW every step of the mode's file, in order. The mode ends once its checks pa
 
 ### 4. Verify with a verifier agent and fix
 
-START a verifier for every change: READ [agents/verifier.md](agents/verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt.
+START a verifier for every change, however small. DO NOT skip it because the change looks simple, and DO NOT replace it with a note that you skipped it. READ [agents/verifier.md](agents/verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt.
 
 WAIT until the verifier hands back its report. DO NOT write to the user while it runs.
 
