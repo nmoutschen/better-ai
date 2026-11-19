@@ -1,0 +1,10 @@
+reply: |
+  Two answers before I build:
+  1. Ana has two accounts with different addresses: id 1 (12 Rue Haute, Liège, 2024) and id 4 (8 Quai Est, Namur, 2025).
+     I propose the merged account keeps the newest address, 8 Quai Est. Confirm or correct.
+  2. Points: should Ana end with 1550 points (1200 + 350, summed) or 1200 (only the kept account's)? I propose summing.
+  I'll assume the oldest id survives, orders move to it, and the job prints "Merged 2 duplicate accounts".
+actions:
+- read: README.md
+- read: data/customers.json
+- read: customers.py

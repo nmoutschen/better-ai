@@ -1,0 +1,35 @@
+reply: 'order_reference() now returns uppercase references, such as ORD-000042; I updated the unit test that expected ord-000042.
+  The unit tests ran and passed (3). The integration tests did not run: all 4 were skipped because ORDERS_DATABASE_URL
+  is not set here, so the run is not all green yet; they need the orders database, for example in CI.'
+actions:
+- write: reference.py
+  content: |
+    def order_reference(order_id):
+        """The reference printed on invoices and quoted by customers, such as ORD-000042."""
+        return f"ORD-{order_id:06d}"
+
+
+    def order_id(reference):
+        """The order id in a reference, as customers type it."""
+        return int(reference.strip().lower().removeprefix("ord-"))
+- write: tests/test_reference.py
+  content: |
+    import unittest
+
+    from reference import order_id, order_reference
+
+
+    class ReferenceTest(unittest.TestCase):
+        def test_reference(self):
+            self.assertEqual(order_reference(42), "ORD-000042")
+
+        def test_round_trip(self):
+            self.assertEqual(order_id(order_reference(1234)), 1234)
+
+        def test_customer_typing(self):
+            self.assertEqual(order_id(" ORD-000042 "), 42)
+
+
+    if __name__ == "__main__":
+        unittest.main()
+- bash: python -m unittest discover -s tests -t . -v

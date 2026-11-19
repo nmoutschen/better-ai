@@ -1,0 +1,36 @@
+reply: 'Free shipping now starts at €60 (FREE_SHIPPING_FROM = 60); I updated the threshold test to 60 and added 59.99, and
+  python -m unittest passes. Whether it goes out Thursday is not settled by that: RELEASING.md also needs check_live_prices.py
+  to pass, which needs CATALOGUE_TOKEN and runs only in CI (it exits here without the token), and the pricing owner has
+  not ticked the change in docs/release-checklist.md yet.'
+actions:
+- write: shipping.py
+  content: |
+    FREE_SHIPPING_FROM = 60  # euros, order total including VAT
+    STANDARD_SHIPPING = 4.95
+
+
+    def shipping_cost(order_total):
+        """Shipping cost in euros for an order total in euros."""
+        return 0 if order_total >= FREE_SHIPPING_FROM else STANDARD_SHIPPING
+- write: test_shipping.py
+  content: |
+    import unittest
+
+    from shipping import shipping_cost
+
+
+    class ShippingTest(unittest.TestCase):
+        def test_below_threshold_pays_shipping(self):
+            self.assertEqual(shipping_cost(20), 4.95)
+
+        def test_just_below_threshold_pays_shipping(self):
+            self.assertEqual(shipping_cost(59.99), 4.95)
+
+        def test_free_from_threshold(self):
+            self.assertEqual(shipping_cost(60), 0)
+
+
+    if __name__ == "__main__":
+        unittest.main()
+- bash: python -m unittest
+- bash: python check_live_prices.py || true

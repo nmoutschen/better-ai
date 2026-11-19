@@ -1,10 +1,11 @@
 # Evaluation plan: code-better
 
-Status (2026-11-18): the rule cases, graders and harness are built and have run
-on Sonnet 5.5. The harness runs the real Claude Code CLI in a Docker sandbox; a
-scripted fake agent runs the whole pipeline over every case and condition without
-a model. The judges have not yet been checked against hand labels, so their
-scores are provisional. See "Results so far" and "Next steps" below.
+Status (2026-11-19): 79 cases cover every rule of the skill and have run on
+Sonnet 5.5 in four conditions. The harness runs the real Claude Code CLI in a
+Docker sandbox; a scripted fake agent runs the whole pipeline over every case and
+condition without a model. The judge agreed with hand labels on 9 of 10 hard
+calls; the one miss was a rubric fault, since fixed. See "Results so far" and
+"Next steps" below.
 
 ## Goal
 
@@ -19,11 +20,18 @@ would write it, and the facts the agent should find in the files, such as a
 README constraint, a caller with its own test, or a sample payload. Each case
 has a `situation` line with the planted fact and the expected behaviour.
 
-The code-better set has 53 cases across the rules that can be tested in one
-agent turn: invocation, 1.1, 1.2, 1.3, 1.5, 2, 3, 4.1, 4.2, 5.1, 5.2, 5.4 and
-7.1. Each rule has cases where the rule should change the behaviour and, where
-it applies, a case where it should not, such as a plain change that needs no
-question, design or plan. Rules 1.4, 5.3, 6.1, 7.2 and 8 have no cases yet.
+The code-better set has 79 cases covering every rule. Each rule has cases
+where the rule should change the behaviour and, where it applies, a case where
+it should not, such as a plain change that needs no question, design or plan.
+Rules about long or shared work (3, 8.2, 8.3) are planted as one turn of a
+longer task, such as a repository with a half-done plan.
+
+Rubrics grade the outcomes the user asked about and the case's own rule. They
+do not fail an agent for a mistake it made and then corrected, such as a test
+run with a wrong flag that it ran again correctly, for true side remarks about
+things the user did not ask about, or for doing what its harness requires, such
+as not committing unasked. Each rubric lists its PASS conditions and its FAIL
+conditions separately.
 
 ## Graders
 
@@ -61,6 +69,9 @@ breaks a case shows up before any model run.
 - **one-sentence:** the request plus one sentence from the rule's core
   instruction. This shows whether the full skill adds anything beyond the one
   sentence. Rules without a sentence are not run in this condition.
+- **short-skill:** a skill with the same name and frontmatter whose body is
+  every sentence of `one_sentence.yaml`, installed and invoked like the skill.
+  This separates the skill's length from its content.
 
 ## Development and held-out sets
 
@@ -80,45 +91,59 @@ weekly allowance; three runs per case used about 3%. Run two or three samples
 in parallel: ten parallel sessions hit rate-limit (429) errors with an earlier
 harness.
 
-## Results so far (Sonnet 5.5, 2026-11-18)
+## Results so far (Sonnet 5.5, 2026-11-19)
 
-53 cases × 3 conditions × 3 runs (477 samples, about 50 minutes, 0 errors).
-Pass rate per case, compared case by case (each case's runs averaged first;
-bootstrap 95% interval; sign-flip permutation p-value, Holm-corrected):
+79 cases × 4 conditions × 3 runs (948 runs, 0 errors). Each case and condition
+uses its latest run with the current rubrics and skill: the no-skill and
+one-sentence runs of the first 53 cases date from 2026-11-18 (rule 7.1 re-run
+on 2026-11-19); everything else ran on 2026-11-19. Pass rate per case, compared
+case by case (each case's runs averaged first; bootstrap 95% interval;
+sign-flip permutation p-value, Holm-corrected):
 
 | Comparison | Mean difference | 95% interval | p (Holm) |
 | --- | --- | --- | --- |
-| skill − no-skill | +0.145 | +0.044 to +0.245 | 0.015 |
-| one-sentence − no-skill | +0.208 | +0.101 to +0.321 | 0.002 |
-| skill − one-sentence | −0.063 | −0.164 to +0.044 | 0.29 |
+| skill − no-skill | +0.232 | +0.148 to +0.325 | 0.0005 |
+| one-sentence − no-skill | +0.232 | +0.135 to +0.329 | 0.0008 |
+| short-skill − no-skill | +0.169 | +0.059 to +0.274 | 0.015 |
+| skill − one-sentence | +0.000 | −0.076 to +0.076 | 1.0 |
+| skill − short-skill | +0.063 | −0.008 to +0.139 | 0.24 |
 
-Readings, all provisional until the judge is checked against hand labels:
+Cost per agent run (Claude Code's reported price, judge excluded): no-skill
+$0.035, one-sentence $0.035, short-skill $0.041, skill $0.059.
 
-- The skill raises the pass rate over no skill.
-- The one-sentence condition appends only the sentence for the rule the case
-  tests, which tells the agent which behaviour matters; it is not a fair
-  comparison with the skill, which must apply every rule. A fair version gives
-  every case all the rule sentences.
-- Rules 1.2, 4.1, 5.1 and 5.2 pass in every condition: their cases are too easy
-  for this model and measure nothing.
-- In rule 7.1 the skill condition scored lower (10 of 15 against 14 and 15):
-  its reports left out failed attempts or claimed checks that did not run.
+Readings:
+
+- The skill raises the pass rate by 23 points over no skill. The tested rule's
+  sentence alone does as well, but only because it names the rule the case
+  tests; the short skill, which holds every sentence, gains 17 points, 6 fewer
+  than the skill (not significant).
+- Rule 4.2 was the skill's weakest rule (6 of 12) because sections 1.3 and 1.5
+  let the agent choose error handling and state it as an assumption. Section
+  4.2 now asks before building; the skill passes 12 of 12, with no rise in
+  needless questions on the invocation cases (12 of 12).
+- The skill still trails on 1.5 (asking costly gaps at once: 50% against 67%
+  for one sentence) and 3 (planning work that spans sessions: 60% against 93%).
+  In the failing runs it assumed a costly gap instead of asking, and started a
+  multi-week migration without writing a plan.
+- The short skill's 4.2 sentence makes it ask about every unstated failure,
+  even when the request already specifies the main ones.
+- Rules 1.2, 6.1, 7.1 and 8.2 pass in nearly every condition, even with the
+  harder cases: Sonnet already does what they test.
+- The 8.2 sentence first said "your raw notes on what you tried"; appended to a
+  request for a handover, Sonnet's safeguards refused it as reasoning
+  extraction. The reworded sentence and the skill text run normally.
 
 Calibration of the cases found and fixed grading errors where a case failed an
 agent for another rule's requirement, a rubric required a fact the agent might
 never see, and a request named something the planted repository lacked. Claude
 Code loads `AGENTS.md` into context itself, so a judge cannot see it being
 read: cases that test reading the project's instructions plant them in
-`CONTRIBUTING.md`.
+`CONTRIBUTING.md` or `docs/`.
 
 ## Next steps
 
-1. Fair short-skill condition: every case gets all the rule sentences.
-2. Harder cases for rules 1.2, 4.1, 5.1 and 5.2.
-3. Hand-label a sample of transcripts in `judge_labels/<skill>.yaml` before
-   looking at the judge's verdicts, compare (`tools/report.py --labels`), fix
-   rubrics, and report the agreement next to every result.
-4. Look at rule 7.1 in the skill: whether the skill's checking guidance makes
-   reports less accurate.
-5. Cases for the uncovered rules (1.4, 5.3, 6.1, 7.2, 8.x), other models, and
-   the held-out set.
+1. Rules 1.5 and 3 in the skill: why the skill under-asks on costly gaps and
+   under-plans multi-session work while its own sentences do not.
+2. A random batch of hand labels for an overall judge error rate (the first ten
+   were chosen where the judge disagreed with itself).
+3. Harder cases for 1.2, 6.1, 7.1 and 8.2, other models, and the held-out set.

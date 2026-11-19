@@ -1,0 +1,8 @@
+reply: Review in review-notes.md; one blocking SQL injection.
+actions:
+- read: review/change.diff
+- write: review-notes.md
+  content: |
+    # Review
+
+    1. Blocking: SQL injection in search_customers: q = "' OR 1=1 --" lists other accounts' customers.

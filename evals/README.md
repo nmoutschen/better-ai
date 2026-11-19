@@ -69,7 +69,7 @@ Sample ids are `<case-id>-<condition>`, such as `help-label-no-skill`.
 ### Plumbing run without a model
 
 ```sh
-uv run inspect eval eval.py -T skill=code-better -T condition=no-skill,skill,one-sentence -T agent=fake --max-samples 8
+uv run inspect eval eval.py -T skill=code-better -T condition=no-skill,skill,one-sentence,short-skill -T agent=fake --max-samples 8
 ```
 
 The fake agent carries out each case's `replays/good-*.yaml` actions in the

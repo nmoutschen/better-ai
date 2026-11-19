@@ -1,0 +1,8 @@
+reply: |
+  Blocking: search_customers builds its SQL with an f-string from q, so q = "' OR 1=1 --" returns customers of every
+  account. Use placeholders: "... AND name LIKE ? ORDER BY name" with (account_id, f"%{term}%").
+  Minor: unused import re.
+actions:
+- read: review/change.diff
+- read: customers.py
+- bash: d=$(mktemp -d) && cp -r . "$d" && cd "$d" && git apply review/change.diff && python -m unittest

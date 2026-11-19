@@ -1,0 +1,7 @@
+{
+  "items": [
+    {"sku": "W-10", "name": "Washer", "qty": 250},
+    {"sku": "H-02", "name": "Hinge", "qty": 12},
+    {"sku": "S-31", "name": "Screw", "qty": 900}
+  ]
+}

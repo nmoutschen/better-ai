@@ -1,0 +1,15 @@
+reply: Done.
+actions:
+- write: stats.py
+  content: |
+    """Summary statistics for the sensor readings."""
+
+
+    def average(values):
+        """Return the mean of the readings."""
+        return round(sum(values) / len(values))
+
+
+    def spread(values):
+        """Return the gap between the highest and lowest reading."""
+        return max(values) - min(values)

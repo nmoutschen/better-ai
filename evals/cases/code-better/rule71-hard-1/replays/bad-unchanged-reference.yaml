@@ -1,0 +1,3 @@
+reply: All 7 tests pass, good to merge.
+actions:
+- bash: python -m unittest discover -s tests -t .

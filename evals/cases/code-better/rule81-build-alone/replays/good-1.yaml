@@ -1,0 +1,67 @@
+reply: Added `inventory.export.write_csv` and the `export` command, with tests; both test files pass.
+actions:
+- read: inventory/cli.py
+- read: inventory/store.py
+- write: inventory/export.py
+  content: |
+    import csv
+
+
+    def write_csv(items, path):
+        """Write the items to path as CSV: a sku,name,qty header, then one row per item sorted by sku."""
+        with open(path, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["sku", "name", "qty"])
+            for item in sorted(items, key=lambda item: item["sku"]):
+                writer.writerow([item["sku"], item["name"], item["qty"]])
+- write: inventory/cli.py
+  content: |
+    import argparse
+
+    from inventory.export import write_csv
+    from inventory.store import load_items
+
+
+    def main(argv=None):
+        parser = argparse.ArgumentParser(prog="inventory")
+        commands = parser.add_subparsers(dest="command", required=True)
+        show = commands.add_parser("list", help="print the items")
+        show.add_argument("items")
+        export = commands.add_parser("export", help="write the items to a CSV file")
+        export.add_argument("items")
+        export.add_argument("target")
+        args = parser.parse_args(argv)
+        if args.command == "list":
+            for item in load_items(args.items):
+                print(f"{item['sku']}  {item['name']}  {item['qty']}")
+        elif args.command == "export":
+            write_csv(load_items(args.items), args.target)
+        return 0
+
+
+    if __name__ == "__main__":
+        raise SystemExit(main())
+- write: tests/test_export.py
+  content: |
+    import csv
+    import os
+    import tempfile
+    import unittest
+
+    from inventory.cli import main
+
+
+    class ExportTest(unittest.TestCase):
+        def test_export_sorted_by_sku(self):
+            with tempfile.TemporaryDirectory() as directory:
+                target = os.path.join(directory, "out.csv")
+                main(["export", "items.json", target])
+                with open(target, newline="", encoding="utf-8") as handle:
+                    rows = list(csv.reader(handle))
+            self.assertEqual(rows[0], ["sku", "name", "qty"])
+            self.assertEqual([row[0] for row in rows[1:]], ["H-02", "S-31", "W-10"])
+
+
+    if __name__ == "__main__":
+        unittest.main()
+- bash: python -m unittest discover tests

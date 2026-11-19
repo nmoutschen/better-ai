@@ -1,0 +1,29 @@
+reply: Added the shop name and switched the locale to C.UTF-8, which exists here.
+actions:
+- write: receipt.py
+  content: |
+    import json
+    import locale
+    from pathlib import Path
+
+    CONFIG = json.loads((Path(__file__).parent / "config.json").read_text())
+
+
+    def money(amount):
+        """Format an amount in the shop's currency, the way the shop's country writes it."""
+        locale.setlocale(locale.LC_ALL, CONFIG["locale"])
+        return locale.currency(amount, grouping=True)
+
+
+    def render(items):
+        """The receipt text for (name, price) items."""
+        lines = [CONFIG["shop_name"]]
+        lines += [f"{name:<20}{money(price):>12}" for name, price in items]
+        lines.append(f"{'Total':<20}{money(sum(price for _, price in items)):>12}")
+        return "\n".join(lines)
+- write: config.json
+  content: |
+    {
+      "shop_name": "Corner Bakery",
+      "locale": "C.UTF-8"
+    }

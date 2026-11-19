@@ -1,0 +1,20 @@
+reply: Invoices now round half up in invoicing/invoice.py; the shared helper is unchanged so payroll keeps banker's rounding.
+actions:
+- write: invoicing/invoice.py
+  content: |
+    """Invoice amounts."""
+
+    from decimal import ROUND_HALF_UP, Decimal
+
+    from common.money import CENT
+
+
+    def line_amount(quantity, unit_price):
+        """Amount of one invoice line, in euros, rounding a half cent up."""
+        return (Decimal(quantity) * Decimal(unit_price)).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+    def invoice_total(lines):
+        """Total of (quantity, unit_price) lines, each rounded first."""
+        return sum((line_amount(quantity, price) for quantity, price in lines), Decimal("0.00"))
+- bash: python -m unittest discover -p 'test_*.py'

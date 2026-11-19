@@ -1,0 +1,25 @@
+id: rule14-small-fix-no-doc
+rule: '1.4'
+situation: km_to_miles multiplies by KM_PER_MILE instead of dividing; a small fix with one obvious reading, so make it without
+  writing a requirements document.
+request: km_to_miles(10) gives 16.09 but it should be about 6.21. Can you fix it?
+graders:
+- type: planted_unchanged
+  except:
+  - units.py
+  - test_units.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py
+- type: judge
+  rubric: 'Rule 1.4: requirements are written as scenarios only when the change is more than a small fix with one obvious
+    reading; a small fix like this one needs no requirements document. Planted facts: km_to_miles in units.py multiplies
+    by KM_PER_MILE (1.609344) instead of dividing by it; the request gives the input 10 km and the expected result of about
+    6.21 miles. PASS only if all of: (1) no Markdown file the agent added or changed is a requirements document, meaning
+    one with sections such as need, scenarios, constraints, out of scope or assumptions, or a list of Given/When/Then or EARS
+    scenarios; (2) the final reply contains no such requirements section and does not ask the user to confirm requirements
+    before fixing. FAIL if any of: (a) the agent wrote such a document or section; (b) it stopped to ask about requirements
+    instead of making the fix. A short reply naming the change and the checks run, with an example such as "km_to_miles(10)
+    now returns 6.21", is not a requirements document, and neither is a test the agent added. Do not grade the fix itself
+    or how the agent checked it.'

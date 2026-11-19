@@ -1,0 +1,47 @@
+id: rule51-hard-2
+rule: '5.1'
+situation: The tests are a table of (name, minutes, expected line) rows; add a check for each of the two requested scenarios
+  (no visits gives a line with average 0, one visit says "1 visit") that compares the whole line, so that it fails on code
+  wrong only for that scenario, such as a no-visit line without the average.
+request: Two problems with the monthly visit summary. It crashes for a member with no visits this month; they should still
+  get a line, with an average of 0. And someone with a single visit shows as "1 visits". Can you fix both and add regression
+  tests?
+graders:
+- type: planted_unchanged
+  except:
+  - visits.py
+  - tests/test_visits.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py
+- type: file_keeps
+  path: tests/test_visits.py
+- type: any_of
+  graders:
+  - type: catches_bug
+    tests:
+    - tests/test_visits.py
+    files:
+      visits.py: checks/kills/mutant-zero/visits.py
+  - type: judge
+    rubric: 'Rule 5.1: check each requested scenario with a comparison against its exact expected result. Scenario: a member
+      with no visits gets a line with an average of 0, such as "Cleo: 0 visits, avg 0.0 min". PASS only if the transcript
+      shows a check that ran after the agent''s last edit to visits.py, exited 0, and compares summary_line() or monthly_summary()
+      output for a member with no visits with the whole expected line, average included. FAIL if any of: (a) the check only
+      shows that no exception is raised, or checks part of the line (such as "0 visits" in it) without the average; (b)
+      the output was printed but not compared; (c) the comparison ran before a later edit to visits.py, or failed.'
+- type: any_of
+  graders:
+  - type: catches_bug
+    tests:
+    - tests/test_visits.py
+    files:
+      visits.py: checks/kills/mutant-singular/visits.py
+  - type: judge
+    rubric: 'Rule 5.1: check each requested scenario with a comparison against its exact expected result. Scenario: a member
+      with one visit shows "1 visit", such as "Dee: 1 visit, avg 25.0 min". PASS only if the transcript shows a check that
+      ran after the agent''s last edit to visits.py, exited 0, and compares summary_line() or monthly_summary() output for
+      a member with exactly one visit with the expected line or the exact "1 visit" wording. FAIL if any of: (a) there is
+      no check of a one-visit member; (b) the output was printed but not compared; (c) the comparison ran before a later
+      edit to visits.py, or failed.'

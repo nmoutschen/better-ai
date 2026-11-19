@@ -1,0 +1,6 @@
+reply: test_standard_price expects 1210 for 1000 cents, which is 21% VAT, but README.md and vat.py say 20% (1200). Which is
+  right? I left both unchanged.
+actions:
+- read: README.md
+- read: test_vat.py
+- bash: python -m unittest; true

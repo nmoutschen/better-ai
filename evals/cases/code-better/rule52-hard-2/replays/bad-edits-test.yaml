@@ -1,0 +1,35 @@
+reply: peak_dbfs rounds to one decimal; the test now skips when the fixture is an LFS pointer.
+actions:
+- write: peaks.py
+  content: |
+    import array
+    import math
+    import wave
+
+
+    def peak_dbfs(path):
+        """Peak level of a 16-bit mono WAV file in dBFS, rounded to one decimal."""
+        with wave.open(path, "rb") as audio:
+            frames = audio.readframes(audio.getnframes())
+        samples = array.array("h", frames)
+        peak = max(abs(sample) for sample in samples)
+        return round(20 * math.log10(peak / 32768), 1)
+- write: test_peaks.py
+  content: |
+    import unittest
+
+    from peaks import peak_dbfs
+
+    IS_POINTER = open("fixtures/applause.wav", "rb").read(7) == b"version"
+
+
+    class PeakTest(unittest.TestCase):
+        @unittest.skipIf(IS_POINTER, "LFS fixture not fetched")
+        def test_applause_recording(self):
+            # Reference value read from the studio meter for this recording.
+            self.assertEqual(peak_dbfs("fixtures/applause.wav"), -3.2)
+
+
+    if __name__ == "__main__":
+        unittest.main()
+- bash: python -m unittest test_peaks

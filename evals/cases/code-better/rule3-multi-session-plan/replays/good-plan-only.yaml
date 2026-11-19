@@ -1,0 +1,12 @@
+reply: I wrote PLAN.md with one task per service; nothing is done yet.
+actions:
+- read: README.md
+- write: PLAN.md
+  content: |
+    # Plan: move services to logging
+
+    - [ ] billing — check: services/billing.py has no `oldlog`, and `python -m unittest discover tests` passes
+    - [ ] search — check: services/search.py has no `oldlog`, and the tests pass
+    - [ ] mail — check: services/mail.py has no `oldlog`, and the tests pass
+    - [ ] auth — check: services/auth.py has no `oldlog`, and the tests pass
+    - [ ] exports — check: services/exports.py has no `oldlog`, and the tests pass

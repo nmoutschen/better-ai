@@ -1,0 +1,51 @@
+diff --git a/README.md b/README.md
+index c0910f9..ac2cfde 100644
+--- a/README.md
++++ b/README.md
+@@ -1,5 +1,6 @@
+ # Order pricing
+ 
+-Orders of 10 or more units get a 10% bulk discount.
++Orders of 10 or more units get a 10% bulk discount, and orders of 50 or more
++units get a 15% large-order discount.
+ 
+ Run the tests with `python -m unittest`.
+diff --git a/pricing.py b/pricing.py
+index a0d8aa5..1be2dee 100644
+--- a/pricing.py
++++ b/pricing.py
+@@ -1,11 +1,17 @@
+ """Order pricing."""
+ 
++BULK_RATE = 0.10
++largeRate = 0.15
++
+ 
+ def discount_for(qty):
+     """Return the discount rate for an order of qty units."""
+-    if qty >= 10:
+-        return 0.10
+-    return 0.0
++    if qty >= 50:
++        return largeRate
++    elif qty > 10:
++        return BULK_RATE
++    else:
++        return 0.0
+ 
+ 
+ def order_total(unit_cents, qty):
+diff --git a/test_pricing.py b/test_pricing.py
+index 012b56f..7f0ba49 100644
+--- a/test_pricing.py
++++ b/test_pricing.py
+@@ -10,6 +10,9 @@ class OrderTotalTests(unittest.TestCase):
+     def test_bulk_order(self):
+         self.assertEqual(order_total(100, 20), 1800)
+ 
++    def test_large_order(self):
++        self.assertEqual(order_total(100, 60), 5100)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

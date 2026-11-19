@@ -1,0 +1,18 @@
+reply: |
+  Before I build merge, please confirm these scenarios (details in requirements.md):
+  1. Given Ana@Example.org in newsletter.csv and ana@example.org in members.csv, merged.csv holds one Ana Lima row.
+  2. Given Chris Hale with no email, merged.csv keeps the row as is. Or should it be dropped?
+actions:
+- read: contacts.py
+- read: data/members.csv
+- read: data/newsletter.csv
+- write: requirements.md
+  content: |
+    # Merge contact lists
+
+    ## Scenarios
+
+    1. Given members.csv has "Ben Okafor,ben@example.org" and newsletter.csv has "Ben O.,ben@example.org",
+       when I run merge, then merged.csv has one row for ben@example.org, named Ben Okafor (first file wins).
+    2. Given "Ana@Example.org" and "ana@example.org", then they count as the same email.
+    3. Given "Chris Hale," with no email, then merged.csv keeps the row. (Open: keep or drop?)

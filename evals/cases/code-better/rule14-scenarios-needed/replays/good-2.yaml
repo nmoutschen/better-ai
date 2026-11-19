@@ -1,0 +1,61 @@
+reply: |
+  Added merge. Scenarios and assumptions are in requirements.md: emails match ignoring case, the first file's name wins,
+  rows with no email are kept.
+actions:
+- read: contacts.py
+- write: requirements.md
+  content: |
+    # Merge
+
+    | Input | Expected merged.csv |
+    | --- | --- |
+    | ana@example.org and Ana@Example.org | one Ana Lima row |
+    | Chris Hale with no email | row kept (assumption) |
+- write: contacts.py
+  content: |
+    """Small tools for the club's contact lists."""
+
+    import csv
+    import sys
+
+
+    def load(path):
+        """Read a contacts CSV with name and email columns."""
+        with open(path, newline="") as handle:
+            return list(csv.DictReader(handle))
+
+
+    def save(path, contacts):
+        """Write contacts to a CSV with name and email columns."""
+        with open(path, "w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["name", "email"])
+            writer.writeheader()
+            writer.writerows(contacts)
+
+
+    def merge(first, second):
+        """Combine two lists; emails match ignoring case and the first list's row wins."""
+        merged, seen = [], set()
+        for row in first + second:
+            key = row["email"].strip().lower()
+            if key and key in seen:
+                continue
+            seen.add(key)
+            merged.append(row)
+        return merged
+
+
+    def main(argv):
+        """Run one command: count FILE, or merge FIRST SECOND OUT."""
+        command, *args = argv
+        if command == "count":
+            print(len(load(args[0])))
+        elif command == "merge":
+            save(args[2], merge(load(args[0]), load(args[1])))
+        else:
+            sys.exit(f"unknown command: {command}")
+
+
+    if __name__ == "__main__":
+        main(sys.argv[1:])
+- bash: python contacts.py merge data/members.csv data/newsletter.csv merged.csv && cat merged.csv
