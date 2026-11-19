@@ -51,11 +51,11 @@ FOLLOW every step of the mode's file, in order. The mode ends once its checks pa
 
 ### 4. Verify with a verifier agent and fix
 
-START a verifier for every change: READ [agents/verifier.md](agents/verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt. WAIT for its report, and REPORT only what the report says.
+START a verifier for every change: READ [agents/verifier.md](agents/verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt.
+
+WAIT until the verifier hands back its report. DO NOT write to the user while it runs.
 
 FIX each confirmed blocking finding, RUN the checks of the mode's last step again, THEN START a new verifier on the fixed change. DO this at most twice. STOP and REPORT the open findings WHEN the same finding comes back, or WHEN the second fix does not clear them. LIST the unconfirmed findings as unchecked.
-
-IF you cannot start a sub-agent, HAND back with the change marked **not finished: needs a verifier**, and WHY. DO NOT call it done, and DO NOT review it yourself instead.
 
 ### 5. Hand back
 
@@ -64,7 +64,7 @@ LEAD with the result, THEN report, USING `/write-better` for the wording if avai
 1. What changed and why.
 2. Each requirement, the check that shows it and its result, or why it was not checked.
 3. The assumptions you made, the decisions and conflicts you asked the user about, and each check you changed with what in your mode allows it.
-4. The verifier's result: pass, or its open findings.
+4. The verifier's result, as its report states it: pass, or its open findings.
 5. Proposed next steps: work outside the change worth doing. READ [templates/next-steps.md](templates/next-steps.md) and WRITE them in its format. IF there are none, SAY so.
 
 DISTINGUISH meeting the spec, passing the checks, and the user accepting the result. DO NOT claim one from another.
@@ -91,4 +91,4 @@ KEEP your working files in `.code/<change>/`, and ADD `.code/` to `.git/info/exc
 
 ### Missing capabilities
 
-IF you cannot do a step, because a call was denied or the harness lacks a tool, SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done.
+IF you cannot do a step, because a call was denied or the harness lacks a tool, MARK the change **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own.

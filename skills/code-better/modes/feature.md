@@ -40,4 +40,4 @@ COMPARE the checks with the copy of step 2. ASK the user about any difference th
 
 FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same check fails twice for the same reason, WHEN three rounds have not made all checks pass, or WHEN a fix breaks a check that passed before.
 
-IF you cannot run code, STOP with the change marked **not finished: not verified**, WHY, and the checks still to run. DO NOT describe results you did not observe. A requirement is met only IF its check passed on the final code.
+DO NOT describe results you did not observe. A requirement is met only IF its check passed on the final code.

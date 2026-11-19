@@ -31,4 +31,4 @@ COMPARE the existing tests with the copy of step 2. ASK the user about any chang
 
 FIX each test that fails for a reason of its own, THEN RUN the tests again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same test fails twice for the same reason, or WHEN three rounds have not made the tests pass.
 
-IF you cannot run code, STOP with the tests marked **not finished: not verified**, WHY, and the tests still to run. DO NOT describe results you did not observe.
+DO NOT describe results you did not observe.
