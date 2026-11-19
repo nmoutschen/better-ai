@@ -195,6 +195,20 @@ async def diff_max_lines(spec: dict[str, Any], repo: Checkout) -> bool:
     return lines <= spec["max"]
 
 
+async def commits_since_start(repo: Checkout) -> int:
+    """Return how many commits HEAD has beyond the planted commit, or -1 when HEAD no longer descends from it."""
+    if (
+        await repo.sandbox_env.exec(["git", "merge-base", "--is-ancestor", repo.start, "HEAD"], cwd=repo.workdir)
+    ).success:
+        return int((await repo.git("rev-list", "--count", f"{repo.start}..HEAD")).strip())
+    return -1
+
+
+async def no_commit(spec: dict[str, Any], repo: Checkout) -> bool:
+    """HEAD is still the planted commit: the agent made no commit and did not reset or rewrite history."""
+    return await commits_since_start(repo) == 0
+
+
 async def command_passes(spec: dict[str, Any], repo: Checkout) -> bool:
     """The hidden command exits zero on a copy of the submitted tree."""
     timeout = spec.get("timeout", COMMAND_TIMEOUT)
@@ -237,6 +251,7 @@ GRADERS: dict[str, Callable[[dict[str, Any], Checkout], Awaitable[bool]]] = {
     "file_not_contains": file_not_contains,
     "planted_unchanged": planted_unchanged,
     "notes_only": notes_only,
+    "no_commit": no_commit,
     "diff_max_lines": diff_max_lines,
     "command_passes": command_passes,
     "command_fails": command_fails,

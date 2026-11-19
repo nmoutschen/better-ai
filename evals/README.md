@@ -147,7 +147,16 @@ cases/<skill>/<case-id>/
   repo/       the planted files, copied into the sandbox
   checks/     hidden files that graders reference by path
   replays/    good-*.yaml and bad-*.yaml runs for validate_cases.py and the fake agent
+  earlier/    optional: the agent's earlier work, for skills that correct it, such as do-better
+    before/       the files as they were before that work
+    message.txt   its commit message, such as the agent's hand-back report
 ```
+
+With `earlier/`, the sandbox starts with two commits: `before/`, then `repo/`
+with `message.txt` as its message. The agent finds its earlier work as the last
+commit, and graders compare against that commit, so a case states the earlier
+work in the repository instead of in a conversation the harness would have to
+replay.
 
 `rule` is the numbered section ID in the skill's `SKILL.md`, or `invocation`.
 `situation` records the planted fact and the expected behaviour. A grader's
@@ -177,6 +186,7 @@ starting commit or run a hidden check on a disposable copy of it:
 | `file_contains`, `file_not_contains` | `path`, `pattern` | The file exists and matches, or does not match, the regex. |
 | `planted_unchanged` | optional `except` | No planted file changed, except those matching the listed patterns. New files are allowed. |
 | `notes_only` | | Every changed or new file is a Markdown note: no code or data changed. |
+| `no_commit` | | HEAD is still the planted commit: no commit, reset or rewritten history. |
 | `diff_max_lines` | `max` | Added plus removed lines in planted files are within the limit. |
 | `command_passes`, `command_fails` | `cmd`, optional `files`, `timeout` | The Bash command exits zero, or nonzero, on a copy of the submitted tree. |
 | `catches_bug` | `restore` or `files`, optional `tests` | A test file the agent added or changed passes on the submitted code and fails on an assertion once the bug is back (planted files restored, or replaced by `files`). |
@@ -227,7 +237,9 @@ uv run python -m tools.report logs/<dir>/*.eval [more.eval ...] [--latest]
 prints the pass rate of `all` per rule and condition, the paired comparisons
 between conditions, cost and time per condition, one line per sample with
 tokens (input, output, cache read, cache write), agent cost, judge cost and
-time, the totals, and any sample errors. With `--latest`, each case and
+time, the totals, any sample errors, and per condition how many runs committed or rewrote
+history. Every sample records its commits under `side_actions` in the score metadata; only cases
+that use `no_commit` score it. With `--latest`, each case and
 condition keeps only the runs of the most recently started log that has it, so
 a re-run after a fix replaces the runs it fixes; without it, every run of every
 log counts.
