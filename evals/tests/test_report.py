@@ -80,3 +80,21 @@ def test_bootstrap_interval_contains_the_mean() -> None:
     differences = [1.0, 0.0, 1.0, 1.0, 0.0, 0.5]
     low, high = bootstrap_interval(differences, random.Random(0))
     assert low <= sum(differences) / len(differences) <= high
+
+
+def test_agreement_matches_the_labelled_run(tmp_path: Path) -> None:
+    """With several runs of a sample, a label is compared with the judge verdict of its own epoch."""
+    second = report.SampleResult(
+        "a-skill", "a", "skill", "1.1", 1, {}, 0.7, 0.1, 40, {"judge": {"verdict": True}}, epoch=2
+    )
+    labels = tmp_path / "labels.yaml"
+    labels.write_text("- {sample: a-skill, epoch: 1, grader: judge, verdict: FAIL}\n")
+    lines = report.agreement([*rows(), second], report.load_labels(labels))
+    assert lines[0].split()[-2:] == ["1/1", "agree"]
+
+
+def test_condition_cost_lines() -> None:
+    """One line per condition with runs, mean and median cost and time; errored runs are left out."""
+    lines = report.condition_cost_lines(rows())
+    assert lines[1].split()[:3] == ["no-skill", "1", "0.500"]
+    assert lines[2].split()[:3] == ["skill", "1", "0.700"]

@@ -4,7 +4,8 @@
     uv run inspect eval eval.py -T skill=code-better -T condition=no-skill,skill,one-sentence -T agent=fake   # plumbing, no model calls
 
 Conditions: `no-skill` sends the request as is, `skill` installs the skill and prefixes `/<skill>`,
-`one-sentence` appends the rule's sentence from `one_sentence.yaml`. The agent is the real Claude Code CLI (`agent=claude_code`, model from
+`one-sentence` appends the rule's sentence from `one_sentence.yaml`,
+`short-skill` installs a skill of the same name holding all those sentences and invokes it like `skill`. The agent is the real Claude Code CLI (`agent=claude_code`, model from
 `-T model=`) or a scripted fake (`agent=fake`) that plays each case's good replay. The judge model is
 `-T judge_model=` (default: a different model from the agent; `none` skips judges). Inspect's own
 `--model` is unused: the CLI calls the API itself, so the task sets the `none` model.
@@ -40,7 +41,7 @@ def skill_eval(
     judge_model: str | None = None,
     timeout: int = 1800,
 ) -> Task:
-    """Build the eval for one skill: `condition` is no-skill, skill, one-sentence or a list of them; `rule` and `cases` filter."""
+    """Build the eval for one skill: `condition` is no-skill, skill, one-sentence, short-skill or a list; `rule` and `cases` filter."""
     if agent not in AGENTS:
         raise ValueError(f"Agents are {', '.join(AGENTS)}")
     conditions = parse_conditions(condition)

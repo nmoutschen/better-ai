@@ -22,7 +22,7 @@ from inspect_ai.solver import Generate, Solver, TaskState, solver
 from inspect_ai.util import SandboxEnvironment, sandbox
 from inspect_ai.util._sandbox.events import without_sandbox_events
 
-from skill_evals.cases import REPO, WITH_SKILL
+from skill_evals.cases import REPO, SHORT_SKILL, WITH_SKILL, short_skill
 from skill_evals.transcript import Run, parse_stream, redact
 
 WORKDIR = "/work"
@@ -115,20 +115,23 @@ def skill_commit(skill: str) -> str:
     return subprocess.run(command, cwd=REPO, text=True, capture_output=True, check=False).stdout.strip()
 
 
-async def install_skill(sandbox_env: SandboxEnvironment, skill: str) -> None:
-    """Copy the skill as is into the agent user's ~/.claude/skills/<skill>/."""
+async def install_skill(sandbox_env: SandboxEnvironment, skill: str, short: bool = False) -> None:
+    """Copy the skill as is into the agent user's ~/.claude/skills/<skill>/, or only the short SKILL.md."""
     source = REPO / "skills" / skill
     target = f"{home(AGENT_USER)}/.claude/skills/{skill}"
-    for path in sorted(source.rglob("*")):
-        if path.is_file() and "__pycache__" not in path.parts:
-            await sandbox_env.write_file(f"{target}/{path.relative_to(source).as_posix()}", path.read_bytes())
+    if short:
+        await sandbox_env.write_file(f"{target}/SKILL.md", short_skill(skill))
+    else:
+        for path in sorted(source.rglob("*")):
+            if path.is_file() and "__pycache__" not in path.parts:
+                await sandbox_env.write_file(f"{target}/{path.relative_to(source).as_posix()}", path.read_bytes())
     await run_checked(sandbox_env, ["chown", "-R", f"{AGENT_USER}:{AGENT_USER}", f"{home(AGENT_USER)}/.claude"])
     await run_checked(sandbox_env, ["test", "-f", f"{target}/SKILL.md"])
 
 
 @solver
 def prepare_sandbox(skill: str) -> Solver:
-    """Commit the planted files as the agent user and, in the skill condition, install the skill."""
+    """Commit the planted files as the agent user and, in the skill conditions, install the full or short skill."""
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         sandbox_env = sandbox()
@@ -137,8 +140,8 @@ def prepare_sandbox(skill: str) -> Solver:
             sandbox_env, ["bash", "-ec", START_SCRIPT, "bash", *IGNORED_PATHS], cwd=WORKDIR, user=AGENT_USER
         )
         state.store.set("start_commit", stdout.split()[-1])
-        if state.metadata["condition"] == WITH_SKILL:
-            await install_skill(sandbox_env, skill)
+        if state.metadata["condition"] in (WITH_SKILL, SHORT_SKILL):
+            await install_skill(sandbox_env, skill, short=state.metadata["condition"] == SHORT_SKILL)
         return state
 
     return solve

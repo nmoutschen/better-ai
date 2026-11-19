@@ -65,3 +65,12 @@ def test_record_run() -> None:
 def test_image_pins_the_same_claude_code_version() -> None:
     """The Dockerfile and the run metadata name the same Claude Code version."""
     assert agent.dockerfile_version() == agent.CLAUDE_CODE_VERSION
+
+
+def test_short_skill_holds_every_sentence_under_the_real_frontmatter() -> None:
+    """The short skill keeps the real name and description, and its body is every rule sentence."""
+    text = cases.short_skill("code-better")
+    assert text.startswith("---\nname: code-better\n")
+    for sentence in cases.rule_sentences("code-better").values():
+        assert f"- {sentence}" in text
+    assert cases.condition_prompt("Fix it.", "short-skill", "code-better") == "/code-better Fix it."

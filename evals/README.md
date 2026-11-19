@@ -40,7 +40,7 @@ Task options (`-T name=value`):
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `skill` | required | Skill folder name, such as `code-better`. |
-| `condition` | `no-skill` | `no-skill`, `skill`, `one-sentence`, or a list such as `no-skill,skill`. |
+| `condition` | `no-skill` | `no-skill`, `skill`, `one-sentence`, `short-skill`, or a list such as `no-skill,skill`. |
 | `rule`, `cases` | all | Only one rule (`-T 'rule="1.5"'`) or some case ids (`-T cases=help-label,meter-zero`). |
 | `agent` | `claude_code` | `fake` plays each case's first good replay instead; no model calls. |
 | `model` | `sonnet` | Claude Code `--model` for the agent. |
@@ -60,6 +60,9 @@ Conditions:
 - **one-sentence** appends the one-sentence instruction for the case's rule
   from `cases/<skill>/one_sentence.yaml`. Rules without a sentence there are
   not run in this condition.
+- **short-skill** installs a skill with the same name and frontmatter whose
+  body is every sentence of `one_sentence.yaml`, and sends `/<skill> <request>`
+  like **skill**. It separates the skill's length from its content.
 
 Sample ids are `<case-id>-<condition>`, such as `help-label-no-skill`.
 

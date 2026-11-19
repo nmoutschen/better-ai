@@ -1,7 +1,8 @@
 """Read a skill's case folders and turn them into Inspect samples, one per case and condition.
 
 Conditions: `no-skill` sends the request as is, `skill` installs the skill and invokes it with its slash
-command, and `one-sentence` appends the rule's one-sentence instruction to the request.
+command, `one-sentence` appends the rule's one-sentence instruction to the request, and `short-skill` installs a
+skill of the same name whose body is every sentence of `one_sentence.yaml` and invokes it the same way.
 
 A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, situation, request, graders),
 `repo/` with the planted files, `checks/` with hidden files that graders reference by path, and
@@ -23,7 +24,9 @@ CASES = EVALS / "cases"
 NO_SKILL = "no-skill"
 WITH_SKILL = "skill"
 ONE_SENTENCE = "one-sentence"
-CONDITIONS = (NO_SKILL, WITH_SKILL, ONE_SENTENCE)
+SHORT_SKILL = "short-skill"
+CONDITIONS = (NO_SKILL, WITH_SKILL, ONE_SENTENCE, SHORT_SKILL)
+SKILL_CONDITIONS = (WITH_SKILL, SHORT_SKILL)
 SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 
@@ -73,6 +76,17 @@ def rule_sentences(skill: str) -> dict[str, str]:
     return {str(rule): text for rule, text in (yaml.safe_load(path.read_text()) or {}).items()}
 
 
+def short_skill(skill: str) -> str:
+    """Return the SKILL.md of the short skill: the real skill's frontmatter, then every rule sentence as a list."""
+    original = (REPO / "skills" / check_skill(skill) / "SKILL.md").read_text()
+    frontmatter = original.split("---", 2)[1]
+    sentences = rule_sentences(skill)
+    if not sentences:
+        raise ValueError(f"No one_sentence.yaml for {skill!r}")
+    body = "\n".join(f"- {text}" for text in sentences.values())
+    return f"---{frontmatter}---\n\n{body}\n"
+
+
 def replays(directory: Path) -> dict[str, dict[str, Any]]:
     """Return a case's replays by name, such as good-1 or bad-edits-test."""
     return {path.stem: yaml.safe_load(path.read_text()) for path in sorted((directory / "replays").glob("*.yaml"))}
@@ -81,12 +95,12 @@ def replays(directory: Path) -> dict[str, dict[str, Any]]:
 def condition_prompt(request: str, condition: str, skill: str, rule_sentence: str | None = None) -> str:
     """Build the prompt for a condition.
 
-    no-skill sends the request as is, skill prefixes the skill's slash command, and one-sentence appends
-    the rule's sentence to the request.
+    no-skill sends the request as is, skill and short-skill prefix the skill's slash command, and one-sentence
+    appends the rule's sentence to the request.
     """
     if condition == NO_SKILL:
         return request
-    if condition == WITH_SKILL:
+    if condition in SKILL_CONDITIONS:
         return f"/{skill} {request}"
     if condition == ONE_SENTENCE and rule_sentence:
         return f"{request}\n\n{rule_sentence}"

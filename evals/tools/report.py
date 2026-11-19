@@ -1,4 +1,4 @@
-"""Summarise eval logs: pass rates, condition comparisons, tokens, cost and time, and judge agreement.
+"""Summarise eval logs: pass rates, condition comparisons, cost and time per condition, and judge agreement.
 
 Reads one or more Inspect `.eval` logs from `eval.py`. A case scores only its rule, so the pass rate of
 a rule in a condition is the share of its samples whose `all` score passed. When a case ran several
@@ -14,6 +14,7 @@ with the judge's verdicts in the same logs.
 import argparse
 import math
 import random
+import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,7 +28,13 @@ from skill_evals.cases import CONDITIONS
 EVALS = Path(__file__).resolve().parents[1]
 
 # Each comparison is (condition, baseline): the difference is condition minus baseline.
-COMPARISONS = (("skill", "no-skill"), ("one-sentence", "no-skill"), ("skill", "one-sentence"))
+COMPARISONS = (
+    ("skill", "no-skill"),
+    ("one-sentence", "no-skill"),
+    ("short-skill", "no-skill"),
+    ("skill", "one-sentence"),
+    ("skill", "short-skill"),
+)
 RESAMPLES = 10_000
 RANDOM_SEED = 0
 
@@ -201,8 +208,29 @@ def case_lines(results: list[SampleResult]) -> list[str]:
     return lines
 
 
+def condition_cost_lines(results: list[SampleResult]) -> list[str]:
+    """Format cost, time and tokens per condition: mean and median per run, over runs without an error."""
+    lines = [
+        f"{'condition':14} {'runs':>5} {'cost mean':>10} {'median':>8} {'time mean':>10} {'median':>8} "
+        f"{'out tokens':>11} {'total cost':>11}"
+    ]
+    for name in CONDITIONS:
+        runs = [sample for sample in results if sample.condition == name and not sample.error]
+        if not runs:
+            continue
+        costs = [sample.cost for sample in runs]
+        times = [sample.seconds for sample in runs]
+        output = statistics.mean(sample.tokens.get("output_tokens", 0) for sample in runs)
+        lines.append(
+            f"{name:14} {len(runs):5} {statistics.mean(costs):10.3f} {statistics.median(costs):8.3f} "
+            f"{statistics.mean(times):9.0f}s {statistics.median(times):7.0f}s {output:11.0f} {sum(costs):11.2f}"
+        )
+    lines.append("cost = Claude Code's total_cost_usd for the agent run (API-price equivalent), judge excluded.")
+    return lines
+
+
 def load_labels(path: Path) -> list[dict[str, Any]]:
-    """Read hand labels: a list of {sample, grader, verdict: PASS or FAIL, note}."""
+    """Read hand labels: a list of {sample, epoch (default 1), grader, verdict: PASS or FAIL, note}."""
     labels = yaml.safe_load(path.read_text()) or []
     for label in labels:
         if str(label.get("verdict")).upper() not in {"PASS", "FAIL"}:
@@ -213,15 +241,17 @@ def load_labels(path: Path) -> list[dict[str, Any]]:
 def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
     """Compare judge verdicts with hand labels, per rubric (case and grader) and overall."""
     verdicts = {
-        (sample.sample_id, grader): info.get("verdict") for sample in results for grader, info in sample.judges.items()
+        (sample.sample_id, sample.epoch, grader): info.get("verdict")
+        for sample in results
+        for grader, info in sample.judges.items()
     }
     cases = {sample.sample_id: sample.case for sample in results}
     per_rubric: dict[tuple[str, str], list[bool]] = defaultdict(list)
     for label in labels:
-        sample_id, grader = str(label["sample"]), str(label["grader"])
-        if (sample_id, grader) in verdicts:
+        key = (str(label["sample"]), int(label.get("epoch", 1)), str(label["grader"]))
+        if key in verdicts:
             human_passes = str(label["verdict"]).upper() == "PASS"
-            per_rubric[cases[sample_id], grader].append(verdicts[sample_id, grader] == human_passes)
+            per_rubric[cases[key[0]], key[2]].append(verdicts[key] == human_passes)
     if not per_rubric:
         return ["no labelled judge verdicts in these logs"]
     lines = [
@@ -243,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     sections = [
         ("Pass rate (all) per rule and condition", pass_table(results)),
         ("Comparisons between conditions (paired by case)", comparison_lines(results)),
+        ("Cost and time per condition", condition_cost_lines(results)),
         ("Samples", case_lines(results)),
     ]
     if args.labels:
