@@ -33,7 +33,7 @@ Install the pinned packages from `evals/` with `uv sync --python 3.12` and
 start Docker. Run from `evals/`:
 
 ```sh
-uv run inspect eval eval.py -T skill=code-better --epochs 3 --max-samples 3 --no-fail-on-error
+uv run inspect eval eval.py -T skill=code-better --epochs 3 --max-samples 6 --no-fail-on-error
 ```
 
 This runs the default conditions, no-skill, skill and short-skill, three times
@@ -136,8 +136,9 @@ if the agent prints its environment. After a run, check:
 ## Budget and rate limits
 
 Each sample is one Claude Code session plus one judge call per judged grader.
-Earlier, ten parallel sessions hit rate limits (429), and three were still
-rate-limited with the previous harness; start with `--max-samples 2` or 3.
+Earlier, ten parallel sessions hit rate limits (429) with the previous harness.
+Six ran without errors on 2026-11-19; use `--max-samples 6`, and lower it if
+samples fail with 429s.
 Claude Code retries 429s itself; a run that still fails becomes a sample error.
 Expect the token to hit its usage cap during long runs, and plan runs so a cap
 stops a run between models rather than in the middle of one.
