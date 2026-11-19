@@ -14,7 +14,7 @@ from typing import Any
 from inspect_ai.model import ChatMessage, ChatMessageAssistant, ChatMessageTool, ChatMessageUser
 from inspect_ai.solver import TaskState
 
-from skill_evals.agent import claude_cli, home
+from skill_evals.agent import EDIT_TOOL, READ_TOOL, SHELL_TOOL, WRITE_TOOL, claude_cli, home
 from skill_evals.grading.files import MARKDOWN_NOTE, Checkout
 from skill_evals.transcript import redact
 
@@ -41,18 +41,18 @@ def clip(text: str, head: int = HEAD_CHARS, tail: int = TAIL_CHARS) -> str:
 
 def describe_call(name: str, args: dict[str, Any]) -> str:
     """Render one tool call compactly: the command, the file and its range, or the edit."""
-    if name == "Bash":
+    if name == SHELL_TOOL:
         return f"Bash: {args.get('command', '')}"
-    if name == "Read":
+    if name == READ_TOOL:
         extra = "".join(f" {key}={args[key]}" for key in ("offset", "limit") if key in args)
         return f"Read {args.get('file_path', '')}{extra or ' (whole file)'}"
-    if name == "Edit":
+    if name == EDIT_TOOL:
         old, new = (
             clip(str(args.get("old_string", "")), ARGUMENT_CHARS, 0),
             clip(str(args.get("new_string", "")), ARGUMENT_CHARS, 0),
         )
         return f"Edit {args.get('file_path', '')}\n  old: {old}\n  new: {new}"
-    if name == "Write":
+    if name == WRITE_TOOL:
         return (
             f"Write {args.get('file_path', '')}\n{clip(str(args.get('content', '')), ARGUMENT_CHARS, ARGUMENT_CHARS)}"
         )
@@ -66,7 +66,7 @@ def describe_result(message: ChatMessageTool) -> str:
     status = "FAILED" if message.error else "OK"
     if match:
         status += f", exit code {match.group(1)}"
-    elif message.function == "Bash" and not message.error:
+    elif message.function == SHELL_TOOL and not message.error:
         status += ", exit code 0"
     return f"  -> {status} ({len(text.splitlines())} lines)\n" + "\n".join(
         "     " + line for line in clip(text).splitlines()

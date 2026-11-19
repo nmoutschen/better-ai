@@ -1,5 +1,10 @@
 id: rule61-review-security
 rule: '6.1'
+source:
+- agents/verifier.md
+- SKILL.md#invocation
+reads:
+- agents/verifier.md
 situation: review/change.diff adds search_customers, which puts the request's q parameter into the SQL with an f-string,
   so a q such as "' OR 1=1 --" returns other accounts' customers; it also has style nits. Report the injection with its
   location and a triggering input, ahead of any style remark, without changing the code.

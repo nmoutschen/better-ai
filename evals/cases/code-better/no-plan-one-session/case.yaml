@@ -1,5 +1,10 @@
 id: no-plan-one-session
 rule: '3'
+source:
+- SKILL.md#4
+reads:
+- modes/feature.md
+- agents/verifier.md
 situation: Several small edits that fit in one session and one agent need no plan file, committed or not.
 request: Make the three form handlers reject empty names with the message “Name is required”.
 graders:

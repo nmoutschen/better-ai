@@ -1,14 +1,20 @@
-"""Compare a skill's numbered rules with the rules its eval cases target.
+"""Compare a skill's rules and files with the sources its eval cases point to.
 
-Lists the numbered rule headings of `skills/<skill>/SKILL.md` (plus `invocation`), the rules the cases
-use, the rules no case covers, and cases whose rule does not exist. Unknown rules exit 1; uncovered
-rules are only reported.
+Each case's `source` lists where its rule lives in the current skill: `SKILL.md#<section>` for a
+numbered rule heading of `skills/<skill>/SKILL.md` (or `SKILL.md#invocation`), or another file of the
+skill folder, such as `modes/bug-fix.md`. Its `reads` lists the skill files the skill condition should
+read. The report lists the sections and files no case points to, and cases whose sources or reads do not
+exist. A case's `rule` names the section in the SKILL.md the case was written for, so it is not checked
+here. The keys of `cases/<skill>/one_sentence.yaml` must be sources too. Unknown sources, reads or sentence
+keys exit 1; uncovered sections and files are only reported.
 
     uv run python -m tools.check_coverage code-better
 """
 
 import argparse
 import re
+from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -43,21 +49,44 @@ def rule_ids(text: str) -> set[str]:
     return rules
 
 
+def skill_sources(folder: Path) -> set[str]:
+    """Return every valid source: `SKILL.md#<rule>` for each rule, and every other file of the skill folder."""
+    sections = {f"SKILL.md#{rule}" for rule in rule_ids((folder / "SKILL.md").read_text())}
+    files = {path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file()}
+    return sections | (files - {"SKILL.md"})
+
+
+def read_paths(case: dict[str, Any]) -> list[str]:
+    """Flatten a case's `reads`, whose entries are a path or a list of alternative paths."""
+    return [path for entry in case.get("reads") or [] for path in ([entry] if isinstance(entry, str) else entry)]
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Print the coverage report for one skill; return 1 when a case names an unknown rule."""
-    parser = argparse.ArgumentParser(description="Compare a skill's numbered rules with its eval cases.")
+    """Print the coverage report for one skill; return 1 when a case names an unknown source or read."""
+    parser = argparse.ArgumentParser(description="Compare a skill's rules and files with its eval cases.")
     parser.add_argument("skill")
     skill = cases.check_skill(parser.parse_args(argv).skill)
-    rules = rule_ids((cases.REPO / "skills" / skill / "SKILL.md").read_text())
+    sources = skill_sources(cases.REPO / "skills" / skill)
     found = [yaml.safe_load((path / "case.yaml").read_text()) for path in cases.case_dirs(skill)]
-    used = {str(case["rule"]) for case in found}
-    dangling = [f"{case['id']} ({case['rule']})" for case in found if str(case["rule"]) not in rules]
+    used = {str(source) for case in found for source in case.get("source") or []}
+    dangling = [
+        f"{case['id']} ({path})"
+        for case in found
+        for path in [*map(str, case.get("source") or []), *read_paths(case)]
+        if path not in sources or path == "SKILL.md"
+    ]
+    no_source = [case["id"] for case in found if not case.get("source")]
+    dangling += [f"one_sentence.yaml ({key})" for key in cases.source_sentences(skill) if key not in sources]
+    no_sentence = sorted(
+        {str(case["source"][0]) for case in found if case.get("source")} - set(cases.source_sentences(skill))
+    )
     print(f"Skill: {skill}")
-    print("Rules:", ", ".join(sorted(rules)) or "none")
-    print("Rules used:", ", ".join(sorted(used)) or "none")
-    print("Uncovered rules:", ", ".join(sorted(rules - used)) or "none")
-    print("Cases with unknown rules:", ", ".join(dangling) or "none")
-    return int(bool(dangling))
+    print("Sources:", ", ".join(sorted(sources)) or "none")
+    print("Uncovered sources:", ", ".join(sorted(sources - used)) or "none")
+    print("Cases without a source:", ", ".join(no_source) or "none")
+    print("First sources without a sentence:", ", ".join(no_sentence) or "none")
+    print("Cases with unknown sources or reads:", ", ".join(dangling) or "none")
+    return int(bool(dangling or no_source))
 
 
 if __name__ == "__main__":

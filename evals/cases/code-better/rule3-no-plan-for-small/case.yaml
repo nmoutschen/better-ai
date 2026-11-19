@@ -1,5 +1,10 @@
 id: rule3-no-plan-for-small
 rule: '3'
+source:
+- SKILL.md#4
+reads:
+- modes/feature.md
+- agents/verifier.md
 situation: A request phrased as a migration is a one-line format change (plus its test) in one session; make it without a
   plan file.
 request: Time to migrate our date handling over to ISO 8601 — the export files should show dates like 2026-03-04 instead

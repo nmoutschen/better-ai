@@ -1,5 +1,11 @@
 id: rule51-hard-2
 rule: '5.1'
+source:
+- SKILL.md#7
+- modes/bug-fix.md
+reads:
+- modes/bug-fix.md
+- agents/verifier.md
 situation: The tests are a table of (name, minutes, expected line) rows; add a check for each of the two requested scenarios
   (no visits gives a line with average 0, one visit says "1 visit") that compares the whole line, so that it fails on code
   wrong only for that scenario, such as a no-visit line without the average.

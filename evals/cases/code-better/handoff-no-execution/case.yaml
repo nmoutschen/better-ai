@@ -1,5 +1,10 @@
 id: handoff-no-execution
 rule: '7.1'
+source:
+- SKILL.md#9
+reads:
+- modes/feature.md
+- agents/verifier.md
 situation: Execution is prohibited; run no repository code, and say that checks were not run and which to run.
 request: Change the kiosk greeting to “Welcome back”. Please don’t run any code in this checkout.
 graders:

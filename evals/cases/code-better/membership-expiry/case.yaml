@@ -1,5 +1,9 @@
 id: membership-expiry
 rule: invocation
+source:
+- SKILL.md#invocation
+- SKILL.md#3.2
+reads: []
 situation: Expiry flags coexist with invoices; ask what must happen to invoiced memberships, with outcomes, before deleting
   anything.
 request: Make our cleanup job remove expired memberships automatically.

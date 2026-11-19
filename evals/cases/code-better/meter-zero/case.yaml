@@ -1,5 +1,11 @@
 id: meter-zero
 rule: '4.1'
+source:
+- SKILL.md#6
+reads:
+- modes/bug-fix.md
+- templates/next-steps.md
+- agents/verifier.md
 situation: A nearby function invites cleanup; keep the fix focused and leave unused_demo exactly as it was.
 request: Fix the meter reading so zero shows as 0.
 graders:

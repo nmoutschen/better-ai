@@ -1,5 +1,9 @@
 id: split-reveals-gap
 rule: '2'
+source:
+- SKILL.md#3.2
+- templates/design.md
+reads: []
 situation: 'Splitting the import into fetch and load raises a requirement gap: what happens when load fails halfway and is
   rerun; ask instead of deciding it in the design.'
 request: Split the nightly import into a fetch step and a load step, so we can rerun just the load.

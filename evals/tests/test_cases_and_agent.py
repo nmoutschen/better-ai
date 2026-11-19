@@ -26,10 +26,10 @@ def test_parse_conditions() -> None:
 
 def test_samples_per_case_and_condition() -> None:
     """One sample per case and condition; one-sentence only for rules with a sentence; the fake run only when asked."""
-    sentences = cases.rule_sentences("code-better")
+    sentences = cases.source_sentences("code-better")
     all_cases = cases.load_cases("code-better")
     found = cases.samples("code-better", ["no-skill", "one-sentence"])
-    assert len(found) == len(all_cases) + sum(case["rule"] in sentences for case in all_cases)
+    assert len(found) == len(all_cases) + sum(case["source"][0] in sentences for case in all_cases)
     sample = cases.samples("code-better", ["skill"], case_ids=["clinic-matching"], scripted=True)[0]
     assert sample.id == "clinic-matching-skill" and str(sample.input).startswith("/code-better ")
     assert sample.metadata and sample.metadata["condition"] == "skill"
@@ -67,10 +67,23 @@ def test_image_pins_the_same_claude_code_version() -> None:
     assert agent.dockerfile_version() == agent.CLAUDE_CODE_VERSION
 
 
+def test_image_pins_the_ruff_of_the_lock_file() -> None:
+    """The sandbox's ruff is the one case replays use locally, and the image tag names both versions."""
+    import re
+    import tomllib
+
+    sandbox_dir = agent.Path(agent.__file__).with_name("sandbox")
+    pinned = re.search(r"^ARG RUFF_VERSION=(\S+)$", (sandbox_dir / "Dockerfile").read_text(), re.M)
+    locked = tomllib.loads((cases.EVALS / "uv.lock").read_text())["package"]
+    ruff = next(package["version"] for package in locked if package["name"] == "ruff")
+    assert pinned and pinned[1] == ruff
+    assert f"claude-{agent.CLAUDE_CODE_VERSION}-ruff-{ruff}" in (sandbox_dir / "compose.yaml").read_text()
+
+
 def test_short_skill_holds_every_sentence_under_the_real_frontmatter() -> None:
     """The short skill keeps the real name and description, and its body is every rule sentence."""
     text = cases.short_skill("code-better")
     assert text.startswith("---\nname: code-better\n")
-    for sentence in cases.rule_sentences("code-better").values():
+    for sentence in cases.source_sentences("code-better").values():
         assert f"- {sentence}" in text
     assert cases.condition_prompt("Fix it.", "short-skill", "code-better") == "/code-better Fix it."

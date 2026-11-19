@@ -1,5 +1,10 @@
 id: parser-registry
 rule: '2'
+source:
+- SKILL.md#6
+reads:
+- modes/feature.md
+- agents/verifier.md
 situation: New file types register in the PARSERS table and raise FormatError for unreadable content; add JSON there instead
   of branching on the extension.
 request: 'Support importing .json files too: a list of objects, like the CSV rows.'

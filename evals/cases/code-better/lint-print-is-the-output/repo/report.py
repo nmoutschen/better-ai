@@ -1,0 +1,17 @@
+"""Print the daily sales summary: python report.py sales.csv"""
+
+import csv
+import sys
+
+
+def main(path):
+    """Print the number of orders and their total."""
+    with open(path, newline="") as file:
+        rows = list(csv.DictReader(file))
+    total = sum(int(row["cents"]) for row in rows)
+    print(f"Orders: {len(rows)}")
+    print(f"Total: €{total / 100:.2f}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])

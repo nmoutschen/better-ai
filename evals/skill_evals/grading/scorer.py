@@ -1,9 +1,10 @@
 """Score one sample: run each of its case's graders and combine them into per-grader values and `all`.
 
-Graders are deterministic file checks (`files.py`), the judge (`judge.py`), or `any_of` a list of
-both. A case scores only its own rule, so `all` is the score for that rule; the rule, the condition, judge
+Graders are deterministic file checks (`files.py`), a check on the transcript's commands (`commands.py`),
+the judge (`judge.py`), or `any_of` a list of these. A case scores only its own rule, so `all` is the score for that rule; the rule, the condition, judge
 replies and grader notes go into the score metadata. A grader that cannot apply in this run (a judge
-when judging is off) scores NaN and is left out of `all`.
+when judging is off) scores NaN and is left out of `all`. Whether the agent read the skill's own files is a
+separate scorer (`reads.py`), so `all` stays the rule's score.
 """
 
 import math
@@ -16,6 +17,7 @@ from inspect_ai.solver import TaskState
 from inspect_ai.util import sandbox
 
 from skill_evals.agent import WORKDIR
+from skill_evals.grading import commands
 from skill_evals.grading.files import GRADERS, Checkout
 from skill_evals.grading.judge import NO_JUDGE, judge
 from skill_evals.transcript import redact
@@ -59,6 +61,8 @@ class Grading:
             passed, info = await judge(spec, self.state, self.repo, self.judge_model)
             self.judges[key] = info
             return int(passed)
+        if kind == "ran_after_last_edit":
+            return int(commands.ran_after_last_edit(spec, self.state.messages))
         if kind not in GRADERS:
             raise ValueError(f"Unknown grader type: {kind!r}")
         return int(await GRADERS[kind](spec, self.repo))
@@ -82,7 +86,7 @@ def applied_mean() -> Metric:
     return compute
 
 
-@scorer(metrics={})
+@scorer(metrics={"*": [applied_mean()]})
 def grade_cases(keys: list[str], judge_model: str) -> Scorer:
     """Score each sample with its case's graders; `keys` lists every grader key in the task."""
 

@@ -4,7 +4,8 @@ Each case plants a small repository with one situation that a rule of a skill
 covers, sends Claude Code a request, and grades whether it followed that rule.
 The agent is the real Claude Code CLI, run in a Docker sandbox. Code checks
 grade the result it left in the repository; an LLM judge reads the transcript
-to grade how it worked. See `PLAN.md` for the plan behind it.
+to grade how it worked. See `PRINCIPLES.md` for what a script grades and what
+the judge grades, and `PLAN.md` for the plan behind it.
 
 ## Layout
 
@@ -16,10 +17,10 @@ evals/
     agent.py              runs Claude Code (or the scripted fake) in the sandbox
     transcript.py         stream-json -> Inspect messages, usage, cost, time
     sandbox/              Dockerfile, compose.yaml, allowlist proxy
-    grading/              scorer.py, files.py (result checks), judge.py
+    grading/              scorer.py, files.py (result checks), judge.py, reads.py (skill files read)
   tools/
     validate_cases.py     replays good and bad runs through the result checks
-    check_coverage.py     rules covered by cases
+    check_coverage.py     skill sections and files the cases point to
     report.py             pass rate per rule and condition, tokens, cost, time, judge agreement
   cases/<skill>/...       the cases
   judge_labels/           hand labels for judge validation
@@ -60,9 +61,11 @@ Conditions:
 - **no-skill** sends the request as is.
 - **skill** copies the skill, as is, into the agent user's
   `~/.claude/skills/<skill>/` and sends `/<skill> <request>`.
-- **one-sentence** appends the one-sentence instruction for the case's rule
-  from `cases/<skill>/one_sentence.yaml`. Rules without a sentence there are
-  not run in this condition. It tells the agent which rule the case tests, so
+- **one-sentence** appends the one-sentence instruction for the case's first
+  `source` from `cases/<skill>/one_sentence.yaml`, which holds one sentence per
+  section or file of the current skill. Cases whose first source has no
+  sentence are not run in this condition. It tells the agent which rule the
+  case tests, so
   it is not run by default: use it on the rules where the skill trails the
   short skill, to tell whether the rule's wording or the rest of the skill is
   at fault.
@@ -85,7 +88,7 @@ judge (scored NaN), and the report. Every result check should pass.
 
 ## Sandbox
 
-`skill_evals/sandbox/compose.yaml` builds one image (Python 3.12, Node, git and
+`skill_evals/sandbox/compose.yaml` builds one image (Python 3.12, Node, git, ruff 0.17.5 and
 Claude Code at the version pinned in the `Dockerfile`, currently 2.1.327) and
 starts a fresh container for each sample. The sandbox sits on an internal
 network with no route out; a tinyproxy container forwards HTTPS only to the
@@ -143,13 +146,23 @@ stops a run between models rather than in the middle of one.
 
 ```
 cases/<skill>/<case-id>/
-  case.yaml   id, rule, situation, request, graders, optional validation
+  case.yaml   id, rule, source, reads, situation, request, graders, optional validation
   repo/       the planted files, copied into the sandbox
   checks/     hidden files that graders reference by path
   replays/    good-*.yaml and bad-*.yaml runs for validate_cases.py and the fake agent
 ```
 
-`rule` is the numbered section ID in the skill's `SKILL.md`, or `invocation`.
+`rule` is the numbered section ID, or `invocation`, in the version of
+`SKILL.md` the case was written for. It stays the same when the skill is
+rewritten, so the report's pass rates per rule compare across versions.
+`source` lists where that rule lives in the current skill:
+`SKILL.md#<section>` (or `SKILL.md#invocation`), or another file of the skill
+folder, such as `modes/bug-fix.md`. `reads` lists the skill's own files the
+skill condition should read in this case, such as its mode file and
+`agents/verifier.md`; an entry may be a list of alternatives, of which one is
+enough, such as `[modes/feature.md, modes/bug-fix.md]`. `check_coverage.py`
+fails on a source or read that does not exist and lists the sections and files
+no case points to.
 `situation` records the planted fact and the expected behaviour. A grader's
 `files` map gives paths relative to the case folder; `cases.py` reads them into
 the grader specs. `checks/` is never copied into the sandbox before grading.
@@ -162,8 +175,8 @@ never reject new tests or notes, and accept equivalent evidence.
 
 ## Graders
 
-A score holds one value per grader and `all`, which passes when every grader
-that applies passes. Repeated types get numbered keys (`judge_1`, `judge_2`).
+The rule's scorer, `grade_cases`, holds one value per grader and `all`, which
+passes when every grader that applies passes. Repeated types get numbered keys (`judge_1`, `judge_2`).
 NaN marks a grader that does not apply, such as a judge in a run without
 judging; the task's metric averages only the samples where a grader applies.
 
@@ -181,6 +194,7 @@ starting commit or run a hidden check on a disposable copy of it:
 | `command_passes`, `command_fails` | `cmd`, optional `files`, `timeout` | The Bash command exits zero, or nonzero, on a copy of the submitted tree. |
 | `catches_bug` | `restore` or `files`, optional `tests` | A test file the agent added or changed passes on the submitted code and fails on an assertion once the bug is back (planted files restored, or replaced by `files`). |
 | `any_of` | `graders` | The first listed grader that passes passes it; later ones, such as a judge, do not run. |
+| `ran_after_last_edit` | `pattern` | A shell command matching the regex ran after the agent's last edit (`grading/commands.py`). Reads the transcript, not the tree. |
 
 Hidden commands find their files under `$GRADE_FILES` and the planted commit
 in `$START_COMMIT`. Use `PYTHONPATH=. python "$GRADE_FILES/check.py"` to let a
@@ -206,6 +220,33 @@ the numbered criteria the run must meet, and what does not count. Order
 matters only where the rule needs it; the judge is told that a check ran on the
 final code when it ran after the last edit to the files it exercises.
 
+## Skill files read
+
+A second scorer, `skill_reads` (`grading/reads.py`), checks in the skill
+condition whether the agent read every skill file the case lists under
+`reads`, other than `SKILL.md`, which the slash command loads. A read is a
+Read tool call on a file in `~/.claude/skills/<skill>/`, or a Bash command
+that prints one (`cat`, `head`, `sed`...), by the agent or by a sub-agent; the
+tool names and the skills folder come from `agent.py`. It scores 1 or 0, with
+the files read and the missing ones in its metadata, and gives no score in
+other conditions or in cases that expect no reads. It is a separate scorer, as
+Inspect advises for an independent judgment, so the rule's `all` is unchanged.
+The report fails a skill run that missed a read and also shows its rule-only
+score.
+
+## Lint issues added
+
+A third scorer, `lint_issues_added` (`grading/lint.py`), observes code quality
+in every case and condition without grading it. On a copy of the final tree it
+runs `grading/new_lint_issues.py`, which lists the ruff issues in the Python
+files the agent added or changed that the planted version of those files did
+not have, with a fixed rule set (pyflakes, bugbear and pycodestyle's statement
+and syntax errors) that ignores the repository's own configuration. Its value
+is the count; runs that change no Python file get no score. The report shows
+the mean per condition. The sandbox image ships ruff at the version in
+`uv.lock`, so cases can also declare ruff as the project's linter: the `lint-*`
+cases grade with the same script, using the repository's own configuration.
+
 ## Judge validation
 
 Judge verdicts count only once the judge has been checked against hand labels.
@@ -225,7 +266,9 @@ uv run python -m tools.report logs/<dir>/*.eval [more.eval ...] [--latest]
 ```
 
 prints the pass rate of `all` per rule and condition, the paired comparisons
-between conditions, cost and time per condition, one line per sample with
+between conditions, cost and time per condition, the skill files read in the
+skill condition (per expected file, and files read where no case expects
+them), one line per sample with
 tokens (input, output, cache read, cache write), agent cost, judge cost and
 time, the totals, and any sample errors. With `--latest`, each case and
 condition keeps only the runs of the most recently started log that has it, so

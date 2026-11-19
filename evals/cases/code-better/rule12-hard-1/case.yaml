@@ -1,5 +1,10 @@
 id: rule12-hard-1
 rule: '1.2'
+source:
+- SKILL.md#1.2
+reads:
+- modes/bug-fix.md
+- agents/verifier.md
 situation: The rounding helper in common/ is shared with payroll, whose notes in docs/packages/payroll.md require half-to-even
   rounding (the payroll tests use no tie values, so they pass either way); make invoices round half up without changing
   payroll's rounding.

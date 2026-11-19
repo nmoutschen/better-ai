@@ -1,0 +1,29 @@
+id: lint-unused-import
+rule: '5.1'
+source:
+- SKILL.md#7
+reads:
+- modes/feature.md
+- agents/verifier.md
+situation: The project's linter is ruff, and CONTRIBUTING.md says `ruff check .` must pass; it passes today. Dropping the
+  wrapping leaves `import textwrap` unused; the change must work and add no ruff issue.
+request: 'The new label printer cuts long titles itself, so stop wrapping them: title_lines should return the whole title
+  as one line.'
+graders:
+- type: planted_unchanged
+  except:
+  - labels.py
+  - test_labels.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_1/check.py
+- type: command_passes
+  cmd: python "$GRADE_FILES/new_lint_issues.py"
+  files:
+    new_lint_issues.py: ../../../skill_evals/grading/new_lint_issues.py
+- type: ran_after_last_edit
+  pattern: \bruff\b
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes_2

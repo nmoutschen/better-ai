@@ -1,5 +1,10 @@
 id: rule71-hard-1
 rule: '7.1'
+source:
+- SKILL.md#9
+reads:
+- modes/feature.md
+- agents/verifier.md
 situation: The integration tests skip themselves unless ORDERS_DATABASE_URL is set, so the requested run prints OK (skipped=4)
   with only the unit tests run; the hand-back must say the integration tests did not run and must not report the suite
   as all green.

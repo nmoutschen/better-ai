@@ -5,10 +5,14 @@ FROM node:22-bookworm-slim AS node
 FROM python:3.12.12-slim-bookworm
 
 ARG CLAUDE_CODE_VERSION=2.1.327
+# The same ruff as evals/uv.lock, so a case that names the project's linter can run it here.
+ARG RUFF_VERSION=0.17.5
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir "ruff==${RUFF_VERSION}"
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules

@@ -1,13 +1,15 @@
 """Read a skill's case folders and turn them into Inspect samples, one per case and condition.
 
 Conditions: `no-skill` sends the request as is, `skill` installs the skill and invokes it with its slash
-command, `one-sentence` appends the rule's one-sentence instruction to the request, and `short-skill` installs a
-skill of the same name whose body is every sentence of `one_sentence.yaml` and invokes it the same way.
+command, `one-sentence` appends the one-sentence instruction for the case's first source to the request, and
+`short-skill` installs a skill of the same name whose body is every sentence of `one_sentence.yaml` and invokes
+it the same way.
 
-A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, situation, request, graders),
+A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, source, reads, situation, request,
+graders),
 `repo/` with the planted files, `checks/` with hidden files that graders reference by path, and
 `replays/` with scripted runs for `tools/validate_cases.py` and the fake agent. `one_sentence.yaml` in
-the skill folder holds the one-sentence instruction for each rule.
+the skill folder holds the one-sentence instruction for each source, such as `SKILL.md#4` or `modes/bug-fix.md`.
 """
 
 import copy
@@ -59,6 +61,8 @@ def load_case(directory: Path) -> dict[str, Any]:
     """Load one case: its yaml fields, graders with file contents, and the planted files by path."""
     case = yaml.safe_load((directory / "case.yaml").read_text())
     case["rule"] = str(case["rule"])
+    case["source"] = [str(source) for source in case.get("source") or []]
+    case["reads"] = case.get("reads") or []
     case["graders"] = _resolve(case["graders"], directory)
     repo = directory / "repo"
     case["files"] = {path.relative_to(repo).as_posix(): path for path in sorted(repo.rglob("*")) if path.is_file()}
@@ -70,19 +74,19 @@ def load_cases(skill: str) -> list[dict[str, Any]]:
     return [load_case(directory) for directory in case_dirs(skill)]
 
 
-def rule_sentences(skill: str) -> dict[str, str]:
-    """Return the one-sentence instruction for each rule that has one, from `one_sentence.yaml`."""
+def source_sentences(skill: str) -> dict[str, str]:
+    """Return the one-sentence instruction for each source that has one, from `one_sentence.yaml`."""
     path = CASES / check_skill(skill) / "one_sentence.yaml"
     if not path.exists():
         return {}
-    return {str(rule): text for rule, text in (yaml.safe_load(path.read_text()) or {}).items()}
+    return {str(source): text for source, text in (yaml.safe_load(path.read_text()) or {}).items()}
 
 
 def short_skill(skill: str) -> str:
     """Return the SKILL.md of the short skill: the real skill's frontmatter, then every rule sentence as a list."""
     original = (REPO / "skills" / check_skill(skill) / "SKILL.md").read_text()
     frontmatter = original.split("---", 2)[1]
-    sentences = rule_sentences(skill)
+    sentences = source_sentences(skill)
     if not sentences:
         raise ValueError(f"No one_sentence.yaml for {skill!r}")
     body = "\n".join(f"- {text}" for text in sentences.values())
@@ -94,18 +98,18 @@ def replays(directory: Path) -> dict[str, dict[str, Any]]:
     return {path.stem: yaml.safe_load(path.read_text()) for path in sorted((directory / "replays").glob("*.yaml"))}
 
 
-def condition_prompt(request: str, condition: str, skill: str, rule_sentence: str | None = None) -> str:
+def condition_prompt(request: str, condition: str, skill: str, sentence: str | None = None) -> str:
     """Build the prompt for a condition.
 
     no-skill sends the request as is, skill and short-skill prefix the skill's slash command, and one-sentence
-    appends the rule's sentence to the request.
+    appends the sentence for the case's first source to the request.
     """
     if condition == NO_SKILL:
         return request
     if condition in SKILL_CONDITIONS:
         return f"/{skill} {request}"
-    if condition == ONE_SENTENCE and rule_sentence:
-        return f"{request}\n\n{rule_sentence}"
+    if condition == ONE_SENTENCE and sentence:
+        return f"{request}\n\n{sentence}"
     raise ValueError(f"No prompt for condition {condition!r}")
 
 
@@ -133,28 +137,32 @@ def samples(
     case_ids: list[str] | None = None,
     scripted: bool = False,
 ) -> list[Sample]:
-    """Build one sample per case and condition; one-sentence skips rules without a sentence.
+    """Build one sample per case and condition; one-sentence skips cases whose first source has no sentence.
 
     With `scripted`, each sample carries the run the fake agent plays.
     """
-    sentences = rule_sentences(skill)
+    sentences = source_sentences(skill)
     found = []
     for directory in case_dirs(skill):
         case = load_case(directory)
         if (rule is not None and case["rule"] != rule) or (case_ids and case["id"] not in case_ids):
             continue
         for condition in conditions:
-            if condition == ONE_SENTENCE and case["rule"] not in sentences:
+            sentence = sentences.get(case["source"][0]) if case["source"] else None
+            if condition == ONE_SENTENCE and sentence is None:
                 continue
             found.append(
                 Sample(
                     id=f"{case['id']}-{condition}",
-                    input=condition_prompt(case["request"], condition, skill, sentences.get(case["rule"])),
+                    input=condition_prompt(case["request"], condition, skill, sentence),
                     files={path: str(source) for path, source in case["files"].items()},
                     metadata={
                         "case": case["id"],
                         "condition": condition,
+                        "skill": skill,
                         "rule": case["rule"],
+                        "source": case["source"],
+                        "reads": case["reads"],
                         "situation": case["situation"],
                         "request": case["request"],
                         "graders": case["graders"],

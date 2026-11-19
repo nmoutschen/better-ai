@@ -1,5 +1,8 @@
 id: archive-two-policies
 rule: '1.5'
+source:
+- SKILL.md#3.2
+reads: []
 situation: Retention age and archive-versus-delete both need first-turn answers with concrete values; state an assumption
   about the low-cost count format instead of asking.
 request: Have the mailbox job clean up old messages every night and print a one-line count when it finishes.

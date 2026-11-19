@@ -6,7 +6,9 @@ times (Inspect epochs), the comparisons first average its runs per condition, th
 case by case (a paired design): mean difference, a bootstrap 95% interval, and a sign-flip permutation
 p-value, with Holm's correction across the comparisons. Hand labels in `judge_labels/<skill>.yaml` (see
 that folder's README) give the human verdict for a judged grader of a sample; the report compares them
-with the judge's verdicts in the same logs. With `--latest`, each case and condition keeps only the runs of
+with the judge's verdicts in the same logs. For the skill condition, it also counts which of the skill's own
+files the runs read, against the files each case expects (`reads` in case.yaml); a skill run that missed one
+fails through the `skill_reads` grader. With `--latest`, each case and condition keeps only the runs of
 the most recently started log that has it, so re-runs after a fix replace the runs they fix.
 
     uv run python -m tools.report logs/<dir>/*.eval [...] [--latest] [--labels judge_labels/code-better.yaml]
@@ -56,28 +58,40 @@ class SampleResult:
     judges: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     epoch: int = 1
+    skill_reads: dict[str, Any] = field(default_factory=dict)
+    rule_passed: float = math.nan
+    lint_issues: float | None = None
     started: str = ""
 
 
 def read_result(sample: EvalSample) -> SampleResult:
     """Read one sample's case, condition, rule, `all` score, Claude Code usage and judge verdicts."""
     metadata = sample.metadata or {}
-    score = next(iter((sample.scores or {}).values()), None)
+    scores = sample.scores or {}
+    score = scores.get("grade_cases") or next(iter(scores.values()), None)
     values = score.value if score and isinstance(score.value, dict) else {}
     run = metadata.get("claude_code") or {}
     judges = (score.metadata or {}).get("judges", {}) if score else {}
+    reads = scores.get("skill_reads")
+    lint = scores.get("lint_issues_added")
+    rule_passed = float(values.get("all", math.nan))
+    # A skill run that missed an expected skill file fails, whatever its rule score.
+    passed = 0.0 if reads is not None and reads.value == 0 and not math.isnan(rule_passed) else rule_passed
     return SampleResult(
         sample_id=str(sample.id),
         case=metadata.get("case", str(sample.id)),
         condition=metadata.get("condition", "?"),
         rule=str(metadata.get("rule", "?")),
-        passed=float(values.get("all", math.nan)),
+        passed=passed,
+        rule_passed=rule_passed,
         epoch=int(sample.epoch or 1),
         tokens=run.get("usage") or {},
         cost=float(run.get("total_cost_usd") or 0.0),
         judge_cost=sum(float(info.get("total_cost_usd") or 0.0) for info in judges.values()),
         seconds=(run.get("duration_ms") or 0) / 1000,
         judges=judges,
+        skill_reads=(reads.metadata or {}) if reads is not None else {},
+        lint_issues=float(lint.value) if lint is not None and not math.isnan(float(lint.value)) else None,
         error=sample.error.message[:120] if sample.error else None,
     )
 
@@ -247,6 +261,40 @@ def condition_cost_lines(results: list[SampleResult]) -> list[str]:
     return lines
 
 
+def skill_read_lines(results: list[SampleResult]) -> list[str]:
+    """Format the skill's own files read: per expected file, per file read where no case expects it, per run."""
+    runs = [sample for sample in results if sample.skill_reads and not sample.error]
+    if not runs:
+        return ["No run tracked skill reads."]
+    expected: dict[str, list[bool]] = defaultdict(list)
+    unexpected: dict[str, int] = defaultdict(int)
+    for sample in runs:
+        missing = set(sample.skill_reads.get("missing", []))
+        for label in sample.skill_reads.get("expected", []):
+            expected[label].append(label not in missing)
+        for path in sample.skill_reads.get("read", {}):
+            if not any(path in label.split(" or ") for label in sample.skill_reads.get("expected", [])):
+                unexpected[path] += 1
+    complete = sum(not sample.skill_reads.get("missing") for sample in runs)
+    lines = [f"Runs that read every expected file: {complete}/{len(runs)}", f"{'expected file':52} {'read':>9}"]
+    for label in sorted(expected):
+        hits = expected[label]
+        lines.append(f"{label:52} {sum(hits):>4}/{len(hits):<4}")
+    lines.append(f"{'read where not expected':52} {'runs':>9}")
+    lines.extend(f"{path:52} {count:>9}" for path, count in sorted(unexpected.items()))
+    return lines
+
+
+def lint_lines(results: list[SampleResult]) -> list[str]:
+    """Format the lint issues runs added to the Python files they changed, per condition (observed, not scored)."""
+    lines = [f"{'condition':14} {'runs':>5} {'mean issues':>12} {'runs with any':>14}"]
+    for name in CONDITIONS:
+        counts = [s.lint_issues for s in results if s.condition == name and s.lint_issues is not None and not s.error]
+        if counts:
+            lines.append(f"{name:14} {len(counts):5} {statistics.mean(counts):12.2f} {sum(c > 0 for c in counts):14}")
+    return lines if len(lines) > 1 else ["No run counted lint issues."]
+
+
 def load_labels(path: Path) -> list[dict[str, Any]]:
     """Read hand labels: a list of {sample, epoch (default 1), grader, verdict: PASS or FAIL, note}."""
     labels = yaml.safe_load(path.read_text()) or []
@@ -297,6 +345,8 @@ def main(argv: list[str] | None = None) -> int:
         ("Pass rate (all) per rule and condition", pass_table(results)),
         ("Comparisons between conditions (paired by case)", comparison_lines(results)),
         ("Cost and time per condition", condition_cost_lines(results)),
+        ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(results)),
+        ("Lint issues added to changed Python files (observed, not scored)", lint_lines(results)),
         ("Samples", case_lines(results)),
     ]
     if args.labels:

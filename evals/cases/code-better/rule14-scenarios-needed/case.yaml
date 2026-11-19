@@ -1,5 +1,12 @@
 id: rule14-scenarios-needed
 rule: '1.4'
+source:
+- SKILL.md#4
+- templates/specs.md
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
 situation: 'A merge command whose inputs hold duplicate emails (differing case, differing names) and a row with no email,
   none of which the request covers; write the requirements as scenarios with concrete rows and results, including at least
   one of these open cases, before or alongside building.'

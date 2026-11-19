@@ -1,5 +1,8 @@
 id: sample-pruning
 rule: '1.1'
+source:
+- SKILL.md#1.1
+reads: []
 situation: The export exists to investigate spikes; dropping high values removes them. Name the 68 reading, propose flagging
   or keeping them, and let the user decide.
 request: Drop every reading over 50 from the cold-room export.

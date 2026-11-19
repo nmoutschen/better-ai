@@ -31,6 +31,10 @@ TOKEN_VARIABLES = ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN")
 DISALLOWED_TOOLS = "WebSearch,WebFetch"
 CLAUDE_CODE_VERSION = "2.1.327"
 IGNORED_PATHS = ("__pycache__/", ".pytest_cache/")
+# Claude Code facts that graders need: where it finds a user's skills, relative to the home folder, and the
+# names of its tools that read, run, edit and write. Graders import these, so only this adapter knows the harness.
+SKILLS_FOLDER = ".claude/skills"
+READ_TOOL, SHELL_TOOL, EDIT_TOOL, WRITE_TOOL = "Read", "Bash", "Edit", "Write"
 START_SCRIPT = """
 git init -q
 git add -f -A
@@ -118,7 +122,7 @@ def skill_commit(skill: str) -> str:
 async def install_skill(sandbox_env: SandboxEnvironment, skill: str, short: bool = False) -> None:
     """Copy the skill as is into the agent user's ~/.claude/skills/<skill>/, or only the short SKILL.md."""
     source = REPO / "skills" / skill
-    target = f"{home(AGENT_USER)}/.claude/skills/{skill}"
+    target = f"{home(AGENT_USER)}/{SKILLS_FOLDER}/{skill}"
     if short:
         await sandbox_env.write_file(f"{target}/SKILL.md", short_skill(skill))
     else:
@@ -183,7 +187,7 @@ async def play_action(
         script = 'mkdir -p "$(dirname "$1")" && cat > "$1"'
         await run_checked(sandbox_env, ["sh", "-c", script, "sh", path], input=content, user=AGENT_USER)
         return (
-            tool_use_block(number, "Write", {"file_path": path, "content": content}),
+            tool_use_block(number, WRITE_TOOL, {"file_path": path, "content": content}),
             f"File created at: {path}",
             False,
         )
@@ -196,13 +200,13 @@ async def play_action(
             if result.success
             else result.stderr
         )
-        return tool_use_block(number, "Read", {"file_path": path}), text, not result.success
+        return tool_use_block(number, READ_TOOL, {"file_path": path}), text, not result.success
     command = action["bash"]
     result = await sandbox_env.exec(["bash", "-c", command], cwd=WORKDIR, user=AGENT_USER, timeout=120)
     output = (result.stdout + result.stderr).strip()
     if not result.success:
         output = f"Exit code {result.returncode}\n{output}"
-    return tool_use_block(number, "Bash", {"command": command}), output, not result.success
+    return tool_use_block(number, SHELL_TOOL, {"command": command}), output, not result.success
 
 
 def tool_use_block(number: int, name: str, arguments: dict[str, Any]) -> dict[str, Any]:

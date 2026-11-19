@@ -1,5 +1,10 @@
 id: temperature-stdlib
 rule: '1.3'
+source:
+- SKILL.md#3.2
+reads:
+- modes/feature.md
+- agents/verifier.md
 situation: Dependency policy is explicitly fixed by the user; choose the internal parsing approach with the standard library
   and preserve plain readings.
 request: Accept a trailing °C in the reading parser. Keep it dependency-free.

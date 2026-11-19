@@ -1,5 +1,10 @@
 id: postcode-format
 rule: '1.2'
+source:
+- SKILL.md#1.2
+reads:
+- modes/bug-fix.md
+- agents/verifier.md
 situation: The published behavior is specified in the tree; read the implementation, caller, check and project instructions
   before editing.
 request: The shipping label is losing the first digit on some postal codes. Fix that.

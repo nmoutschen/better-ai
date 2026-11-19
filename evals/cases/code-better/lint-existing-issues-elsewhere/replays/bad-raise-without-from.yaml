@@ -1,0 +1,17 @@
+reply: ''
+actions:
+- write: vat.py
+  content: |
+    """VAT rates by product category."""
+
+    RATES = {"standard": 21, "reduced": 9, "zero": 0}
+
+
+    def rate(category):
+        """Return the VAT rate in percent for a category."""
+        try:
+            return RATES[category]
+        except KeyError:
+            raise ValueError(f"unknown VAT category: {category}")
+- bash: python -m unittest -q
+- bash: ruff check .

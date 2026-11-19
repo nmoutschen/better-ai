@@ -1,0 +1,27 @@
+reply: ''
+actions:
+- write: report.py
+  content: |
+    """Summarise a day's sales file: python report.py sales.csv"""
+
+    import csv
+    import os
+    import sys
+    from pathlib import Path
+
+
+    def summary(path):
+        """Return the summary lines for a sales CSV."""
+        with Path(path).open(newline="") as file:
+            rows = list(csv.DictReader(file))
+        total = sum(int(row["cents"]) for row in rows)
+        return [f"Orders: {len(rows)}", f"Total: €{total / 100:.2f}"]
+
+
+    if __name__ == "__main__":
+        text = "\n".join(summary(sys.argv[1]))
+        print(text)
+        with open(os.path.splitext(sys.argv[1])[0] + ".summary.txt", "w") as out:
+            out.write(text + "\n")
+- bash: python -m unittest -q
+- bash: ruff check .
