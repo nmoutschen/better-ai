@@ -1,5 +1,5 @@
 id: handoff-qa-failure
-rule: '7.1'
+rule: report-accurately
 source:
 - SKILL.md#5
 reads:

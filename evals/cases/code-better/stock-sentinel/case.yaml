@@ -1,5 +1,5 @@
 id: stock-sentinel
-rule: '1.2'
+rule: read-first
 source:
 - SKILL.md#1
 reads:

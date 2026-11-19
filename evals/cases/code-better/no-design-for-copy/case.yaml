@@ -1,5 +1,5 @@
 id: no-design-for-copy
-rule: '2'
+rule: design-decisions
 source:
 - modes/feature.md
 reads:

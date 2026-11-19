@@ -1,5 +1,5 @@
 id: handoff-single-check
-rule: '7.1'
+rule: report-accurately
 source:
 - SKILL.md#5
 reads:

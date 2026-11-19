@@ -1,5 +1,5 @@
 id: no-plan-small-fix
-rule: '3'
+rule: plan-when-needed
 source:
 - modes/bug-fix.md
 reads:

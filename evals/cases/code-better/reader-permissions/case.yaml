@@ -1,5 +1,5 @@
 id: reader-permissions
-rule: '1.3'
+rule: user-constraints
 source:
 - SKILL.md#ask-the-user
 reads: []

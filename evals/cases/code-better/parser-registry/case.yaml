@@ -1,5 +1,5 @@
 id: parser-registry
-rule: '2'
+rule: design-decisions
 source:
 - modes/feature.md
 reads:

@@ -45,7 +45,7 @@ Task options (`-T name=value`):
 | --- | --- | --- |
 | `skill` | required | Skill folder name, such as `code-better`. |
 | `condition` | `no-skill,skill,short-skill` | `no-skill`, `skill`, `one-sentence`, `short-skill`, or a list such as `no-skill,skill`. |
-| `rule`, `cases` | all | Only one rule (`-T 'rule="1.5"'`) or some case ids (`-T cases=help-label,meter-zero`). |
+| `rule`, `cases` | all | Only one rule (`-T rule=report-accurately`) or some case ids (`-T cases=help-label,meter-zero`). |
 | `agent` | `claude_code` | `fake` plays each case's first good replay instead; no model calls. |
 | `model` | `sonnet` | Claude Code `--model` for the agent. |
 | `judge_model` | a different model | `opus`, or `sonnet` when the agent runs Opus; `none` skips judges. The fake agent defaults to `none`. |
@@ -152,12 +152,13 @@ cases/<skill>/<case-id>/
   replays/    good-*.yaml and bad-*.yaml runs for validate_cases.py and the fake agent
 ```
 
-`rule` is the numbered section ID, or `invocation`, in the version of
-`SKILL.md` the case was written for. It stays the same when the skill is
-rewritten, so the report's pass rates per rule compare across versions.
-`source` lists where that rule lives in the current skill:
-`SKILL.md#<section>` (or `SKILL.md#invocation`), or another file of the skill
-folder, such as `modes/bug-fix.md`. `reads` lists the skill's own files the
+`rule` names the behaviour the case tests, such as `report-accurately` or
+`ask-costly-gaps-at-once`, independent of how the skill is organised, so the
+report's pass rates per rule compare across rewrites. `source` lists where
+that rule lives in the current skill: `SKILL.md#<section>` for a numbered
+step, the slug of a named heading such as `SKILL.md#ask-the-user`,
+`SKILL.md#invocation`, or another file of the skill folder, such as
+`modes/bug-fix.md`. `reads` lists the skill's own files the
 skill condition should read in this case, such as its mode file and
 `agents/verifier.md`; an entry may be a list of alternatives, of which one is
 enough, such as `[modes/feature.md, modes/bug-fix.md]`. `check_coverage.py`

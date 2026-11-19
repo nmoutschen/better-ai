@@ -5,7 +5,7 @@ numbered rule heading of `skills/<skill>/SKILL.md`, the slug of an unnumbered `#
 `SKILL.md#ask-the-user`, `SKILL.md#invocation`, or another file of the
 skill folder, such as `modes/bug-fix.md`. Its `reads` lists the skill files the skill condition should
 read. The report lists the sections and files no case points to, and cases whose sources or reads do not
-exist. A case's `rule` names the section in the SKILL.md the case was written for, so it is not checked
+exist. A case's `rule` names the behaviour it tests, independent of the skill's sections, so it is not checked
 here. The keys of `cases/<skill>/one_sentence.yaml` must be sources too. Unknown sources, reads or sentence
 keys exit 1; uncovered sections and files are only reported.
 

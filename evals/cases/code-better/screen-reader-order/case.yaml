@@ -1,5 +1,5 @@
 id: screen-reader-order
-rule: '5.4'
+rule: check-unstated-requirements
 source:
 - modes/feature.md
 reads:

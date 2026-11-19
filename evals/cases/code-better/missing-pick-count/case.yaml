@@ -1,5 +1,5 @@
 id: missing-pick-count
-rule: '4.2'
+rule: error-handling
 source:
 - SKILL.md#ask-the-user
 reads: []

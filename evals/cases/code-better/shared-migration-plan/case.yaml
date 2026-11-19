@@ -1,5 +1,5 @@
 id: shared-migration-plan
-rule: '3'
+rule: plan-when-needed
 source:
 - SKILL.md#working-notes
 - templates/tasks.md

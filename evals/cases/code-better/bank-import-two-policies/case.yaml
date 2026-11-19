@@ -1,5 +1,5 @@
 id: bank-import-two-policies
-rule: '1.5'
+rule: ask-costly-gaps-at-once
 source:
 - SKILL.md#ask-the-user
 reads: []

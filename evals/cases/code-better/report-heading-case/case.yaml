@@ -1,5 +1,5 @@
 id: report-heading-case
-rule: '1.5'
+rule: ask-costly-gaps-at-once
 source:
 - SKILL.md#ask-the-user
 reads:

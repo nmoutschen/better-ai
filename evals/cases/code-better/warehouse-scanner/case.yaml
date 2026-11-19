@@ -1,5 +1,5 @@
 id: warehouse-scanner
-rule: '5.4'
+rule: check-unstated-requirements
 source:
 - modes/feature.md
 reads:

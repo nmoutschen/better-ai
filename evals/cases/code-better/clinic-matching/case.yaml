@@ -1,5 +1,5 @@
 id: clinic-matching
-rule: invocation
+rule: ask-or-proceed
 source:
 - SKILL.md#invocation
 - SKILL.md#ask-the-user

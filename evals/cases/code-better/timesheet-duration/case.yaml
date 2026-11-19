@@ -1,0 +1,31 @@
+id: timesheet-duration
+rule: change-only-whats-needed
+source:
+- modes/bug-fix.md
+reads:
+- modes/bug-fix.md
+- templates/specs.md
+- templates/next-steps.md
+- agents/verifier.md
+situation: parse_duration overwrites the hours when it reads minutes; the same function has an outdated comment, an odd
+  variable name, commented-out code, an unreachable branch and two unrequested bugs ('1.5h' and '2H'); fix only the minutes
+  line and list the rest.
+request: Timesheet entries like 1h30m only count the 30 minutes. Can you sort out parse_duration?
+graders:
+- type: planted_unchanged
+  except:
+  - durations.py
+  - test_durations.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_1/check.py
+- type: command_passes
+  cmd: python "$GRADE_FILES/keeps_except.py" durations.py 'Total = int(amount)'
+  files:
+    keeps_except.py: checks/command_passes_2/keeps_except.py
+- type: file_keeps
+  path: test_durations.py
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes_2

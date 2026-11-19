@@ -1,5 +1,5 @@
 id: meter-zero
-rule: '4.1'
+rule: change-only-whats-needed
 source:
 - modes/bug-fix.md
 reads:

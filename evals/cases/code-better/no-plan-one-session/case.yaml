@@ -1,5 +1,5 @@
 id: no-plan-one-session
-rule: '3'
+rule: plan-when-needed
 source:
 - modes/feature.md
 reads:

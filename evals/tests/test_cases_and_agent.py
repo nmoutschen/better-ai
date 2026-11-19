@@ -34,7 +34,7 @@ def test_samples_per_case_and_condition() -> None:
     assert sample.id == "clinic-matching-skill" and str(sample.input).startswith("/code-better ")
     assert sample.metadata and sample.metadata["condition"] == "skill"
     assert sample.metadata["scripted_run"]["actions"] is not None
-    assert "scripted_run" not in (cases.samples("code-better", ["no-skill"], rule="5.2")[0].metadata or {})
+    assert "scripted_run" not in (cases.samples("code-better", ["no-skill"], rule="bounded-repair-loop")[0].metadata or {})
 
 
 def test_invalid_skill_name() -> None:

@@ -1,5 +1,5 @@
 id: conflicting-tests
-rule: '5.2'
+rule: bounded-repair-loop
 source:
 - modes/bug-fix.md
 - SKILL.md#ask-the-user

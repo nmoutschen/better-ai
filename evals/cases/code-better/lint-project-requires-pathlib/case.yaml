@@ -1,5 +1,5 @@
 id: lint-project-requires-pathlib
-rule: '5.1'
+rule: check-every-requirement
 source:
 - modes/feature.md
 reads:

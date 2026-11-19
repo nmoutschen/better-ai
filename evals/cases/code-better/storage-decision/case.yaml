@@ -1,5 +1,5 @@
 id: storage-decision
-rule: '2'
+rule: design-decisions
 source:
 - SKILL.md#ask-the-user
 reads: []

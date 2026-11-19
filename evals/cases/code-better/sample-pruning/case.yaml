@@ -1,5 +1,5 @@
 id: sample-pruning
-rule: '1.1'
+rule: question-the-solution
 source:
 - SKILL.md#1
 reads: []
