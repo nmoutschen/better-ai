@@ -116,3 +116,12 @@ async def test_catches_bug_needs_a_passing_test(plant: Plant) -> None:
     """A test that fails on the submitted code does not count, and neither does an unchanged planted test."""
     repo = await plant({"fees.py": FEES, "test_fees.py": TEST})
     assert not await files.catches_bug({"tests": ["test_fees.py"], "restore": ["fees.py"]}, repo)
+
+
+async def test_changed_lists_markdown_notes_git_ignores(plant: Plant) -> None:
+    """A Markdown note in a folder Git ignores counts as new; other ignored files do not."""
+    repo = await plant({"fees.py": FEES})
+    await repo.sandbox_env.exec(["bash", "-c", "echo .code/ >> .git/info/exclude"])
+    await repo.sandbox_env.write_file(".code/fix/tasks.md", "# Tasks\n")
+    await repo.sandbox_env.write_file(".code/fix/check.py", "x = 1\n")
+    assert await repo.all_changed() == {".code/fix/tasks.md"}
