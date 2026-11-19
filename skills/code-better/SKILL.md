@@ -89,7 +89,7 @@ TREAT a constraint the user set as a requirement. ADD each answer to the spec; y
 
 ### Working notes
 
-KEEP your working files in `.code/<change>/`, and ADD `.code/` to `.git/info/exclude`. KEEP `.code/conventions.md` as a short list of facts about the repo, each with its source. WHEN the work spans several sessions, people or agents, WRITE a task list in `.code/<change>/tasks.md`: READ [templates/tasks.md](templates/tasks.md), WRITE it in its format, and KEEP it current. IN a session the harness may compact, WRITE each constraint the user gives to `.code/<change>/notes.md`, and READ it again after each compaction.
+KEEP your working files in `.code/<change>/`, and ADD `.code/` to `.git/info/exclude`. KEEP `.code/conventions.md` as a short list of facts about the repo, each with its source. IN a session the harness may compact, WRITE each constraint the user gives to `.code/<change>/notes.md`, and READ it again after each compaction.
 
 ### Missing capabilities
 

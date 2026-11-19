@@ -1,7 +1,7 @@
 id: shared-migration-plan
 rule: plan-when-needed
 source:
-- SKILL.md#working-notes
+- modes/refactor.md
 - templates/tasks.md
 reads:
 - [modes/refactor.md, modes/coordinate.md]

@@ -1,7 +1,7 @@
 id: oldlog-multi-session-plan
 rule: plan-when-needed
 source:
-- SKILL.md#working-notes
+- modes/refactor.md
 - templates/tasks.md
 reads:
 - templates/tasks.md

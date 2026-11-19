@@ -15,6 +15,8 @@ IF the design says some behaviour changes, that part is not this change: LIST it
 
 FOR a data migration, IF the design does not say what happens to records the old format allows and the new one does not, ASK the user.
 
+WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.md` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task todo.
+
 ## 2. Pin the current behaviour
 
 PIN the behaviour of every path in the spec with checks: the existing tests, plus checks you add where a path has none. Each check compares the result with an expected value. FOR a data migration, ALSO PIN the record counts and a sample of records.
@@ -43,3 +45,5 @@ COMPARE the checks with the copy of step 2. ASK the user about any difference.
 FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same check fails twice for the same reason, WHEN three rounds have not made all checks pass, or WHEN a fix breaks a check that passed before.
 
 DO NOT describe results you did not observe. Behaviour is kept only IF every check of step 2 gave its recorded result on the final code.
+
+IF there is a task list, SET each task whose check you saw pass to done, in an edit of its own.

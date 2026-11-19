@@ -62,7 +62,7 @@ WHEN a skill delegates, cheaper worker agents do the bulk of the work, and the m
 
 ### 6.1. Use one instruction style
 
-WRITE instructions as imperatives with the verb in capitals: CHECK, ASK, DO NOT. WRITE conditions as IF or WHEN at the start of the sentence. NUMBER sections so rules can be referenced, such as "section 3.2".
+WRITE instructions as imperatives with the verb in capitals: CHECK, ASK, DO NOT. WRITE conditions as IF or WHEN at the start of the sentence. NUMBER steps and sections so rules can be referenced, such as "step 3" or "section 3.2"; NAME each general rule by its heading (section 6.8).
 
 FOLLOW `/write-better` for the wording: plain words, one term per concept, literal statements.
 
@@ -127,7 +127,24 @@ WHEN a skill serves a page where the user writes to the agent, such as design-be
 
 The skill TELLS the agent the same rules for its side, in the same words: reply in the page, in one or two short sentences; mark `working` only what it is changing now; and once an answer leads to a change, mark the item done and ask the next question as a new message.
 
-### 6.8. Give modes and agents one frontmatter
+### 6.8. Structure a skill as ordered steps and general rules
+
+Agents skip what a skill leaves vague, what it says only in passing, and what it buries among rules that do not apply to the work. STRUCTURE a skill that runs a workflow so its order and scope are explicit:
+
+- **SKILL.md** HAS, in this order: the lines that say what invoking it means (section 6.3), `## Principles`, `## Instructions`, then `## General rules`.
+- **Instructions** OPEN with "FOLLOW these steps in order", and HOLD one numbered `###` heading per step. The heading NAMES the step's action. The order lives in the step numbers: DO NOT write order as "before X, do Y" or "do Y after X" inside rules.
+- **General rules** HOLD what applies in every step and every mode, such as when to ask the user, under one `###` heading each. STATE each general rule there only, and DO NOT repeat it in a step or a mode, even as a reminder: a second wording invites agents to treat the two as different rules.
+- **A rule that applies to only some modes** GOES in those modes' files, not in SKILL.md. Each mode file HOLDS its own numbered steps, complete enough to follow alone. A mode MAY repeat another mode's wording where both need it, because each is read alone.
+- **Every file the agent must read** is NAMED in the step that needs it, with READ and FOLLOW. WHEN the choice of file depends on the work, such as a mode, a template or an agent, GIVE a table with what it is, when it applies, and its file. SAY that a mandatory file is mandatory.
+- **Every document the agent writes** is NAMED in the step that writes it, with when to write it, its path, and its template. READ a template only for a document you write.
+- **A step that starts a sub-agent** SAYS to wait for its report and what not to do meanwhile, such as writing to the user. Starting is not finishing: agents hand back while the sub-agent still runs.
+- **One fallback for a missing capability**, in the general rules, not one per step. A fallback in a step reads as permission to skip that step.
+- **Plain verbs over coined terms.** WRITE "ASK the user", not a term such as "send up" that needs its own definition.
+- **No partial lists that add nothing.** USE "such as" only when the examples define the category; a list of examples that does not change what the agent does is noise.
+
+Each point comes from evals of `/code-better`, where agents skipped mode files and the verifier until the steps were numbered and the files named as mandatory, and handed back before the verifier finished until the step said to wait.
+
+### 6.9. Give modes and agents one frontmatter
 
 WHEN a skill has kinds of work that need different rules, PUT each in `modes/<name>.md`. WHEN a skill starts other agents, PUT each agent's prompt in `agents/<name>.md`, not in `templates/`. `templates/` holds only documents the agent writes.
 

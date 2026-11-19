@@ -13,6 +13,8 @@ WRITE the requirements of this change in `.code/<change>/specs.md`. READ [../tem
 
 IF the change adds a module, a data model, a dependency or a migration, and no design covers it, ALSO WRITE `.code/<change>/design.md`: READ [../templates/design.md](../templates/design.md) and WRITE it in its format.
 
+WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.md` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task todo.
+
 ## 2. Write the checks
 
 WRITE one check per requirement. A check compares the result with an expected value: a check that only runs the code does not count. IF the project would keep the check, ADD it as a test next to the existing tests, in their style. OTHERWISE, WRITE it as a command and RECORD it in the spec. DO NOT add test helpers or frameworks the project does not use.
@@ -41,3 +43,5 @@ COMPARE the checks with the copy of step 2. ASK the user about any difference th
 FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same check fails twice for the same reason, WHEN three rounds have not made all checks pass, or WHEN a fix breaks a check that passed before.
 
 DO NOT describe results you did not observe. A requirement is met only IF its check passed on the final code.
+
+IF there is a task list, SET each task whose check you saw pass to done, in an edit of its own.

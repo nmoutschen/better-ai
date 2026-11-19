@@ -31,3 +31,25 @@ WRITE cases, rubrics and graders around the capabilities a skill names, such as 
 DO NOT fail an agent for doing what its harness requires, such as a permission step. WHEN a case depends on a capability the harness lacks, MARK the run as not applicable, not as failed.
 
 REPORT results as results for the harness and model they ran on. A result in one harness is not a result for the skill in every harness.
+
+## 6. Name and map cases by behaviour
+
+NAME each case after its situation, such as `order-ref-skipped-tests`, and SET its `rule` to the behaviour it tests, such as `report-accurately`, not to a section number of the skill. Section numbers change when a skill is restructured; the behaviour does not, so results stay comparable across rewrites.
+
+MAP each case to where the skill states that behaviour now, in `source`, and to the skill files a skill run must read, in `reads`. WHEN the skill is restructured, UPDATE `source` and `reads`, and the one-sentence instructions keyed by source, in the same change.
+
+## 7. Read the run before blaming the skill
+
+BEFORE changing a skill because a case fails, READ the failing runs: the judge's reasons, the final reply and the transcript. A failure may come from the grader, the case or the harness instead:
+
+- a grader that cannot see what the agent wrote, such as notes in a folder Git ignores;
+- a transcript that hides who did a step, such as a sub-agent's work shown as the agent's;
+- a check stricter than the rule, such as a file that must stay unchanged when adding a test to it is allowed;
+- a harness tool that keeps a run open, such as a scheduled wake-up;
+- a request that can be read two ways.
+
+FIX the grader, the case or the adapter WHEN that is the cause, and VALIDATE the case with its scripted runs. CHANGE the skill only for a failure the agent's own behaviour explains.
+
+## 8. Test a skill change on a pilot before a full run
+
+STATE each skill change as a hypothesis: the behaviour it should change, the evidence for it, and the cases that show it. RUN those cases, and a fixed set of about ten cases that covers the skill's main steps, a few times each, and COMPARE them with the same cases before the change. CHANGE one thing at a time where you can. RUN the full eval only once the pilots reach a satisfactory rate, and KEEP the pilot logs to compare against.
