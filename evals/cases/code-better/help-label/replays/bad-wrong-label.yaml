@@ -1,0 +1,5 @@
+reply: ''
+actions:
+- write: labels.py
+  content: |
+    SETTINGS_BUTTON = "Prefs"

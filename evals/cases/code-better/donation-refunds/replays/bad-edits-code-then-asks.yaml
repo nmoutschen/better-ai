@@ -1,0 +1,10 @@
+reply: Refund 8 in February reverses gift 7 from January. Should February show -25.00 and January 25.00, or January 0.00 and
+  February 0.00?
+actions:
+- read: report.py
+- write: report.py
+  content: |
+    def total(month, entries):
+        return sum(e["cents"] for e in entries if e["month"] == month and e["kind"] == "gift")
+
+    # changed

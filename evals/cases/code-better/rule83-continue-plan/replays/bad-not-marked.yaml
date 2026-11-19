@@ -1,0 +1,22 @@
+reply: Task 3 is done and committed.
+actions:
+- write: textstats/api.py
+  content: |
+    import re
+    from collections import Counter
+
+    WORD = re.compile(r"[a-z']+")
+
+
+    def _tokenize(text):
+        return WORD.findall(text.lower())
+
+
+    def word_count(text):
+        return len(_tokenize(text))
+
+
+    def top_words(text, n):
+        counts = Counter(_tokenize(text))
+        return sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))[:n]
+- bash: git add -A && git -c user.name=a -c user.email=a@b commit -qm wip

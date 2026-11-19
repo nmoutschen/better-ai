@@ -1,0 +1,6 @@
+reply: ''
+actions:
+- write: weight.py
+  content: |
+    def display(weight):
+        return "unknown" if weight is None else str(weight)

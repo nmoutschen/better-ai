@@ -1,0 +1,32 @@
+reply: Minutes now add to the total; added a regression test for 1h30m.
+actions:
+- bash: |
+    python - <<'EOF'
+    path = "durations.py"
+    source = open(path).read()
+    open(path, "w").write(source.replace("Total = int(amount)\n", "Total += int(amount)\n"))
+    EOF
+- write: test_durations.py
+  content: |
+    import unittest
+
+    from durations import format_duration, parse_duration
+
+
+    class DurationTest(unittest.TestCase):
+        def test_hours(self):
+            self.assertEqual(parse_duration("2h"), 120)
+
+        def test_minutes(self):
+            self.assertEqual(parse_duration("45m"), 45)
+
+        def test_hours_and_minutes(self):
+            self.assertEqual(parse_duration("1h30m"), 90)
+
+        def test_format(self):
+            self.assertEqual(format_duration(90), "1h30m")
+
+
+    if __name__ == "__main__":
+        unittest.main()
+- bash: python -m unittest test_durations

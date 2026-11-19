@@ -1,0 +1,11 @@
+reply: If confirm times out after reserve has committed the locker, should I keep the reservation and retry, or release it?
+actions:
+- read: lockers.py
+- read: README.md
+- write: requirements.md
+  content: |
+    # Requirements
+
+    ## Open question
+
+    See the question in my reply.

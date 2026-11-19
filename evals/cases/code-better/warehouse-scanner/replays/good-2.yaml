@@ -1,0 +1,10 @@
+reply: ''
+actions:
+- bash: |-
+    cat > barcode.py <<'EOF'
+    PREFIX = 'BIN'
+
+    def encode(number):
+        return f"{PREFIX}{number}"
+    EOF
+    python test_barcode.py

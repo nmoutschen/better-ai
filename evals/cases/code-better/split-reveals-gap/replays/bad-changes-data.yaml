@@ -1,0 +1,6 @@
+reply: Last night's load stored order 1, then stopped at the order without an id. If you rerun the load, should order 1 be
+  skipped (stored once) or stored again?
+actions:
+- write: data.csv
+  content: |
+    x

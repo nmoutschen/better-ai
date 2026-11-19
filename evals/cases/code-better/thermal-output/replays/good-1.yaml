@@ -1,0 +1,6 @@
+reply: ''
+actions:
+- write: label.py
+  content: |
+    LABEL = 'KEEP COOL'
+- bash: python test_label.py

@@ -1,0 +1,10 @@
+reply: ''
+actions:
+- write: sensor.py
+  content: |
+    LABEL = 'Ready'
+- write: test_sensor.py
+  content: |
+    from sensor import LABEL
+    assert LABEL == 'Ready'
+- bash: python test_sensor.py

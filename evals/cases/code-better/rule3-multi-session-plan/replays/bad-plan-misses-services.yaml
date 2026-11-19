@@ -1,0 +1,9 @@
+reply: Billing is done; next up search and mail.
+actions:
+- write: NOTES.md
+  content: |
+    # Next steps
+
+    - [x] billing
+    - [ ] search
+    - [ ] mail

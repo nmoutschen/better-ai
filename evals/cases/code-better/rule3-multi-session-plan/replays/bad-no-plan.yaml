@@ -1,0 +1,13 @@
+reply: Billing now uses logging.
+actions:
+- write: services/billing.py
+  content: |
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+
+    def handle(request):
+        logger.info(f"billing request {request['id']}")
+        return {"service": "billing", "id": request["id"]}
+- bash: python -m unittest discover tests

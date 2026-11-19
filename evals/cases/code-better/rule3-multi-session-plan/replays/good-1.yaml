@@ -1,0 +1,29 @@
+reply: Billing is moved and checked; docs/logging-plan.md tracks the other four services.
+actions:
+- read: README.md
+- read: services/billing.py
+- write: services/billing.py
+  content: |
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+
+    def handle(request):
+        logger.info(f"billing request {request['id']}")
+        return {"service": "billing", "id": request["id"]}
+- bash: '! grep -q oldlog services/billing.py && python -m unittest discover tests'
+- write: docs/logging-plan.md
+  content: |
+    # Plan: services off oldlog
+
+    Check for each service: `! grep -q oldlog services/<name>.py && python -m unittest discover tests`.
+    Mark a task done only after its check passes.
+
+    | Service | Check | Status |
+    |---|---|---|
+    | billing | `! grep -q oldlog services/billing.py && python -m unittest discover tests` | done |
+    | search | `! grep -q oldlog services/search.py && python -m unittest discover tests` | todo |
+    | mail | `! grep -q oldlog services/mail.py && python -m unittest discover tests` | todo |
+    | auth | `! grep -q oldlog services/auth.py && python -m unittest discover tests` | todo |
+    | exports | `! grep -q oldlog services/exports.py && python -m unittest discover tests` | todo |

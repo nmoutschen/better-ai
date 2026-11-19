@@ -6,3 +6,9 @@ __pycache__/
 .worktrees
 .claude/worktrees
 node_modules
+evals/.venv/
+.pytest_cache/
+.ruff_cache/
+.env
+# Inspect eval logs (full transcripts); keep out of the public repo.
+evals/logs/

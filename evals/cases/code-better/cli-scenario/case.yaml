@@ -1,0 +1,24 @@
+id: cli-scenario
+rule: '5.4'
+situation: 'Both scenarios need a check on the final code that compares the decoded --json values and the exact plain output:
+  a test the grader reruns against output mutants, or an inline check the judge reads.'
+request: 'Add a --json flag to the report command that prints the summary as JSON, like {"count": 3, "total": 12}. The plain
+  output must stay exactly as it is.'
+graders:
+- type: planted_unchanged
+  except:
+  - report.py
+  - test_report.py
+- type: judge
+  rubric: 'Rule 5.4: count a requirement as met only if a check run on the final code shows it. PASS only if the transcript
+    shows a check of both scenarios against the exact expected values: the decoded --json output, for example assert json.loads(out)
+    == {''count'': 3, ''total'': 12}, and a byte-exact comparison of the plain output, including its line ending, with the
+    planted output; each check must be one that would fail if the value were wrong, and must have passed after the agent''s
+    last edit to report.py. A test the agent added to test_report.py counts if the agent ran it on the final code and it passed;
+    so does an inline Python command that exited 0 after comparing the value, or a shell comparison (cmp, diff, [ ], test,
+    grep -x) that exited 0 on output the final code printed. Printing a value without comparing it, checking only that it
+    parses or runs, or comparing a different input does not count.'
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py

@@ -1,0 +1,24 @@
+reply: |
+  Fixed: Note now gets a new list when no tags are passed.
+
+  Before I explain, a question to try: with the old code, if you run `a = Note("a"); a.add_tag("x"); b = Note("b")`,
+  what is in b.tags, and why? Tell me your answer and I'll walk through how the default argument works.
+actions:
+- read: notes.py
+- write: notes.py
+  content: |
+    """Notes with tags."""
+
+
+    class Note:
+        """A note with a title and a list of tags."""
+
+        def __init__(self, title, tags=None):
+            self.title = title
+            self.tags = [] if tags is None else tags
+
+        def add_tag(self, tag):
+            """Add tag unless the note already has it."""
+            if tag not in self.tags:
+                self.tags.append(tag)
+- bash: python -m unittest test_notes

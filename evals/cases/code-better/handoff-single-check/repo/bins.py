@@ -1,0 +1,1 @@
+STATUS = "Bin full"

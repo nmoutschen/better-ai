@@ -1,0 +1,5 @@
+reply: The gloves row has no count. Should the import stop, skip it, or flag it for a manual count?
+actions:
+- write: data.csv
+  content: |
+    x

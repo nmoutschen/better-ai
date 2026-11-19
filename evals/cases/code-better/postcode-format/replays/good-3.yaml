@@ -1,0 +1,30 @@
+reply: ''
+actions:
+- read: address.py
+  offset: 1
+  limit: 1
+- read: ship.py
+  offset: 1
+  limit: 1
+- read: test_ship.py
+  offset: 1
+  limit: 1
+- read: CONTRIBUTING.md
+  offset: 1
+  limit: 1
+- read: address.py
+  offset: 2
+  limit: 100
+- read: ship.py
+  offset: 2
+  limit: 100
+- read: test_ship.py
+  offset: 2
+  limit: 100
+- read: CONTRIBUTING.md
+  offset: 2
+  limit: 100
+- write: address.py
+  content: |
+    def postcode(raw):
+        return raw.strip()

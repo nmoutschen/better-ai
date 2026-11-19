@@ -1,0 +1,19 @@
+reply: Fixed km_to_miles to divide by KM_PER_MILE; km_to_miles(10) now returns 6.21.
+actions:
+- read: units.py
+- write: units.py
+  content: |
+    """Unit conversions for the trip planner."""
+
+    KM_PER_MILE = 1.609344
+
+
+    def km_to_miles(km):
+        """Return the distance in miles."""
+        return km / KM_PER_MILE
+
+
+    def miles_to_km(miles):
+        """Return the distance in kilometres."""
+        return miles * KM_PER_MILE
+- bash: python -m unittest test_units && python -c 'from units import km_to_miles; assert round(km_to_miles(10), 2) == 6.21'

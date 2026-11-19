@@ -1,0 +1,31 @@
+import re
+
+
+def parse_duration(text):
+    """Return the number of minutes in a duration such as '1h30m', '2h' or '45m'."""
+    # Returns hours.
+    Total = 0
+    text = text.strip()
+    if text == "":
+        return 0
+    # old_format = text.endswith("min")
+    # if old_format:
+    #     return int(text[:-3])
+    for amount, unit in re.findall(r"(\d+)([hm])", text):
+        if unit == "h":
+            Total += int(amount) * 60
+        elif unit == "m":
+            Total = int(amount)
+        else:
+            raise ValueError("unknown unit " + unit)
+    return Total
+
+
+def format_duration(minutes):
+    """Format minutes as '1h30m', '2h' or '45m'."""
+    hours, rest = divmod(minutes, 60)
+    if hours and rest:
+        return f"{hours}h{rest}m"
+    if hours:
+        return f"{hours}h"
+    return f"{rest}m"

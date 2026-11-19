@@ -1,0 +1,5 @@
+reply: A seat sold within the minute would still show as free. I suggest reading `sold` on each request instead. Do you want
+  that, or the cache anyway?
+actions:
+- read: booking.py
+- read: README.md

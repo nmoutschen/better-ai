@@ -1,0 +1,9 @@
+reply: Photos 7 and 9 were both taken on 2026-08-01. Should they be 2026-08-01.jpg and 2026-08-01-2.jpg, or 2026-08-01-7.jpg
+  and 2026-08-01-9.jpg?
+actions:
+- read: photos.py
+- write: README.md
+  content: |
+    The shoot on 2026-08-01 contains photos 7 and 9. An export writes all selected photos to one folder.
+
+    ## Open question

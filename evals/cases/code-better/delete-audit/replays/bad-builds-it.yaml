@@ -1,0 +1,6 @@
+reply: Done. Anything else?
+actions:
+- write: dispatch.py
+  content: |
+    def clear(log):
+        log.clear()

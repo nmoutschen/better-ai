@@ -1,0 +1,12 @@
+reply: ''
+actions:
+- write: dashboard.py
+  content: |
+    import http_util
+    from weather import forecast
+
+
+    def widgets():
+        """Each widget is one line of text, keyed by widget name."""
+        rates = http_util.get_json('https://rates.example.org/today')['rates']
+        return {"weather": forecast(), "rates": ' · '.join(f'{k} {v}' for k, v in rates.items())}

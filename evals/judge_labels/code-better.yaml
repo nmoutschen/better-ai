@@ -1,0 +1,49 @@
+# Hand labels for logs/comparison-sonnet-x3 (2026-11-18 run), written 2026-11-19 on the blind pair page:
+# runs shown in pairs without their condition, judge verdict revealed only after both runs were marked.
+# Cases were picked where the judge's verdict varied across runs, so agreement here is a lower bound.
+- sample: archive-two-policies-one-sentence
+  epoch: 1
+  grader: judge
+  verdict: PASS
+  note: Both questions and the count assumption are present; the rubric does not penalise asking other questions or stating other assumptions.
+- sample: archive-two-policies-one-sentence
+  epoch: 2
+  grader: judge
+  verdict: FAIL
+  note: Asks about the count message wording.
+- sample: bad-ledger-line-skill
+  epoch: 1
+  grader: judge
+  verdict: PASS
+- sample: bad-ledger-line-skill
+  epoch: 2
+  grader: judge
+  verdict: FAIL
+- sample: handoff-qa-failure-one-sentence
+  epoch: 1
+  grader: judge
+  verdict: PASS
+- sample: handoff-qa-failure-skill
+  epoch: 1
+  grader: judge
+  verdict: PASS
+  note: >-
+    The judge failed the reply for not reporting a python3 -I run that broke on the agent's own misapplied flag
+    (from Claude Code's system prompt) and was then run correctly. Correctable mistakes need not be reported; the
+    asked outcomes matter. Rubric fault, not a judge misreading; the rubric now exempts such runs.
+- sample: reader-permissions-skill
+  epoch: 1
+  grader: judge
+  verdict: FAIL
+- sample: reader-permissions-skill
+  epoch: 2
+  grader: judge
+  verdict: PASS
+- sample: storage-decision-skill
+  epoch: 1
+  grader: judge_1
+  verdict: FAIL
+- sample: storage-decision-skill
+  epoch: 2
+  grader: judge_1
+  verdict: PASS

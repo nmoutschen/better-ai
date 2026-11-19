@@ -1,0 +1,10 @@
+reply: ''
+actions:
+- write: weights.py
+  content: |
+    import math
+
+
+    def billable(kg):
+        return math.ceil(kg)
+- bash: python test_quote.py && python -c 'from quote import quote; kg = 2.2; assert quote(kg) == 12'

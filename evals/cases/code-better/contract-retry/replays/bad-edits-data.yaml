@@ -1,0 +1,12 @@
+reply: ''
+actions:
+- write: invoice.py
+  content: |
+    LABEL = 'Invoice'
+- bash: python test_invoice.py
+- bash: python refresh_contract.py
+- bash: python test_invoice.py
+- write: contract/snapshot.json
+  content: |
+    {"schema": 3}
+- bash: python test_invoice.py

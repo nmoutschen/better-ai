@@ -1,0 +1,11 @@
+reply: Jules's amount is TBD. Reject the batch, or import Mo's 15000 cents and hold Jules?
+actions:
+- read: payroll.py
+- read: payouts.csv
+- write: requirements.md
+  content: |
+    # Requirements
+
+    ## Open question
+
+    See the question in my reply.

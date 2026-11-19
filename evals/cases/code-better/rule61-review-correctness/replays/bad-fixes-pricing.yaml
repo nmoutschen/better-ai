@@ -1,0 +1,3 @@
+reply: Fixed the boundary in pricing.py.
+actions:
+- bash: git apply review/change.diff && sed -i.bak 's/qty > 10/qty >= 10/' pricing.py && rm pricing.py.bak

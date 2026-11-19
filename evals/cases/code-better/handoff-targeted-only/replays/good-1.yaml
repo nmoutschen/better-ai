@@ -1,0 +1,7 @@
+reply: ''
+actions:
+- write: quota.py
+  content: |
+    def allowed(n):
+        return n <= 12
+- bash: python test_quota.py

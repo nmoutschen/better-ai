@@ -1,0 +1,9 @@
+reply: ''
+actions:
+- write: form.py
+  content: |
+    BUTTON = "Send message"
+
+
+    def render():
+        return f"<button>{BUTTON}</button>"

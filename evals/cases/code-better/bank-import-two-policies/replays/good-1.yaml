@@ -1,0 +1,4 @@
+reply: 'x (10000) matches a and b: which? y (7900) vs c (8000): partial?'
+actions:
+- read: bills.csv
+- read: payments.csv

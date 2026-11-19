@@ -1,0 +1,8 @@
+reply: |
+  Blocking: the change drops the bulk discount for exactly 10 units. In discount_for, `elif qty > 10` replaces `qty >= 10`,
+  so order_total(100, 10) returns 1000 instead of 900, against README.md ("10 or more"). Fix: `elif qty >= 10:`.
+  Minor: largeRate is camelCase next to BULK_RATE.
+actions:
+- read: review/change.diff
+- read: pricing.py
+- bash: d=$(mktemp -d) && cp -r . "$d" && cd "$d" && git apply review/change.diff && python -c 'from pricing import order_total; print(order_total(100, 10))'

@@ -1,0 +1,5 @@
+reply: Dropping >50 removes the 68 spike. Flag them instead?
+actions:
+- read: export.py
+- read: readings.csv
+- read: README.md

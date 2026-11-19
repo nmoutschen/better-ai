@@ -1,0 +1,16 @@
+judge: false
+reply: ''
+actions:
+- write: weights.py
+  content: |
+    import math
+
+
+    def billable(kg):
+        return math.ceil(kg)
+- write: test_weights.py
+  content: |
+    from weights import billable
+
+    assert billable(2.2) == 3
+- bash: python test_weights.py && python test_quote.py

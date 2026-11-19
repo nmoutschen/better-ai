@@ -21,7 +21,7 @@ Being invoked does NOT mean you must write code now. These instructions can end 
 5. Repair loops gain most in the first few rounds. Test results help more than compiler errors, and a weak critique can hurt more than a bare failure. Extra rounds can break code that was already correct, and repeated failure feedback leads agents to game tests.
 6. Self-review without outside evidence finds few errors. LLM judgements of whether code meets its requirements are unreliable.
 7. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
-8. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), and showing the design before building (section 2) are design choices.
+8. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), showing the design before building (section 2), and asking about error handling the requirements leave open (section 4.2) are design choices.
 
 This skill names capabilities, not tools: reading files, running commands and tests, asking the user, writing files, and sub-agents. FOR each capability you lack, FOLLOW the fallback the section gives.
 
@@ -94,7 +94,9 @@ BEFORE finishing, REMOVE edits left over from approaches you tried and abandoned
 
 ### 4.2. Decide error handling on purpose
 
-HANDLE invalid input and failures as the requirements' scenarios say. IF they do not say, TREAT it as a requirement gap (section 1.3). Differences in input validation and error handling explained why agent code was harder to build on. TREAT this as a guide, not a rule.
+HANDLE invalid input and failures as the requirements' scenarios say, such as a malformed row, a missing value, or a call that fails halfway.
+
+IF they do not say, DO NOT choose the behaviour yourself and state it as an assumption. ASK the user before building, as a costly requirement gap (section 1.5): SHOW what they would observe under each option for the input in question, such as the whole import rejected or the bad row held back. The user lives with the data or money a wrong choice affects, and differences in input validation and error handling explained why agent code was harder to build on.
 
 ## 5. Verify
 

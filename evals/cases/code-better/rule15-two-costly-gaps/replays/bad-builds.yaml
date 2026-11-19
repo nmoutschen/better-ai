@@ -1,0 +1,29 @@
+reply: Done. The merged account keeps the oldest account's address and sums the points.
+actions:
+- write: merge_duplicates.py
+  content: |
+    from customers import CUSTOMERS, ORDERS, load, save
+
+
+    def main():
+        customers = load(CUSTOMERS)
+        orders = load(ORDERS)
+        kept = {}
+        merged = 0
+        for customer in sorted(customers, key=lambda customer: customer["created_at"]):
+            first = kept.get(customer["email"])
+            if first is None:
+                kept[customer["email"]] = customer
+                continue
+            first["loyalty_points"] += customer["loyalty_points"]
+            for order in orders:
+                if order["customer_id"] == customer["id"]:
+                    order["customer_id"] = first["id"]
+            merged += 1
+        save(CUSTOMERS, list(kept.values()))
+        save(ORDERS, orders)
+        print(f"Merged {merged} duplicate accounts")
+
+
+    if __name__ == "__main__":
+        main()

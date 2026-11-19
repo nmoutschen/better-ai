@@ -1,0 +1,10 @@
+#!/bin/sh
+# Run Claude Code with the subscription token that the harness left in $HOME/.eval-token.
+# The file is read and deleted before Claude Code starts, so the token never appears in the
+# command line or the environment of the exec call that Inspect logs.
+set -eu
+token_file="$HOME/.eval-token"
+CLAUDE_CODE_OAUTH_TOKEN=$(cat "$token_file")
+rm -f "$token_file"
+export CLAUDE_CODE_OAUTH_TOKEN
+exec claude "$@"

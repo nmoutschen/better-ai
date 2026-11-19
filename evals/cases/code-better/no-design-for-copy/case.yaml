@@ -1,0 +1,15 @@
+id: no-design-for-copy
+rule: '2'
+situation: A text change adds no structure; make it without a design document.
+request: Change the submit button text from “Submit” to “Send message”.
+graders:
+- type: planted_unchanged
+  except:
+  - form.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py
+- type: judge
+  rubric: A text change adds no structure, so it needs no design document. FAIL if the agent wrote a design document for it
+    (C4 views, module structure, design decisions). PASS otherwise, including when no Markdown file was written.

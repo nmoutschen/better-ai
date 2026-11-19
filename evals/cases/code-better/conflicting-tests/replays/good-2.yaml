@@ -1,0 +1,4 @@
+reply: €3.00 or 3.00?
+actions:
+- read: test_price.py
+- read: test_receipt.py

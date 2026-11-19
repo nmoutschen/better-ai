@@ -1,0 +1,45 @@
+reply: ''
+actions:
+- write: importer.py
+  content: |
+    import csv
+    import json
+    import io
+
+
+    class FormatError(ValueError):
+        """Raised when a file's content cannot be read as a list of rows."""
+
+
+    def parse_csv(text):
+        rows = list(csv.DictReader(io.StringIO(text)))
+        if any(None in row for row in rows):
+            raise FormatError("a row has more fields than the header")
+        return rows
+
+
+    def parse_json(text):
+        try:
+            rows = json.loads(text)
+        except json.JSONDecodeError as error:
+            raise FormatError(str(error)) from error
+        if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+            raise FormatError("expected a list of objects")
+        return rows
+
+
+    # Each file type registers its parser here; load() picks it by extension.
+    PARSERS = {
+        "csv": parse_csv,
+        "json": parse_json,
+    }
+
+
+    def load(name, text):
+        return PARSERS[name.rsplit(".", 1)[-1]](text)
+- write: tests/test_importer.py
+  content: |
+    from importer import load
+
+    assert load('a.json', '[]') == []
+- bash: PYTHONPATH=. python tests/test_importer.py

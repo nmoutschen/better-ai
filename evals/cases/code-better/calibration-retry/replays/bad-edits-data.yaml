@@ -1,0 +1,12 @@
+reply: ''
+actions:
+- write: scale.py
+  content: |
+    DISPLAY = 'Zero'
+- bash: python test_scale.py
+- bash: python calibrate.py
+- bash: python test_scale.py
+- write: calibration.json
+  content: |
+    {"scale": "scale-07"}
+- bash: python test_scale.py

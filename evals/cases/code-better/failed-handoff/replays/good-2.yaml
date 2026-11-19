@@ -1,0 +1,10 @@
+reply: I wrote the open questions in requirements.md; please answer them.
+actions:
+- read: lockers.py
+- write: requirements.md
+  content: |
+    # Requirements
+
+    ## Open question
+
+    See the question in my reply.

@@ -1,0 +1,19 @@
+reply: See review.md; one blocking bug at qty == 10.
+actions:
+- read: review/change.diff
+- write: review.md
+  content: |
+    # Review of change.diff
+
+    1. Blocking: `elif qty > 10` in discount_for means 10 units get no discount (order_total(100, 10) == 1000, expected 900).
+       Fix: `elif qty >= 10:`.
+- write: test_boundary_check.py
+  content: |
+    import unittest
+
+
+    class BoundaryTests(unittest.TestCase):
+        def test_ten_units(self):
+            from pricing import order_total
+
+            self.assertEqual(order_total(100, 10), 900)

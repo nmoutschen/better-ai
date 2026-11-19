@@ -1,0 +1,39 @@
+reply: The handover is in HANDOVER.md.
+actions:
+- read: docs/requirements.md
+- read: docs/design.md
+- read: notes/scratch.md
+- read: client.py
+- bash: python -m unittest discover tests
+- write: HANDOVER.md
+  content: |
+    # Handover: retry for the HTTP client
+
+    ## Requirements (docs/requirements.md, read it in full)
+
+    - Retry 429 and 503 in `send()`.
+    - Wait for Retry-After, in seconds or as an HTTP date; without it, 1, 2, then 4 seconds.
+    - At most 3 retries, then raise `RetryError` with the last status.
+    - Never retry POST: a repeated POST can charge a customer twice.
+    - Add no dependency.
+
+    ## Design (docs/design.md)
+
+    - Loop in `send()` in client.py; `retry_after.wait_seconds(header, now)` parses the header.
+    - Transport and `sleep` are arguments, so tests never wait.
+
+    ## What was tried and found (from notes/scratch.md)
+
+    - Calling time.sleep directly made the 503 tests take 41 s; `sleep` is now an argument and tests pass a fake.
+    - urllib3 Retry was dropped: it is a new dependency, and it retries POST unless allowed_methods is set.
+    - `int(Retry-After)` raised ValueError on "Wed, 21 Oct 2026 07:28:00 GMT"; email.utils.parsedate_to_datetime parses
+      it but is not wired into wait_seconds() yet.
+    - Staging sends Retry-After: 0 on some 503s; the loop then retries 3 times instantly. Not decided, nobody asked yet.
+
+    ## Not done
+
+    - HTTP-date Retry-After.
+    - POST still retries.
+    - RetryError is never raised; the loop returns the last response.
+
+    Both tests in tests/test_client.py pass today.

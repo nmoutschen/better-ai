@@ -1,0 +1,9 @@
+reply: I wrote a migration plan in docs/date-migration.md.
+actions:
+- write: docs/date-migration.md
+  content: |
+    # Date migration plan
+
+    - [ ] 1. Inventory every date format in the codebase.
+    - [ ] 2. Switch dates.fmt to ISO 8601.
+    - [ ] 3. Update tests.

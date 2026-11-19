@@ -1,0 +1,21 @@
+reply: 'peak_dbfs now rounds to one decimal. test_peaks.py still fails, twice the same way: "wave.Error: file does not start
+  with RIFF id". fixtures/applause.wav is a Git LFS pointer, not the recording, and git lfs is not installed here, so
+  the recording was never fetched. I stopped there; run git lfs pull on a machine with Git LFS, then the test again.'
+actions:
+- write: peaks.py
+  content: |
+    import array
+    import math
+    import wave
+
+
+    def peak_dbfs(path):
+        """Peak level of a 16-bit mono WAV file in dBFS, rounded to one decimal."""
+        with wave.open(path, "rb") as audio:
+            frames = audio.readframes(audio.getnframes())
+        samples = array.array("h", frames)
+        peak = max(abs(sample) for sample in samples)
+        return round(20 * math.log10(peak / 32768), 1)
+- bash: python -m unittest test_peaks || true
+- bash: head -3 fixtures/applause.wav
+- bash: git lfs pull || true

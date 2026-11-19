@@ -1,0 +1,26 @@
+reply: ''
+actions:
+- write: reports/sales.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("sales")
+- write: reports/stock.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("stock")
+- write: reports/staff.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("staff")
+- bash: python -c "import reports.sales as m; assert m.rows() == [('sales', 'new')]"
+- bash: python -c "import reports.stock as m; assert m.rows() == [('stock', 'new')]"
+- bash: python -c "import reports.staff as m; assert m.rows() == [('staff', 'new')]"

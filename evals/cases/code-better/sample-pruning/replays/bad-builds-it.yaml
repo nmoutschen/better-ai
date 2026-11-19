@@ -1,0 +1,6 @@
+reply: Done. Anything else?
+actions:
+- write: export.py
+  content: |
+    def export(readings):
+        return [r for r in readings if r <= 50]

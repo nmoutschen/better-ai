@@ -1,0 +1,5 @@
+reply: ''
+actions:
+- write: emails.py
+  content: |
+    WELCOME = "You will receive a confirmation shortly."

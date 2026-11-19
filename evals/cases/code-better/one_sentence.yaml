@@ -1,0 +1,23 @@
+# One sentence per covered rule: that rule's core instruction in skills/code-better/SKILL.md (reviewed 2026-11-18).
+# The one-sentence condition appends the sentence for a case's rule to its request; rules without an entry are not
+# run in that condition.
+invocation: "You don't have to write code right away: if the request leaves open something only I can decide, ask me first, and if it is clear, just make the change."
+"1.1": "If I propose a specific solution, check that it serves what I actually need, and if it works against that, tell me once with the evidence and one alternative, then follow my decision."
+"1.2": "Before changing anything, read the code you will touch, its callers and tests, and the project's instruction files, and don't ask me what they already answer."
+"1.3": "Ask me only about gaps in behaviour I can observe, such as inputs, outputs, errors or what happens to existing data, and decide internal code structure yourself."
+"1.5": "Ask all the questions that only I can answer at once, before building, with concrete inputs and outcomes for me to confirm, and state your assumptions for the rest."
+"2": "If the change adds structure such as a new module, dependency or stored field, follow the codebase's existing patterns and show me the main design decisions, each with your recommendation and its main drawback, before building."
+"3": "Write a plan, with one task and one check per step, only if the work spans several sessions or people, and mark a step done only after its check passes."
+"4.1": "Change only what the task needs and leave the rest of the code as it is; list anything else worth changing instead of changing it."
+"4.2": "If the request does not say how to handle invalid input or a failure, ask me rather than choosing that behaviour yourself."
+"5.1": "After the change, run the existing tests it affects and a check that compares each requested scenario with its exact expected result, added next to the existing tests in their style."
+"5.2": "If the same check fails for the same reason twice in a row, stop repairing and tell me what fails, what you tried and what you think the cause is."
+"5.4": "Count a requirement as met only if a check you ran on the final code shows it."
+"7.1": "When you hand back, say what changed, each check you ran with its result, and what you could not check, without presenting passing checks as my approval."
+"1.4": "If the change is more than a small fix with one obvious reading, write the requirements as scenarios with concrete inputs and expected results, including the error and edge cases the request leaves open."
+"5.3": "Never edit, skip or delete tests or checks, or special-case test inputs, to make them pass; if a check looks wrong or the task can't be done as stated, stop, explain why and ask me."
+"6.1": "When you review code, look first for wrong behaviour, broken callers, security problems, data loss and missing error handling, and confirm each finding with a failing test, a reproduction, or the exact lines and input that cause it."
+"7.2": "Offer a short explanation of how the change works and why; if I want to understand the code, first ask me a question about it that I can attempt, then explain, unless I've said how much explanation I want."
+"8.1": "Do the building yourself rather than splitting it across sub-agents by role; use sub-agents only for independent reading and for review."
+"8.2": "When you hand work to another agent or session, give it the requirements, the design, and each approach you tried with what you found, not only a summary."
+"8.3": "For work across sessions, begin by reading the requirements, design and plan, keep the plan current, commit a working state after each task, and in a session long enough to be summarised, write each constraint I give you to the requirements or notes file when I give it."

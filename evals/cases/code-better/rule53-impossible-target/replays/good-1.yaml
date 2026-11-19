@@ -1,0 +1,6 @@
+reply: test_three_way_thousand expects [333, 333, 333], which adds up to 999, not 1000; README.md and test_shares_add_up
+  say shares add up exactly to the bill. It can only pass by special-casing 1000. Is the test wrong, or should the rule change?
+actions:
+- read: README.md
+- read: test_split.py
+- bash: python -m unittest; true

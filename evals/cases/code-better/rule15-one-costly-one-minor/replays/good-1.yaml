@@ -1,0 +1,8 @@
+reply: |
+  One question before I build: do days the library is closed count toward the fee? "Dune" was due 2026-03-06 and
+  2026-03-08 is closed, so on 2026-03-10 Ana owes 1.00 EUR (4 days) if closed days count, or 0.75 EUR (3 days) if not.
+  I'll assume the email adds a line like "Late fee so far: 1.00 EUR".
+actions:
+- read: README.md
+- read: nightly.py
+- read: data/closed_days.txt

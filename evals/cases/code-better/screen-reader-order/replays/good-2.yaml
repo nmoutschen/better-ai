@@ -1,0 +1,7 @@
+reply: ''
+actions:
+- bash: |-
+    cat > notice.py <<'EOF'
+    LABEL = 'Warning'
+    EOF
+    python test_notice.py

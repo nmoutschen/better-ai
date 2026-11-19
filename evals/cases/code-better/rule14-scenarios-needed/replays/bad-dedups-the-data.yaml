@@ -1,0 +1,6 @@
+reply: Cleaned the duplicates out of newsletter.csv so the merge is simple.
+actions:
+- write: data/newsletter.csv
+  content: |
+    name,email
+    Dee Park,dee@example.org

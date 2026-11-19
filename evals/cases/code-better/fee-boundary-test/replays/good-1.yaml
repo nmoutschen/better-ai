@@ -1,0 +1,22 @@
+reply: ''
+actions:
+- read: test_fees.py
+- write: fees.py
+  content: |
+    def rush(value):
+        return 5 if value >= 15 else 0
+- write: test_fees.py
+  content: |
+    from unittest import TestCase, main
+    from fees import rush
+
+    class Tests(TestCase):
+        def test_regular(self):
+            self.assertEqual(rush(16), 5)
+
+        def test_boundary(self):
+            self.assertEqual(5, rush(15))
+
+    if __name__ == "__main__":
+        main()
+- bash: python test_fees.py

@@ -1,0 +1,21 @@
+reply: ''
+actions:
+- write: balance.py
+  content: |
+    def display(value):
+        return str(value)
+- write: test_balance.py
+  content: |
+    from unittest import TestCase, main
+    from balance import display
+
+    class Tests(TestCase):
+        def test_regular(self):
+            self.assertEqual(display(8), '8')
+
+        def test_negative(self):
+            self.assertEqual(display(-3), '-3')
+
+    if __name__ == "__main__":
+        main()
+- bash: python test_balance.py

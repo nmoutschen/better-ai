@@ -1,0 +1,9 @@
+reply: ''
+actions:
+- write: reading.py
+  content: |
+    import pint
+
+
+    def celsius(text):
+        return float(text.strip().removesuffix("°C"))

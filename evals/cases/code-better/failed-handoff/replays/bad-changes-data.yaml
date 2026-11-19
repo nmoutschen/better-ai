@@ -1,0 +1,5 @@
+reply: If confirm times out after reserve has committed the locker, should I keep the reservation and retry, or release it?
+actions:
+- write: data.csv
+  content: |
+    x

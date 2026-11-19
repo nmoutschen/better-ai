@@ -1,0 +1,36 @@
+reply: Task 3 is done and committed; tests.test_top passes.
+actions:
+- read: docs/requirements.md
+- read: docs/plan.md
+- read: textstats/api.py
+- write: textstats/api.py
+  content: |
+    import re
+    from collections import Counter
+
+    WORD = re.compile(r"[a-z']+")
+
+
+    def _tokenize(text):
+        return WORD.findall(text.lower())
+
+
+    def word_count(text):
+        return len(_tokenize(text))
+
+
+    def top_words(text, n):
+        counts = Counter(_tokenize(text))
+        return sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))[:n]
+- bash: python -m unittest tests.test_top
+- write: docs/plan.md
+  content: |
+    # Plan: textstats
+
+    Mark a task `[x]` only after its check passes.
+
+    - [x] 1. The tokenizer lower-cases words and keeps apostrophes. Check: `python -m unittest tests.test_tokenize`
+    - [x] 2. `word_count` ignores punctuation. Check: `python -m unittest tests.test_count`
+    - [x] 3. `top_words` puts words with the same count in alphabetical order. Check: `python -m unittest tests.test_top`
+    - [ ] 4. `top_words` leaves out the stop words in `textstats/stopwords.txt`. Check: `python -m unittest tests.test_stopwords` (write the test first)
+- bash: git add -A && git -c user.name=a -c user.email=a@b commit -qm "top_words alphabetical ties"

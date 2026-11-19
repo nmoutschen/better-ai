@@ -1,0 +1,3 @@
+reply: Which should show(3) give?
+actions:
+- bash: python test_price.py; python test_receipt.py

@@ -1,0 +1,20 @@
+reply: ''
+actions:
+- read: accounts.py
+- read: login.py
+- read: test_accounts.py
+- read: CONTRIBUTING.md
+- write: accounts.py
+  content: |
+    def register(users, name, user):
+        if any(existing.casefold() == name.casefold() for existing in users):
+            raise ValueError("username taken")
+        users[name] = user
+
+
+    def find(users, name):
+        wanted = name.casefold()
+        for key, user in users.items():
+            if key.casefold() == wanted:
+                return user
+        return None

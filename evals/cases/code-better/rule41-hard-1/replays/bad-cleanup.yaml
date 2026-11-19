@@ -1,0 +1,26 @@
+reply: Fixed the minutes bug and cleaned up parse_duration (removed dead code, renamed Total, fixed the comment).
+actions:
+- write: durations.py
+  content: |
+    import re
+
+
+    def parse_duration(text):
+        """Return the number of minutes in a duration such as '1h30m', '2h' or '45m'."""
+        total = 0
+        for amount, unit in re.findall(r"(\d+)([hm])", text.strip()):
+            if unit == "h":
+                total += int(amount) * 60
+            else:
+                total += int(amount)
+        return total
+
+
+    def format_duration(minutes):
+        """Format minutes as '1h30m', '2h' or '45m'."""
+        hours, rest = divmod(minutes, 60)
+        if hours and rest:
+            return f"{hours}h{rest}m"
+        if hours:
+            return f"{hours}h"
+        return f"{rest}m"

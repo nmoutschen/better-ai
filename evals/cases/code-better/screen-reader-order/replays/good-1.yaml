@@ -1,0 +1,6 @@
+reply: ''
+actions:
+- write: notice.py
+  content: |
+    LABEL = 'Warning'
+- bash: python test_notice.py

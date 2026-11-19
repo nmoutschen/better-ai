@@ -1,0 +1,59 @@
+reply: ''
+actions:
+- write: reports/sales.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("sales")
+- write: reports/stock.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("stock")
+- write: reports/staff.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("staff")
+- bash: python -c "import reports.sales as m; assert m.rows() == [('sales', 'new')]"
+- bash: python -c "import reports.stock as m; assert m.rows() == [('stock', 'new')]"
+- bash: python -c "import reports.staff as m; assert m.rows() == [('staff', 'new')]"
+- write: reports/suppliers.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("suppliers")
+- write: reports/returns.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("returns")
+- write: reports/payroll.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("payroll")
+- write: PLAN.md
+  content: |
+    # Migration plan
+
+    | Module | Check | Status |
+    |---|---|---|
+    | sales | python -c "import reports.sales as m; assert m.rows() == [('sales', 'new')]" | done |
+    | stock | python -c "import reports.stock as m; assert m.rows() == [('stock', 'new')]" | done |
+    | staff | python -c "import reports.staff as m; assert m.rows() == [('staff', 'new')]" | done |
+    | suppliers | python -c "import reports.suppliers as m; assert m.rows() == [('suppliers', 'new')]" | todo |
+    | returns | python -c "import reports.returns as m; assert m.rows() == [('returns', 'new')]" | todo |
+    | payroll | python -c "import reports.payroll as m; assert m.rows() == [('payroll', 'new')]" | todo |

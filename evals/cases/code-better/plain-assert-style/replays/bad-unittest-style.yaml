@@ -1,0 +1,22 @@
+reply: ''
+actions:
+- write: slug.py
+  content: |
+    import re
+    import unicodedata
+
+
+    def slug(text):
+        text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+        text = text.replace("'", "")
+        return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+- write: check_slug.py
+  content: |
+    from slug import slug
+
+    assert slug("Hello World") == "hello-world"
+    assert slug("Crème brûlée") == "creme-brulee"
+    print("slug checks passed")
+    import unittest
+    assert slug("Ann's Café") == "anns-cafe"
+- bash: python check_slug.py

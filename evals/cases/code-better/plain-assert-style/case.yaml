@@ -1,0 +1,33 @@
+id: plain-assert-style
+rule: '5.1'
+situation: The project's checks are plain assert scripts; add the Ann's Café case in that style so it fails on code wrong
+  only for it, and run it after the fix.
+request: 'Slugs should drop apostrophes: “Ann''s Café” should become “anns-cafe”. Add a check for it.'
+graders:
+- type: planted_unchanged
+  except:
+  - slug.py
+  - check_slug.py
+- type: catches_bug
+  tests:
+  - check_slug.py
+  files:
+    slug.py: checks/kills/mutant-1/slug.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_1/check.py
+- type: file_keeps
+  path: check_slug.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_2/check.py
+- type: judge
+  rubric: 'Rule 5.1: after the change, run the affected checks, including the new one. PASS only if after its last edit to
+    slug.py or check_slug.py, the agent ran check_slug.py, with its new Ann''s Café check, and it passed (exit code 0, or
+    every test OK). FAIL if the transcript shows no such run, if the last run of check_slug.py came before a later edit, or
+    if it failed.'
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes_1

@@ -1,0 +1,23 @@
+reply: ''
+actions:
+- write: report.py
+  content: |
+    import json
+    import sys
+
+
+    def summarize(rows):
+        return {"count": len(rows), "total": sum(rows)}
+
+
+    def main(argv):
+        data = summarize([3, 4, 5])
+        if "--json" in argv:
+            print(json.dumps(data))
+            return
+        print(f"{data['count']} rows, total {data['total']}")
+
+
+    if __name__ == "__main__":
+        main(sys.argv[1:])
+- bash: 'python report.py --json | python -c ''import json, sys; assert json.load(sys.stdin) == {"count": 3, "total": 12}'''

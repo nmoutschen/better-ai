@@ -1,0 +1,17 @@
+reply: ''
+actions:
+- write: weight.py
+  content: |
+    def header(name):
+        return "Weights for %s" % name
+
+
+    def label(value, unit):
+        if unit == "lb":
+            return "%.1f lb" % value
+        return "%.1f kg" % value
+
+
+    def footer(count):
+        # count of rows
+        return "%d entries" % count

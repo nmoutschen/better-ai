@@ -1,0 +1,9 @@
+reply: ''
+actions:
+- write: reading.py
+  content: |
+    import re
+
+
+    def celsius(text):
+        return float(re.sub(r"\s*°C\s*$", "", text.strip()))

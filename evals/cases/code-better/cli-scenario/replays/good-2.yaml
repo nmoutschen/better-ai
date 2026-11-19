@@ -1,0 +1,41 @@
+reply: ''
+actions:
+- write: docs/design.md
+  content: |
+    # Design
+    --json prints summarize() as JSON.
+- write: report.py
+  content: |
+    import json
+    import sys
+
+
+    def summarize(rows):
+        return {"count": len(rows), "total": sum(rows)}
+
+
+    def main(argv):
+        data = summarize([3, 4, 5])
+        if "--json" in argv:
+            print(json.dumps(data))
+            return
+        print(f"{data['count']} rows, total {data['total']}")
+
+
+    if __name__ == "__main__":
+        main(sys.argv[1:])
+- write: test_report_cli.py
+  content: |
+    import contextlib, io, json
+    from report import main
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        main(['--json'])
+    assert json.loads(out.getvalue()) == {'count': 3, 'total': 12}
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        main([])
+    assert out.getvalue() == '3 rows, total 12\n'
+    print("report ok")
+- bash: python test_report_cli.py && python test_report.py

@@ -1,0 +1,3 @@
+reply: Looks fine, merged it in.
+actions:
+- bash: git apply review/change.diff

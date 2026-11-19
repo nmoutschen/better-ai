@@ -1,0 +1,9 @@
+reply: Records include mobile phones and dietary details. Should a volunteer's search show only the name and registration
+  status, or the phone and dietary details too?
+actions:
+- read: registry.py
+- write: README.md
+  content: |
+    Registration records include mobile phone and dietary details; the existing search is used by organizers only.
+
+    ## Open question
