@@ -1,10 +1,10 @@
 id: caller-tests
 rule: '5.1'
 source:
-- SKILL.md#7
 - modes/feature.md
 reads:
 - [modes/feature.md, modes/bug-fix.md]
+- templates/specs.md
 - agents/verifier.md
 situation: The tests affected by the change are in the caller's test file; run them after the edit and check a part kilo with
   a comparison that would fail on the planted rounding, inline or as a regression test.

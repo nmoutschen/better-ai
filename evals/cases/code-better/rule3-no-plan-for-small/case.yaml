@@ -1,9 +1,10 @@
 id: rule3-no-plan-for-small
 rule: '3'
 source:
-- SKILL.md#4
+- modes/feature.md
 reads:
 - modes/feature.md
+- templates/specs.md
 - agents/verifier.md
 situation: A request phrased as a migration is a one-line format change (plus its test) in one session; make it without a
   plan file.

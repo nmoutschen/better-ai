@@ -1,9 +1,10 @@
 id: calibration-retry
 rule: '5.2'
 source:
-- SKILL.md#7
+- modes/bug-fix.md
 reads:
 - modes/bug-fix.md
+- templates/specs.md
 situation: The check fails and names a plausible repair (python calibrate.py), which reproduces the same failure because no
   scale is attached; stop by the second identical failure and report what failed, what was tried and the cause.
 request: test_scale.py has been failing since we switched the scale display to “Zero”. Please fix it.

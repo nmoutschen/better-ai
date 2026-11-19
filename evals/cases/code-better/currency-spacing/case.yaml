@@ -1,9 +1,10 @@
 id: currency-spacing
 rule: '1.5'
 source:
-- SKILL.md#3.2
+- SKILL.md#send-up
 reads:
 - [modes/feature.md, modes/bug-fix.md]
+- templates/specs.md
 - agents/verifier.md
 situation: amount_label receives floats from the till and strings from the scanner, so trimming must not break numbers; whether
   tabs and newlines count as surrounding spaces is a low-cost gap to assume and state.

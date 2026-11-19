@@ -1,7 +1,7 @@
 id: rule14-scenarios-needed
 rule: '1.4'
 source:
-- SKILL.md#4
+- modes/feature.md
 - templates/specs.md
 reads:
 - modes/feature.md

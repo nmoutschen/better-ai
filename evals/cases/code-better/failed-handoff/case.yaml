@@ -1,7 +1,7 @@
 id: failed-handoff
 rule: '4.2'
 source:
-- SKILL.md#3.2
+- SKILL.md#send-up
 reads: []
 situation: The locker booking can succeed even when confirmation fails; ask whether to keep or roll back the reservation.
 request: Run pickup confirmation after booking a locker.

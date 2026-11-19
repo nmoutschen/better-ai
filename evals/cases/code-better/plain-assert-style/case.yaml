@@ -1,9 +1,10 @@
 id: plain-assert-style
 rule: '5.1'
 source:
-- SKILL.md#7
+- modes/feature.md
 reads:
 - [modes/feature.md, modes/bug-fix.md]
+- templates/specs.md
 - agents/verifier.md
 situation: The project's checks are plain assert scripts; add the Ann's Café case in that style so it fails on code wrong
   only for it, and run it after the fix.

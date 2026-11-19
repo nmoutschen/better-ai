@@ -1,9 +1,10 @@
 id: reuse-http-helper
 rule: '2'
 source:
-- SKILL.md#6
+- modes/feature.md
 reads:
 - modes/feature.md
+- templates/specs.md
 - agents/verifier.md
 situation: The project already has an HTTP helper for JSON APIs; the rates widget must fetch through it, not urllib, requests
   or a new dependency.

@@ -5,10 +5,40 @@ description: Use for a defect in existing behaviour.
 
 # Mode: bug fix
 
-BEFORE you change the code, WRITE a check that reproduces the defect with the input that triggers it and FAILS on the current code. IF you cannot make it fail, STOP and REPORT what you tried: the defect is not understood yet.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
-KEEP the spec to the behaviour the fix restores, usually one or two requirements in the hand-back. IF the defect shows a requirement the design missed, SEND that gap up, and ADD it to a saved spec only once the user accepts it.
+## 1. Update the spec
 
-FIX the cause, not the symptom the check shows, and RUN the checks of the behaviour around it.
+WRITE the behaviour the fix restores in `.code/<change>/specs.md`, usually one or two requirements. READ [../templates/specs.md](../templates/specs.md) and WRITE the spec in its format. IF the file exists from earlier work on this change, UPDATE it in place. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
-IF an existing test asserts the defective behaviour, DO NOT change it yourself: SEND it up with the defect, since someone may rely on that behaviour.
+IF the defect shows a requirement nobody stated, SEND that gap up, and ADD it to the spec only once the user accepts it.
+
+## 2. Reproduce the defect
+
+WRITE a check that reproduces the defect with the input that triggers it, and compares the result with the expected value. IF the project would keep the check, ADD it as a test next to the existing tests, in their style. OTHERWISE, WRITE it as a command and RECORD it in the spec.
+
+RUN it on the current code: it FAILS, and you RECORD the result. IF you cannot make it fail, STOP and REPORT what you tried: the defect is not understood yet.
+
+KEEP a copy of this check and of the existing tests the fix could break: COMMIT them IF you work on a branch created for this change; OTHERWISE, COPY them to `.code/<change>/checks/`.
+
+From now on, WHEN a check fails, CHANGE the code, not the check. DO NOT edit, skip or delete a check, or write code for its inputs. This mode allows no change to an existing check. IF an existing test asserts the defective behaviour, SEND it up with the defect: someone may rely on that behaviour.
+
+## 3. Fix the cause
+
+FIX the cause, not the symptom the check shows. FOLLOW the codebase's existing patterns, and SAY why where you depart from them. CHANGE only what the fix needs, and LIST anything else worth changing as a proposed next step. DO the fixing yourself; USE sub-agents only to read. REMOVE edits left over from approaches you abandoned.
+
+## 4. Test the fix
+
+RUN, on the final code:
+
+1. The check of step 2.
+2. The existing tests of the behaviour around the fix.
+3. The check of every earlier spec in `.code/` that covers the code you changed.
+4. A smoke check that the program starts and its main path works.
+5. The static, type, lint and security checks the project uses.
+
+COMPARE the checks with the copy of step 2. SEND up any difference.
+
+FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same check fails twice for the same reason, WHEN three rounds have not made all checks pass, or WHEN a fix breaks a check that passed before.
+
+IF you cannot run code, STOP with the fix marked **not finished: not verified**, WHY, and the checks still to run. DO NOT describe results you did not observe. The defect is fixed only IF the check of step 2 passed on the final code.

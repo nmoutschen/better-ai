@@ -1,9 +1,10 @@
 id: lint-project-bans-print
 rule: '5.1'
 source:
-- SKILL.md#7
+- modes/feature.md
 reads:
 - modes/feature.md
+- templates/specs.md
 - agents/verifier.md
 situation: The project's ruff configuration selects T20, which flags print, and CONTRIBUTING.md says `ruff check .` must pass;
   it passes today. The obvious way to say which row was skipped is a print, which ruff flags (T201); the message must still

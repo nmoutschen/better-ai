@@ -1,10 +1,11 @@
 id: rule83-continue-plan
 rule: '8.3'
 source:
-- SKILL.md#4
+- modes/feature.md
 - templates/tasks.md
 reads:
 - modes/feature.md
+- templates/specs.md
 - agents/verifier.md
 situation: A later session continues a plan; read the requirements and the plan first, do task 3 without changing the public
   signatures the requirements protect, and mark it done only after its check passes.

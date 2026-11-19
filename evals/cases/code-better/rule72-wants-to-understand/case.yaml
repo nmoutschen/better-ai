@@ -1,9 +1,10 @@
 id: rule72-wants-to-understand
 rule: '7.2'
 source:
-- SKILL.md#9
+- SKILL.md#5
 reads:
 - modes/bug-fix.md
+- templates/specs.md
 - agents/verifier.md
 situation: Note.__init__ shares one default tags list between notes; the user is new and wants to understand the fix, so
   after fixing it, ask a question about the change the user can attempt before the full explanation.

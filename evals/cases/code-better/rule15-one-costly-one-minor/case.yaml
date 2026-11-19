@@ -1,7 +1,7 @@
 id: rule15-one-costly-one-minor
 rule: '1.5'
 source:
-- SKILL.md#3.2
+- SKILL.md#send-up
 reads: []
 situation: Adding the late fee leaves one costly gap, whether days the library is closed count as overdue days (money), and
   one minor gap, the wording of the fee line in the email; ask about the first with concrete amounts and state an assumption

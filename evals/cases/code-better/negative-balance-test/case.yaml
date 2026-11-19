@@ -1,10 +1,10 @@
 id: negative-balance-test
 rule: '5.1'
 source:
-- SKILL.md#7
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
+- templates/specs.md
 - agents/verifier.md
 situation: The existing unittest file lacks the new edge; add a unittest regression test that fails on code wrong only for
   that edge, run the affected tests after the fix, and report the result.

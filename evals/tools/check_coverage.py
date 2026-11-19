@@ -1,7 +1,8 @@
 """Compare a skill's rules and files with the sources its eval cases point to.
 
 Each case's `source` lists where its rule lives in the current skill: `SKILL.md#<section>` for a
-numbered rule heading of `skills/<skill>/SKILL.md` (or `SKILL.md#invocation`), or another file of the
+numbered rule heading of `skills/<skill>/SKILL.md`, the slug of an unnumbered `###` heading such as
+`SKILL.md#send-up`, `SKILL.md#invocation`, or another file of the
 skill folder, such as `modes/bug-fix.md`. Its `reads` lists the skill files the skill condition should
 read. The report lists the sections and files no case points to, and cases whose sources or reads do not
 exist. A case's `rule` names the section in the SKILL.md the case was written for, so it is not checked
@@ -21,11 +22,13 @@ import yaml
 from skill_evals import cases
 
 HEADING = re.compile(r"^(#{2,6})\s+([0-9]+(?:\.[0-9]+)*)(?:[.:)]?\s|$)")
+NAMED = re.compile(r"^###\s+([^0-9\s].*?)\s*$")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 
 
 def rule_ids(text: str) -> set[str]:
-    """Return the numbered rule ids in a SKILL.md, skipping code blocks; a section with subsections is not a rule."""
+    """Return the rule ids in a SKILL.md, skipping code blocks: numbered headings, where a section with subsections is
+    not a rule, and unnumbered `###` headings by their slug, such as `send-up`."""
     rules = {"invocation"}
     parent = fence = None
     for line in text.splitlines():
@@ -39,6 +42,9 @@ def rule_ids(text: str) -> set[str]:
             continue
         if line.startswith("## "):
             parent = None
+        if match := NAMED.match(line):
+            rules.add(re.sub(r"[^a-z0-9]+", "-", match[1].lower()).strip("-"))
+            continue
         if match := HEADING.match(line):
             level, rule = match.groups()
             if level == "##":

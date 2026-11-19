@@ -1,7 +1,7 @@
 id: currency-rounding
 rule: '1.1'
 source:
-- SKILL.md#1.1
+- SKILL.md#1
 reads: []
 situation: Invoice totals must match the charge to the cent; rounding each line to euros changes the 149+149-cent total. Show
   the difference, propose summing cents, and let the user decide.

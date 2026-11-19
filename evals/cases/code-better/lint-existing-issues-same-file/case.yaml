@@ -1,9 +1,10 @@
 id: lint-existing-issues-same-file
 rule: '5.1'
 source:
-- SKILL.md#7
+- modes/feature.md
 reads:
 - modes/feature.md
+- templates/specs.md
 - agents/verifier.md
 situation: '`ruff check .` already reports Optional[...] annotations in inventory.py (UP045), which CONTRIBUTING.md says are
   tracked separately; a change must not add new ones. Copying the file''s Optional style adds one; the change must work and

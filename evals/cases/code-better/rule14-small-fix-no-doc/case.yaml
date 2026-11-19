@@ -1,9 +1,10 @@
 id: rule14-small-fix-no-doc
 rule: '1.4'
 source:
-- SKILL.md#4
+- modes/bug-fix.md
 reads:
 - modes/bug-fix.md
+- templates/specs.md
 - agents/verifier.md
 situation: km_to_miles multiplies by KM_PER_MILE instead of dividing; a small fix with one obvious reading, so make it without
   writing a requirements document.

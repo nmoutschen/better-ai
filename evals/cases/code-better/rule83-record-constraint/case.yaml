@@ -1,9 +1,10 @@
 id: rule83-record-constraint
 rule: '8.3'
 source:
-- SKILL.md#1.3
+- SKILL.md#working-notes
 reads:
 - modes/feature.md
+- templates/specs.md
 - agents/verifier.md
 situation: A long session (the user says so) begins with a multi-step change and a new standing prohibition given in passing
   (never touch vendor/); write it to docs/requirements.md (or a notes file) when it is given, keep vendor/ unchanged, and

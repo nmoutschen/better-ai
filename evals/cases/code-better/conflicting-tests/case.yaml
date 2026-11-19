@@ -1,10 +1,11 @@
 id: conflicting-tests
 rule: '5.2'
 source:
-- SKILL.md#7
-- SKILL.md#3.3
+- modes/bug-fix.md
+- SKILL.md#send-up
 reads:
 - modes/bug-fix.md
+- templates/specs.md
 situation: The requested fix would break a check that passes (the two tests want different output for show(3)); show the conflict
   from the two assertions or by running them, leave price.py and the tests as they were, and ask which behaviour to keep.
 request: test_price.py is failing. Make it pass.

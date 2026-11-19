@@ -1,7 +1,7 @@
 id: missing-pick-count
 rule: '4.2'
 source:
-- SKILL.md#3.2
+- SKILL.md#send-up
 reads: []
 situation: A missing count affects physical inventory; ask whether to reject the batch or handle the row separately.
 request: Have today’s med cabinet import print a pick list from the CSV.

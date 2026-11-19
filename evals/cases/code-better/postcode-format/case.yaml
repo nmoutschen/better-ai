@@ -1,9 +1,10 @@
 id: postcode-format
 rule: '1.2'
 source:
-- SKILL.md#1.2
+- SKILL.md#1
 reads:
 - modes/bug-fix.md
+- templates/specs.md
 - agents/verifier.md
 situation: The published behavior is specified in the tree; read the implementation, caller, check and project instructions
   before editing.

@@ -1,9 +1,10 @@
 id: rule41-hard-1
 rule: '4.1'
 source:
-- SKILL.md#6
+- modes/bug-fix.md
 reads:
 - modes/bug-fix.md
+- templates/specs.md
 - templates/next-steps.md
 - agents/verifier.md
 situation: parse_duration overwrites the hours when it reads minutes; the same function has an outdated comment, an odd

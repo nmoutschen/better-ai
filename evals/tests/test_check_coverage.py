@@ -41,3 +41,9 @@ def test_dangling_rule_is_an_error(
     out = capsys.readouterr().out
     assert "Uncovered sources: SKILL.md#1.1, SKILL.md#2, SKILL.md#invocation" in out
     assert "Cases with unknown sources or reads: typo (SKILL.md#9), typo (modes/gone.md)" in out
+
+
+def test_rule_ids_include_named_headings() -> None:
+    """Numbered headings and unnumbered `###` headings, by slug, are rules."""
+    text = "## Instructions\n\n### 1. Understand\n\n## General rules\n\n### Send up\n\n### Working notes\n"
+    assert check_coverage.rule_ids(text) == {"invocation", "1", "send-up", "working-notes"}
