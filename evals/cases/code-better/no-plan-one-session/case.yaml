@@ -8,7 +8,13 @@ graders:
     it orders implementation tasks or tracks their completion, such as a list of steps with done or todo marks. Notes that
     only state requirements, scenarios or a summary of the change are not plans. PASS if no such file exists, including when
     no Markdown file was written.'
-- type: command_passes
-  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
-  files:
-    check.py: checks/command_passes/check.py
+# Built and working, or stopped before any code edit to ask: asking about open behaviour belongs to other rules.
+- type: any_of
+  graders:
+  - type: command_passes
+    cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+    files:
+      check.py: checks/command_passes/check.py
+  - type: notes_only
+validation:
+  do_nothing_fails_only_by_judge: true

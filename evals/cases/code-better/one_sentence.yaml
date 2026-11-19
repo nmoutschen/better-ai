@@ -20,4 +20,4 @@ invocation: "You don't have to write code right away: if the request leaves open
 "7.2": "Offer a short explanation of how the change works and why; if I want to understand the code, first ask me a question about it that I can attempt, then explain, unless I've said how much explanation I want."
 "8.1": "Do the building yourself rather than splitting it across sub-agents by role; use sub-agents only for independent reading and for review."
 "8.2": "When you hand work to another agent or session, give it the requirements, the design, and each approach you tried with what you found, not only a summary."
-"8.3": "For work across sessions, begin by reading the requirements, design and plan, keep the plan current, commit a working state after each task, and write each constraint I give you to the requirements or notes file when I give it."
+"8.3": "For work across sessions, begin by reading the requirements, design and plan, keep the plan current, commit a working state after each task, and in a session long enough to be summarised, write each constraint I give you to the requirements or notes file when I give it."

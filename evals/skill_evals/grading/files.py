@@ -126,13 +126,33 @@ async def file_unchanged(spec: dict[str, Any], repo: Checkout) -> bool:
     return spec["path"] in await repo.planted() and spec["path"] not in await repo.all_changed()
 
 
+FROM_IMPORT = re.compile(r"from\s+([\w.]+)\s+import\s+\(?([\w\s,]+?)\)?")
+
+
+def keeps_line(planted: str, line: str) -> bool:
+    """A line keeps a planted line if it is the same, or imports the same names and more from the same module."""
+    if planted == line:
+        return True
+    old, new = FROM_IMPORT.fullmatch(planted), FROM_IMPORT.fullmatch(line)
+    if not old or not new or old.group(1) != new.group(1):
+        return False
+    names = [{name.strip() for name in match.group(2).split(",") if name.strip()} for match in (old, new)]
+    return names[0] <= names[1]
+
+
 async def file_keeps(spec: dict[str, Any], repo: Checkout) -> bool:
-    """Every non-blank planted line is still there, in order, ignoring indentation; additions are allowed."""
+    """Every non-blank planted line is still there, in order, ignoring indentation; additions are allowed.
+
+    A planted `from module import a` line also counts as kept when it now imports more names, as adding a test
+    for another function needs.
+    """
     original, current = await repo.planted_text(spec["path"]), await repo.text(spec["path"])
     if original is None or current is None:
         return False
     remaining = iter(line.strip() for line in current.splitlines())
-    return all(line.strip() in remaining for line in original.splitlines() if line.strip())
+    return all(
+        any(keeps_line(line.strip(), now) for now in remaining) for line in original.splitlines() if line.strip()
+    )
 
 
 async def file_contains(spec: dict[str, Any], repo: Checkout) -> bool:

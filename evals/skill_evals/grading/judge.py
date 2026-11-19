@@ -98,7 +98,8 @@ async def record(state: TaskState, repo: Checkout, spec: dict[str, Any]) -> str:
         if MARKDOWN_NOTE.search(path):
             notes.append(f"--- {path}\n{clip(await repo.text(path) or '', NOTE_CHARS, 0)}")
     sections = [
-        ("Request", state.input_text),
+        # The case's own request, without the skill command or appended sentence, so the judge does not see the condition.
+        ("Request", (getattr(state, "metadata", None) or {}).get("request", state.input_text)),
         ("Transcript", render_transcript(state.messages)),
         ("Final reply", state.output.completion or "(empty)"),
         (

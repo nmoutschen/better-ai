@@ -156,6 +156,7 @@ def samples(
                         "condition": condition,
                         "rule": case["rule"],
                         "situation": case["situation"],
+                        "request": case["request"],
                         "graders": case["graders"],
                         **({"scripted_run": scripted_run(directory)} if scripted else {}),
                     },

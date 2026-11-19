@@ -96,14 +96,37 @@ weekly allowance; three runs per case used about 3%. Run two or three samples
 in parallel: ten parallel sessions hit rate-limit (429) errors with an earlier
 harness.
 
-## Results so far (Sonnet 5.5, 2026-11-19)
+## Results so far (Sonnet 5.5, 2026-11-19, development set)
+
+These are development-set results: the cases were written and repaired
+against these runs, and the 4.2 change was diagnosed and checked on the same
+cases. Confirm them on a held-out set before treating them as results.
 
 79 cases × 4 conditions × 3 runs (948 runs, 0 errors). Each case and condition
 uses its latest run with the current rubrics and skill: the no-skill and
 one-sentence runs of the first 53 cases date from 2026-11-18 (rule 7.1 re-run
 on 2026-11-19); everything else ran on 2026-11-19. Pass rate per case, compared
 case by case (each case's runs averaged first; bootstrap 95% interval;
-sign-flip permutation p-value, Holm-corrected):
+sign-flip permutation p-value, Holm-corrected). The table comes from
+
+```sh
+uv run python -m tools.report --latest logs/comparison-sonnet-x3/*.eval \
+  logs/comparison-sonnet-x3-short/*.eval logs/rule-7.1-new-rubric/*.eval \
+  logs/rule-7.1-side-claims/*.eval logs/gap-old-cases/*.eval \
+  logs/gap-new-cases/*.eval logs/gap-fix-81/*.eval logs/gap-fix-81b/*.eval \
+  logs/gap-fix-82/*.eval
+```
+
+These runs predate four fixes from a review, made without re-running: five
+cases (`no-plan-one-session`, `reuse-http-helper`, `shared-formatter`,
+`rule83-record-constraint`, `rule41-hard-2`) failed agents that stopped to ask
+before building or that made a correct minimal fix; `rule83-record-constraint`
+did not say the session was long, which rule 8.3 requires; the short skill used
+an earlier wording of the 8.2 sentence; and the judge saw the condition's
+prompt (`/code-better` or the appended sentence) instead of the plain request.
+An estimate that counts the 15 affected runs as passes moves skill −
+short-skill from +0.063 to about +0.02 (not checked run by run); the other
+comparisons keep their direction.
 
 | Comparison | Mean difference | 95% interval | p (Holm) |
 | --- | --- | --- | --- |
@@ -124,14 +147,22 @@ Readings:
   than the skill (not significant).
 - Rule 4.2 was the skill's weakest rule (6 of 12) because sections 1.3 and 1.5
   let the agent choose error handling and state it as an assumption. Section
-  4.2 now asks before building; the skill passes 12 of 12, with no rise in
-  needless questions on the invocation cases (12 of 12).
+  4.2 now asks before building; the skill passes 12 of 12. Across the 53 older
+  cases its passes rose from 129 to 145, and no case that expects building
+  without asking lost one. Few cases test needless asking (`help-label`,
+  `explicit-fallback` and the small fixes), and none has unstated error
+  handling that is cheap to get wrong.
 - The skill still trails on 1.5 (asking costly gaps at once: 50% against 67%
   for one sentence) and 3 (planning work that spans sessions: 60% against 93%).
   In the failing runs it assumed a costly gap instead of asking, and started a
   multi-week migration without writing a plan.
 - The short skill's 4.2 sentence makes it ask about every unstated failure,
-  even when the request already specifies the main ones.
+  even when the request already specifies the main ones. Section 4.2 reads the
+  same way literally: it does not limit the rule to failures whose handling
+  changes data, money or what the user is told, and 1.3 and 1.5 do not name it
+  as an exception.
+- Only the skill under test is installed, so its links to sibling skills (such
+  as `/ask-better` from 1.5) always take the fallback.
 - Rules 1.2, 6.1, 7.1 and 8.2 pass in nearly every condition, even with the
   harder cases: Sonnet already does what they test.
 - The 8.2 sentence first said "your raw notes on what you tried"; appended to a
@@ -147,8 +178,15 @@ read: cases that test reading the project's instructions plant them in
 
 ## Next steps
 
-1. Rules 1.5 and 3 in the skill: why the skill under-asks on costly gaps and
+1. Re-run the cases the review fixes changed, and the short skill, before
+   using these numbers as a baseline.
+2. Section 4.2: limit it to failures whose handling changes data, money or what
+   the user is told, name it as an exception in 1.3 and 1.5, and add a case with
+   unstated error handling that is cheap to get wrong, where stating an
+   assumption passes.
+3. Rules 1.5 and 3 in the skill: why the skill under-asks on costly gaps and
    under-plans multi-session work while its own sentences do not.
-2. A random batch of hand labels for an overall judge error rate (the first ten
+4. A random batch of hand labels for an overall judge error rate (the first ten
    were chosen where the judge disagreed with itself).
-3. Harder cases for 1.2, 6.1, 7.1 and 8.2, other models, and the held-out set.
+5. Harder cases for 1.2, 6.1, 7.1 and 8.2, a run with the whole plugin
+   installed, other models, and the held-out set.

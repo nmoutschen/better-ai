@@ -15,7 +15,7 @@ graders:
     check.py: checks/command_passes_1/check.py
 - type: command_passes
   cmd: python "$GRADE_FILES/keeps_except.py" bank_import.py 'AMOUNT = re.compile(r"-?\d+\.\d{2}")' 'cell = cell.strip()' 'if
-    not AMOUNT.fullmatch(cell):'
+    not AMOUNT.fullmatch(cell):' 'amount = Decimal(cell)'
   files:
     keeps_except.py: checks/command_passes_2/keeps_except.py
 - type: file_keeps

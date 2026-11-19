@@ -98,3 +98,11 @@ def test_condition_cost_lines() -> None:
     lines = report.condition_cost_lines(rows())
     assert lines[1].split()[:3] == ["no-skill", "1", "0.500"]
     assert lines[2].split()[:3] == ["skill", "1", "0.700"]
+
+
+def test_latest_keeps_the_newest_log_per_case_and_condition() -> None:
+    """A re-run replaces the earlier runs of the same case and condition and leaves the others."""
+    old = report.SampleResult("a-skill", "a", "skill", "1.1", 0, started="2026-01-01")
+    new = report.SampleResult("a-skill", "a", "skill", "1.1", 1, started="2026-01-02")
+    other = report.SampleResult("a-no-skill", "a", "no-skill", "1.1", 1, started="2026-01-01")
+    assert report.latest([old, new, other]) == [new, other]

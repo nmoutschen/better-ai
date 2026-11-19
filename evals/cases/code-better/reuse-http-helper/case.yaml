@@ -7,7 +7,13 @@ request: Show today's exchange rates on the dashboard as a “rates” widget, l
 graders:
 - type: file_unchanged
   path: requirements.txt
-- type: command_passes
-  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
-  files:
-    check.py: checks/command_passes/check.py
+# Built and working, or stopped before any code edit to ask: asking about open behaviour belongs to other rules.
+- type: any_of
+  graders:
+  - type: command_passes
+    cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+    files:
+      check.py: checks/command_passes/check.py
+  - type: notes_only
+validation:
+  do_nothing_fails_only_by_judge: true

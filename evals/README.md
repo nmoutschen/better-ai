@@ -95,7 +95,10 @@ hosts in `proxy-allow.txt` (only `api.anthropic.com`). Claude Code runs with
 
 Before the agent starts, the planted files are committed as the starting
 commit, owned by the non-root `agent` user, whose home is empty apart from the
-skill of the skill condition: no CLAUDE.md, memory or other skills. The agent runs
+skill of the skill condition: no CLAUDE.md, memory or skills of this repository.
+Claude Code's own bundled skills are still present, and only the skill under
+test is installed, so links to its sibling skills (such as `/ask-better`) take
+their fallback. The agent runs
 `claude -p "<prompt>" --output-format stream-json --verbose` in `/work` with
 `--permission-mode bypassPermissions` and WebSearch and WebFetch disallowed.
 
@@ -218,12 +221,16 @@ prints the agreement per rubric and overall.
 ## Report
 
 ```sh
-uv run python -m tools.report logs/<file>.eval [more.eval ...]
+uv run python -m tools.report logs/<dir>/*.eval [more.eval ...] [--latest]
 ```
 
-prints the pass rate of `all` per rule and condition, one line per sample with
+prints the pass rate of `all` per rule and condition, the paired comparisons
+between conditions, cost and time per condition, one line per sample with
 tokens (input, output, cache read, cache write), agent cost, judge cost and
-time, the totals, and any sample errors.
+time, the totals, and any sample errors. With `--latest`, each case and
+condition keeps only the runs of the most recently started log that has it, so
+a re-run after a fix replaces the runs it fixes; without it, every run of every
+log counts.
 
 ## Contributing
 

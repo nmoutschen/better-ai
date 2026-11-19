@@ -33,6 +33,19 @@ async def test_file_keeps(plant: Plant) -> None:
     assert not await files.file_keeps({"path": "a.py"}, repo)
 
 
+async def test_file_keeps_accepts_an_extended_import(plant: Plant) -> None:
+    """Importing more names from the same module keeps the planted import; dropping one or switching module does not."""
+    repo = await plant({"test_fees.py": TEST})
+    await repo.sandbox_env.write_file(
+        "test_fees.py", TEST.replace("from fees import rush", "from fees import late, rush")
+    )
+    assert await files.file_keeps({"path": "test_fees.py"}, repo)
+    await repo.sandbox_env.write_file("test_fees.py", TEST.replace("from fees import rush", "from fees import late"))
+    assert not await files.file_keeps({"path": "test_fees.py"}, repo)
+    await repo.sandbox_env.write_file("test_fees.py", TEST.replace("from fees import rush", "from other import rush"))
+    assert not await files.file_keeps({"path": "test_fees.py"}, repo)
+
+
 async def test_file_contains_and_not_contains(plant: Plant) -> None:
     """Both need the file; each passes on the matching outcome."""
     repo = await plant({"a.py": "TODO = 1\n"})

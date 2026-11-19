@@ -6,9 +6,10 @@ times (Inspect epochs), the comparisons first average its runs per condition, th
 case by case (a paired design): mean difference, a bootstrap 95% interval, and a sign-flip permutation
 p-value, with Holm's correction across the comparisons. Hand labels in `judge_labels/<skill>.yaml` (see
 that folder's README) give the human verdict for a judged grader of a sample; the report compares them
-with the judge's verdicts in the same logs.
+with the judge's verdicts in the same logs. With `--latest`, each case and condition keeps only the runs of
+the most recently started log that has it, so re-runs after a fix replace the runs they fix.
 
-    uv run python -m tools.report logs/<file>.eval [more.eval ...] [--labels judge_labels/code-better.yaml]
+    uv run python -m tools.report logs/<dir>/*.eval [...] [--latest] [--labels judge_labels/code-better.yaml]
 """
 
 import argparse
@@ -55,6 +56,7 @@ class SampleResult:
     judges: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     epoch: int = 1
+    started: str = ""
 
 
 def read_result(sample: EvalSample) -> SampleResult:
@@ -81,8 +83,24 @@ def read_result(sample: EvalSample) -> SampleResult:
 
 
 def read_results(paths: list[Path]) -> list[SampleResult]:
-    """Read every sample of every log."""
-    return [read_result(sample) for path in paths for sample in read_eval_log(str(path)).samples or []]
+    """Read every sample of every log, noting when its log started."""
+    results = []
+    for path in paths:
+        log = read_eval_log(str(path))
+        for sample in log.samples or []:
+            result = read_result(sample)
+            result.started = log.stats.started_at or ""
+            results.append(result)
+    return results
+
+
+def latest(results: list[SampleResult]) -> list[SampleResult]:
+    """Keep, for each case and condition, only the runs from the most recently started log that has it."""
+    newest: dict[tuple[str, str], str] = {}
+    for result in results:
+        key = (result.case, result.condition)
+        newest[key] = max(newest.get(key, ""), result.started)
+    return [result for result in results if result.started == newest[result.case, result.condition]]
 
 
 def rule_key(rule: str) -> tuple[int, list[int]]:
@@ -268,8 +286,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Pass rates per rule and condition, cost, time and judge agreement.")
     parser.add_argument("logs", nargs="+", type=Path)
     parser.add_argument("--labels", type=Path, help="hand labels, such as judge_labels/code-better.yaml")
+    parser.add_argument(
+        "--latest", action="store_true", help="keep each case and condition's runs from the newest log that has it"
+    )
     args = parser.parse_args(argv)
     results = read_results(args.logs)
+    if args.latest:
+        results = latest(results)
     sections = [
         ("Pass rate (all) per rule and condition", pass_table(results)),
         ("Comparisons between conditions (paired by case)", comparison_lines(results)),

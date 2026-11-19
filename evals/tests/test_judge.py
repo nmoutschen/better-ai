@@ -70,11 +70,16 @@ def test_parse_output() -> None:
 
 
 async def test_judge_record_and_verdict(plant: Plant, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The judge reads request, transcript, reply, diff and notes, and its verdict decides the grader."""
+    """The judge reads the plain request (not the condition's prompt), transcript, reply, diff and notes; its verdict decides."""
     repo = await plant({"f.py": "x = 1\n"})
     await repo.sandbox_env.write_file("f.py", "x = 2\n")
     await repo.sandbox_env.write_file("PLAN.md", "Step 1\n")
-    state = SimpleNamespace(input_text="Fix it", messages=messages(), output=ModelOutput.from_content("m", "Done."))
+    state = SimpleNamespace(
+        input_text="/code-better Fix it",
+        metadata={"request": "Fix it"},
+        messages=messages(),
+        output=ModelOutput.from_content("m", "Done."),
+    )
     seen: dict[str, Any] = {}
 
     async def fake_cli(sandbox_env: Any, user: str, args: list[str], **options: Any) -> tuple[str, str, bool]:
@@ -87,6 +92,7 @@ async def test_judge_record_and_verdict(plant: Plant, monkeypatch: pytest.Monkey
     prompt = seen["stdin"]
     for part in ("Pass if good.", "## Request\nFix it", "## Final reply\nDone.", "+x = 2", "--- PLAN.md\nStep 1"):
         assert part in prompt
+    assert "/code-better" not in prompt
     assert "--tools" in seen["args"] and seen["args"][seen["args"].index("--tools") + 1] == ""
 
 
