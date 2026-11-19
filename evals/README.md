@@ -32,15 +32,18 @@ Install the pinned packages from `evals/` with `uv sync --python 3.12` and
 start Docker. Run from `evals/`:
 
 ```sh
-uv run inspect eval eval.py -T skill=code-better -T condition=skill --max-samples 2
+uv run inspect eval eval.py -T skill=code-better --epochs 3 --max-samples 3 --no-fail-on-error
 ```
+
+This runs the default conditions, no-skill, skill and short-skill, three times
+per case.
 
 Task options (`-T name=value`):
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `skill` | required | Skill folder name, such as `code-better`. |
-| `condition` | `no-skill` | `no-skill`, `skill`, `one-sentence`, `short-skill`, or a list such as `no-skill,skill`. |
+| `condition` | `no-skill,skill,short-skill` | `no-skill`, `skill`, `one-sentence`, `short-skill`, or a list such as `no-skill,skill`. |
 | `rule`, `cases` | all | Only one rule (`-T 'rule="1.5"'`) or some case ids (`-T cases=help-label,meter-zero`). |
 | `agent` | `claude_code` | `fake` plays each case's first good replay instead; no model calls. |
 | `model` | `sonnet` | Claude Code `--model` for the agent. |
@@ -59,7 +62,10 @@ Conditions:
   `~/.claude/skills/<skill>/` and sends `/<skill> <request>`.
 - **one-sentence** appends the one-sentence instruction for the case's rule
   from `cases/<skill>/one_sentence.yaml`. Rules without a sentence there are
-  not run in this condition.
+  not run in this condition. It tells the agent which rule the case tests, so
+  it is not run by default: use it on the rules where the skill trails the
+  short skill, to tell whether the rule's wording or the rest of the skill is
+  at fault.
 - **short-skill** installs a skill with the same name and frontmatter whose
   body is every sentence of `one_sentence.yaml`, and sends `/<skill> <request>`
   like **skill**. It separates the skill's length from its content.
@@ -69,7 +75,7 @@ Sample ids are `<case-id>-<condition>`, such as `help-label-no-skill`.
 ### Plumbing run without a model
 
 ```sh
-uv run inspect eval eval.py -T skill=code-better -T condition=no-skill,skill,one-sentence,short-skill -T agent=fake --max-samples 8
+uv run inspect eval eval.py -T skill=code-better -T agent=fake --max-samples 8
 ```
 
 The fake agent carries out each case's `replays/good-*.yaml` actions in the

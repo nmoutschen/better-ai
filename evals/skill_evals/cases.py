@@ -27,6 +27,8 @@ ONE_SENTENCE = "one-sentence"
 SHORT_SKILL = "short-skill"
 CONDITIONS = (NO_SKILL, WITH_SKILL, ONE_SENTENCE, SHORT_SKILL)
 SKILL_CONDITIONS = (WITH_SKILL, SHORT_SKILL)
+# one-sentence names the tested rule, so it is a per-rule diagnostic rather than a default comparison.
+DEFAULT_CONDITIONS = f"{NO_SKILL},{WITH_SKILL},{SHORT_SKILL}"
 SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 

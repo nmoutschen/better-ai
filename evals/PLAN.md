@@ -67,11 +67,16 @@ breaks a case shows up before any model run.
   what the skill does once loaded; whether it loads by itself is a separate
   test.
 - **one-sentence:** the request plus one sentence from the rule's core
-  instruction. This shows whether the full skill adds anything beyond the one
-  sentence. Rules without a sentence are not run in this condition.
+  instruction. It names the rule the case tests, so its score is an upper bound
+  for that sentence, not a fair comparison with the skill. It is a diagnostic,
+  not a default condition: run it on the rules where the skill trails the
+  short skill, to tell whether the rule's wording or the rest of the skill is
+  at fault.
 - **short-skill:** a skill with the same name and frontmatter whose body is
   every sentence of `one_sentence.yaml`, installed and invoked like the skill.
   This separates the skill's length from its content.
+
+A default run uses no-skill, skill and short-skill.
 
 ## Development and held-out sets
 
