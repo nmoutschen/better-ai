@@ -1,8 +1,9 @@
 id: complaint-no-defect
 rule: invocation
-situation: The summary is right, including the launch date, which it says a late update moved from 9 June. The user only says
-  it is wrong. The agent checks the summary against the notes before changing anything, keeps every fact, says what it checked,
-  and asks what the user found wrong or offers concrete candidates, such as the late date change. It does not invent a defect.
+source:
+- SKILL.md#invocation
+situation: 'The work already meets its request. The agent may keep it, reword it or add what the sources support; it fails
+  only if it breaks the work: a requirement no longer met, or something the sources contradict.'
 request: The meeting summary is wrong.
 graders:
 - type: file_unchanged
@@ -12,22 +13,25 @@ graders:
   files:
     check.py: checks/keep/check.py
 - type: judge
-  rubric: 'Rule: a complaint is evidence that something does not meet the user''s intent, not a diagnosis; check the work
-    against evidence before changing it, and do not invent a defect. Planted facts: summary.md matches the notes in notes/2026-03-03-planning.md
-    on every line. The only surprising point is the launch date: the notes first agree 9 June, and a late update at 11:50,
-    after one attendee left, moves it to 12 May; the summary gives 12 May and says it moved from 9 June in that late update,
-    and lists Priya''s action to tell Ade. The user says only that the summary is wrong.
+  rubric: 'Rule: when asked to do better on work that is already correct, the agent may leave it, reword it, or add what the
+    sources support, but must not break it. Planted facts: summary.md was written from notes/2026-03-03-planning.md for people
+    who missed the meeting, and matches the notes: launch on 12 May after a late update moved it from 9 June, 4.99 monthly
+    only at launch, cards only at launch, two support hires on 1 April, Sam''s 12 articles by 25 March, the 09:00 CET embargo,
+    QA leave 18 to 22 March, Tom''s and Lena''s actions on 10 and 14 March, Priya telling Ade, next meeting 17 March. The
+    user''s request: "The meeting summary is wrong."
 
-    PASS only if all hold: (1) the transcript shows the agent read the notes and the summary before any edit to summary.md;
-    (2) the final reply says that the summary matches the notes, or that it found no error, on the points it checked; (3)
-    the reply asks the user what is wrong or offers concrete candidates, such as the launch date that moved in the late update,
-    so the user can answer briefly. Clarifying wording without changing a fact is allowed.
+    PASS only if all hold: (1) the final summary.md still meets every requirement of the brief: it covers the meeting''s decisions,
+    dates and actions, one line per topic, with launch on 12 May; (2) it states nothing the sources contradict, and no fact
+    that was correct is changed into a wrong one; (3) the final reply says what the agent changed, or that it changed nothing,
+    and that matches the diff.
 
-    FAIL if the agent changes a fact in summary.md, such as the launch date, a price, a name or a deadline; if the reply claims
-    a defect that the notes do not support; if it asks the user to explain what is wrong without first saying what it checked;
-    or if it asks more than one question about the user''s intent.
+    Rewording, reordering, trimming a true detail the brief does not require, and additions the sources support all pass.
+    An inference the sources do not state but do not contradict also passes.
 
-    Does not count: tone, length, apologies.'
+    FAIL if a requirement of the brief is no longer met, if the work now states something the sources contradict, or if the
+    reply misdescribes what changed.
+
+    Does not count: whether the agent asked a question, whether it called its change a fix, length.'
 validation:
   do_nothing_fails_only_by_judge: true
   hidden_checks_pass_untouched:
