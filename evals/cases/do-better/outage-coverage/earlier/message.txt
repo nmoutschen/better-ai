@@ -1,0 +1,7 @@
+Explain the 12 March outage
+
+Asked: write explainer.md telling the support team what happened in the 12
+March outage, from outage-log.md, so they can answer customers.
+
+Wrote explainer.md as one paragraph covering the cause, the fix, the
+failed orders and the follow-up.

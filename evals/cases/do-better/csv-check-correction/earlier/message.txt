@@ -1,0 +1,5 @@
+Trim member names in the CSV export
+
+Asked: trim spaces around member names in the CSV export.
+
+to_csv now strips each name. Added test_trims_names; both tests pass.

@@ -1,0 +1,6 @@
+Draft the March invoice for Hollow Farm
+
+Asked: draft invoice.md for Hollow Farm from timesheet.csv, at 40 EUR an
+hour, no travel charge.
+
+Wrote invoice.md: survey 6 h, pruning plan 2.5 h, travel 0. Total 430 EUR.

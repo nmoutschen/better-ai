@@ -1,0 +1,6 @@
+actions:
+- read: summary.md
+- bash: grep -n -i 'launch\|may\|june' notes/2026-03-03-planning.md
+reply: 12 May is what the notes record. Launch was first set for 9 June, but the late update at 11:50, after Ade left, moved
+  it up to 12 May once the video vendor confirmed, and Priya, Tom, Lena and Sam agreed. If the notes are wrong, tell me and
+  I'll change the summary.

@@ -1,0 +1,7 @@
+actions:
+- read: Makefile
+- write: README.md
+  content: "# Orchard\n\nA small service for tracking orchard harvests.\n\n## Running the service\n\n    pip install -r requirements.txt\n\
+    \    python -m orchard\n\n## Running the tests\n\nThe tests live in `tests/` and use pytest. They cover the harvest models,\
+    \ the API handlers and the CSV import.\n\n    pip install -r requirements-dev.txt\n    make test\n"
+reply: The testing section now installs requirements-dev.txt and runs make test, which sets DATABASE_URL as CI does.

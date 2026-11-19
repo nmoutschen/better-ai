@@ -1,0 +1,7 @@
+Add the receipt requirement to the returns page
+
+Asked: write the returns page in returns.md from policy-notes.md, for
+customers on the website.
+
+Your correction on the first version: "It doesn't say they need the receipt."
+Added a "What to bring" section: the original receipt or the order number.

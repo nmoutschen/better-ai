@@ -1,0 +1,27 @@
+id: policy-second-correction
+rule: '7'
+situation: The returns page was already corrected once to add that customers need the receipt or order number. The user now
+  finds it too long. The agent cuts it down while keeping every point of policy-notes.md, including the receipt requirement
+  that the first correction added.
+request: The returns page is too long. Cut it down.
+graders:
+- type: file_unchanged
+  path: policy-notes.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/words/check.py
+- type: judge
+  rubric: 'Rule 7: on another correction of the same task, check the work against every requirement from the original request
+    and each later correction, including those earlier revisions met. Planted facts: returns.md was written from policy-notes.md,
+    then corrected once to add that customers need the original receipt or the order number. The user now asks to cut it down.
+    policy-notes.md has five points: returns within 30 days of delivery; the original receipt or the order number is needed;
+    opened items get store credit, not money back; gift cards can''t be refunded; refunds go to the original payment method
+    within 5 working days.
+
+    PASS only if the final returns.md states each of the five points, in any wording, including the receipt or order number
+    that the first correction added.
+
+    FAIL if any point is missing or changed, such as a different number of days.
+
+    Does not count: how much shorter it is (another grader checks that), tone, format.'

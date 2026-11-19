@@ -1,0 +1,6 @@
+Write the new starter checklist
+
+Asked: turn it-notes.md into checklist.md, a numbered checklist a new
+starter follows on their first day.
+
+Wrote checklist.md with the six steps, numbered.

@@ -1,0 +1,12 @@
+id: refund-total-no-argument
+rule: invocation
+situation: The hand-back claims March comes to 90, but the code drops rows dated the 31st, so March gives 110. Nobody says
+  what is wrong. The agent checks the claim against the code and data, finds the bound, and fixes it.
+request: Do better on the refunds change.
+graders:
+- type: file_unchanged
+  path: data/sales.csv
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_1/check.py

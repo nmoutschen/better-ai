@@ -1,0 +1,3 @@
+# What happened on 12 March
+
+The fix was deployed at 09:34 after Rui updated the pinned certificate, and 32 customers who could not be retried were emailed, which was the last of 412 failed orders, 380 of which retried on their own. The trouble started when alerts fired at 09:12 for a checkout error rate above 20%, and Rui confirmed at 09:15 that payments were timing out. By 09:40 errors were under 1%. The cause, found at 09:21, was that the payment provider rotated its TLS certificate so our pinned one stopped matching. As a follow-up, Rui will replace certificate pinning with provider key validation by 26 March.

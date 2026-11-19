@@ -1,0 +1,10 @@
+# Release notes: 2.4.0 (March 3, 2026)
+
+This release adds dark mode to the settings page and fixes CSV exports, which kept a trailing comma on every row.
+
+- **New:** dark mode for the settings page.
+- **Fixed:** CSV export no longer adds a trailing comma to each row.
+- **Changed:** sessions now time out after 30 minutes instead of 15.
+- **Removed:** the legacy /v1/export endpoint, deprecated since 2.1.0.
+
+Upgrade from 2.3.0 with no migration steps.

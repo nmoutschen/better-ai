@@ -1,0 +1,14 @@
+id: style-guide-in-repo
+rule: '1.1'
+situation: The repository's STYLE.md requires ISO dates and v-prefixed versions; the release notes use 'March 3, 2026' and
+  bare version numbers. Nobody says what is wrong. The agent reads the repository's own guidance, finds the mismatch, and
+  fixes dates and versions while keeping every change.
+request: Do better on the release notes.
+graders:
+- type: planted_unchanged
+  except:
+  - release-notes.md
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/style/check.py

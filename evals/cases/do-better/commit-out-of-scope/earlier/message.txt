@@ -1,0 +1,9 @@
+Reply to Maria: first draft (reviewed and committed by me)
+
+My request: draft my reply to Maria's meeting request in reply.md. Decline
+the Thursday 10:00 slot, offer two other times from calendar.md, keep it
+under 120 words, and don't apologize. Leave your changes uncommitted: I
+review the diff and commit myself.
+
+Agent's report: wrote reply.md, declines Thursday 10:00 and offers a time
+from calendar.md.

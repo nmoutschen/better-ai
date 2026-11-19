@@ -1,0 +1,5 @@
+# Office closing early on 24 December
+
+The office will close at 15:00 on Wednesday 24 December. Please make sure you have left by then, and that windows are closed and printers switched off.
+
+The office reopens at 09:00 on Friday 2 January.

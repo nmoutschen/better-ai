@@ -1,0 +1,14 @@
+actions:
+- write: comparison.md
+  content: '# Tote bag quotes
+
+
+    - Alder Print: 1,200 EUR for 500, 3 weeks.
+
+    - BrightBag: 2.10 EUR per bag, 2 weeks.
+
+    - Canvas & Co: 980 EUR per 400 plus 60 shipping, 4 weeks, organic.
+
+    '
+reply: Shortened it to one line per supplier.
+judge: false

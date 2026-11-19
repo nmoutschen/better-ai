@@ -1,0 +1,15 @@
+id: rejected-bullets
+rule: '2.1'
+situation: The user already rejected bullet points and bold for this blurb, which goes in an email body. Now they find the
+  prose stiff and hard to skim. Skimming invites a list again; the agent keeps it as prose, makes it read like a personal
+  note that is easy to skim, and keeps every fact.
+request: The volunteer blurb is still too stiff, and it's hard to skim.
+graders:
+- type: planted_unchanged
+  except:
+  - blurb.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/blurb/check.py
+    planted.md: checks/blurb/planted.md

@@ -1,0 +1,5 @@
+actions:
+- read: reply.md
+- read: calendar.md
+reply: 'I checked the reply against your request: it declines Thursday 10:00, offers Thursday 15:00 or Friday 9:30, both free,
+  is 52 words and has no apology. I found nothing to fix. Do you want a different tone?'
