@@ -126,3 +126,26 @@ WHEN a skill serves a page where the user writes to the agent, such as design-be
 - The pages SHARE one stylesheet, `page.css`, for the bar, the side column, the conversation, the buttons and the toast. They SHARE the conversation's code too: `page.py` for the log, the server's conversation endpoints and the agent's subcommands, and `page.js` for the conversation on the page; `tests/` tests both. EACH skill carries identical copies of the files it uses, and the Scripts workflow fails if they differ: change one in one skill, then copy it to the others. A page's own files add only what that page alone shows, such as its pins, through the hooks the shared files offer.
 
 The skill TELLS the agent the same rules for its side, in the same words: reply in the page, in one or two short sentences; mark `working` only what it is changing now; and once an answer leads to a change, mark the item done and ask the next question as a new message.
+
+### 6.8. Give modes and agents one frontmatter
+
+WHEN a skill has kinds of work that need different rules, PUT each in `modes/<name>.md`. WHEN a skill starts other agents, PUT each agent's prompt in `agents/<name>.md`, not in `templates/`. `templates/` holds only documents the agent writes.
+
+START every mode and agent file with this frontmatter, and no other fields:
+
+```yaml
+---
+name: <the file name without .md>
+description: <one sentence: when to use this mode, or what this agent does and who starts it>
+---
+```
+
+An agent file ADDS:
+
+```yaml
+capabilities: [<what it needs, from: read files, run commands, write files, commit, search the web, sub-agents, message the starting agent>]
+edits: <true | false — whether it may change the work it is given>
+model: <cheaper | same | most capable — relative to the agent that starts it>
+```
+
+AFTER the frontmatter, an agent file HAS these sections, in this order: `## Input`, the named fields the starting agent fills in, each required; `## Messages`, what it tells the starting agent while it works, in plain words, or "None"; `## Output`, what its one hand-back must contain. The input is strict, because the agent sees nothing else. Messages and output are plain language, because how agents talk depends on the harness: the starting agent's skill or mode SAYS how it acts on each kind of message and each outcome.

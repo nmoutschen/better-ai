@@ -1,189 +1,131 @@
 ---
 name: code-better
-description: Helps an AI agent write, check and review code so that it builds what the user needs, keeps the change small and correct, and leaves the user able to understand and maintain the result.
+description: Helps an AI agent build, check and review code against a design or a request, so that it builds what the user needs, keeps the change small and correct, proves each requirement with a check, and leaves the user able to trust and maintain the result without reading every line.
 argument-hint: "[TASK]"
 ---
 
 # Code Better
 
 IF invoked with a task as argument, USE these instructions to do that task.
-IF invoked without argument, USE these instructions on the coding work in the current conversation: CHECK the work done so far against sections 1, 5 and 6, THEN continue or correct it.
-IF the code to check is someone else's, such as a diff or a pull request, USE section 6.
+IF invoked without argument, USE these instructions on the coding work in the current conversation: CHECK the work done so far against sections 1, 4 and 5, THEN continue or correct it.
+IF the code to check is someone else's, such as a diff or a pull request, REVIEW it as [agents/verifier.md](agents/verifier.md) says, and REPORT the findings to the user.
 
-Being invoked does NOT mean you must write code now. These instructions can end with requirements and questions for the user, or with a report that the request works against the user's GOAL.
+Being invoked does NOT mean you must write code now. These instructions can end with questions for the user, with a conflict sent up, or with a report that the request works against the user's GOAL.
+
+This skill names capabilities, not tools: reading files, running commands and tests, asking the user, writing files, committing, and sub-agents. IF you lack a capability a step needs, SAY which step you cannot do, WHY, such as a call the user denied or a tool the harness does not have, and what that leaves unchecked. DO NOT present that step as done.
 
 ## Principles
 
-1. Agents most often miss what the user wanted by filling a gap in the request with a plausible assumption and not saying so. Stating every requirement does not prevent it.
-2. Passing tests does not show the result is what the user needs. Maintainers would reject many patches that pass their tests.
-3. People judge whether a result is right more accurately from concrete scenarios, examples and tests than from prose or from the code itself.
-4. Requirements, design and plan are different artifacts. Requirements align on intent and the user checks them. A design aligns on shared understanding and structure. A plan orders the work. They change each other: design work reveals missing requirements.
-5. Repair loops gain most in the first few rounds. Test results help more than compiler errors, and a weak critique can hurt more than a bare failure. Extra rounds can break code that was already correct, and repeated failure feedback leads agents to game tests.
-6. Self-review without outside evidence finds few errors. LLM judgements of whether code meets its requirements are unreliable.
-7. Developers who let AI write code they do not engage with understand it less. Asking for explanations or conceptual answers preserved understanding.
-8. The stopping rules for repair loops (section 5.2), the checks at checkpoints of long runs (section 8.3), showing the design before building (section 2), and asking about error handling the requirements leave open (section 4.2) are design choices.
+1. Agents most often miss what the user wanted by filling a gap with a plausible assumption and not saying so. Stating every requirement does not prevent it.
+2. Passing tests does not show the result is what the user needs, and agents make checks pass by changing the checks or special-casing their inputs.
+3. People judge whether a result is right more accurately from concrete inputs, outcomes and checks than from prose or from the code itself.
+4. Agents follow fewer requirements as more arrive at once. Only a check per requirement shows which ones the result meets.
+5. Self-review without outside evidence finds few errors.
+6. Sending decisions and conflicts up, asking about error handling the spec leaves open, the copy of the checks, the repair-loop limits, and the checks at checkpoints of long work are design choices.
 
-This skill names capabilities, not tools: reading files, running commands and tests, asking the user, writing files, and sub-agents. FOR each capability you lack, FOLLOW the fallback the section gives.
+## Terms
 
-## 1. Requirements: build the right thing
+- A *requirement* is one statement of what the result MUST or MUST NOT do. The *spec* is the list of requirements for a change.
+- A *saved spec* is a `specs.md` versioned in the repo, not one in `.code/`.
+- The *design* is what people read and debate. Its *recorded decisions* are the choices it keeps for the future, with the options they rejected.
+- A *coordinator* holds the design for a large change, has other agents build and verify it, and decides their proposals inside the design ([modes/coordinate.md](modes/coordinate.md)). In a small change, the user is the coordinator.
+- To *send up* is to ASK the user. IF a coordinator runs the change, it is to TELL the coordinator, which decides what stays inside the design, may revise saved requirements not linked to a recorded decision, and sends the rest to the user.
 
-### 1.1. Name the GOAL and the need
+## 1. Send up what is not yours to decide
 
-NAME the user's GOAL: what they must be able to do, decide, or understand once the code works. DISTINGUISH it from the requested change.
+USE `/ask-better` to send something up if available.
 
-IF the request states a solution, such as "add a cache" or "use a queue", NAME the need behind it. CHECK whether the solution serves that need. Agents follow a flawed proposed solution far more often than they serve the intended need. IF the solution works against the GOAL, SAY so once, with the evidence and one alternative, THEN FOLLOW the user's decision.
+### 1.1. Decisions
 
-### 1.2. Read before deciding anything
+IF what you would build contradicts a recorded decision, such as storing data somewhere other than the design chose, LOOK first for a way to build it within the decision. IF there is none, SEND it up, with the approaches compared: keep the decision and what that costs, change it, or another approach, each with its main drawback. KEEP building the parts it does not affect.
 
-READ the code the change touches, its callers and tests, the project's instruction and contribution files, and earlier conversation. Agents rarely look up a repository's rules unless reminded. DO NOT ask the user what these sources answer.
+IF you find a decision worth recording, one that changes behaviour, cost, risk or how the code must be maintained, such as a new dependency or a schema change, SEND it up before building, with your recommendation, its main reason and its main drawback. USE `/decide-better` for both if available. IF the user does not read code, DESCRIBE each option by what they would observe or pay.
 
-### 1.3. Sort each gap: requirement or design
+### 1.2. Gaps
 
-LIST what the result depends on and is not stated. FOR each gap, DECIDE whether it is:
+LIST what the result depends on and the request or design does not state. DECIDE the gaps only a person reading the code would notice, such as module structure, yourself. TREAT a constraint the user set, such as "add no dependency", as a requirement.
 
-1. **A requirement gap**: behaviour the user can observe without reading the code, such as inputs, outputs, formats, errors, limits, permissions, or what happens to existing data.
-2. **A design gap**: something only a person reading or changing the code would notice, such as module structure, internal names, or algorithms.
+FOR a gap the user can observe that is costly to get wrong, such as one that decides what is stored, what someone is charged or paid, or what users are told, including how an invalid input or a failure is handled, SEND it up before you write checks or code. PUT all such questions in one message, with concrete inputs and the outcome of each option, such as the whole import rejected or the bad row held back. DO NOT ask the user to review the spec or the code instead. ADD each answer to the spec; your own proposals are not answers.
 
-IF the user's request fixes part of the design, such as "use Postgres" or "add no dependency", TREAT it as a requirement: the user owns it.
+FOR every other gap, CHOOSE the most plausible option, PROCEED, and STATE it as an assumption in the hand-back.
 
-DECIDE design gaps yourself from the codebase (section 2). CHECK requirement gaps with the user (section 1.5) or state them as assumptions.
+### 1.3. Conflicts and changes to requirements
 
-### 1.4. Write the requirements as scenarios
+IF a test contradicts a requirement and your mode does not allow changing that test, IF two requirements conflict, or IF a requirement cannot or should not hold as written, SEND it up with the change you propose and what the user would see differently. DO NOT change the requirement or build to your own version until it is agreed. KEEP building the parts it does not affect.
 
-IF the change is more than a small fix with one obvious reading, THEN WRITE the requirements with [templates/requirements.md](templates/requirements.md): the need, what changes for the user, scenarios with concrete inputs and expected results, constraints, what is out of scope, and assumptions.
+WHEN a requirement changes, REVISE it in place: the spec states only what holds now, never one requirement and another that contradicts or amends it.
 
-WRITE each scenario in a structured form, such as Given/When/Then (Gherkin) or EARS ("When <trigger>, the <system> shall <response>"), with concrete data. WRITE it so the user can check it without reading code. INCLUDE the error and edge cases that the request leaves open, because that is where silent assumptions hide. KEEP the requirements short: a scenario earns its place only if a wrong guess on it would change what you build.
+## 2. Start
 
-IF you cannot write files, PUT the requirements in your reply.
+### 2.1. Name the GOAL
 
-### 1.5. Check the requirements with the user
+NAME the user's GOAL: what they must be able to do, decide, or understand once the code works. IF the request states a solution, such as "add a cache", CHECK that it serves the need behind it; IF it works against the GOAL, SAY so once, with one alternative, THEN FOLLOW the user's decision.
 
-USE `/ask-better` if available, THEN CONTINUE with section 2 once the user answers. OTHERWISE, ASK only about requirement gaps that only the user can answer, that change what you build, and that are costly to get wrong. ASK all such questions at once, before building.
+### 2.2. Read the repo
 
-SHOW the scenarios the gap affects, with concrete inputs and outputs, and ASK the user to confirm or correct each one. DO NOT ask the user to review prose requirements or code instead.
+BEFORE you list gaps or decide anything, READ the code the change touches, its callers and tests, the project's instruction and contribution files, any spec tool's files, the design, and earlier conversation. DO NOT ask the user what these answer. WHEN they disagree, FOLLOW the user's instructions, then the repo's own files, then the existing code's patterns, then `.code/conventions.md`, then this skill's defaults.
 
-FOR every other gap, CHOOSE the most plausible option, PROCEED, and STATE the assumption next to the result it affects.
+### 2.3. Keep your working state
 
-KEEP the requirements as the reference for the whole task. ADD each later answer or correction to them. DO NOT treat your own proposals as requirements the user accepted.
+KEEP your working state as Markdown in `.code/<change>/`, ignored through `.git/info/exclude`. KEEP `.code/conventions.md` as a short list of facts you found about the repo, each with its source; UPDATE an entry the repo contradicts. IN a session the harness may compact, WRITE each constraint the user gives to `.code/<change>/notes.md`, and RE-READ it after each compaction.
 
-## 2. Design: shared understanding and structure
+### 2.4. Pick the mode
 
-IF the change adds or changes structure, such as a new module, data model, interface, dependency, or migration, THEN WRITE a design with [templates/design.md](templates/design.md). SHOW only the C4 levels the change touches and the main flows it adds or changes. OTHERWISE, KEEP the design to a few lines in your report.
+PICK one mode, and READ its file: [feature](modes/feature.md), [bug fix](modes/bug-fix.md), [refactor](modes/refactor.md) (behaviour stays the same, such as a migration), [tests](modes/tests.md), or [coordinate](modes/coordinate.md) WHEN the work splits into more than one task that each needs its own review, such as an epic of several tickets. LIST work of another kind as a proposed next step.
 
-FOLLOW the existing patterns, conventions and dependencies of the codebase. IF you must depart from them, SAY why.
+### 2.5. Write the spec and what the work needs
 
-NAME the design decisions that change behaviour, cost, risk, or how the code must be maintained, such as a new dependency, a schema change, or a trade-off between speed and simplicity. IF the user is a developer who will maintain the code, SHOW them these decisions before building: FOLLOW `/decide-better` if available, OTHERWISE GIVE for each your recommendation, its main reason and its main drawback. OTHERWISE, REPORT them with the result.
+WHEN you write one of these, READ its template first. IF the repo uses a spec tool, such as OpenSpec, Spec Kit or Kiro, USE its files instead, and WRITE none of your own beside them.
 
-IF design work reveals a requirement gap, such as what happens when a step fails halfway, RETURN to section 1.3 for that gap. DO NOT decide it silently in the design.
+| Write | When | Template |
+|---|---|---|
+| The spec | the change is more than a small fix with one obvious reading. FOR a small fix, REVISE the committed spec in place instead, IF one covers the code | [templates/specs.md](templates/specs.md) |
+| A design | there is none and the change adds structure, such as a module, data model, dependency or migration | [templates/design.md](templates/design.md) |
+| A task list | the work spans several sessions, people or agents | [templates/tasks.md](templates/tasks.md) |
+| Proposed next steps | at hand-back | [templates/next-steps.md](templates/next-steps.md) |
 
-## 3. Plan: only for long or shared work
+## 3. Write the code
 
-IF the work spans several sessions, several agents, or more steps than fit in one context, THEN WRITE a plan with [templates/plan.md](templates/plan.md). A plan records progress. It does not replace the requirements or the design.
+BEFORE you write code, PROTECT the checks by section 5. FOLLOW the codebase's existing patterns; SAY why where you depart from them. CHANGE only what the change needs: DO NOT add features, options, refactors or defensive code the spec does not ask for, and LIST anything else worth changing as a proposed next step. BEFORE finishing, REMOVE edits left over from approaches you abandoned.
 
-KEEP one task per step, each with a check that shows it is done. MARK a task done only after its check passes.
+DO the building yourself. USE sub-agents only for independent reading, such as searching a large codebase, and for review. DO NOT split building across agents by role.
 
-## 4. Write the code
-
-### 4.1. Change only what the task needs
-
-PRESERVE existing code that the task does not require you to change, since agents edit more than the task needs and a plain instruction to preserve existing code reduced over-editing. DO NOT add features, options, refactors, or defensive code the requirements do not ask for. IF you see something else worth changing, LIST it in your report instead of changing it.
-
-KEEP each change to one purpose. Maintainers ask for small, focused changes, and large mixed changes are rejected more often.
-
-BEFORE finishing, REMOVE edits left over from approaches you tried and abandoned.
-
-### 4.2. Decide error handling on purpose
-
-HANDLE invalid input and failures as the requirements' scenarios say, such as a malformed row, a missing value, or a call that fails halfway.
-
-IF they do not say, DO NOT choose the behaviour yourself and state it as an assumption. ASK the user before building, as a costly requirement gap (section 1.5): SHOW what they would observe under each option for the input in question, such as the whole import rejected or the bad row held back. The user lives with the data or money a wrong choice affects, and differences in input validation and error handling explained why agent code was harder to build on.
-
-## 5. Verify
-
-### 5.1. Choose checks that test the requirements
+## 4. Verify
 
 RUN, in this order:
 
-1. The existing tests that the change affects. FIND them from the code you changed, not by running a generic test-first procedure.
-2. A check for each scenario in the requirements. EACH check COMPARES the result with the scenario's expected outcome, such as an assertion on the exact value. A check that only runs the code, or only shows that it does not crash, does not check the scenario. IF the project would keep the test, THEN ADD it next to the existing tests, in their style. OTHERWISE, RUN a command or the program and record the result. DO NOT add test helpers, fixtures or frameworks the project does not already use.
+1. The existing tests the change affects.
+2. One check per requirement that compares the result with the expected value; a check that only runs the code does not count. ADD it next to the existing tests, in their style, IF the project would keep it; OTHERWISE, RUN a command and RECORD the result. DO NOT add test helpers or frameworks the project does not use.
 3. A smoke check that the program starts and its main path works.
-4. Static analysis, type checks and security checks that the project already uses.
+4. The static, type and security checks the project already uses.
 
-PREFER narrow checks tied to the requirements over broad generic end-to-end suites, which often reject working code.
+PREFER narrow checks tied to the spec over broad end-to-end suites. IF you cannot run code, HAND back with the change marked **not finished: not verified**, WHY you could not run it, and the checks still to run. DO NOT call it done, and DO NOT describe results you did not observe.
 
-IF you cannot run code, SAY so. DO NOT describe results you did not observe. LIST the checks the user should run.
+FIX failures from the latest run of the current code. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same check fails for the same reason twice in a row, WHEN about three rounds have not made all checks pass, or WHEN a fix would break a check that passed before.
 
-WHEN the user adds or changes a requirement after earlier scenarios were met, RE-RUN the checks of every earlier scenario, not only those the new change touches. IF one fails, UNDO the change that broke it, THEN make the new change another way or REPORT the conflict between the two requirements. New code often breaks behaviour that earlier requirements set.
+WHEN a requirement changes, or the change touches code a saved spec covers, RE-RUN the checks of every requirement in that spec. IF one fails, UNDO the change that broke it, THEN do it another way or SEND the conflict up.
 
-### 5.2. Bound the repair loop
+A requirement counts as met only IF a check you ran on the final code shows it.
 
-FIX failures with the evidence from the latest run of the current code. DO NOT act on output from an earlier version of the code.
+## 5. Protect the checks
 
-STOP repairing and REPORT when:
+WHEN a check fails, CHANGE the code, not the check: DO NOT edit, skip or delete a check to make it pass, or write code for the test inputs. IF a check looks wrong, STOP, EXPLAIN why, and SEND it up.
 
-1. The same check fails for the same reason twice in a row.
-2. About three rounds of fixes have not made all checks pass.
-3. A fix would break a check that passed before.
+BEFORE you write code, KEEP a copy of the checks that decide the change: one per requirement, and the existing tests the change could break. COMMIT them IF you work on a branch the user, the harness, or you with the user's permission created for this change; OTHERWISE, COPY them to `.code/<change>/checks/`. DO NOT change harness settings without the user's permission.
 
-IN the report, STATE what fails, what you tried, and what you think the cause is.
+BEFORE you hand back, COMPARE the checks with that copy. SEND up any difference your mode does not allow, such as a removed or skipped test, a loosened assertion, or a special-cased input.
 
-### 5.3. Never weaken the checks
+## 6. Hand back
 
-DO NOT edit, skip, or delete tests or checks to make them pass. DO NOT special-case test inputs. IF a check looks wrong, or the task cannot be done as stated, STOP, EXPLAIN why, and ASK the user.
+HAVE a verifier, a sub-agent that did not build the change, review it with [agents/verifier.md](agents/verifier.md). FIX the confirmed blocking findings, THEN have a new verifier review the change again. REPEAT within the limits of section 4: STOP and REPORT WHEN the same finding comes back twice, WHEN about three rounds have not cleared the blocking findings, or WHEN a fix breaks a check that passed before. LIST the unconfirmed findings as unchecked. IF you cannot start a sub-agent, HAND back with the change marked **not finished: needs a verifier**, WHY you could not start one, and everything else the report holds. DO NOT call it done, and DO NOT review it yourself instead.
 
-### 5.4. Check the result against the requirements
+LEAD with the result, THEN report, USING `/write-better` for the wording if available:
 
-COMPARE the finished behaviour with each scenario in the requirements, using the results of section 5.1. A scenario counts as met only if a check you ran shows it.
+1. What changed and why.
+2. Each check you ran with its result, and each requirement with how it was checked and the result, or why it was not.
+3. The decisions and assumptions of section 1, the checks you changed as your mode allows, and any conflict sent up.
+4. Proposed next steps.
 
-## 6. Review
+DISTINGUISH meeting the spec, passing the checks, and the user accepting the result. DO NOT claim one from another.
 
-FOLLOW `/review-better` if available to run the review, confirm findings and hand them back, with section 6.1 as what to look for. OTHERWISE, IF you can start a sub-agent, GIVE a separate reviewer only the diff, the requirements and access to the code, from the most capable model you can choose, and not your reasoning, your conversation with the user, or your verdict. IF you cannot, RE-READ the requirements, THEN read the diff as if someone else wrote it. ALSO CHECK the blocking criteria of the user's review guide, if there is one. KEEP a finding you cannot confirm as unconfirmed, ORDER findings by effect, and REPORT each with its location, the input that triggers it, its effect, and a fix.
-
-IF the diff is large, such as over about 150 changed lines, SPLIT the review by purpose, such as one part per feature or per layer, and review each part on its own. Reviewers, model or human, find far fewer problems in large diffs. TREAT this as a guide, not a rule.
-
-### 6.1. What to look for in code
-
-LOOK first for wrong behaviour against the requirements, broken callers, security problems, data loss, and missing error handling. LOOK for style only where the project's rules require it. AI reviewers comment on style far more than human reviewers do, and on correctness and security far less.
-
-READ beyond the diff: callers, configuration, and tests.
-
-CONFIRM a finding with a failing test, a reproduction, or the exact lines and input that cause it. WRITE the fix as code.
-
-## 7. Hand back
-
-### 7.1. Report what was done and checked
-
-USE `/write-better` if available. OTHERWISE, lead with the result, THEN report:
-
-1. What changed and why, in terms of the requirements.
-2. The design decisions from section 2 and the assumptions from section 1.5.
-3. Each check you ran and its result, and each requirement scenario you could not check.
-4. Anything you listed instead of changing (section 4.1).
-
-DISTINGUISH meeting the requirements, passing the checks, and the user accepting the result. DO NOT claim one from another.
-
-### 7.2. Leave the user able to maintain the code
-
-OFFER a short explanation of how the change works and why it is built this way. IF the user wants to understand the code, THEN USE `/write-better` for the explanation if available. OTHERWISE, ASK a question about the change that the user can attempt first, THEN EXPLAIN the reasoning.
-
-IF the user has stated how much explanation they want, FOLLOW that instead of this section.
-
-IF the user rejects the result, USE `/do-better` if available. OTHERWISE, FIND what the result misses from the user's feedback and the requirements, and CORRECT it.
-
-## 8. Sub-agents and long runs
-
-### 8.1. Default to one agent
-
-DO the building yourself, since delegating usually costs more and teams of agents do not reliably beat a single agent. USE sub-agents for independent reading, such as searching a large codebase, and for review (section 6). DO NOT split building across agents by role, such as planner, coder and tester, unless the work does not fit in one context.
-
-### 8.2. Hand over the full requirements
-
-WHEN you hand work to another agent or session, GIVE it the requirements, the design, and your raw notes on what you tried and found. DO NOT give only a summary: details of a plan get lost when it is handed to another agent.
-
-### 8.3. Keep long runs on track
-
-FOR work that spans several sessions, KEEP the plan file current, COMMIT a working state after each task, and BEGIN each session by reading the requirements, the design, and the plan.
-
-IN a session long enough that the harness may compact or summarize the conversation, WRITE each constraint and prohibition the user gives to the requirements file, or to a notes file if there is none, when they give it, and RE-READ that file after each compaction. Summaries drop prohibitions far more often than build specifications.
-
-AT each checkpoint, RE-CHECK the result against the requirements' scenarios and REVIEW the structure for growing duplication or complexity. Agent code erodes in structure as it grows while still passing tests. Requests for quality did not stop erosion.
+OFFER a short explanation of how the change works. IF the user wants to understand the code, ASK a question they can attempt first, THEN EXPLAIN, USING `/write-better` if available, unless they stated how much explanation they want. IF the user rejects the result, USE `/do-better` if available; OTHERWISE, CORRECT what their feedback and the spec show it misses.
