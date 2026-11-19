@@ -28,7 +28,9 @@ from skill_evals.transcript import Run, parse_stream, redact
 WORKDIR = "/work"
 AGENT_USER = "agent"
 TOKEN_VARIABLES = ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN")
-DISALLOWED_TOOLS = "WebSearch,WebFetch"
+# Web tools would let the agent look answers up; scheduling tools keep a non-interactive run open until a
+# wake-up fires, long after the work is done.
+DISALLOWED_TOOLS = "WebSearch,WebFetch,ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor"
 CLAUDE_CODE_VERSION = "2.1.327"
 IGNORED_PATHS = ("__pycache__/", ".pytest_cache/")
 # Claude Code facts that graders need: where it finds a user's skills, relative to the home folder, and the
@@ -160,7 +162,7 @@ def record_run(state: TaskState, run: Run, prompt: str) -> None:
 
 @solver
 def claude_code(model: str = "sonnet", timeout: int = 1800) -> Solver:
-    """Run the real Claude Code CLI on the sample's prompt in /work, web tools disallowed."""
+    """Run the real Claude Code CLI on the sample's prompt in /work, with the web and scheduling tools disallowed."""
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         prompt = state.input_text

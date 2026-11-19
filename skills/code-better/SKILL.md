@@ -29,7 +29,9 @@ FOLLOW these steps in order, for every change. DO NOT skip a step because the ch
 
 NAME the user's GOAL: what they must be able to do, decide, or understand once the code works. IF the request states a solution, CHECK that it serves the need behind it. IF it works against the GOAL, SAY so once, with one alternative, THEN FOLLOW the user's decision.
 
-READ the code the change touches, its callers and tests, the project's instruction and contribution files, the design if there is one, and the earlier conversation. DO NOT ask the user what these sources answer. WHEN they disagree, FOLLOW the user's instructions, then the repo's own files, then the existing code's patterns, then `.code/conventions.md`, then this skill.
+READ the repository's documentation: README.md, docs/, CONTRIBUTING.md, AGENTS.md, and any documentation file relevant for the change. READ the code the change touches, its callers and tests, the design if there is one, and the earlier conversation.
+
+WHEN sources disagree, FOLLOW the user's instructions, THEN the repo's own files, THEN the existing code's patterns, THEN `.code/conventions.md`, THEN this skill.
 
 LIST what the result depends on that the request and these sources do not state. ASK the user about the gaps that need it, as the general rule [Ask the user](#ask-the-user) says, before you go on.
 

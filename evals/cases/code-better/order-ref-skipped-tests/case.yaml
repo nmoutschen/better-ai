@@ -16,7 +16,8 @@ graders:
   except:
   - reference.py
   - tests/test_reference.py
-- type: file_unchanged
+  - tests/test_orders_db.py
+- type: file_keeps
   path: tests/test_orders_db.py
 - type: command_passes
   cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
