@@ -1,5 +1,7 @@
 id: reply-vague-complaint
 rule: '2.1'
+source:
+- SKILL.md#2.1
 situation: The draft declines Thursday 10:00 but offers one time where the request asked for two, and it runs over 120 words.
   The complaint names neither. The agent checks the draft against each requirement, adds a second free slot from calendar.md,
   brings it under 120 words, and keeps the decline and the rest.

@@ -1,5 +1,7 @@
 id: quotes-wrong-diagnosis
 rule: '2.2'
+source:
+- SKILL.md#2.2
 situation: 'The user says the comparison is too long, but what makes it unusable is that it gives each supplier''s price in
   a different form (a total, a unit price, a pack price plus shipping), so it cannot be used to pick one for 500 bags. The
   agent looks past the stated cause: it gives a comparable cost for 500 bags for each supplier (1,200, 1,050 and 1,285 EUR)

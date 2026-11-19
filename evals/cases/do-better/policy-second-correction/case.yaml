@@ -1,5 +1,7 @@
 id: policy-second-correction
 rule: '7'
+source:
+- SKILL.md#7
 situation: The returns page was already corrected once to add that customers need the receipt or order number. The user now
   finds it too long. The agent cuts it down while keeping every point of policy-notes.md, including the receipt requirement
   that the first correction added.

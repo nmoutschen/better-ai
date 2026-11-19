@@ -1,5 +1,7 @@
 id: reply-no-argument
 rule: invocation
+source:
+- SKILL.md#invocation
 situation: The draft offers one time where the request asked for two, and runs over 120 words. Nobody says what is wrong.
   The agent checks the draft against each requirement in the request and fixes both.
 request: Do better on the reply to Maria.

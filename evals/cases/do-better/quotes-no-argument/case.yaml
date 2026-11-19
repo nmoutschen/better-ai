@@ -1,5 +1,7 @@
 id: quotes-no-argument
 rule: invocation
+source:
+- SKILL.md#invocation
 situation: The comparison gives each supplier's price in a different form, so it cannot be used to pick a supplier for 500
   bags. Nobody says what is wrong. The agent checks the work against that goal and gives a comparable cost for 500 bags per
   supplier (1,200, 1,050 and 1,285 EUR), or asks one question naming that comparison.

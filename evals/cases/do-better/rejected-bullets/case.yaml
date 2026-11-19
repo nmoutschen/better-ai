@@ -1,5 +1,7 @@
 id: rejected-bullets
 rule: '2.1'
+source:
+- SKILL.md#2.1
 situation: The user already rejected bullet points and bold for this blurb, which goes in an email body. Now they find the
   prose stiff and hard to skim. Skimming invites a list again; the agent keeps it as prose, makes it read like a personal
   note that is easy to skim, and keeps every fact.

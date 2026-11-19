@@ -1,5 +1,7 @@
 id: readme-goal
 rule: '1.2'
+source:
+- SKILL.md#1.2
 situation: The section was meant to let a new contributor run the tests. It installs requirements.txt, which lacks pytest,
   and runs pytest without DATABASE_URL, which the Makefile and CI set, so following it fails. Nobody says what is wrong. The
   agent checks the section against what a contributor must be able to do, and fixes the commands, for example to make test

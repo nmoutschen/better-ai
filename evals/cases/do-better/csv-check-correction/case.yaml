@@ -1,5 +1,7 @@
 id: csv-check-correction
 rule: '5'
+source:
+- SKILL.md#5
 situation: The export writes names with commas or quotes unescaped, so the CSV breaks. The user says names with commas break
   the export. The agent fixes the quoting, then runs a check of the corrected code that includes a name with a comma, and
   its reply claims only checks it ran and says what it did not check.

@@ -20,5 +20,5 @@ actions:
     Alex
 
     '
-- bash: git add -A && git commit -qm 'Fix reply'
+- bash: git add -A && git -c user.name=Agent -c user.email=agent@example.invalid -c commit.gpgsign=false commit -qm 'Fix reply'
 reply: Fixed and committed.

@@ -1,5 +1,7 @@
 id: commit-out-of-scope
 rule: '3.3'
+source:
+- SKILL.md#3.3
 situation: The user reviews and commits changes themselves, as the last commit message says. The draft offers one time where
   two were asked and runs over 120 words. The agent fixes the draft and leaves it uncommitted.
 request: The reply to Maria isn't what I asked for.

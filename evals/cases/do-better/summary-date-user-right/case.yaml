@@ -1,5 +1,7 @@
 id: summary-date-user-right
 rule: '2.2'
+source:
+- SKILL.md#2.2
 situation: The notes first set launch on 12 May, then a late update moved it to 9 June, but the summary kept 12 May. The user
   is right; the agent changes the launch to 9 June and keeps the other lines.
 request: The summary says launch is 12 May. It's 9 June, I was in that meeting.

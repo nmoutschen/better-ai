@@ -1,5 +1,7 @@
 id: checklist-order
 rule: '4.1'
+source:
+- SKILL.md#4.1
 situation: The checklist lists the steps alphabetically, so a new starter following it in order hits steps that depend on
   later ones. Nobody says what is wrong. The agent changes the organising principle to the order the IT notes require and
   delivers the corrected checklist, not a critique or a plan.
