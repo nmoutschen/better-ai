@@ -11,6 +11,8 @@ def paths(*args):
 
 changed = paths("diff", "--name-only", "--no-renames", "-z", os.environ["START_COMMIT"], "--")
 changed += paths("ls-files", "--others", "--exclude-standard", "-z")
+# Markdown notes in folders Git ignores, such as .code/, count too.
+changed += [p for p in paths("ls-files", "--others", "--ignored", "--exclude-standard", "-z") if p.endswith(".md")]
 notes = [path for path in changed if path.endswith(".md") and os.path.isfile(path)]
 assert notes, "no Markdown notes"
 for path in notes:
