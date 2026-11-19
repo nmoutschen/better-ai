@@ -9,4 +9,4 @@ The requirement is that observable behaviour stays the same. BEFORE you change t
 
 AFTER the change, RUN the same checks. Any difference is a defect of the change. IF the design says that behaviour changes, that part is not this change: LIST it as a proposed next step, or, under a coordinator, its own task.
 
-FOR a data migration, ALSO CHECK the data: counts, a sample of records before and after, and what happens to records the old format allowed and the new one does not. SEND the last up as a gap if the design does not say (section 1.2 of SKILL.md).
+FOR a data migration, ALSO CHECK the data: counts, a sample of records before and after, and what happens to records the old format allowed and the new one does not. SEND the last up as a gap if the design does not say (section 3.2 of SKILL.md).

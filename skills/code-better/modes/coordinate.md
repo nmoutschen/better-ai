@@ -13,13 +13,13 @@ Sections 3 to 5 of SKILL.md are your builders' and verifiers' work. Sections 1, 
 
 ## Split the work
 
-WRITE the spec and the task list first (section 2 of SKILL.md). SPLIT the work into tasks by part, such as one module or one flow per task, never by role. EACH task fits in one context, names its mode and its requirements.
+WRITE the spec and the task list first (section 4 of SKILL.md). SPLIT the work into tasks by part, such as one module or one flow per task, never by role. EACH task fits in one context, names its mode and its requirements.
 
 CREATE and MANAGE a branch or worktree for each task, from your own main branch for the change.
 
 ## Start builders and verifiers
 
-START a builder for each task that can run in parallel, with [../agents/builder.md](../agents/builder.md), its input filled in. START verifiers with [../agents/verifier.md](../agents/verifier.md), as below.
+START a builder with [../agents/builder.md](../agents/builder.md) for each task that can run in parallel (section 8 of SKILL.md). START verifiers with [../agents/verifier.md](../agents/verifier.md), as below.
 
 IF the harness lets you choose a model, USE a cheaper model than yours for builders and the most capable model for verifiers.
 
@@ -36,7 +36,7 @@ WHEN a builder hands back:
 
 - Done: START a verifier on its branch, with its changed checks.
 - Partly done or blocked: ANSWER what is open, THEN START the task again with the answers in `answers`.
-- KEEP its assumptions for the final hand-back, and SEND up any that is costly by section 1.2 of SKILL.md. ADD its next steps to `.code/<change>/next-steps.md`: ADMIT those that stay inside the design, and SEND the rest up.
+- KEEP its assumptions for the final hand-back, and SEND up any that is costly by section 3.2 of SKILL.md. ADD its next steps to `.code/<change>/next-steps.md`: ADMIT those that stay inside the design, and SEND the rest up.
 
 WHEN a verifier fails a task, START the task again with its findings in `tried`. IF it fails the same task twice for the same finding, SEND it up. WHEN it passes with unconfirmed blocking findings or parts it could not review, SEND those up before you merge.
 
@@ -44,4 +44,4 @@ WHEN a verifier fails a task, START the task again with its findings in `tried`.
 
 KEEP your own main branch or worktree for the change. MERGE each task into it only after its verifier hands back `pass`, or after the user has decided its open findings.
 
-AFTER the last merge, START a builder to run every check of the spec on your main branch, and a verifier on its whole diff. HAND back by section 6 of SKILL.md from those results, with every task's assumptions and the decisions you made. MERGE into the user's branch only once that hand-back is done and the user allows it.
+AFTER the last merge, START a builder to run every check of the spec on your main branch, and a verifier on its whole diff. HAND back by section 9 of SKILL.md from those results, with every task's assumptions and the decisions you made. MERGE into the user's branch only once that hand-back is done and the user allows it.

@@ -14,7 +14,7 @@ You build one part of a larger change. A coordinator holds the design and decide
 
 BUILD only your part, on your branch or worktree. COMMIT your checks before your code, and a working state after each step; IF you cannot commit, COPY the checks to `.code/<change>/checks/` instead. DO NOT review or approve your own work: a verifier does. DO NOT ask the user anything: everything goes to the coordinator.
 
-APPLY all of SKILL.md, except sections 2.4 and 2.5: USE the mode, spec and design in your input instead of choosing or writing your own. Your Output replaces the report in section 6.
+APPLY all of SKILL.md, except sections 2, 4, 8 and 9: USE the mode, spec and design in your input instead of choosing or writing your own, START none of the agents of section 8, and HAND back with your Output, not the report of section 9. The coordinator starts the verifier.
 
 ## Input
 
@@ -33,7 +33,7 @@ The coordinator gives every field. IF one is missing or contradicts another, ASK
 
 ## Messages
 
-WHILE you work, TELL the coordinator, in plain words, anything section 1 of SKILL.md would send up: a gap, a conflict, a decision, or that you are blocked. SAY which it is, what you need from the coordinator, and what you keep building meanwhile. DO NOT build the part a decision or a conflict affects until the coordinator answers; its answer is binding unless new evidence appears. IF you cannot message the coordinator while you run, PUT these in your output and STOP at that point.
+WHILE you work, TELL the coordinator, in plain words, anything section 3 of SKILL.md would send up: a gap, a conflict, a decision, or that you are blocked. SAY which it is, what you need from the coordinator, and what you keep building meanwhile. DO NOT build the part a decision or a conflict affects until the coordinator answers; its answer is binding unless new evidence appears. IF you cannot message the coordinator while you run, PUT these in your output and STOP at that point.
 
 ## Output
 
