@@ -15,11 +15,9 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 WRITE the requirements of the whole change in `.code/<change>/specs.md`. READ [../templates/specs.md](../templates/specs.md) and WRITE the spec in its format. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
-IF the change adds a module, a data model, a dependency or a migration, and no design covers it, WRITE `.code/<change>/design.md`: READ [../templates/design.md](../templates/design.md) and WRITE it in its format. SEND up each decision it makes.
+IF the change adds a module, a data model, a dependency or a migration, and no design covers it, WRITE `.code/<change>/design.md`: READ [../templates/design.md](../templates/design.md) and WRITE it in its format.
 
 SPLIT the work into tasks by part, such as one module or one flow per task, never by role. EACH task fits in one context, and names its mode and its requirements. WRITE them in `.code/<change>/tasks.md`: READ [../templates/tasks.md](../templates/tasks.md) and WRITE the list in its format.
-
-SEND up the costly gaps the spec shows, and WAIT for the answers before step 2.
 
 ## 2. Start the builders
 
@@ -33,16 +31,16 @@ ANSWER what builders send you, in plain language, and SAY whether an answer came
 
 - A gap the design, the spec or the repo answers: ANSWER it yourself.
 - A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed, and RECORD it in `.code/<change>/`.
-- Anything that would change what the user agreed, or that only the user can answer: SEND it up, with everything the builder gave.
-- A blocked task: GIVE what is missing, SPLIT the task, or SEND it up. DO NOT build the task yourself.
+- Anything that would change what the user agreed, or that only the user can answer: ASK the user, with everything the builder gave.
+- A blocked task: GIVE what is missing, SPLIT the task, or ASK the user. DO NOT build the task yourself.
 
 WHEN a builder hands back:
 
 - Done: START a verifier on its branch, with its changed checks, as step 4 of SKILL.md says.
 - Partly done or blocked: ANSWER what is open, THEN START the task again with the answers in `answers`.
-- KEEP its assumptions for your hand-back, and SEND up any costly one. ADD its proposed next steps to `.code/<change>/next-steps.md`: ADMIT those that stay inside the design, and SEND the rest up.
+- KEEP its assumptions for your hand-back, and ASK the user about any costly one. ADD its proposed next steps to `.code/<change>/next-steps.md`: ADMIT those that stay inside the design, and ASK the user about the rest.
 
-WHEN a verifier fails a task, START the task again with its findings in `tried`. IF it fails the same task twice for the same finding, SEND it up. WHEN it passes with unconfirmed blocking findings or parts it could not review, SEND those up before you merge. UPDATE the task's status in `tasks.md`.
+WHEN a verifier fails a task, START the task again with its findings in `tried`. IF it fails the same task twice for the same finding, ASK the user. WHEN it passes with unconfirmed blocking findings or parts it could not review, ASK the user about them before you merge. UPDATE the task's status in `tasks.md`.
 
 ## 4. Merge and test the whole change
 

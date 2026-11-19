@@ -25,9 +25,9 @@ DO NOT change the code under test. LIST the changes it needs as proposed next st
 
 ## 4. Run the tests
 
-RUN the new and the existing tests on the current code. A new test PASSES. IF one fails because the code disagrees with its expected value, DO NOT change the test to match the code: SEND the disagreement up as a possible defect.
+RUN the new and the existing tests on the current code. A new test PASSES. IF one fails because the code disagrees with its expected value, DO NOT change the test to match the code: ASK the user about the disagreement as a possible defect.
 
-COMPARE the existing tests with the copy of step 2. SEND up any change this mode does not allow.
+COMPARE the existing tests with the copy of step 2. ASK the user about any change this mode does not allow.
 
 FIX each test that fails for a reason of its own, THEN RUN the tests again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same test fails twice for the same reason, or WHEN three rounds have not made the tests pass.
 

@@ -11,9 +11,7 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 WRITE the requirements of this change in `.code/<change>/specs.md`. READ [../templates/specs.md](../templates/specs.md) and WRITE the spec in its format. IF the file exists from earlier work on this change, UPDATE it in place. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
-IF the change adds a module, a data model, a dependency or a migration, and no design covers it, ALSO WRITE `.code/<change>/design.md`: READ [../templates/design.md](../templates/design.md) and WRITE it in its format. SEND up each decision it makes.
-
-SEND up the costly gaps the spec shows, and WAIT for the answers before step 2.
+IF the change adds a module, a data model, a dependency or a migration, and no design covers it, ALSO WRITE `.code/<change>/design.md`: READ [../templates/design.md](../templates/design.md) and WRITE it in its format.
 
 ## 2. Write the checks
 
@@ -23,7 +21,7 @@ RUN the checks on the current code and RECORD each result. A check for new or ch
 
 KEEP a copy of these checks and of the existing tests the change could break: COMMIT them IF you work on a branch created for this change; OTHERWISE, COPY them to `.code/<change>/checks/`.
 
-From now on, WHEN a check fails, CHANGE the code, not the check. DO NOT edit, skip or delete a check, or write code for its inputs. This mode allows one change to an existing check: WHEN a requirement from the user's request or the design changes an expected value, UPDATE the check to it, and LIST it in the hand-back with the old and the new value. A requirement you assumed never justifies it. IF a check looks wrong for any other reason, STOP and SEND it up.
+From now on, WHEN a check fails, CHANGE the code, not the check. DO NOT edit, skip or delete a check, or write code for its inputs. This mode allows one change to an existing check: WHEN a requirement from the user's request or the design changes an expected value, UPDATE the check to it, and LIST it in the hand-back with the old and the new value. A requirement you assumed never justifies it. IF a check looks wrong for any other reason, STOP and ASK the user.
 
 ## 3. Write the code
 
@@ -38,7 +36,7 @@ RUN, on the final code:
 3. A smoke check that the program starts and its main path works.
 4. The static, type, lint and security checks the project uses.
 
-COMPARE the checks with the copy of step 2. SEND up any difference this mode does not allow.
+COMPARE the checks with the copy of step 2. ASK the user about any difference this mode does not allow.
 
 FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same check fails twice for the same reason, WHEN three rounds have not made all checks pass, or WHEN a fix breaks a check that passed before.
 

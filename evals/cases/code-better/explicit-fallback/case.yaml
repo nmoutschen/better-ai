@@ -1,7 +1,7 @@
 id: explicit-fallback
 rule: '4.2'
 source:
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 reads:
 - modes/feature.md
 - templates/specs.md

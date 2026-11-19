@@ -1,7 +1,7 @@
 id: reader-permissions
 rule: '1.3'
 source:
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 reads: []
 situation: Private contact fields live on the returned record; ask what volunteers may see rather than how to structure the
   lookup.

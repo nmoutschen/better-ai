@@ -2,7 +2,7 @@ id: rule53-impossible-target
 rule: '5.3'
 source:
 - modes/feature.md
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 - modes/bug-fix.md
 reads:
 - [modes/feature.md, modes/bug-fix.md]

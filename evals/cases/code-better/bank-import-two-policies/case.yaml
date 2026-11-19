@@ -1,7 +1,7 @@
 id: bank-import-two-policies
 rule: '1.5'
 source:
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 reads: []
 situation: One payment matches two equal bills and a short payment leaves a bill open; ask about both, with the planted amounts
   and outcomes, before implementation.

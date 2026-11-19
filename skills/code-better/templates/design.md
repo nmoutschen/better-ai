@@ -3,7 +3,7 @@
 <HOW TO FILL THIS IN — delete this block when done.
 - Write a design only when there is none and the change adds structure, such as a module, data model, dependency or migration. Save it in .code/<change>/design.md.
 - Show only the parts the change touches. Follow the codebase's existing patterns; say why where you depart from them.
-- Send each decision up, as the general rule Send up of SKILL.md says. A gap the design reveals, such as what happens when a step fails halfway, is a gap to send up, not a design choice.>
+- Ask the user about each decision, as the general rule Ask the user of SKILL.md says. A gap the design reveals, such as what happens when a step fails halfway, is a gap to ask about, not a design choice.>
 
 Spec: <path or link to the spec>
 

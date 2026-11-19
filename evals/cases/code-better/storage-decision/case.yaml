@@ -1,7 +1,7 @@
 id: storage-decision
 rule: '2'
 source:
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 reads: []
 situation: Per-user time zones need a stored field and leave existing reminders without a zone; ask about those records and
   show the storage recommendation with its reason and drawback before building.

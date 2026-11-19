@@ -33,7 +33,7 @@ The coordinator gives every field. IF one is missing or contradicts another, ASK
 
 ## Messages
 
-WHILE you work, TELL the coordinator, in plain words, anything the general rule Send up of SKILL.md would send up: a gap, a conflict, a decision, or that you are blocked. SAY which it is, what you need from the coordinator, and what you keep building meanwhile. DO NOT build the part a decision or a conflict affects until the coordinator answers; its answer is binding unless new evidence appears. IF you cannot message the coordinator while you run, PUT these in your output and STOP at that point.
+WHILE you work, TELL the coordinator, in plain words, anything SKILL.md tells you to ask the user, instead of asking the user: a gap, a conflict, a decision, or that you are blocked. SAY which it is, what you need from the coordinator, and what you keep building meanwhile. DO NOT build the part a decision or a conflict affects until the coordinator answers; its answer is binding unless new evidence appears. IF you cannot message the coordinator while you run, PUT these in your output and STOP at that point.
 
 ## Output
 

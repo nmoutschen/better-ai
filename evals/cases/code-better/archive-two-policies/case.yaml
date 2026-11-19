@@ -1,7 +1,7 @@
 id: archive-two-policies
 rule: '1.5'
 source:
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 reads: []
 situation: Retention age and archive-versus-delete both need first-turn answers with concrete values; state an assumption
   about the low-cost count format instead of asking.

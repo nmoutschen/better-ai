@@ -2,7 +2,7 @@
 
 Each case's `source` lists where its rule lives in the current skill: `SKILL.md#<section>` for a
 numbered rule heading of `skills/<skill>/SKILL.md`, the slug of an unnumbered `###` heading such as
-`SKILL.md#send-up`, `SKILL.md#invocation`, or another file of the
+`SKILL.md#ask-the-user`, `SKILL.md#invocation`, or another file of the
 skill folder, such as `modes/bug-fix.md`. Its `reads` lists the skill files the skill condition should
 read. The report lists the sections and files no case points to, and cases whose sources or reads do not
 exist. A case's `rule` names the section in the SKILL.md the case was written for, so it is not checked
@@ -28,7 +28,7 @@ FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 
 def rule_ids(text: str) -> set[str]:
     """Return the rule ids in a SKILL.md, skipping code blocks: numbered headings, where a section with subsections is
-    not a rule, and unnumbered `###` headings by their slug, such as `send-up`."""
+    not a rule, and unnumbered `###` headings by their slug, such as `ask-the-user`."""
     rules = {"invocation"}
     parent = fence = None
     for line in text.splitlines():

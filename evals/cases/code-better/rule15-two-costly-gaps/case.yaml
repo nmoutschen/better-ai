@@ -1,7 +1,7 @@
 id: rule15-two-costly-gaps
 rule: '1.5'
 source:
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 reads: []
 situation: Merging duplicate accounts leaves two costly gaps only the user can answer, which shipping address the merged account
   keeps and what happens to each account's loyalty points (money); ask both at once with concrete outcomes before building,

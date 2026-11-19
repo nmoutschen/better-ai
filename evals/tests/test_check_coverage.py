@@ -45,5 +45,5 @@ def test_dangling_rule_is_an_error(
 
 def test_rule_ids_include_named_headings() -> None:
     """Numbered headings and unnumbered `###` headings, by slug, are rules."""
-    text = "## Instructions\n\n### 1. Understand\n\n## General rules\n\n### Send up\n\n### Working notes\n"
-    assert check_coverage.rule_ids(text) == {"invocation", "1", "send-up", "working-notes"}
+    text = "## Instructions\n\n### 1. Understand\n\n## General rules\n\n### Ask the user\n\n### Working notes\n"
+    assert check_coverage.rule_ids(text) == {"invocation", "1", "ask-the-user", "working-notes"}

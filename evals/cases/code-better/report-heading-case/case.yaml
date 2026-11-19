@@ -1,7 +1,7 @@
 id: report-heading-case
 rule: '1.5'
 source:
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 reads:
 - modes/feature.md
 - templates/specs.md

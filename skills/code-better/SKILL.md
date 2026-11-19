@@ -31,7 +31,7 @@ NAME the user's GOAL: what they must be able to do, decide, or understand once t
 
 READ the code the change touches, its callers and tests, the project's instruction and contribution files, the design if there is one, and the earlier conversation. DO NOT ask the user what these sources answer. WHEN they disagree, FOLLOW the user's instructions, then the repo's own files, then the existing code's patterns, then `.code/conventions.md`, then this skill.
 
-LIST what the result depends on that the request and these sources do not state. SEND up the gaps that need it, as the general rule [Send up](#send-up) says, before you go on.
+LIST what the result depends on that the request and these sources do not state. ASK the user about the gaps that need it, as the general rule [Ask the user](#ask-the-user) says, before you go on.
 
 ### 2. Pick the mode
 
@@ -63,7 +63,7 @@ LEAD with the result, THEN report, USING `/write-better` for the wording if avai
 
 1. What changed and why.
 2. Each requirement, the check that shows it and its result, or why it was not checked.
-3. The assumptions you made, the decisions and conflicts you sent up, and each check you changed with what in your mode allows it.
+3. The assumptions you made, the decisions and conflicts you asked the user about, and each check you changed with what in your mode allows it.
 4. The verifier's result: pass, or its open findings.
 5. Proposed next steps: work outside the change worth doing. READ [templates/next-steps.md](templates/next-steps.md) and WRITE them in its format. IF there are none, SAY so.
 
@@ -75,15 +75,15 @@ OFFER a short explanation of how the change works. IF the user wants to understa
 
 FOLLOW these rules in every step and every mode.
 
-### Send up
+### Ask the user
 
-To send up is to ASK the user, USING `/ask-better` if available. Under a coordinator, it is to TELL the coordinator, which decides what stays inside the design and sends the rest to the user.
+ASK the user, USING `/ask-better` if available, in these cases:
 
-- **Gaps.** DECIDE yourself a gap only someone reading the code would notice. SEND up a gap the user would notice that is costly to get wrong: what is stored, what someone is charged or paid, what users are told, and how an invalid input or a failure is handled. PUT all of them in one message, each with concrete inputs and the outcome of each option. FOR every other gap, CHOOSE the most plausible option and STATE it as an assumption in the hand-back.
-- **Decisions.** SEND up a decision that changes behaviour, cost, risk or how the code is maintained, and anything that contradicts a decision the design records, with your recommendation, its main reason and its main drawback. USE `/decide-better` if available. IF the user does not read code, DESCRIBE each option by what they would observe or pay.
-- **Conflicts.** SEND up a test that contradicts a requirement, two requirements that conflict, and a requirement that cannot or should not hold as written, with the change you propose and what the user would see differently. DO NOT build to your own version until it is agreed. ONCE agreed, REVISE the requirement in place.
+- **Gaps.** DECIDE yourself a gap only someone reading the code would notice. ASK about a gap the user would notice that is costly to get wrong: what is stored, what someone is charged or paid, what users are told, and how an invalid input or a failure is handled. PUT all of them in one message, each with concrete inputs and the outcome of each option. FOR every other gap, CHOOSE the most plausible option and STATE it as an assumption in the hand-back.
+- **Decisions.** ASK about a decision that changes behaviour, cost, risk or how the code is maintained, and anything that contradicts a decision the design records, with your recommendation, its main reason and its main drawback. USE `/decide-better` if available. IF the user does not read code, DESCRIBE each option by what they would observe or pay.
+- **Conflicts.** ASK about a test that contradicts a requirement, two requirements that conflict, and a requirement that cannot or should not hold as written, with the change you propose and what the user would see differently. DO NOT build to your own version until it is agreed. ONCE agreed, REVISE the requirement in place.
 
-TREAT a constraint the user set as a requirement. ADD each answer to the spec; your own proposals are not answers. KEEP building the parts that what you sent up does not affect.
+TREAT a constraint the user set as a requirement. ADD each answer to the spec; your own proposals are not answers. KEEP building the parts your questions do not affect.
 
 ### Working notes
 

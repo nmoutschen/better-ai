@@ -13,7 +13,7 @@ WRITE the spec in `.code/<change>/specs.md`. READ [../templates/specs.md](../tem
 
 IF the design says some behaviour changes, that part is not this change: LIST it as a proposed next step, or, under a coordinator, as its own task.
 
-FOR a data migration, IF the design does not say what happens to records the old format allows and the new one does not, SEND that gap up.
+FOR a data migration, IF the design does not say what happens to records the old format allows and the new one does not, ASK the user.
 
 ## 2. Pin the current behaviour
 
@@ -23,7 +23,7 @@ RUN the checks on the current code: they PASS, and you RECORD the results.
 
 KEEP a copy of these checks: COMMIT them IF you work on a branch created for this change; OTHERWISE, COPY them to `.code/<change>/checks/`.
 
-From now on, WHEN a check fails, CHANGE the code, not the check. DO NOT edit, skip or delete a check, or write code for its inputs. This mode allows no change to an existing check. IF a check looks wrong, STOP and SEND it up.
+From now on, WHEN a check fails, CHANGE the code, not the check. DO NOT edit, skip or delete a check, or write code for its inputs. This mode allows no change to an existing check. IF a check looks wrong, STOP and ASK the user.
 
 ## 3. Refactor the code
 
@@ -38,7 +38,7 @@ RUN, on the final code:
 3. A smoke check that the program starts and its main path works.
 4. The static, type, lint and security checks the project uses.
 
-COMPARE the checks with the copy of step 2. SEND up any difference.
+COMPARE the checks with the copy of step 2. ASK the user about any difference.
 
 FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same check fails twice for the same reason, WHEN three rounds have not made all checks pass, or WHEN a fix breaks a check that passed before.
 

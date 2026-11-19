@@ -2,7 +2,7 @@ id: conflicting-tests
 rule: '5.2'
 source:
 - modes/bug-fix.md
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 reads:
 - modes/bug-fix.md
 - templates/specs.md

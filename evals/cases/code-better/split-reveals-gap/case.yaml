@@ -1,7 +1,7 @@
 id: split-reveals-gap
 rule: '2'
 source:
-- SKILL.md#send-up
+- SKILL.md#ask-the-user
 - templates/design.md
 reads: []
 situation: 'Splitting the import into fetch and load raises a requirement gap: what happens when load fails halfway and is
