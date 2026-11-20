@@ -331,3 +331,27 @@ def test_labels_found_in_any_group_are_not_listed_as_unmatched() -> None:
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
     assert report.unmatched_labels([a, b], labels) == []
     assert report.agreement([a], labels)[0].split()[-2:] == ["1/1", "agree"]
+
+
+def installed(case: str, loaded: float | None, passed: float) -> report.SampleResult:
+    """One skill-installed run of a case that did or did not load the skill."""
+    return report.SampleResult(f"{case}-skill-installed", case, "skill-installed", "r", passed, skill_loaded=loaded)
+
+
+def test_loaded_lines_per_case() -> None:
+    """One row per case: runs, runs that loaded the skill, pass rate when loaded and when not."""
+    results = [
+        installed("a", 1.0, 1),
+        installed("a", 1.0, 0),
+        installed("a", 0.0, 0),
+        installed("b", 0.0, 1),
+        installed("c", None, 1),  # not a skill-installed run
+        report.SampleResult("d-skill-installed", "d", "skill-installed", "r", math.nan, skill_loaded=1.0, error="x"),
+    ]
+    lines = report.loaded_lines(results)
+    assert lines[0].split() == ["case", "runs", "loaded", "pass", "loaded", "pass", "not", "loaded"]
+    rows_ = {line.split()[0]: line.split()[1:] for line in lines[1:]}
+    assert rows_["a"] == ["3", "2", "50%", "0%"]
+    assert rows_["b"] == ["1", "0", "-", "100%"]
+    assert "c" not in rows_ and "d" not in rows_
+    assert report.loaded_lines(rows()) == ["No skill-installed runs."]
