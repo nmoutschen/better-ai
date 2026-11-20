@@ -198,8 +198,11 @@ function li(cls, html) { const x = document.createElement("li"); x.className = c
 // A question to the user waits until they answer it; a decision the coordinator took can be replied to, to change it.
 function decisionItem(c, state, actions) {
   const x = c.e.x, status = decisionStatus(x), answer = answerOf(c);
+  // A question to the user moves forward only: Waiting for you, You answered, Applied. A decision has no steps.
+  const step = decisionStep(status, answer, state);
+  const STEP = [["asked", "Waiting for you"], ["replied", "You answered"], ["done", "Applied"]][step];
   // An unanswered question shows its time in the head: the state row under it already says it waits for the user.
-  const label = status === "waiting" ? (answer ? "answered, waiting for the coordinator" : "")
+  const label = step === 1 ? "answered, waiting for the coordinator" : step === 0 ? ""
     : status === "answered" ? "answered by you" : "decided";
   const from = [has(x.from) ? x.from : "", has(x.task) ? "task " + x.task : ""].filter(Boolean).join(", ");
   // The answer the coordinator copied shows only when the user gave it in the chat: an answer from the page is in the thread.
@@ -209,9 +212,6 @@ function decisionItem(c, state, actions) {
     ${md(x.asked || "")}${after}`);
   item.dataset.d = x.id;
   if (step === 0) item.classList.add("open-q");  // the top bar's figure takes the user to the first one
-  // A question to the user moves forward only: Waiting for you, You answered, Applied. A decision has no steps.
-  const step = decisionStep(status, answer, state);
-  const STEP = [["asked", "Waiting for you"], ["replied", "You answered"], ["done", "Applied"]][step];
   item.dataset.state = STEP ? STEP[0] : "";
   const foot = document.createElement("div"); foot.className = "foot";
   // A reply to a decision the coordinator took shows its own state, like any item the user sends.
@@ -222,6 +222,7 @@ function decisionItem(c, state, actions) {
     : `<button type="button" class="btn btn--quiet btn--sm answer change">Reply</button>`);
   return [item, foot];
 }
+// item:end
 function crumb(e) {
   const x = document.createElement("span");
   if (e.on) { x.className = "crumb"; x.innerHTML = `<span class="path">on</span><span class="el"><button type="button" data-a="${esc(e.on.id)}">${esc(e.on.title || e.on.id)}</button></span>`; }
