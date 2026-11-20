@@ -34,6 +34,8 @@ NAME the user's GOAL: what they must be able to do, decide, or understand once t
 
 READ the repository's documentation: README.md, docs/, CONTRIBUTING.md, AGENTS.md, and any documentation file relevant for the change. READ the code the change touches, its callers and tests, the design if there is one, and the earlier conversation.
 
+IF the change adds an interface, or changes which screens exist, what they hold, their layout or their flow, and no design covers it, USE `/design-better` for the change instead, if available: it designs the change with the user, then has `/code-better` build its design.
+
 WHEN sources disagree, FOLLOW the user's instructions, THEN the repo's own files, THEN the existing code's patterns, THEN `.code/conventions.md`, THEN this skill.
 
 LIST what the result depends on that the request and these sources do not state. ASK the user about the gaps that need it, as the general rule [Ask the user](#ask-the-user) says, before you go on.

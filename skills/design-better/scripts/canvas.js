@@ -53,14 +53,23 @@
   }
   document.querySelectorAll('.sw').forEach(function (b) { b.addEventListener('click', function () { setBg(b.dataset.bg); }); });
   try { var savedBg = localStorage.getItem('canvas-bg'); if (savedBg && document.querySelector('.sw[data-bg="' + savedBg + '"]')) setBg(savedBg); } catch (e) {}
-  // Screen size: one size at a time, chosen in the top bar.
+  // Screen size: one size at a time, chosen in the top bar. The page opens on the first size the agent gave, or on
+  // the size the user last chose on this page, which a reload keeps.
+  var SIZE_KEY = 'canvas-size:' + location.pathname;
   document.querySelectorAll('button[data-size]').forEach(function (b) {
     b.addEventListener('click', function () {
       document.querySelectorAll('button[data-size]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
       document.querySelectorAll('main > section').forEach(function (sec) { sec.hidden = sec.dataset.size !== b.dataset.size; });
+      try { sessionStorage.setItem(SIZE_KEY, b.getAttribute('aria-label')); } catch (e) {}
       fit();
     });
   });
+  try {
+    // Kept by its label, such as "Mobile, 375 × 760 px", so it survives the agent reordering the sizes.
+    var savedSize = sessionStorage.getItem(SIZE_KEY), sizeBtn = savedSize && Array.prototype.find.call(
+      document.querySelectorAll('button[data-size]'), function (b) { return b.getAttribute('aria-label') === savedSize; });
+    if (sizeBtn && sizeBtn.getAttribute('aria-pressed') !== 'true') sizeBtn.click();
+  } catch (e) {}
   // Scrolling: frames of one screen size scroll together. The position is matched between elements with the
   // same id in both versions, such as headings, so versions of different length stay on the same section.
   // This works only for versions embedded from files; a page loaded from an address cannot be followed.
@@ -459,7 +468,7 @@
     var e = c.e, t = (e.verdict ? (e.verdict === 'up' ? 'Thumbs up for ' : 'Thumbs down for ') + e.version : 'You withdrew your verdict on ' + e.version);
     return el('li', 'sys', t + ', ' + time(e.at));
   }
-  // New versions from the agent load on the same screen size, view and version.
+  // New versions from the agent load on the same view and version; the screen size is kept by SIZE_KEY above.
   var KEY = 'canvas-view:' + location.pathname, deciding = false;
   var conv = pageConversation({
     served: served, name: 'canvas', unsent: 'Use Copy all to paste it in the chat.', apply: apply, byId: byId,
@@ -470,8 +479,7 @@
     sendMode: function () { return deciding ? sendDecision : null; },
     busy: function () { return !pop.hidden; },
     beforeReload: function () {
-      var size = document.querySelector('button[data-size][aria-pressed="true"]');
-      sessionStorage.setItem(KEY, JSON.stringify({ view: main.classList.contains('switch') ? 'switch' : 'side', current: current, size: size && size.dataset.size }));
+      sessionStorage.setItem(KEY, JSON.stringify({ view: main.classList.contains('switch') ? 'switch' : 'side', current: current }));
     },
     rendered: function (state) { pinState = state; syncPins(); }
   });
@@ -539,7 +547,6 @@
       var kept = JSON.parse(sessionStorage.getItem(KEY) || 'null');
       sessionStorage.removeItem(KEY);
       if (kept) {
-        var sb = kept.size && document.querySelector('button[data-size="' + kept.size + '"]'); if (sb) sb.click();
         if (kept.current < labels.length) current = kept.current;
         view(labels.length > 1 ? kept.view : 'side'); show(current);
       }

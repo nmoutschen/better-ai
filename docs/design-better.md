@@ -1,15 +1,16 @@
 # `/design-better`
 
-Designs, builds and reviews an interface so the people who use it can do what they came for.
+Designs and audits an interface so the people who use it can do what they came for, and has `/code-better` build it.
 
 ![The compare page: two versions of an orders list side by side, "A, one list" and "B, late orders first", with a conversation panel on the right](img/design-better-compare.png)
 *You compare versions on one page, and click any part of a version to comment on it or Decide.*
 
 ## What it does
 
-- **Shows you versions to choose from.** For a new page or a layout change, it puts two or three rough directions side by side on one page, before it builds.
+- **Shows you versions to choose from.** For a new page or a layout change, it puts two or three rough directions side by side on one page before anything is built.
 - **Agrees the tasks first.** A short brief: who uses the page and what they come to do, as scenarios with real data.
-- **Checks by using the page.** It walks each scenario by pointer, by keyboard and on a small screen.
+- **Hands the build to `/code-better`.** It writes a design with one requirement per scenario, and `/code-better` builds and checks the code.
+- **Accepts the result by using it.** A separate reviewer walks every scenario in the built interface, by pointer, by keyboard and on a small screen, and what fails goes back to `/code-better`.
 - **Keeps your design language.** When a rule, such as text contrast, clashes with it, it tells you and follows your decision.
 
 For example, to get late orders found first:
@@ -23,12 +24,13 @@ For example, to get late orders found first:
 <details>
 <summary><b>When to use it</b></summary>
 
-- To design, build or change an interface: a web page, an app screen, a rendered report.
-- To review an interface, yours or someone else's.
-- To create, extend, change or review a design language: the named colours, type, spacing and components that give a set of interfaces one look.
+- To design a new interface or change one: its screens, what they hold, their layout or their flow. A web page, an app screen, a rendered report.
+- To audit an interface or a design language, yours or someone else's.
+- To create, extend or change a design language: the named colours, type, spacing and components that give a set of interfaces one look.
 
 Use something else nearby:
 
+- For a small change inside one screen, such as a clearer label, [`/code-better`](code-better.md) is enough. If you call `/design-better` for it, it applies its design rules and hands the change to `/code-better` without a brief.
 - To introduce a dense document with visual panels, use [`/show-better`](show-better.md).
 - For the words in the interface, such as labels, button text and messages, `/design-better` calls [`/write-better`](write-better.md) itself.
 
@@ -49,11 +51,11 @@ It picks one of three modes from the task:
 
 | Task | Mode |
 |---|---|
-| Design, build or change an interface | build |
-| Review an interface or a design language | review |
+| A new interface, or a change to its screens, layout or flow | design |
+| A review of an interface or a design language, or what to improve | audit |
 | Create, extend or change a design language | language |
 
-Without an argument, it reviews the interface the conversation is building, then continues or corrects the work. If there is none, it asks which interface or design language to work on, and whether to build, review or change it.
+Without an argument, it audits the interface the conversation is building, then continues or corrects the work. If there is none, it asks which interface or design language to work on, and whether to design, audit or change it.
 
 </details>
 
@@ -61,10 +63,17 @@ Without an argument, it reviews the interface the conversation is building, then
 <summary><b>What happens</b></summary>
 
 1. **It reads first.** It reads the existing interface, its styles, components and design files, the content, and the project's instructions. It does not ask you what these already answer.
-2. **It writes a brief.** For anything more than a small change, it writes the goal, the audience, a few scenarios (one task each, from start to an end you can observe, with real data), and the pages and what each holds. It asks whether each page or part should stay, merge or go.
-3. **It asks a few questions.** At most about three, all at once, before building, each answerable in a few words. A question about how something looks becomes versions you choose between, not a text description.
-4. **It shows directions.** For a new interface or a change to structure, layout or flow, it first asks whether you have a direction or references in mind. Then it shows two or three rough directions that differ in structure or emphasis, not only in colour. It reviews new directions before showing them.
-5. **You compare versions on one page.** Versions appear side by side at the screen sizes in the brief, with a switch to flip between them in place. When your browser runs on the same machine, the page is served live:
+2. **It writes a brief** in `.design/<slug>/brief.md`: the goal, the audience, a few scenarios (one task each, from start to an end you can observe, with real data), and the pages and what each holds. It asks whether each page or part should stay, merge or go.
+3. **It asks a few questions.** At most about three, all at once, each answerable in a few words. A question about how something looks becomes versions you choose between, not a text description.
+4. **In design mode:**
+   - It first asks whether you have a direction or references in mind, then shows two or three rough directions that differ in structure or emphasis, not only in colour.
+   - It decides the empty, loading, error and other edge states with you.
+   - It writes `.design/<slug>/design.md`: the chosen direction, the screens and their states, and the requirements, one per scenario plus what only the code can meet, such as labels tied to fields and keyboard access.
+   - `/code-better` builds it and its verifier checks the code. Visual changes to an existing interface come in small batches, each shown before and after.
+   - A separate reviewer walks every scenario in the built interface. Each confirmed problem goes back to `/code-better`, and the reviewer walks all scenarios again, for at most three rounds.
+5. **In audit mode**, a separate reviewer gets the interface, the brief and your decisions, not the agent's reasoning. It walks each scenario and reads the labels and headings without the visual page. A finding counts only if it names a step where a person is stopped or slowed. Pages that should merge or go come first. Nothing is changed.
+6. **In language mode**, it asks what the interfaces must express, in your words, shows directions that depart from its own default, and writes the values in tables, one name per value shared by the document and the code.
+7. **You compare versions on one page.** Versions appear side by side, one screen size at a time: the page opens on the size most of the audience uses, and you switch to the others in the top bar. The page keeps your choice when it reloads. When your browser runs on the same machine, the page is served live:
    - Click any part of a version to comment on it.
    - Give each version a thumbs up or down when there are three or more.
    - Choose one version, a combination or none with Decide.
@@ -72,23 +81,21 @@ Without an argument, it reviews the interface the conversation is building, then
    - Every message, the agent's included, can be answered with Reply. The conversation opens at the latest message, and what you are typing survives new replies.
    - Open lists what is not accepted yet, and the agent's questions until you answer them.
    - New versions load by themselves once you stop typing. If the agent's server stops, a strip under the bar says the canvas is closed.
-6. **It builds.** It keeps your design language. If a rule such as text contrast conflicts with it, the agent reports the conflict once and follows your decision. It changes a few visual things at a time and shows each batch before and after. It decides empty, loading, error and other edge states.
-7. **It checks by walking.** It operates the rendered interface for each scenario: with a pointer, by keyboard only, and at the smallest screen width. It reads the labels and headings without the visual page, runs an accessibility checker if one is available, and stops fixing after about three rounds or when a fix breaks a scenario that passed.
-8. **A separate reviewer reviews it.** The reviewer gets the interface, the brief and your decisions, not the builder's reasoning. A finding counts only if it names a scenario step where a person is stopped or slowed.
 
 </details>
 
 <details>
 <summary><b>What you get</b></summary>
 
-- A brief, from `templates/brief.md`, in the project or in the reply.
+- A brief at `.design/<slug>/brief.md`, and in design mode a design at `.design/<slug>/design.md`.
 - A compare page at `.design/<slug>/index.html`, with your feedback appended to `answers.jsonl` next to it. It is not committed unless you ask.
-- The built or changed interface. When a change alters how it looks, a page showing each changed screen before and after, and the same screenshots in the pull request when the change goes into one.
+- In design mode, the interface built by `/code-better`. When a change alters how it looks, a page showing each changed screen before and after, and the same screenshots in the pull request when the change goes into one.
 - A short report:
   - which scenarios it walked and how, and which failed or could not be walked
   - the decisions that are yours: conflicts with the design language, and assumptions that changed the build
-  - review findings it could not confirm
+  - the reviewer's open findings, and those it could not confirm
 - For a new interface or a changed main flow that other people will use, an offer of a short test: you watch three to five people from the audience try the scenarios. When the pages or their names change, it offers a tree test instead, and after a test leads to changes, a second short round.
+- In audit mode, the findings in order, each with a proposed fix, and what works and must be kept.
 - In language mode, a design language document with values in tables, one name per value shared by the document and the code.
 
 The report keeps three claims apart: the scenarios can be completed, the checks pass, and the audience can use the interface. Only a test with people shows the last one.
@@ -98,7 +105,7 @@ The report keeps three claims apart: the scenarios can be completed, the checks 
 <details>
 <summary><b>Works with</b></summary>
 
-- [`/code-better`](code-better.md) for the code that implements the interface.
+- [`/code-better`](code-better.md) builds the design, and fixes what the reviewer finds.
 - [`/ask-better`](ask-better.md) for the questions before building.
 - [`/write-better`](write-better.md) for the words in the interface and for the final report.
 - [`/review-better`](review-better.md) to run the review, with design-better's rules as what to look for.
@@ -116,9 +123,9 @@ The report keeps three claims apart: the scenarios can be completed, the checks 
 | A browser that can reach the machine | It publishes the page, whose Copy all button copies your feedback for the chat. If it cannot publish, it opens the page and gives you its path. |
 | Rendering a page | It shows each version as a plain text outline and says the choice may change once rendered. |
 | Being told about your feedback as it arrives | It asks you to say "sent" in the chat, then reads your feedback from `answers.jsonl`. |
-| Operating the page by pointer and keyboard | It looks for a headless browser or automation library first. If none works, it says so and lists the walks for you to do. |
+| Operating the page by pointer and keyboard | It looks for a headless browser or automation library first. If none works, it marks the work not finished and lists the walks for you to do. |
 | An accessibility checker | It says none ran, and relies on the walks and reading the markup. |
-| Sub-agents | It reviews in a separate pass after building, re-reading the brief first. |
-| Writing files | It puts the brief and the design language in its reply. |
+| Sub-agents | It stops and marks the work not finished: the review needs a reviewer that did not design the interface. |
+| Writing files | It stops and marks the work not finished. |
 
 </details>
