@@ -8,8 +8,10 @@ p-value, with Holm's correction across the comparisons. Hand labels in `judge_la
 that folder's README) give the human verdict for a judged grader of a sample; the report compares them
 with the judge's verdicts in the same logs. For the skill condition, it also counts which of the skill's own
 files the runs read, against the files each case expects (`reads` in case.yaml); a skill run that missed one
-fails through the `skill_reads` grader. With `--latest`, each case and condition keeps only the runs of
-the most recently started log that has it, so re-runs after a fix replace the runs they fix.
+fails through the `skill_reads` grader. Logs are grouped by skill and agent model, and each group gets its own report
+with a header (judge model, Claude Code version, skill commit with a dirty flag). With `--latest`, each case
+and condition of a group keeps only the runs of the most recently started log that has it, so re-runs after a fix
+replace the runs they fix.
 
     uv run python -m tools.report logs/<dir>/*.eval [...] [--latest] [--labels judge_labels/code-better.yaml]
 """
@@ -27,20 +29,18 @@ import yaml
 from inspect_ai.log import EvalSample, read_eval_log
 
 from skill_evals.agent import AGENT_TIMEOUT_MESSAGE
-from skill_evals.cases import CONDITIONS
+from skill_evals.cases import CONDITIONS, NO_SKILL, ONE_SENTENCE, SHORT_SKILL, SKILL_INSTALLED, WITH_SKILL
 from skill_evals.grading.files import GRADING_ERROR_MESSAGE
-
-EVALS = Path(__file__).resolve().parents[1]
 
 # Each comparison is (condition, baseline): the difference is condition minus baseline.
 COMPARISONS = (
-    ("skill", "no-skill"),
-    ("one-sentence", "no-skill"),
-    ("short-skill", "no-skill"),
-    ("skill", "one-sentence"),
-    ("skill", "short-skill"),
-    ("skill-installed", "no-skill"),
-    ("skill", "skill-installed"),
+    (WITH_SKILL, NO_SKILL),
+    (ONE_SENTENCE, NO_SKILL),
+    (SHORT_SKILL, NO_SKILL),
+    (WITH_SKILL, ONE_SENTENCE),
+    (WITH_SKILL, SHORT_SKILL),
+    (SKILL_INSTALLED, NO_SKILL),
+    (WITH_SKILL, SKILL_INSTALLED),
 )
 RESAMPLES = 10_000
 RANDOM_SEED = 0
