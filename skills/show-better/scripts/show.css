@@ -27,12 +27,12 @@ main { min-height:0; overflow:hidden; display:flex; flex-direction:column; backg
 /* Part names cut and segments shrink before the strip scrolls; it never shows a scrollbar over the numbers. */
 .strip { flex:1; display:flex; gap:8px; min-width:0; margin:0; padding:0; list-style:none; overflow-x:auto; scrollbar-width:none; }
 .grp { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:5px; }
-.grp .pname { font:700 10px/1.2 var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+.grp .pname { font:700 11px/1.2 var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:12px; }
 .grp.on .pname { color:var(--heading); }
 .segs { display:flex; gap:3px; }
 .segs button { flex:1 1 0; min-width:14px; height:24px; border:0; padding:0 4px; cursor:pointer; background:var(--line);
-  font:700 10px var(--sans); color:var(--ink); }
+  font:700 11px var(--sans); color:var(--ink); }
 .segs button[aria-current="step"] { background:var(--umber); color:var(--cream); }
 .segs button:hover { outline:1px solid var(--umber); }
 .count { flex:none; font:400 13px var(--sans); color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -119,18 +119,6 @@ text.has-detail:hover, text.has-detail.sel, .has-detail:hover > text { text-deco
   font:700 12px var(--sans); align-items:center; justify-content:center; }
 .msg.deleted { opacity:.55; }
 
-/* The comment box. */
-.pop { position:fixed; z-index:5; width:min(22rem, calc(100vw - 24px)); background:var(--cream); color:var(--ink);
-  border:2px solid var(--ink); box-shadow:0 8px 24px rgba(28,26,23,.25); padding:12px; }
-.pop[hidden] { display:none; }
-.pop .target { margin:0 0 8px; font-size:13px; color:var(--muted); overflow-wrap:anywhere; }
-.pop textarea { width:100%; min-height:4.5em; font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff;
-  border:1px solid var(--muted); padding:8px 10px; resize:vertical; }
-.pop .row2 { display:flex; gap:8px; align-items:center; margin-top:8px; }
-.pop .remove { margin-left:auto; }
-.pop .remove[hidden] { display:none; }
-.unwatched { margin:0 0 12px; padding:8px 12px; background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:500 13px/1.45 var(--sans); }
-.unwatched[hidden] { display:none; }
 
 /* ---------- The visual kinds ---------- */
 .slide table { border-collapse:collapse; font:400 15px/1.45 var(--s-sans); width:100%; }
@@ -200,7 +188,7 @@ text.has-detail:hover, text.has-detail.sel, .has-detail:hover > text { text-deco
 }
 
 /* ---------- The exported presentation: one slide filling the window ---------- */
-body.present { background:#F5F5F5; }
+body.present { background:var(--surround); }
 .present .deck { position:fixed; inset:0; }
 .present .slide { position:absolute; left:50%; top:50%; width:1000px; margin:0; transform-origin:center; }
 .pcount { position:fixed; right:18px; bottom:12px; margin:0; font:400 13px var(--sans); color:var(--muted); font-variant-numeric:tabular-nums; }

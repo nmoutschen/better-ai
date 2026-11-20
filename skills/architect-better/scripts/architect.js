@@ -154,7 +154,7 @@ function start(data) {
 
   document.title = 'Design: ' + data.title;
   byId('title').textContent = document.title;
-  byId('accepted-count').innerHTML = new Set(data.accepted).size + '<span> / ' + (tabs.length - 1) + '</span>';
+  byId('accepted-count').innerHTML = new Set(data.accepted).size + '<span class="of"> / ' + (tabs.length - 1) + '</span>';
   const sections = tabs.slice(1).map(button => {
     const key = button.id.slice(4);
     const accepted = data.accepted.includes(key);

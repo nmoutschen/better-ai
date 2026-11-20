@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>better-ai design language</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- The shared stylesheet itself, so this page shows what the boards show. DESIGN.md says what each part is for. -->
+<link rel="stylesheet" href="skills/research-better/scripts/page.css">
+<style>
+/* Only the layout of this reference page; every colour, type size and component comes from page.css. */
+main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
+.ref section { max-width:64rem; padding-top:24px; }
+.ref h2.big { font:700 22px/1.3 var(--serif); color:var(--heading); margin:0 0 4px; }
+.ref section > h3 { font:700 15px var(--sans); color:var(--heading); margin:24px 0 8px; }
+.ref p.lead { color:var(--muted); margin:0 0 16px; max-width:65ch; }
+.ref .row { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; margin:0 0 8px; }
+.swatches { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(15rem, 1fr)); gap:12px; }
+.swatches li { border:1px solid var(--line); background:var(--cream); }
+.swatches .chip { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; padding:0 12px; font:700 15px var(--sans); }
+.swatches .info { padding:8px 12px 10px; font-size:13px; line-height:1.4; }
+.swatches code { font:400 12px ui-monospace, Menlo, monospace; }
+.swatches b { color:var(--heading); }
+.swatches .role { color:var(--ink); margin-top:2px; }
+.type { width:100%; border-collapse:collapse; }
+.type td, .type th { text-align:left; vertical-align:baseline; padding:10px 12px 10px 0; border-bottom:1px solid var(--line); }
+.type th { font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.type td:first-child { width:9rem; font-size:12px; color:var(--muted); }
+.specimen { border:1px solid var(--line); background:var(--cream); padding:16px; }
+.ref .qpop.demo { position:relative; max-width:34rem; }
+.ref .tabs { position:static; }
+.ref .link { color:var(--umber); }
+.ref .flush { margin:0; }
+.ref .gap { margin-bottom:8px; }
+.ref .narrow { max-width:34rem; }
+.ref .spaced { margin:12px 0 0; }
+.ref .on-umber { background:var(--umber); padding:12px; }
+.ref svg.fig { max-width:100%; height:auto; }
+.ref td.stat { display:table-cell; }
+.t-title { font:700 20px/1.2 var(--serif); color:var(--heading); }
+.t-card { font:700 16px/1.3 var(--serif); color:var(--heading); }
+.t-body { font:400 15px/1.55 var(--sans); }
+.t-message { font:400 14px/1.45 var(--sans); }
+.t-small { font:400 12px/1.4 var(--sans); color:var(--muted); }
+.t-prose { font:400 17px/1.75 var(--serif); max-width:42rem; }
+.ref .offline.demo { max-width:34rem; }
+.article { border:1px solid var(--line); background:var(--cream); padding:24px 28px 28px; }
+.article .site { font:700 1.5rem var(--sans); color:var(--heading); margin:0 0 16px; }
+.article .site span { color:var(--muted); font-weight:400; }
+.article .atitle { font:700 2.75rem/1.15 var(--serif); color:var(--heading); margin:16px 0 0; }
+.article .terra { height:10px; margin:24px 0; background:var(--terracotta) var(--saya); background-size:13px 7.5px; max-width:42rem; }
+.article .alead { font:400 1.25rem/1.55 var(--serif); color:var(--ink); margin:0 0 16px; max-width:42rem; }
+.article .prose { font:400 17px/1.75 var(--serif); color:var(--ink); margin:0; max-width:42rem; }
+.article .band { height:10px; }
+@media (max-width:700px) { .article .atitle { font-size:2rem; } }
+</style></head>
+<body>
+<div class="band"></div>
+<header class="bar--stats">
+  <div><h1>better-ai design language</h1></div>
+  <div class="stats">
+    <span class="stat"><b id="n-done"></b>messages answered<span class="meter" aria-hidden="true"><i id="meter-done"></i></span></span>
+    <span class="stat"><b id="n-colours"></b>colours</span>
+    <button type="button" class="stat" id="to-waiting"><b>1</b>question for you</button>
+  </div>
+</header>
+<div class="work">
+<main class="ref">
+
+  <section aria-labelledby="h-colour">
+    <h2 class="big" id="h-colour">Colour</h2>
+    <p class="lead">Every colour a page uses. Each card shows the text colours allowed on it, and its contrast. The rules are in <a href="DESIGN.md" class="link">DESIGN.md</a>.</p>
+    <ul class="swatches" id="swatches"></ul>
+  </section>
+
+  <section aria-labelledby="h-type">
+    <h2 class="big" id="h-type">Type</h2>
+    <p class="lead">Libre Baskerville for titles and prose to read; Space Grotesk for the interface.</p>
+    <table class="type">
+      <thead><tr><th scope="col">Name</th><th scope="col">Sample</th></tr></thead>
+      <tbody>
+        <tr><td>title, serif 20 / 700</td><td class="t-title">Export invoices as CSV</td></tr>
+        <tr><td>card title, serif 16 / 700</td><td class="t-card">3: Fix rounding of VAT totals</td></tr>
+        <tr><td>stat, sans 20 / 700</td><td class="stat"><b>2<span class="of"> / 6</span></b></td></tr>
+        <tr><td>body, sans 15 / 400</td><td class="t-body">Round VAT per line or on the invoice total? The ticket says both.</td></tr>
+        <tr><td>message, sans 14 / 400</td><td class="t-message">Applied the default: treating it as unsupported and recording the issue as a gap.</td></tr>
+        <tr><td>small, sans 12 / 400</td><td class="t-small">Updated just now</td></tr>
+        <tr><td>label, sans 12 / 700</td><td><span class="section-h">Conversation</span></td></tr>
+        <tr><td>prose, serif 17 / 400</td><td class="t-prose">A board shows what the agent is doing and what waits for you, in one window.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="h-comp">
+    <h2 class="big" id="h-comp">Components</h2>
+    <p class="lead">Rendered from page.css. The conversation on the right runs on page.js, as on every board: write a message, then try Reply.</p>
+
+    <h3>Stats header</h3>
+    <p class="lead flush">The bar at the top of this page: a figure with a meter, a plain figure, and a figure that is a button (it takes you to the question in the conversation).</p>
+
+    <h3>Section label and legend</h3>
+    <div class="specimen">
+      <h4 class="section-h gap">Agents</h4>
+      <ul class="legend">
+        <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="#6B7F5E" stroke="#33302B" stroke-width=".75"/></svg>answered</li>
+        <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="#C4B69C" stroke="#33302B" stroke-width=".75"/></svg>to do</li>
+        <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="#9A3B2A" stroke-width="2"/></svg>not found</li>
+      </ul>
+    </div>
+
+    <h3>Tabs</h3>
+    <div class="tabs" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" aria-selected="true">Overview</button>
+      <button type="button" role="tab" aria-selected="false">Requirements <span class="count ok">✓</span></button>
+      <button type="button" role="tab" aria-selected="false">Flows <span class="count">1</span></button>
+    </div>
+
+    <h3>Buttons and segmented controls</h3>
+    <div class="row">
+      <button type="button" class="btn">Send</button>
+      <button type="button" class="btn btn--quiet">Decide…</button>
+      <button type="button" class="btn btn--sm">✓</button>
+      <button type="button" class="btn btn--quiet btn--sm">Reply</button>
+      <button type="button" class="mini" aria-label="Good">+</button>
+      <div class="seg seg--light" role="group" aria-label="Show">
+        <button type="button" aria-pressed="false">All</button><button type="button" aria-pressed="true">Open (4)</button>
+      </div>
+    </div>
+    <div class="row on-umber">
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" aria-pressed="true">Side by side</button><button type="button" aria-pressed="false">Switch</button>
+      </div>
+    </div>
+
+    <h3>Progress</h3>
+    <div class="row" id="progress-demo"></div>
+
+    <h3>Pop-up</h3>
+    <div class="qpop demo" role="dialog" aria-label="Example pop-up">
+      <button type="button" class="x" aria-label="Close">×</button>
+      <h3>How do coding agents test their apps?</h3>
+      <p>Answered by w1 from 4 sources. Ask the coordinator about it below.</p>
+      <form class="ask" onsubmit="return false"><textarea aria-label="Question about it"></textarea><button type="submit" class="btn">Ask</button></form>
+    </div>
+
+    <h3>Notices</h3>
+    <p class="unwatched narrow">The agent is not watching this page right now. What you send is saved, but it reads it only when it next looks: tell it in the chat.</p>
+    <p class="offline demo">The page's server stopped answering. Ask the agent to restart it.</p>
+    <p class="spaced"><button type="button" class="btn btn--quiet" id="toast-ok">Show a toast</button></p>
+
+    <h3>Diagram boxes</h3>
+    <svg viewBox="0 0 640 120" width="640" class="fig" role="img" aria-label="Three boxes: a plain box, a dashed group, and the selected box outlined in terracotta">
+      <rect x="1" y="20" width="180" height="70" fill="#FFFCF7" stroke="#C4B69C"/>
+      <text x="16" y="50" font-family="Space Grotesk" font-size="15" fill="#33302B">Coordinator agent</text>
+      <text x="16" y="70" font-family="Space Grotesk" font-size="12" fill="#78736B">plans, answers, merges</text>
+      <rect x="220" y="10" width="190" height="96" fill="#F2EDE5" stroke="#C4B69C" stroke-dasharray="4 3"/>
+      <text x="234" y="30" font-family="Space Grotesk" font-size="12" fill="#78736B">Agent team</text>
+      <rect x="234" y="40" width="162" height="50" fill="#FFFCF7" stroke="#C4B69C"/>
+      <text x="248" y="70" font-family="Space Grotesk" font-size="15" fill="#33302B">Builder agents</text>
+      <rect x="450" y="20" width="180" height="70" fill="#FFFCF7" stroke="#E8725C" stroke-width="2"/>
+      <text x="466" y="50" font-family="Space Grotesk" font-size="15" fill="#33302B">Dashboard page</text>
+      <text x="466" y="70" font-family="Space Grotesk" font-size="12" fill="#78736B">selected</text>
+    </svg>
+  </section>
+
+  <section aria-labelledby="h-article">
+    <h2 class="big" id="h-article">Article page</h2>
+    <p class="lead">For the website and for documents a skill writes: a page to read, which scrolls.</p>
+    <div class="article">
+      <p class="site">better-ai <span>skills for AI agents</span></p>
+      <div class="band"></div>
+      <h3 class="atitle">Research a topic from sources</h3>
+      <div class="terra"></div>
+      <p class="alead">research-better splits a question into smaller ones, sends worker agents after each, and shows the run on a live board.</p>
+      <p class="prose">You see which questions are answered, which are contested, and which decisions wait for you. Each finding cites its source, so you can check the claims that matter to you.</p>
+    </div>
+  </section>
+</main>
+
+<aside class="notes" aria-labelledby="notes-h">
+  <div class="notes-top">
+    <h2 id="notes-h">Conversation</h2>
+    <div class="seg seg--light" role="group" aria-label="Show">
+      <button type="button" data-filter="all" aria-pressed="false">All</button>
+      <button type="button" data-filter="open" aria-pressed="true">Open</button>
+    </div>
+  </div>
+  <p class="empty">Nothing yet.</p>
+  <ol class="thread"></ol>
+  <div class="composer">
+    <label for="note">Message to the agent</label>
+    <textarea id="note"></textarea>
+    <div class="send">
+      <button type="button" class="btn">Send</button>
+      <p class="status" role="status"></p>
+    </div>
+  </div>
+</aside>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+<script src="skills/research-better/scripts/page.js"></script>
+<script>
+// The colours of DESIGN.md's table, read from page.css so the values shown are the ones the boards use.
+const COLOURS = [
+  ["cream", "page background; text on dark fills", ["ink", "heading", "muted", "umber", "terracotta-dark", "moss-dark", "error"]],
+  ["linen", "the agent's messages, code, a quiet panel", ["ink", "heading", "umber", "terracotta-dark", "error"]],
+  ["white", "inside fields; the user's own messages", ["ink", "heading", "muted"]],
+  ["umber", "header bar, primary buttons, waiting for you", ["cream"]],
+  ["ink", "body text, separating rules", ["cream"]],
+  ["heading", "headings, names", ["cream"]],
+  ["muted", "times, metadata (cream and white only)", []],
+  ["terracotta", "bands, the working bar, a selected outline; never text", ["heading"]],
+  ["terracotta-dark", "terracotta as text", ["cream"]],
+  ["moss-dark", "done, accepted, a feature", ["cream"]],
+  ["moss", "fill only: a done mark on a map", []],
+  ["sand", "thin box borders, seen bars", ["heading"]],
+  ["line", "hairlines between rows", []],
+  ["error", "failure, blocked, not watching", ["cream"]],
+  ["surround", "behind versions and exported slides", ["ink"]],
+  ["surround-dark", "the canvas's dark surround", ["cream"]],
+  ["frame", "a version's outline on light", []],
+  ["frame-dark", "a version's outline on dark", []],
+];
+const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue("--" + n).trim();
+function lum(hex) {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4);
+  return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+}
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => p - q); return ((y + .05) / (x + .05)).toFixed(1); };
+document.getElementById("swatches").replaceChildren(...COLOURS.map(([name, role, on]) => {
+  const li = document.createElement("li"), bg = v(name);
+  const chip = document.createElement("div"); chip.className = "chip"; chip.style.background = bg;
+  on.forEach(fg => { const s = document.createElement("span"); s.style.color = v(fg); s.textContent = "Aa"; s.title = `--${fg} on --${name}, ${ratio(v(fg), bg)}:1`; chip.append(s); });
+  const info = document.createElement("div"); info.className = "info";
+  info.innerHTML = `<b>--${name}</b> <code>${bg}</code><div class="role"></div>`;
+  info.querySelector(".role").textContent = role + (on.length ? `. Text: ${on.map(fg => `${fg} ${ratio(v(fg), bg)}:1`).join(", ")}.` : ".");
+  li.append(chip, info); return li;
+}));
+document.getElementById("n-colours").textContent = COLOURS.length;
+
+const conv = pageConversation({ served: false, stream: false, name: "reference page", agent: "Agent", latestLast: true,
+  unsent: "This reference page has no agent." });
+conv.setLog([
+  { action: "note", id: "m1", at: "2026-11-20T16:40:00", note: "Why not server-sent events? They are one-way, but that is the direction we need." },
+  { action: "reply", to: "m1", at: "2026-11-20T16:41:00", text: "SSE could push replies to the page. Answers still need a separate path back." },
+  { action: "status", to: "m1", at: "2026-11-20T16:41:00", status: "done" },
+  { action: "note", id: "m2", at: "2026-11-20T16:43:00", note: "Say why the page has no login." },
+  { action: "status", to: "m2", at: "2026-11-20T16:43:00", status: "working" },
+  { action: "reply", id: "r3", at: "2026-11-20T16:44:00", text: "Is 2 seconds the right bound for a question to show in the page, or is 10 seconds fine?" },
+]);
+conv.start && conv.start();
+document.getElementById("progress-demo").replaceChildren(...["seen", "asked", "working", "done", "accepted", "reopened"].map(s => conv.progress(s)));
+document.getElementById("toast-ok").addEventListener("click", () => conv.flash("✓ Message sent to the agent", "ok"));
+document.getElementById("to-waiting").addEventListener("click", () => {
+  const q = document.querySelector(".thread > li:last-child"); if (!q) return;
+  q.scrollIntoView({ block: "nearest" }); const b = q.querySelector("button"); if (b) b.focus({ preventScroll: true });
+});
+// The meter: the user's messages the agent finished, out of all of them.
+const mine = ["m1", "m2"], done = 1;
+document.getElementById("n-done").innerHTML = `${done}<span class="of"> / ${mine.length}</span>`;
+document.getElementById("meter-done").style.width = `${100 * done / mine.length}%`;
+</script>
+</body></html>

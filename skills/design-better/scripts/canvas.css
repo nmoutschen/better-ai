@@ -7,8 +7,8 @@
 .seg button.ico[aria-pressed="true"] { opacity:1; }
 .seg button.ico svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
 .seg button.sw .chip { width:14px; height:14px; border:1px solid var(--sand); display:block; }
-.chip--light { background:#F5F5F5; }
-.chip--dark { background:#1E1E1E; }
+.chip--light { background:var(--surround); }
+.chip--dark { background:var(--surround-dark); }
 /* In the bar, a two-option setting is one button that shows the current option. Both options share one cell, so
    the button keeps the width of the longer one; the first option is cream and the second umber, so the colour also
    tells which is on. */
@@ -24,9 +24,9 @@
 .morebtn svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; }
 .morebtn[aria-expanded="true"] { background:var(--cream); color:var(--umber); }
 .menu { position:absolute; right:0; top:calc(100% + 6px); z-index:4; display:grid; gap:4px; min-width:12rem;
-  padding:10px 12px 12px; background:var(--umber); border:1px solid var(--cream); box-shadow:0 8px 24px rgba(28,26,23,.3); }
+  padding:10px 12px 12px; background:var(--umber); border:1px solid var(--cream); box-shadow:var(--shadow); }
 .menu[hidden] { display:none; }
-.menu-h { margin:4px 0 2px; font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--cream); opacity:.8; }
+.menu-h { margin:4px 0 2px; font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--cream); opacity:.8; }
 /* ---------- Versions ---------- */
 main { min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:12px 20px 10px;
   background:var(--surround); color:var(--ink); }
@@ -42,8 +42,8 @@ figure { margin:0; min-width:0; min-height:0; display:flex; flex-direction:colum
 .full:hover { background:var(--ink); color:var(--cream); }
 .stage { flex:1; min-height:0; display:flex; justify-content:center; align-items:flex-start; }
 /* A thin neutral outline on each frame keeps the background from changing how the version's own edges read. */
-.screen { position:relative; flex:none; overflow:hidden; max-width:100%; border:1px solid #BDBDBD; background:#fff; }
-.screen iframe { display:block; border:0; transform-origin:0 0; background:#fff; }
+.screen { position:relative; flex:none; overflow:hidden; max-width:100%; border:1px solid var(--frame); background:var(--white); }
+.screen iframe { display:block; border:0; transform-origin:0 0; background:var(--white); }
 /* Verdicts, shown with three or more versions. */
 .vbtn { border:1px solid var(--ink); background:transparent; color:var(--ink); height:30px; min-width:30px; padding:0 8px;
   cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; font:700 12px var(--sans);
@@ -63,7 +63,7 @@ main .pick button[aria-pressed="true"] { background:var(--ink); color:var(--crea
 main.on-dark .label b, main.on-dark .full { color:var(--cream); }
 main.on-dark .full { border-color:var(--cream); }
 main.on-dark .vbtn { color:var(--cream); border-color:var(--cream); }
-main.on-dark .screen { border-color:#5A5A5A; }
+main.on-dark .screen { border-color:var(--frame-dark); }
 main.on-dark .pick, main.on-dark .pick button + button { border-color:var(--cream); }
 main.on-dark .pick button { color:var(--cream); }
 main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:var(--heading); }
@@ -71,11 +71,11 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .msg .n { display:inline-flex; width:24px; height:24px; border-radius:50%; background:var(--terracotta); color:var(--heading);
   font:700 12px var(--sans); align-items:center; justify-content:center; }
 .msg .with { color:var(--muted); }
-.verdict { display:inline-block; font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; padding:1px 6px;
+.verdict { display:inline-block; font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; padding:1px 6px;
   margin-right:8px; vertical-align:1px; }
 .verdict.up { background:var(--moss-dark); color:var(--cream); }
 .verdict.down { background:var(--terracotta); color:var(--heading); }
-.decide { border:1px solid var(--sand); background:#fff; padding:8px 10px; margin-bottom:10px; }
+.decide { border:1px solid var(--sand); background:var(--white); padding:8px 10px; margin-bottom:10px; }
 .decide .menu-h { color:var(--muted); margin:0 0 6px; }
 .dopt { display:flex; align-items:center; gap:6px; font-size:14px; margin:4px 0; cursor:pointer; }
 .dopt input { accent-color:var(--umber); }
@@ -84,18 +84,6 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .status { margin:0; font-size:14px; }
 .status.error { color:var(--error); font-weight:700; }
 .copy[hidden] { display:none; }
-.pop textarea { width:100%; min-height:4.5em; font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff;
-  border:1px solid var(--muted); padding:8px 10px; resize:vertical; }
-.pop { position:fixed; z-index:5; width:min(22rem, calc(100vw - 24px)); background:var(--cream); color:var(--ink);
-  border:2px solid var(--ink); box-shadow:0 8px 24px rgba(28,26,23,.25); padding:12px; }
-.pop[hidden] { display:none; }
-.pop .target { margin:0 0 8px; font-size:13px; color:var(--muted); overflow-wrap:anywhere; }
 .pop .verdicts { display:flex; gap:6px; margin-bottom:8px; }
-.pop .row2 { display:flex; gap:8px; align-items:center; margin-top:8px; }
-.pop .remove { margin-left:auto; }
-.pop .remove[hidden] { display:none; }
 .vcomment { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .vcomment:focus { position:static; width:auto; height:30px; clip-path:none; padding:0 10px; border:1px solid var(--ink); background:var(--cream); font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
-/* Above the message box when no `wait` is connected, so a note sent after the agent stopped watching is not lost in silence. */
-.unwatched { margin:0 0 12px; padding:8px 12px; background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:500 13px/1.45 var(--sans); }
-.unwatched[hidden] { display:none; }

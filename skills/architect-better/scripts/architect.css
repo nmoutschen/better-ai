@@ -6,7 +6,7 @@
 .tbl th { font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
 .chip { white-space:nowrap; display:inline-block; font:700 11px var(--sans); letter-spacing:.04em; padding:2px 8px; border:1px solid var(--sand); color:var(--ink); background:var(--linen); }
 .chip.ok { border-color:var(--moss-dark); color:var(--moss-dark); background:var(--cream); }
-.chip.open { border-color:var(--terracotta); color:#AA5141; background:var(--cream); }
+.chip.open { border-color:var(--terracotta); color:var(--terracotta-dark); background:var(--cream); }
 .chip.guess { border-color:var(--umber); color:var(--umber); background:var(--cream); border-style:dashed; }
 .chip.req { font-weight:600; }
 .controls { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:0 0 12px; }
@@ -40,14 +40,6 @@ code { font:400 .9em ui-monospace, Menlo, monospace; background:var(--linen); pa
 .edit textarea { font:inherit; padding:6px 8px; border:1px solid var(--ink); min-height:3em; }
 .edit .btn { justify-self:start; }
 
-header.bar--stats { align-items:flex-end; }
-.bar--stats h1 { margin:0; }
-.stats { display:flex; gap:24px; align-items:flex-end; font-size:12px; }
-.stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
-.stat b { font:700 20px/1.1 var(--sans); }
-.stat b span { font-size:14px; }
-button.stat { border:0; background:none; padding:0; color:inherit; font:inherit; cursor:pointer; }
-button.stat b { text-decoration:underline; text-underline-offset:3px; }
 .view { min-height:0; overflow:auto; padding:0 var(--pad) 48px; }
 .tabs { overflow:auto; }
 .tabs button { white-space:nowrap; }
@@ -57,16 +49,14 @@ button.stat b { text-decoration:underline; text-underline-offset:3px; }
 .fig svg g[role="button"] > line:first-child { pointer-events:stroke; }
 .fig svg g[role="button"]:focus-visible { outline:3px solid var(--terracotta); }
 .fig svg.focused > :not(.highlighted, defs, style, rect:first-child) { opacity:.18; }
-.fig svg .highlighted > :is(rect, path, line):first-child { stroke:#E8725C; stroke-width:3.5; }
+.fig svg .highlighted > :is(rect, path, line):first-child { stroke:var(--terracotta); stroke-width:3.5; }
 .fig svg .mark.highlighted > rect { stroke:none; }
 .boxref svg { flex:none; }
 
-.decide, .pop { border:1px solid var(--sand); background:var(--cream); padding:10px 12px; }
-.decide { margin-bottom:10px; }
+.decide { border:1px solid var(--sand); background:var(--cream); padding:10px 12px; margin-bottom:10px; }
 .decide p { margin:0 0 6px; }
 .menu-h { font-weight:700; }
-.pop { position:fixed; z-index:5; width:min(22rem, calc(100vw - 24px)); box-shadow:0 4px 18px #33302b33; }
-.pop textarea { display:block; width:100%; min-height:5em; font:inherit; margin:8px 0; }
+.pop textarea { display:block; min-height:5em; margin:8px 0; }
 .comment-actions { display:flex; gap:8px; }
 /* Comment pins and the commenting cursor match design-better's canvas. */
 .pin { position:absolute; width:24px; height:24px; transform:translate(-50%, -50%); border-radius:50%; background:var(--terracotta);
