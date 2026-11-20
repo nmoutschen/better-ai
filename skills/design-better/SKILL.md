@@ -2,6 +2,8 @@
 name: design-better
 description: Helps an AI agent design, build and review an interface or page, such as a web page, an app screen or a rendered report, so that the people who use it can do what they came for, and create, apply and review the design language behind it. Agrees the audience and their tasks with the user, shows rough directions before building, and checks the result by walking each task instead of trusting how it looks. Use show-better to introduce a document with visual panels, and write-better for the words in the interface.
 argument-hint: "[INTERFACE OR TASK]"
+metadata:
+  kind: procedural
 ---
 
 # Design Better
