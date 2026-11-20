@@ -261,12 +261,21 @@ final code when it ran after the last edit to the files it exercises.
 
 A second scorer, `skill_reads` (`grading/reads.py`), checks in the skill
 condition whether the agent read every skill file the case lists under
-`reads`, other than `SKILL.md`, which the slash command loads. A read is a
-Read tool call on a file in `~/.claude/skills/<skill>/`, or a Bash command
-that prints one (`cat`, `head`, `sed`...), by the agent or by a sub-agent; the
-tool names and the skills folder come from `agent.py`. It scores 1 or 0, with
-the files read and the missing ones in its metadata, and gives no score in
-other conditions or in cases that expect no reads. It is a separate scorer, as
+`reads`, other than `SKILL.md`, which the slash command loads. It works in two
+steps. A script counts a Read tool call on a file in
+`~/.claude/skills/<skill>/` that did not fail, by the agent or by a
+sub-agent; the tool names and the skills folder come from `agent.py`. For the
+files still missing, one judge call per sample (the same `claude -p` judge
+and `judge_model`, asked only when something is missing) says for each file
+whether the transcript shows the agent, or a sub-agent it started, printing
+its content by any means (`cat`, `sed`, a loop...). Only files the judge also
+finds unread are missed. A judge that cannot run makes the sample a sample
+error; with `judge_model=none` the script's result stands. It scores 1 or 0,
+with the files the script found (`read`), the files the judge found
+(`judge_read`), `missing`, who decided (`decided_by`) and the judge's reply in
+its metadata, and gives no score in other conditions or in cases that expect no
+reads. Re-scoring a log with `inspect score` needs a sandbox only when the
+judge is asked. It is a separate scorer, as
 Inspect advises for an independent judgment, so the rule's `all` is unchanged.
 The report fails a skill run that missed a read and also shows its rule-only
 score.

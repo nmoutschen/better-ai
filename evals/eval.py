@@ -68,7 +68,7 @@ def skill_eval(
         solver=solver,
         # The rule's score first; skill_reads and lint_issues_added are independent, so they are separate
         # scorers (Inspect's advice). lint_issues_added only observes: it is never part of a pass or fail.
-        scorer=[grade_cases(keys, judge_model), skill_reads(), skill_loaded(), lint_issues_added()],
+        scorer=[grade_cases(keys, judge_model), skill_reads(judge_model), skill_loaded(), lint_issues_added()],
         sandbox=("docker", COMPOSE),
         model="none/none",
         metadata={"skill": skill, "conditions": conditions, "rule": rule, "judge_model": judge_model}

@@ -124,7 +124,11 @@ async def test_failed_read_is_missing_and_goes_to_the_judge(monkeypatch: pytest.
 async def test_judge_finds_a_read_by_cat(monkeypatch: pytest.MonkeyPatch) -> None:
     """When the judge says the file was printed by cat, it is not missed; the metadata says who found it."""
     stub = StubJudge("Step 1 prints it.\nmodes/bug-fix.md: READ")
-    result = await score([ChatMessageAssistant(content="", tool_calls=[CAT_CALL])], stub=stub, monkeypatch=monkeypatch)
+    result = await score(
+        [ChatMessageUser(content="Fix it"), ChatMessageAssistant(content="", tool_calls=[CAT_CALL])],
+        stub=stub,
+        monkeypatch=monkeypatch,
+    )
     assert result.value == 1 and "cat modes/bug-fix.md" in stub.prompts[0]
     meta = result.metadata
     assert meta["read"] == {} and meta["judge_read"] == ["modes/bug-fix.md"] and meta["missing"] == []
