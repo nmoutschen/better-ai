@@ -33,7 +33,7 @@ IF the repository has no history, or less than the period above, SAY so in the r
 
 ## 3. Run the review
 
-USE `/review-better` to run the review, if available. The work is the code in scope. The GOAL of the review is that the user can choose what to improve next. The reviewer does not change the code. GIVE the reviewer the evidence file and this list of what to look for:
+START a separate reviewer for every audit, however small the scope: DO NOT review the code yourself instead. USE `/review-better` to run the review, if available. The work is the code in scope. The GOAL of the review is that the user can choose what to improve next. The reviewer does not change the code, and reports every finding it confirms, however small, because the full list is for agents to work from: the report to the user stays short in step 6. GIVE the reviewer the evidence file and this list of what to look for:
 
 1. Code that gives wrong results now, or loses data, money or what users are told.
 2. Knowledge written in more than one place, such as a rate, a rule or a format, where the copies already differ, or where the history shows one copy changed without the other. Repeated lines alone are not a finding: duplicated code causes defects in some systems and not in others.
@@ -41,10 +41,13 @@ USE `/review-better` to run the review, if available. The work is the code in sc
 4. Code that changes often and is hard to change: files high in the history of step 2 that are long, complex or untested, and files that must change together without the code showing why.
 5. Abstractions that fit their callers badly, such as a flag or branch per caller, and code written for needs that never came, such as unused parameters, modules or extension points. Speculative code has not been shown to cause defects: it costs only where the code changes.
 6. Code that breaks a rule the repository states.
+7. Small cleanups: unused imports or code, leftover debug output, unnamed constants, and names that break the codebase's conventions.
 
 FOR a scope too large for one reviewer to read, START one reviewer per area, each with the same list.
 
-IF `/review-better` is not available, START a sub-agent as the reviewer, with what to look for, the evidence file and the scope, and without your own view of the code. WAIT until each reviewer hands back its report. DO NOT write to the user while a reviewer runs.
+IF `/review-better` is not available, START a sub-agent as the reviewer, with what to look for, the evidence file and the scope, and without your own view of the code.
+
+WAIT until each reviewer hands back its report. DO NOT write to the user while a reviewer runs.
 
 CONFIRM each finding with evidence you can show: a failing test or a reproduction, the history entries, or the exact lines and the input that make it fail. KEEP a finding you could not confirm, marked unconfirmed.
 
