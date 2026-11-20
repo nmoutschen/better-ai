@@ -22,7 +22,6 @@
   --surround:#F5F5F5; --surround-dark:#1E1E1E; --frame:#BDBDBD; --frame-dark:#5A5A5A;
   --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
   --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E");
-  --pad:max(40px, (100% - 110rem) / 2);
 }
 * { box-sizing:border-box; }
 :focus-visible { outline:2px solid var(--umber); outline-offset:2px; }
@@ -468,15 +467,15 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
     <p class="lead">Every board has the same areas: band, header, view, side column. The page never scrolls; the parts marked ↕ scroll inside themselves. A new board picks one header and one view pattern.</p>
     <div class="wires">
       <figure>
-        <div class="wire" role="img" aria-label="Research board: stats header; a tool row with the legend and zoom buttons over a map; a side column with the agents, then the conversation.">
+        <div class="wire" role="img" aria-label="Research board: stats header; the agents at work in a row, a tool row with the legend and zoom buttons, then a map; the conversation.">
           <div class="b"></div>
           <div class="h"><div class="t">Agent-made local apps<small>Choose an approach for building agent apps</small></div><div class="r"><b>19 / 21 closed</b><b>1 for you</b></div></div>
           <div class="w">
-            <div class="v"><div class="wrow"><div class="x">answered, to do, contested</div><div class="x fixed">+ &minus; Fit</div></div><div class="x grow"><span class="s">pans and zooms</span><br>Map of the research questions</div></div>
-            <div class="n"><div class="lbl">Agents</div><div class="x">w1 WebGen references</div><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+            <div class="v"><div class="lbl">Agents</div><div class="wrow"><div class="x">w1 WebGen references</div><div class="x">v1 Checking claims</div></div><div class="wrow"><div class="x">answered, to do, contested</div><div class="x fixed">+ &minus; Fit</div></div><div class="x grow"><span class="s">pans and zooms</span><br>Map of the research questions</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
           </div>
         </div>
-        <figcaption><b>Tool row and canvas</b>, research-better. Stats header. The agents sit above the conversation.</figcaption>
+        <figcaption><b>Tool row and canvas</b>, research-better. Stats header. The agents at work sit in one row above the map.</figcaption>
       </figure>
       <figure>
         <div class="wire" role="img" aria-label="Code dashboard: stats header; agent cards that scroll, a task list fixed at the bottom; the conversation.">

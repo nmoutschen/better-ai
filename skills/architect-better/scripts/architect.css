@@ -40,7 +40,7 @@ code { font:400 .9em ui-monospace, Menlo, monospace; background:var(--linen); pa
 .edit textarea { font:inherit; padding:6px 8px; border:1px solid var(--ink); min-height:3em; }
 .edit .btn { justify-self:start; }
 
-.view { min-height:0; overflow:auto; padding:0 var(--pad) 48px; }
+.view { min-height:0; overflow:auto; padding:0 20px 48px; }
 .tabs { overflow:auto; }
 .tabs button { white-space:nowrap; }
 .row-actions { display:flex; gap:4px; width:112px; }

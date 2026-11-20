@@ -14,7 +14,6 @@
   --surround:#F5F5F5; --surround-dark:#1E1E1E; --frame:#BDBDBD; --frame-dark:#5A5A5A;
   --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
   --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E");
-  --pad:max(40px, (100% - 110rem) / 2);
 }
 * { box-sizing:border-box; }
 :focus-visible { outline:2px solid var(--umber); outline-offset:2px; }
