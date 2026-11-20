@@ -47,3 +47,28 @@ def test_rule_ids_include_named_headings() -> None:
     """Numbered headings and unnumbered `###` headings, by slug, are rules."""
     text = "## Instructions\n\n### 1. Understand\n\n## General rules\n\n### Ask the user\n\n### Working notes\n"
     assert check_coverage.rule_ids(text) == {"invocation", "1", "ask-the-user", "working-notes"}
+
+
+def test_numeric_rule_is_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A rule made only of digits and dots names a section, not a behaviour, so the coverage check fails."""
+    skill = tmp_path / "skills" / "another"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("## 1. Standalone\n")
+    monkeypatch.setattr(cases, "REPO", tmp_path)
+    monkeypatch.setattr(cases, "CASES", tmp_path / "cases")
+    for rule, expected in (("'1.1'", 1), ("5", 1), ("ask-first", 0)):
+        case = tmp_path / "cases" / "another" / "a-case"
+        case.mkdir(parents=True, exist_ok=True)
+        (case / "case.yaml").write_text(
+            f"id: a-case\nrule: {rule}\nsource: ['SKILL.md#1']\nrequest: A case.\ngraders: []\n"
+        )
+        assert check_coverage.main(["another"]) == expected
+    assert "Cases with a numeric rule" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("skill", ["code-better", "do-better", "write-better"])
+def test_rules_name_behaviours(skill: str) -> None:
+    """No case's rule is a section number."""
+    assert [case["id"] for case in cases.load_cases(skill) if check_coverage.NUMERIC_RULE.fullmatch(case["rule"])] == []
