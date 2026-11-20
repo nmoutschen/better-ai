@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Change dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/*__PAGE_CSS__*/
+/* What only the dashboard shows; the shared look (bar, side column, conversation, buttons, toast) is page.css above. */
+header.bar--stats { flex-wrap:nowrap; align-items:flex-end; }
+header.bar--stats > div { min-width:0; }
+header.bar--stats h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.unwatched { margin:0 0 12px; padding:8px 12px; background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:500 13px/1.45 var(--sans); }
+.unwatched[hidden] { display:none; }
+.status { flex:none; display:flex; gap:24px; align-items:flex-end; margin:0; font-size:12px; }
+.stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
+.stat b { font:700 20px/1.1 var(--sans); }
+.stat .of { font-size:14px; opacity:.8; }
+button.stat { border:0; background:none; padding:0; color:inherit; font:inherit; cursor:pointer; }
+button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px; }
+.stat.wait b { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+.bar { width:140px; height:8px; border:1px solid var(--cream); margin-top:4px; display:flex; }
+.bar i { display:block; height:100%; background:var(--cream); }
+
+/* The agents, on the untinted surround */
+/* The agents scroll; the task list stays pinned under them, five rows high, and scrolls on its own past five. */
+.view { min-height:0; display:flex; flex-direction:column; }
+.agents-pane { flex:1; min-height:0; overflow-y:auto; padding:12px 20px; }
+.tasks-pane { flex:none; padding:4px 20px 12px; border-top:2px solid var(--line); background:var(--paper, inherit); }
+.tasks-pane[hidden] { display:none; }
+.view h2 { margin:8px 0 12px; font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+.cards { list-style:none; margin:0 0 24px; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(20rem, 1fr)); gap:12px; }
+.card { display:block; width:100%; height:100%; text-align:left; background:var(--cream); border:1px solid var(--line); border-left:4px solid var(--umber);
+  padding:10px 12px; font:400 14px/1.45 var(--sans); color:var(--ink); cursor:pointer; }
+.card:hover h3 { text-decoration:underline; }
+/* The card's edge is the mode of its task, in the mode tag's colour; the state is the chip's word. */
+.card.m-feature { border-left-color:var(--moss-dark); }
+.card.m-bugfix { border-left-color:var(--terracotta); }
+.card.m-refactor { border-left-color:var(--umber); }
+.card.m-tests { border-left-color:var(--sand); }
+.card.m-other { border-left-color:var(--line); }
+.card h3 { margin:4px 0 6px; font:700 16px/1.3 var(--serif); color:var(--heading); }
+.card ol { list-style:none; margin:0; padding:0; }
+.card ol li { margin:2px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.card ol li:last-child { white-space:normal; overflow-wrap:anywhere; }
+.meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0; font:700 11px/1.4 var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.chip { font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.mode { display:inline-block; padding:1px 6px; font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.mode.m-feature { background:var(--moss-dark); color:var(--cream); }
+.mode.m-bugfix { background:var(--terracotta); color:var(--heading); }
+.mode.m-refactor { background:var(--umber); color:var(--cream); }
+.mode.m-tests { background:var(--sand); color:var(--heading); }
+.mode.m-other { border:1px solid var(--muted); color:var(--ink); }
+/* The state as an icon, named for screen readers and on hover; the key under the heading says what each means. */
+.state { display:inline-flex; align-items:center; gap:4px; font:700 12px/1 var(--sans); color:var(--ink); }
+.state svg { width:14px; height:14px; flex:none; }
+.state.blocked, .state.quiet { color:var(--error); }
+/* The key, as on research-better's board: an icon and a plain word per state. */
+.key { list-style:none; margin:0 0 12px; padding:0; display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; color:var(--ink); }
+.key li { display:inline-flex; align-items:center; gap:6px; }
+.chip.finished { color:var(--moss-dark); }
+.ago { margin:6px 0 0; font-size:12px; color:var(--muted); }
+.view .empty { color:var(--muted); font-style:italic; }
+/* What the agent must make true: the requirements of its task, one line each, in full in the pop-up and the task list. */
+.reqs { list-style:none; margin:0 0 6px; padding:0 0 6px; border-bottom:1px solid var(--line); font-size:13px; }
+.card .reqs li { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.card .reqs li:last-child { white-space:nowrap; }
+.reqs b, .req-list b { font:700 11px var(--sans); letter-spacing:.06em; margin-right:6px; color:var(--umber); }
+.req-list { list-style:none; margin:6px 0 8px; padding:0; }
+.req-list li { margin:4px 0; padding-left:3.2em; text-indent:-3.2em; overflow-wrap:anywhere; }
+.req-list .missing { color:var(--muted); font-style:italic; }
+.check { margin:4px 0 8px; font-size:13px; color:var(--ink); overflow-wrap:anywhere; }
+.check code { font:400 12px/1.4 ui-monospace, Menlo, monospace; }
+
+/* The task list: one folded row per task, opened to show its requirements, its check and its agents. */
+.tasks { list-style:none; margin:0; padding:0; border-top:1px solid var(--line); max-height:calc(5 * 37px); overflow-y:auto; }
+.tasks > li { border-bottom:1px solid var(--line); background:var(--cream); }
+.tasks summary { display:flex; align-items:center; gap:10px; padding:8px 12px; cursor:pointer; font:400 14px/1.4 var(--sans); color:var(--ink); }
+.tasks summary:hover .t { text-decoration:underline; }
+.tasks summary::-webkit-details-marker { display:none; }
+.tasks summary::before { content:"▸"; flex:none; width:1em; color:var(--muted); }
+.tasks details[open] summary::before { content:"▾"; }
+.tasks .n { flex:none; width:2em; font:700 13px var(--sans); color:var(--muted); }
+.tasks .t { flex:1; min-width:0; }
+.tasks .on { flex:none; font-size:12px; color:var(--muted); }
+.tasks .tstat { flex:none; width:9em; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
+.tasks .tstat svg { width:13px; height:13px; }
+.tasks .tstat.done { color:var(--moss-dark); }
+.tasks .tstat.blocked { color:var(--error); }
+/* Past five rows the list scrolls, with a scroll bar that stays visible. macOS hides scroll bars until you scroll,
+   and Firefox lets no page change that, so the page hides the browser's bar and draws its own track and thumb. */
+.tasks-box { display:flex; gap:4px; }
+.tasks-box .tasks { flex:1; min-width:0; scrollbar-width:none; }
+.tasks-box .tasks::-webkit-scrollbar { display:none; }
+.sbar { flex:none; width:10px; position:relative; background:var(--linen); cursor:pointer; }
+.sbar[hidden] { display:none; }
+.sbar i { position:absolute; left:2px; right:2px; background:var(--muted); cursor:grab; }
+.sbar i:active { cursor:grabbing; }
+.tasks .body { padding:0 12px 10px calc(12px + 3em + 20px); }
+.tasks .agents button { border:0; background:none; padding:0; margin-right:12px; font:700 12px var(--sans); color:var(--ink); text-decoration:underline; cursor:pointer; }
+
+/* The pop-up for an agent */
+.qpop { position:fixed; z-index:5; width:min(36rem, calc(100vw - 24px)); max-height:calc(100vh - 20px); overflow:auto; background:var(--cream);
+  color:var(--ink); border:2px solid var(--ink); box-shadow:0 8px 24px rgba(28,26,23,.25); padding:12px; font-size:14px; }
+.qpop h3 { font:700 17px/1.3 var(--serif); color:var(--heading); margin:6px 0 8px; }
+.qpop p, .qpop li, .qpop textarea, .qpop .thread .body { font:400 14px/1.45 var(--sans); }
+.qpop .meta { padding-right:24px; }
+.qpop .x { position:absolute; top:8px; right:8px; border:0; background:none; font:700 18px var(--sans); color:var(--muted); cursor:pointer; }
+.qpop .steps { padding-left:20px; margin:8px 0; }
+.qpop .steps li { margin:4px 0; overflow-wrap:anywhere; }
+.qpop .crumb { display:none; }
+.qpop .thread { flex:none; overflow:visible; padding:0; margin:12px 0 0; }
+.ask { display:flex; gap:8px; align-items:stretch; margin-top:12px; }
+.ask textarea { flex:1; min-height:3em; font:400 14px/1.45 var(--sans); color:var(--ink); background:#fff; border:1px solid var(--muted); padding:6px 8px; resize:vertical; }
+
+/* The conversation: the coordinator's decisions and questions */
+.thread .crumb button { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; }
+.thread > li.msg.decision { border-left:4px solid var(--umber); }
+.thread > li.msg.decision > .head .who { color:var(--umber); }
+.thread > li.msg.decision > .head .when { color:var(--umber); font-weight:700; }
+.msg .what { margin:2px 0 0; font:700 12px/1.4 var(--sans); color:var(--ink); }
+</style></head><body>
+<div class="band"></div>
+<header class="bar--stats"><div><h1 id="title" dir="auto">Change dashboard</h1></div>
+  <div class="status" id="status">Loading…</div></header>
+<p class="offline" id="offline" role="status" hidden>The dashboard is closed. Ask the agent to restart it.</p>
+<div class="work">
+  <main class="view">
+   <div class="agents-pane">
+    <h2>Agents</h2>
+    <ul class="key" id="key" title="Key"></ul>
+    <ul class="cards" id="cards"></ul>
+   </div>
+   <section class="tasks-pane" id="tasks-sec" aria-labelledby="tasks-h" hidden>
+    <h2 id="tasks-h">Tasks</h2>
+    <div class="tasks-box"><ul class="tasks" id="tasks"></ul><div class="sbar" id="sbar" aria-hidden="true" hidden><i id="sthumb"></i></div></div>
+   </section>
+  </main>
+  <aside class="notes" aria-labelledby="notes-h">
+    <div class="notes-top">
+      <h2 id="notes-h">Conversation</h2>
+    </div>
+    <p class="empty" id="empty">Nothing yet. Click an agent to ask about its work, or write to the coordinator below.</p>
+    <ol class="thread" id="thread"></ol>
+    <form class="composer" id="noteform">
+      <p class="unwatched" id="unwatched" role="status" hidden>The coordinator is not watching this page right now. What you send is saved, but it reads it only when it next looks: tell it in the chat.</p>
+      <label for="note">Message to the coordinator</label>
+      <textarea id="note"></textarea>
+      <div class="send"><button type="submit" class="btn">Send</button></div>
+    </form>
+  </aside>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script>
+/*__PAGE_JS__*/
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const has = v => v && v !== "none";
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const ago = s => s < 60 ? "just now" : s < 5400 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`;
+const STATEWORD = {working: "working", waiting: "waiting", blocked: "blocked", finished: "handed back"};
+// An agent at work that has not written to its log for this long is shown as quiet, with the stuck ones. Builders log
+// after each step, so a long silence usually means a stuck command or a lost agent.
+const QUIET = 15 * 60;
+const ORDER = {blocked: 0, quiet: 1, waiting: 2, working: 3};
+const stateOf = (a, now) => a.state === "working" && now - a._changed > QUIET ? "quiet" : a.state;
+const word = (a, now) => stateOf(a, now) === "quiet" ? `quiet ${Math.round((now - a._changed) / 60)} min` : STATEWORD[a.state];
+const DONE = new Set(["done", "merged"]);
+let D = null, OPEN = null, REPLIES = -1, CLOSED_PAGE = false;  // OPEN: the agent the pop-up shows, as {id, anchor}
+
+// An agent's log line without its first word, as a person reads it: "step: wrote the check" shows "wrote the check".
+const KINDS = ["start", "step", "asked", "blocked", "handed back"];
+const words = line => { const i = String(line).indexOf(":"), kind = i < 0 ? "" : line.slice(0, i).trim().toLowerCase(), rest = line.slice(i + 1).trim();
+  return !KINDS.includes(kind) ? line : kind === "step" ? rest : `${kind[0].toUpperCase()}${kind.slice(1)}: ${rest}`; };
+// Who the agent is: its name, with its role only when the name does not already say it.
+// Who the agent is and what it does: its name, its role, and for a builder the mode of its task.
+// The mode of the agent's task shows as a tag with one colour per mode; a verifier's tag is its task's mode.
+const MODES = {feature: "feature", "bug fix": "bugfix", bugfix: "bugfix", refactor: "refactor", tests: "tests"};
+const modeOf = a => String(a.mode || "").trim().toLowerCase();
+const modeClass = a => { const m = modeOf(a); return m && m !== "none" ? "m-" + (MODES[m] || "other") : "m-other"; };
+const modeTag = a => { const m = modeOf(a); return m && m !== "none" ? `<span class="mode ${modeClass(a)}">${esc(m)}</span>` : ""; };
+// One icon per state, drawn in currentColor so blocked and quiet take the red of their text.
+const ICON = {
+  working: '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 2l9 5-9 5z" fill="currentColor"/></svg>',
+  waiting: '<svg viewBox="0 0 14 14" aria-hidden="true"><rect x="3" y="2" width="3" height="10" fill="currentColor"/><rect x="8" y="2" width="3" height="10" fill="currentColor"/></svg>',
+  blocked: '<svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 11L11 3" stroke="currentColor" stroke-width="2"/></svg>',
+  quiet: '<svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 4v3.5l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  finished: '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+};
+// The state icon; a quiet agent also shows how long it has been quiet, the one figure the icon cannot carry.
+const stateIcon = (a, now) => { const s = stateOf(a, now), w = word(a, now);
+  return `<span class="state ${s}" role="img" aria-label="${esc(w)}" title="${esc(w)}">${ICON[s]}${s === "quiet" ? esc(w.replace(/^quiet /, "")) : ""}</span>`; };
+const who = a => esc(a.name);
+const taskOf = a => a.task ? (D.tasks || []).find(t => t.id === a.task) : undefined;
+// A task's requirements with their text from specs.md; an ID the spec does not hold shows as missing, not hidden.
+const reqsOf = t => ((t || {}).requirements || []).map(id => [id, (D.requirements || {})[id]]);
+const reqItems = t => reqsOf(t).map(([id, text]) => `<li dir="auto"><b>${esc(id)}</b>${text ? esc(text) : '<span class="missing">not in the spec</span>'}</li>`).join("");
+const taskLabel = a => { const t = taskOf(a); return t ? `${t.id}: ${t.task}` : a.task ? `Task ${a.task}` : "No task named"; };
+
+// ---------- The agents ----------
+function drawAgents(d) {
+  setHTML($("key"), ["working", "waiting", "blocked", "quiet"].map(s => `<li><span class="state ${s}">${ICON[s]}</span>${s === "waiting" ? "waiting on coordinator" : s}</li>`).join(""));
+  // The stuck agents first, then by task number, so the user finds both a problem and a given task without reading every card.
+  // The tasks keep tasks.md's order, so the agents follow it too.
+  const num = a => { const i = (d.tasks || []).findIndex(t => t.id === a.task); return i < 0 ? Infinity : i; }, now = d.now;
+  const live = d.agents.filter(a => a.state !== "finished")
+    .sort((a, z) => ORDER[stateOf(a, now)] - ORDER[stateOf(z, now)] || num(a) - num(z) || a.name.localeCompare(z.name));
+  setHTML($("cards"), live.map(a => `<li><button type="button" class="card ${stateOf(a, now)} ${modeClass(a)}" data-a="${esc(a.name)}">
+      <p class="meta">${modeTag(a)} ${stateIcon(a, now)} ${who(a)}</p>
+      <h3 dir="auto">${esc(taskLabel(a))}</h3>
+      ${reqsOf(taskOf(a)).length ? `<ul class="reqs">${reqItems(taskOf(a))}</ul>` : ""}
+      <ol>${a.lines.filter(l => l.slice(0, l.indexOf(":")).trim().toLowerCase() !== "start").slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
+      <p class="ago">Updated ${ago(d.now - a._changed)}</p></button></li>`).join("")
+    || `<li class="empty">No agent is working right now.</li>`);
+}
+// ---------- The tasks ----------
+const TICON = {todo: '<svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  done: ICON.finished, blocked: ICON.blocked, active: ICON.working};
+function drawTasks(d) {
+  const tasks = d.tasks || [];
+  $("tasks-sec").hidden = !tasks.length;
+  // The heading says how many tasks are done of how many, since past five rows the list scrolls and the rest are out of sight.
+  $("tasks-h").textContent = `Tasks: ${tasks.filter(t => DONE.has(t.status)).length} of ${tasks.length} done`;
+  // The tasks keep their own order, the one tasks.md gives; a task an agent works on reads "in progress".
+  setHTML($("tasks"), tasks.map(t => {
+    const live = d.agents.filter(a => a.task && a.task === t.id && a.state !== "finished");
+    const st = DONE.has(t.status) ? "done" : t.status === "blocked" ? "blocked" : live.length ? "active" : "todo";
+    const word = st === "active" ? "in progress" : st;
+    const tag = has(t.mode) ? `<span class="mode m-${MODES[t.mode.trim().toLowerCase()] || "other"}">${esc(t.mode)}</span>` : "";
+    const open = OPENTASKS.has(t.id) ? " open" : "";
+    return `<li><details data-t="${esc(t.id)}"${open}><summary><span class="n">${esc(t.id)}</span>
+      <span class="tstat ${st}">${TICON[st]}${word}</span>${tag}<span class="t" dir="auto">${esc(t.task)}</span>
+      ${live.length ? `<span class="on">${esc(live.map(a => a.name).join(", "))}</span>` : ""}</summary>
+      <div class="body">${reqsOf(t).length ? `<ul class="req-list">${reqItems(t)}</ul>` : '<p class="empty">No requirement named.</p>'}
+      ${has(t.check) ? `<p class="check">Check: <code>${esc(t.check)}</code></p>` : ""}
+      ${live.length ? `<p class="agents">${live.map(a => `<button type="button" data-a="${esc(a.name)}">${esc(a.name)}</button>`).join("")}</p>` : ""}</div></details></li>`;
+  }).join(""));
+}
+// The task list's own scroll bar: shown only when the list holds more than it shows, its thumb sized and placed from
+// the list's scroll. Dragging the thumb scrolls the list; a click on the track moves it by one view. The wheel and
+// the keyboard scroll the list itself, as usual.
+function syncBar() {
+  const ul = $("tasks"), bar = $("sbar"), th = $("sthumb"), h = ul.clientHeight, full = ul.scrollHeight;
+  bar.hidden = full <= h + 1; if (bar.hidden) return;
+  const size = Math.max(24, h * h / full);
+  th.style.height = size + "px"; th.style.top = (ul.scrollTop / (full - h)) * (h - size) + "px";
+}
+$("tasks").addEventListener("scroll", syncBar, {passive: true});
+addEventListener("resize", syncBar);
+$("sbar").addEventListener("pointerdown", ev => {
+  const ul = $("tasks"), th = $("sthumb");
+  if (ev.target !== th) { ul.scrollTop += (ev.offsetY < th.offsetTop ? -1 : 1) * ul.clientHeight; return; }
+  ev.preventDefault(); th.setPointerCapture(ev.pointerId);
+  const y0 = ev.clientY, top0 = ul.scrollTop, rate = (ul.scrollHeight - ul.clientHeight) / (ul.clientHeight - th.offsetHeight);
+  const move = e => { ul.scrollTop = top0 + (e.clientY - y0) * rate; };
+  th.addEventListener("pointermove", move);
+  th.addEventListener("pointerup", () => th.removeEventListener("pointermove", move), {once: true});
+});
+// Which task rows the user opened, so a refresh every two seconds does not fold them again.
+const OPENTASKS = new Set();
+document.addEventListener("toggle", ev => { const t = ev.target.dataset && ev.target.dataset.t;
+  if (t !== undefined) { ev.target.open ? OPENTASKS.add(t) : OPENTASKS.delete(t); syncBar(); } }, true);
+function setHTML(el, html) { if (el._html !== html) el.innerHTML = el._html = html; }
+
+// ---------- The conversation: page.js; the dashboard adds the coordinator's decisions and questions ----------
+// A decision or question is a message from the coordinator, placed at its `at` time. Nothing comes before what it
+// answers, so an answer never shows above its question.
+function events(d) {
+  const at = e => Date.parse(e.at) / 1000 || 0;
+  const decisions = (d.decisions || []).map(x => ({action: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || x._changed}));
+  const when = Object.fromEntries(decisions.map(e => [e.id, e._t]));
+  return (d.conversation || []).map(e => {
+    const _t = Math.max(at(e), when[e.action === "answer" ? e.decision : e.to] || 0);
+    if (e.id) when[e.id] = _t;
+    return {...e, _t}; })
+    .concat(decisions).sort((a, z) => a._t - z._t || (z.action === "decision") - (a.action === "decision"));
+}
+const decisionStatus = x => String(x.status || "decided").trim().toLowerCase();
+const answerOf = c => c.replies.filter(r => r.action === "answer").pop();
+const clock = at => String(at || "").slice(11, 16);
+const headHTML = (who, at, extra) => `<div class="head"><span class="who">${who}</span><span class="when">${esc(extra || clock(at))}</span></div>`;
+function li(cls, html) { const x = document.createElement("li"); x.className = cls; x.innerHTML = html; return x; }
+// A question to the user waits until they answer it; a decision the coordinator took can be replied to, to change it.
+function decisionItem(c, state, actions) {
+  const x = c.e.x, status = decisionStatus(x), answer = answerOf(c);
+  // An unanswered question shows its time in the head: the state row under it already says it waits for the user.
+  const label = status === "waiting" ? (answer ? "answered, waiting for the coordinator" : "")
+    : status === "answered" ? "answered by you" : "decided";
+  const from = [has(x.from) ? x.from : "", has(x.task) ? "task " + x.task : ""].filter(Boolean).join(", ");
+  // The answer the coordinator copied shows only when the user gave it in the chat: an answer from the page is in the thread.
+  const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer: ${x.answer}`)
+    : status === "decided" && has(x.decision) ? md(`Decided: ${x.decision}`) : "";
+  const item = li(`msg decision ${status}`, `${headHTML("Coordinator", x.at, label)}${from ? `<p class="what">From ${esc(from)}</p>` : ""}
+    ${md(x.asked || "")}${after}`);
+  item.dataset.d = x.id;
+  if (status === "waiting" && !answer) item.classList.add("open-q");  // the top bar's figure takes the user to the first one
+  // A question to the user moves forward only: Waiting for you, You answered, Applied. A decision has no steps.
+  const step = status === "answered" ? 2 : status === "waiting" ? (answer ? 1 : 0) : -1;
+  const STEP = [["asked", "Waiting for you"], ["replied", "You answered"], ["done", "Applied"]][step];
+  item.dataset.state = STEP ? STEP[0] : "";
+  const foot = document.createElement("div"); foot.className = "foot";
+  // A reply to a decision the coordinator took shows its own state, like any item the user sends.
+  if (!STEP && answer) foot.append(conv.progress(state[answer.id]));
+  if (STEP) foot.insertAdjacentHTML("beforeend", `<span class="progress ${STEP[0]}"><span class="bars" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${i <= step ? "on" : ""}"></i>`).join("")}</span><span>${STEP[1]}</span></span>`);
+  if (actions) foot.insertAdjacentHTML("beforeend", !answer && status === "waiting"
+    ? `<button type="button" class="btn btn--sm answer change">Answer</button>`
+    : `<button type="button" class="btn btn--quiet btn--sm answer change">Reply</button>`);
+  return [item, foot];
+}
+function crumb(e) {
+  const x = document.createElement("span");
+  if (e.on) { x.className = "crumb"; x.innerHTML = `<span class="path">on</span><span class="el"><button type="button" data-a="${esc(e.on.id)}">${esc(e.on.title || e.on.id)}</button></span>`; }
+  return x;
+}
+const md = text => pageMarkdown(text).outerHTML;  // Markdown, built as elements: safe to place as HTML
+function commentBody(e) { return pageMarkdown(e.text); }
+const conv = pageConversation({
+  served: true, stream: false, name: "dashboard", agent: "Coordinator", thread: $("thread"),
+  kinds: {decision: decisionItem}, crumb, commentBody,
+  // No accept step: the coordinator answers or acts, and an answered item is finished.
+  steps: ["seen", "working", "done"], labels: {done: "Answered"}, shown: st => st === "accepted" ? "done" : st,
+  accept: false, filter: false,
+  // A question waiting for the user comes last, next to the message box, until they answer it; so does a message of
+  // theirs that the coordinator asked about.
+  waiting: (c, state) => c.kind === "decision" ? !answerOf(c) && decisionStatus(c.e.x) === "waiting" : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
+  afterSend: () => tick(),
+});
+const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+
+// ---------- The pop-up for an agent: its whole recent log, and a box to ask about its work ----------
+function openPop(id, anchor) {
+  closePop(); OPEN = {id, anchor};
+  const el = document.createElement("div"); el.className = "qpop"; el.setAttribute("role", "dialog"); el.id = "pop";
+  document.body.append(el); fillPop(); placePop(anchor);
+  const h3 = el.querySelector("h3"); if (h3) { h3.id = "pop-title"; el.setAttribute("aria-labelledby", "pop-title"); h3.setAttribute("tabindex", "-1"); h3.focus({preventScroll: true}); }
+}
+function closePop() { const p = $("pop"); if (p) p.remove(); const back = OPEN && OPEN.anchor; OPEN = null; if (back && document.contains(back)) back.focus({preventScroll: true}); }
+function placePop(anchor) {
+  const el = $("pop"); if (!el || !anchor) return;
+  const r = anchor.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, side = !!anchor.closest("aside");
+  let left = side ? r.left - w - 12 : r.left, top = side ? r.top : r.bottom + 8;
+  left = Math.max(10, Math.min(left, innerWidth - w - 10)); if (top + h > innerHeight - 10) top = Math.max(10, innerHeight - h - 10);
+  el.style.left = left + "px"; el.style.top = top + "px";
+}
+function fillPop() {
+  const el = $("pop"); if (!el || !D) return;
+  const ta = el.querySelector("textarea"), typed = ta ? ta.value : "", focused = ta && document.activeElement === ta;
+  // An agent that handed back leaves the page, its pop-up too.
+  const a = D.agents.find(x => x.name === OPEN.id && x.state !== "finished"); if (!a) return closePop();
+  const label = `Message about ${a.name}'s work`;
+  const html = `<button type="button" class="x" aria-label="Close">×</button>
+    <p class="meta">${modeTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>
+    <h3 dir="auto">${esc(taskLabel(a))}</h3>
+    ${reqsOf(taskOf(a)).length ? `<ul class="req-list">${reqItems(taskOf(a))}</ul>` : ""}
+    ${taskOf(a) && has(taskOf(a).check) ? `<p class="check">Check: <code>${esc(taskOf(a).check)}</code></p>` : ""}
+    <ol class="steps">${a.lines.map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
+    <ul class="thread"></ul>
+    <form class="ask popask"><textarea aria-label="${esc(label)}" placeholder="${esc(label)}"></textarea><button type="submit" class="btn">Send</button></form>`;
+  const mine = conv.nodes(e => e.on && e.on.kind === "agent" && e.on.id === a.name), key = html + mine.map(n => n.outerHTML).join("");
+  if (el._html === key) return;
+  el.innerHTML = html; el._html = key;
+  el.querySelector("ul.thread").append(...mine);
+  const t = el.querySelector("textarea"); t.value = typed; if (focused) t.focus({preventScroll: true});
+  placePop(OPEN.anchor);
+}
+
+// ---------- Sending: the message box and replies are page.js's; the pop-up and the answers are the dashboard's ----------
+document.addEventListener("submit", ev => {
+  ev.preventDefault();
+  const f = ev.target; if (!f.classList.contains("popask")) return;
+  const ta = f.querySelector("textarea"), text = ta.value.trim(); if (!text) return ta.focus();
+  conv.send("comment", {id: uid("c"), on: {kind: "agent", id: OPEN.id, title: OPEN.id}, text}, "Comment", () => { ta.value = ""; fillPop(); });
+});
+document.addEventListener("click", ev => {
+  const t = ev.target;
+  if (t.closest("#to-waiting")) { const q = document.querySelector("#thread .open-q"); if (!q) return;
+    q.scrollIntoView({block: "start"}); const b = q.querySelector(".change"); if (b) b.focus({preventScroll: true}); return; }
+  if (t.closest(".qpop .x")) return closePop();
+  if (t.closest(".qpop")) return;
+  const a = t.closest("[data-a]"); if (a) return openPop(a.dataset.a, a);
+  const ch = t.closest(".thread .change"); if (ch) { const d = ch.closest("li").dataset.d;
+    const asked = decisionStatus((D.decisions.find(x => x.id === d) || {})) === "waiting";
+    return conv.box(ch.closest("li"), d, asked ? "Your answer" : "Your reply", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text}, "Answer", done)); }
+  if ($("pop") && !t.closest("form, .why")) closePop();
+});
+document.addEventListener("keydown", ev => {
+  // Tab stays inside the open pop-up, so focus never goes to the cards hidden under it.
+  if (ev.key === "Tab" && $("pop") && $("pop").contains(ev.target)) {
+    const f = [...$("pop").querySelectorAll("button, textarea, [tabindex]")], i = f.indexOf(ev.target);
+    if (ev.shiftKey && i <= 0) { ev.preventDefault(); f[f.length - 1].focus(); }
+    else if (!ev.shiftKey && i === f.length - 1) { ev.preventDefault(); f[0].focus(); }
+  }
+  if (ev.key === "Escape" && $("pop") && !(ev.target.closest && ev.target.closest(".why"))) { ev.preventDefault(); closePop(); }
+  if (ev.key === "Enter" && !ev.shiftKey && ev.target.matches && ev.target.matches("form.popask textarea")) { ev.preventDefault(); ev.target.form.requestSubmit(); }
+});
+
+// ---------- Render ----------
+function render(d) {
+  D = d;
+  $("title").textContent = d.name || "Change dashboard"; document.title = `${$("title").textContent} · Change dashboard`;
+  const tasks = d.tasks || [], done = tasks.filter(t => DONE.has(t.status)).length;
+  const working = d.agents.filter(a => a.state !== "finished").length;
+  // A question the user answered in the page no longer waits for them, even before the coordinator applies the answer.
+  const answered = new Set((d.conversation || []).filter(e => e.action === "answer").map(e => e.decision));
+  const waitingN = (d.decisions || []).filter(x => decisionStatus(x) === "waiting" && !answered.has(x.id)).length;
+  const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
+  setHTML($("status"), (tasks.length ? `<span class="stat"><b>${done}<span class="of"> / ${tasks.length}</span></b>tasks done
+      <span class="bar" aria-hidden="true"><i style="width:${(100 * done / tasks.length).toFixed(0)}%"></i></span></span>` : "")
+    + stat(working, working === 1 ? "agent at work" : "agents at work")
+    + (waitingN ? `<button type="button" class="stat wait" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "open question" : "open questions"}</button>`
+      : stat(0, "open questions"))
+    + (CLOSED_PAGE ? stat("Closed", `since ${new Date(d.now * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`) : ""));
+  drawAgents(d);
+  drawTasks(d);
+  syncBar();
+  const replies = (d.conversation || []).filter(e => e.action === "reply");
+  if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + replies[replies.length - 1].text.slice(0, 120), "ok");
+  REPLIES = replies.length;
+  conv.setLog(events(d), (d.decisions || []).map(x => [x.id, x.status, x.answer, x.decision, x._changed]));
+  if (OPEN) fillPop();
+}
+
+let fails = 0;
+function tick() {
+  return fetch("dashboard.json", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(d => { fails = 0; CLOSED_PAGE = false; $("offline").hidden = true; $("unwatched").hidden = d.listening !== false; render(d); },
+      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("offline").hidden = false; $("unwatched").hidden = true; if (D) render(D); } });
+}
+tick(); setInterval(tick, 2000);
+</script></body></html>

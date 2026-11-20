@@ -23,16 +23,27 @@ SPLIT the work into tasks by part, such as one module or one flow per task, neve
 
 CREATE your own main branch or worktree for the change, and one branch or worktree per task from it.
 
-START a builder for each task that can run in parallel: READ [../agents/builder.md](../agents/builder.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt. IF the harness lets you choose a model, USE a cheaper model than yours for builders and the most capable model for verifiers.
+IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the dashboard: `python3 scripts/dashboard.py watch <change folder>` from this skill's directory, with the full path of `.code/<change>/`. It opens the user's browser and prints its address. GIVE the user the address. IF the harness can only run commands in the foreground, DO NOT start it: TELL the user they can run it themselves. LEAVE it running until the user says they are done with it. The dashboard shows the agents at work from their logs, the tasks done from `tasks.md`, and a conversation with you in which your decisions and questions appear.
+
+IF your harness tells you when a background command ends, ALSO RUN `python3 scripts/dashboard.py wait <change folder>` in the background while the dashboard runs: it ends with the user's new actions in the page. START it again at once each time it ends, before you act on what it printed.
+
+START a builder for each task that can run in parallel: READ [../agents/builder.md](../agents/builder.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt. GIVE each builder and verifier its own log, `.code/<change>/logs/<agent name>.md`, in its `log` input, with a name no other agent of the change uses. BEFORE you start each builder or verifier, WRITE `.code/<change>/logs/<agent name>.json`: `{"role": "builder", "task": "T3", "mode": "bug fix", "branch": "fix/t3-reads"}`, with `role` builder or verifier, `task` the task's # exactly as `tasks.md` writes it, `mode` one of feature, bug fix, refactor or tests, the one the agent works in, and `branch` the branch it works on. The dashboard reads what the agent works on from this file. IF the harness lets you choose a model, USE a cheaper model than yours for builders and the most capable model for verifiers.
 
 ## 3. Answer the builders and verify each task
 
 ANSWER what builders send you, in plain language, and SAY whether an answer came from you or from the user:
 
 - A gap the design, the spec or the repo answers: ANSWER it yourself.
-- A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed, and RECORD it in `.code/<change>/`.
+- A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed, and RECORD it in `.code/<change>/decisions/`: READ [../templates/decision.md](../templates/decision.md) and WRITE it in its format.
 - Anything that would change what the user agreed, or that only the user can answer: ASK the user, with everything the builder gave.
 - A blocked task: GIVE what is missing, SPLIT the task, or ASK the user. DO NOT build the task yourself.
+
+EACH time this mode says ASK the user, ALSO RECORD the question in `.code/<change>/decisions/` with the status `waiting`, so the dashboard shows it. ASK it in the chat too, because the user may not be watching the page. The user answers in either: APPLY the first answer, THEN SET the status to `answered` and COPY the answer into the file.
+
+WHILE the dashboard runs, READ the user's open items with `python3 scripts/dashboard.py pending <change folder>` each time `wait` ends, each time an agent hands back, and when you resume the change. An answer to a question or a reply to a decision arrives as an item of its own, naming the decision. HANDLE each item as you handle a builder's message above: the user's word is binding, and what changes an agent's task reaches that agent only through you, in its `answers`.
+
+- TRACK each item with `python3 scripts/dashboard.py status <change folder> seen|asked|done <id>...`: MARK it `seen` when it arrives, `asked` when you asked the user something about it and wait, and `done` once you answered it or made the change.
+- REPLY in the page with `python3 scripts/dashboard.py reply <change folder> "<your answer, or what you changed>" --to <id>`, in one or two short sentences. The page renders Markdown: USE a list or a table when it shows the answer better than sentences, such as the state of several tasks. WHILE the user works in the page, PUT your answers there, and DO NOT repeat page events in the chat.
 
 WHEN a builder hands back:
 

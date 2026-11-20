@@ -14,7 +14,7 @@ Spec: <path or link>
 
 | # | Task | Mode | Requirements | Check that tells done from not done | Status |
 |---|---|---|---|---|---|
-| <n> | <one task> | <feature / bug fix / refactor / tests> | <requirement IDs> | <test or command specific to this task: fails before, passes after> | <todo / done / blocked> |
+| <n> | <one task> | <feature / bug fix / refactor / tests> | <requirement IDs from the spec, separated by commas, nothing else> | <test or command specific to this task: fails before, passes after> | <todo / done / blocked> |
 
 ## Progress notes
 

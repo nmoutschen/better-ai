@@ -30,10 +30,21 @@ The coordinator gives every field. IF one is missing or contradicts another, ASK
 - `tried`: <approaches tried before and what was found, or "none">
 - `done_when`: <the checks that must pass>
 - `answers`: <the coordinator's answers to what an earlier run of this task left open, or "none">
+- `log`: <path of your log, `.code/<change>/logs/<agent name>.md`, or "none">
 
 ## Messages
 
 WHILE you work, TELL the coordinator, in plain words, anything SKILL.md tells you to ask the user, instead of asking the user: a gap, a conflict, a decision, or that you are blocked. SAY which it is, what you need from the coordinator, and what you keep building meanwhile. DO NOT build the part a decision or a conflict affects until the coordinator answers; its answer is binding unless new evidence appears. IF you cannot message the coordinator while you run, PUT these in your output and STOP at that point.
+
+## Log
+
+IF `log` is not "none", the coordinator's dashboard shows the user your work from it. CREATE it, and ADD one line at the end for each event as it happens, never editing earlier lines. START each line with its kind, and keep it to one short sentence:
+
+- `start: <what you begin with>` when you begin;
+- `step: <what you just did or found>` after each step of your mode, such as `step: wrote the check for R3; it fails as expected`;
+- `asked: <what you sent the coordinator, in a few words>` each time you message it;
+- `blocked: <what you need>` when you cannot go on;
+- `handed back: <done | partly done | blocked>, <one short reason>` at the end.
 
 ## Output
 

@@ -60,7 +60,7 @@ function pageConversation(o) {
 
   // ---------- The thread: everything sent and every reply, in order; a comment shows once, in its latest state ----------
   var thread = o.thread || document.querySelector('.thread');
-  function body(text) { var p = el('p', 'body', text); p.dir = 'auto'; return p; }
+  function body(text) { return pageMarkdown(text); }
   function head(who, at) { var h = el('div', 'head'); h.append(el('span', 'who', who), el('span', 'when', time(at))); return h; }
   // A reply that names the message it answers is shown under that message, so the user sees what was answered.
   function replyBlock(e) {
@@ -92,7 +92,11 @@ function pageConversation(o) {
     // A redraw moves the box into a new item, whose own buttons it hid: show those again, not only the first one.
     function close() {
       var host = box.parentNode; box.remove(); if (from) from.style.visibility = '';
-      if (host) host.querySelectorAll('.foot .answer, .foot .change').forEach(function (b) { b.style.visibility = ''; });
+      var again = host ? host.querySelectorAll('.foot .answer, .foot .change') : [];
+      again.forEach(function (b) { b.style.visibility = ''; });
+      // Focus goes back to the button that opened the box, so a keyboard user who cancels stays at the item. After a
+      // redraw that button is gone: its copy in the redrawn item takes the focus instead.
+      if (from) { var back = document.contains(from) ? from : again[again.length - 1]; if (back) back.focus({ preventScroll: true }); }
     }
     function sendIt() {
       var r = ta.value.trim(); if (!r) return ta.focus();
@@ -333,4 +337,124 @@ function pageThread(log, itemKinds, waiting) {
     return (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waits(c);
   });
   return { state: state, entries: entries, open: open };
+}
+
+// ---------- Markdown in messages ----------
+// What the user and the agent write in the conversation is Markdown: paragraphs (a single line break stays a line
+// break, as in a chat), headings, lists (nested by indenting), quotes, code spans and blocks, tables, rules, bold,
+// italic, strikethrough and links. Anything else shows as written. The text becomes a tree of plain objects, then
+// elements whose words are set as text, never as HTML, so a message cannot add markup or scripts to the page; a link
+// opens only an http, https or mailto address.
+var MD_ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])(?:[ \t]+(.*))?$/, MD_FENCE = /^ {0,3}(`{3,}|~{3,})/, MD_RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+var MD_HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/, MD_QUOTE = /^ {0,3}> ?/, MD_TABLE_RULE = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+function mdIndent(line) { return line.match(/^[ \t]*/)[0].replace(/\t/g, '    ').length; }
+function mdCells(line) {
+  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map(function (c) { return c.trim().replace(/\\\|/g, '|'); });
+}
+function mdTableStart(lines, i) {
+  return lines[i].indexOf('|') >= 0 && i + 1 < lines.length && lines[i + 1].indexOf('|') >= 0 && MD_TABLE_RULE.test(lines[i + 1]) &&
+    mdCells(lines[i + 1]).length === mdCells(lines[i]).length;
+}
+function mdStarts(lines, i) {
+  var l = lines[i];
+  return MD_FENCE.test(l) || MD_HEADING.test(l) || MD_RULE.test(l) || MD_QUOTE.test(l) || MD_ITEM.test(l) || mdTableStart(lines, i);
+}
+// The words of a block, with their marks. A code span keeps the marks in it as written, and so does a backslash.
+var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(([^()\s]+)\)|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*\\])\*|(^|[^\w\\])_(?=[^\s_])([\s\S]*?[^\s_\\])_(?!\w)|(https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]*_])|\\([\\`*_{}\[\]()#+\-.!|~>])/g;
+function mdInline(text) {
+  var out = [], last = 0, m, re = new RegExp(MD_INLINE.source, 'g');
+  function words(s) { if (!s) return; var prev = out[out.length - 1]; if (prev && prev.tag == null) prev.text += s; else out.push({ text: s }); }
+  while ((m = re.exec(text))) {
+    words(text.slice(last, m.index)); last = re.lastIndex;
+    if (m[1]) out.push({ tag: 'code', children: [{ text: m[2].replace(/^ (.*) $/, '$1') }] });
+    else if (m[3]) out.push(/^(https?:|mailto:)/i.test(m[4]) ? { tag: 'a', href: m[4], children: mdInline(m[3]).reduce(function (a, n) { return a.concat(n.tag === 'a' ? n.children : [n]); }, []) } : { text: m[0] });
+    else if (m[5]) out.push({ tag: 'strong', children: mdInline(m[5]) });
+    else if (m[6]) out.push({ tag: 'del', children: mdInline(m[6]) });
+    else if (m[7]) out.push({ tag: 'em', children: mdInline(m[7]) });
+    else if (m[9]) { words(m[8]); out.push({ tag: 'em', children: mdInline(m[9]) }); }
+    else if (m[10]) out.push({ tag: 'a', href: m[10], children: [{ text: m[10] }] });
+    else words(m[11]);  // an escaped mark is the mark as written
+  }
+  words(text.slice(last));
+  return out;
+}
+// The blocks of a message, or of a list item or a quote inside it.
+// Past MD_DEPTH quotes or lists inside each other, the rest shows as written: deeper nesting could overflow the stack.
+var MD_DEPTH = 20;
+function mdBlocks(lines, depth) {
+  var out = [], i = 0, m;
+  depth = depth || 0;
+  if (depth > MD_DEPTH) return lines.join('').trim() ? [{ tag: 'p', children: [{ text: lines.join('\n') }] }] : [];
+  while (i < lines.length) {
+    var line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    if ((m = line.match(MD_FENCE))) {
+      var fence = m[1], code = [];
+      for (i++; i < lines.length && !(lines[i].trim().indexOf(fence) === 0 && !lines[i].trim().slice(fence.length).trim()); i++) code.push(lines[i]);
+      i++; out.push({ tag: 'pre', children: [{ tag: 'code', children: [{ text: code.join('\n') }] }] });
+    } else if ((m = line.match(MD_HEADING))) {
+      out.push({ tag: 'p', cls: 'md-h', children: [{ tag: 'strong', children: mdInline(m[2]) }] }); i++;
+    } else if (MD_RULE.test(line)) {
+      out.push({ tag: 'hr' }); i++;
+    } else if (MD_QUOTE.test(line)) {
+      var quoted = [];
+      for (; i < lines.length && MD_QUOTE.test(lines[i]); i++) quoted.push(lines[i].replace(MD_QUOTE, ''));
+      out.push({ tag: 'blockquote', children: mdBlocks(quoted, depth + 1) });
+    } else if ((m = line.match(MD_ITEM))) {
+      // One list: its items, each with the lines indented under it, which can hold a nested list.
+      var ordered = /\d/.test(m[2]), list = { tag: ordered ? 'ol' : 'ul', children: [] }, item = null, base = m[1].length, blank = false;
+      if (ordered && parseInt(m[2], 10) !== 1) list.start = parseInt(m[2], 10);
+      for (; i < lines.length; i++) {
+        var l = lines[i], im = l.match(MD_ITEM), ind = mdIndent(l);
+        if (im && ind < base + 2 && /\d/.test(im[2]) === ordered) {
+          item = { lines: [im[3] || ''], at: im[1].length + im[2].length + 1 }; list.children.push(item); blank = false;
+        } else if (!l.trim()) { blank = true; if (item) item.lines.push(''); }
+        else if (ind >= base + 2 || (!blank && !mdStarts(lines, i))) {
+          item.lines.push(ind >= base + 2 ? l.replace(/\t/g, '    ').slice(Math.min(ind, item.at)) : l); blank = false;
+        } else break;
+      }
+      list.children = list.children.map(function (it) {
+        var inner = mdBlocks(it.lines, depth + 1);
+        // A short item shows as words, not as a paragraph with its own space.
+        if (inner.length && inner[0].tag === 'p' && !inner[0].cls) inner.splice.apply(inner, [0, 1].concat(inner[0].children));
+        return { tag: 'li', children: inner };
+      });
+      out.push(list);
+    } else if (mdTableStart(lines, i)) {
+      var head = mdCells(line), align = mdCells(lines[i + 1]).map(function (c) {
+        return /^:-+:$/.test(c) ? 'center' : /-:$/.test(c) ? 'right' : '';
+      }), rows = [];
+      for (i += 2; i < lines.length && lines[i].trim() && lines[i].indexOf('|') >= 0; i++) rows.push(mdCells(lines[i]));
+      var cell = function (tag) { return function (c, k) { return { tag: tag, align: align[k], children: mdInline(c) }; }; };
+      out.push({ tag: 'table', children: [
+        { tag: 'thead', children: [{ tag: 'tr', children: head.map(cell('th')) }] },
+        { tag: 'tbody', children: rows.map(function (r) { return { tag: 'tr', children: head.map(function (_, k) { return r[k] || ''; }).map(cell('td')) }; }) }] });
+    } else {
+      // A paragraph runs to a blank line or the start of another block; each line break in it stays.
+      var para = [];
+      for (; i < lines.length && lines[i].trim() && !(para.length && mdStarts(lines, i)); i++) {
+        if (para.length) para.push({ tag: 'br' });
+        para.push.apply(para, mdInline(lines[i].trim()));
+      }
+      out.push({ tag: 'p', children: para });
+    }
+  }
+  return out;
+}
+function pageMarkdownTree(text) { return mdBlocks(String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n')); }
+// The message as elements: a div of class "body md", with the text direction of its words.
+function pageMarkdown(text) {
+  function make(n) {
+    if (n.tag == null) return document.createTextNode(n.text);
+    var x = document.createElement(n.tag);
+    if (n.cls) x.className = n.cls;
+    if (n.start != null) x.start = n.start;
+    if (n.align) x.style.textAlign = n.align;
+    if (n.href) { x.href = n.href; x.target = '_blank'; x.rel = 'noopener noreferrer'; }
+    (n.children || []).forEach(function (c) { x.append(make(c)); });
+    return x;
+  }
+  var d = document.createElement('div'); d.className = 'body md'; d.dir = 'auto';
+  pageMarkdownTree(text).forEach(function (n) { d.append(make(n)); });
+  return d;
 }
