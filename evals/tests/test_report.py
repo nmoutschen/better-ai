@@ -180,7 +180,9 @@ def grading_error_rows() -> list[report.SampleResult]:
         report.SampleResult(
             "b-skill", "b", "skill", "1.1", math.nan, cost=0.4, seconds=20, grading_errors={"judge": "timed out"}
         ),
-        report.SampleResult("c-no-skill", "c", "no-skill", "1.1", math.nan, error="RuntimeError: timed out after 1800 s"),
+        report.SampleResult(
+            "c-no-skill", "c", "no-skill", "1.1", math.nan, error="RuntimeError: timed out after 1800 s"
+        ),
     ]
 
 
@@ -196,7 +198,7 @@ def test_grading_errors_are_left_out_of_rates_and_marked() -> None:
     """The pass table counts only scored samples; case lines mark the grading error; totals count it."""
     assert "1/1" in report.pass_table(grading_error_rows())[1]
     lines = report.case_lines(grading_error_rows())
-    assert next(line for line in lines if line.startswith("b-skill")).split()[1] == "GERR"
+    assert next(line for line in lines if line.startswith("b-skill")).split()[1] == "GRD"
     assert "3 samples, 1 errors, 1 grading errors" in lines[-1]
 
 
@@ -204,9 +206,7 @@ def test_errors_are_not_averaged_in_as_zero_cost_and_time() -> None:
     """Cost and time means use only the runs that finished and were graded."""
     text = "\n".join(report.condition_cost_lines(grading_error_rows()))
     skill = next(line for line in text.splitlines() if line.startswith("skill "))
-    assert skill.split()[1:3] == ["1", "0.500"] and not any(
-        line.startswith("no-skill") for line in text.splitlines()
-    )
+    assert skill.split()[1:3] == ["1", "0.500"] and not any(line.startswith("no-skill") for line in text.splitlines())
 
 
 def test_read_result_reads_grading_errors() -> None:

@@ -59,6 +59,7 @@ class SampleResult:
     seconds: float = 0.0
     judges: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
+    grading_errors: dict[str, str] = field(default_factory=dict)
     epoch: int = 1
     skill_reads: dict[str, Any] = field(default_factory=dict)
     rule_passed: float = math.nan
@@ -76,6 +77,7 @@ def read_result(sample: EvalSample) -> SampleResult:
     values = score.value if score and isinstance(score.value, dict) else {}
     run = metadata.get("claude_code") or {}
     judges = (score.metadata or {}).get("judges", {}) if score else {}
+    grading_errors = (score.metadata or {}).get("grading_errors", {}) if score else {}
     reads = scores.get("skill_reads")
     lint = scores.get("lint_issues_added")
     loaded = scores.get("skill_loaded")
@@ -98,6 +100,7 @@ def read_result(sample: EvalSample) -> SampleResult:
         skill_reads=(reads.metadata or {}) if reads is not None else {},
         lint_issues=float(lint.value) if lint is not None and not math.isnan(float(lint.value)) else None,
         skill_loaded=float(loaded.value) if loaded is not None else None,
+        grading_errors=grading_errors,
         error=sample.error.message[:120] if sample.error else None,
         side_actions=(score.metadata or {}).get("side_actions") or {} if score else {},
     )
@@ -149,6 +152,22 @@ def pass_table(results: list[SampleResult]) -> list[str]:
             values = cells.get((rule, condition), [])
             parts.append(f"{sum(values):>4.0f}/{len(values):<3} {sum(values) / len(values):>4.0%}" if values else "-")
         lines.append(f"{rule:{width}}" + "".join(f"{part:>19}" for part in parts))
+    return lines
+
+
+def error_lines(results: list[SampleResult]) -> list[str]:
+    """Count, per condition, the samples, the sample errors (agent run failed or timed out) and the grading errors.
+
+    Both kinds are left out of the pass rates and of the cost and time means; grading errors can be scored again
+    with `inspect score`, sample errors rerun with `inspect eval-retry`.
+    """
+    lines = [f"{'condition':18} {'samples':>8} {'sample errors':>14} {'grading errors':>15}"]
+    for name in CONDITIONS:
+        runs = [sample for sample in results if sample.condition == name]
+        if runs:
+            errors = sum(1 for sample in runs if sample.error)
+            grading = sum(1 for sample in runs if sample.grading_errors and not sample.error)
+            lines.append(f"{name:18} {len(runs):8} {errors:14} {grading:15}")
     return lines
 
 
@@ -237,7 +256,15 @@ def case_lines(results: list[SampleResult]) -> list[str]:
     lines = [f"{'sample':42} all  {'tokens in/out/cache-read/cache-write':36}  cost  judge   time"]
     total: dict[str, int] = defaultdict(int)
     for sample in sorted(results, key=lambda sample: (sample.case, sample.condition, sample.epoch)):
-        outcome = "ERR" if sample.error else "-" if math.isnan(sample.passed) else str(int(sample.passed))
+        outcome = (
+            "ERR"
+            if sample.error
+            else "GRD"
+            if sample.grading_errors
+            else "-"
+            if math.isnan(sample.passed)
+            else str(int(sample.passed))
+        )
         lines.append(
             f"{sample.sample_id + (f' #{sample.epoch}' if sample.epoch > 1 else ''):42} {outcome:>3}  {tokens_text(sample.tokens):36} "
             f"{sample.cost:6.3f} {sample.judge_cost:6.3f} {sample.seconds:5.0f}s"
@@ -248,19 +275,22 @@ def case_lines(results: list[SampleResult]) -> list[str]:
     judge_cost = sum(sample.judge_cost for sample in results)
     seconds = sum(sample.seconds for sample in results)
     errors = sum(1 for sample in results if sample.error)
-    label = f"total: {len(results)} samples, {errors} errors"
+    grading = sum(1 for sample in results if sample.grading_errors and not sample.error)
+    label = f"total: {len(results)} samples, {errors} errors, {grading} grading errors"
     lines.append(f"{label:46} {tokens_text(total):36} {cost:6.3f} {judge_cost:6.3f} {seconds:5.0f}s")
     return lines
 
 
 def condition_cost_lines(results: list[SampleResult]) -> list[str]:
-    """Format cost, time and tokens per condition: mean and median per run, over runs without an error."""
+    """Format cost, time and tokens per condition: mean and median per run, over runs with neither a sample error nor a grading error."""
     lines = [
         f"{'condition':18} {'runs':>5} {'cost mean':>10} {'median':>8} {'time mean':>10} {'median':>8} "
         f"{'out tokens':>11} {'total cost':>11}"
     ]
     for name in CONDITIONS:
-        runs = [sample for sample in results if sample.condition == name and not sample.error]
+        runs = [
+            sample for sample in results if sample.condition == name and not sample.error and not sample.grading_errors
+        ]
         if not runs:
             continue
         costs = [sample.cost for sample in runs]
@@ -386,6 +416,7 @@ def main(argv: list[str] | None = None) -> int:
         results = latest(results)
     sections = [
         ("Pass rate (all) per rule and condition", pass_table(results)),
+        ("Errors per condition (left out of pass rates, cost and time)", error_lines(results)),
         ("Comparisons between conditions (paired by case)", comparison_lines(results)),
         ("Cost and time per condition", condition_cost_lines(results)),
         ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(results)),
