@@ -39,6 +39,9 @@ SKILLS_FOLDER = ".claude/skills"
 READ_TOOL, SHELL_TOOL, EDIT_TOOL, WRITE_TOOL = "Read", "Bash", "Edit", "Write"
 # With a case's earlier work planted in .earlier/, the first commit holds .earlier/before/ and the second, whose
 # message is .earlier/message.txt, holds the planted repository: the agent finds its earlier work as the last commit.
+# With a history planted in .history/, each step folder, in name order, adds its files/ to the tree and commits them
+# with its message.txt, as the author and date its optional commit.env sets. The planted repository then replaces the
+# tree as a last commit, only when it differs from the last step.
 START_SCRIPT = """
 commit() {
     git add -f -A
@@ -56,7 +59,37 @@ if [ -d .earlier ]; then
     cp -a "$saved/earlier/before/." .
 fi
 git init -q
-commit -m 'Planted repository'
+if [ -d .history ]; then
+    saved_history=$(mktemp -d)
+    mv .history "$saved_history/history"
+    cp -a . "$saved_history/after"
+    clear_tree
+    for step in "$saved_history"/history/*/; do
+        if [ -d "$step/files" ]; then
+            cp -a "$step/files/." .
+        fi
+        (
+            if [ -f "$step/commit.env" ]; then
+                while IFS='=' read -r key value; do
+                    if [ -n "$key" ]; then
+                        export "$key=$value"
+                    fi
+                done < "$step/commit.env"
+                if [ -n "${GIT_AUTHOR_DATE:-}" ]; then
+                    export GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE"
+                fi
+            fi
+            commit -F "$step/message.txt"
+        )
+    done
+    clear_tree
+    cp -a "$saved_history/after/." .
+    git add -f -A
+    git diff --cached --quiet || commit -m 'Planted repository'
+    rm -rf "$saved_history"
+else
+    commit -m 'Planted repository'
+fi
 if [ -n "$saved" ]; then
     clear_tree
     cp -a "$saved/after/." .

@@ -11,7 +11,9 @@ graders),
 `replays/` with scripted runs for `tools/validate_cases.py` and the fake agent. A case about earlier work, such as
 work the user asks the agent to correct, also has `earlier/`: `before/` with the files as they were before that work,
 and `message.txt` with its commit message. The sandbox then starts with two commits, and the planted repository is
-the last one. `one_sentence.yaml` in
+the last one. A case that needs a Git history, such as an audit that reads which files change together, has
+`history/` instead: one folder per commit, in name order, with `files/` (the files that commit adds or changes),
+`message.txt` and an optional `commit.env` that sets the author and date. `one_sentence.yaml` in
 the skill folder holds the one-sentence instruction for each source, such as `SKILL.md#4` or `modes/bug-fix.md`.
 """
 
@@ -35,6 +37,8 @@ SKILL_CONDITIONS = (WITH_SKILL, SHORT_SKILL)
 # one-sentence names the tested rule, so it is a per-rule diagnostic rather than a default comparison.
 DEFAULT_CONDITIONS = f"{NO_SKILL},{WITH_SKILL},{SHORT_SKILL}"
 SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
+# What a step of a planted history may set in its commit.env.
+HISTORY_KEYS = ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_AUTHOR_DATE")
 
 
 def check_skill(skill: str) -> str:
@@ -69,12 +73,33 @@ def load_case(directory: Path) -> dict[str, Any]:
     case["graders"] = _resolve(case["graders"], directory)
     repo = directory / "repo"
     case["files"] = {path.relative_to(repo).as_posix(): path for path in sorted(repo.rglob("*")) if path.is_file()}
-    earlier = directory / "earlier"
-    if earlier.is_dir():
-        for path in sorted(earlier.rglob("*")):
-            if path.is_file():
-                case["files"][f".earlier/{path.relative_to(earlier).as_posix()}"] = path
+    earlier, history = directory / "earlier", directory / "history"
+    if earlier.is_dir() and history.is_dir():
+        raise ValueError(f"{directory.name}: a case has earlier/ or history/, not both")
+    if history.is_dir():
+        check_history(history)
+    for folder in (earlier, history):
+        if folder.is_dir():
+            for path in sorted(folder.rglob("*")):
+                if path.is_file():
+                    case["files"][f".{folder.name}/{path.relative_to(folder).as_posix()}"] = path
     return case
+
+
+def check_history(history: Path) -> None:
+    """Raise unless each step of a planted history has a message and sets only the author and date."""
+    steps = sorted(path for path in history.iterdir() if path.is_dir())
+    if not steps:
+        raise ValueError(f"{history}: no commit folders")
+    for step in steps:
+        if not (step / "message.txt").is_file():
+            raise ValueError(f"{step}: no message.txt")
+        env = step / "commit.env"
+        if env.is_file():
+            for line in env.read_text().splitlines():
+                key = line.partition("=")[0]
+                if line and key not in HISTORY_KEYS:
+                    raise ValueError(f"{env}: {key!r} is not one of {', '.join(HISTORY_KEYS)}")
 
 
 def load_cases(skill: str) -> list[dict[str, Any]]:

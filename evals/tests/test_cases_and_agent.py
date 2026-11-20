@@ -1,6 +1,7 @@
 """Tests for skill_evals/cases.py and the parts of skill_evals/agent.py that need no sandbox or model."""
 
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -109,3 +110,74 @@ def test_earlier_work_is_the_last_commit(tmp_path: Path) -> None:
     assert git("show", "HEAD:sales.py") == (cases.CASES / "do-better/refund-total-user-right/repo/sales.py").read_text()
     assert "test_sales.py" not in git("ls-tree", "--name-only", "HEAD~1")
     assert not (tmp_path / ".earlier").exists() and git("status", "--porcelain") == ""
+
+
+def write_tree(root: Path, files: dict[str, str]) -> None:
+    """Write each file under root, creating folders."""
+    for path, text in files.items():
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        (root / path).write_text(text)
+
+
+def plant(case: dict, target: Path) -> None:
+    """Copy a loaded case's files into target, as the sandbox receives them."""
+    for path, source in case["files"].items():
+        (target / path).parent.mkdir(parents=True, exist_ok=True)
+        (target / path).write_bytes(source.read_bytes())
+
+
+@pytest.mark.parametrize("final_differs", [True, False])
+def test_history_is_planted_commit_by_commit(tmp_path: Path, final_differs: bool) -> None:
+    """A case with history/ starts with one commit per step, in name order, with the step's author and date.
+
+    The planted repository is a last commit only when it differs from the last step.
+    """
+    case_dir, work = tmp_path / "case", tmp_path / "work"
+    final = {"tax.py": "RATE = 0.21\n", "README.md": "Shop\n"}
+    write_tree(
+        case_dir,
+        {
+            "case.yaml": "id: history-case\nrule: r\nsituation: s\nrequest: r\ngraders: []\n",
+            **{f"repo/{path}": text for path, text in final.items()},
+            "history/01-start/files/tax.py": "RATE = 0.2\n",
+            "history/01-start/files/old.py": "x = 1\n",
+            "history/01-start/message.txt": "Start the shop\n",
+            "history/01-start/commit.env": "GIT_AUTHOR_NAME=Ana\nGIT_AUTHOR_EMAIL=ana@example.invalid\n"
+            "GIT_AUTHOR_DATE=2026-03-01T10:00:00+00:00\n",
+            "history/02-rate/files/tax.py": "RATE = 0.21\n",
+            "history/02-rate/message.txt": "Raise the tax rate\n",
+        },
+    )
+    if not final_differs:
+        write_tree(case_dir, {"history/02-rate/files/README.md": "Shop\n"})
+        (case_dir / "history/01-start/files/old.py").unlink()
+    case = cases.load_case(case_dir)
+    work.mkdir()
+    plant(case, work)
+    subprocess.run(["bash", "-ec", agent.START_SCRIPT, "bash"], cwd=work, check=True, capture_output=True)
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=work, check=True, capture_output=True, text=True).stdout
+
+    expected = ["Raise the tax rate", "Start the shop"]
+    assert git("log", "--format=%s").splitlines() == (["Planted repository", *expected] if final_differs else expected)
+    first = git("log", "--reverse", "--format=%an|%ae|%at|%ct").splitlines()[0]
+    stamp = int(datetime(2026, 3, 1, 10, tzinfo=UTC).timestamp())
+    assert first == f"Ana|ana@example.invalid|{stamp}|{stamp}"
+    assert sorted(git("ls-tree", "--name-only", "HEAD").split()) == sorted(final)
+    assert git("show", "HEAD:tax.py") == "RATE = 0.21\n"
+    assert not (work / ".history").exists() and git("status", "--porcelain") == ""
+
+
+def test_history_rejects_bad_steps(tmp_path: Path) -> None:
+    """A history step needs a message, sets only author and date, and a case has earlier/ or history/, not both."""
+    base = {"case.yaml": "id: c\nrule: r\nsituation: s\nrequest: r\ngraders: []\n", "repo/a.py": "a = 1\n"}
+    for extra, error in (
+        ({"history/01/files/a.py": "a = 0\n"}, "no message.txt"),
+        ({"history/01/message.txt": "m\n", "history/01/commit.env": "GIT_DIR=/tmp\n"}, "GIT_DIR"),
+        ({"history/01/message.txt": "m\n", "earlier/message.txt": "m\n"}, "not both"),
+    ):
+        case_dir = tmp_path / error.replace(" ", "-").replace(".", "")
+        write_tree(case_dir, {**base, **extra})
+        with pytest.raises(ValueError, match=error):
+            cases.load_case(case_dir)

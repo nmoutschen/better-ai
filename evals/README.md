@@ -154,6 +154,11 @@ cases/<skill>/<case-id>/
   earlier/    optional: the agent's earlier work, for skills that correct it, such as do-better
     before/       the files as they were before that work
     message.txt   its commit message, such as the agent's hand-back report
+  history/    optional, instead of earlier/: a Git history the case needs, such as for an audit
+    <NN-slug>/    one folder per commit, in name order
+      files/        the files this commit adds or changes
+      message.txt   its commit message
+      commit.env    optional: GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_AUTHOR_DATE
 ```
 
 With `earlier/`, the sandbox starts with two commits: `before/`, then `repo/`
@@ -161,6 +166,13 @@ with `message.txt` as its message. The agent finds its earlier work as the last
 commit, and graders compare against that commit, so a case states the earlier
 work in the repository instead of in a conversation the harness would have to
 replay.
+
+With `history/`, the sandbox starts with one commit per step folder, each
+adding its `files/` to the tree of the step before. `repo/` then replaces the
+tree as a last commit, `Planted repository`, only when it differs from the
+last step, so a case can keep its last step identical to `repo/` and end on
+that step's message. A step cannot delete a file; leave it out of `repo/` to
+delete it in the last commit. Graders compare against the last commit.
 
 `rule` names the behaviour the case tests, such as `report-accurately` or
 `ask-costly-gaps-at-once`, independent of how the skill is organised, so the
