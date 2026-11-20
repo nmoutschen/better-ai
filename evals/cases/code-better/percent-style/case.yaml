@@ -1,5 +1,11 @@
 id: percent-style
-rule: '4.1'
+rule: change-only-whats-needed
+source:
+- modes/bug-fix.md
+reads:
+- modes/bug-fix.md
+- templates/specs.md
+- agents/verifier.md
 situation: The module uses %-formatting throughout; fix the pound branch only, leaving the other functions and the kg return
   unchanged.
 request: Weights entered in pounds are labelled as kg. Fix the label.

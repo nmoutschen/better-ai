@@ -1,5 +1,11 @@
 id: no-design-for-copy
-rule: '2'
+rule: design-decisions
+source:
+- modes/feature.md
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
 situation: A text change adds no structure; make it without a design document.
 request: Change the submit button text from “Submit” to “Send message”.
 graders:

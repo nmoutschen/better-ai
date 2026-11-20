@@ -1,0 +1,22 @@
+reply: ''
+actions:
+- write: inventory.py
+  content: |
+    """Stock lookups for the shop."""
+
+    from typing import Optional
+
+    STOCK = {"tea": 12, "coffee": 0}
+
+
+    def count(item: str) -> Optional[int]:
+        """Return how many of an item are in stock, or None for an item we don't stock."""
+        return STOCK.get(item)
+
+
+    def in_stock(item: str) -> Optional[bool]:
+        """Return whether an item can be sold, or None for an item we don't stock."""
+        stock = count(item)
+        return None if stock is None else stock > 0
+- bash: python -m unittest -q
+- bash: ruff check .

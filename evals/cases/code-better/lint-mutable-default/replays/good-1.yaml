@@ -1,0 +1,16 @@
+reply: ''
+actions:
+- write: notes.py
+  content: |
+    """In-memory notes for the help desk."""
+
+    NOTES = []
+
+
+    def add_note(text, tags=None):
+        """Store a note with its tags, if any, and return it."""
+        note = {"text": text, "tags": list(tags or [])}
+        NOTES.append(note)
+        return note
+- bash: python -m unittest -q
+- bash: ruff check .

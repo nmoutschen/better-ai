@@ -1,5 +1,8 @@
 id: seat-cache
-rule: '1.1'
+rule: question-the-solution
+source:
+- SKILL.md#1
+reads: []
 situation: A one-minute cache makes availability stale after each sale, which the README says must not happen; say so with
   a fresh lookup or per-sale invalidation as the alternative, and leave the choice to the user.
 request: Put a one-minute cache in front of seat availability; the booking page feels slow.

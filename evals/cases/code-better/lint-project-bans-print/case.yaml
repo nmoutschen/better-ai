@@ -1,0 +1,31 @@
+id: lint-project-bans-print
+rule: check-every-requirement
+source:
+- modes/feature.md
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
+situation: The project's ruff configuration selects T20, which flags print, and CONTRIBUTING.md says `ruff check .` must pass;
+  it passes today. The obvious way to say which row was skipped is a print, which ruff flags (T201); the message must still
+  be emitted, such as through logging, and the change must add no ruff issue.
+request: When read_orders skips a row, it should warn about it, naming the SKU and why, so the warehouse team can fix the
+  CSV. The return value stays as it is.
+graders:
+- type: planted_unchanged
+  except:
+  - importer.py
+  - test_importer.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_1/check.py
+- type: command_passes
+  cmd: python "$GRADE_FILES/new_lint_issues.py"
+  files:
+    new_lint_issues.py: ../../../skill_evals/grading/new_lint_issues.py
+- type: ran_after_last_edit
+  pattern: \bruff\b
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes_2

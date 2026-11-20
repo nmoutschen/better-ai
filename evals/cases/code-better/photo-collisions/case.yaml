@@ -1,5 +1,8 @@
 id: photo-collisions
-rule: '1.3'
+rule: user-constraints
+source:
+- SKILL.md#ask-the-user
+reads: []
 situation: Several photos can share a date; ask about collision behavior with photos 7 and 9 and decide internal formatting
   structure independently.
 request: Name exported photos using just the capture date.

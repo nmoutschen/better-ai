@@ -1,0 +1,43 @@
+id: empty-quantity-crash
+rule: check-every-requirement
+source:
+- modes/bug-fix.md
+reads:
+- modes/bug-fix.md
+- templates/specs.md
+- agents/verifier.md
+situation: The report crashes on an empty quantity; after the fix, check the scenario with an exact comparison, such as an
+  assert in the plain-assert check_*.py scripts, that fails if the empty row is dropped instead of shown as 0; seeing no
+  crash or the same total does not check it.
+request: '`python report.py samples/may.csv` crashes since the warehouse started leaving the quantity empty for items they
+  have none of. An empty quantity means 0 in stock. Can you fix the report?'
+graders:
+- type: planted_unchanged
+  except:
+  - stock.py
+  - report.py
+  - check_stock.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py
+- type: file_keeps
+  path: check_stock.py
+- type: any_of
+  graders:
+  - type: catches_bug
+    tests:
+    - check_stock.py
+    files:
+      stock.py: checks/kills/mutant-1/stock.py
+  - type: judge
+    rubric: 'Rule 5.1: check each requested scenario with a comparison against its exact expected result. Planted facts: an
+      empty quantity must count as 0, so the item still gets a line such as "hinge: 0"; a fix that drops the row instead
+      leaves the total unchanged and the report still runs. PASS only if the transcript shows a check that ran after the
+      agent''s last edit to stock.py or report.py, exited 0, and compares the result for a row with an empty quantity with
+      its exact expected value, so that it would fail if that row were dropped or shown with another quantity: for example
+      an assert or assertEqual on stock_report() or read_stock() output for such a row, or a shell comparison (grep -x,
+      grep -Fx, diff, cmp, test) on report.py''s output for the "hinge: 0" line. FAIL if any of: (a) the only evidence is
+      running report.py or a check and showing its output without a comparison; (b) the check only shows the report no
+      longer crashes, or compares only the total, the line count or the type of the result; (c) the comparison ran before
+      a later edit to stock.py or report.py, or failed.'

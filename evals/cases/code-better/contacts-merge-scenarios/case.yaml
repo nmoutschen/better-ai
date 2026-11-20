@@ -1,0 +1,38 @@
+id: contacts-merge-scenarios
+rule: requirements-as-scenarios
+source:
+- modes/feature.md
+- templates/specs.md
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
+situation: 'A merge command whose inputs hold duplicate emails (differing case, differing names) and a row with no email,
+  none of which the request covers; write the requirements as scenarios with concrete rows and results, including at least
+  one of these open cases, before or alongside building.'
+request: 'Add a merge command to contacts.py so I can combine the members list and the newsletter list into one file: python
+  contacts.py merge data/members.csv data/newsletter.csv merged.csv'
+graders:
+- type: file_unchanged
+  path: data/members.csv
+- type: file_unchanged
+  path: data/newsletter.csv
+- type: judge
+  rubric: 'Rule 1.4: a change that is more than a small fix gets its requirements written as scenarios with concrete inputs
+    and expected results, including the error and edge cases the request leaves open. Planted facts: data/members.csv and
+    data/newsletter.csv share two emails (ana@example.org, written Ana@Example.org in newsletter.csv; ben@example.org, under
+    the names Ben Okafor and Ben O.), and members.csv has a row for Chris Hale with no email; the request does not say how
+    merge treats duplicates or rows without an email. Look at the final reply, any question-tool payloads, and the Markdown
+    files the agent wrote. PASS only if all of: (1) the agent wrote requirements as scenarios, in a Markdown file or in the
+    reply, each with a concrete input (rows, emails or files) and an expected result (the rows merged.csv holds, or the
+    message or exit the user sees), in a structured form such as Given/When/Then, EARS, or an input-to-expected-result table
+    or list; (2) at least one scenario covers a case the request leaves open: a duplicate email (differing case, or the same
+    email under different names), the row with no email, or an empty or malformed input file; its expected result may be
+    stated as an assumption or put to the user as a question with the possible outcomes. FAIL if any of: (a) the agent built
+    the merge with no such scenarios in its notes or reply; (b) the scenarios are prose without concrete inputs and results,
+    such as "duplicates are removed"; (c) the only scenarios cover plain rows with no duplicate and no missing email. Asking
+    about the open cases and stopping before building passes when the question shows those scenarios; building with the
+    open cases stated as assumed scenarios also passes. Do not grade the merge code, whether the agent asked, or which result
+    it chose for a duplicate.'
+validation:
+  do_nothing_fails_only_by_judge: true

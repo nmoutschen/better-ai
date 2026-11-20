@@ -1,0 +1,31 @@
+id: bank-euro-prefix
+rule: change-only-whats-needed
+source:
+- modes/feature.md
+reads:
+- [modes/feature.md, modes/bug-fix.md]
+- templates/specs.md
+- agents/verifier.md
+situation: The new bank writes amounts as '€-18.40', which parse_amount rejects; accept the leading euro sign only, and leave
+  the misleading cents comment, the zero-amount rejection, the strict format (no commas, no 'EUR') and the fail-whole-import
+  behaviour as they are, listing anything worth changing.
+request: The import blows up on the export from our new bank account (samples/new-bank.csv). Can you make it work?
+graders:
+- type: planted_unchanged
+  except:
+  - bank_import.py
+  - test_bank_import.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_1/check.py
+- type: command_passes
+  cmd: python "$GRADE_FILES/keeps_except.py" bank_import.py 'AMOUNT = re.compile(r"-?\d+\.\d{2}")' 'cell = cell.strip()' 'if
+    not AMOUNT.fullmatch(cell):' 'amount = Decimal(cell)'
+  files:
+    keeps_except.py: checks/command_passes_2/keeps_except.py
+- type: file_keeps
+  path: test_bank_import.py
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes_2

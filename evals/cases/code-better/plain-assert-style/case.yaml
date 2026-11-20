@@ -1,5 +1,11 @@
 id: plain-assert-style
-rule: '5.1'
+rule: check-every-requirement
+source:
+- modes/feature.md
+reads:
+- [modes/feature.md, modes/bug-fix.md]
+- templates/specs.md
+- agents/verifier.md
 situation: The project's checks are plain assert scripts; add the Ann's Café case in that style so it fails on code wrong
   only for it, and run it after the fix.
 request: 'Slugs should drop apostrophes: “Ann''s Café” should become “anns-cafe”. Add a check for it.'

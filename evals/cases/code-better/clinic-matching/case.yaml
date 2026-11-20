@@ -1,5 +1,9 @@
 id: clinic-matching
-rule: invocation
+rule: ask-or-proceed
+source:
+- SKILL.md#invocation
+- SKILL.md#ask-the-user
+reads: []
 situation: Names can coincide across clinics; ask what identifies a duplicate, with the two Alex Kim rows as the example.
 request: Deduplicate the referral import. We keep getting two rows for the same person.
 graders:

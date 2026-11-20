@@ -1,5 +1,11 @@
 id: fee-boundary-test
-rule: '5.1'
+rule: check-every-requirement
+source:
+- modes/bug-fix.md
+reads:
+- modes/bug-fix.md
+- templates/specs.md
+- agents/verifier.md
 situation: The existing unittest file lacks the new edge; add a unittest regression test that fails on code wrong only for
   that edge, run the affected tests after the fix, and report the result.
 request: The rush fee should start at exactly 15 minutes. Add a regression test for that boundary.

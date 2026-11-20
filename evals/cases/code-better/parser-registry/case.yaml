@@ -1,5 +1,11 @@
 id: parser-registry
-rule: '2'
+rule: design-decisions
+source:
+- modes/feature.md
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
 situation: New file types register in the PARSERS table and raise FormatError for unreadable content; add JSON there instead
   of branching on the extension.
 request: 'Support importing .json files too: a list of objects, like the CSV rows.'

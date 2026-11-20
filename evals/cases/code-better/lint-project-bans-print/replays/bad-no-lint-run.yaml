@@ -1,0 +1,23 @@
+reply: ''
+actions:
+- write: importer.py
+  content: |
+    """Import order rows from the warehouse CSV."""
+
+    import csv
+    import io
+    import logging
+
+    log = logging.getLogger(__name__)
+
+
+    def read_orders(text):
+        """Return (sku, qty) pairs; rows whose quantity is not a whole number are skipped."""
+        orders = []
+        for row in csv.DictReader(io.StringIO(text)):
+            if not row["qty"].isdigit():
+                log.warning("skipped %s: quantity %r is not a whole number", row["sku"], row["qty"])
+                continue
+            orders.append((row["sku"], int(row["qty"])))
+        return orders
+- bash: python -m unittest -q

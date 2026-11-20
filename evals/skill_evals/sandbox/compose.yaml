@@ -3,7 +3,8 @@
 services:
   default:
     build: .
-    image: better-ai-evals-sandbox:latest
+    # Tagged by what it holds, so worktrees with an older Dockerfile keep their own image.
+    image: better-ai-evals-sandbox:claude-2.1.327-ruff-0.17.5
     init: true
     command: sleep infinity
     working_dir: /work

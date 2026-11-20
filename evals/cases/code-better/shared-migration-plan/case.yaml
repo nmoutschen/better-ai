@@ -1,5 +1,13 @@
 id: shared-migration-plan
-rule: '3'
+rule: plan-when-needed
+source:
+- modes/refactor.md
+- templates/tasks.md
+reads:
+- [modes/refactor.md, modes/coordinate.md]
+- templates/specs.md
+- templates/tasks.md
+- agents/verifier.md
 situation: The work is shared with a teammate who continues next week; write a plan with one task per module, a concrete check
   for each, and a status that marks only the finished modules done.
 request: Move the report modules from old_db to new_db. You do sales, stock and staff today; Priya picks up suppliers, returns

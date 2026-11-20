@@ -1,5 +1,11 @@
 id: cli-scenario
-rule: '5.4'
+rule: check-unstated-requirements
+source:
+- modes/feature.md
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
 situation: 'Both scenarios need a check on the final code that compares the decoded --json values and the exact plain output:
   a test the grader reruns against output mutants, or an inline check the judge reads.'
 request: 'Add a --json flag to the report command that prints the summary as JSON, like {"count": 3, "total": 12}. The plain

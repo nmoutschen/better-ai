@@ -20,9 +20,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from inspect_ai.model import ChatMessageAssistant
+from inspect_ai.tool import ToolCall
 from inspect_ai.util._sandbox.local import LocalSandboxEnvironment
 
-from skill_evals.agent import IGNORED_PATHS, START_SCRIPT
+from skill_evals.agent import IGNORED_PATHS, READ_TOOL, SHELL_TOOL, START_SCRIPT, WRITE_TOOL
 from skill_evals.cases import case_dirs, load_case, replays
 from skill_evals.grading.files import Checkout
 from skill_evals.grading.judge import NO_JUDGE
@@ -32,9 +34,9 @@ from skill_evals.grading.scorer import NOT_APPLICABLE, Grading, grader_keys
 class ReplayGrading(Grading):
     """Grading that skips top-level judges and assumes a verdict for judges inside any_of."""
 
-    def __init__(self, repo: Checkout, assumed: bool) -> None:
-        """Grade the replayed checkout, assuming `assumed` for nested judges."""
-        super().__init__(SimpleNamespace(), repo, NO_JUDGE)  # type: ignore[arg-type]
+    def __init__(self, repo: Checkout, assumed: bool, actions: list[dict[str, Any]]) -> None:
+        """Grade the replayed checkout and its actions as a transcript, assuming `assumed` for nested judges."""
+        super().__init__(SimpleNamespace(messages=replay_messages(actions)), repo, NO_JUDGE)  # type: ignore[arg-type]
         self.assumed = assumed
 
     async def run(self, key: str, spec: dict[str, Any]) -> float:
@@ -42,6 +44,21 @@ class ReplayGrading(Grading):
         if spec["type"] == "judge":
             return int(self.assumed) if "." in key else NOT_APPLICABLE
         return await super().run(key, spec)
+
+
+def replay_messages(actions: list[dict[str, Any]]) -> list[ChatMessageAssistant]:
+    """Turn a replay's writes, reads and commands into tool calls, as the agent's transcript would hold them."""
+    messages = []
+    for number, action in enumerate(actions):
+        if "write" in action:
+            name, arguments = WRITE_TOOL, {"file_path": action["write"], "content": action["content"]}
+        elif "read" in action:
+            name, arguments = READ_TOOL, {"file_path": action["read"]}
+        else:
+            name, arguments = SHELL_TOOL, {"command": action["bash"]}
+        call = ToolCall(id=f"replay-{number}", function=name, arguments=arguments)
+        messages.append(ChatMessageAssistant(content="", tool_calls=[call]))
+    return messages
 
 
 def put_python_on_path() -> None:
@@ -70,7 +87,7 @@ async def replay(case: dict[str, Any], run: dict[str, Any]) -> tuple[dict[str, f
         started = await sandbox_env.exec(["bash", "-ec", START_SCRIPT, "bash", *IGNORED_PATHS])
         repo = Checkout(sandbox_env, started.stdout.split()[-1], sandbox_env.directory.name)
         await play_actions(sandbox_env, run.get("actions") or [])
-        grading = ReplayGrading(repo, run.get("judge", True))
+        grading = ReplayGrading(repo, run.get("judge", True), run.get("actions") or [])
         values = {}
         for key, spec in zip(grader_keys(case["graders"]), case["graders"], strict=True):
             value = await grading.run(key, spec)

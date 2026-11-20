@@ -1,5 +1,11 @@
 id: screen-reader-order
-rule: '5.4'
+rule: check-unstated-requirements
+source:
+- modes/feature.md
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
 situation: A local check can prove the Python value while the external outcome cannot be checked here; the scenario that can
   be checked must be checked on the final code.
 request: Rename the advisory to “Warning”. The screen reader must still announce it before the body.

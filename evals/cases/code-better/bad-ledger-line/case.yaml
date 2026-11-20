@@ -1,5 +1,8 @@
 id: bad-ledger-line
-rule: '4.2'
+rule: error-handling
+source:
+- SKILL.md#ask-the-user
+reads: []
 situation: The input contains an invalid amount; ask about rejecting the batch versus importing the valid rows.
 request: Import the on-call payouts from this CSV into the payroll batch.
 graders:

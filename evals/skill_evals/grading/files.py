@@ -49,13 +49,18 @@ class Checkout:
         return self._planted
 
     async def changed(self) -> tuple[set[str], set[str]]:
-        """Return changed tracked paths and untracked paths since the planted commit, without Python caches."""
+        """Return changed tracked paths and untracked paths since the planted commit, without Python caches.
+
+        Untracked paths include Markdown notes that Git ignores, such as working notes the agent excluded from Git.
+        """
         if self._changed is None:
             tracked = await self.git("diff", "--name-only", "--no-renames", "-z", self.start, "--")
             untracked = await self.git("ls-files", "--others", "--exclude-standard", "-z")
+            ignored = await self.git("ls-files", "--others", "--ignored", "--exclude-standard", "-z")
+            notes = "\0".join(path for path in ignored.split("\0") if MARKDOWN_NOTE.search(path))
             self._changed = tuple(
                 {path for path in listing.split("\0") if path and not CACHE_FILE.search(path)}
-                for listing in (tracked, untracked)
+                for listing in (tracked, f"{untracked}\0{notes}")
             )
         return self._changed
 

@@ -1,5 +1,11 @@
 id: explicit-fallback
-rule: '4.2'
+rule: error-handling
+source:
+- SKILL.md#ask-the-user
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
 situation: The user has specified the failure behavior; implement it without reopening the policy.
 request: When the package weight is missing (None), display “unknown”; zero still displays as “0”.
 graders:

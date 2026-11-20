@@ -1,0 +1,31 @@
+id: lint-existing-issues-same-file
+rule: check-every-requirement
+source:
+- modes/feature.md
+reads:
+- modes/feature.md
+- templates/specs.md
+- agents/verifier.md
+situation: '`ruff check .` already reports Optional[...] annotations in inventory.py (UP045), which CONTRIBUTING.md says are
+  tracked separately; a change must not add new ones. Copying the file''s Optional style adds one; the change must work and
+  add no ruff issue. Fixing the existing one is not graded.'
+request: 'Add an in_stock(item) function that says whether an item can be sold: True when its count is above zero, False at
+  zero, and None for an item we don''t stock.'
+graders:
+- type: planted_unchanged
+  except:
+  - inventory.py
+  - test_inventory.py
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes_1/check.py
+- type: command_passes
+  cmd: python "$GRADE_FILES/new_lint_issues.py"
+  files:
+    new_lint_issues.py: ../../../skill_evals/grading/new_lint_issues.py
+- type: ran_after_last_edit
+  pattern: \bruff\b
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes_2

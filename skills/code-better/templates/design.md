@@ -1,6 +1,11 @@
 # Design: <short name of the change>
 
-Requirements: <path or link to the requirements>
+<HOW TO FILL THIS IN — delete this block when done.
+- Write a design only when there is none and the change adds structure, such as a module, data model, dependency or migration. Save it in .code/<change>/design.md.
+- Show only the parts the change touches. Follow the codebase's existing patterns; say why where you depart from them.
+- Ask the user about each decision, as the general rule Ask the user of SKILL.md says. A gap the design reveals, such as what happens when a step fails halfway, is a gap to ask about, not a design choice.>
+
+Spec: <path or link to the spec>
 
 ## Approach
 
@@ -31,14 +36,15 @@ Requirements: <path or link to the requirements>
 ### <Decision>
 
 - Chosen: <option>
-- Alternatives: <options considered>
-- Why: <reason, tied to the requirements or the codebase>
-- Affects: <behaviour | cost | risk | maintenance>, <how>
+- Rejected: <options considered>
+- Main reason: <tied to the spec or the codebase>
+- Main drawback: <cost, risk or maintenance burden of the chosen option>
+- Assumes: <what must stay true for this choice to hold>
 
 ## Departures from existing patterns
 
 - <Pattern not followed>: <why>
 
-## Requirement gaps found
+## Gaps found
 
 - <Gap found during design>: <status: asked | assumed | open>

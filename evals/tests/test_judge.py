@@ -45,6 +45,27 @@ def test_render_transcript_numbers_steps_with_exit_codes() -> None:
     assert "[4] Bash: python t.py\n  -> OK, exit code 0" in text
 
 
+def test_render_transcript_marks_sub_agent_steps() -> None:
+    """A sub-agent's text and tool calls are labelled as the sub-agent's."""
+    sub = {"subagent_of": "a"}
+    text = judge.render_transcript(
+        [
+            ChatMessageUser(content="Fix it"),
+            ChatMessageAssistant(
+                content="",
+                metadata=sub,
+                tool_calls=[ToolCall(id="s", function="Bash", arguments={"command": "git diff"})],
+            ),
+            ChatMessageTool(content="diff", tool_call_id="s", function="Bash"),
+            ChatMessageAssistant(content="Verdict: passes.", metadata=sub),
+            ChatMessageAssistant(content="Done."),
+        ]
+    )
+    assert "[1] (sub-agent) Bash: git diff" in text
+    assert "[2] Sub-agent says: Verdict: passes." in text
+    assert "[3] Agent says: Done." in text
+
+
 def test_clip_and_read_ranges() -> None:
     """Long outputs keep both ends; a Read shows whether it was partial."""
     assert "characters cut" in judge.clip("x" * 5000)

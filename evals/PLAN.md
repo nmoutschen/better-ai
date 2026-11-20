@@ -119,8 +119,8 @@ uv run python -m tools.report --latest logs/comparison-sonnet-x3/*.eval \
 
 These runs predate four fixes from a review, made without re-running: five
 cases (`no-plan-one-session`, `reuse-http-helper`, `shared-formatter`,
-`rule83-record-constraint`, `rule41-hard-2`) failed agents that stopped to ask
-before building or that made a correct minimal fix; `rule83-record-constraint`
+`record-session-constraint`, `bank-euro-prefix`) failed agents that stopped to ask
+before building or that made a correct minimal fix; `record-session-constraint`
 did not say the session was long, which rule 8.3 requires; the short skill used
 an earlier wording of the 8.2 sentence; and the judge saw the condition's
 prompt (`/code-better` or the appended sentence) instead of the plain request.

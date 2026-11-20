@@ -28,9 +28,15 @@ from skill_evals.transcript import Run, parse_stream, redact
 WORKDIR = "/work"
 AGENT_USER = "agent"
 TOKEN_VARIABLES = ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN")
-DISALLOWED_TOOLS = "WebSearch,WebFetch"
+# Web tools would let the agent look answers up; scheduling tools keep a non-interactive run open until a
+# wake-up fires, long after the work is done.
+DISALLOWED_TOOLS = "WebSearch,WebFetch,ScheduleWakeup,CronCreate,CronDelete,CronList,Monitor"
 CLAUDE_CODE_VERSION = "2.1.327"
 IGNORED_PATHS = ("__pycache__/", ".pytest_cache/")
+# Claude Code facts that graders need: where it finds a user's skills, relative to the home folder, and the
+# names of its tools that read, run, edit and write. Graders import these, so only this adapter knows the harness.
+SKILLS_FOLDER = ".claude/skills"
+READ_TOOL, SHELL_TOOL, EDIT_TOOL, WRITE_TOOL = "Read", "Bash", "Edit", "Write"
 # With a case's earlier work planted in .earlier/, the first commit holds .earlier/before/ and the second, whose
 # message is .earlier/message.txt, holds the planted repository: the agent finds its earlier work as the last commit.
 START_SCRIPT = """
@@ -139,7 +145,7 @@ def skill_commit(skill: str) -> str:
 async def install_skill(sandbox_env: SandboxEnvironment, skill: str, short: bool = False) -> None:
     """Copy the skill as is into the agent user's ~/.claude/skills/<skill>/, or only the short SKILL.md."""
     source = REPO / "skills" / skill
-    target = f"{home(AGENT_USER)}/.claude/skills/{skill}"
+    target = f"{home(AGENT_USER)}/{SKILLS_FOLDER}/{skill}"
     if short:
         await sandbox_env.write_file(f"{target}/SKILL.md", short_skill(skill))
     else:
@@ -177,7 +183,7 @@ def record_run(state: TaskState, run: Run, prompt: str) -> None:
 
 @solver
 def claude_code(model: str = "sonnet", timeout: int = 1800) -> Solver:
-    """Run the real Claude Code CLI on the sample's prompt in /work, web tools disallowed."""
+    """Run the real Claude Code CLI on the sample's prompt in /work, with the web and scheduling tools disallowed."""
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         prompt = state.input_text
@@ -204,7 +210,7 @@ async def play_action(
         script = 'mkdir -p "$(dirname "$1")" && cat > "$1"'
         await run_checked(sandbox_env, ["sh", "-c", script, "sh", path], input=content, user=AGENT_USER)
         return (
-            tool_use_block(number, "Write", {"file_path": path, "content": content}),
+            tool_use_block(number, WRITE_TOOL, {"file_path": path, "content": content}),
             f"File created at: {path}",
             False,
         )
@@ -217,13 +223,13 @@ async def play_action(
             if result.success
             else result.stderr
         )
-        return tool_use_block(number, "Read", {"file_path": path}), text, not result.success
+        return tool_use_block(number, READ_TOOL, {"file_path": path}), text, not result.success
     command = action["bash"]
     result = await sandbox_env.exec(["bash", "-c", command], cwd=WORKDIR, user=AGENT_USER, timeout=120)
     output = (result.stdout + result.stderr).strip()
     if not result.success:
         output = f"Exit code {result.returncode}\n{output}"
-    return tool_use_block(number, "Bash", {"command": command}), output, not result.success
+    return tool_use_block(number, SHELL_TOOL, {"command": command}), output, not result.success
 
 
 def tool_use_block(number: int, name: str, arguments: dict[str, Any]) -> dict[str, Any]:

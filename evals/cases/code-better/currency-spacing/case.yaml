@@ -1,5 +1,11 @@
 id: currency-spacing
-rule: '1.5'
+rule: ask-costly-gaps-at-once
+source:
+- SKILL.md#ask-the-user
+reads:
+- [modes/feature.md, modes/bug-fix.md]
+- templates/specs.md
+- agents/verifier.md
 situation: amount_label receives floats from the till and strings from the scanner, so trimming must not break numbers; whether
   tabs and newlines count as surrounding spaces is a low-cost gap to assume and state.
 request: Trim surrounding spaces from amounts before printing a receipt.

@@ -1,5 +1,9 @@
 id: donation-refunds
-rule: invocation
+rule: ask-or-proceed
+source:
+- SKILL.md#invocation
+- SKILL.md#ask-the-user
+reads: []
 situation: Refunds can occur after the original receipt month; ask which period the refund reduces, with the two totals.
 request: Can the donation report show net receipts instead?
 graders:
