@@ -78,8 +78,31 @@ async def play_actions(sandbox_env: LocalSandboxEnvironment, actions: list[dict[
             await sandbox_env.exec(["bash", "-c", action["bash"]], timeout=60)
 
 
-async def replay(case: dict[str, Any], run: dict[str, Any]) -> tuple[dict[str, float], list[str]]:
-    """Plant the case, play the run, and return each deterministic grader's value and the notes."""
+def nested_commands(specs: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
+    """Return each command_passes grader inside an any_of, with the key the scorer gives it, such as any_of.1."""
+    found = []
+    for key, spec in zip(grader_keys(specs), specs, strict=True):
+        if spec["type"] == "any_of":
+            found += _nested_in(key, spec)
+    return found
+
+
+def _nested_in(key: str, spec: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """Return the command_passes graders inside the any_of that has the given key, numbered as the scorer numbers them."""
+    found = []
+    for number, inner in enumerate(spec["graders"], 1):
+        if inner["type"] == "command_passes":
+            found.append((f"{key}.{number}", inner))
+        elif inner["type"] == "any_of":
+            found += _nested_in(f"{key}.{number}", inner)
+    return found
+
+
+async def replay(case: dict[str, Any], run: dict[str, Any]) -> tuple[dict[str, float], list[str], dict[str, float]]:
+    """Plant the case, play the run, and return each deterministic grader's value, the notes, and the nested ones.
+
+    The nested values are those of the command_passes graders inside any_of, by their scorer keys.
+    """
     sandbox_env = LocalSandboxEnvironment()
     try:
         for path, source in case["files"].items():
@@ -93,7 +116,8 @@ async def replay(case: dict[str, Any], run: dict[str, Any]) -> tuple[dict[str, f
             value = await grading.run(key, spec)
             if not math.isnan(value):
                 values[key] = value
-        return values, repo.notes
+        nested = {key: await grading.run(key, spec) for key, spec in nested_commands(case["graders"])}
+        return values, repo.notes, nested
     finally:
         sandbox_env.directory.cleanup()
 
@@ -104,7 +128,7 @@ async def validate(directory: Path, verbose: bool) -> list[str]:
     checks = case.get("validation") or {}
     problems = []
     for name, run in replays(directory).items():
-        values, notes = await replay(case, run)
+        values, notes, _ = await replay(case, run)
         failed = [key for key, value in values.items() if not value]
         if name.startswith("good") and failed:
             problems.append(f"{name} fails {failed} {notes or ''}")
@@ -112,26 +136,34 @@ async def validate(directory: Path, verbose: bool) -> list[str]:
             problems.append(f"{name} passes every deterministic grader")
         elif name.startswith("bad") and verbose:
             print(f"    {name} fails {failed}")
-    values, _ = await replay(case, {"actions": [], "reply": ""})
+    values, _, nested = await replay(case, {"actions": [], "reply": ""})
     if all(values.values()) and not checks.get("do_nothing_fails_only_by_judge"):
         problems.append("a do-nothing run passes every deterministic grader")
     allowed = set(checks.get("hidden_checks_pass_untouched") or [])
-    for key, value in values.items():
-        if key.startswith("command_passes") and value and key not in allowed:
+    for key, value in {**values, **nested}.items():
+        if (key.startswith("command_passes") or key in nested) and value and key not in allowed:
             problems.append(f"{key} passes on the untouched repo")
     return problems
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Validate the selected cases and print one line per case; exit 1 on any problem."""
     parser = argparse.ArgumentParser(description="Replay each case's scripted runs through its graders.")
     parser.add_argument("skill")
     parser.add_argument("cases", nargs="*")
     parser.add_argument("-v", "--verbose", action="store_true", help="show which grader fails each bad run")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    try:
+        directories = case_dirs(args.skill)
+    except ValueError as error:
+        print(error)
+        return 1
+    if unknown := sorted(set(args.cases) - {directory.name for directory in directories}):
+        print(f"No case {', '.join(unknown)} in {args.skill!r}")
+        return 1
     put_python_on_path()
     ok = True
-    for directory in case_dirs(args.skill):
+    for directory in directories:
         if args.cases and directory.name not in args.cases:
             continue
         problems = asyncio.run(validate(directory, args.verbose))

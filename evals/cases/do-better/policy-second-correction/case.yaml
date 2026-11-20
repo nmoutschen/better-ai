@@ -1,5 +1,5 @@
 id: policy-second-correction
-rule: '7'
+rule: change-approach-on-retry
 source:
 - SKILL.md#7
 situation: The returns page was already corrected once to add that customers need the receipt or order number. The user now

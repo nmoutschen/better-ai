@@ -44,6 +44,40 @@ def test_samples_per_case_and_condition() -> None:
     )
 
 
+def test_unknown_case_id_or_skill_fails() -> None:
+    """A case id or skill that matches no case folder is an error that names it, not a silent skip."""
+    with pytest.raises(ValueError, match="invoice-half-upp"):
+        cases.samples("code-better", ["no-skill"], None, ["invoice-half-up", "invoice-half-upp"])
+    with pytest.raises(ValueError, match="nonexistent-skill"):
+        cases.case_dirs("nonexistent-skill")
+
+
+def write_case(tmp_path: Path, text: str, folder: str = "a-case") -> Path:
+    """Write a case.yaml with a minimal valid body plus `text`, and return the case folder."""
+    directory = tmp_path / folder
+    (directory / "repo").mkdir(parents=True)
+    (directory / "repo" / "main.py").write_text("x = 1\n")
+    (directory / "case.yaml").write_text(text)
+    return directory
+
+
+VALID_CASE = "id: a-case\nrule: some-behaviour\nsituation: S.\nrequest: R.\ngraders:\n  - type: notes_only\n"
+
+
+def test_case_yaml_keys_are_checked(tmp_path: Path) -> None:
+    """A valid case loads; an unknown top-level key, an unknown grader field, or an id that is not the folder fails."""
+    assert cases.load_case(write_case(tmp_path, VALID_CASE))["id"] == "a-case"
+    with pytest.raises(ValueError, match="a-case.*read"):
+        cases.load_case(write_case(tmp_path / "1", VALID_CASE + "read: [SKILL.md]\n"))
+    with pytest.raises(ValueError, match="a-case.*paterns"):
+        cases.load_case(write_case(tmp_path / "2", VALID_CASE + "  - type: ran_command\n    paterns: x\n"))
+    nested = VALID_CASE + "  - type: any_of\n    graders:\n      - type: file_contains\n        pth: main.py\n"
+    with pytest.raises(ValueError, match="a-case.*pth"):
+        cases.load_case(write_case(tmp_path / "3", nested))
+    with pytest.raises(ValueError, match="a-case.*other-name"):
+        cases.load_case(write_case(tmp_path / "4", VALID_CASE.replace("id: a-case", "id: other-name")))
+
+
 def test_invalid_skill_name() -> None:
     """Skill names are plain folder names."""
     with pytest.raises(ValueError):
@@ -138,7 +172,7 @@ def test_history_is_planted_commit_by_commit(tmp_path: Path, final_differs: bool
     write_tree(
         case_dir,
         {
-            "case.yaml": "id: history-case\nrule: r\nsituation: s\nrequest: r\ngraders: []\n",
+            "case.yaml": "id: case\nrule: r\nsituation: s\nrequest: r\ngraders: []\n",
             **{f"repo/{path}": text for path, text in final.items()},
             "history/01-start/files/tax.py": "RATE = 0.2\n",
             "history/01-start/files/old.py": "x = 1\n",
@@ -172,14 +206,15 @@ def test_history_is_planted_commit_by_commit(tmp_path: Path, final_differs: bool
 
 def test_history_rejects_bad_steps(tmp_path: Path) -> None:
     """A history step needs a message, sets only author and date, and a case has earlier/ or history/, not both."""
-    base = {"case.yaml": "id: c\nrule: r\nsituation: s\nrequest: r\ngraders: []\n", "repo/a.py": "a = 1\n"}
+    base = {"repo/a.py": "a = 1\n"}
     for extra, error in (
         ({"history/01/files/a.py": "a = 0\n"}, "no message.txt"),
         ({"history/01/message.txt": "m\n", "history/01/commit.env": "GIT_DIR=/tmp\n"}, "GIT_DIR"),
         ({"history/01/message.txt": "m\n", "earlier/message.txt": "m\n"}, "not both"),
     ):
         case_dir = tmp_path / error.replace(" ", "-").replace(".", "")
-        write_tree(case_dir, {**base, **extra})
+        case_yaml = f"id: {case_dir.name}\nrule: r\nsituation: s\nrequest: r\ngraders: []\n"
+        write_tree(case_dir, {**base, **extra, "case.yaml": case_yaml})
         with pytest.raises(ValueError, match=error):
             cases.load_case(case_dir)
 
@@ -196,3 +231,76 @@ def test_every_skill_declares_its_kind() -> None:
     """Every skill in the repository has metadata.kind in its frontmatter."""
     for skill_md in sorted((cases.REPO / "skills").glob("*/SKILL.md")):
         assert cases.skill_kind(skill_md.parent.name) in cases.KINDS
+
+
+def test_sandbox_images_are_pinned() -> None:
+    """Node and tinyproxy are pinned to exact versions, and the proxy image tag names the tinyproxy version."""
+    import re
+
+    sandbox_dir = agent.Path(agent.__file__).with_name("sandbox")
+    assert re.search(r"^FROM node:22\.\d+\.\d+-bookworm-slim AS node$", (sandbox_dir / "Dockerfile").read_text(), re.M)
+    proxy = (sandbox_dir / "proxy.Dockerfile").read_text()
+    tinyproxy = re.search(r"apk add --no-cache tinyproxy=(\S+)", proxy)
+    assert tinyproxy
+    assert f"image: better-ai-evals-proxy:tinyproxy-{tinyproxy[1]}\n" in (sandbox_dir / "compose.yaml").read_text()
+
+
+async def test_agent_timeout_is_a_sample_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run cut off at the timeout raises, naming the timeout, instead of being scored as a finished run."""
+
+    async def fake_cli(*args: object, **options: object) -> tuple[str, str, bool]:
+        return '{"type": "assistant", "message": {"id": "m", "content": []}}', "", True
+
+    monkeypatch.setattr(agent, "sandbox", lambda: None)
+    monkeypatch.setattr(agent, "claude_cli", fake_cli)
+    monkeypatch.setattr(agent, "secrets", lambda: ())
+    state = type("State", (), {"metadata": {}, "input_text": "Fix it"})()
+    solve = agent.claude_code(timeout=7)
+    with pytest.raises(RuntimeError, match="timed out after 7 seconds"):
+        await solve(state, None)  # type: ignore[arg-type]
+
+
+def test_lint_cases_grade_the_lint_run_with_the_judge() -> None:
+    """Each code-better lint case judges whether ruff ran after the last edit, keeps its script checks, and has no command-pattern grader for it."""
+    assert "ran_after_last_edit" not in cases.GRADER_FIELDS
+    directories = [path for path in cases.case_dirs("code-better") if path.name.startswith("lint-")]
+    assert len(directories) == 7
+    for directory in directories:
+        graders = cases.load_case(directory)["graders"]
+        types = [grader["type"] for grader in graders]
+        assert "ran_after_last_edit" not in types, directory.name
+        assert "command_passes" in types and "planted_unchanged" in types, directory.name
+        rubrics = [grader["rubric"] for grader in graders if grader["type"] == "judge"]
+        assert len(rubrics) == 1, directory.name
+        assert "ruff" in rubrics[0] and "PASS only if" in rubrics[0] and "FAIL" in rubrics[0], directory.name
+        assert "whether or not a ruff check follows the pop" in rubrics[0], directory.name
+        assert "The ruff check that counts is the last one run on the agent's final code" in rubrics[0], directory.name
+        assert "A run by a sub-agent the agent started counts." in rubrics[0], directory.name
+        assert "different from what the last ruff check saw" not in rubrics[0], directory.name
+        assert "that leaves a .py file different from the agent's own code before the command" in rubrics[0], (
+            directory.name
+        )
+        assert (
+            "the last `ruff check` run on the agent's own code (not on the planted code while its changes were set aside)"
+            in rubrics[0]
+        ), directory.name
+        assert "any tool call or command that writes or changes a .py file in the repository, such as" in rubrics[0], (
+            directory.name
+        )
+        assert "Edits by a sub-agent the agent started count as edits too." in rubrics[0], directory.name
+        assert "the file edit and file write tools" in rubrics[0], directory.name
+
+
+def test_agent_metadata_flags_a_dirty_skill_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The run metadata records whether the skill's folder had uncommitted changes."""
+    folder = tmp_path / "skills" / "demo"
+    folder.mkdir(parents=True)
+    (folder / "SKILL.md").write_text("one\n")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run([*git, "add", "."], cwd=tmp_path, check=True)
+    subprocess.run([*git, "commit", "-qm", "x"], cwd=tmp_path, check=True)
+    monkeypatch.setattr(agent, "REPO", tmp_path)
+    assert agent.agent_metadata("fake", "m", "demo")["skill_dirty"] is False
+    (folder / "SKILL.md").write_text("two\n")
+    assert agent.agent_metadata("fake", "m", "demo")["skill_dirty"] is True

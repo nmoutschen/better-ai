@@ -1,5 +1,5 @@
 id: style-guide-in-repo
-rule: '1.1'
+rule: read-repo-guidance
 source:
 - SKILL.md#1.1
 situation: The repository's STYLE.md requires ISO dates and v-prefixed versions; the release notes use 'March 3, 2026' and

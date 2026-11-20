@@ -1,6 +1,7 @@
 # Sandbox for one eval sample: Python for the planted repositories, Node for Claude Code, git for the
-# starting commit, and a headless Chromium with Playwright for cases that render and operate a page. Built once by compose; each sample gets a fresh container.
-FROM node:22-bookworm-slim AS node
+# starting commit, and a headless Chromium with Playwright for cases that render and operate a page. Built once
+# by compose; each sample gets a fresh container.
+FROM node:22.23.5-bookworm-slim AS node
 
 FROM python:3.12.12-slim-bookworm
 

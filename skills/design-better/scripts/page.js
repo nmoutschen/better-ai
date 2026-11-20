@@ -20,6 +20,7 @@
 // o.accept       a done item offers Accept (default true); without it, a done item is finished
 // o.filter       the thread has Open and All (default true); without it, one list in time order
 // o.waiting(c, state)  an entry that waits for the user, shown last (default: the agent's own unanswered question)
+// o.latestLast   order the items by their newest message, replies included, so the newest is at the bottom, waiting ones last (default: by first message)
 // o.readOnly     a copy of the page to read: no actions
 // o.stream       read the log from the server's /events (default true); otherwise the page calls setLog
 // o.afterSend()  called once the server saved an action
@@ -179,7 +180,7 @@ function pageConversation(o) {
   }
   function renderThread() {
     var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
-    var model = pageThread(log, itemKinds, o.waiting), entries = model.entries, open = model.open;
+    var model = pageThread(log, itemKinds, o.waiting, o.latestLast), entries = model.entries, open = model.open;
     state = model.state;
     // A box the user is typing in survives the redraw, with its text and cursor, and keeps its item on the page until
     // it is sent or cancelled, even when the item has left Open meanwhile.
@@ -230,7 +231,7 @@ function pageConversation(o) {
   }
   // The user's items that match, without actions, such as the comments on one question.
   function nodes(match) {
-    return pageThread(log, itemKinds, o.waiting).entries
+    return pageThread(log, itemKinds, o.waiting, o.latestLast).entries
       .filter(function (c) { return itemKinds.indexOf(c.kind) >= 0 && match(c.e); })
       .map(function (c) { return entryNode(c, false); });
   }
@@ -264,7 +265,7 @@ function pageConversation(o) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
         // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
-        if (after > 0) r.events.forEach(function (e) { if (e.action === 'reply') flash(agent + ': ' + e.text.slice(0, 120), 'ok'); });
+        if (after > 0) r.events.forEach(function (e) { if (e.action === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
         if (r.events.length) renderThread();
         stream(r.total);
       }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
@@ -304,7 +305,9 @@ function pageWords(e) { return e.note != null ? e.note : e.text; }
 // The thread as the log makes it, without the page: each item's state, the entries in the order they show, with the
 // replies under them, and the entries Open lists. Kept apart from the drawing so it can be tested without a browser.
 // WAITING(c, state) says which entries wait for the user and come last; by default, the agent's own question.
-function pageThread(log, itemKinds, waiting) {
+// LATESTLAST puts the entries in the order of their newest message, replies included, not of their first; the waiting
+// ones still come last.
+function pageThread(log, itemKinds, waiting, latestLast) {
   var entries = [], byKey = {}, state = {};
   log.forEach(function (e) {
     if (e.action === 'status') state[e.to] = e.status;
@@ -315,20 +318,21 @@ function pageThread(log, itemKinds, waiting) {
     // A reply under a finished item is a follow-up: the item goes back to the agent.
     else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
   });
-  log.forEach(function (e) {
+  log.forEach(function (e, i) {
     // What an event answers: an answer to a decision names the decision; the rest name it in `to`.
     var to = e.action === 'answer' ? e.decision : e.to;
     if (e.action === 'comment' || e.action === 'delete') {
       var c = byKey[e.id];
-      if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
+      if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [], last: i }; entries.push(c); }
       else if (e.action === 'delete') c.deleted = true;
       else { c.e = e; c.edited = true; c.deleted = false; }
-    } else if ((e.action === 'reply' || e.action === 'answer' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && to)) && to && byKey[to]) { byKey[to].replies.push(e); if (e.id) byKey[e.id] = byKey[to]; }
+    } else if ((e.action === 'reply' || e.action === 'answer' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && to)) && to && byKey[to]) { byKey[to].replies.push(e); byKey[to].last = i; if (e.id) byKey[e.id] = byKey[to]; }
     else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
-    else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
+    else { var n = { kind: e.action, e: e, replies: [], last: i }; if (e.id) byKey[e.id] = n; entries.push(n); }
   });
   // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
   // comes last, next to the message box.
+  if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
   var waits = waiting ? function (c) { return waiting(c, state); }
     : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); };
   entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
@@ -346,7 +350,14 @@ function pageThread(log, itemKinds, waiting) {
 // elements whose words are set as text, never as HTML, so a message cannot add markup or scripts to the page; a link
 // opens only an http, https or mailto address.
 var MD_ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])(?:[ \t]+(.*))?$/, MD_FENCE = /^ {0,3}(`{3,}|~{3,})/, MD_RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
-var MD_HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/, MD_QUOTE = /^ {0,3}> ?/, MD_TABLE_RULE = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+var MD_HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/, MD_QUOTE = /^ {0,3}> ?/, MD_TABLE_RULE = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+// A heading's words without the closing #s it may end with. Done by hand: a pattern for it is slow on long runs of spaces.
+function mdHeadingText(t) {
+  t = (t || '').trim();
+  var end = t.length;
+  while (end > 0 && t[end - 1] === '#') end--;
+  return end < t.length && (end === 0 || /[ \t]/.test(t[end - 1])) ? t.slice(0, end).trim() : t;
+}
 function mdIndent(line) { return line.match(/^[ \t]*/)[0].replace(/\t/g, '    ').length; }
 function mdCells(line) {
   return line.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map(function (c) { return c.trim().replace(/\\\|/g, '|'); });
@@ -355,28 +366,48 @@ function mdTableStart(lines, i) {
   return lines[i].indexOf('|') >= 0 && i + 1 < lines.length && lines[i + 1].indexOf('|') >= 0 && MD_TABLE_RULE.test(lines[i + 1]) &&
     mdCells(lines[i + 1]).length === mdCells(lines[i]).length;
 }
+// A numbered line starts a list mid-paragraph only from 1, so "in\n2024. Then" stays a sentence.
 function mdStarts(lines, i) {
-  var l = lines[i];
-  return MD_FENCE.test(l) || MD_HEADING.test(l) || MD_RULE.test(l) || MD_QUOTE.test(l) || MD_ITEM.test(l) || mdTableStart(lines, i);
+  var l = lines[i], item = l.match(MD_ITEM);
+  return MD_FENCE.test(l) || MD_HEADING.test(l) || MD_RULE.test(l) || MD_QUOTE.test(l) || mdTableStart(lines, i) ||
+    !!item && (!/\d/.test(item[2]) || parseInt(item[2], 10) === 1);
 }
 // The words of a block, with their marks. A code span keeps the marks in it as written, and so does a backslash.
-var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(([^()\s]+)\)|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*\\])\*|(^|[^\w\\])_(?=[^\s_])([\s\S]*?[^\s_\\])_(?!\w)|(https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]*_])|\\([\\`*_{}\[\]()#+\-.!|~>])/g;
+var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|\*\*\*(?=\S)([\s\S]*?\S)\*\*\*(?!\*)|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*\\])\*(?:(?!\*)|(?=\*\*[^\s*]))|(^|[^\w\\])_(?=[^\s_])([\s\S]*?[^\s_\\])_(?!\w)|(https?:\/\/(?:[^\s<>()]|\([^\s<>()]*\))*(?:[^\s<>().,;:!?'"\]*_]|\([^\s<>()]*\)))|\\([\\`*_{}\[\]()#+\-.!|~>])/g;
+// Link text cannot hold another link, such as a bare URL: keep its words only.
+function mdNoLinks(nodes) {
+  return nodes.reduce(function (a, n) {
+    return a.concat(n.tag === 'a' ? mdNoLinks(n.children) : [n.children ? Object.assign({}, n, { children: mdNoLinks(n.children) }) : n]);
+  }, []);
+}
+// Past MD_INLINE_MAX characters, a block's words show as written: an unclosed mark makes the search slow on long text.
+var MD_INLINE_MAX = 10000;
 function mdInline(text) {
+  if (text.length > MD_INLINE_MAX) return [{ text: text }];
   var out = [], last = 0, m, re = new RegExp(MD_INLINE.source, 'g');
   function words(s) { if (!s) return; var prev = out[out.length - 1]; if (prev && prev.tag == null) prev.text += s; else out.push({ text: s }); }
   while ((m = re.exec(text))) {
     words(text.slice(last, m.index)); last = re.lastIndex;
-    if (m[1]) out.push({ tag: 'code', children: [{ text: m[2].replace(/^ (.*) $/, '$1') }] });
-    else if (m[3]) out.push(/^(https?:|mailto:)/i.test(m[4]) ? { tag: 'a', href: m[4], children: mdInline(m[3]).reduce(function (a, n) { return a.concat(n.tag === 'a' ? n.children : [n]); }, []) } : { text: m[0] });
-    else if (m[5]) out.push({ tag: 'strong', children: mdInline(m[5]) });
-    else if (m[6]) out.push({ tag: 'del', children: mdInline(m[6]) });
-    else if (m[7]) out.push({ tag: 'em', children: mdInline(m[7]) });
-    else if (m[9]) { words(m[8]); out.push({ tag: 'em', children: mdInline(m[9]) }); }
-    else if (m[10]) out.push({ tag: 'a', href: m[10], children: [{ text: m[10] }] });
-    else words(m[11]);  // an escaped mark is the mark as written
+    if (m[1]) out.push({ tag: 'code', children: [{ text: m[2].replace(/\n/g, ' ').replace(/^ (.*) $/, '$1') }] });
+    else if (m[3]) out.push(/^(https?:|mailto:)/i.test(m[4]) ? { tag: 'a', href: m[4], children: mdNoLinks(mdInline(m[3])) } : { text: m[0] });
+    else if (m[5]) out.push({ tag: 'strong', children: [{ tag: 'em', children: mdInline(m[5]) }] });
+    else if (m[6]) out.push({ tag: 'strong', children: mdInline(m[6]) });
+    else if (m[7]) out.push({ tag: 'del', children: mdInline(m[7]) });
+    else if (m[8]) out.push({ tag: 'em', children: mdInline(m[8]) });
+    else if (m[10]) { words(m[9]); out.push({ tag: 'em', children: mdInline(m[10]) }); }
+    else if (m[11]) out.push({ tag: 'a', href: m[11], children: [{ text: m[11] }] });
+    else words(m[12]);  // an escaped mark is the mark as written
   }
   words(text.slice(last));
   return out;
+}
+// Each line break in a paragraph's words as a break element.
+function mdBreaks(nodes) {
+  return nodes.reduce(function (a, n) {
+    if (n.tag == null) n.text.split('\n').forEach(function (t, k) { if (k) a.push({ tag: 'br' }); if (t) a.push({ text: t }); });
+    else a.push(n.children && n.tag !== 'code' ? Object.assign({}, n, { children: mdBreaks(n.children) }) : n);
+    return a;
+  }, []);
 }
 // The blocks of a message, or of a list item or a quote inside it.
 // Past MD_DEPTH quotes or lists inside each other, the rest shows as written: deeper nesting could overflow the stack.
@@ -389,11 +420,12 @@ function mdBlocks(lines, depth) {
     var line = lines[i];
     if (!line.trim()) { i++; continue; }
     if ((m = line.match(MD_FENCE))) {
-      var fence = m[1], code = [];
-      for (i++; i < lines.length && !(lines[i].trim().indexOf(fence) === 0 && !lines[i].trim().slice(fence.length).trim()); i++) code.push(lines[i]);
+      // The code lines lose as many spaces as the fence is indented.
+      var fence = m[1], code = [], strip = new RegExp('^ {0,' + line.match(/^ */)[0].length + '}');
+      for (i++; i < lines.length && !(lines[i].trim().indexOf(fence) === 0 && !lines[i].trim().slice(fence.length).trim()); i++) code.push(lines[i].replace(strip, ''));
       i++; out.push({ tag: 'pre', children: [{ tag: 'code', children: [{ text: code.join('\n') }] }] });
     } else if ((m = line.match(MD_HEADING))) {
-      out.push({ tag: 'p', cls: 'md-h', children: [{ tag: 'strong', children: mdInline(m[2]) }] }); i++;
+      out.push({ tag: 'p', cls: 'md-h', children: [{ tag: 'strong', children: mdInline(mdHeadingText(m[2])) }] }); i++;
     } else if (MD_RULE.test(line)) {
       out.push({ tag: 'hr' }); i++;
     } else if (MD_QUOTE.test(line)) {
@@ -409,7 +441,7 @@ function mdBlocks(lines, depth) {
         if (im && ind < base + 2 && /\d/.test(im[2]) === ordered) {
           item = { lines: [im[3] || ''], at: im[1].length + im[2].length + 1 }; list.children.push(item); blank = false;
         } else if (!l.trim()) { blank = true; if (item) item.lines.push(''); }
-        else if (ind >= base + 2 || (!blank && !mdStarts(lines, i))) {
+        else if (ind >= base + 2 || (!blank && !MD_ITEM.test(l) && !mdStarts(lines, i))) {
           item.lines.push(ind >= base + 2 ? l.replace(/\t/g, '    ').slice(Math.min(ind, item.at)) : l); blank = false;
         } else break;
       }
@@ -431,17 +463,21 @@ function mdBlocks(lines, depth) {
         { tag: 'tbody', children: rows.map(function (r) { return { tag: 'tr', children: head.map(function (_, k) { return r[k] || ''; }).map(cell('td')) }; }) }] });
     } else {
       // A paragraph runs to a blank line or the start of another block; each line break in it stays.
+      // Its marks can span a line break, such as bold over two lines.
       var para = [];
-      for (; i < lines.length && lines[i].trim() && !(para.length && mdStarts(lines, i)); i++) {
-        if (para.length) para.push({ tag: 'br' });
-        para.push.apply(para, mdInline(lines[i].trim()));
-      }
-      out.push({ tag: 'p', children: para });
+      for (; i < lines.length && lines[i].trim() && !(para.length && mdStarts(lines, i)); i++) para.push(lines[i].trim());
+      out.push({ tag: 'p', children: mdBreaks(mdInline(para.join('\n'))) });
     }
   }
   return out;
 }
 function pageMarkdownTree(text) { return mdBlocks(String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n')); }
+// The message's words without its marks, on one line, such as for a short notice.
+function pageMarkdownText(text) {
+  var BLOCK = /^(p|li|pre|blockquote|ul|ol|table|tr|th|td|hr|br)$/;
+  function words(n) { return (BLOCK.test(n.tag) ? ' ' : '') + (n.text != null ? n.text : (n.children || []).map(words).join('')) + (BLOCK.test(n.tag) ? ' ' : ''); }
+  return pageMarkdownTree(text).map(words).join('').replace(/\s+/g, ' ').trim();
+}
 // The message as elements: a div of class "body md", with the text direction of its words.
 function pageMarkdown(text) {
   function make(n) {

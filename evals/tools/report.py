@@ -8,8 +8,10 @@ p-value, with Holm's correction across the comparisons. Hand labels in `judge_la
 that folder's README) give the human verdict for a judged grader of a sample; the report compares them
 with the judge's verdicts in the same logs. For the skill condition, it also counts which of the skill's own
 files the runs read, against the files each case expects (`reads` in case.yaml); a skill run that missed one
-fails through the `skill_reads` grader. With `--latest`, each case and condition keeps only the runs of
-the most recently started log that has it, so re-runs after a fix replace the runs they fix.
+fails through the `skill_reads` grader. Logs are grouped by skill and agent model, and each group gets its own report
+with a header (judge model, Claude Code version, skill commit with a dirty flag). With `--latest`, each case
+and condition of a group keeps only the runs of the most recently started log that has it, so re-runs after a fix
+replace the runs they fix.
 
     uv run python -m tools.report logs/<dir>/*.eval [...] [--latest] [--labels judge_labels/code-better.yaml]
 """
@@ -26,19 +28,19 @@ from typing import Any
 import yaml
 from inspect_ai.log import EvalSample, read_eval_log
 
-from skill_evals.cases import CONDITIONS
-
-EVALS = Path(__file__).resolve().parents[1]
+from skill_evals.agent import AGENT_TIMEOUT_MESSAGE
+from skill_evals.cases import CONDITIONS, NO_SKILL, ONE_SENTENCE, SHORT_SKILL, SKILL_INSTALLED, WITH_SKILL
+from skill_evals.grading.files import GRADING_ERROR_MESSAGE
 
 # Each comparison is (condition, baseline): the difference is condition minus baseline.
 COMPARISONS = (
-    ("skill", "no-skill"),
-    ("one-sentence", "no-skill"),
-    ("short-skill", "no-skill"),
-    ("skill", "one-sentence"),
-    ("skill", "short-skill"),
-    ("skill-installed", "no-skill"),
-    ("skill", "skill-installed"),
+    (WITH_SKILL, NO_SKILL),
+    (ONE_SENTENCE, NO_SKILL),
+    (SHORT_SKILL, NO_SKILL),
+    (WITH_SKILL, ONE_SENTENCE),
+    (WITH_SKILL, SHORT_SKILL),
+    (SKILL_INSTALLED, NO_SKILL),
+    (WITH_SKILL, SKILL_INSTALLED),
 )
 RESAMPLES = 10_000
 RANDOM_SEED = 0
@@ -66,6 +68,13 @@ class SampleResult:
     skill_loaded: float | None = None
     started: str = ""
     side_actions: dict[str, int] = field(default_factory=dict)
+    skill: str = "?"
+    agent_model: str = "?"
+    judge_model: str = "?"
+    agent_version: str = "?"
+    skill_commit: str = ""
+    skill_dirty: bool | None = False
+    log: str = ""
 
 
 def read_result(sample: EvalSample) -> SampleResult:
@@ -92,7 +101,8 @@ def read_result(sample: EvalSample) -> SampleResult:
         epoch=int(sample.epoch or 1),
         tokens=run.get("usage") or {},
         cost=float(run.get("total_cost_usd") or 0.0),
-        judge_cost=sum(float(info.get("total_cost_usd") or 0.0) for info in judges.values()),
+        judge_cost=sum(float(info.get("total_cost_usd") or 0.0) for info in judges.values())
+        + float(((reads.metadata or {}).get("judge") or {}).get("total_cost_usd") or 0.0 if reads is not None else 0.0),
         seconds=(run.get("duration_ms") or 0) / 1000,
         judges=judges,
         skill_reads=(reads.metadata or {}) if reads is not None else {},
@@ -104,33 +114,67 @@ def read_result(sample: EvalSample) -> SampleResult:
 
 
 def read_results(paths: list[Path]) -> list[SampleResult]:
-    """Read every sample of every log, noting when its log started."""
+    """Read every sample of every log, noting when its log started and what it ran on."""
     results = []
     for path in paths:
         log = read_eval_log(str(path))
+        metadata = log.eval.metadata or {}
         for sample in log.samples or []:
             result = read_result(sample)
             result.started = log.stats.started_at or ""
+            result.log = path.name
+            result.skill = str(metadata.get("skill", "?"))
+            result.agent_model = str(metadata.get("agent_model", "?"))
+            result.judge_model = str(metadata.get("judge_model", "?"))
+            result.agent_version = str(metadata.get("agent_version", "?"))
+            result.skill_commit = str(metadata.get("skill_commit", ""))
+            dirty = metadata.get("skill_dirty")
+            result.skill_dirty = None if dirty is None else bool(dirty)
             results.append(result)
     return results
 
 
 def latest(results: list[SampleResult]) -> list[SampleResult]:
-    """Keep, for each case and condition, only the runs from the most recently started log that has it."""
-    newest: dict[tuple[str, str], str] = {}
+    """Keep, for each skill, agent model, case and condition, only the runs from the most recently started log."""
+    newest: dict[tuple[str, str, str, str], str] = {}
     for result in results:
-        key = (result.case, result.condition)
+        key = (result.skill, result.agent_model, result.case, result.condition)
         newest[key] = max(newest.get(key, ""), result.started)
-    return [result for result in results if result.started == newest[result.case, result.condition]]
+    return [
+        result
+        for result in results
+        if result.started == newest[result.skill, result.agent_model, result.case, result.condition]
+    ]
 
 
-def rule_key(rule: str) -> tuple[int, list[int], str]:
-    """Sort invocation first, then numbered rules in numeric order, then named rules alphabetically."""
-    if rule == "invocation":
-        return (0, [], "")
-    if all(part.isdigit() for part in rule.split(".")):
-        return (1, [int(part) for part in rule.split(".")], "")
-    return (2, [], rule)
+def group_results(results: list[SampleResult]) -> dict[tuple[str, str], list[SampleResult]]:
+    """Split the results by (skill, agent model), so that runs of different models are never pooled."""
+    groups: dict[tuple[str, str], list[SampleResult]] = defaultdict(list)
+    for result in results:
+        groups[result.skill, result.agent_model].append(result)
+    return dict(sorted(groups.items()))
+
+
+def _dirty_text(dirty: bool | None) -> str:
+    """Return the header flag for a skill folder state: dirty, unknown (the log did not record it) or nothing."""
+    return " (dirty ?)" if dirty is None else " (dirty)" if dirty else ""
+
+
+def group_header(results: list[SampleResult]) -> list[str]:
+    """Name what a group ran on: skill, agent model, judge model, Claude Code version and skill commit."""
+    skill, agent_model = results[0].skill, results[0].agent_model
+    commits = sorted({f"{r.skill_commit[:7] or '?'}{_dirty_text(r.skill_dirty)}" for r in results})
+    judges = sorted({r.judge_model for r in results})
+    versions = sorted({r.agent_version for r in results})
+    return [
+        f"# Skill {skill}, agent model {agent_model}",
+        f"judge model {', '.join(judges)} · Claude Code {', '.join(versions)} · skill commit {', '.join(commits)}",
+    ]
+
+
+def rule_key(rule: str) -> tuple[int, str]:
+    """Sort invocation first, then the rules alphabetically."""
+    return (0 if rule == "invocation" else 1, rule)
 
 
 def pass_table(results: list[SampleResult]) -> list[str]:
@@ -149,6 +193,28 @@ def pass_table(results: list[SampleResult]) -> list[str]:
             values = cells.get((rule, condition), [])
             parts.append(f"{sum(values):>4.0f}/{len(values):<3} {sum(values) / len(values):>4.0%}" if values else "-")
         lines.append(f"{rule:{width}}" + "".join(f"{part:>19}" for part in parts))
+    return lines
+
+
+def error_cause(message: str) -> str:
+    """Name the cause of a sample error from its message: agent timeout, grading error, or other."""
+    if AGENT_TIMEOUT_MESSAGE in message:
+        return "agent timeout"
+    return "grading error" if GRADING_ERROR_MESSAGE in message else "other"
+
+
+def error_lines(results: list[SampleResult]) -> list[str]:
+    """Count, per condition, the samples and the sample errors by cause.
+
+    Sample errors are left out of the pass rates and of the cost and time means; `inspect eval-retry` reruns them.
+    """
+    causes = ("agent timeout", "grading error", "other")
+    lines = [f"{'condition':18} {'samples':>8} " + " ".join(f"{cause:>14}" for cause in causes)]
+    for name in CONDITIONS:
+        runs = [sample for sample in results if sample.condition == name]
+        if runs:
+            found = [error_cause(sample.error) for sample in runs if sample.error]
+            lines.append(f"{name:18} {len(runs):8} " + " ".join(f"{found.count(cause):14}" for cause in causes))
     return lines
 
 
@@ -254,7 +320,7 @@ def case_lines(results: list[SampleResult]) -> list[str]:
 
 
 def condition_cost_lines(results: list[SampleResult]) -> list[str]:
-    """Format cost, time and tokens per condition: mean and median per run, over runs without an error."""
+    """Format cost, time and tokens per condition: mean and median per run, over runs without a sample error."""
     lines = [
         f"{'condition':18} {'runs':>5} {'cost mean':>10} {'median':>8} {'time mean':>10} {'median':>8} "
         f"{'out tokens':>11} {'total cost':>11}"
@@ -299,17 +365,22 @@ def skill_read_lines(results: list[SampleResult]) -> list[str]:
 
 
 def loaded_lines(results: list[SampleResult]) -> list[str]:
-    """Format how often skill-installed runs loaded the skill, and the pass rate with and without it."""
+    """Format, per case, the skill-installed runs, how many loaded the skill, and the pass rate with and without it."""
     runs = [sample for sample in results if sample.skill_loaded is not None and not sample.error]
     if not runs:
         return ["No skill-installed runs."]
-    lines = [f"{'skill loaded':14} {'runs':>5} {'pass rate':>10}"]
-    for label, value in (("yes", 1.0), ("no", 0.0)):
-        group = [sample.passed for sample in runs if sample.skill_loaded == value and not math.isnan(sample.passed)]
-        rate = f"{statistics.mean(group):10.0%}" if group else f"{'-':>10}"
-        lines.append(f"{label:14} {len(group):5} {rate}")
-    not_loaded = sorted({sample.case for sample in runs if sample.skill_loaded == 0.0})
-    lines.append(f"Cases with a run that did not load it: {', '.join(not_loaded) or '-'}")
+
+    def rate(group: list[SampleResult]) -> str:
+        scored = [sample.passed for sample in group if not math.isnan(sample.passed)]
+        return f"{statistics.mean(scored):.0%}" if scored else "-"
+
+    width = max(len("case"), *(len(sample.case) for sample in runs)) + 2
+    lines = [f"{'case':{width}} {'runs':>5} {'loaded':>7} {'pass loaded':>12} {'pass not loaded':>16}"]
+    for case in sorted({sample.case for sample in runs}):
+        own = [sample for sample in runs if sample.case == case]
+        yes = [sample for sample in own if sample.skill_loaded == 1.0]
+        no = [sample for sample in own if sample.skill_loaded != 1.0]
+        lines.append(f"{case:{width}} {len(own):5} {len(yes):7} {rate(yes):>12} {rate(no):>16}")
     return lines
 
 
@@ -347,20 +418,82 @@ def load_labels(path: Path) -> list[dict[str, Any]]:
     return labels
 
 
+def label_key(label: dict[str, Any]) -> tuple[str, int, str]:
+    """Return the (sample, epoch, grader) a hand label names."""
+    return str(label["sample"]), int(label.get("epoch", 1)), str(label["grader"])
+
+
+def label_runs(results: list[SampleResult], label: dict[str, Any]) -> list[SampleResult]:
+    """Return every run a label may mean: its sample and epoch, its agent model if it names one.
+
+    A run counts when its judge for the label's grader ran or errored, and when it ended in a sample
+    error, since either could be the run the label was written on.
+    """
+    sample, epoch, grader = label_key(label)
+    return [
+        run
+        for run in results
+        if run.sample_id == sample
+        and run.epoch == epoch
+        and ("agent_model" not in label or str(label["agent_model"]) == run.agent_model)
+        and (grader in run.judges or run.error)
+    ]
+
+
+def verdict_of(run: SampleResult, grader: str) -> bool | None:
+    """Return the judge's verdict for a grader, or None when the judge gave none (it errored, or the run did)."""
+    info = run.judges.get(grader)
+    return None if info is None or "error" in info else info.get("verdict")
+
+
+def resolve_labels(
+    results: list[SampleResult], labels: list[dict[str, Any]]
+) -> list[tuple[dict[str, Any], SampleResult]]:
+    """Pair each label with the one run it matches, or raise ValueError naming every label that has none or several.
+
+    Raised before anything prints. Runs of every group are searched, so a label without `agent_model` that
+    matches runs of two models, or a run and a copy that errored, cannot be scored against the wrong one.
+    """
+    resolved, problems = [], []
+    for label in labels:
+        runs = label_runs(results, label)
+        if len(runs) == 1:
+            resolved.append((label, runs[0]))
+            continue
+        sample, epoch, grader = label_key(label)
+        found = (
+            "matches no run" if not runs else "matches " + "; ".join(f"{r.agent_model} in {r.log or '?'}" for r in runs)
+        )
+        fix = "" if not runs else ": add `agent_model: <model>` to the label or pass --latest to pick one"
+        problems.append(f"Label {sample!r} (epoch {epoch}, grader {grader!r}) {found}{fix}")
+    if problems:
+        raise ValueError("\n".join(problems))
+    return resolved
+
+
+def unmatched_labels(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
+    """List the labels whose one run has no verdict to compare, such as an errored judge, with the reason."""
+    lines = []
+    for label, run in resolve_labels(results, labels):
+        grader = str(label["grader"])
+        if verdict_of(run, grader) is None:
+            reason = f"sample error: {run.error}" if run.error and grader not in run.judges else "judge error"
+            lines.append(f"  {label['sample']} (epoch {label_key(label)[1]}, grader {grader}): {reason}")
+    return [f"{len(lines)} label(s) have a run without a judge verdict:", *lines] if lines else []
+
+
 def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
-    """Compare judge verdicts with hand labels, per rubric (case and grader) and overall."""
-    verdicts = {
-        (sample.sample_id, sample.epoch, grader): info.get("verdict")
-        for sample in results
-        for grader, info in sample.judges.items()
-    }
-    cases = {sample.sample_id: sample.case for sample in results}
+    """Compare judge verdicts with hand labels, per rubric (case and grader) and overall.
+
+    A label counts here when its one run is in `results`; labels with no run or no verdict are left out.
+    """
     per_rubric: dict[tuple[str, str], list[bool]] = defaultdict(list)
     for label in labels:
-        key = (str(label["sample"]), int(label.get("epoch", 1)), str(label["grader"]))
-        if key in verdicts:
+        runs = label_runs(results, label)
+        grader = str(label["grader"])
+        if len(runs) == 1 and verdict_of(runs[0], grader) is not None:
             human_passes = str(label["verdict"]).upper() == "PASS"
-            per_rubric[cases[key[0]], key[2]].append(verdicts[key] == human_passes)
+            per_rubric[runs[0].case, grader].append(verdict_of(runs[0], grader) == human_passes)
     if not per_rubric:
         return ["no labelled judge verdicts in these logs"]
     lines = [
@@ -384,23 +517,36 @@ def main(argv: list[str] | None = None) -> int:
     results = read_results(args.logs)
     if args.latest:
         results = latest(results)
-    sections = [
-        ("Pass rate (all) per rule and condition", pass_table(results)),
-        ("Comparisons between conditions (paired by case)", comparison_lines(results)),
-        ("Cost and time per condition", condition_cost_lines(results)),
-        ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(results)),
-        ("Skill loaded without a command (skill-installed)", loaded_lines(results)),
-        ("Lint issues added to changed Python files (observed, not scored)", lint_lines(results)),
-        ("Side actions per condition", side_action_lines(results)),
-        ("Samples", case_lines(results)),
-    ]
-    if args.labels:
-        sections.append(("Judge agreement with hand labels", agreement(results, load_labels(args.labels))))
-    for title, lines in sections:
-        print(f"\n## {title}\n" + "\n".join(lines))
-    errors = [f"{sample.sample_id}: {sample.error}" for sample in results if sample.error]
-    if errors:
-        print("\n## Sample errors\n" + "\n".join(errors))
+    labels = load_labels(args.labels) if args.labels else None
+    if labels is not None:
+        try:
+            resolve_labels(results, labels)
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
+    for group in group_results(results).values():
+        print("\n" + "\n".join(group_header(group)))
+        sections = [
+            ("Pass rate (all) per rule and condition", pass_table(group)),
+            ("Errors per condition (left out of pass rates, cost and time)", error_lines(group)),
+            ("Comparisons between conditions (paired by case)", comparison_lines(group)),
+            ("Cost and time per condition", condition_cost_lines(group)),
+            ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(group)),
+            ("Skill loaded without a command (skill-installed)", loaded_lines(group)),
+            ("Lint issues added to changed Python files (observed, not scored)", lint_lines(group)),
+            ("Side actions per condition", side_action_lines(group)),
+            ("Samples", case_lines(group)),
+        ]
+        if labels is not None:
+            sections.append(("Judge agreement with hand labels", agreement(group, labels)))
+        for title, lines in sections:
+            print(f"\n## {title}\n" + "\n".join(lines))
+        errors = [f"{sample.sample_id}: {sample.error}" for sample in group if sample.error]
+        if errors:
+            print("\n## Sample errors\n" + "\n".join(errors))
+    if labels is not None:
+        unmatched = unmatched_labels(results, labels)
+        if unmatched:
+            print("\n## Labels without a verdict\n" + "\n".join(unmatched))
     return 0
 
 

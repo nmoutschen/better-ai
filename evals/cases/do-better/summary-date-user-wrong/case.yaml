@@ -1,5 +1,5 @@
 id: summary-date-user-wrong
-rule: '2.2'
+rule: check-competing-explanations
 source:
 - SKILL.md#2.2
 situation: The notes first set launch on 9 June, then a late update after Ade left moved it to 12 May, and the summary says

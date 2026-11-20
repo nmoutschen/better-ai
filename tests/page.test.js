@@ -214,3 +214,156 @@ test('nesting past the limit shows as written instead of overflowing', () => {
 test('a list can start at 0', () => {
   assert.equal(md('0. zero\n1. one')[0].start, 0);
 });
+
+// The dashboard's decision card: its step comes from the decision file and from the state of the user's latest answer.
+// The two helpers are read out of dashboard.html, between their own marker comments, so the test runs the shipped code.
+const html = fs.readFileSync(path.join(__dirname, '..', 'skills', 'code-better', 'scripts', 'dashboard.html'), 'utf8');
+const stepCode = html.split('// step:begin')[1].split('// item:end')[0];
+// The whole decision card is run too, with a minimal DOM stub: the helpers it uses are the shipped ones.
+const fakeEl = () => ({ className: '', dataset: {}, html: '', classList: { add(c) { this.list.push(c); }, list: [] },
+  set innerHTML(v) { this.html = v; }, get innerHTML() { return this.html; },
+  append(n) { this.html += n.html; }, insertAdjacentHTML(_w, v) { this.html += v; } });
+const fakeDoc = { createElement: fakeEl };
+const fakeConv = { progress: s => ({ html: `<span class="progress">${s}</span>` }) };
+const { decisionStep, decisionItem } = new Function('document', 'conv', 'esc', 'has', 'md',
+  stepCode + '; return {decisionStep, decisionItem};')(fakeDoc, fakeConv, s => String(s), v => v && v !== 'none', s => String(s));
+const STEP_NAME = ['Waiting for you', 'You answered', 'Applied'];
+const shows = (status, answer, st) => STEP_NAME[decisionStep(status, answer, st)];
+
+test('a question the coordinator asked back about waits for the user again, until they answer again', () => {
+  const a1 = { id: 'a-1', action: 'answer' }, a2 = { id: 'a-2', action: 'answer' };
+  assert.equal(shows('waiting', null, {}), 'Waiting for you');
+  assert.equal(shows('waiting', a1, {}), 'You answered');
+  assert.equal(shows('waiting', a1, { 'a-1': 'seen' }), 'You answered');
+  assert.equal(shows('waiting', a1, { 'a-1': 'asked' }), 'Waiting for you');
+  assert.equal(shows('waiting', a2, { 'a-1': 'asked' }), 'You answered');  // the latest answer decides
+  assert.equal(shows('waiting', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
+  // The file already says answered: when the coordinator asks back, the latest answer decides, not the file.
+  assert.equal(shows('answered', a1, { 'a-1': 'asked' }), 'Waiting for you');
+  assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'seen' }), 'Applied');  // answered again: the file's word stands
+  assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
+  assert.equal(shows('answered', null, {}), 'Applied');  // answered in the chat: no item in the thread
+});
+
+test('a decision card renders for a waiting, an answered-then-asked and a decided decision, and its head agrees with its foot', () => {
+  const card = (status, answers) => ({ e: { x: { id: 'd1', status, asked: 'Which?', at: '2026-11-20T10:00:00' } },
+    replies: answers.map(id => ({ action: 'answer', id })) });
+  const run = (status, answers, st) => { const [item, foot] = decisionItem(card(status, answers), st, true); return { head: item.html.match(/class="when">([^<]*)</)[1], foot: foot.html, item }; };
+  const waiting = run('waiting', [], {});
+  assert.equal(waiting.head, '10:00');  // the time, not a state
+  assert.match(waiting.foot, /Waiting for you/);
+  assert.ok(waiting.item.classList.list.includes('open-q'));
+  const asked = run('waiting', ['a-1'], { 'a-1': 'asked' });
+  assert.equal(asked.head, '10:00');
+  assert.match(asked.foot, /Waiting for you/);
+  const answered = run('waiting', ['a-1'], {});
+  assert.equal(answered.head, 'answered, waiting for the coordinator');
+  assert.match(answered.foot, /You answered/);
+  const applied = run('waiting', ['a-1'], { 'a-1': 'done' });
+  assert.equal(applied.head, 'answered by you');
+  assert.match(applied.foot, /Applied/);
+  const reAsked = run('answered', ['a-1'], { 'a-1': 'asked' });  // the file says answered, the coordinator asked back
+  assert.equal(reAsked.head, '10:00');
+  assert.match(reAsked.foot, /Waiting for you/);
+  assert.ok(reAsked.item.classList.list.includes('open-q'));
+  assert.equal(run('answered', ['a-1', 'a-2'], { 'a-1': 'asked', 'a-2': 'seen' }).head, 'answered by you');
+  assert.equal(run('answered', ['a-1', 'a-2'], { 'a-2': 'done' }).head, 'answered by you');
+  const decided = run('decided', [], {});
+  assert.equal(decided.head, 'decided');
+  assert.doesNotMatch(decided.foot, /Waiting for you|You answered|Applied/);
+});
+
+test('with latestLast, an item whose reply is the newest message comes last, so the newest message is at the bottom', () => {
+  const log = [
+    { action: 'note', id: 'm1', note: 'first' },
+    { action: 'note', id: 'm2', note: 'second' },
+    { action: 'reply', id: 'r1', to: 'm1', text: 'answer to the first' },
+  ];
+  assert.deepEqual(ids(context.pageThread(log, ITEMS, null, true).entries), ['m2', 'm1']);
+  assert.deepEqual(ids(context.pageThread(log, ITEMS).entries), ['m1', 'm2']);  // the other pages keep their order
+  const later = log.concat({ action: 'note', id: 'm3', note: 'third' });
+  assert.deepEqual(ids(context.pageThread(later, ITEMS, null, true).entries), ['m2', 'm1', 'm3']);
+});
+
+test("the dashboard's conversation opts in to latestLast", () => {
+  assert.match(html, /latestLast: true/);
+});
+
+test('with latestLast, threads sort by their latest message and a question waiting for the user stays at the bottom', () => {
+  const log = [
+    { action: 'reply', id: 'q1', to: null, text: 'Which size?' },
+    { action: 'note', id: 'm2', note: 'newer' },
+  ];
+  const waiting = c => c.e.id === 'q1';
+  assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'q1']);
+  const t = context.pageThread(log, ITEMS, waiting, true);
+  assert.deepEqual(ids(t.entries), ['m2', 'q1']);  // the newer message does not push the question up
+  assert.ok(ids(t.open).includes('q1'));  // it still counts as open
+  const more = log.concat([{ action: 'note', id: 'm3', note: 'third' }, { action: 'reply', id: 'r1', to: 'm2', text: 'answer' }]);
+  assert.deepEqual(ids(context.pageThread(more, ITEMS, waiting, true).entries), ['m3', 'm2', 'q1']);  // the rest by latest message
+});
+
+test('links with parentheses, as on Wikipedia, keep their whole address', () => {
+  const w = 'https://en.wikipedia.org/wiki/Rust_(programming_language)';
+  assert.deepEqual(md(`[Rust](${w})`)[0].children, [{ tag: 'a', href: w, children: [t('Rust')] }]);
+  assert.deepEqual(md(`See ${w} for more.`)[0].children, [t('See '), { tag: 'a', href: w, children: [t(w)] }, t(' for more.')]);
+  assert.deepEqual(md('(see https://a.com/x)')[0].children, [t('(see '), { tag: 'a', href: 'https://a.com/x', children: [t('https://a.com/x')] }, t(')')]);
+});
+
+test('bold inside italics', () => {
+  assert.deepEqual(md('*a **b** c*')[0].children, [{ tag: 'em', children: [t('a '), { tag: 'strong', children: [t('b')] }, t(' c')] }]);
+});
+
+test('no link inside a link, however deep', () => {
+  assert.deepEqual(md('[**https://a.com**](https://b.com)')[0].children,
+    [{ tag: 'a', href: 'https://b.com', children: [{ tag: 'strong', children: [t('https://a.com')] }] }]);
+});
+
+test('a year at the start of a line does not start a list mid-paragraph', () => {
+  assert.deepEqual(md('Released in\n2024. Then more.').map(b => b.tag), ['p']);
+  assert.deepEqual(md('Steps:\n1. a\n2. b').map(b => b.tag), ['p', 'ol']);
+});
+
+test('bold and italic together', () => {
+  assert.deepEqual(md('***x***')[0].children, [{ tag: 'strong', children: [{ tag: 'em', children: [t('x')] }] }]);
+});
+
+test('marks can span a line break, which stays a break', () => {
+  assert.deepEqual(md('**bold\nacross** end')[0].children,
+    [{ tag: 'strong', children: [t('bold'), { tag: 'br' }, t('across')] }, t(' end')]);
+  assert.deepEqual(md('`a\nb`')[0].children, [{ tag: 'code', children: [t('a b')] }]);
+});
+
+test('an indented fence takes its indentation off the code', () => {
+  assert.deepEqual(md('  ```\n  x\n    y\n  ```')[0].children[0].children, [t('x\n  y')]);
+  assert.deepEqual(md('- a\n\t```\n\tx\n\t```')[0].children[0].children[1].children[0].children, [t('x')]);
+});
+
+test('headings drop their closing #s only after a space', () => {
+  assert.deepEqual(md('## Plan ##')[0].children[0].children, [t('Plan')]);
+  assert.deepEqual(md('# C#')[0].children[0].children, [t('C#')]);
+});
+
+test("a notice shows the message's words without marks", () => {
+  assert.equal(context.pageMarkdownText('## Done\n- **b**old `x`\n- [spec](https://a.com)'), 'Done bold x spec');
+});
+
+test('long messages with unclosed marks stay fast', () => {
+  for (const text of ['**a '.repeat(50000), '# a' + ' '.repeat(50000), '_a '.repeat(50000), '`'.repeat(100000)]) {
+    const start = Date.now();
+    md(text);
+    assert.ok(Date.now() - start < 500, `${JSON.stringify(text.slice(0, 6))}… took ${Date.now() - start} ms`);
+  }
+});
+
+test('a numbered list right after a bullet list is its own list', () => {
+  assert.deepEqual(md('- a\n- b\n2. Then').map(b => [b.tag, b.start]), [['ul', undefined], ['ol', 2]]);
+});
+
+test('italics can close right before bold', () => {
+  assert.deepEqual(md('*it***b**')[0].children, [{ tag: 'em', children: [t('it')] }, { tag: 'strong', children: [t('b')] }]);
+});
+
+test("a notice keeps a space between nested blocks' words", () => {
+  assert.equal(context.pageMarkdownText('- a\n  - b'), 'a b');
+});
