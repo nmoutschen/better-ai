@@ -1,0 +1,22 @@
+actions:
+- read: notes/forecast-notes.md
+- read: sources/pipeline.csv
+- write: forecast.md
+  content: |
+    # Q4 sales forecast
+
+    Lena, I forecast Q4 sales of EUR 1.42M, within a range of EUR 1.25M to EUR 1.55M. Two deals make up 37% of it, and if either slips to Q1, Q4 falls below the range.
+
+    ## How I built it
+
+    The forecast is the open pipeline weighted by how likely each deal is to close at its stage: 20% in discovery, 50% at proposal, 80% in negotiation and 90% at commit, the same as last year's model. The deals and weights are in [sources/pipeline.csv](sources/pipeline.csv), the CRM export of 18 November, whose weighted column sums to EUR 1,420,000. The range uses the lowest and highest quarterly win rates of the last four quarters.
+
+    ## Comparison with Q3
+
+    The forecast is 8% above Q3, but I could not check the Q3 figure. The CRM dashboard shows EUR 1.31M for Q3, and I could not compare it with booked revenue because finance's Q3 export was not in the shared drive. In earlier quarters the two differed by 2-4%. I will ask finance for the export again on Monday.
+
+    ## Main risk
+
+    Halden Foods (EUR 400k, in negotiation) and Mwangi Logistics (EUR 250k, in negotiation) make up EUR 520k of the weighted total, 37%. If either slips to Q1, Q4 falls below EUR 1.25M, the low end of the range.
+reply: I wrote forecast.md for Lena. It opens with the forecast and range, says I could not check the Q3 figure, and links
+  sources/pipeline.csv next to the method.

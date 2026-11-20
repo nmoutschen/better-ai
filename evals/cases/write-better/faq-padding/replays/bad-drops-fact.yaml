@@ -1,0 +1,7 @@
+actions:
+- write: faq-answer.md
+  content: |
+    ## Can I change my delivery address after I have placed an order?
+
+    Yes, while the order status shows "Processing". Go to your account, then Orders, then Edit address. Once the status shows "Packed", contact the courier, Nordlys Post, with your tracking number.
+reply: Tightened the answer.

@@ -1,0 +1,31 @@
+actions:
+- read: notes.md
+- read: people.md
+- write: status.md
+  content: |
+    # Billing duplicate credits: status for Dana, 20 November
+
+    **Decision needed from you by 24 November:** should we email the 12 affected customers before the 1 December invoices go
+    out, or let their invoice show a correction line and explain only if they ask? Lucía (support lead) prefers emailing
+    before. We need your answer by 24 November so the email can go through review in time.
+
+    ## Where we are
+
+    After the October tariff change, the billing system credited some customers twice: when a customer's tariff changed in
+    the middle of a billing period, the code that matches credits to tariffs applied the credit once for each period the
+    change touched. On 9 November this affected 140 accounts.
+
+    - A fix that stops new duplicate credits went live on 16 November. There have been none since. Tariff changes were
+      frozen in the admin tool from 13 to 16 November while it was in review; they are allowed again.
+    - An automatic correction run fixed 128 of the 140 accounts on 17 November.
+    - The other 12 accounts had a second tariff change in November, so the automatic run cannot work them out. Kofi will
+      correct them by hand by 27 November, before the 1 December invoices. Together they were over-credited by €2,316; the
+      largest single account by €410.
+
+    ## What we decided not to do now
+
+    We considered patching the credit code directly, but it touches every invoice, and we could not test it properly before
+    the 1 December billing run. The full fix, rebuilding that code on the new ledger design, will start in January at the
+    earliest.
+reply: The status update for Dana is in status.md. It opens with the decision she needs to make by 24 November and explains
+  each fix in plain words instead of the team's labels.

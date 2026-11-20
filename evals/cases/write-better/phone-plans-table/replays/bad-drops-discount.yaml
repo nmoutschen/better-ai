@@ -1,0 +1,23 @@
+actions:
+- read: plans.md
+- write: plans.md
+  content: |
+    # Mobile plans for the field team
+
+    Amara asked for a comparison of Telvia's three business plans for the nine people on the field team, who travel to
+    client sites around the UK and, a few times a year, to the EU and the US.
+
+    | | Flex | Team | Unlimited |
+    | --- | --- | --- | --- |
+    | Price per line per month | £14 | £19 | £27 |
+    | Data per line per month | 15 GB | 40 GB | Unlimited (fair-use limit 650 GB) |
+    | Contract | One-month rolling | 12 months | 24 months |
+    | Roaming in the EU | £2 per line per day used abroad | Included, up to 20 GB per month abroad | Included, same allowance as at home |
+    | Roaming in the US | Charged per megabyte, rates not confirmed | Included, up to 20 GB per month abroad | Included (one of 70 countries) |
+
+    On all three plans, calls and texts within the UK are unlimited, and Telvia charges a one-off £25 per line to move our
+    current numbers across.
+
+    For comparison with the data allowances: last quarter the team used between 6 and 22 GB of data per person per month,
+    with a median of 11 GB.
+reply: plans.md now compares the three plans in a table.

@@ -1,0 +1,21 @@
+actions:
+- write: announcement.md
+  content: |
+    # Recurring invoices and 31 currencies in Ledgerly
+
+    From 2 December 2026, you can set any invoice to repeat weekly, monthly or yearly, and Ledgerly will send it for you on the right day. You no longer need to copy last month's invoice by hand, a game-changer if you bill clients on a retainer.
+
+    Multi-currency invoicing now supports 31 currencies, up from 12, with exchange rates updated every hour.
+
+    ## Who gets it
+
+    Recurring invoices and the new currencies are included in the Pro plan at no extra cost. Starter plan customers get recurring invoices on 15 January 2027; the 31 currencies stay Pro only.
+
+    ## Other changes
+
+    The Export button has moved from the invoice list to Settings > Data. Exports work as before.
+
+    Ledgerly will be unavailable for scheduled maintenance on 1 December 2026 from 22:00 to 23:30 CET while we switch on these features. Invoices scheduled during that time will go out at 23:30.
+
+    Questions? Reply to this email or write to help@ledgerly.example.
+reply: Toned it down.

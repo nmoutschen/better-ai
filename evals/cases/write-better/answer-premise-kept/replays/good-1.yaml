@@ -1,0 +1,14 @@
+actions:
+- read: answer.md
+- write: answer.md
+  content: |
+    Hi Kofi,
+
+    Single sign-on isn't part of the Basic plan you're on. It's only included in the Business plan, which costs €12 per user per month.
+
+    You can move to Business at any time from Settings, then Billing. The change takes effect straight away, and your data and settings stay as they are.
+
+    Best regards,
+    Mireille Dubois
+    Customer Support, Ledgerwick
+reply: I cut answer.md to the correction, the price and how to upgrade.

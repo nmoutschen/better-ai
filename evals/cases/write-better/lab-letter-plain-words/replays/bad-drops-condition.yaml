@@ -1,0 +1,32 @@
+actions:
+- write: lab-results.md
+  content: |
+    # Your recent blood test results
+
+    Dear Ms Adeyemi,
+
+    Your blood test from 5 November 2026 shows that your cholesterol is slightly high. This is common. You have no symptoms from it, and you do not need to do anything urgently.
+
+    ## Your results
+
+    The test measured the fats in your blood after you had not eaten (a fasting cholesterol test).
+
+    - Your total cholesterol was 6.2 mmol/L (mmol/L is the unit the laboratory uses).
+    - Your LDL cholesterol, the "bad" cholesterol that can build up in blood vessels, was 4.1 mmol/L. This is above the target of 3.0 mmol/L that we set for people with your level of risk of heart disease and stroke.
+    - Your HDL cholesterol, the "good" cholesterol, was 1.4 mmol/L, and your triglycerides, another type of fat in the blood, were 1.6 mmol/L. Both are in the normal range.
+
+    Your risk of having a heart attack or stroke in the next 10 years is 6%, worked out with a standard calculator called QRISK3. We usually offer cholesterol-lowering medicine only when this risk is 10% or more, so you do not need medicine now.
+
+    ## What we recommend
+
+    To lower your LDL cholesterol, eat less saturated fat, the fat found in fatty meat, butter and cheese, and be more physically active.
+
+    Please book a repeat fasting cholesterol test in 12 weeks. Before the test, do not eat for 10 hours; you may drink water.
+
+    If you have any questions, please phone the practice on 01632 960 418 (Monday to Friday, 8:00 to 18:00) and ask for the practice nurse.
+
+    Yours sincerely,
+
+    Dr Haruto Sato
+    General Practitioner, Riverside Health Centre
+reply: Rewrote the letter in plain words.

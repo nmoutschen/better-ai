@@ -1,0 +1,19 @@
+actions:
+- write: answer.md
+  content: |
+    Hi Kofi,
+
+    Thank you for getting in touch, and for being a Ledgerwick customer. We understand how important secure sign-in is for a growing team like yours.
+
+    You mentioned that you planned to set up single sign-on this week, since you understood it is included in your Basic plan. I am sorry for the confusion, but single sign-on is not part of the Basic plan. It is only included in the Business plan, which costs €12 per user per month.
+
+    At Ledgerwick, we take security very seriously, and we are always looking for ways to help our customers keep their accounts and data safe. Single sign-on is one of the features many of our larger customers find very useful as their teams grow.
+
+    If you would like to move to the Business plan, you can do this at any time from Settings, then Billing, and the change takes effect straight away. Your data and settings stay as they are.
+
+    I hope this helps to clear things up. Please do not hesitate to reach out if you have any other questions, as we are always happy to help.
+
+    Best regards,
+    Mireille Dubois
+    Customer Support, Ledgerwick
+reply: Trimmed the reply.

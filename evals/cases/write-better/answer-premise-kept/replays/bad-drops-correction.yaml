@@ -1,0 +1,11 @@
+actions:
+- write: answer.md
+  content: |
+    Hi Kofi,
+
+    Thanks for getting in touch about single sign-on. You can manage your plan, Basic or Business (€12 per user per month), from Settings, then Billing, and any change takes effect straight away. Your data and settings stay as they are.
+
+    Best regards,
+    Mireille Dubois
+    Customer Support, Ledgerwick
+reply: Made the reply much shorter.

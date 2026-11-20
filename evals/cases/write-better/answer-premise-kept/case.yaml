@@ -1,0 +1,17 @@
+id: answer-premise-kept
+rule: keep-premise-correction
+source:
+- SKILL.md#2.1
+situation: answer.md is a padded draft reply to a customer who believes the Basic plan includes single sign-on. Amid thanks,
+  security boilerplate and a closing offer, it corrects that belief - single sign-on is only in the Business plan, at €12 per
+  user per month. The user asks for a much shorter reply; the agent cuts the padding and keeps the correction and the price.
+request: Make answer.md much shorter.
+graders:
+- type: planted_unchanged
+  except:
+  - answer.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+    planted.md: checks/planted.md

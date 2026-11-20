@@ -1,0 +1,21 @@
+actions:
+- read: incident-report.md
+- write: incident-report.md
+  content: |
+    # Incident report: duplicate card charges after payments release 4.13
+
+    On Monday 16 November at 10:40 CET we deployed version 4.13 of the payments service, which added Apple Pay to web
+    checkout and changed how card payments are retried when a bank does not answer within 8 seconds. When a bank answered
+    late, the service had already sent a retry, and both payments went through.
+
+    On Tuesday 17 November we shipped 4.13.1, which raised the timeout to 15 seconds. This reduced the duplicates but did not
+    stop them: we still see about 40 a day. As of Thursday 19 November, 312 customers have been charged twice, €8,400 in
+    total, and none has been refunded.
+
+    The proper fix, an idempotency key on each payment, would ship around 4 December at the earliest. Rolling back to 4.12
+    stops the duplicates and takes about an hour, but removes Apple Pay from web checkout, which 2.1% of web payments have
+    used.
+
+    We should roll back the payments service to 4.12 by Friday 20 November, and need your approval to take Apple Pay off
+    web checkout until the fix ships. Finance will refund the €8,400 once the rollback is done.
+reply: Tightened incident-report.md for the CTO.

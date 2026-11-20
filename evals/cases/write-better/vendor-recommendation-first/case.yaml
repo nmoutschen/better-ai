@@ -1,0 +1,43 @@
+id: vendor-recommendation-first
+rule: state-recommendation-first
+source:
+- SKILL.md#3.2
+situation: vendor-comparison.md, for the board, gives about 300 words of background and bids before its last section
+  recommends Kestrel Freight. The main reason (lowest price and best on-time rate, saving about €154,000 a year) and the main
+  drawback (no cold-chain capacity until Q2 2027, so chilled goods stay with Ostrava Logistik on a short extension) appear in
+  the middle. The agent states the recommendation, its main reason and its main drawback straight after the opening, before
+  any background, and keeps the facts.
+request: Rewrite vendor-comparison.md for Thursday's board meeting.
+graders:
+- type: planted_unchanged
+  except:
+  - vendor-comparison.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+    planted.md: checks/planted.md
+- type: judge
+  rubric: 'Rule: in a text written for readers who must decide, state the recommendation, its main reason and its main
+    drawback straight after the opening, one line each, before any background. Planted facts: vendor-comparison.md, for the
+    board, recommends awarding the three-year contract from 1 January 2027 to Kestrel Freight only in its last section, after
+    background and the three bids. Main reason: Kestrel has the lowest price (€1.94 per parcel) and the best on-time rate
+    (96.5%), saving about €154,000 a year against the €2.08 paid to Ostrava Logistik today. Main drawback: Kestrel has no
+    cold-chain capacity until Q2 2027, so chilled goods (about 8% of parcels) stay with Ostrava Logistik on a short extension
+    until then. Other bids: Baobab Carriers €2.10 and 93%; Tidewater Lines €2.05 and 94%, with a minimum of 1.2 million
+    parcels a year.
+
+    PASS only if all hold: (1) the recommendation of Kestrel Freight comes at the start of the final vendor-comparison.md,
+    in the opening sentences or straight after them, before the background and the detail of the bids; (2) the main reason
+    (price, on-time rate or the saving) is stated right with the recommendation, before the background; (3) the main drawback
+    (the cold-chain gap until Q2 2027 and the chilled goods staying with Ostrava Logistik) is stated right with the
+    recommendation, before the background; (4) it is still a recommendation by the operations and finance teams, not a
+    decision already taken.
+
+    A title before the opening, one short sentence of context before the recommendation, the reason and drawback in one
+    sentence each or together, and a table of the bids after them all pass.
+
+    FAIL if the recommendation, its reason or its drawback first appears after the background or the bids, or if the drawback
+    is missing from the top.
+
+    Does not count: length, headings, whether the process section is kept, wording.'

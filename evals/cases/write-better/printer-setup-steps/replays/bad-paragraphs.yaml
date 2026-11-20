@@ -1,0 +1,17 @@
+actions:
+- read: printer-setup.md
+- write: printer-setup.md
+  content: |
+    # Printer setup
+
+    You will set up the third-floor colour printer on your laptop yourself. First connect to the office Wi-Fi network
+    HARBOUR-STAFF, not HARBOUR-GUEST, because the guest network cannot see the print server.
+
+    Then open Settings, go to Bluetooth & devices > Printers & scanners, and click Add device. Wait until the link "The
+    printer that I want isn't listed" appears, click it, choose "Select a shared printer by name" and type
+    `\\PRNSRV-02\Floor3-Colour`. When Windows cannot find a driver, click Have Disk, browse to
+    `\\fs01\drivers\ricoh\IMC3000\x64`, select IMC3000.inf and click OK.
+
+    Once it is installed, open Printing preferences, set Colour mode to Black and White, and print a test page. If anything
+    goes wrong, call the IT desk on extension 4410 and ask for Sione.
+reply: Split printer-setup.md into three shorter paragraphs.

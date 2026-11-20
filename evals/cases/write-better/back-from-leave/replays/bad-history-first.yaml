@@ -1,0 +1,17 @@
+actions:
+- read: migration-log.md
+- write: catch-up.md
+  content: |
+    # Cluster migration catch-up
+
+    While you were away, Nadia carried on with the migration. On 2026-11-09 she moved accounts-api; the DNS switch caused 4
+    minutes of 502 errors, so she lowered the DNS TTL to 60 seconds. On 2026-11-11 she moved reports and webhooks. On
+    2026-11-12 webhook deliveries to two customers failed because the new cluster's outgoing IP address was not on their
+    allowlists, so webhooks went back to the old cluster until both customers added the address, and they moved again on
+    2026-11-16. On 2026-11-17 audit-log moved.
+
+    On 2026-11-19 billing moved, and a full invoice dry run matched the old totals, so all 11 services now run on k8s-eu2.
+
+    Next, Nadia runs a restore test of the final k8s-old backup on 2026-11-23, and if it passes, we shut down k8s-old on
+    2026-11-24.
+reply: Wrote the catch-up in catch-up.md.

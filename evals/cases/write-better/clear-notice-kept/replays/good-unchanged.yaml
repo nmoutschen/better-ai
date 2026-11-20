@@ -1,0 +1,3 @@
+actions:
+- read: notice.md
+reply: notice.md already gives tenants the date and times first, what to do, and whom to call, in short sentences. I left it as it is.

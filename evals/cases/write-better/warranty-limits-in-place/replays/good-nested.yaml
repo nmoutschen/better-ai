@@ -1,0 +1,10 @@
+actions:
+- write: warranty-summary.md
+  content: |
+    1. Frame and motor defects: 5 years from purchase.
+       - Bikes used commercially (delivery, rental): 2 years.
+    2. Battery (capacity below 70%): 2 years or 500 full charge cycles, whichever comes first.
+       - Not covered if charged with a non-original charger.
+    3. Collection and return for a valid claim: free on the mainland.
+       - Islands: the customer pays a flat €35.
+reply: Wrote warranty-summary.md.

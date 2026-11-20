@@ -1,0 +1,29 @@
+actions:
+- read: refund-policy.md
+- write: refund-guide.md
+  content: |
+    # Deciding whether a refund is allowed
+
+    Use this guide to decide whether a customer's refund request from the online shop is allowed. The full rules are in refund-policy.md.
+
+    ## The questions to ask
+
+    1. Is it a gift card? Gift cards are never refunded, used or not.
+    2. Is the item faulty or damaged, and was it delivered less than 12 months ago? Then refund it, even if it was used. Ask for a photo of the fault first. We pay the return postage.
+    3. Is it a personalised item (engraved or custom-glazed)? Then refund it only if it is faulty, as in question 2.
+    4. Otherwise, did the customer ask within 30 days of delivery, and is the item unused and in its original packaging? Then refund it. The customer pays the return postage.
+    5. If none of these fits, do not promise a refund: pass the request to a team lead with the order number.
+
+    Refunds over EUR 200 need a team lead's approval before you confirm them.
+
+    ## Worked examples
+
+    **A teapot, changed mind.** Wanjiru bought a teapot, received it 12 days ago, and has not taken it out of its box. She has decided she prefers a larger one. It is not a gift card, not faulty and not personalised, she asked within 30 days, and it is unused in its packaging: the refund is allowed. She pays the return postage.
+
+    **A cracked serving bowl after eight months.** Mateo's serving bowl was delivered eight months ago and he has used it every week. A crack has now appeared across the base, and he sends a photo. The bowl is faulty and within 12 months of delivery, so the refund is allowed even though it was used. We pay the return postage, or, since a cracked bowl cannot sensibly be posted, the photo is enough.
+
+    **An engraved mug, wrong name.** Aiko ordered a mug engraved with her sister's name and returns it after a week because her sister already has one. It is unused and within 30 days, but it is personalised and not faulty, so the refund is not allowed.
+
+    **An unused gift card.** Dev bought a EUR 50 gift card last week and has not used it. Gift cards are never refunded, so the refund is not allowed.
+reply: 'I wrote refund-guide.md: five questions in the order staff should ask them, then four worked examples, two allowed
+  and two refused, each on a different product and rule.'

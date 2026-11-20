@@ -1,0 +1,16 @@
+id: workspace-term
+rule: one-term-per-concept
+source:
+- SKILL.md#4.3
+situation: help-article.md tells new users of a fictional app how to create a workspace, but calls the same thing a workspace,
+  a project space, a team area and a space. The interface labels say "New workspace" and "Workspace settings". The agent uses
+  one term throughout and keeps every step, label and limit.
+request: Rewrite help-article.md for new users.
+graders:
+- type: planted_unchanged
+  except:
+  - help-article.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py

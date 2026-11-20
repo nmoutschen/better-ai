@@ -1,0 +1,43 @@
+id: lab-letter-plain-words
+rule: use-known-words
+source:
+- SKILL.md#4.1
+situation: lab-results.md is a fictional letter from a GP to a patient about a cholesterol test, written in medical jargon
+  (fasting lipid panel, hyperlipidaemia, LDL-C, QRISK3, pharmacotherapy, statins). The agent replaces rare terms with common
+  words or explains them next to first use, and keeps every result, the 3.0 target, the 10% threshold, the 12-week repeat
+  and its statin exception, and the fasting instruction.
+request: Rewrite lab-results.md so the patient understands it.
+graders:
+- type: planted_unchanged
+  except:
+  - lab-results.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+    planted.md: checks/planted.md
+- type: judge
+  rubric: 'Rule 4.1: replace a long or rare word with a common one when the meaning stays exact; when the rare word is needed,
+    keep it and explain it next to its first use; simplify the language, not the substance, so conditions and limits stay.
+    Planted facts: lab-results.md is a letter to a patient, Ms Adeyemi, full of medical jargon: fasting lipid panel, hyperlipidaemia,
+    asymptomatic, LDL-C, HDL-C, triglycerides, reference range, cardiovascular risk profile, QRISK3, pharmacological therapy
+    / pharmacotherapy, dietary modification, statins. Results: total cholesterol 6.2, LDL-C 4.1 above the 3.0 target, HDL-C
+    1.4 and triglycerides 1.6 normal, 10-year risk 6% below the 10% threshold for medicine. Conditions: repeat the fasting
+    test in 12 weeks, unless she has started statins from another clinician, in which case contact the practice before booking;
+    no food for 10 hours before, water allowed.
+
+
+    PASS only if all hold: (1) in the final lab-results.md, each jargon term above is either replaced by common words with
+    the same meaning or kept and explained in plain words at or next to its first use (a short synonym or clause in the same
+    sentence or the next one); (2) the statin exception still qualifies the 12-week repeat test and still tells her to contact
+    the practice before booking; (3) LDL is still compared with the 3.0 target, the 6% risk with the 10% threshold for medicine,
+    and the fasting rule keeps its 10 hours and the water exception; (4) no result or instruction changed meaning, for example
+    "slightly high" is fine but "normal" for the LDL value is not.
+
+
+    FAIL if a jargon term is left unexplained, if terms are explained only in a glossary or list away from their first use,
+    if the statin condition or another condition or limit is dropped or changed, or if the letter is unchanged.
+
+
+    Does not count: whether the unit mmol/L is explained, the letter''s length or layout, its tone, small additions of plain
+    explanation, the reply.'

@@ -1,0 +1,17 @@
+id: writing-guide-in-repo
+rule: follow-users-guide
+source:
+- SKILL.md#1.1
+situation: 'The repository has a team writing guide for customer emails, docs/WRITING.md: dates as YYYY-MM-DD, times with
+  the time zone, no bullet or numbered lists, no exclamation marks, no internal names, sign off "The Support Team". incident.md
+  holds the internal notes of yesterday''s mobile login outage. The agent finds the guide and writes the customer email by
+  it, keeping the outage''s date, times, cause and credit.'
+request: Write the customer email about yesterday's outage in outage-email.md, from incident.md.
+graders:
+- type: planted_unchanged
+  except:
+  - outage-email.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/email/check.py

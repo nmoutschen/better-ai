@@ -1,0 +1,36 @@
+actions:
+- write: notice.md
+  content: |
+    # Important notice: planned water shut-off
+
+    ## Summary
+
+    The water will be off in the whole building on Tuesday 8 December, from 09:00 to 13:00. The plumbers are replacing the main valve in the basement.
+
+    ## Why is this happening?
+
+    The main valve controls the water supply to every flat in the building. Replacing it keeps the system working reliably for years to come, and the work can only be done safely with the water off.
+
+    ## What this means for you
+
+    - No tap, shower or toilet will have running water during those hours.
+    - If you need water in the morning, fill bottles or a kettle before 09:00.
+    - Each toilet will flush once from its cistern.
+
+    ## After the work
+
+    - The water may run brown for about a minute when it comes back.
+    - Let the cold tap run until the water is clear before you drink it.
+
+    ## Updates
+
+    If the work runs late, I will post an update on the noticeboard by the front door by 12:30.
+
+    ## Contact
+
+    If you have questions, call me on 0612 448 903 or email jortega@lindenhof-residences.example.
+
+    Thank you for your patience and understanding while we carry out this important work.
+
+    Joaquín Ortega, building manager
+reply: I restructured the notice with headings and added a short explanation of why the work is needed.

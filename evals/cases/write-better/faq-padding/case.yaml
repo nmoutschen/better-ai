@@ -1,0 +1,18 @@
+id: faq-padding
+rule: cut-padding
+source:
+- SKILL.md#2.1
+situation: faq-answer.md is a help-centre answer of about 250 words with three real facts (change the address under Orders,
+  then Edit address, while the status shows Processing; once Packed, contact the courier Nordlys Post with the tracking number;
+  no change to another country at any stage). The rest is padding - a restated question, a preamble about how orders work,
+  generic caveats and a closing offer. The agent cuts the padding and keeps the three facts.
+request: Tighten faq-answer.md, it's going in the help centre.
+graders:
+- type: planted_unchanged
+  except:
+  - faq-answer.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+    planted.md: checks/planted.md

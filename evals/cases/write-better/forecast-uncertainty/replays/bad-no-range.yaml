@@ -1,0 +1,13 @@
+actions:
+- write: forecast.md
+  content: "# Q4 sales forecast\n\nLena, I forecast Q4 sales of EUR 1.42M. Two deals make up 37% of it, and if either slips\
+    \ to Q1, Q4 falls below the range.\n\n## How I built it\n\nThe forecast is the open pipeline weighted by how likely each\
+    \ deal is to close at its stage: 20% in discovery, 50% at proposal, 80% in negotiation and 90% at commit, the same as\
+    \ last year's model. The deals and weights are in [sources/pipeline.csv](sources/pipeline.csv), the CRM export of 18 November,\
+    \ whose weighted column sums to EUR 1,420,000. \n\n## Comparison with Q3\n\nThe forecast is 8% above Q3, but I could not\
+    \ check the Q3 figure. The CRM dashboard shows EUR 1.31M for Q3, and I could not compare it with booked revenue because\
+    \ finance's Q3 export was not in the shared drive. In earlier quarters the two differed by 2-4%. I will ask finance for\
+    \ the export again on Monday.\n\n## Main risk\n\nHalden Foods (EUR 400k, in negotiation) and Mwangi Logistics (EUR 250k,\
+    \ in negotiation) make up EUR 520k of the weighted total, 37%. If either slips to Q1, Q4 falls below the low end of the\
+    \ range.\n"
+reply: Wrote forecast.md.

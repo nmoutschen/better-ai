@@ -1,0 +1,16 @@
+id: launch-tone
+rule: neutral-tone
+source:
+- SKILL.md#4.6
+situation: 'announcement.md tells customers of a fictional invoicing app about recurring invoices and more currencies, in
+  hype: "HUGE NEWS!!!", rocket emojis, "insanely good", "game-changer", "mind-blowing", "crushing it". The agent rewrites
+  it in a neutral tone and keeps every date, plan, number and the maintenance window.'
+request: Rewrite announcement.md for our customers.
+graders:
+- type: planted_unchanged
+  except:
+  - announcement.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py

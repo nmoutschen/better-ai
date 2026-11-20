@@ -1,0 +1,27 @@
+actions:
+- read: welcome-email.md
+- write: welcome-email.md
+  content: |
+    Subject: Welcome to the team: your first day on Monday 4 January
+
+    Dear Thandiwe,
+
+    Welcome to the analytics team. Your first day is Monday 4 January 2027.
+
+    Please arrive at 08:45 at the reception on the 2nd floor of Harbour House, 17 Quay Street. Ravi Menon, the team lead you will report to, will meet you there.
+
+    Please bring:
+
+    1. Your passport or national ID card.
+    2. The bank details form attached to your contract, filled in. HR cannot pay your salary without it.
+
+    At 10:30, IT will give you your laptop in room 2.14, on the same floor as reception. At 12:30, Ravi has organised lunch with the team, so you do not need to bring lunch.
+
+    There is no staff parking at Harbour House. Most people take the tram: the Harbour Square stop is two minutes away on foot.
+
+    If anything is unclear, call Ravi on 021 555 0187.
+
+    Kind regards,
+    Lerato Dlamini
+    People team
+reply: I rewrote welcome-email.md in short sentences, with the first-day facts in the order Thandiwe needs them.

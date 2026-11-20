@@ -1,0 +1,26 @@
+id: status-for-pm
+rule: explain-references
+source:
+- SKILL.md#1.3
+situation: 'notes.md is an engineer''s working notes on a billing bug, full of labels only the team knows: plan A, plan B,
+  the v2 path, fix-7, ORPHAN-check, the credit-note batch, and the function name reconcile_ledger. people.md says Dana is
+  the product manager and is not in the engineering channel. The agent writes Dana''s status update so that every label it
+  uses is replaced or explained, keeping the dates, the accounts left and the decision Dana must make.'
+request: Write a status update for Dana in status.md from notes.md.
+graders:
+- type: planted_unchanged
+  except:
+  - status.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/status/check.py
+- type: judge
+  rubric: |-
+    Rule: explain or replace file names, function names and labels the reader has not seen; keep a technical name only when the reader must type or find it, and explain it on first use; for each plan or result referred to, say what it is. Planted facts: notes.md uses team labels "plan A" (patch reconcile_ledger in place, rejected), "plan B" (stop new duplicates and correct existing ones, chosen), "the v2 path" (move reconciliation onto the new ledger schema, not before January), "fix-7" (the change that stops new duplicates, live since 16 Nov), "ORPHAN-check" (a script that counts affected accounts), "the credit-note batch" (the automatic correction run), and the function name reconcile_ledger. people.md says Dana is the product manager and does not follow the engineering channel.
+
+    PASS only if all hold: (1) every one of these labels that appears in status.md is explained where it first appears, in words Dana can follow, or is replaced by such a description (for example "the change that stops new duplicate credits" instead of "fix-7"); (2) any code name kept, such as reconcile_ledger, is explained on first use; (3) the update does not refer to a plan, path or option by a bare label such as "plan B" or "the v2 path" without saying what it is.
+
+    FAIL if status.md uses any of the labels above, at its first use, without saying what it means; or if it is missing.
+
+    Does not count: whether the update includes the history, its length or format, whether it names people, or common product and billing words a product manager knows, such as invoice, credit or tariff.

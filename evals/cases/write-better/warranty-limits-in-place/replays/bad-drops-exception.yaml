@@ -1,0 +1,7 @@
+actions:
+- write: warranty-summary.md
+  content: |
+    - Frame and motor defects: 5 years from purchase, 2 years for commercial use.
+    - Battery: capacity loss below 70%, for 2 years or 500 full charge cycles.
+    - Collection and return: free on the mainland; the islands pay €35.
+reply: Wrote a three-item summary.

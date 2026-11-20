@@ -1,0 +1,17 @@
+id: vague-to-specific
+rule: be-specific
+source:
+- SKILL.md#4.9
+situation: 'delivery-update.md tells shop owners about a warehouse move with vague terms ("soon", "a few weeks", "most orders",
+  "likely", "a little before the move"), while facts.md has the exact values: opens 12 May 2027, 3 weeks of slower deliveries,
+  84% of trial orders on time, 7 of 10 test runs, last Mill Lane collection on 7 May. The Ashford Park collection date is
+  not decided, so that one stays vague. The agent uses the exact values and keeps what each number measured.'
+request: Rewrite delivery-update.md for the shop owners; the figures are in facts.md.
+graders:
+- type: planted_unchanged
+  except:
+  - delivery-update.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
