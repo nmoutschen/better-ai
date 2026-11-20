@@ -19,8 +19,8 @@ Being invoked does NOT mean you must design now. The work can end with questions
 2. A quality goal stated as a wish, such as "fast" or "secure", cannot be checked against a design. A scenario with a trigger and an observable response can.
 3. Designers who have a workable solution in mind often stop looking for alternatives, prefer familiar solutions, and stick to their first idea.
 4. A diagram does not keep why a decision was made or what it rejected, and decision records often leave out their drivers and alternatives.
-5. Links that a model draws between requirements and their sources include many false ones.
-6. Threat modelling with STRIDE reports many threats that are not real, and a one-off review tends to become a checklist exercise.
+5. Links that a model draws between requirements and other documents often include false ones, more so on some kinds of document than others.
+6. Threat modelling with STRIDE reports many threats that are not real. Starting from the risks finds more of the threats that matter than applying STRIDE to each element in turn.
 7. The live page for debating the design, one layout shared by Before and After, the register of box kinds, Attribute-Driven Design iterations, STRIDE for security, one reviewer per applicable perspective once the user approves the design, and the spec in EARS are design choices.
 
 ## Instructions
