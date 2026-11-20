@@ -16,7 +16,7 @@ better-ai's pages share one look: the live pages the skills serve (boards) and t
 | What only one board shows | `board.html`, `dashboard.html`, `canvas.css`, `show.css`, `architect.css` | Uses only the tokens and components below. |
 | This document | `DESIGN.md`, `DESIGN.html` | The names here are the names in page.css. DESIGN.html holds copies of page.css and page.js, so it works as a single file: after changing either, paste it again into DESIGN.html (the test says which). |
 
-`tests/test_design.py` fails when a page uses a colour that is not in the colour table below, or when the table and page.css disagree.
+`tests/test_design.py` fails when a page uses a colour that is not in the colour table below, a raw px value for a space or a type size, or when this document and page.css disagree.
 
 ## What it must express
 
@@ -57,26 +57,49 @@ Light only. Every colour a page uses is one of these. Write it as `var(--name)` 
 
 Two typefaces, loaded from Google Fonts: **Libre Baskerville** (`--serif`) for titles and prose to read, **Space Grotesk** (`--sans`) for the interface.
 
-| Name | Typeface | Size | Weight | Line height | Use |
-|---|---|---|---|---|---|
-| title | serif | 20px | 700 | 1.2 | the board's title in the header bar |
-| stat | sans | 20px | 700 | 1.1 | a figure in the header; its "/ total" at 14px |
-| card title | serif | 16–17px | 700 | 1.3 | a card or pop-up heading |
-| body | sans | 15px | 400 | 1.55 | the board's body text and fields |
-| message | sans | 14px | 400 | 1.45 | text in the conversation, pop-ups and cards |
-| small | sans | 12–13px | 400 | 1.4 | times, metadata, the legend |
-| label | sans | 11–12px | 700, uppercase, .08–.1em spacing | 1.2 | section labels, buttons, tags, progress words. Never under 11px |
-| code | ui-monospace | .9em | 400 | 1.4 | code in messages |
-| article title | serif | 2.75rem (2rem under 700px) | 700 | 1.15 | the title of an article page |
-| lead | serif | 1.25rem | 400 | 1.55 | the paragraph under an article title |
-| prose | serif | 17px | 400 | 1.75 | article text, at most 42rem wide (about 70 characters) |
+Boards use these tokens for every type size. Write `font-size:var(--text-small)` or `font:700 var(--text-label) var(--sans)`.
 
-- Use a size from this table. A new size is a change to this document.
+| Token | Size | Typeface and weight | Use |
+|---|---|---|---|
+| `--text-label` | 11px | sans 700, uppercase, .08–.1em spacing | buttons, tags, progress words, table heads. Nothing under it |
+| `--text-small` | 12px | sans 400 or 700 | times, metadata, the legend, section labels (uppercase) |
+| `--text-message` | 14px | sans 400 | the conversation, pop-ups, cards, tables, secondary lines |
+| `--text-body` | 15px | sans 400 | the board's body text and fields |
+| `--text-heading` | 17px | serif 700 | a card, pop-up or section heading |
+| `--text-title` | 20px | serif 700, or sans 700 for a header figure | the board's title; a figure in the stats header, its "/ total" in `--text-message` |
+
+Code in messages is `ui-monospace` at .9em. Slides and drawings, such as the research map and architect-better's diagrams, keep their own sizes: they are documents and pictures that scale with their frame.
+
+The article page uses rem sizes, as n14n.dev:
+
+| Name | Size | Typeface and weight | Use |
+|---|---|---|---|
+| article title | 2.75rem (2rem under 700px) | serif 700, line height 1.15 | the title of an article page |
+| lead | 1.25rem | serif 400, line height 1.55 | the paragraph under an article title |
+| prose | 17px | serif 400, line height 1.75 | article text, at most 42rem wide (about 70 characters) |
+
+- Use a token from this table. A new size is a change to this document.
 - Uppercase only for labels of two or three words. Never for sentences.
 
 ## Spacing and layout
 
-Spacing values, in px: 2, 4, 6, 8, 10, 12, 16, 20, 24, 32, 40. Use these only. They are not tokens yet.
+Boards use these tokens for every padding, margin and gap: `--space-N` is N × 2px. Write `padding:var(--space-5) var(--space-6)`, and `calc(-1 * var(--space-6))` for a negative margin. 1px is a hairline, such as a tag's top padding, not a space.
+
+| Token | Value | Typical use |
+|---|---|---|
+| `--space-1` | 2px | between lines of a list, a badge's side |
+| `--space-2` | 4px | between a mark and its word |
+| `--space-3` | 6px | between tags, under a heading in a card |
+| `--space-4` | 8px | between buttons, a pop-up's inner gaps |
+| `--space-5` | 10px | inside a conversation item, above and below |
+| `--space-6` | 12px | inside an item at the sides, between cards, above the view |
+| `--space-8` | 16px | between sections of the side column, between tabs |
+| `--space-10` | 20px | the sides of the header, the view and the side column |
+| `--space-12` | 24px | between groups of cards, around a slide |
+| `--space-16` | 32px | between the header's title and its figures |
+| `--space-20` | 40px | the bottom of a scrolling view |
+
+Slides keep their own spacing, as their type.
 
 | Layout | Rule |
 |---|---|
@@ -101,7 +124,7 @@ From top to bottom, then left to right. Every board has all of them, in this ord
 | Side column | `aside.notes` | the conversation, and what else the agent says (see Side column) | the thread only |
 | Toast, pop-ups | `div.toast`, `.qpop`, `.pop` | over everything, outside `.work` | no |
 
-Padding is 20px at the sides of the header, the view and the side column, and 12px above the view's first row (tabs bring their own 16px).
+Padding is `--space-10` (20px) at the sides of the header, the view and the side column, and `--space-6` (12px) above the view's first row (tabs bring their own `--space-8`).
 
 ### Headers
 
@@ -190,7 +213,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 | `.btn--sm` | an action inside a conversation item |
 | `.mini` | a small square action, such as a thumbs up |
 
-- Labels are uppercase sans, 12px (11px small). Square corners. A button names its action.
+- Labels are uppercase sans, `--text-small` (`--text-label` on a small button). Square corners. A button names its action.
 
 ### Conversation
 
@@ -228,7 +251,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ## Rules
 
-- Use only the colours, sizes and components in this document, because one board that drifts makes the others look inconsistent. Correct: `color:var(--muted)`. Wrong: `color:#777`.
+- Use only the colours, type sizes, spaces and components in this document, by their token, because one board that drifts makes the others look inconsistent. Correct: `color:var(--muted); padding:var(--space-4)`. Wrong: `color:#777; padding:9px`.
 - Make a shared part shared: if two boards need the same rule, it goes in page.css, because copies drift. Correct: `.legend` in page.css. Wrong: the same `.key` rules in two boards.
 - Square corners everywhere, except the round comment pins and numbered markers, because n14n never rounds boxes.
 - One shadow (`--shadow`), on things that float over the page only.
@@ -238,15 +261,11 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ## Known conflicts
 
-Each of these breaks a rule above. They stay until the user decides.
-
-- research-better's board writes "contested" claims in terracotta text (`.chip.bad`, 2.9:1 on cream). Alternative: `--terracotta-dark`, as architect-better's "1 comment".
-- `--muted` text on linen is 4.0:1, under 4.5:1. page.css already switches times on linen to ink; other muted text on linen should do the same.
-- The board type scale has more sizes than it needs (11, 12, 13, 14, 15px for small text). Merging them changes how boards look.
-- Spacing values are not named in code.
+None. A conflict between a rule above and a page is listed here until the user decides it.
 
 ## Changes and exceptions
 
 - 2026-11-20: first version, drawn from the five boards. Added the names `--moss`, `--terracotta-dark`, `--white`, `--shadow`, `--surround-dark`, `--frame` and `--frame-dark` for values the boards already used. Moved the stats header, meter, section label, legend, pop-up, question box, decision item and the "not watching" notice into page.css. The research board's waiting figure is now a button that goes to the waiting decision, as on code-better's dashboard. architect-better's comment box now has the shared pop-up border, shadow and textarea, and its "architect is away" notice the shared `.unwatched` style it lacked.
 - 2026-11-20: small buttons, tags, progress words and the canvas and slide labels went from 10px to 11px (the user's decision): text that carries meaning is never under 11px.
 - 2026-11-20: the agents at work moved from the side column to the top of the view on research-better's board, as on code-better's dashboard; the side column holds the conversation only. architect-better's view has 20px at the sides, as the other boards; the `--pad` token is gone.
+- 2026-11-20: spacing and type sizes became tokens (`--space-N`, `--text-*`) in every board. Off-scale values moved to the nearest step: 3px to 4, 5 to 6, 7 to 8, 14 to 16, 18 to 20, 28 to 24, 48 to 40. Type sizes merged: 13px into 14 (`--text-message`), 16 and 18 into 17 (`--text-heading`), 22 into 20 (`--text-title`). On linen, muted text and the progress words use ink, and research-better's "contested" uses `--terracotta-dark`.

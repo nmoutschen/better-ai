@@ -6,13 +6,13 @@
 <style>
 /*__PAGE_CSS__*/
 /* What only the board shows; the shared look (bar, side column, conversation, buttons, toast) is page.css above. */
-.goal { margin:4px 0 0; font:400 15px/1.4 var(--serif); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.goal { margin:var(--space-2) 0 0; font:400 var(--text-body)/1.4 var(--serif); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
 .goal.open { white-space:normal; }
 
 /* The map, on the untinted surround */
-.view { min-height:0; display:flex; flex-direction:column; padding:12px 20px; }
-.tools { flex:none; display:flex; gap:20px; align-items:center; justify-content:space-between; margin:0 0 12px; }
-.zoombar { display:flex; gap:8px; }
+.view { min-height:0; display:flex; flex-direction:column; padding:var(--space-6) var(--space-10); }
+.tools { flex:none; display:flex; gap:var(--space-10); align-items:center; justify-content:space-between; margin:0 0 var(--space-6); }
+.zoombar { display:flex; gap:var(--space-4); }
 .zoombar .btn { min-width:36px; }
 .zoomwrap { flex:1; min-height:0; display:flex; border:1px solid var(--line); background:var(--cream); overflow:hidden; cursor:grab; touch-action:none; }
 .zoomwrap.drag { cursor:grabbing; }
@@ -32,39 +32,39 @@ svg.map { display:block; width:100%; height:100%; }
 .zoomwrap .empty { margin:auto; color:var(--muted); font-style:italic; }
 
 /* The pop-up for a question or an agent */
-.qpop summary { font:400 14px/1.45 var(--sans); }
-.qpop p { margin:8px 0; }
-.qpop .meta, .qpop .chip, .qpop h2, .qpop .thread .head, .qpop .progress { font:700 11px/1.4 var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.qpop summary { font:400 var(--text-message)/1.45 var(--sans); }
+.qpop p { margin:var(--space-4) 0; }
+.qpop .meta, .qpop .chip, .qpop h2, .qpop .thread .head, .qpop .progress { font:700 var(--text-label)/1.4 var(--sans); letter-spacing:.08em; text-transform:uppercase; }
 .qpop .meta, .qpop h2 { color:var(--muted); }
-.qpop .btn { font-size:11px; }
-.qpop .meta { margin:0; padding-right:24px; }
-.qpop details { margin:8px 0; }
+.qpop .btn { font-size:var(--text-label); }
+.qpop .meta { margin:0; padding-right:var(--space-12); }
+.qpop details { margin:var(--space-4) 0; }
 .qpop summary { cursor:pointer; color:var(--umber); }
-.qpop details ul, .qpop .searches { padding-left:20px; margin:8px 0; }
-.qpop details li, .qpop .searches li { margin:4px 0; }
-.chip { font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.qpop details ul, .qpop .searches { padding-left:var(--space-10); margin:var(--space-4) 0; }
+.qpop details li, .qpop .searches li { margin:var(--space-2) 0; }
+.chip { font:700 var(--text-label) var(--sans); letter-spacing:.08em; text-transform:uppercase; }
 .chip.ok { color:var(--moss-dark); }
 .chip.todo { color:var(--muted); }
-.chip.bad { color:var(--terracotta); }
-.chip.now { color:var(--cream); background:var(--umber); padding:1px 6px; }
+.chip.bad { color:var(--terracotta-dark); }
+.chip.now { color:var(--cream); background:var(--umber); padding:1px var(--space-3); }
 .muted { color:var(--muted); }
 
 /* The side column: the conversation, then the agents */
 /* A worker's message when it closes a question: white like the user's, with a sand edge, so the coordinator's stay distinct. */
 .thread > li.msg.worker { border-left:4px solid var(--sand); }
 .msg .qlink { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; text-align:left; }
-.msg .added { margin:4px 0 0; font-size:12px; color:var(--muted); }
+.msg .added { margin:var(--space-2) 0 0; font-size:var(--text-small); color:var(--muted); }
 /* The agents at work, at the top of the view as on code-better's dashboard: one line each, side by side, so the map
    keeps most of the height. Past a fifth of the window the row scrolls. */
-.agentsec { flex:none; max-height:20vh; overflow-y:auto; margin:0 0 12px; }
-.agentsec h2 { margin:0 0 8px; }
-.agents { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px 16px; }
+.agentsec { flex:none; max-height:20vh; overflow-y:auto; margin:0 0 var(--space-6); }
+.agentsec h2 { margin:0 0 var(--space-4); }
+.agents { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--space-4) var(--space-8); }
 .agents button { display:block; max-width:28rem; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
-  padding:4px 8px; margin:0; font:400 14px/1.4 var(--sans); color:var(--ink); cursor:pointer; }
+  padding:var(--space-2) var(--space-4); margin:0; font:400 var(--text-message)/1.4 var(--sans); color:var(--ink); cursor:pointer; }
 .agents button.verifier { border-color:var(--moss-dark); }
 .agents button:hover span { text-decoration:underline; }
-.agents .dry { display:block; font-style:normal; font-size:12px; color:var(--error); }
-.agents b { font-size:12px; letter-spacing:.08em; text-transform:uppercase; margin-right:8px; }
+.agents .dry { display:block; font-style:normal; font-size:var(--text-small); color:var(--error); }
+.agents b { font-size:var(--text-small); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--space-4); }
 </style></head><body>
 <div class="band"></div>
 <header class="bar--stats"><div><h1 id="title" dir="auto">Research board</h1><p class="goal" id="goal" dir="auto"></p></div>
