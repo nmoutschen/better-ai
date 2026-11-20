@@ -37,6 +37,8 @@ COMPARISONS = (
     ("short-skill", "no-skill"),
     ("skill", "one-sentence"),
     ("skill", "short-skill"),
+    ("skill-not-invoked", "no-skill"),
+    ("skill", "skill-not-invoked"),
 )
 RESAMPLES = 10_000
 RANDOM_SEED = 0
@@ -61,6 +63,7 @@ class SampleResult:
     skill_reads: dict[str, Any] = field(default_factory=dict)
     rule_passed: float = math.nan
     lint_issues: float | None = None
+    skill_loaded: float | None = None
     started: str = ""
     side_actions: dict[str, int] = field(default_factory=dict)
 
@@ -75,6 +78,7 @@ def read_result(sample: EvalSample) -> SampleResult:
     judges = (score.metadata or {}).get("judges", {}) if score else {}
     reads = scores.get("skill_reads")
     lint = scores.get("lint_issues_added")
+    loaded = scores.get("skill_loaded")
     rule_passed = float(values.get("all", math.nan))
     # A skill run that missed an expected skill file fails, whatever its rule score.
     passed = 0.0 if reads is not None and reads.value == 0 and not math.isnan(rule_passed) else rule_passed
@@ -93,6 +97,7 @@ def read_result(sample: EvalSample) -> SampleResult:
         judges=judges,
         skill_reads=(reads.metadata or {}) if reads is not None else {},
         lint_issues=float(lint.value) if lint is not None and not math.isnan(float(lint.value)) else None,
+        skill_loaded=float(loaded.value) if loaded is not None else None,
         error=sample.error.message[:120] if sample.error else None,
         side_actions=(score.metadata or {}).get("side_actions") or {} if score else {},
     )
@@ -135,13 +140,15 @@ def pass_table(results: list[SampleResult]) -> list[str]:
         if sample.error is None and not math.isnan(sample.passed):
             cells[sample.rule, sample.condition].append(sample.passed)
     conditions = [name for name in CONDITIONS if any(condition == name for _, condition in cells)]
-    lines = ["rule        " + "".join(f"{name:>16}" for name in conditions)]
-    for rule in sorted({rule for rule, _ in cells}, key=rule_key):
+    rules = sorted({rule for rule, _ in cells}, key=rule_key)
+    width = max([len("rule"), *map(len, rules)]) + 2
+    lines = [f"{'rule':{width}}" + "".join(f"{name:>19}" for name in conditions)]
+    for rule in rules:
         parts = []
         for condition in conditions:
             values = cells.get((rule, condition), [])
             parts.append(f"{sum(values):>4.0f}/{len(values):<3} {sum(values) / len(values):>4.0%}" if values else "-")
-        lines.append(f"{rule:12}" + "".join(f"{part:>16}" for part in parts))
+        lines.append(f"{rule:{width}}" + "".join(f"{part:>19}" for part in parts))
     return lines
 
 
@@ -249,7 +256,7 @@ def case_lines(results: list[SampleResult]) -> list[str]:
 def condition_cost_lines(results: list[SampleResult]) -> list[str]:
     """Format cost, time and tokens per condition: mean and median per run, over runs without an error."""
     lines = [
-        f"{'condition':14} {'runs':>5} {'cost mean':>10} {'median':>8} {'time mean':>10} {'median':>8} "
+        f"{'condition':18} {'runs':>5} {'cost mean':>10} {'median':>8} {'time mean':>10} {'median':>8} "
         f"{'out tokens':>11} {'total cost':>11}"
     ]
     for name in CONDITIONS:
@@ -260,7 +267,7 @@ def condition_cost_lines(results: list[SampleResult]) -> list[str]:
         times = [sample.seconds for sample in runs]
         output = statistics.mean(sample.tokens.get("output_tokens", 0) for sample in runs)
         lines.append(
-            f"{name:14} {len(runs):5} {statistics.mean(costs):10.3f} {statistics.median(costs):8.3f} "
+            f"{name:18} {len(runs):5} {statistics.mean(costs):10.3f} {statistics.median(costs):8.3f} "
             f"{statistics.mean(times):9.0f}s {statistics.median(times):7.0f}s {output:11.0f} {sum(costs):11.2f}"
         )
     lines.append("cost = Claude Code's total_cost_usd for the agent run (API-price equivalent), judge excluded.")
@@ -291,19 +298,34 @@ def skill_read_lines(results: list[SampleResult]) -> list[str]:
     return lines
 
 
+def loaded_lines(results: list[SampleResult]) -> list[str]:
+    """Format how often skill-not-invoked runs loaded the skill, and the pass rate with and without it."""
+    runs = [sample for sample in results if sample.skill_loaded is not None and not sample.error]
+    if not runs:
+        return ["No skill-not-invoked runs."]
+    lines = [f"{'skill loaded':14} {'runs':>5} {'pass rate':>10}"]
+    for label, value in (("yes", 1.0), ("no", 0.0)):
+        group = [sample.passed for sample in runs if sample.skill_loaded == value and not math.isnan(sample.passed)]
+        rate = f"{statistics.mean(group):10.0%}" if group else f"{'-':>10}"
+        lines.append(f"{label:14} {len(group):5} {rate}")
+    not_loaded = sorted({sample.case for sample in runs if sample.skill_loaded == 0.0})
+    lines.append(f"Cases with a run that did not load it: {', '.join(not_loaded) or '-'}")
+    return lines
+
+
 def lint_lines(results: list[SampleResult]) -> list[str]:
     """Format the lint issues runs added to the Python files they changed, per condition (observed, not scored)."""
-    lines = [f"{'condition':14} {'runs':>5} {'mean issues':>12} {'runs with any':>14}"]
+    lines = [f"{'condition':18} {'runs':>5} {'mean issues':>12} {'runs with any':>14}"]
     for name in CONDITIONS:
         counts = [s.lint_issues for s in results if s.condition == name and s.lint_issues is not None and not s.error]
         if counts:
-            lines.append(f"{name:14} {len(counts):5} {statistics.mean(counts):12.2f} {sum(c > 0 for c in counts):14}")
+            lines.append(f"{name:18} {len(counts):5} {statistics.mean(counts):12.2f} {sum(c > 0 for c in counts):14}")
     return lines if len(lines) > 1 else ["No run counted lint issues."]
 
 
 def side_action_lines(results: list[SampleResult]) -> list[str]:
     """Format, per condition, how many runs committed or rewrote history, over the runs where it was measured."""
-    lines = [f"{'condition':14} {'measured':>9} {'committed':>10} {'rewrote':>8}  cases that committed"]
+    lines = [f"{'condition':18} {'measured':>9} {'committed':>10} {'rewrote':>8}  cases that committed"]
     for name in CONDITIONS:
         runs = [sample for sample in results if sample.condition == name and "commits" in sample.side_actions]
         if not runs:
@@ -311,7 +333,7 @@ def side_action_lines(results: list[SampleResult]) -> list[str]:
         committed = [sample for sample in runs if sample.side_actions["commits"] > 0]
         rewrote = sum(1 for sample in runs if sample.side_actions["commits"] < 0)
         cases = ", ".join(sorted({sample.case for sample in committed})) or "-"
-        lines.append(f"{name:14} {len(runs):9} {len(committed):10} {rewrote:8}  {cases}")
+        lines.append(f"{name:18} {len(runs):9} {len(committed):10} {rewrote:8}  {cases}")
     lines.append("Measured on every run, scored only by cases whose rule covers it (no_commit grader).")
     return lines
 
@@ -367,6 +389,7 @@ def main(argv: list[str] | None = None) -> int:
         ("Comparisons between conditions (paired by case)", comparison_lines(results)),
         ("Cost and time per condition", condition_cost_lines(results)),
         ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(results)),
+        ("Skill loaded without a command (skill-not-invoked)", loaded_lines(results)),
         ("Lint issues added to changed Python files (observed, not scored)", lint_lines(results)),
         ("Side actions per condition", side_action_lines(results)),
         ("Samples", case_lines(results)),
