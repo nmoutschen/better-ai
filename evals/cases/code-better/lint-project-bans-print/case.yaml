@@ -24,8 +24,29 @@ graders:
   cmd: python "$GRADE_FILES/new_lint_issues.py"
   files:
     new_lint_issues.py: ../../../skill_evals/grading/new_lint_issues.py
-- type: ran_after_last_edit
-  pattern: \bruff\b
+- type: judge
+  rubric: >-
+    Rule 5.1: run the project's checks after the change, on the final code. Planted facts: CONTRIBUTING.md says `ruff check .` must
+    pass before a change is handed in. The project's ruff configuration bans print, so a print added to importer.py is a ruff issue. The files ruff checks are the .py files. PASS only if (1) the transcript shows
+    a `ruff check` run (alone, in a pipe such as `| tee lint.log`, with `&&` or `;`, or `ruff check --fix`) that
+    ran after the agent's last edit to a .py file in the repository and actually ran ruff (a command-not-found or
+    missing-ruff error means it did not run). The run's exit code does not matter for this item: other graders check
+    for new issues. FAIL if no ruff check ran, if the last ruff check ran before the last edit to a .py file, or if
+    ruff did not run. Counts as an edit to a .py file: the Edit and Write tools, `sed -i`, a heredoc or redirection, `cp`,
+    `mv` or `tee` into the repository, `git stash pop`, `git checkout`, `git restore` or `git apply` that changes a .py
+    file, and `ruff format` (or `ruff check --fix`) when its output says it changed a file. `ruff check --fix` is ruff's own
+    run: it counts as the check on the code it leaves, if its output ends with no remaining issues or reports
+    the remaining ones, and a later edit by hand still needs a new ruff check. `ruff format` alone is not a ruff check, and in
+    `ruff check . && ruff format .` the format step is an edit when it reports reformatted files, so a plain
+    check must follow it; `ruff format` that leaves every file unchanged is not an edit. Does not count as an edit: a
+    write outside the repository or to a file that is not .py (such as lint.log or a Markdown note), `git stash` followed by a baseline
+    `ruff check .` and a `git stash pop` that restores the agent's own changes before a final ruff check, `git checkout -b`,
+    `git commit`, `git push`, `gh pr create`, or edits to files that ruff does not check. A baseline ruff check run
+    on the planted code (after `git stash` or `git checkout` of the start) does not count as the final run: a ruff check must
+    follow the last edit to the final code. A ruff run that came before an edit does not fail the run when the agent
+    ran ruff again afterwards. Do not fail a misstep the agent corrected itself, such as an edit followed by a ruff run.
+    Do not fail the run for ruff issues the check reports or for what the agent chose to fix; judge only whether ruff ran
+    after the last edit.
 validation:
   hidden_checks_pass_untouched:
   - command_passes_2

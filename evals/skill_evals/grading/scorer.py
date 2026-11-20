@@ -61,8 +61,6 @@ class Grading:
             passed, info = await judge(spec, self.state, self.repo, self.judge_model)
             self.judges[key] = info
             return int(passed)
-        if kind == "ran_after_last_edit":
-            return int(commands.ran_after_last_edit(spec, self.state.messages))
         if kind == "ran_command":
             return int(commands.ran_command(spec, self.state.messages))
         if kind not in GRADERS:
