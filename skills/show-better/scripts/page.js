@@ -1,3 +1,117 @@
+// The element-comment layer. A page supplies its target metadata, pin coordinates and navigation;
+// this owns the editor, the numbered pins and their actions.
+function pageElementComments(o) {
+  var pop = o.pop, draft = null, opener = null, state = {};
+  var input = pop.querySelector('textarea'), ok = pop.querySelector('.ok'), del = pop.querySelector('.remove');
+
+  function open(data, item, from, position) {
+    draft = data;
+    pop.querySelector('.target').replaceChildren(o.crumb(data));
+    input.value = item ? item.comment || '' : '';
+    if (o.prepare) o.prepare(data);
+    del.hidden = !item;
+    ok.textContent = item ? 'Update' : 'Send';
+    pop.hidden = false;
+    opener = from;
+    var point = position(pop);
+    pop.style.left = point.x + 'px';
+    pop.style.top = point.y + 'px';
+    input.focus();
+  }
+  function close() {
+    pop.hidden = true;
+    draft = null;
+    if (opener && document.contains(opener)) opener.focus();
+    opener = null;
+  }
+  function remove(it) { o.send('delete', { id: it.id, n: it.n }, 'Deletion of comment ' + it.n); }
+  function submit() {
+    var text = input.value.trim();
+    if (!draft || (!text && !(o.allowEmpty && o.allowEmpty(draft)))) { input.focus(); return; }
+    var it = draft.item, n = it ? it.n : o.nextNumber();
+    var id = it ? it.id : 'c' + n + '-' + Date.now().toString(36);
+    var params = Object.assign({ id: id, n: n }, o.params(draft, text));
+    close();
+    // An update reuses the comment's id, so the agent replaces the earlier version.
+    o.send('comment', params, 'Comment ' + n + (it ? ' (updated)' : ''));
+  }
+  pop.querySelector('.cancel').addEventListener('click', close);
+  del.addEventListener('click', function () { var it = draft && draft.item; close(); if (it) remove(it); });
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
+  ok.addEventListener('click', submit);
+
+  function findPin(root, id) { return root && root.querySelector('.' + o.pinClass + '[data-id="' + CSS.escape(id) + '"]'); }
+  function updatePin(pin, it) {
+    pin.textContent = it.n;
+    pin.dataset.state = state[it.id] || 'new';
+  }
+  function placePin(root, it) {
+    var pin = findPin(root, it.id);
+    if (!pin) {
+      pin = root.ownerDocument.createElement('span');
+      pin.className = o.pinClass;
+      pin.dataset.id = it.id;
+      root.appendChild(pin);
+    }
+    updatePin(pin, it);
+    return pin;
+  }
+  function removePin(root, id) { var pin = findPin(root, id); if (pin) pin.remove(); }
+  function flashPin(pin, cls) { pin.classList.remove(cls); void pin.offsetWidth; pin.classList.add(cls); }
+  function click(e, start, edit) {
+    var pin = e.target.closest && e.target.closest('.' + o.pinClass);
+    if (pin) {
+      e.preventDefault();
+      if (o.stopPinPropagation) e.stopPropagation();
+      var it = o.byId(pin.dataset.id), st = state[pin.dataset.id];
+      if (it && (st === 'done' || st === 'accepted')) o.reopen(it.id);
+      else if (it) edit(it, pin);
+      return true;
+    }
+    if (!o.commenting()) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!pop.hidden) close();
+    else start();
+    return true;
+  }
+
+  return {
+    open: open, close: close, remove: remove, click: click,
+    draft: function () { return draft; },
+    findPin: findPin, placePin: placePin, updatePin: updatePin, removePin: removePin, flashPin: flashPin,
+    state: function (next) { if (next) state = next; return state; }
+  };
+}
+
+// Anchor at the nearest ID that is unique across the document. Otherwise use a positional path
+// from body, or a path relative to the supplied root for a page with multiple commentable regions.
+function pageElementSelector(node, root) {
+  var doc = node.ownerDocument, counts = pageIdCounts(doc), parts = [];
+  while (node && node.nodeType === 1 && node !== root && node !== doc.body && node !== doc.documentElement) {
+    if (node.id && counts[node.id] === 1) return ['#' + CSS.escape(node.id)].concat(parts).join(' > ');
+    var tag = node.tagName.toLowerCase(), n = 1, sib = node;
+    while ((sib = sib.previousElementSibling)) if (sib.tagName === node.tagName) n++;
+    parts.unshift(tag + ':nth-of-type(' + n + ')');
+    node = node.parentElement;
+  }
+  return (root ? parts : ['body'].concat(parts)).join(' > ');
+}
+function pageIdCounts(doc) {
+  var counts = Object.create(null);
+  doc.querySelectorAll('[id]').forEach(function (el) { counts[el.id] = (counts[el.id] || 0) + 1; });
+  return counts;
+}
+function pageElementDescription(node, root, text, limit) {
+  return { tag: node.tagName.toLowerCase(), text: (text || '').replace(/\s+/g, ' ').trim().slice(0, limit),
+           selector: pageElementSelector(node, root) };
+}
+
+function pageCommentPosition(x, y, pop) {
+  return { x: Math.max(12, Math.min(x + 12, innerWidth - pop.offsetWidth - 12)),
+           y: Math.max(12, Math.min(y + 12, innerHeight - pop.offsetHeight - 12)) };
+}
+
 // The conversation between a served page and the agent: sending, the thread with its items, states and replies, the
 // message box, and the live updates. Each skill whose page talks to the agent carries an identical copy of this file,
 // as it does page.css and page.py, and the Scripts workflow fails if the copies differ: change it in one skill, then

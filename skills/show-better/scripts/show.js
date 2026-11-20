@@ -149,7 +149,16 @@
   });
 
   // ---------- Read and Comment ----------
-  var commenting = false, pop = document.querySelector('.pop'), draft = null, opener = null;
+  var commenting = false, pop = document.querySelector('.pop');
+  var comments = pageElementComments({
+    pop: pop, pinClass: 'pin', byId: byId, send: send, crumb: crumb,
+    commenting: function () { return commenting; },
+    reopen: function (id) { conv.reopen(id); },
+    nextNumber: function () { return seq + 1; },
+    params: function (data, text) {
+      return { slide: data.slide, part: data.part, headline: data.headline, target: data.target, spot: data.spot, comment: text };
+    }
+  });
   function choose(attr, value) {
     document.querySelectorAll('button[' + attr + ']').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value)); });
   }
@@ -168,35 +177,12 @@
   });
   stage.addEventListener('click', function (e) {
     var slide = e.target.closest('.slide'); if (!slide) return;
-    var pin = e.target.closest('.pin');
-    if (pin) {  // a pin opens its comment, to read, change or delete it, in either mode
-      e.preventDefault();
-      var found = byId(pin.dataset.id);
-      if (found && (pinState[found.id] === 'done' || pinState[found.id] === 'accepted')) conv.reopen(found.id);
-      else if (found) openEdit(found, pin);
-      return;
-    }
-    if (commenting) {
-      e.preventDefault(); e.stopPropagation();
-      if (!pop.hidden) return closePop();
-      return openPop(slide, e.target, e.clientX, e.clientY);
-    }
+    if (comments.click(e, function () { openPop(slide, e.target, e.clientX, e.clientY); }, openEdit)) return;
     var goto = e.target.closest('[data-go]');
     if (goto) { e.preventDefault(); return go(+goto.dataset.go - 1); }
     var h = e.target.closest('[data-dk]');
     if (h) openDetail(slide, h);
   }, true);
-  function selectorOf(node, root) {
-    var parts = [];
-    while (node && node.nodeType === 1 && node !== root) {
-      if (node.id) { parts.unshift('#' + CSS.escape(node.id)); break; }
-      var tag = node.tagName.toLowerCase(), n = 1, sib = node;
-      while ((sib = sib.previousElementSibling)) if (sib.tagName === node.tagName) n++;
-      parts.unshift(tag + ':nth-of-type(' + n + ')');
-      node = node.parentElement;
-    }
-    return parts.join(' > ');
-  }
   // The label of the drawn item nearest the click: its own label when it has a detail, else the closest text.
   function nearestItem(target, x, y) {
     var h = target.closest('[data-dk]'), slide = target.closest('.slide');
@@ -211,10 +197,11 @@
   }
   function describe(slide, target, x, y) {
     var r = slide.getBoundingClientRect(), n = slides.indexOf(slide) + 1;
+    var description = pageElementDescription(target, slide, target.textContent, 160);
+    description.item = nearestItem(target, x, y);
     return {
       slide: n, part: slide.dataset.part || '', headline: slide.dataset.headline || '',
-      target: { tag: target.tagName.toLowerCase(), text: (target.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160),
-                item: nearestItem(target, x, y), selector: selectorOf(target, slide) },
+      target: description,
       // Where the click fell, as fractions of the slide's width and height; yw, the height over the width, places the
       // pin so it stays on its spot when a detail opened below makes the slide taller.
       spot: { fx: Math.round((x - r.left) / Math.max(1, r.width) * 1000) / 1000, fy: Math.round((y - r.top) / Math.max(1, r.height) * 1000) / 1000,
@@ -228,49 +215,20 @@
                el('span', 'el', said ? '“' + said.slice(0, 90) + (said.length > 90 ? '…' : '') + '”' : 'the slide'));
     return box;
   }
-  function placePop(x, y) {
-    pop.hidden = false;
-    pop.style.left = Math.max(12, Math.min(x + 12, innerWidth - pop.offsetWidth - 12)) + 'px';
-    pop.style.top = Math.max(12, Math.min(y + 12, innerHeight - pop.offsetHeight - 12)) + 'px';
-    pop.querySelector('textarea').focus();
-  }
   function openPop(slide, target, x, y) {
-    draft = describe(slide, target, x, y);
-    opener = document.activeElement !== document.body ? document.activeElement : null;
-    pop.querySelector('.target').replaceChildren(crumb(draft));
-    pop.querySelector('textarea').value = '';
-    pop.querySelector('.remove').hidden = true; pop.querySelector('.ok').textContent = 'Send';
-    placePop(x, y);
+    comments.open(describe(slide, target, x, y), null, document.activeElement !== document.body ? document.activeElement : null,
+      function () { return pageCommentPosition(x, y, pop); });
   }
   function openEdit(it, from) {
     var r = from.getBoundingClientRect();
-    draft = { item: it, slide: it.slide, part: it.part, headline: it.headline, target: it.target, spot: it.spot };
-    opener = from;
-    pop.querySelector('.target').replaceChildren(crumb(it));
-    pop.querySelector('textarea').value = it.comment || '';
-    pop.querySelector('.remove').hidden = false; pop.querySelector('.ok').textContent = 'Update';
-    placePop(r.left, r.bottom);
+    var data = { item: it, slide: it.slide, part: it.part, headline: it.headline, target: it.target, spot: it.spot };
+    comments.open(data, it, from, function () { return pageCommentPosition(r.left, r.bottom, pop); });
   }
-  function closePop() { pop.hidden = true; draft = null; if (opener && document.contains(opener)) opener.focus(); opener = null; }
-  document.addEventListener('mousedown', function (e) { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('.slide')) closePop(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pop.hidden) closePop(); });
-  pop.querySelector('.cancel').addEventListener('click', closePop);
-  pop.querySelector('.remove').addEventListener('click', function () { var it = draft && draft.item; closePop(); if (it) removeItem(it); });
-  pop.querySelector('textarea').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } });
-  pop.querySelector('.ok').addEventListener('click', submitComment);
-  function submitComment() {
-    var text = pop.querySelector('textarea').value.trim();
-    if (!draft || !text) { pop.querySelector('textarea').focus(); return; }
-    var it = draft.item, n = it ? it.n : seq + 1, id = it ? it.id : 'c' + n + '-' + Date.now().toString(36);
-    var params = { id: id, n: n, slide: draft.slide, part: draft.part, headline: draft.headline, target: draft.target, spot: draft.spot, comment: text };
-    closePop();
-    // An update reuses the comment's id, so the agent replaces the earlier version of it.
-    send('comment', params, 'Comment ' + n + (it ? ' (updated)' : ''));
-  }
-  function removeItem(it) { send('delete', { id: it.id, n: it.n }, 'Deletion of comment ' + it.n); }
+  document.addEventListener('mousedown', function (e) { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('.slide')) comments.close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pop.hidden) comments.close(); });
 
   // ---------- The conversation: page.js, shared with design-better's canvas; this page adds its pins and slides ----------
-  var seq = 0, items = [], pinState = {};
+  var seq = 0, items = [];
   function byId(id) { return items.filter(function (x) { return x.id === id; })[0]; }
   function apply(e, fresh) {
     if (e.action === 'comment') {
@@ -280,36 +238,33 @@
       placePin(it, fresh);
     } else if (e.action === 'delete') {
       items = items.filter(function (x) { return x.id !== e.id; });
-      document.querySelectorAll('.pin[data-id="' + e.id + '"]').forEach(function (p) { p.remove(); });
+      slides.forEach(function (slide) { comments.removePin(slide, e.id); });
     }
   }
   function placePin(it, fresh) {
     var slide = slides[(it.slide || 1) - 1]; if (!slide) return;
-    var pin = slide.querySelector('.pin[data-id="' + it.id + '"]');
-    if (!pin) { pin = el('span', 'pin'); pin.dataset.id = it.id; slide.append(pin); }
-    pin.textContent = it.n;
+    var pin = comments.placePin(slide, it);
     pin.style.left = (it.spot.fx * 100) + '%';
     pin.style.top = it.spot.yw != null ? (it.spot.yw * 100) + 'cqw' : (it.spot.fy * 100) + '%';
-    pin.dataset.state = pinState[it.id] || 'new';
     pin.title = 'Comment ' + it.n + ': click to open it';
-    if (fresh) { pin.classList.remove('flash'); void pin.offsetWidth; pin.classList.add('flash'); }
+    if (fresh) comments.flashPin(pin, 'flash');
   }
   // Show a comment where it was made: its slide, with its pin flashing.
   function reveal(e) {
     go((e.slide || 1) - 1);
-    var pin = slides[cur].querySelector('.pin[data-id="' + e.id + '"]'); if (!pin) return;
-    pin.classList.remove('flash'); void pin.offsetWidth; pin.classList.add('flash');
+    var pin = comments.findPin(slides[cur], e.id); if (!pin) return;
+    comments.flashPin(pin, 'flash');
     pin.scrollIntoView({ block: 'nearest' });
   }
   var KEY = 'show-mode:' + location.pathname;
   var conv = pageConversation({
-    served: served, name: 'page', apply: apply, byId: byId, reveal: reveal, edit: openEdit, remove: removeItem,
+    served: served, name: 'page', apply: apply, byId: byId, reveal: reveal, edit: openEdit, remove: comments.remove,
     showLabel: function (n) { return 'Show comment ' + n + ' on its slide'; },
     crumb: crumb, commentBody: function (e) { return el('p', 'body', e.comment); },
     noteParams: function () { return { slide: cur + 1, part: slides[cur].dataset.part || '' }; },
     busy: function () { return !pop.hidden; },
     beforeReload: function () { sessionStorage.setItem(KEY, commenting ? 'comment' : 'read'); },
-    rendered: function (state) { pinState = state; items.forEach(function (it) { placePin(it, false); }); }
+    rendered: function (state) { comments.state(state); items.forEach(function (it) { placePin(it, false); }); }
   });
   function send(method, params, what, done) { conv.send(method, params, what, done); }
   function flash(text, kind) { conv.flash(text, kind); }
