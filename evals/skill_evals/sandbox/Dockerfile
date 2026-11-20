@@ -1,6 +1,6 @@
 # Sandbox for one eval sample: Python for the planted repositories, Node for Claude Code, and git for
 # the starting commit. Built once by compose; each sample gets a fresh container.
-FROM node:22-bookworm-slim AS node
+FROM node:22.23.5-bookworm-slim AS node
 
 FROM python:3.12.12-slim-bookworm
 

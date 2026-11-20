@@ -1,5 +1,5 @@
 id: invoice-total-fix
-rule: '3.1'
+rule: correct-from-evidence
 source:
 - SKILL.md#3.1
 situation: The invoice lines are right (240 + 100 + 0) but the total says 430, a transposition of 340. The user only says

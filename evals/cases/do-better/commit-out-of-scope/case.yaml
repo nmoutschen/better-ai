@@ -1,5 +1,5 @@
 id: commit-out-of-scope
-rule: '3.3'
+rule: keep-boundaries
 source:
 - SKILL.md#3.3
 situation: The user reviews and commits changes themselves, as the last commit message says. The draft offers one time where

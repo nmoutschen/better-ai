@@ -9,9 +9,8 @@ the skill itself.
 A skill's kind, `behavioural` or `procedural`, is `metadata.kind` in its SKILL.md frontmatter. Behavioural skills
 also run `skill-installed` by default, because agents are meant to load them for the work without a command.
 
-A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, source, reads, situation, request,
-graders),
-`repo/` with the planted files, `checks/` with hidden files that graders reference by path, and
+A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, source, reads, situation, request, graders,
+optional validation), `repo/` with the planted files, `checks/` with hidden files that graders reference by path, and
 `replays/` with scripted runs for `tools/validate_cases.py` and the fake agent. A case about earlier work, such as
 work the user asks the agent to correct, also has `earlier/`: `before/` with the files as they were before that work,
 and `message.txt` with its commit message. The sandbox then starts with two commits, and the planted repository is
@@ -51,6 +50,25 @@ DEFAULT_CONDITIONS = {
 SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
 # What a step of a planted history may set in its commit.env.
 HISTORY_KEYS = ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_AUTHOR_DATE")
+CASE_KEYS = ("id", "rule", "source", "reads", "situation", "request", "graders", "validation")
+# The fields each grader type reads, besides `type`; a field outside the list is a typo that turns a check off.
+GRADER_FIELDS: dict[str, tuple[str, ...]] = {
+    "any_of": ("graders",),
+    "catches_bug": ("tests", "files", "restore"),
+    "command_fails": ("cmd", "files", "timeout"),
+    "command_passes": ("cmd", "files", "timeout"),
+    "diff_max_lines": ("max",),
+    "file_contains": ("path", "pattern"),
+    "file_keeps": ("path",),
+    "file_not_contains": ("path", "pattern"),
+    "file_unchanged": ("path",),
+    "judge": ("rubric", "observe"),
+    "no_commit": (),
+    "note_written": (),
+    "notes_only": (),
+    "planted_unchanged": ("except",),
+    "ran_command": ("pattern",),
+}
 
 
 def check_skill(skill: str) -> str:
@@ -77,7 +95,10 @@ def default_conditions(skill: str) -> list[str]:
 
 def case_dirs(skill: str) -> list[Path]:
     """Return the case folders of a skill, sorted by case id."""
-    return sorted(path.parent for path in (CASES / check_skill(skill)).glob("*/case.yaml"))
+    folder = CASES / check_skill(skill)
+    if not folder.is_dir():
+        raise ValueError(f"No cases for skill {skill!r}: there is no folder {folder}")
+    return sorted(path.parent for path in folder.glob("*/case.yaml"))
 
 
 def _resolve(specs: list[dict[str, Any]], directory: Path) -> list[dict[str, Any]]:
@@ -91,9 +112,32 @@ def _resolve(specs: list[dict[str, Any]], directory: Path) -> list[dict[str, Any
     return specs
 
 
+def check_graders(name: str, specs: list[dict[str, Any]]) -> None:
+    """Raise unless every grader, also inside any_of, has a known type and only the fields of that type."""
+    for spec in specs:
+        kind = spec.get("type")
+        if kind not in GRADER_FIELDS:
+            raise ValueError(f"{name}: unknown grader type {kind!r}")
+        for key in spec.keys() - {"type", *GRADER_FIELDS[kind]}:
+            raise ValueError(f"{name}: {kind} has an unknown field {key!r}")
+        if kind == "any_of":
+            check_graders(name, spec["graders"])
+
+
+def check_case(directory: Path, case: dict[str, Any]) -> None:
+    """Raise unless the case has only known keys, its id is its folder name, and its graders are valid."""
+    name = directory.name
+    for key in case.keys() - set(CASE_KEYS):
+        raise ValueError(f"{name}: unknown key {key!r} in case.yaml; keys are {', '.join(CASE_KEYS)}")
+    if case.get("id") != name:
+        raise ValueError(f"{name}: id {case.get('id')!r} is not the folder name")
+    check_graders(name, case.get("graders") or [])
+
+
 def load_case(directory: Path) -> dict[str, Any]:
     """Load one case: its yaml fields, graders with file contents, and the planted files by path."""
     case = yaml.safe_load((directory / "case.yaml").read_text())
+    check_case(directory, case)
     case["rule"] = str(case["rule"])
     case["source"] = [str(source) for source in case.get("source") or []]
     case["reads"] = case.get("reads") or []
@@ -203,8 +247,10 @@ def samples(
     """
     sentences = source_sentences(skill)
     found = []
-    for directory in case_dirs(skill):
-        case = load_case(directory)
+    loaded = [load_case(directory) for directory in case_dirs(skill)]
+    if unknown := sorted(set(case_ids or []) - {case["id"] for case in loaded}):
+        raise ValueError(f"No case {', '.join(unknown)} in {skill!r}; cases are {', '.join(c['id'] for c in loaded)}")
+    for directory, case in zip(case_dirs(skill), loaded, strict=True):
         if (rule is not None and case["rule"] != rule) or (case_ids and case["id"] not in case_ids):
             continue
         for condition in conditions:
