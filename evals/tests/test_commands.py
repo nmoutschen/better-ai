@@ -3,7 +3,7 @@
 from inspect_ai.model import ChatMessageAssistant
 from inspect_ai.tool import ToolCall
 
-from skill_evals.grading.commands import ran_after_last_edit
+from skill_evals.grading.commands import ran_after_last_edit, ran_command
 
 SPEC = {"pattern": r"\bruff\b"}
 
@@ -33,3 +33,12 @@ def test_order_inside_one_command() -> None:
     assert ran_after_last_edit(
         SPEC, calls(("Edit", {}), ("Bash", {"command": "ruff check . > /tmp/out.txt; python -m unittest"}))
     )
+
+
+def test_ran_command_at_any_point() -> None:
+    """A matching command passes wherever it ran, also before an edit; no matching command fails."""
+    log = ("Bash", {"command": "git log --name-only --since=12.months"})
+    write = ("Write", {"file_path": "/work/.code/audit/findings.md"})
+    spec = {"pattern": r"\bgit\s+log\b"}
+    assert ran_command(spec, calls(log, write))
+    assert not ran_command(spec, calls(("Bash", {"command": "git status"}), write))

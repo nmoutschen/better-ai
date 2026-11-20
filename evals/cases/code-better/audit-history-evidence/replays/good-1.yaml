@@ -1,0 +1,16 @@
+reply: 'The quote total is written twice, in pricing.py and quote_pdf.py. The history shows they change together, and in December 2025 a rounding fix reached the PDF a week before pricing, so invoices disagreed with signed quotes. Proposed: one price function both call. Full list of 3 findings in .code/audit/findings.md.'
+actions:
+- bash: 'git log --name-only --format=''%h %ad %s'' --since=12.months'
+- read: README.md
+- read: pricing.py
+- read: quote_pdf.py
+- read: emails.py
+- write: .code/audit/findings.md
+  content: |
+    # Audit
+
+    1. The quote total is computed in pricing.py and again in quote_pdf.py. git log shows the two changed together on
+       2025-09-10, 2026-03-15 and 2026-07-20, and the rounding fix reached the PDF on 2025-12-01 but pricing only on
+       2025-12-09, when invoices disagreed with signed quotes. Proposed task: refactor, quote_pdf.py calls pricing.price.
+    2. quote_pdf.py has no tests. Proposed task: tests.
+    3. fmt_date is written twice (quote_pdf.py, emails.py); unchanged since 2025-06, low cost.

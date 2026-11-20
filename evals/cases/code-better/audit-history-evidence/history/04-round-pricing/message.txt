@@ -1,0 +1,1 @@
+Round prices to whole euros too: invoices disagreed with the quotes clients signed

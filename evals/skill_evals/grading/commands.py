@@ -1,4 +1,7 @@
-"""Grade from the transcript whether the agent ran a command after its last edit, such as the project's linter.
+"""Grade from the transcript whether the agent ran a command, at all or after its last edit.
+
+The grader `ran_command` (field `pattern`) passes when any shell command matching `pattern` ran, such as `git log`
+in an audit that must read the history.
 
 The grader `ran_after_last_edit` (field `pattern`, a regex for the command) passes when a shell command matching
 `pattern` ran after the agent's last edit, so on the final code. Edits are the harness's edit and write tool
@@ -49,3 +52,8 @@ def ran_after_last_edit(spec: dict[str, Any], messages: list[ChatMessage]) -> bo
     edits = [event for event in found if event[2] == "edit"]
     runs = [event for event in found if event[2] == "run"]
     return bool(runs) and (not edits or runs[-1] > edits[-1])
+
+
+def ran_command(spec: dict[str, Any], messages: list[ChatMessage]) -> bool:
+    """Return whether a shell command matching the spec's `pattern` ran at any point."""
+    return any(kind == "run" for _, _, kind in events(messages, re.compile(spec["pattern"])))

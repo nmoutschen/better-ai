@@ -91,7 +91,7 @@ Running it does not mean code gets written right away. It can stop at requiremen
   The report keeps three things apart: meeting the requirements, passing the checks, and your acceptance.
 - For an audit, no code change. Instead:
   - every finding, with its evidence and a proposed task, in `.code/audit/findings.md`, for an agent to pick up later
-  - a short report with what costs you now and the top five findings, highest value first
+  - a short report with what costs you now and the five to ten findings of highest value
 
 </details>
 

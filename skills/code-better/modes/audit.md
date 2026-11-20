@@ -67,7 +67,7 @@ READ [../templates/audit.md](../templates/audit.md). WRITE every finding, confir
 REPORT in the conversation, USING `/write-better` for the wording if available:
 
 1. Whether anything in the scope costs the user now, and what.
-2. At most five findings, highest value first, each with its effect on the GOAL and the proposed task.
+2. The five to ten findings of highest value, or every finding when there are fewer than five, highest value first, each with its effect on the GOAL and the proposed task.
 3. How many findings `.code/audit/findings.md` holds, and its path.
 4. What you did not read or run, such as history you could not see or checks that did not run.
 
