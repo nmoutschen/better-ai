@@ -67,7 +67,7 @@ LEAD with the result, THEN report, USING `/write-better` for the wording if avai
 2. Each requirement, the check that shows it and its result, or why it was not checked.
 3. The assumptions you made, the decisions and conflicts you asked the user about, and each check you changed with what in your mode allows it.
 4. The verifier's result, as its report states it: pass, or its open findings.
-5. Proposed next steps: work outside the change worth doing. READ [templates/next-steps.md](templates/next-steps.md) and WRITE them in its format. IF there are none, SAY so.
+5. Proposed next steps: work outside the change worth doing. LIST each with what goes wrong if nobody does it. IF there are none, SAY so.
 
 DISTINGUISH meeting the spec, passing the checks, and the user accepting the result. DO NOT claim one from another.
 

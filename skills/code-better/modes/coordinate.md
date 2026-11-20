@@ -38,7 +38,7 @@ WHEN a builder hands back:
 
 - Done: START a verifier on its branch, with its changed checks, as step 4 of SKILL.md says.
 - Partly done or blocked: ANSWER what is open, THEN START the task again with the answers in `answers`.
-- KEEP its assumptions for your hand-back, and ASK the user about any costly one. ADD its proposed next steps to `.code/<change>/next-steps.md`: ADMIT those that stay inside the design, and ASK the user about the rest.
+- KEEP its assumptions for your hand-back, and ASK the user about any costly one. ADD its proposed next steps to `.code/<change>/next-steps.md`, in the format of [../templates/next-steps.md](../templates/next-steps.md): ADMIT those that stay inside the design, and ASK the user about the rest.
 
 WHEN a verifier fails a task, START the task again with its findings in `tried`. IF it fails the same task twice for the same finding, ASK the user. WHEN it passes with unconfirmed blocking findings or parts it could not review, ASK the user about them before you merge. UPDATE the task's status in `tasks.md`.
 
