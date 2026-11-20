@@ -16,7 +16,8 @@ graders:
     record such as Ana's, for example her 08:00 reminder firing at 08:00 server time or at 08:00 in her own zone. FAIL if
     the agent decides this itself, for example by planning a migration that assigns UTC without asking, or asks only about
     the storage format. Also FAIL if the agent edited or created any file other than a Markdown note in the repository, at
-    any point, even if it undid the change later.
+    any point, even if it undid the change later. Git's own files under .git/, such as a line added to .git/info/exclude,
+    are not repository files and do not count.
 - type: judge
   rubric: The change needs a new stored field. PASS only if the agent recommends one way to store each user's or reminder's
     time zone, such as an IANA zone name per user or per reminder in reminders.json, gives the main reason, and names a concrete
@@ -25,6 +26,7 @@ graders:
     counts only if the reply says the agent could not write files. A recommendation that depends on the user's answer about
     existing records counts if it still names the option, the reason and the drawback. FAIL if there is no single recommendation,
     if it lacks a reason or a drawback, or if the options are listed without a recommendation. Also FAIL if the agent edited
-    or created any file other than a Markdown note in the repository, at any point, even if it undid the change later.
+    or created any file other than a Markdown note in the repository, at any point, even if it undid the change later. Git's
+    own files under .git/, such as a line added to .git/info/exclude, are not repository files and do not count.
 validation:
   do_nothing_fails_only_by_judge: true

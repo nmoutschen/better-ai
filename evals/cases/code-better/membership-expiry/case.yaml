@@ -22,6 +22,6 @@ graders:
     observe, if it asks only generic questions (scope, naming, scheduling, whether to proceed), if it asks the user to decide
     internal code structure such as helper or module names, or if the agent settles the decision itself. Also FAIL if the
     agent edited or created any file other than a Markdown note in the repository, at any point, even if it undid the change
-    later.'
+    later. Git''s own files under .git/, such as a line added to .git/info/exclude, are not repository files and do not count.'
 validation:
   do_nothing_fails_only_by_judge: true

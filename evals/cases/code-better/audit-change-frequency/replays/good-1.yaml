@@ -1,0 +1,16 @@
+reply: 'bookings.py is where change costs you: it changed in 11 commits this year and has no tests. Proposed: tests for each booking rule, then split book(). The legacy reports and plugins.py are duplicated or unused but have not changed since 2024, so they rank low. Full list of 3 findings in .code/audit/findings.md.'
+actions:
+- bash: 'git log --name-only --format=''%h %ad %s'' --since=12.months'
+- read: README.md
+- read: bookings.py
+- read: plugins.py
+- read: legacy/daily.py
+- read: legacy/weekly.py
+- write: .code/audit/findings.md
+  content: |
+    # Audit
+
+    1. bookings.py changed in 11 commits this year, one rule each, all inside book(), and has no tests. Proposed task:
+       tests for each rule, then refactor book() into one check per rule.
+    2. legacy/daily.py and legacy/weekly.py duplicate one report; unchanged since 2024-11, so low cost.
+    3. plugins.py is a hook registry nothing uses; unchanged since 2024-11. Proposed task: remove it.

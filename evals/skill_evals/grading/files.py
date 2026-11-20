@@ -185,6 +185,12 @@ async def notes_only(spec: dict[str, Any], repo: Checkout) -> bool:
     return all(MARKDOWN_NOTE.search(path) for path in await repo.all_changed())
 
 
+async def note_written(spec: dict[str, Any], repo: Checkout) -> bool:
+    """The agent wrote at least one new Markdown note, such as a report; notes Git ignores count."""
+    planted = await repo.planted()
+    return any(MARKDOWN_NOTE.search(path) and path not in planted for path in await repo.all_changed())
+
+
 async def diff_max_lines(spec: dict[str, Any], repo: Checkout) -> bool:
     """Added plus removed lines in planted files are within `max`; new files do not count, binary changes fail."""
     planted = await repo.planted()
@@ -256,6 +262,7 @@ GRADERS: dict[str, Callable[[dict[str, Any], Checkout], Awaitable[bool]]] = {
     "file_not_contains": file_not_contains,
     "planted_unchanged": planted_unchanged,
     "notes_only": notes_only,
+    "note_written": note_written,
     "no_commit": no_commit,
     "diff_max_lines": diff_max_lines,
     "command_passes": command_passes,

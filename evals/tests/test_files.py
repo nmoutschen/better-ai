@@ -66,6 +66,18 @@ async def test_notes_only(plant: Plant) -> None:
     assert not await files.notes_only({}, repo)
 
 
+async def test_note_written(plant: Plant) -> None:
+    """A new Markdown note passes, also in a folder Git ignores; an edited planted note or a code file does not."""
+    repo = await plant({"a.py": "x = 1\n", "README.md": "Shop\n"})
+    await repo.sandbox_env.write_file("README.md", "Shop, audited\n")
+    await repo.sandbox_env.write_file("b.py", "y = 2\n")
+    assert not await files.note_written({}, repo)
+    await repo.sandbox_env.exec(["sh", "-c", "echo .code/ >> .git/info/exclude"])
+    await repo.sandbox_env.write_file(".code/audit/findings.md", "1. VAT\n")
+    repo = files.Checkout(repo.sandbox_env, repo.start, repo.workdir)
+    assert await files.note_written({}, repo)
+
+
 async def test_diff_max_lines(plant: Plant) -> None:
     """Counts added plus removed lines in planted files only."""
     repo = await plant({"a.py": "x = 1\n"})

@@ -1,6 +1,6 @@
 # `/code-better`
 
-Writes, checks and reviews code so it builds what you need, and leaves you able to understand and maintain it.
+Writes, checks, reviews and audits code so it builds what you need, and leaves you able to understand and maintain it.
 
 ```markdown
 ### Late orders first
@@ -18,6 +18,7 @@ Writes, checks and reviews code so it builds what you need, and leaves you able 
 - **Keeps the change small.** It changes only what the task needs, and never weakens a test to make it pass.
 - **Checks the code against the scenarios**, with a limit on fix attempts, and has a separate reviewer read the diff.
 - **Reports its decisions, assumptions and checks**, so you can maintain the code.
+- **Audits existing code** for technical debt and what to improve, ranked by what each finding costs you, without changing the code.
 
 For example:
 
@@ -33,6 +34,7 @@ For example:
 - You want the agent to write or change code.
 - You want the agent to check coding work already done in the conversation.
 - You want a review of someone else's code, such as a diff or a pull request.
+- You want to know what to improve in existing code, such as its technical debt.
 
 Use a neighbouring skill instead when:
 
@@ -48,6 +50,7 @@ Use a neighbouring skill instead when:
 - `/code-better <task>` does that task.
 - `/code-better` with no argument checks the coding work in the current conversation, then continues or corrects it.
 - To check someone else's code, give it the diff or the pull request.
+- `/code-better audit <path>` audits that part of the code, or the whole repository without a path.
 
 Example: `/code-better add a --dry-run flag to the deploy script`
 
@@ -86,6 +89,9 @@ Running it does not mean code gets written right away. It can stop at requiremen
   - what it listed instead of changing
 
   The report keeps three things apart: meeting the requirements, passing the checks, and your acceptance.
+- For an audit, no code change. Instead:
+  - every finding, with its evidence and a proposed task, in `.code/audit/findings.md`, for an agent to pick up later
+  - a short report with what costs you now and the five to ten findings of highest value
 
 </details>
 
@@ -95,7 +101,7 @@ Running it does not mean code gets written right away. It can stop at requiremen
 It calls:
 
 - [`/ask-better`](ask-better.md) when it checks requirements with you.
-- [`/review-better`](review-better.md) to run the review, with `/code-better`'s list of what to look for in code.
+- [`/review-better`](review-better.md) to run the review and the audit, with `/code-better`'s list of what to look for in code.
 - [`/decide-better`](decide-better.md) when it shows you design decisions before building.
 - [`/write-better`](write-better.md) for the final report and for explanations.
 - [`/do-better`](do-better.md) when you reject the result.

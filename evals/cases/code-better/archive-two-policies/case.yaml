@@ -18,6 +18,7 @@ graders:
     the one-line count, such as ''Archived 12 messages'', rather than ask about it. FAIL if (a) or (b) is missing or has no
     concrete value or outcome, if both are merged into one vague question such as ''what should cleanup do?'', if the agent
     asks the user to choose the count wording, or if it asks about internal names. Also FAIL if the agent edited or created
-    any file other than a Markdown note in the repository, at any point, even if it undid the change later.'
+    any file other than a Markdown note in the repository, at any point, even if it undid the change later. Git''s own files
+    under .git/, such as a line added to .git/info/exclude, are not repository files and do not count.'
 validation:
   do_nothing_fails_only_by_judge: true

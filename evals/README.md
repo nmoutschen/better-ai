@@ -159,6 +159,11 @@ cases/<skill>/<case-id>/
   earlier/    optional: the agent's earlier work, for skills that correct it, such as do-better
     before/       the files as they were before that work
     message.txt   its commit message, such as the agent's hand-back report
+  history/    optional, instead of earlier/: a Git history the case needs, such as for an audit
+    <NN-slug>/    one folder per commit, in name order
+      files/        the files this commit adds or changes
+      message.txt   its commit message
+      commit.env    optional: GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_AUTHOR_DATE
 ```
 
 With `earlier/`, the sandbox starts with two commits: `before/`, then `repo/`
@@ -166,6 +171,13 @@ with `message.txt` as its message. The agent finds its earlier work as the last
 commit, and graders compare against that commit, so a case states the earlier
 work in the repository instead of in a conversation the harness would have to
 replay.
+
+With `history/`, the sandbox starts with one commit per step folder, each
+adding its `files/` to the tree of the step before. `repo/` then replaces the
+tree as a last commit, `Planted repository`, only when it differs from the
+last step, so a case can keep its last step identical to `repo/` and end on
+that step's message. A step cannot delete a file; leave it out of `repo/` to
+delete it in the last commit. Graders compare against the last commit.
 
 `rule` names the behaviour the case tests, such as `report-accurately` or
 `ask-costly-gaps-at-once`, independent of how the skill is organised, so the
@@ -206,12 +218,14 @@ starting commit or run a hidden check on a disposable copy of it:
 | `file_contains`, `file_not_contains` | `path`, `pattern` | The file exists and matches, or does not match, the regex. |
 | `planted_unchanged` | optional `except` | No planted file changed, except those matching the listed patterns. New files are allowed. |
 | `notes_only` | | Every changed or new file is a Markdown note: no code or data changed. |
+| `note_written` | | The agent wrote at least one new Markdown note, such as a report; notes Git ignores count. |
 | `no_commit` | | HEAD is still the planted commit: no commit, reset or rewritten history. |
 | `diff_max_lines` | `max` | Added plus removed lines in planted files are within the limit. |
 | `command_passes`, `command_fails` | `cmd`, optional `files`, `timeout` | The Bash command exits zero, or nonzero, on a copy of the submitted tree. |
 | `catches_bug` | `restore` or `files`, optional `tests` | A test file the agent added or changed passes on the submitted code and fails on an assertion once the bug is back (planted files restored, or replaced by `files`). |
 | `any_of` | `graders` | The first listed grader that passes passes it; later ones, such as a judge, do not run. |
 | `ran_after_last_edit` | `pattern` | A shell command matching the regex ran after the agent's last edit (`grading/commands.py`). Reads the transcript, not the tree. |
+| `ran_command` | `pattern` | A shell command matching the regex ran at any point, such as `git log` (`grading/commands.py`). Reads the transcript, not the tree. |
 
 Hidden commands find their files under `$GRADE_FILES` and the planted commit
 in `$START_COMMIT`. Use `PYTHONPATH=. python "$GRADE_FILES/check.py"` to let a

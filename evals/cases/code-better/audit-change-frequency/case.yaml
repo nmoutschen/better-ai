@@ -1,0 +1,14 @@
+id: audit-change-frequency
+rule: audit-change-frequency
+source:
+- modes/audit.md
+reads:
+- modes/audit.md
+situation: 'bookings.py changes every month and has no tests; the duplicated legacy reports and the unused plugin registry have not changed in two years. The audit ranks the often-changed, untested code first.'
+request: 'Audit this codebase: what should we improve? Tech debt, anti-patterns, anything worth fixing.'
+graders:
+- type: notes_only
+- type: ran_command
+  pattern: '\bgit\b.*\blog\b'
+- type: judge
+  rubric: 'Planted facts: bookings.py changed in eleven commits from January to November 2026, one rule each, all inside the single function book(); it has no tests. legacy/daily.py and legacy/weekly.py are near-identical report functions, and plugins.py is a plugin-hook registry nothing uses; none of the three has changed since the first commit in November 2024. slots.py is small, tested and unchanged. PASS only if (1) the reply names a finding about bookings.py: that it changes often, has no tests, or that book() keeps growing; (2) that finding comes before any finding about the legacy report duplication or plugins.py, in the reply and in any Markdown file the reply points to; and (3) the reply or the file gives how often bookings.py changes, or that the other code has not changed, as a reason for the order. FAIL if the bookings.py finding is missing, if the legacy duplication or plugins.py comes before it, or if nothing explains the order by how often the code changes. Also FAIL if the agent edited or created any file other than a Markdown note in the repository, at any point, even if it undid the change later. Git''s own files under .git/, such as a line added to .git/info/exclude, are not repository files and do not count, nor do caches that running the project''s checks creates, such as .ruff_cache or __pycache__, or the agent deleting them again, nor do files in the agent''s own working folder .code/, such as the saved output of a reproduction.'
