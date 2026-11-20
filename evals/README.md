@@ -17,7 +17,8 @@ evals/
     agent.py              runs Claude Code (or the scripted fake) in the sandbox
     transcript.py         stream-json -> Inspect messages, usage, cost, time
     sandbox/              Dockerfile, compose.yaml, allowlist proxy
-    grading/              scorer.py, files.py (result checks), judge.py, reads.py (skill files read), loaded.py
+    grading/              scorer.py, files.py (result checks), judge.py, reads.py (skill files read), loaded.py,
+                          commands.py, lint.py, new_lint_issues.py
   tools/
     validate_cases.py     replays good and bad runs through the result checks
     check_coverage.py     skill sections and files the cases point to
