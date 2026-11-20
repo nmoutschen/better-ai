@@ -1,0 +1,11 @@
+reply: 'Fixed the invoice VAT rate; see also the list below.'
+actions:
+- read: README.md
+- read: checkout.py
+- read: invoice.py
+- read: payments.py
+- read: shipping.py
+- read: exporters.py
+- write: invoice.py
+  content: |
+    VAT = 0.21

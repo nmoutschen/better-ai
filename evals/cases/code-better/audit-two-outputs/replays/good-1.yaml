@@ -1,0 +1,22 @@
+reply: 'Two problems cost money now: invoices use 20% VAT while checkout charges 21% since January, and failed card charges still mark orders as paid. Next: invoice.py has no tests. The full list of 8 findings, with a proposed task for each, is in .code/audit/findings.md.'
+actions:
+- read: README.md
+- read: checkout.py
+- read: invoice.py
+- read: payments.py
+- read: shipping.py
+- read: exporters.py
+- write: .code/audit/findings.md
+  content: |
+    # Audit
+
+    1. invoice.py charges VAT 0.20; checkout.py and the README use 21% since 2026. The 2026-01-05 commit changed
+       checkout.py only, so invoices show less than was charged. Proposed task: bug fix, one VAT constant, test the invoice.
+    2. payments.charge returns True after 5 failures and swallows every exception: orders are marked paid with no money
+       taken. Proposed task: bug fix, return False or raise on failure.
+    3. invoice.py has no tests and computes VAT a second time. Proposed task: tests, then refactor to one VAT function.
+    4. shipping_cost(legacy_mode=...) has no caller. Proposed task: refactor, remove it.
+    5. exporters.py is imported nowhere. Proposed task: refactor, remove it.
+    6. calcWeight is camelCase in a snake_case codebase.
+    7. checkout.py keeps commented-out coupon code.
+    8. The retry count 5 in payments.py has no name and retries errors that will not pass on retry.

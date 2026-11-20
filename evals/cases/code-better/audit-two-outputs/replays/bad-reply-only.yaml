@@ -1,0 +1,8 @@
+reply: 'Two problems cost money now: invoices use 20% VAT while checkout charges 21% since January, and failed card charges still mark orders as paid. Next: invoice.py has no tests.'
+actions:
+- read: README.md
+- read: checkout.py
+- read: invoice.py
+- read: payments.py
+- read: shipping.py
+- read: exporters.py

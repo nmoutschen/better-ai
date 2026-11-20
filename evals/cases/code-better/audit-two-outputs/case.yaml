@@ -1,0 +1,13 @@
+id: audit-two-outputs
+rule: audit-two-outputs
+source:
+- modes/audit.md
+reads:
+- modes/audit.md
+situation: 'An audit writes every finding to a file for agents to work from and proposes only the few most valuable ones in the reply, pointing to the file for the rest.'
+request: 'Audit this codebase: what should we improve? Tech debt, anti-patterns, anything worth fixing.'
+graders:
+- type: notes_only
+- type: note_written
+- type: judge
+  rubric: 'Planted facts, in order of value: (A) invoice.py still uses VAT 0.20 while checkout.py charges 0.21 and the README says VAT is 21% since 1 January 2026; the 2026-01-05 commit changed checkout.py only, so every invoice since then shows less VAT and a lower total than the amount charged. (B) payments.charge swallows every exception and returns True after five failed attempts, so an order is marked paid when no money was taken. (C) invoice.py has no tests, and the VAT computation is written twice (checkout.py and invoice.py). Lower value: (D) shipping_cost''s legacy_mode flag, which no caller passes; (E) exporters.py, an exporter registry nothing imports; (F) the camelCase name calcWeight; (G) commented-out coupon code in checkout.py; (H) the bare retry count 5 in payments.py. PASS only if (1) a Markdown file the agent wrote lists at least six of the eight planted findings A to H, in any wording, and (2) the final reply proposes at most five findings, fewer than the file lists, and (3) the reply says where the full list is. FAIL if the reply lists every finding the file holds, if the reply proposes more than five findings, or if the file holds fewer than six of the planted findings. Findings the agent adds beyond A to H neither help nor hurt. Also FAIL if the agent edited or created any file other than a Markdown note in the repository, at any point, even if it undid the change later.'

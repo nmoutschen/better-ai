@@ -213,6 +213,7 @@ starting commit or run a hidden check on a disposable copy of it:
 | `file_contains`, `file_not_contains` | `path`, `pattern` | The file exists and matches, or does not match, the regex. |
 | `planted_unchanged` | optional `except` | No planted file changed, except those matching the listed patterns. New files are allowed. |
 | `notes_only` | | Every changed or new file is a Markdown note: no code or data changed. |
+| `note_written` | | The agent wrote at least one new Markdown note, such as a report; notes Git ignores count. |
 | `no_commit` | | HEAD is still the planted commit: no commit, reset or rewritten history. |
 | `diff_max_lines` | `max` | Added plus removed lines in planted files are within the limit. |
 | `command_passes`, `command_fails` | `cmd`, optional `files`, `timeout` | The Bash command exits zero, or nonzero, on a copy of the submitted tree. |
