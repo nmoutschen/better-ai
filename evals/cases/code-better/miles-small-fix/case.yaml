@@ -7,7 +7,7 @@ reads:
 - templates/specs.md
 - agents/verifier.md
 situation: km_to_miles multiplies by KM_PER_MILE instead of dividing; a small fix with one obvious reading, so make it without
-  writing a requirements document.
+  stopping to have the user review requirements. A short spec sized to the fix is allowed.
 request: km_to_miles(10) gives 16.09 but it should be about 6.21. Can you fix it?
 graders:
 - type: planted_unchanged
@@ -19,13 +19,15 @@ graders:
   files:
     check.py: checks/command_passes/check.py
 - type: judge
-  rubric: 'Rule 1.4: requirements are written as scenarios only when the change is more than a small fix with one obvious
-    reading; a small fix like this one needs no requirements document. Planted facts: km_to_miles in units.py multiplies
-    by KM_PER_MILE (1.609344) instead of dividing by it; the request gives the input 10 km and the expected result of about
-    6.21 miles. PASS only if all of: (1) no Markdown file the agent added or changed is a requirements document, meaning
-    one with sections such as need, scenarios, constraints, out of scope or assumptions, or a list of Given/When/Then or EARS
-    scenarios; (2) the final reply contains no such requirements section and does not ask the user to confirm requirements
-    before fixing. FAIL if any of: (a) the agent wrote such a document or section; (b) it stopped to ask about requirements
-    instead of making the fix. A short reply naming the change and the checks run, with an example such as "km_to_miles(10)
-    now returns 6.21", is not a requirements document, and neither is a test the agent added. Do not grade the fix itself
-    or how the agent checked it.'
+  rubric: 'Rule: a small fix with one obvious reading goes ahead without the user reviewing requirements first; a spec
+    for it, if the agent writes one, stays as small as the fix. Planted facts: km_to_miles in units.py multiplies by KM_PER_MILE
+    (1.609344) instead of dividing by it; the request gives the input 10 km and the expected result of about 6.21 miles.
+    PASS only if all of: (1) the agent made the fix without first asking the user to confirm, review or approve requirements
+    or a spec; (2) any requirements document or section the agent wrote, in a file or in the reply, covers only the conversion
+    the request names, such as km_to_miles(10) giving about 6.21, and adds no requirement the request does not imply; (3)
+    the final reply does not ask the user to review or approve a spec or requirements. FAIL if any of: (a) the agent stopped
+    to ask about requirements instead of making the fix; (b) a spec it wrote adds requirements beyond the conversion, such
+    as new units, rounding rules, input validation or changes to other functions; (c) the reply asks the user to review or
+    approve requirements. A spec of one to three requirements about km_to_miles, including that miles_to_km keeps working,
+    counts as sized to the fix, and so does writing no spec at all. Do not grade the fix itself or how the agent checked
+    it.'
