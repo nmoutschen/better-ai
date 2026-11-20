@@ -6,6 +6,8 @@ const byId = id => document.getElementById(id);
 const text = value => String(value).replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[char]));
+const inlineCode = value => value.split(/(`[^`]+`)/).map((part, index) =>
+  index % 2 ? '<code>' + text(part.slice(1, -1)) + '</code>' : text(part)).join('');
 const chip = (value, kind = '') => '<span class="chip ' + kind + '">' + text(value) + '</span>';
 
 function table(headers, rows) {
@@ -27,7 +29,7 @@ const changeButton = '<button class="btn btn--quiet btn--sm" type="button" data-
 
 function sourceLink(source) {
   if (source.type === 'guessed') return chip('guessed', 'guess');
-  if (source.type === 'user') return 'You, on this page<br>' + text(source.at);
+  if (source.type === 'user') return 'You, on this page<br>' + text(source.at.slice(11, 16));
   const query = new URLSearchParams({file: source.type === 'request' ? 'request.md' : source.file});
   return '<a class="src" href="/source?' + text(query) + '" target="_blank" rel="noopener">' +
     (source.sentence ? text(source.sentence) : text(source.file) +
@@ -54,10 +56,10 @@ function decisionRecords(decisions) {
     return '<article class="dec" id="dec-' + text(decision.id) + '" data-record="' + text(decision.id) + '">' +
       '<div class="dh"><span>' + text(decision.id) + '</span><h3>' + text(decision.title) + '</h3>' + changeButton + '</div>' +
       editor('What should change in ' + decision.id) + '<p class="drv">Driven by ' + drivers + '</p>' +
-      '<div class="chosen"><span class="lbl">Chosen</span><p>' + text(decision.chosen) + '</p></div>' +
+      '<div class="chosen"><span class="lbl">Chosen</span><p>' + inlineCode(decision.chosen) + '</p></div>' +
       '<details class="rej"><summary>Rejected alternatives (' + decision.rejected.length +
       ')</summary><ul class="alts">' + alternatives + '</ul></details>' +
-      '<p class="drawback"><span class="lbl">Main drawback</span> ' + text(decision.drawback) + '</p></article>';
+      '<p class="drawback"><span class="lbl">Main drawback</span> ' + inlineCode(decision.drawback) + '</p></article>';
   }).join('');
 }
 
@@ -88,11 +90,16 @@ function perspectiveTables(perspectives, findings, parts, reviewed) {
         const first = refs[0];
         const icon = first.icon ? '<svg viewBox="-1 -1 16 16" width="13" height="13" aria-hidden="true">' +
           first.icon + '</svg>' : '<span aria-hidden="true">→</span>';
+        const edge = refs.find(ref => ref.kind === 'edge');
+        const step = refs.find(ref => ref.kind === 'step');
+        const label = refs.length === 2 && edge && step ?
+          edge.route + ': ' + step.description : refs.map(ref => ref.label).join(' · ');
         return '<a class="boxref ' + first.kind + '" href="#panel-' + first.view + '" data-parts="' +
           text(JSON.stringify(group)) + '" data-perspective="' + text(p.name) + '" data-badge="' + text(f.id) + '">' +
-          icon + '<span>' + refs.map(ref => text(ref.label)).join(' · ') + '</span></a>';
+          icon + '<span>' + text(label) + '</span></a>';
       }).join('<br>');
-      return row(['<strong>' + text(f.id) + '</strong>', links, text(f.text), text(f.handled_by ?? 'Open')]);
+      return row(['<strong>' + text(f.id) + '</strong>', links, text(f.text) +
+        (f.confirmed ? '' : ' ' + chip('Unconfirmed', 'guess')), text(f.handled_by ?? 'Open')]);
     });
     return '<h3>' + text(p.name) + '</h3>' + (rows.length ? table(headers, rows) : '<p class="muted">No findings.</p>');
   }).join('');
@@ -109,7 +116,7 @@ function start(data) {
   const {perspectives} = data;
   const review = data.reviews.at(-1);
   const applicable = perspectives.filter(p => p.applies);
-  const reviewNames = review ? review.perspectives : applicable.map(p => p.name);
+  const reviewNames = data.rerun;
   const items = ['comment', 'note', 'approve', 'confirm'];
   const waiting = (entry, states) => states[entry.e.id] === 'asked' ||
     (entry.kind === 'reply' && !entry.e.to && entry.e.id && !entry.replies.some(reply => reply.action === 'note'));
@@ -152,6 +159,7 @@ function start(data) {
     row([text(rule.id), text(rule.requirement), text(rule.source), text(rule.checked_by)]))));
 
   for (const [key, part] of Object.entries(data.parts)) {
+    if (key !== part.key) continue;
     for (const id of part.ids) {
       const target = byId(id);
       if (!target) continue;
@@ -260,7 +268,13 @@ function start(data) {
     li.className = 'msg me';
     const head = document.createElement('div');
     head.className = 'head';
-    head.textContent = 'You · ' + (entry.e.at || '').slice(11, 16);
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = 'You';
+    const when = document.createElement('span');
+    when.className = 'when';
+    when.textContent = (entry.e.at || '').slice(11, 16);
+    head.append(who, when);
     li.append(head, pageMarkdown(entry.e.text));
     return li;
   }
@@ -302,7 +316,7 @@ function start(data) {
         link.className = 'src';
         link.href = '#thread';
         link.dataset.confirmation = event.id;
-        link.append('You, on this page', document.createElement('br'), event.at);
+        link.append('You, on this page', document.createElement('br'), event.at.slice(11, 16));
         $('.req-source', record).replaceChildren(link);
         $('[data-confirm]', record).remove();
       }
@@ -419,17 +433,20 @@ function start(data) {
     reviewToggle.setAttribute('aria-expanded', String(open));
   }
   reviewToggle.addEventListener('click', () => {
-    const changes = review?.changed.length ? 'Changed parts: ' + review.changed.join(', ') + '. ' : '';
     const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
     const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
-    $('.review-summary').textContent = (review ? changes || 'No changed parts recorded. ' : stats) + scope;
+    const labels = data.since.map(key => data.parts[key].label);
+    const changed = 'Changed since the review: ' + labels.join(', ') + '.';
+    const rerun = reviewNames.length ? ' ' + reviewNames.join(', ') + (reviewNames.length === 1 ? ' runs' : ' run') + ' again.' : '';
+    $('.review-summary').textContent = review ?
+      (labels.length ? changed + rerun : 'Nothing changed since the review.') : stats + scope;
     toggleReview(reviewMenu.hidden);
   });
   runReview.addEventListener('click', () => {
     runReview.disabled = true;
     const label = review ? 'Review requested again' : 'Design approved';
     conversation.send('approve', {id: 'approval-' + Date.now().toString(36), again: !!review, perspectives: reviewNames,
-      changes: review?.changed || [], text: label + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')},
+      changes: data.since, text: label + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')},
     'Review request', () => { toggleReview(false); runReview.disabled = false; },
     () => { runReview.disabled = false; });
   });

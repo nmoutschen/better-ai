@@ -1,6 +1,7 @@
 """Check the live architecture page's folder format and agent commands."""
 
 import contextlib
+import hashlib
 import importlib.util
 import io
 import json
@@ -62,6 +63,85 @@ class Architect(unittest.TestCase):
         self.assertIn('data-p="Security"', view["flows"][0]["versions"]["after"])
         self.browser.assert_not_called()
 
+    def test_check_and_serve_accept_minimal_folder(self):
+        for name in architect.FILES:
+            if name.endswith(".jsonl"):
+                (self.folder / name).unlink()
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        for key in ("title", "summary", "scope", "accepted"):
+            design.pop(key)
+        path.write_text(json.dumps(design))
+        (self.folder / "request.md").write_text("# Design title\nFollow-up.")
+        self.assertIn("Valid change folder", self.command("check"))
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["title"], "Design title")
+        self.assertEqual(view["accepted"], [])
+        self.assertEqual(view["summary"], "")
+        self.assertEqual(view["scope"], "")
+        (self.folder / "request.md").write_text("")
+        self.assertEqual(architect.model(architect.read_folder(self.folder))["title"], self.folder.name)
+        with (
+            patch.object(architect.http.server, "ThreadingHTTPServer") as server,
+            patch.object(architect.page, "stop_like_ctrl_c"),
+        ):
+            server.return_value.__enter__.return_value.server_address = ("127.0.0.1", 12345)
+            self.command("serve", "--no-browser")
+
+    def test_review_fingerprints_and_reruns(self):
+        path = self.folder / "reviews.jsonl"
+        path.unlink()
+        design_path = self.folder / "design.json"
+        design = json.loads(design_path.read_text())
+        self.command("review", "--perspectives", "Security")
+        first = json.loads(path.read_text())
+        node = next(n for n in design["containers"]["nodes"] if n["id"] == "server")
+        self.assertEqual(
+            first["hashes"]["box:server"], hashlib.sha256(json.dumps(node, sort_keys=True).encode()).hexdigest()
+        )
+        self.assertEqual(set(first["changed"]), set(first["hashes"]))
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["since"], [])
+        self.assertEqual(view["rerun"], ["Observability"])
+        node["detail"] = "New details"
+        design_path.write_text(json.dumps(design))
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["since"], ["box:server"])
+        self.assertEqual(view["rerun"], ["Security", "Observability"])
+        self.command("review", "--perspectives", "Security", "Observability")
+        last = json.loads(path.read_text().splitlines()[-1])
+        self.assertEqual(last["changed"], ["box:server"])
+        self.assertEqual(set(last["hashes"]), set(first["hashes"]))
+        self.assertEqual(architect.model(architect.read_folder(self.folder))["rerun"], [])
+
+    def test_named_and_numbered_flow_references_resolve_to_one_part(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        design["flows"][0]["id"] = "Read"
+        path.write_text(json.dumps(design))
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["parts"]["step:Read/s6"], view["parts"]["step:flow1/s6"])
+        self.update("findings.jsonl", lambda rows: rows[0].update(parts=["step:Read/missing"]))
+        with self.assertRaisesRegex(
+            ValueError, r"use box:<id>, edge:<id>, step:<flow id>/<step id> \(flow ids: .*Read"
+        ):
+            architect.read_folder(self.folder)
+
+    def test_check_collects_errors_across_files(self):
+        (self.folder / "request.md").unlink()
+        (self.folder / "design.json").write_text("{")
+        self.update("findings.jsonl", lambda rows: rows[0].update(confirmed="false"))
+        self.update("spec.jsonl", lambda rows: rows[1].update(checked_by=[]))
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()) as output:
+            self.command("check")
+        for error in (
+            "request.md:1:",
+            "design.json:1:",
+            "findings.jsonl:1: confirmed: expected bool",
+            "spec.jsonl:2: checked_by: expected str",
+        ):
+            self.assertIn(error, output.getvalue())
+
     def test_reader_loads_every_contract_file(self):
         data = architect.read_folder(self.folder)
         for name in architect.FILES:
@@ -97,6 +177,18 @@ class Architect(unittest.TestCase):
         view = architect.model(architect.read_folder(self.folder))
         self.assertEqual(view["reviews"], [])
         self.assertNotIn('class="mark"', view["containers"]["after"])
+        html = self.render_javascript(view, "controls(data.perspectives, data.reviews.at(-1))")
+        self.assertIn('aria-label="State"', html)
+        self.assertNotIn('aria-label="Findings"', html)
+
+    def test_perspective_table_marks_unconfirmed_findings(self):
+        view = architect.model(architect.read_folder(self.folder))
+        html = self.render_javascript(view, "perspectiveTables(data.perspectives, data.findings, data.parts, true)")
+        self.assertEqual(html.count('<span class="chip guess">Unconfirmed</span>'), 1)
+        self.assertIn("Dashboard page to dashboard.py: POST /rpc (Flows, step 2c)", html)
+        self.assertIn("Coordinator agent to dashboard.py: wait ends with the answer (Flows, step 2d)", html)
+
+    def render_javascript(self, view, expression):
         result = subprocess.run(
             [
                 "node",
@@ -109,18 +201,17 @@ class Architect(unittest.TestCase):
                 const context = {data, fetch: () => new Promise(() => {}),
                   document: {querySelector: () => ({})}};
                 vm.runInNewContext(source, context);
-                process.stdout.write(vm.runInNewContext(
-                  'controls(data.perspectives, data.reviews.at(-1))', context));
+                process.stdout.write(vm.runInNewContext(process.argv[2], context));
                 """,
                 str(SCRIPTS / "architect.js"),
+                expression,
             ],
             input=json.dumps(view),
             text=True,
             capture_output=True,
             check=True,
         )
-        self.assertIn('aria-label="State"', result.stdout)
-        self.assertNotIn('aria-label="Findings"', result.stdout)
+        return result.stdout
 
     def test_editing_a_requirement_changes_its_confirmation_fingerprint(self):
         def wording():
@@ -141,6 +232,8 @@ class Architect(unittest.TestCase):
             ("requirements.jsonl", {"kind": "Responsiveness"}, "unknown requirement kind"),
             ("perspectives.jsonl", {"applies": "true"}, "applies: expected bool"),
             ("findings.jsonl", {"handled_by": 42}, "handled_by: expected string or null"),
+            ("findings.jsonl", {"confirmed": 1}, "confirmed: expected bool"),
+            ("reviews.jsonl", {"hashes": {"box:server": "wrong"}}, "hashes: invalid"),
             ("reviews.jsonl", {"changed": ["box:missing"]}, "unknown changed part 'box:missing'"),
             ("decisions.jsonl", {"drivers": ["missing"]}, "unknown driver 'missing'"),
             ("spec.jsonl", {"checked_by": []}, "checked_by: expected str"),
@@ -157,7 +250,7 @@ class Architect(unittest.TestCase):
 
     def test_reader_rejects_unknown_finding_part(self):
         self.update("findings.jsonl", lambda rows: rows[0]["parts"].append("edge:e3+step:flow1/missing"))
-        with self.assertRaisesRegex(ValueError, "findings.jsonl:1: unknown diagram part 'step:flow1/missing'"):
+        with self.assertRaisesRegex(ValueError, "findings.jsonl:1: unknown part 'step:flow1/missing'"):
             architect.read_folder(self.folder)
 
     def test_reader_rejects_source_outside_change(self):
@@ -179,6 +272,10 @@ class Architect(unittest.TestCase):
         self.assertEqual(item["thread"][0]["text"], "Checking the server.")
         self.command("status", "done", "A1")
         self.assertNotIn('"id": "A1"', self.command("pending"))
+
+    def test_serve_refuses_to_write_into_the_example(self):
+        with self.assertRaisesRegex(ValueError, "use a copy"):
+            architect.serve(SCRIPTS / "example", 0, False)
 
     def test_serve_uses_browser_only_when_requested(self):
         for open_browser in (False, True):

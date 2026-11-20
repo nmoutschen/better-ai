@@ -11,7 +11,7 @@ FOLLOW these steps in order. The general rules of SKILL.md and the rules of this
 
 ### Change folder
 
-KEEP the files the page reads in the change folder under the Files rule. WRITE each `.jsonl` file with one JSON record per line. RUN scripts from this skill's directory, with the full path of the change folder as `<folder>`. AFTER each write to the change folder, RUN `python3 scripts/architect.py check <folder>` and FIX what it reports.
+KEEP the files the page reads in the change folder under the Files rule. READ and FOLLOW [../scripts/example/README.md](../scripts/example/README.md) for the fields of each file. RUN scripts from this skill's directory, with the full path of the change folder as `<folder>`. FROM step 2 on, AFTER each write to the change folder, RUN `python3 scripts/architect.py check <folder>` and FIX what it reports.
 
 ### Live page conversation
 
@@ -22,9 +22,9 @@ KEEP the files the page reads in the change folder under the Files rule. WRITE e
 
 REPLY in the page, in one or two short sentences. MARK each item `seen` when it arrives and `asked` when you need an answer. KEEP `working` on the items you are changing now, usually one. WHEN an item needs only an answer, MARK it `done` once answered. WHEN the user's answer leads to a change, MARK the item `done` once the change is in the page, and PUT your next question in a new message. MARK it `accepted` when the user accepts it in words. TREAT a reply to a finished item as work to do.
 
-### Diagram kinds
+### Box kinds
 
-RUN `python3 scripts/diagram.py register --out <file>.html` to see the available diagram kinds. USE only kinds from that register.
+RUN `python3 scripts/diagram.py register --out <file>.html` to see the available box kinds. USE only kinds from that register.
 
 ## 1. Read the request and the system
 
@@ -32,26 +32,26 @@ READ the user's request, the relevant repo instructions and docs, existing desig
 
 ## 2. Draw the system as it is
 
-DRAW the current containers and flows in `design.json` in the change folder, from the code or existing design docs. USE the design JSON accepted by `scripts/diagram.py`. CHECK each box, relationship and flow step against the code. MARK what you could not verify.
+DRAW the current containers and flows in `design.json` in the change folder, from the code or existing design docs. CHECK each box, relationship and flow step against the code. MARK what you could not verify.
 
 RUN `python3 scripts/diagram.py check <folder>/design.json` and `python3 scripts/diagram.py render <folder>/design.json --out <folder>/diagrams`.
 
 RUN `python3 scripts/architect.py serve <folder>` to start the page and GIVE the user its address.
 
-SHOW Before and ASK the user to confirm or correct it in the page. IF the change introduces a system or flow, SHOW its absence in Before. WAIT for the user’s confirmation or correction and APPLY any corrections.
+ASK the user to confirm or correct Before in the page. IF the change introduces a system or flow, SHOW its absence in Before. WAIT for the user's confirmation or correction and APPLY any corrections.
 
 ## 3. Agree the requirements
 
-LIST functional requirements, quality attributes and constraints. WRITE each as one line of `requirements.jsonl` with `id`, `kind` (`functional`, `quality` or `constraint`), `text` and `source`. SET `source` to where it comes from:
+LIST functional requirements, quality attributes and constraints, and WRITE each as a record of `requirements.jsonl`. SET its source to where it comes from:
 
-| Source | `source` |
+| Where it comes from | Source |
 |---|---|
-| A sentence of the request | `{"type": "request", "sentence": "<the sentence, word for word>"}` |
-| Code | `{"type": "file", "file": "<path>", "symbol": "<symbol>"}` |
-| Your guess | `{"type": "guessed"}` |
-| The user's confirmation | `{"type": "user", "at": "<time>"}` |
+| A sentence of the request | `request`, with the sentence word for word |
+| Code | `file`, with `<path from the repo root>` and the symbol |
+| The user, in words or in the page | `user`, with the time |
+| Nothing in the request, the code or the user's words | `guessed` |
 
-DRAFT quality attributes from the request and current system as observable scenarios. NAME the trigger, conditions and observable response, with a measure where it matters. HAVE the user confirm or correct them in the page. KEEP Change available on every requirement.
+DRAFT quality attributes from the request and current system as observable scenarios. NAME the trigger, conditions and observable response, with a measure where it matters. HAVE the user confirm or correct them in the page.
 
 ## 4. Design in attribute-driven iterations
 
@@ -71,27 +71,29 @@ PICK the perspectives that apply, from what the change touches and the applicabl
 | Data and privacy | Check what data moves, who can access it and what persists. |
 | Repo standards | Check each applicable repo standard where the change touches it. |
 
-WRITE each perspective as one line of `perspectives.jsonl` with `name`, `applies` (`true` or `false`), `why` and `from` (`built in` for a perspective of the table, or the path of the repo standard). KEEP unresolved questions in the design and conversation.
+WRITE every perspective of the table and every applicable repo standard as a record of `perspectives.jsonl`, with whether it applies and why. KEEP unresolved questions in the design and conversation.
 
 ## 5. Debate and iterate in the page
 
-KEEP the page served. SHOW Overview, Requirements, Containers, Flows, Perspectives, Decision records and Spec. OPEN each tab directly on its content. DO NOT add an agent-written line explaining what the section is. SHOW all flows together. USE the same Before or After setting in Containers and Flows. INVITE comments on boxes, arrows and flow steps. SHOW the options and recommendation for decisions under discussion.
+KEEP the page served. INVITE comments on boxes, arrows and flow steps. GIVE the options and your recommendation for each decision under discussion in the page conversation.
 
-UPDATE the files and rendered views as the user corrects the design. WHEN the design is ready for review, ASK the user to choose Approve….
+UPDATE the files and rendered views as the user corrects the design. WHEN the user accepts a section in words or in the page, ADD its key to `accepted` in `design.json`. WHEN the design is ready for review, ASK the user to choose Approve….
 
 ## 6. Review the approved design
 
 WHEN the user chooses Approve…, READ and FOLLOW [../agents/perspective-reviewer.md](../agents/perspective-reviewer.md). FILL IN its inputs and START one fresh reviewer per applicable perspective on the approved design, with that perspective's checks from step 4.
 
-WAIT for every report. HOLD changes and user replies about the reviewed design while the reviewers run. USE `/review-better` if available to confirm each finding. OTHERWISE, MARK each finding unconfirmed. WRITE each finding as one line of `findings.jsonl` with `id`, `perspective`, `parts`, `text` and `handled_by`. NAME each part in `parts` as `box:<id>`, `edge:<id>` or `step:<flow>/<id>`, and JOIN the views of one exchange with `+`, such as `edge:<id>+step:<flow>/<id>`. SET `handled_by` to the change or decision that addresses the finding, or `null` while it is open. WRITE one line of `reviews.jsonl` for the run, with `at` (the time), `perspectives` (those run) and `changed` (the parts changed since the previous run, empty for the first).
+WAIT for every report. HOLD changes and user replies about the reviewed design while the reviewers run. THEN RUN `python3 scripts/architect.py review <folder> --perspectives <name>...` with the perspectives run.
 
-DEBATE findings in the page and UPDATE the design where needed. SET `handled_by` on findings the changes address. WHEN the user chooses Review again…, SHOW what changed since the review and START fresh reviewers only for the perspectives those changes touch. WAIT and handle their findings and run record the same way. KEEP unresolved findings visible.
+USE `/review-better` if available to confirm each finding. WRITE each finding as a record of `findings.jsonl`, with `confirmed` true when `/review-better` confirmed it and false otherwise. NAME each part it affects as `box:<id>`, `edge:<id>` or `step:<flow id>/<step id>`, where `<flow id>` is the flow's `id`, or `flow<N>` for the Nth flow. JOIN the views of one exchange with `+`, such as `edge:<id>+step:<flow id>/<step id>`. SET `handled_by` to the change or decision that addresses the finding, or `null` while it is open.
+
+DEBATE findings in the page and UPDATE the design where needed. SET `handled_by` on findings the changes address. WHEN the user chooses Review again…, START fresh reviewers for the perspectives the page lists, and HANDLE their reports as above.
 
 ## 7. Record decisions and extract the spec
 
-WHEN the approved design and its review are settled, WRITE each decision of `design.md` worth recording as one line of `decisions.jsonl` with `id`, `title`, `drivers` (requirement IDs), `chosen`, `rejected` (a list of `{"option": ..., "why": ...}`) and `drawback` (the main drawback). READ and FOLLOW [../templates/decision.md](../templates/decision.md), and WRITE each of these decisions as `<id>.md` in the decision record location.
+WHEN the approved design and its review are settled, WRITE each decision of `design.md` worth recording as a record of `decisions.jsonl`. READ and FOLLOW [../templates/decision.md](../templates/decision.md), and WRITE each of these decisions as `<id>.md` in the decision record location.
 
-READ and FOLLOW code-better's spec template, [../../code-better/templates/specs.md](../../code-better/templates/specs.md) (`skills/code-better/templates/specs.md` in this repo). EXTRACT every MUST and MUST NOT stated or implied by the design and decisions as one verifiable EARS statement per rule. WRITE each as one line of `spec.jsonl` with `id`, `requirement` (the EARS statement), `source` (the design section, decision ID or request sentence it comes from) and `checked_by` (how it can be checked). WRITE the same spec as `specs.md` in the spec location, or in the repo's spec format when it has one.
+READ and FOLLOW code-better's spec template, [../../code-better/templates/specs.md](../../code-better/templates/specs.md) (`skills/code-better/templates/specs.md` in this repo). EXTRACT every MUST and MUST NOT stated or implied by the design and decisions as one verifiable EARS statement per rule. WRITE each as a record of `spec.jsonl`, with the design section, decision ID or request sentence it comes from as its source. WRITE the same spec as `specs.md` in the spec location, or in the repo's spec format when it has one.
 
 READ and FOLLOW [../agents/spec-checker.md](../agents/spec-checker.md). FILL IN its inputs and START a separate checker. WAIT for its report. HOLD spec edits and hand-back while it runs. FIX confirmed omissions and unsupported links, and have the checker verify the revised mapping. ASK the user to resolve low-confidence links, because models make false matches between requirements and sources. CARRY unresolved links into the hand-back.
 

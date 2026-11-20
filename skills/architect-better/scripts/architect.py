@@ -7,9 +7,11 @@ The change-folder format and review handoff are documented in example/README.md.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import http.server
 import json
+import re
 import sys
 import webbrowser
 from pathlib import Path
@@ -56,7 +58,7 @@ def read_text(folder, name):
     try:
         return (folder / name).read_bytes().decode("utf-8")
     except FileNotFoundError:
-        if name == "reviews.jsonl":
+        if name.endswith(".jsonl"):
             return ""
         raise ValueError(f"{name}:1: missing file") from None
     except (OSError, UnicodeError) as exc:
@@ -100,16 +102,19 @@ def source_file(folder, path):
     return target
 
 
-def read_folder(folder: Path) -> dict:
-    """Read and validate the page files, including traced references and diagram targets."""
-    folder = folder.resolve()
-    request = read_text(folder, "request.md")
+def read_design(folder, request):
     try:
         design = json.loads(read_text(folder, "design.json"))
     except json.JSONDecodeError as exc:
         raise ValueError(f"design.json:{exc.lineno}: {exc.msg}") from exc
     try:
-        fields(design, title=str, summary=str, scope=str, accepted=list, containers=dict, flows=list)
+        fields(design, containers=dict, flows=list)
+        first_line = next(iter((request or "").splitlines()), "")
+        design.setdefault("title", re.sub(r"^#{1,6}\s+", "", first_line.strip()).strip() or folder.name)
+        design.setdefault("summary", "")
+        design.setdefault("scope", "")
+        design.setdefault("accepted", [])
+        fields(design, title=str, summary=str, scope=str, accepted=list)
         require(set(design["accepted"]) <= set(TABS), "unknown accepted section")
         errors = diagram.validate(design)
         require(not errors, "\n".join(errors))
@@ -117,9 +122,25 @@ def read_folder(folder: Path) -> dict:
             fields(flow, name=str)
             if "id" in flow:
                 fields(flow, id=str)
-        parts = diagram_parts(design)
+        return design, *diagram_parts(design)
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         raise ValueError("\n".join(f"design.json:1: {error}" for error in str(exc).splitlines())) from exc
+
+
+def read_folder(folder: Path) -> dict:
+    """Read and validate the page files, including traced references and diagram targets."""
+    folder = folder.resolve()
+    errors = []
+
+    def collect(read, *args, default=None):
+        try:
+            return read(*args)
+        except ValueError as exc:
+            errors.append(str(exc))
+            return default
+
+    request = collect(read_text, folder, "request.md")
+    design, parts, hashes = collect(read_design, folder, request, default=(None, None, None))
 
     sources = {}
 
@@ -131,8 +152,9 @@ def read_folder(folder: Path) -> dict:
         match source["type"]:
             case "request":
                 fields(source, sentence=str)
-                require(source["sentence"] and source["sentence"] in request, "request sentence is missing")
-                sources["request.md"] = source_file(folder, "request.md")
+                if request is not None:
+                    require(source["sentence"] and source["sentence"] in request, "request sentence is missing")
+                    sources["request.md"] = source_file(folder, "request.md")
             case "file":
                 fields(source, file=str, symbol=str)
                 sources[source["file"]] = source_file(folder, source["file"])
@@ -148,11 +170,35 @@ def read_folder(folder: Path) -> dict:
 
     def references(values, allowed, label):
         for value in values:
-            require(isinstance(value, str) and value in allowed, f"unknown {label} {value!r}")
+            require(isinstance(value, str) and (allowed is None or value in allowed), f"unknown {label} {value!r}")
+
+    def part_references(values, allowed, label):
+        flow_ids = (
+            list(
+                dict.fromkeys(
+                    alias
+                    for i, flow in enumerate(design["flows"], 1)
+                    for alias in (f"flow{i}", flow.get("id", f"flow{i}"))
+                )
+            )
+            if design
+            else []
+        )
+        forms = "use box:<id>, edge:<id>, step:<flow id>/<step id>"
+        if flow_ids:
+            forms += f" (flow ids: {', '.join(flow_ids)})"
+        for value in values:
+            require(
+                isinstance(value, str) and (allowed is None or value in allowed),
+                f"unknown {label} {value!r}; {forms}",
+            )
 
     def finding(record):
-        fields(record, perspective=str, parts=list, text=str)
-        require(record["perspective"] in applicable, f"unknown or inapplicable perspective {record['perspective']!r}")
+        fields(record, perspective=str, parts=list, text=str, confirmed=bool)
+        require(
+            applicable is None or record["perspective"] in applicable,
+            f"unknown or inapplicable perspective {record['perspective']!r}",
+        )
         require(
             "handled_by" in record and (record["handled_by"] is None or isinstance(record["handled_by"], str)),
             "handled_by: expected string or null",
@@ -160,12 +206,18 @@ def read_folder(folder: Path) -> dict:
         require(record["parts"], "parts: expected at least one diagram part")
         for group in record["parts"]:
             require(isinstance(group, str), "parts: expected a string")
-            references(group.split("+"), parts, "diagram part")
+            part_references(group.split("+"), parts, "part")
 
     def review(record):
-        fields(record, at=str, perspectives=list, changed=list)
-        references(record["perspectives"], applicable, "review perspective")
-        references(record["changed"], parts, "changed part")
+        fields(record, at=str, perspectives=list, changed=list, hashes=dict)
+        fingerprints = record["hashes"]
+        for key, digest in fingerprints.items():
+            require(
+                isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest),
+                f"hashes: invalid part or SHA-256 fingerprint for {key!r}",
+            )
+        references(record["perspectives"], None, "review perspective")
+        part_references(record["changed"], fingerprints, "changed part")
 
     def decision(record):
         fields(record, title=str, drivers=list, chosen=str, rejected=list, drawback=str)
@@ -176,77 +228,103 @@ def read_folder(folder: Path) -> dict:
     def spec_row(record):
         fields(record, requirement=str, source=str, checked_by=str)
 
-    requirements = read_records(folder, "requirements.jsonl", requirement, "id")
-    req_ids = {record["id"] for record in requirements}
-    perspectives = read_records(folder, "perspectives.jsonl", perspective, "name")
-    applicable = {record["name"] for record in perspectives if record["applies"]}
-    return {
+    def records(name, validate, unique=None):
+        return collect(read_records, folder, f"{name}.jsonl", validate, unique)
+
+    requirements = records("requirements", requirement, "id")
+    req_ids = {record["id"] for record in requirements} if requirements is not None else None
+    perspectives = records("perspectives", perspective, "name")
+    applicable = {record["name"] for record in perspectives if record["applies"]} if perspectives is not None else None
+    data = {
         "design": design,
         "request": request,
         "requirements": requirements,
         "perspectives": perspectives,
-        "findings": read_records(folder, "findings.jsonl", finding, "id"),
-        "reviews": read_records(folder, "reviews.jsonl", review),
-        "decisions": read_records(folder, "decisions.jsonl", decision, "id"),
-        "spec": read_records(folder, "spec.jsonl", spec_row, "id"),
+        "findings": records("findings", finding, "id"),
+        "reviews": records("reviews", review),
+        "decisions": records("decisions", decision, "id"),
+        "spec": records("spec", spec_row, "id"),
         "parts": parts,
+        "hashes": hashes,
         "sources": sources,
     }
+    if errors and design is not None:
+        collect(render_diagrams, design, {})
+    require(not errors, "\n".join(errors))
+    return data
 
 
 def diagram_parts(design):
     """Index the same boxes, arrows and steps across both versions for links and comments."""
-    parts = {}
+    parts, hashes = {}, {}
+
+    def add(key, item, part):
+        require(key not in parts, f"duplicate diagram part {key!r}")
+        parts[key] = {**part, "key": key}
+        hashes[key] = hashlib.sha256(json.dumps(item, sort_keys=True).encode()).hexdigest()
 
     def ids(view, kind, ident):
         return [diagram.part_id(f"{view}-{state}", kind, ident) for state in diagram.STATES]
 
     nodes = {node["id"]: node for node in design["containers"]["nodes"]}
     for ident, node in nodes.items():
-        parts[f"box:{ident}"] = {
-            "label": node["label"],
-            "kind": "box",
-            "ids": ids("c", "box", ident),
-            "view": "containers",
-            "icon": diagram.glyph(node["kind"]),
-        }
+        add(
+            f"box:{ident}",
+            node,
+            {
+                "label": node["label"],
+                "kind": "box",
+                "ids": ids("c", "box", ident),
+                "view": "containers",
+                "icon": diagram.glyph(node["kind"]),
+            },
+        )
     for edge in design["containers"].get("edges", []):
         ident = edge["id"]
         route = f"{nodes[edge['from']]['label']} to {nodes[edge['to']]['label']}"
-        parts[f"edge:{ident}"] = {
-            "label": f"{route}: {edge.get('label', '')}",
-            "kind": "edge",
-            "view": "containers",
-            "ids": ids("c", "edge", ident),
-        }
+        add(
+            f"edge:{ident}",
+            edge,
+            {
+                "label": f"{route}: {edge.get('label', '')}",
+                "route": route,
+                "kind": "edge",
+                "view": "containers",
+                "ids": ids("c", "edge", ident),
+            },
+        )
+    flow_ids = {f"flow{i}": i for i in range(1, len(design["flows"]) + 1)}
     for i, flow in enumerate(design["flows"], 1):
         view = f"flow{i}"
         flow_id = flow.get("id", view)
+        require(flow_id and flow_ids.setdefault(flow_id, i) == i, f"empty or ambiguous flow id {flow_id!r}")
+        participants = {p["id"]: nodes[p["box"]]["label"] for p in flow["participants"]}
         for participant in flow["participants"]:
             parts[f"box:{participant['box']}"]["ids"].extend(ids(view, "box", participant["id"]))
         for step, number in zip(flow["steps"], diagram.step_numbers(flow), strict=True):
             ident = step["id"]
+            route = f"{participants[step['from']]} to {participants[step['to']]}"
+            description = f"{step.get('label', '')} (Flows, step {number})"
             part = {
-                "label": f"{flow['name']}, step {number}: {step.get('label', '')}",
+                "label": f"{route}: {description}",
+                "description": description,
                 "kind": "step",
                 "ids": ids(view, "step", ident),
                 "view": "flows",
                 "mark": f"{view}:step:{ident}",
             }
             key = f"step:{flow_id}/{ident}"
-            require(key not in parts, f"duplicate diagram part {key!r}")
-            parts[key] = part
-    return parts
+            add(key, step, part)
+            parts[f"step:{view}/{ident}"] = parts[key]
+    return parts, hashes
 
 
-def model(data):
-    design = data["design"]
-    marks = {}
-    if data["reviews"]:
-        for finding in data["findings"]:
-            for key in dict.fromkeys(part for group in finding["parts"] for part in group.split("+")):
-                target = data["parts"][key].get("mark", key.removeprefix("box:"))
-                marks.setdefault(target, []).append([finding["id"], finding["text"], finding["perspective"]])
+def changed_parts(hashes, review):
+    previous = review["hashes"] if review else {}
+    return [key for key, digest in hashes.items() if previous.get(key) != digest]
+
+
+def render_diagrams(design, marks):
     try:
         layout = diagram.layout({**design, "findings": marks})
         containers = {s: diagram.svg_containers(layout, s) for s in diagram.STATES}
@@ -263,9 +341,33 @@ def model(data):
         ]
     except (AttributeError, IndexError, KeyError, TypeError, ValueError) as exc:
         raise ValueError(f"design.json:1: {exc}") from exc
-    result = {k: v for k, v in data.items() if k not in ("sources", "request", "design")}
+    return containers, flows
+
+
+def model(data):
+    design = data["design"]
+    review = data["reviews"][-1] if data["reviews"] else None
+    since = changed_parts(data["hashes"], review)
+    changed = set(since)
+    marks, affected = {}, set()
+    for finding in data["findings"]:
+        keys = {data["parts"][part]["key"] for group in finding["parts"] for part in group.split("+")}
+        if changed.intersection(keys):
+            affected.add(finding["perspective"])
+        if review:
+            for key in sorted(keys):
+                target = data["parts"][key].get("mark", key.removeprefix("box:"))
+                marks.setdefault(target, []).append([finding["id"], finding["text"], finding["perspective"]])
+    ran = review["perspectives"] if review else []
+    rerun = [
+        p["name"] for p in data["perspectives"] if p["applies"] and (p["name"] in affected or p["name"] not in ran)
+    ]
+    containers, flows = render_diagrams(design, marks)
+    result = {k: v for k, v in data.items() if k not in ("sources", "request", "design", "hashes")}
     return {
         **result,
+        "since": since,
+        "rerun": rerun,
         **{k: design[k] for k in ("title", "summary", "scope", "accepted")},
         "requirements": [
             {**req, "wording": hashlib.sha256(req["text"].encode()).hexdigest()} for req in data["requirements"]
@@ -273,6 +375,26 @@ def model(data):
         "containers": containers,
         "flows": flows,
     }
+
+
+def record_review(folder, perspectives):
+    with (folder / "reviews.jsonl").open("a+", encoding="utf-8") as log:
+        fcntl.flock(log, fcntl.LOCK_EX)
+        data = read_folder(folder)
+        applicable = {p["name"] for p in data["perspectives"] if p["applies"]}
+        for name in perspectives:
+            require(name in applicable, f"unknown or inapplicable perspective {name!r}")
+        previous = data["reviews"][-1] if data["reviews"] else None
+        record = {
+            "at": page.now(),
+            "perspectives": list(dict.fromkeys(perspectives)),
+            "changed": changed_parts(data["hashes"], previous),
+            "hashes": data["hashes"],
+        }
+        log.seek(0)
+        content = log.read()
+        separator = "\n" if content and not content.endswith("\n") else ""
+        log.write(separator + json.dumps(record) + "\n")
 
 
 def conversation(folder: Path) -> page.Conversation:
@@ -288,6 +410,10 @@ def conversation(folder: Path) -> page.Conversation:
 
 
 def serve(folder: Path, port: int, open_browser: bool) -> None:
+    require(
+        not folder.resolve().is_relative_to(HERE.parents[1]),
+        "serve writes conversation files; use a copy of the change folder outside skills/",
+    )
     model(read_folder(folder))
     conv = conversation(folder)
 
@@ -352,6 +478,7 @@ def main(argv=None):
         for name, help_text in (
             ("serve", "serve the live design"),
             ("check", "validate the change folder"),
+            ("review", "record the reviewed diagram fingerprints"),
             ("wait", "wait for new user actions"),
             ("reply", "reply in the conversation"),
             ("status", "mark an item with its current state"),
@@ -362,6 +489,7 @@ def main(argv=None):
         command.add_argument("change", type=Path)
     commands["serve"].add_argument("--port", type=int, default=0)
     commands["serve"].add_argument("--no-browser", action="store_true")
+    commands["review"].add_argument("--perspectives", nargs="+", required=True)
     commands["wait"].add_argument("--timeout", type=float, default=600)
     commands["reply"].add_argument("text")
     commands["reply"].add_argument("--to", metavar="ID")
@@ -376,6 +504,8 @@ def main(argv=None):
         if args.command == "check":
             model(read_folder(folder))
             print(f"Valid change folder: {folder}")
+        elif args.command == "review":
+            record_review(folder, args.perspectives)
         elif args.command == "serve":
             serve(folder, args.port, not args.no_browser)
         elif args.command == "wait":

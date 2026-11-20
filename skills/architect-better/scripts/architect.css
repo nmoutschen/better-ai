@@ -35,7 +35,7 @@
 .drawback { margin:12px 0 0; font-size:14px; }
 .drawback .lbl { display:inline; margin-right:6px; }
 code { font:400 .9em ui-monospace, Menlo, monospace; background:var(--linen); padding:1px 4px; }
-.src { color:var(--umber); font-size:13px; }
+.src, .view a[data-section] { color:var(--umber); font-size:13px; }
 .edit { display:grid; gap:6px; margin-top:6px; }
 .edit textarea { font:inherit; padding:6px 8px; border:1px solid var(--ink); min-height:3em; }
 .edit .btn { justify-self:start; }
