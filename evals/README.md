@@ -305,7 +305,9 @@ uv run python -m tools.report logs/<file>.eval --labels judge_labels/code-better
 prints the agreement per rubric and overall, per skill and agent model, and lists
 the labels that match no judged run. A label compares with the run of its own
 sample, epoch and grader; if two logs hold the same key, the report stops and asks
-for `--latest`.
+for `--latest`. Sample ids are the same for every agent model, so a label that
+matches runs of more than one agent model also stops the report, before anything
+prints, and names the models: add `agent_model: <model>` to the label to pick one.
 
 ## Report
 
@@ -315,7 +317,7 @@ uv run python -m tools.report logs/<dir>/*.eval [more.eval ...] [--latest]
 
 prints one section per skill and agent model (a mixed folder of logs is split),
 each headed with the skill, agent model, judge model, Claude Code version and
-skill commit (flagged dirty when the skill folder had uncommitted changes). A
+skill commit (flagged dirty when the skill folder had uncommitted changes, `dirty ?` when the log does not say). A
 section holds the pass rate of `all` per rule and condition, the paired comparisons
 between conditions, cost and time per condition, the skill files read in the
 skill condition (per expected file, and files read where no case expects

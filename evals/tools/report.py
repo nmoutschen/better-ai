@@ -73,7 +73,7 @@ class SampleResult:
     judge_model: str = "?"
     agent_version: str = "?"
     skill_commit: str = ""
-    skill_dirty: bool = False
+    skill_dirty: bool | None = False
 
 
 def read_result(sample: EvalSample) -> SampleResult:
@@ -125,7 +125,8 @@ def read_results(paths: list[Path]) -> list[SampleResult]:
             result.judge_model = str(metadata.get("judge_model", "?"))
             result.agent_version = str(metadata.get("agent_version", "?"))
             result.skill_commit = str(metadata.get("skill_commit", ""))
-            result.skill_dirty = bool(metadata.get("skill_dirty", False))
+            dirty = metadata.get("skill_dirty")
+            result.skill_dirty = None if dirty is None else bool(dirty)
             results.append(result)
     return results
 
@@ -151,10 +152,15 @@ def group_results(results: list[SampleResult]) -> dict[tuple[str, str], list[Sam
     return dict(sorted(groups.items()))
 
 
+def _dirty_text(dirty: bool | None) -> str:
+    """Return the header flag for a skill folder state: dirty, unknown (the log did not record it) or nothing."""
+    return " (dirty ?)" if dirty is None else " (dirty)" if dirty else ""
+
+
 def group_header(results: list[SampleResult]) -> list[str]:
     """Name what a group ran on: skill, agent model, judge model, Claude Code version and skill commit."""
     skill, agent_model = results[0].skill, results[0].agent_model
-    commits = sorted({f"{r.skill_commit[:7] or '?'}{' (dirty)' if r.skill_dirty else ''}" for r in results})
+    commits = sorted({f"{r.skill_commit[:7] or '?'}{_dirty_text(r.skill_dirty)}" for r in results})
     judges = sorted({r.judge_model for r in results})
     versions = sorted({r.agent_version for r in results})
     return [
@@ -434,10 +440,39 @@ def label_key(label: dict[str, Any]) -> tuple[str, int, str]:
     return str(label["sample"]), int(label.get("epoch", 1)), str(label["grader"])
 
 
+def label_applies(label: dict[str, Any], agent_model: str) -> bool:
+    """Say whether a label may be scored against runs of this agent model: it names no model, or this one."""
+    return "agent_model" not in label or str(label["agent_model"]) == agent_model
+
+
+def validate_labels(results: list[SampleResult], labels: list[dict[str, Any]]) -> None:
+    """Raise ValueError before anything prints when a label or a run cannot be matched to one run.
+
+    Each group must have one run per (sample, epoch, grader), and a label without an `agent_model`
+    must match runs of only one agent model, since sample ids are the same for every model.
+    """
+    groups = group_results(results)
+    verdicts = {name: judge_verdicts(group) for name, group in groups.items()}
+    for label in labels:
+        key = label_key(label)
+        models = sorted(
+            {model for (_, model), found in verdicts.items() if key in found and label_applies(label, model)}
+        )
+        if len(models) > 1:
+            raise ValueError(
+                f"Label {key[0]!r} (epoch {key[1]}, grader {key[2]!r}) matches runs of agent models "
+                f"{', '.join(models)}: add `agent_model: <model>` to the label to pick one"
+            )
+
+
 def unmatched_labels(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
-    """List the hand labels that match no judge verdict in any group of the results, such as a mistyped sample id."""
-    found = {key for group in group_results(results).values() for key in judge_verdicts(group)}
-    missing = [label_key(label) for label in labels if label_key(label) not in found]
+    """List the hand labels that match no judge verdict of an agent model they apply to, such as a mistyped sample id."""
+    found = [(model, key) for (_, model), group in group_results(results).items() for key in judge_verdicts(group)]
+    missing = [
+        label_key(label)
+        for label in labels
+        if not any(key == label_key(label) and label_applies(label, model) for model, key in found)
+    ]
     if not missing:
         return []
     return [
@@ -451,9 +486,10 @@ def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list
     verdicts = judge_verdicts(results)
     cases = {sample.sample_id: sample.case for sample in results}
     per_rubric: dict[tuple[str, str], list[bool]] = defaultdict(list)
+    model = results[0].agent_model if results else ""
     for label in labels:
         key = label_key(label)
-        if key in verdicts:
+        if key in verdicts and label_applies(label, model):
             human_passes = str(label["verdict"]).upper() == "PASS"
             per_rubric[cases[key[0]], key[2]].append(verdicts[key] == human_passes)
     if not per_rubric:
@@ -480,6 +516,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.latest:
         results = latest(results)
     labels = load_labels(args.labels) if args.labels else None
+    if labels is not None:
+        try:
+            validate_labels(results, labels)
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
     for group in group_results(results).values():
         print("\n" + "\n".join(group_header(group)))
         sections = [
@@ -494,20 +535,14 @@ def main(argv: list[str] | None = None) -> int:
             ("Samples", case_lines(group)),
         ]
         if labels is not None:
-            try:
-                sections.append(("Judge agreement with hand labels", agreement(group, labels)))
-            except ValueError as error:
-                raise SystemExit(str(error)) from error
+            sections.append(("Judge agreement with hand labels", agreement(group, labels)))
         for title, lines in sections:
             print(f"\n## {title}\n" + "\n".join(lines))
         errors = [f"{sample.sample_id}: {sample.error}" for sample in group if sample.error]
         if errors:
             print("\n## Sample errors\n" + "\n".join(errors))
     if labels is not None:
-        try:
-            unmatched = unmatched_labels(results, labels)
-        except ValueError as error:
-            raise SystemExit(str(error)) from error
+        unmatched = unmatched_labels(results, labels)
         if unmatched:
             print("\n## Labels without a run\n" + "\n".join(unmatched))
     return 0
