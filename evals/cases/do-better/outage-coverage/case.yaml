@@ -1,5 +1,5 @@
 id: outage-coverage
-rule: '4.2'
+rule: reduce-user-effort
 source:
 - SKILL.md#4.2
 situation: The explainer has every fact but tells them out of order in one paragraph, so it is hard to follow. The user is
