@@ -10,6 +10,7 @@ from inspect_ai.model import ChatMessageAssistant, ChatMessageTool, ChatMessageU
 from inspect_ai.tool import ToolCall, ToolCallError
 
 from skill_evals.grading import judge
+from skill_evals.grading.files import GradingError
 
 
 def messages() -> list[Any]:
@@ -135,6 +136,7 @@ async def test_malformed_judge_output(plant: Plant, monkeypatch: pytest.MonkeyPa
     [
         (("", "", True), "timed out"),
         ((json.dumps({"is_error": True, "subtype": "error_during_execution", "result": ""}), "429", False), "error"),
+        ((json.dumps({"is_error": True, "result": ""}), "", False), "is_error"),
         (("", "", False), "no JSON"),
         ((json.dumps({"result": ""}), "", False), "no reply"),
     ],
@@ -152,3 +154,19 @@ async def test_judge_that_could_not_run_is_not_a_verdict(
     monkeypatch.setattr(judge, "claude_cli", fake_cli)
     passed, info = await judge.judge({"rubric": "r"}, state, repo, "opus")  # type: ignore[arg-type]
     assert passed is None and info["verdict"] is None and reason in info["error"]
+
+
+async def test_judge_raises_when_its_record_cannot_be_built(plant: Plant, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A sandbox error while taking the diff is a grading error, not a diff shown as unavailable."""
+    repo = await plant({"f.py": ""})
+    state = SimpleNamespace(input_text="Do", messages=[ChatMessageUser(content="Do")], output=ModelOutput())
+    real = repo.sandbox_env.exec
+
+    async def exec_fails(command: list[str], *args: Any, **options: Any) -> Any:
+        if command[:2] == ["mktemp", "-d"]:
+            raise OSError("docker gone")
+        return await real(command, *args, **options)
+
+    monkeypatch.setattr(repo.sandbox_env, "exec", exec_fails)
+    with pytest.raises(GradingError, match="docker gone"):
+        await judge.judge({"rubric": "r"}, state, repo, "opus")  # type: ignore[arg-type]
