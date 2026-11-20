@@ -1,9 +1,15 @@
 """Tests for skill_evals/grading/new_lint_issues.py: only issues the change added count."""
 
+import math
 import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from skill_evals.grading import lint
 
 SCRIPT = Path(__file__).resolve().parents[1] / "skill_evals" / "grading" / "new_lint_issues.py"
 
@@ -40,3 +46,16 @@ def test_counts_only_new_issues(tmp_path: Path) -> None:
     added = run(tmp_path)
     assert added.returncode == 1
     assert added.stdout.splitlines() == ["new.py: F401: import sys", "1 new issue(s)"]
+
+
+async def test_lint_scorer_gives_no_score_when_the_sandbox_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The lint scorer only observes: a sandbox failure gives an unscored result, not a sample error."""
+
+    class BrokenSandbox:
+        async def exec(self, *args: object, **kwargs: object) -> None:
+            raise RuntimeError("sandbox gone")
+
+    monkeypatch.setattr(lint, "sandbox", BrokenSandbox)
+    state = SimpleNamespace(store=SimpleNamespace(get=lambda key: "abc"))
+    result = await lint.lint_issues_added()(state, None)  # type: ignore[arg-type]
+    assert result is not None and math.isnan(result.value) and result.reason == "scoring_failed"

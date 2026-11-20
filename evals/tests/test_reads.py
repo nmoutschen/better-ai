@@ -187,3 +187,29 @@ async def test_no_score_for_other_conditions_or_cases_without_reads(monkeypatch:
     assert await score([], stub=stub, monkeypatch=monkeypatch, condition="no-skill") is None
     assert await score([], stub=stub, monkeypatch=monkeypatch, expected=[]) is None
     assert stub.prompts == []
+
+
+class FailingJudge:
+    """A judge call that fails the way a sandbox or CLI failure does: by raising."""
+
+    def __init__(self, error: Exception) -> None:
+        """Raise `error` when called."""
+        self.error = error
+
+    async def __call__(self, system: str, prompt: str, model: str) -> tuple[str, dict[str, Any]]:
+        """Raise the error."""
+        raise self.error
+
+
+@pytest.mark.parametrize("error", [RuntimeError("sandbox gone"), TimeoutError("slow"), OSError("pipe")])
+async def test_judge_that_raises_is_a_grading_error_naming_skill_reads(
+    monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    """A judge call that raises is a grading error that names the scorer, not an uncounted failure."""
+    monkeypatch.setattr(reads, "ask_judge", FailingJudge(error))
+    state = SimpleNamespace(
+        metadata={"condition": "skill", "skill": "code-better", "reads": ["modes/bug-fix.md"]},
+        messages=[ChatMessageUser(content="Fix it")],
+    )
+    with pytest.raises(GradingError, match="skill_reads"):
+        await reads.skill_reads("opus")(state, None)  # type: ignore[arg-type]

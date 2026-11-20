@@ -577,3 +577,17 @@ def test_main_prints_labels_without_a_verdict_and_stops_on_an_unmatched_label(
     with pytest.raises(SystemExit, match="typo"):
         report.main(["x.eval", "--labels", str(labels)])
     assert capsys.readouterr().out == ""
+
+
+def test_judge_cost_includes_the_skill_reads_judge() -> None:
+    """The judge cost adds the reads judge's cost to the rule judges' cost."""
+    rule = SimpleNamespace(value={"judge": 1, "all": 1}, metadata={"judges": {"judge": {"total_cost_usd": 0.25}}})
+    reads = SimpleNamespace(value=1, metadata={"judge": {"total_cost_usd": 0.5}})
+    sample = SimpleNamespace(
+        id="a-skill",
+        epoch=1,
+        error=None,
+        scores={"grade_cases": rule, "skill_reads": reads},
+        metadata={"case": "a", "condition": "skill", "rule": "5.1"},
+    )
+    assert report.read_result(sample).judge_cost == pytest.approx(0.75)  # type: ignore[arg-type]

@@ -50,3 +50,12 @@ def test_nested_command_that_fails_untouched_is_fine(tmp_path: Path) -> None:
         "  - type: any_of\n    graders:\n      - type: command_passes\n        cmd: 'false'\n"
     )
     assert asyncio.run(validate_cases.validate(write_case(tmp_path, graders), False)) == []
+
+
+def test_nested_any_of_key_equals_the_scorer_key() -> None:
+    """A command_passes in an any_of inside an any_of is named as the scorer names it: any_of.2.1."""
+    inner = {"type": "any_of", "graders": [{"type": "judge"}, {"type": "command_passes", "cmd": "true"}]}
+    specs = [{"type": "any_of", "graders": [{"type": "judge"}, inner]}]
+    assert [key for key, _ in validate_cases.nested_commands(specs)] == ["any_of.2.2"]
+    flat = [{"type": "any_of", "graders": [{"type": "command_passes", "cmd": "true"}, inner]}]
+    assert [key for key, _ in validate_cases.nested_commands(flat)] == ["any_of.1", "any_of.2.2"]
