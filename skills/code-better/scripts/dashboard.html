@@ -208,6 +208,8 @@ function decisionItem(c, state, actions) {
   const STEP = [["asked", "Waiting for you"], ["replied", "You answered"], ["done", "Applied"]][step];
   item.dataset.state = STEP ? STEP[0] : "";
   const foot = document.createElement("div"); foot.className = "foot";
+  // A reply to a decision the coordinator took shows its own state, like any item the user sends.
+  if (!STEP && answer) foot.append(conv.progress(state[answer.id]));
   if (STEP) foot.insertAdjacentHTML("beforeend", `<span class="progress ${STEP[0]}"><span class="bars" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${i <= step ? "on" : ""}"></i>`).join("")}</span><span>${STEP[1]}</span></span>`);
   if (actions) foot.insertAdjacentHTML("beforeend", !answer && status === "waiting"
     ? `<button type="button" class="btn btn--sm answer change">Answer</button>`

@@ -354,6 +354,40 @@ class Scripts(unittest.TestCase):
                 [sys.executable, "-I", script, "watch", str(folder), "--no-browser"], folder, "dashboard.json"
             )
 
+    def test_code_better_dashboard_page_and_answers(self):
+        """The dashboard serves its own page, and an answer to a question reaches `pending` with the decision it answers."""
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            (folder / "decisions").mkdir()
+            (folder / "decisions" / "D-1.md").write_text("id: D-1\nasked: Count weekends?\nstatus: waiting\n")
+            script = str(ROOT / "skills" / "code-better" / "scripts" / "dashboard.py")
+            cmd = [sys.executable, "-I", script, "watch", str(folder), "--no-browser"]
+            server = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            try:
+                for _ in range(80):
+                    if (folder / ".server").exists():
+                        break
+                    time.sleep(0.1)
+                url = (folder / ".server").read_text().strip()
+                with urllib.request.urlopen(url, timeout=5) as r:
+                    self.assertIn("dashboard.json", r.read().decode())
+                with urllib.request.urlopen(url + "dashboard.json", timeout=5) as r:
+                    self.assertEqual(json.loads(r.read())["decisions"][0]["status"], "waiting")
+                params = {"id": "a1", "decision": "D-1", "text": "Business days only."}
+                body = {"jsonrpc": "2.0", "id": 1, "method": "answer", "params": params}
+                headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
+                request = urllib.request.Request(url + "rpc", data=json.dumps(body).encode(), headers=headers)
+                with urllib.request.urlopen(request, timeout=5) as r:
+                    self.assertEqual(json.loads(r.read())["result"], "saved")
+                out = subprocess.run(
+                    [sys.executable, "-I", script, "pending", str(folder)], capture_output=True, text=True
+                )
+                item = json.loads(out.stdout.splitlines()[0])
+                self.assertEqual((item["action"], item["decision"], item["status"]), ("answer", "D-1", "new"))
+            finally:
+                server.send_signal(signal.SIGTERM)
+                server.communicate(timeout=10)
+
 
 class Dashboard(unittest.TestCase):
     """What code-better's dashboard reads from a change folder: the tasks, the agents' logs and the decisions."""

@@ -92,9 +92,11 @@ function pageConversation(o) {
     // A redraw moves the box into a new item, whose own buttons it hid: show those again, not only the first one.
     function close() {
       var host = box.parentNode; box.remove(); if (from) from.style.visibility = '';
-      if (host) host.querySelectorAll('.foot .answer, .foot .change').forEach(function (b) { b.style.visibility = ''; });
-      // Focus goes back to the button that opened the box, so a keyboard user who cancels stays at the item.
-      if (from && document.contains(from)) from.focus({ preventScroll: true });
+      var again = host ? host.querySelectorAll('.foot .answer, .foot .change') : [];
+      again.forEach(function (b) { b.style.visibility = ''; });
+      // Focus goes back to the button that opened the box, so a keyboard user who cancels stays at the item. After a
+      // redraw that button is gone: its copy in the redrawn item takes the focus instead.
+      if (from) { var back = document.contains(from) ? from : again[again.length - 1]; if (back) back.focus({ preventScroll: true }); }
     }
     function sendIt() {
       var r = ta.value.trim(); if (!r) return ta.focus();

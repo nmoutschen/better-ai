@@ -84,7 +84,7 @@ When it coordinates several agents, it opens a dashboard in your browser, if it 
 ![The live dashboard: figures for tasks done, agents at work and open questions; one card per agent with its task's mode, a state icon and its latest steps, stuck agents first; and a conversation with the coordinator on the right](img/code-better-dashboard.png)
 
 - **The figures** at the top: tasks done, agents at work, and open questions. Click the open questions to jump to the first one.
-- **The agents**, one card each, with its task's mode as a coloured tag and edge, an icon for its state (working, waiting on the coordinator, blocked, or quiet for 15 minutes), and its latest steps. Blocked and quiet agents come first, then the rest by task number. Click a card for the agent's whole log and to ask about its work. Agents that handed back are under Finished.
+- **The agents**, one card each, with its task's mode as a coloured tag and edge, an icon for its state (working, waiting on the coordinator, blocked, or quiet for 15 minutes), and its latest steps. Blocked and quiet agents come first, then the rest by task number. Click a card for the agent's recent log and to ask about its work. Agents that handed back are under Finished.
 - **The conversation** with the coordinating agent: write to it, reply to any message, and see each message move from seen to answered. Each decision the coordinator takes on its own shows there, and you can reply to change it. Its questions to you come last, next to the message box, until you answer. It also asks them in the chat and waits for your answer from either place.
 
 The dashboard reads the change's folder, `.code/<change>/`, and keeps running until you tell the agent you are done with it.
