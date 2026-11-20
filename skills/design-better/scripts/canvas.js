@@ -64,6 +64,13 @@
   // Scrolling: frames of one screen size scroll together. The position is matched between elements with the
   // same id in both versions, such as headings, so versions of different length stay on the same section.
   // This works only for versions embedded from files; a page loaded from an address cannot be followed.
+  // An id counts only where it is unique in its document: versions can repeat an id, and the first match is then
+  // often the wrong element.
+  function idCounts(doc) {
+    var counts = Object.create(null);
+    doc.querySelectorAll('[id]').forEach(function (el) { counts[el.id] = (counts[el.id] || 0) + 1; });
+    return counts;
+  }
   var quietUntil = new WeakMap();
   function tops(win, ids) {
     var doc = win.document, end = doc.documentElement.scrollHeight;
@@ -76,8 +83,9 @@
     return marks;
   }
   function sharedIds(a, b) {
+    var inA = idCounts(a.document), inB = idCounts(b.document);
     return Array.prototype.map.call(a.document.querySelectorAll('[id]'), function (el) { return el.id; })
-      .filter(function (id) { return id && b.document.getElementById(id); });
+      .filter(function (id) { return id && inA[id] === 1 && inB[id] === 1; });
   }
   function match(from, to) {
     try {
@@ -197,16 +205,19 @@
     if ((e.key === 'c' || e.key === 'C') && !/INPUT|TEXTAREA/.test(e.target.tagName) && !e.metaKey && !e.ctrlKey) setMode(!commenting);
     if (e.key === 'Escape' && !pop.hidden) closePop();
   });
+  // A path from the nearest ancestor with a unique id, or from body: a path without an anchor can match a deeper
+  // element earlier in the page.
   function selectorOf(el) {
-    var parts = [];
+    var parts = [], counts = idCounts(el.ownerDocument), anchored = false;
     while (el && el.nodeType === 1 && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
-      if (el.id) { parts.unshift('#' + CSS.escape(el.id)); break; }
+      if (el.id && counts[el.id] === 1) { parts.unshift('#' + CSS.escape(el.id)); anchored = true; break; }
       var tag = el.tagName.toLowerCase(), n = 1, sib = el;
       while ((sib = sib.previousElementSibling)) if (sib.tagName === el.tagName) n++;
       parts.unshift(tag + ':nth-of-type(' + n + ')');
       el = el.parentElement;
     }
-    return parts.join(' > ') || 'body';
+    if (!parts.length) return 'body';
+    return (anchored ? '' : 'body > ') + parts.join(' > ');
   }
   // What a click points at, in enough detail for the agent to find it without the user picking an exact element:
   // the element and its parents, the words under the pointer, an image's source, and where the click fell.
