@@ -197,10 +197,10 @@ function decisionItem(c, state, actions) {
     : status === "answered" ? "answered by you" : "decided";
   const from = [has(x.from) ? x.from : "", has(x.task) ? "task " + x.task : ""].filter(Boolean).join(", ");
   // The answer the coordinator copied shows only when the user gave it in the chat: an answer from the page is in the thread.
-  const after = status === "answered" && has(x.answer) && !answer ? `<p class="body" dir="auto">Your answer: ${esc(x.answer)}</p>`
-    : status === "decided" && has(x.decision) ? `<p class="body" dir="auto">Decided: ${esc(x.decision)}</p>` : "";
+  const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer: ${x.answer}`)
+    : status === "decided" && has(x.decision) ? md(`Decided: ${x.decision}`) : "";
   const item = li(`msg decision ${status}`, `${headHTML("Coordinator", x.at, label)}${from ? `<p class="what">From ${esc(from)}</p>` : ""}
-    <p class="body" dir="auto">${esc(x.asked || "")}</p>${after}`);
+    ${md(x.asked || "")}${after}`);
   item.dataset.d = x.id;
   if (status === "waiting" && !answer) item.classList.add("open-q");  // the top bar's figure takes the user to the first one
   // A question to the user moves forward only: Waiting for you, You answered, Applied. A decision has no steps.
@@ -221,7 +221,8 @@ function crumb(e) {
   if (e.on) { x.className = "crumb"; x.innerHTML = `<span class="path">on</span><span class="el"><button type="button" data-a="${esc(e.on.id)}">${esc(e.on.title || e.on.id)}</button></span>`; }
   return x;
 }
-function commentBody(e) { const p = document.createElement("p"); p.className = "body"; p.dir = "auto"; p.textContent = e.text; return p; }
+const md = text => pageMarkdown(text).outerHTML;  // Markdown, built as elements: safe to place as HTML
+function commentBody(e) { return pageMarkdown(e.text); }
 const conv = pageConversation({
   served: true, stream: false, name: "dashboard", agent: "Coordinator", thread: $("thread"),
   kinds: {decision: decisionItem}, crumb, commentBody,
