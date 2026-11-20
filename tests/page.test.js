@@ -267,3 +267,15 @@ test('long messages with unclosed marks stay fast', () => {
     assert.ok(Date.now() - start < 500, `${JSON.stringify(text.slice(0, 6))}… took ${Date.now() - start} ms`);
   }
 });
+
+test('a numbered list right after a bullet list is its own list', () => {
+  assert.deepEqual(md('- a\n- b\n2. Then').map(b => [b.tag, b.start]), [['ul', undefined], ['ol', 2]]);
+});
+
+test('italics can close right before bold', () => {
+  assert.deepEqual(md('*it***b**')[0].children, [{ tag: 'em', children: [t('it')] }, { tag: 'strong', children: [t('b')] }]);
+});
+
+test("a notice keeps a space between nested blocks' words", () => {
+  assert.equal(context.pageMarkdownText('- a\n  - b'), 'a b');
+});
