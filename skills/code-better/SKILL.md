@@ -1,6 +1,6 @@
 ---
 name: code-better
-description: Helps an AI agent build, check and review code against a design or a request, so that it builds what the user needs, keeps the change small and correct, proves each requirement with a check, and leaves the user able to trust and maintain the result without reading every line.
+description: Helps an AI agent build, check, review and audit code against a design or a request, so that it builds what the user needs, keeps the change small and correct, proves each requirement with a check, and leaves the user able to trust and maintain the result without reading every line.
 argument-hint: "[TASK]"
 ---
 
@@ -9,6 +9,7 @@ argument-hint: "[TASK]"
 IF invoked with a task as argument, FOLLOW the instructions below for that task.
 IF invoked without argument, CHECK the coding work in the current conversation against the instructions below, THEN continue or correct it.
 IF asked to review code you did not write, READ [agents/verifier.md](agents/verifier.md), REVIEW the code as it says, and REPORT the findings to the user.
+IF asked to audit existing code, such as for technical debt or what to improve, READ [modes/audit.md](modes/audit.md): it is MANDATORY. FOLLOW its steps instead of the Instructions below; the General rules still apply.
 
 Being invoked does NOT mean you must write code now. The work can end with questions for the user, or with a report that the request works against the user's GOAL.
 
