@@ -369,7 +369,7 @@ function mdStarts(lines, i) {
     !!item && (!/\d/.test(item[2]) || parseInt(item[2], 10) === 1);
 }
 // The words of a block, with their marks. A code span keeps the marks in it as written, and so does a backslash.
-var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|\*\*\*(?=\S)([\s\S]*?\S)\*\*\*(?!\*)|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*\\])\*(?!\*)|(^|[^\w\\])_(?=[^\s_])([\s\S]*?[^\s_\\])_(?!\w)|(https?:\/\/(?:[^\s<>()]|\([^\s<>()]*\))*(?:[^\s<>().,;:!?'"\]*_]|\([^\s<>()]*\)))|\\([\\`*_{}\[\]()#+\-.!|~>])/g;
+var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|\*\*\*(?=\S)([\s\S]*?\S)\*\*\*(?!\*)|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*\\])\*(?:(?!\*)|(?=\*\*[^\s*]))|(^|[^\w\\])_(?=[^\s_])([\s\S]*?[^\s_\\])_(?!\w)|(https?:\/\/(?:[^\s<>()]|\([^\s<>()]*\))*(?:[^\s<>().,;:!?'"\]*_]|\([^\s<>()]*\)))|\\([\\`*_{}\[\]()#+\-.!|~>])/g;
 // Link text cannot hold another link, such as a bare URL: keep its words only.
 function mdNoLinks(nodes) {
   return nodes.reduce(function (a, n) {
@@ -437,7 +437,7 @@ function mdBlocks(lines, depth) {
         if (im && ind < base + 2 && /\d/.test(im[2]) === ordered) {
           item = { lines: [im[3] || ''], at: im[1].length + im[2].length + 1 }; list.children.push(item); blank = false;
         } else if (!l.trim()) { blank = true; if (item) item.lines.push(''); }
-        else if (ind >= base + 2 || (!blank && !mdStarts(lines, i))) {
+        else if (ind >= base + 2 || (!blank && !MD_ITEM.test(l) && !mdStarts(lines, i))) {
           item.lines.push(ind >= base + 2 ? l.replace(/\t/g, '    ').slice(Math.min(ind, item.at)) : l); blank = false;
         } else break;
       }
@@ -471,7 +471,7 @@ function pageMarkdownTree(text) { return mdBlocks(String(text == null ? '' : tex
 // The message's words without its marks, on one line, such as for a short notice.
 function pageMarkdownText(text) {
   var BLOCK = /^(p|li|pre|blockquote|ul|ol|table|tr|th|td|hr|br)$/;
-  function words(n) { return (n.text != null ? n.text : (n.children || []).map(words).join('')) + (BLOCK.test(n.tag) ? ' ' : ''); }
+  function words(n) { return (BLOCK.test(n.tag) ? ' ' : '') + (n.text != null ? n.text : (n.children || []).map(words).join('')) + (BLOCK.test(n.tag) ? ' ' : ''); }
   return pageMarkdownTree(text).map(words).join('').replace(/\s+/g, ' ').trim();
 }
 // The message as elements: a div of class "body md", with the text direction of its words.
