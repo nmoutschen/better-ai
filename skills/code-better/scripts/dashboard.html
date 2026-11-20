@@ -184,6 +184,12 @@ function events(d) {
     return {...e, _t}; })
     .concat(decisions).sort((a, z) => a._t - z._t || (z.action === "decision") - (a.action === "decision"));
 }
+// step:begin
+// A question to the user moves forward only: 0 Waiting for you, 1 You answered, 2 Applied; a decision has none (-1).
+// The user's latest answer is an item with its own state: when the coordinator asked back (`asked`), the user is up again.
+const decisionStep = (status, answer, st) => status === "answered" ? 2 : status !== "waiting" ? -1
+  : !answer ? 0 : st[answer.id] === "asked" ? 0 : ["done", "accepted"].includes(st[answer.id]) ? 2 : 1;
+// step:end
 const decisionStatus = x => String(x.status || "decided").trim().toLowerCase();
 const answerOf = c => c.replies.filter(r => r.action === "answer").pop();
 const clock = at => String(at || "").slice(11, 16);
@@ -202,16 +208,16 @@ function decisionItem(c, state, actions) {
   const item = li(`msg decision ${status}`, `${headHTML("Coordinator", x.at, label)}${from ? `<p class="what">From ${esc(from)}</p>` : ""}
     ${md(x.asked || "")}${after}`);
   item.dataset.d = x.id;
-  if (status === "waiting" && !answer) item.classList.add("open-q");  // the top bar's figure takes the user to the first one
+  if (step === 0) item.classList.add("open-q");  // the top bar's figure takes the user to the first one
   // A question to the user moves forward only: Waiting for you, You answered, Applied. A decision has no steps.
-  const step = status === "answered" ? 2 : status === "waiting" ? (answer ? 1 : 0) : -1;
+  const step = decisionStep(status, answer, state);
   const STEP = [["asked", "Waiting for you"], ["replied", "You answered"], ["done", "Applied"]][step];
   item.dataset.state = STEP ? STEP[0] : "";
   const foot = document.createElement("div"); foot.className = "foot";
   // A reply to a decision the coordinator took shows its own state, like any item the user sends.
   if (!STEP && answer) foot.append(conv.progress(state[answer.id]));
   if (STEP) foot.insertAdjacentHTML("beforeend", `<span class="progress ${STEP[0]}"><span class="bars" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${i <= step ? "on" : ""}"></i>`).join("")}</span><span>${STEP[1]}</span></span>`);
-  if (actions) foot.insertAdjacentHTML("beforeend", !answer && status === "waiting"
+  if (actions) foot.insertAdjacentHTML("beforeend", step === 0
     ? `<button type="button" class="btn btn--sm answer change">Answer</button>`
     : `<button type="button" class="btn btn--quiet btn--sm answer change">Reply</button>`);
   return [item, foot];
@@ -231,7 +237,7 @@ const conv = pageConversation({
   accept: false, filter: false,
   // A question waiting for the user comes last, next to the message box, until they answer it; so does a message of
   // theirs that the coordinator asked about.
-  waiting: (c, state) => c.kind === "decision" ? !answerOf(c) && decisionStatus(c.e.x) === "waiting" : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
+  waiting: (c, state) => c.kind === "decision" ? decisionStep(decisionStatus(c.e.x), answerOf(c), state) === 0 : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
   afterSend: () => tick(),
 });
 const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
@@ -307,8 +313,11 @@ function render(d) {
   const tasks = d.tasks || [], done = tasks.filter(t => DONE.has(t.status)).length;
   const working = d.agents.filter(a => a.state !== "finished").length;
   // A question the user answered in the page no longer waits for them, even before the coordinator applies the answer.
-  const answered = new Set((d.conversation || []).filter(e => e.action === "answer").map(e => e.decision));
-  const waitingN = (d.decisions || []).filter(x => decisionStatus(x) === "waiting" && !answered.has(x.id)).length;
+  // It waits again when the coordinator asked back about the answer.
+  conv.setLog(events(d), (d.decisions || []).map(x => [x.id, x.status, x.answer, x.decision, x._changed]));
+  const st = conv.state(), last = {};
+  (d.conversation || []).filter(e => e.action === "answer").forEach(e => { last[e.decision] = e; });
+  const waitingN = (d.decisions || []).filter(x => decisionStep(decisionStatus(x), last[x.id], st) === 0).length;
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   setHTML($("status"), (tasks.length ? `<span class="stat"><b>${done}<span class="of"> / ${tasks.length}</span></b>tasks done
       <span class="bar" aria-hidden="true"><i style="width:${(100 * done / tasks.length).toFixed(0)}%"></i></span></span>` : "")
@@ -320,7 +329,6 @@ function render(d) {
   const replies = (d.conversation || []).filter(e => e.action === "reply");
   if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + replies[replies.length - 1].text.slice(0, 120), "ok");
   REPLIES = replies.length;
-  conv.setLog(events(d), (d.decisions || []).map(x => [x.id, x.status, x.answer, x.decision, x._changed]));
   if (OPEN) fillPop();
 }
 
