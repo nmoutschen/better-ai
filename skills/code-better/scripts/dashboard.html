@@ -38,6 +38,7 @@ button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px
 .card.m-refactor { border-left-color:var(--umber); }
 .card.m-tests { border-left-color:var(--sand); }
 .card.m-other { border-left-color:var(--line); }
+.card.m-verifier { border-left-color:var(--ink); }
 .card h3 { margin:4px 0 6px; font:700 16px/1.3 var(--serif); color:var(--heading); }
 .card ol { list-style:none; margin:0; padding:0; }
 .card ol li { margin:2px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -50,8 +51,7 @@ button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px
 .mode.m-refactor { background:var(--umber); color:var(--cream); }
 .mode.m-tests { background:var(--sand); color:var(--heading); }
 .mode.m-other { border:1px solid var(--muted); color:var(--ink); }
-.role { display:inline-block; padding:0 5px; margin-right:4px; border:1.5px solid var(--ink); font:700 10px var(--sans);
-  letter-spacing:.08em; text-transform:uppercase; color:var(--ink); background:var(--cream); }
+.mode.m-verifier { background:var(--ink); color:var(--cream); }
 /* The state as an icon, named for screen readers and on hover; the key under the heading says what each means. */
 .state { display:inline-flex; align-items:center; gap:4px; font:700 12px/1 var(--sans); color:var(--ink); }
 .state svg { width:14px; height:14px; flex:none; }
@@ -175,13 +175,13 @@ const words = line => { const i = String(line).indexOf(":"), kind = i < 0 ? "" :
   return !KINDS.includes(kind) ? line : kind === "step" ? rest : `${kind[0].toUpperCase()}${kind.slice(1)}: ${rest}`; };
 // Who the agent is: its name, with its role only when the name does not already say it.
 // Who the agent is and what it does: its name, its role, and for a builder the mode of its task.
-// The mode of the agent's task shows as a tag with one colour per mode; a verifier's tag is its task's mode.
+// The mode of the agent's task shows as a tag with one colour per mode; a verifier shows verifier instead.
 const MODES = {feature: "feature", "bug fix": "bugfix", bugfix: "bugfix", refactor: "refactor", tests: "tests"};
 const modeOf = a => String(a.mode || "").trim().toLowerCase();
-const modeClass = a => { const m = modeOf(a); return m && m !== "none" ? "m-" + (MODES[m] || "other") : "m-other"; };
-// A verifier says so: it works on a task's mode but builds nothing, so its card must not read as a builder's.
-const roleTag = a => String(a.role || "").trim().toLowerCase() === "verifier" ? '<span class="role">verifier</span>' : "";
-const modeTag = a => { const m = modeOf(a); return m && m !== "none" ? `<span class="mode ${modeClass(a)}">${esc(m)}</span>` : ""; };
+const modeClass = a => { if (String(a.role || "").trim().toLowerCase() === "verifier") return "m-verifier"; const m = modeOf(a); return m && m !== "none" ? "m-" + (MODES[m] || "other") : "m-other"; };
+// A verifier's tag says verifier, not its task's mode: it builds nothing, so its card must not read as a builder's.
+const isVerifier = a => String(a.role || "").trim().toLowerCase() === "verifier";
+const modeTag = a => { if (isVerifier(a)) return '<span class="mode m-verifier">verifier</span>'; const m = modeOf(a); return m && m !== "none" ? `<span class="mode ${modeClass(a)}">${esc(m)}</span>` : ""; };
 // One icon per state, drawn in currentColor so blocked and quiet take the red of their text.
 const ICON = {
   working: '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 2l9 5-9 5z" fill="currentColor"/></svg>',
@@ -209,7 +209,7 @@ function drawAgents(d) {
   const live = d.agents.filter(a => a.state !== "finished")
     .sort((a, z) => ORDER[stateOf(a, now)] - ORDER[stateOf(z, now)] || num(a) - num(z) || a.name.localeCompare(z.name));
   setHTML($("cards"), live.map(a => `<li><button type="button" class="card ${stateOf(a, now)} ${modeClass(a)}" data-a="${esc(a.name)}">
-      <p class="meta">${roleTag(a)}${modeTag(a)} ${stateIcon(a, now)} ${who(a)}</p>
+      <p class="meta">${modeTag(a)} ${stateIcon(a, now)} ${who(a)}</p>
       <h3 dir="auto">${esc(taskLabel(a))}</h3>
       ${reqsOf(taskOf(a)).length ? `<ul class="reqs">${reqItems(taskOf(a))}</ul>` : ""}
       <ol>${a.lines.filter(l => l.slice(0, l.indexOf(":")).trim().toLowerCase() !== "start").slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
@@ -361,7 +361,7 @@ function fillPop() {
   const a = D.agents.find(x => x.name === OPEN.id && x.state !== "finished"); if (!a) return closePop();
   const label = `Message about ${a.name}'s work`;
   const html = `<button type="button" class="x" aria-label="Close">×</button>
-    <p class="meta">${roleTag(a)}${modeTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>
+    <p class="meta">${modeTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>
     <h3 dir="auto">${esc(taskLabel(a))}</h3>
     ${reqsOf(taskOf(a)).length ? `<ul class="req-list">${reqItems(taskOf(a))}</ul>` : ""}
     ${taskOf(a) && has(taskOf(a).check) ? `<p class="check">Check: <code>${esc(taskOf(a).check)}</code></p>` : ""}
