@@ -128,3 +128,89 @@ test("a message's words are its note, or its text on the board before it shared 
   assert.equal(context.pageWords({ note: 'new' }), 'new');
   assert.equal(context.pageWords({ text: 'old' }), 'old');
 });
+
+// ---------- Markdown in messages: pageMarkdownTree, the tree page.js turns into elements ----------
+// The tree as plain JSON, so it compares across the vm boundary.
+const md = text => JSON.parse(JSON.stringify(context.pageMarkdownTree(text)));
+const t = text => ({ text });
+
+test('plain text is one paragraph, and a single line break stays', () => {
+  assert.deepEqual(md('hello\nthere'), [{ tag: 'p', children: [t('hello'), { tag: 'br' }, t('there')] }]);
+  assert.deepEqual(md('one\n\ntwo').map(b => b.tag), ['p', 'p']);
+});
+
+test('inline marks: bold, italic, strikethrough, code, links', () => {
+  assert.deepEqual(md('**b** *i* _u_ ~~s~~ `x*y*`')[0].children, [
+    { tag: 'strong', children: [t('b')] }, t(' '), { tag: 'em', children: [t('i')] }, t(' '),
+    { tag: 'em', children: [t('u')] }, t(' '), { tag: 'del', children: [t('s')] }, t(' '),
+    { tag: 'code', children: [t('x*y*')] }]);
+  assert.deepEqual(md('[docs](https://x.dev/a) and https://y.dev.')[0].children, [
+    { tag: 'a', href: 'https://x.dev/a', children: [t('docs')] }, t(' and '),
+    { tag: 'a', href: 'https://y.dev', children: [t('https://y.dev')] }, t('.')]);
+});
+
+test('words that only look like marks stay as written', () => {
+  assert.deepEqual(md('snake_case_name and 2 * 3 * 4')[0].children, [t('snake_case_name and 2 * 3 * 4')]);
+  assert.deepEqual(md('\\*not italic\\*')[0].children, [t('*not italic*')]);
+});
+
+test('a link to anything but http, https or mailto is not a link', () => {
+  assert.deepEqual(md('[x](javascript:alert(1))')[0].children.some(c => c.tag === 'a'), false);
+  assert.deepEqual(md('[x](javascript:void)')[0].children, [t('[x](javascript:void)')]);
+});
+
+test('HTML in a message is text', () => {
+  assert.deepEqual(md('<img src=x onerror=alert(1)>'), [{ tag: 'p', children: [t('<img src=x onerror=alert(1)>')] }]);
+});
+
+test('lists: bullets, numbers with their start, nesting, and a list right after a line of text', () => {
+  const [p, ul] = md('Steps:\n- one\n- two\n  - nested\n- three');
+  assert.equal(p.tag, 'p');
+  assert.equal(ul.tag, 'ul');
+  assert.deepEqual(ul.children.map(li => li.children[0].text), ['one', 'two', 'three']);
+  assert.equal(ul.children[1].children[1].tag, 'ul');
+  assert.deepEqual(md('3. c\n4. d')[0], { tag: 'ol', start: 3, children: [{ tag: 'li', children: [t('c')] }, { tag: 'li', children: [t('d')] }] });
+});
+
+test('headings, quotes, rules and code blocks', () => {
+  assert.deepEqual(md('## Plan\n> quoted\n\n---\n```js\nif (a < b) **x**\n```').map(b => b.tag), ['p', 'blockquote', 'hr', 'pre']);
+  assert.deepEqual(md('```\n**x**\n\n<b>\n```')[0], { tag: 'pre', children: [{ tag: 'code', children: [t('**x**\n\n<b>')] }] });
+});
+
+test('tables: a head, rows, alignment and missing cells', () => {
+  const [table] = md('| a | b |\n|:-|-:|\n| 1 | **2** |\n| 3 |');
+  assert.equal(table.tag, 'table');
+  const [head, body] = table.children;
+  assert.deepEqual(head.children[0].children.map(c => [c.tag, c.align]), [['th', ''], ['th', 'right']]);
+  assert.deepEqual(body.children[0].children[1].children, [{ tag: 'strong', children: [t('2')] }]);
+  assert.deepEqual(body.children[1].children[1].children, []);
+});
+
+test('an escaped mark neither opens nor closes italics', () => {
+  assert.deepEqual(md('\\_x\\_')[0].children, [t('_x_')]);
+  assert.deepEqual(md('*a\\*')[0].children, [t('*a*')]);
+});
+
+test('a blank line inside a list item stays, as in code under a step', () => {
+  const [ul] = md('- step\n  ```\n  a\n\n  b\n  ```');
+  assert.deepEqual(ul.children[0].children[1], { tag: 'pre', children: [{ tag: 'code', children: [t('a\n\nb')] }] });
+  assert.deepEqual(md('- a\n\n  second')[0].children[0].children.map(c => c.tag || 'text'), ['text', 'p']);
+});
+
+test('a URL as link text is not a second link', () => {
+  assert.deepEqual(md('[https://a.com](https://b.com)')[0].children, [{ tag: 'a', href: 'https://b.com', children: [t('https://a.com')] }]);
+});
+
+test('a line with a bar over a rule is not a table unless the cells match', () => {
+  assert.deepEqual(md('Results: a | b\n---\nnext').map(b => b.tag), ['p', 'hr', 'p']);
+  assert.ok(!md('a|b\n-').some(b => b.tag === 'table'));
+});
+
+test('nesting past the limit shows as written instead of overflowing', () => {
+  assert.doesNotThrow(() => md('>'.repeat(4000) + ' x'));
+  assert.doesNotThrow(() => md('- '.repeat(4000) + 'x'));
+});
+
+test('a list can start at 0', () => {
+  assert.equal(md('0. zero\n1. one')[0].start, 0);
+});

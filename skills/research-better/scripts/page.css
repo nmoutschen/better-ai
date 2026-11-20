@@ -68,6 +68,29 @@ h1 { font:700 20px/1.2 var(--serif); color:var(--cream); margin:0; }
 .msg.agent .when, .thread .reply:not(.mine) .when { color:var(--ink); }
 .msg .re { font-style:italic; }
 .msg .body { margin:4px 0 0; white-space:pre-wrap; font-size:14px; line-height:1.45; }
+/* A message in Markdown: its blocks keep a small gap, and wide code or tables scroll inside the message. */
+.body.md { white-space:normal; overflow-wrap:anywhere; }
+.body.md > * { margin:0; }
+.body.md > * + *, .body.md li > * + * { margin-top:6px; }
+.body.md ul, .body.md ol { padding-left:20px; }
+/* Inside the thread's own list, a list would start at the nested bullet: set the usual ones. */
+.body.md ul { list-style:disc; }
+.body.md ul ul { list-style:circle; }
+.body.md ol { list-style:decimal; }
+.body.md li + li { margin-top:2px; }
+.body.md .md-h { margin-top:10px; color:var(--heading); }
+.body.md .md-h:first-child { margin-top:0; }
+.body.md blockquote { padding-left:10px; border-left:2px solid var(--sand); color:var(--muted); }
+.body.md code { font:400 .9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--linen); padding:1px 4px; }
+.body.md pre { overflow-x:auto; padding:8px 10px; background:var(--linen); border:1px solid var(--line); white-space:pre; overflow-wrap:normal; }
+.body.md pre code { padding:0; background:none !important; }
+.body.md table { display:block; overflow-x:auto; border-collapse:collapse; font-size:13px; overflow-wrap:normal; }
+.body.md th, .body.md td { padding:3px 8px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+.body.md th { background:var(--linen); color:var(--heading); }
+.body.md hr { border:0; border-top:1px solid var(--line); }
+.body.md a { color:var(--umber); }
+/* On linen, the agent's code and table heads take cream, so they still stand out. */
+.msg.agent .body.md :is(code, pre, th), .thread .reply:not(.mine) .body.md :is(code, pre, th) { background:var(--cream); }
 .msg .link { margin-left:auto; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
 .msg .head .link + .link { margin-left:8px; }
 .msg .answered { font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }

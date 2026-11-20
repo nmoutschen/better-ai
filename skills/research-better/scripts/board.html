@@ -327,7 +327,7 @@ function closedItem(c) {
   const title = q ? `<button type="button" class="qlink" data-open="question:${esc(e.q)}">${esc(q.label)}</button>` : esc(e.q);
   const more = n ? `<p class="added">Raised ${plural(n, "new question")}.</p>` : "";
   return li("msg worker", `${headHTML(esc(e.by || "A worker"), e.at)}
-    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p><p class="body" dir="auto">${esc(e.text)}</p>${more}`);
+    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p>${md(e.text)}${more}`);
 }
 // A decision waiting for the user: Use the default (the check) or Answer; once answered or decided, Reply.
 function decisionItem(c, state, actions) {
@@ -336,7 +336,7 @@ function decisionItem(c, state, actions) {
   const label = status === "changed" ? "changed by you" : status === "default" ? (answer ? "default, chosen by you" : "decided without you")
     : answer ? (answer.default ? "default accepted, waiting for the coordinator" : "answered, waiting for the coordinator")
     : left > 0 ? `default in ${left < 90 ? "under 2 min" : Math.round(left / 60) + " min"}` : "default due now";
-  const item = li(`msg decision ${status}`, `${headHTML("Coordinator", "", label)}<p class="body" dir="auto">${esc(x.asked || "")} ${status === "pending" ? "If you don't answer: " : ""}${esc(def)}</p>`);
+  const item = li(`msg decision ${status}`, `${headHTML("Coordinator", "", label)}${md(`${x.asked || ""}${def ? (status === "pending" ? "\n\nIf you don't answer: " : "\n\n") + def : ""}`)}`);
   item.dataset.d = x.id;
   item.dataset.state = status === "changed" ? "done" : ast || (status === "pending" ? "asked" : "");
   const foot = document.createElement("div"); foot.className = "foot";
@@ -351,7 +351,8 @@ function crumb(e) {
   if (e.on) { x.className = "crumb"; x.innerHTML = `<span class="path">on</span><span class="el"><button type="button" data-open="${esc(e.on.kind)}:${esc(e.on.id)}">${esc(e.on.title || e.on.id)}</button></span>`; }
   return x;
 }
-function commentBody(e) { const p = document.createElement("p"); p.className = "body"; p.dir = "auto"; p.textContent = e.text; return p; }
+const md = text => pageMarkdown(text).outerHTML;  // Markdown, built as elements: safe to place as HTML
+function commentBody(e) { return pageMarkdown(e.text); }
 const conv = pageConversation({
   served: !SNAPSHOT, readOnly: !!SNAPSHOT, stream: false, name: "board", agent: "Coordinator", thread: $("thread"),
   agentKinds: ["reply", "closed"], kinds: {decision: decisionItem, closed: closedItem}, crumb, commentBody,
