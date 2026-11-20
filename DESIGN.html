@@ -68,6 +68,17 @@ button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px
 ul.legend { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; color:var(--ink); }
 ul.legend li { display:inline-flex; align-items:center; gap:6px; }
 
+/* The question header: the title with the question under it, and the page's controls on the right. A two-option
+   setting is one button that shows the current option: both options share one cell, so it keeps the longer one's width;
+   the first option shows cream and the second umber, so the colour also tells which is on. */
+.question { font:400 15px/1.4 var(--serif); margin:4px 0 0; max-width:65ch; }
+.controls { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; color:var(--cream); }
+.controls > .seg.cycle { display:inline-grid; }
+.controls > .seg.cycle button { grid-area:1 / 1; justify-content:center; border:0; }
+.controls > .seg.cycle button[aria-pressed="false"] { visibility:hidden; }
+.controls > .seg.cycle button:first-child[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
+.controls > .seg.cycle button:last-child[aria-pressed="true"] { background:transparent; color:var(--cream); }
+
 /* Segmented controls: one of several options, the chosen one filled. */
 .seg { display:inline-flex; border:1px solid var(--cream); }
 .seg[hidden] { display:none; }
@@ -295,6 +306,44 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 .t-small { font:400 12px/1.4 var(--sans); color:var(--muted); }
 .t-prose { font:400 17px/1.75 var(--serif); max-width:42rem; }
 .ref .offline.demo { max-width:34rem; }
+/* Wireframes of the board layouts: square cream boxes with thin sand borders, the header in umber. */
+.wires { display:grid; grid-template-columns:repeat(auto-fill, minmax(26rem, 1fr)); gap:24px; margin:0; }
+.wires figure { margin:0; }
+.wires figcaption { margin-top:8px; font-size:14px; line-height:1.45; }
+.wires figcaption b { color:var(--heading); }
+.wire { display:grid; grid-template-rows:4px auto 1fr; height:300px; border:1px solid var(--sand); background:var(--cream); font:400 11px/1.3 var(--sans); color:var(--ink); }
+.wire.tall { height:420px; }
+.wire > .b { background:var(--umber) var(--saya); background-size:13px 7.5px; }
+.wire > .h { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; padding:6px 10px; background:var(--umber); color:var(--cream); }
+.wire > .h .t { font:700 13px/1.2 var(--serif); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wire > .h .t small { display:block; font:400 11px/1.3 var(--serif); opacity:.85; }
+.wire > .h .r { display:flex; gap:10px; white-space:nowrap; }
+.wire > .h .r span { border:1px solid var(--cream); padding:1px 5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.wire > .h .r b { display:block; font-size:12px; text-align:right; }
+.wire > .w { display:grid; grid-template-columns:1fr 34%; min-height:0; }
+.wire.stack > .w { grid-template-columns:1fr; grid-template-rows:1fr auto; }
+.wire .v { display:flex; flex-direction:column; gap:6px; padding:8px; min-height:0; }
+.wire .v.grey { background:var(--surround); }
+.wire .n { display:flex; flex-direction:column; gap:6px; padding:8px; border-left:2px solid var(--ink); min-height:0; }
+.wire.stack .n { border-left:0; border-top:2px solid var(--ink); }
+.wire .x { border:1px solid var(--sand); background:var(--cream); padding:4px 6px; }
+.wire .x.shade { background:var(--linen); }
+.wire .x.grow { flex:1; min-height:0; }
+.wire .wrow > .x.fixed { flex:none; }
+.wire .wrow.fill { flex:1; min-height:0; }
+.wire .v:not(.grey) .wrow.fill { align-items:flex-start; }
+.wire .x.bare { background:none; border:0; }
+.wire .v.flush { padding:0; }
+.wire .x.route { border:0; border-bottom:1px solid var(--line); }
+.wire .x.slide { margin:auto; width:80%; aspect-ratio:16 / 9; }
+.wire .x.sel { outline:2px solid var(--terracotta); outline-offset:-2px; }
+.wire .wrow { display:flex; gap:6px; margin:0; }
+.wire .wrow > .x { flex:1; }
+.wire .lbl { font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.wire .s { color:var(--muted); }
+.wire .s::before { content:"\2195\00a0"; }
+.wire .tabsw { display:flex; gap:10px; border-bottom:2px solid var(--ink); padding:2px 0 3px; font-weight:700; }
+.wire .tabsw span:first-child { border-bottom:2px solid var(--terracotta); margin-bottom:-5px; }
 .article { border:1px solid var(--line); background:var(--cream); padding:24px 28px 28px; }
 .article .site { font:700 1.5rem var(--sans); color:var(--heading); margin:0 0 16px; }
 .article .site span { color:var(--muted); font-weight:400; }
@@ -412,6 +461,79 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
       <text x="466" y="50" font-family="Space Grotesk" font-size="15" fill="#33302B">Dashboard page</text>
       <text x="466" y="70" font-family="Space Grotesk" font-size="12" fill="#78736B">selected</text>
     </svg>
+  </section>
+
+  <section aria-labelledby="h-layout">
+    <h2 class="big" id="h-layout">Board layout</h2>
+    <p class="lead">Every board has the same areas: band, header, view, side column. The page never scrolls; the parts marked ↕ scroll inside themselves. A new board picks one header and one view pattern.</p>
+    <div class="wires">
+      <figure>
+        <div class="wire" role="img" aria-label="Research board: stats header; a tool row with the legend and zoom buttons over a map; a side column with the agents, then the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Agent-made local apps<small>Choose an approach for building agent apps</small></div><div class="r"><b>19 / 21 closed</b><b>1 for you</b></div></div>
+          <div class="w">
+            <div class="v"><div class="wrow"><div class="x">answered, to do, contested</div><div class="x fixed">+ &minus; Fit</div></div><div class="x grow"><span class="s">pans and zooms</span><br>Map of the research questions</div></div>
+            <div class="n"><div class="lbl">Agents</div><div class="x">w1 WebGen references</div><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Tool row and canvas</b>, research-better. Stats header. The agents sit above the conversation.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Code dashboard: stats header; agent cards that scroll, a task list fixed at the bottom; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Export invoices as CSV</div><div class="r"><b>1 / 7 done</b><b>1 question</b></div></div>
+          <div class="w">
+            <div class="v"><div class="lbl">Agents</div><div class="wrow fill"><div class="x"><span class="s">cards</span><br>3: Fix rounding of VAT totals</div><div class="x">2: Export endpoint</div></div><div class="lbl">Tasks: 1 of 7 done</div><div class="x"><span class="s">five rows</span><br>1 Done, CSV writer</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Cards and fixed list</b>, code-better. Stats header. The list stays in view under the cards.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Architect design page: stats header; tabs fixed at the top of the view over one section; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Design: Live dashboard</div><div class="r"><b>2 / 6 accepted</b><b>2 questions</b></div></div>
+          <div class="w">
+            <div class="v"><div class="tabsw"><span>Overview</span><span>Requirements</span><span>Flows</span></div><div class="x grow"><span class="s">the view</span><br>Containers: one diagram, its findings beside it</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the architect<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Tabs and sections</b>, architect-better. Stats header. The tabs stay at the top while the section scrolls.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Design canvas: question header with view controls; two versions side by side on a grey surround; the conversation with Decide.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Orders<small>Which layout shows late orders first?</small></div><div class="r"><span>Desktop</span><span>Comment</span></div></div>
+          <div class="w">
+            <div class="v grey"><div class="wrow"><div class="x bare">A, one list</div><div class="x bare">B, late first</div></div><div class="wrow fill"><div class="x"><span class="s">each</span><br>version A</div><div class="x sel"><span class="s">each</span><br>version B</div></div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>Comments on the versions</div><div class="x">Message to the agent<br><b>SEND</b>&nbsp; DECIDE&hellip;</div></div>
+          </div>
+        </div>
+        <figcaption><b>Versions side by side</b>, design-better. Question header. Each version scrolls inside its own frame.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Show-better slides: question header; a route with Previous, the slide strip and Next; one slide centred; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">A page can send your click back<small>Can a page your agent built reach it?</small></div><div class="r"><span>Comment</span></div></div>
+          <div class="w">
+            <div class="v grey flush"><div class="x shade route">PREVIOUS &nbsp;[1][2][3][4] &nbsp;1 of 8 &nbsp;NEXT</div><div class="x slide">One slide, 16:9, centred on the surround</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the agent<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Strip and stage</b>, show-better. Question header. Opened as a file, the side column is hidden.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire stack tall" role="img" aria-label="A board under 900px wide: the view first, the side column under it, and the page scrolls.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Export invoices as CSV</div><div class="r"><b>1 / 7 done</b></div></div>
+          <div class="w">
+            <div class="v"><div class="x grow">The view, 85% of the window height</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x shade">thread</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Under 900px</b>, every board. The side column moves under the view, and the page scrolls.</figcaption>
+      </figure>
+    </div>
   </section>
 
   <section aria-labelledby="h-article">

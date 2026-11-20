@@ -80,9 +80,72 @@ Spacing values, in px: 2, 4, 6, 8, 10, 12, 16, 20, 24, 32, 40. Use these only. T
 
 | Layout | Rule |
 |---|---|
-| Board | Band (6px), header bar, then a grid: the board's own view, and the conversation column at `minmax(20rem, 24rem)` behind a 2px ink rule. Each part scrolls inside itself. Under 900px the column moves below and the page scrolls. |
-| Board padding | 20px at the sides of the header, the view and the conversation. |
+| Board | See Board layout below. |
 | Article page | Band (10px), a header, the title with a terracotta band under it, then the prose column, max 42rem. A figure or a side panel may sit beside the prose from 960px. |
+
+## Board layout
+
+A board fills the window and never scrolls as a page: each area scrolls inside itself, so the header and the message box stay in view. [DESIGN.html](DESIGN.html) draws each layout below.
+
+### Areas
+
+From top to bottom, then left to right. Every board has all of them, in this order.
+
+| Area | Markup | Holds | Scrolls |
+|---|---|---|---|
+| Band | `div.band` | the sayagata band, 6px | no |
+| Header | `header` | the title, and the figures or the controls (see Headers) | no |
+| Offline notice | `p.offline` | only when the server stops answering | no |
+| Work | `div.work` | a grid: the view, then the side column at `minmax(20rem, 24rem)` behind a 2px ink rule | no |
+| View | `main` | what the agent is working on; one of the view patterns below | inside itself |
+| Side column | `aside.notes` | the conversation, and what else the agent says (see Side column) | the thread only |
+| Toast, pop-ups | `div.toast`, `.qpop`, `.pop` | over everything, outside `.work` | no |
+
+Padding is 20px at the sides of the header, the view and the side column, and 12px above the view's first row (tabs bring their own 16px).
+
+### Headers
+
+| Header | Markup | Use when | Board |
+|---|---|---|---|
+| Stats header | `header.bar--stats`: the title (and a goal line under it) on the left, `.stats` on the right | the agent works on its own, and the user comes back to see how far it is and what waits for them | research, code, architect |
+| Question header | `header`: `.ttl` with the title and `p.question` under it on the left, `.controls` on the right | the page asks the user one question, and the user works the page with modes and views | canvas, show |
+
+- The stats header never wraps: the title cuts off. The question header wraps its controls under the title on a narrow window.
+- In the question header, keep to the controls used on every visit. Put settings changed rarely in a menu, as the canvas's Display menu.
+- A board never has both: figures go in the stats header, a question goes in the question header.
+
+### View patterns
+
+| Pattern | Layout of the view | Board |
+|---|---|---|
+| Tool row and canvas | `.tools`: the legend on the left, the view's buttons on the right; then one drawing that takes the rest of the height and pans and zooms inside its frame | research |
+| Cards and fixed list | a section label and legend, then cards in a grid that scroll; under them a list fixed at the bottom of the view, five rows high, scrolling on its own | code |
+| Tabs and sections | `.tabs` fixed at the top of the view, then one section at a time; the view scrolls under the tabs | architect |
+| Versions side by side | a label row per version (its name, Full size, and thumbs up and down from three versions), then the versions in equal columns on the neutral surround, each scrolling inside its frame | canvas |
+| Strip and stage | `nav.route`: Previous, the strip of slides, the count, Next; then one slide centred on the surround | show |
+
+- A new board uses one of these patterns. A new pattern is a change to this document.
+- Put what the user acts on most at the top of the view, and what they read for detail below it or in a pop-up.
+- A drawing, a version or a slide sits on `--surround` or in a 1px `--line` frame. Panels of text sit on cream.
+
+### Side column
+
+From top to bottom:
+
+1. Optional: a short section about the agents at work, with a section label, at most 30% of the height, scrolling on its own (research).
+2. `.notes-top`: the label "Conversation", and the All / Open filter when the board has items the user accepts.
+3. `p.empty` until the first message; it says what the user can click to comment, and that they can write below.
+4. `ol.thread`: the items in time order. What waits for the user comes last, next to the message box.
+5. `.composer`: a panel for a decision when one is open (`.decide`), the `.unwatched` notice, the label "Message to …" naming the agent, the box, then `.send`: Send first, then the quiet buttons (Decide…, Copy all, Review again…), then the status line.
+
+- What waits for the user comes last in the thread. On a board with a stats header, a button figure there also counts it and goes to it.
+- A page opened as a file, with no agent, hides the side column and the view takes the whole width (show-better).
+
+### Narrow windows
+
+- Under 900px, the work stops being a grid: the view comes first at 85% of the window height, the side column under it behind a 2px ink rule, and the page scrolls.
+- The stats header keeps one row and cuts the title. The question header puts its controls under the title.
+- Boards are made for a desktop window. Phones are not tested.
 
 ## Components
 
@@ -180,6 +243,8 @@ Each of these breaks a rule above. They stay until the user decides.
 - `--muted` text on linen is 4.0:1, under 4.5:1. page.css already switches times on linen to ink; other muted text on linen should do the same.
 - The board type scale has more sizes than it needs (11, 12, 13, 14, 15px for small text). Merging them changes how boards look.
 - Spacing values are not named in code.
+- architect-better's view has 40px or more at the sides (`--pad`), the other boards 20px.
+- The agents at work sit in the side column on research-better's board and in the view on code-better's dashboard.
 
 ## Changes and exceptions
 

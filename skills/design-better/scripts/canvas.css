@@ -1,7 +1,5 @@
 /* What only the canvas shows: the versions, their controls, the comment box and the decision panel. The shared look
    is in page.css, loaded first. */
-.question { font:400 15px/1.4 var(--serif); margin:4px 0 0; max-width:65ch; }
-.controls { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; color:var(--cream); }
 .seg button.ico { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; opacity:.8;
   font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; }
 .seg button.ico[aria-pressed="true"] { opacity:1; }
@@ -9,14 +7,6 @@
 .seg button.sw .chip { width:14px; height:14px; border:1px solid var(--sand); display:block; }
 .chip--light { background:var(--surround); }
 .chip--dark { background:var(--surround-dark); }
-/* In the bar, a two-option setting is one button that shows the current option. Both options share one cell, so
-   the button keeps the width of the longer one; the first option is cream and the second umber, so the colour also
-   tells which is on. */
-.controls > .seg.cycle { display:inline-grid; }
-.controls > .seg.cycle button { grid-area:1 / 1; justify-content:center; border:0; }
-.controls > .seg.cycle button[aria-pressed="false"] { visibility:hidden; }
-.controls > .seg.cycle button:first-child[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
-.controls > .seg.cycle button:last-child[aria-pressed="true"] { background:transparent; color:var(--cream); }
 /* Settings changed rarely sit in the Display menu. */
 .more { position:relative; }
 .morebtn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--cream); background:transparent; color:var(--cream);
