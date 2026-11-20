@@ -74,4 +74,4 @@ REPORT in the conversation, USING `/write-better` for the wording if available:
 3. How many findings `.code/audit/findings.md` holds, and its path.
 4. What you did not read or run, such as history you could not see or checks that did not run.
 
-DO NOT list every finding in the report: the file holds them. OFFER to start the first proposed task with `/code-better`.
+DO NOT list the other findings in the report, not even as a short list of smaller items: the file holds them. OFFER to start the first proposed task with `/code-better`.
