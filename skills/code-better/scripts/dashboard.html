@@ -190,7 +190,7 @@ const ICON = {
 const stateIcon = (a, now) => { const s = stateOf(a, now), w = word(a, now);
   return `<span class="state ${s}" role="img" aria-label="${esc(w)}" title="${esc(w)}">${ICON[s]}${s === "quiet" ? esc(w.replace(/^quiet /, "")) : ""}</span>`; };
 const who = a => esc(a.name);
-const taskOf = a => (D.tasks || []).find(t => t.id === a.task);
+const taskOf = a => a.task ? (D.tasks || []).find(t => t.id === a.task) : undefined;
 // A task's requirements with their text from specs.md; an ID the spec does not hold shows as missing, not hidden.
 const reqsOf = t => ((t || {}).requirements || []).map(id => [id, (D.requirements || {})[id]]);
 const reqItems = t => reqsOf(t).map(([id, text]) => `<li dir="auto"><b>${esc(id)}</b>${text ? esc(text) : '<span class="missing">not in the spec</span>'}</li>`).join("");
@@ -208,7 +208,7 @@ function drawAgents(d) {
       <p class="meta">${modeTag(a)} ${stateIcon(a, now)} ${who(a)}</p>
       <h3 dir="auto">${esc(taskLabel(a))}</h3>
       ${reqsOf(taskOf(a)).length ? `<ul class="reqs">${reqItems(taskOf(a))}</ul>` : ""}
-      <ol>${a.lines.filter(l => !l.toLowerCase().startsWith("start:")).slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
+      <ol>${a.lines.filter(l => l.slice(0, l.indexOf(":")).trim().toLowerCase() !== "start").slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
       <p class="ago">Updated ${ago(d.now - a._changed)}</p></button></li>`).join("")
     || `<li class="empty">No agent is working right now.</li>`);
 }
@@ -222,7 +222,7 @@ function drawTasks(d) {
   $("tasks-h").textContent = `Tasks: ${tasks.filter(t => DONE.has(t.status)).length} of ${tasks.length} done`;
   // The tasks keep their own order, the one tasks.md gives; a task an agent works on reads "in progress".
   setHTML($("tasks"), tasks.map(t => {
-    const live = d.agents.filter(a => a.task === t.id && a.state !== "finished");
+    const live = d.agents.filter(a => a.task && a.task === t.id && a.state !== "finished");
     const st = DONE.has(t.status) ? "done" : t.status === "blocked" ? "blocked" : live.length ? "active" : "todo";
     const word = st === "active" ? "in progress" : st;
     const tag = has(t.mode) ? `<span class="mode m-${MODES[t.mode.trim().toLowerCase()] || "other"}">${esc(t.mode)}</span>` : "";
@@ -343,7 +343,8 @@ function placePop(anchor) {
 function fillPop() {
   const el = $("pop"); if (!el || !D) return;
   const ta = el.querySelector("textarea"), typed = ta ? ta.value : "", focused = ta && document.activeElement === ta;
-  const a = D.agents.find(x => x.name === OPEN.id); if (!a) return closePop();
+  // An agent that handed back leaves the page, its pop-up too.
+  const a = D.agents.find(x => x.name === OPEN.id && x.state !== "finished"); if (!a) return closePop();
   const label = `Message about ${a.name}'s work`;
   const html = `<button type="button" class="x" aria-label="Close">×</button>
     <p class="meta">${modeTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>

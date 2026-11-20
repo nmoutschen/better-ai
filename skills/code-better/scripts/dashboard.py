@@ -130,7 +130,7 @@ def read_agent(logs: Path, name: str) -> dict:
         state = STEPS.get(line.partition(":")[0].strip().lower(), "working")
     return {
         "name": name,
-        **{key: str(about.get(key, "")) for key in ("role", "task", "mode", "branch")},
+        **{key: "" if about.get(key) is None else str(about[key]) for key in ("role", "task", "mode", "branch")},
         "state": state,
         "lines": lines[-40:],
         "_changed": max(f.stat().st_mtime for f in (card, log) if f.exists()),
