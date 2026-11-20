@@ -21,8 +21,8 @@ READ and FOLLOW [../agents/perspective-reviewer.md](../agents/perspective-review
 
 ## 3. Confirm findings and report
 
-USE `/review-better` if available. OTHERWISE, CONFIRM and rank the reviewers’ findings against the evidence and the affected scenarios.
+USE `/review-better` if available to confirm and rank the reviewers’ findings against the evidence and the affected scenarios. OTHERWISE, REPORT every finding as unconfirmed.
 
-CHECK each finding against the design or the system, as the request requires. ATTACH it to the affected box, arrow or flow step. NAME the scenario or standard, the evidence, the consequence and the proposed action. MARK findings you could not confirm.
+ATTACH each finding to the affected box, arrow or flow step. NAME the scenario or standard, the evidence, the consequence and the proposed action. MARK findings that were not confirmed.
 
 ORDER confirmed findings by their effect on the goal and scenarios. REPORT them by perspective with their diagram references. NAME what should be kept, what could not be checked and which decisions the user needs to make.

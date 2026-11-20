@@ -51,18 +51,10 @@ USE `/ask-better` if available. OTHERWISE, ASK only when the answer changes the 
 
 ### Files
 
-LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP `design.md`, `design.json` and a word-for-word copy of the user's request as `request.md` together in the repo's design location for the change. KEEP decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` for the design files, request and spec, and `.architect/<change>/decisions/` for decision records.
-
-### Live page conversation
-
-REPLY in the page, in one or two short sentences. KEEP `working` on the items you are changing now, usually one. WHEN the user's answer leads to a change, MARK the item `done` once the change is in the page, and PUT your next question in a new message.
-
-### Diagram kinds
-
-RUN `python3 scripts/diagram.py register --out <file>.html` from this skill's directory to see the available diagram kinds. USE only kinds from that register.
+LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP the design of a change in its own folder, the change folder, in the design location. KEEP decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` as the change folder and for the spec, and `.architect/<change>/decisions/` for decision records.
 
 ### Missing capabilities
 
-IF you cannot do a step, because a call was denied or the harness lacks a tool, MARK the work **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own, such as reviewing the design yourself.
+IF you cannot do a step, because a call was denied, the harness lacks a tool or a file the step names is missing, MARK the work **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own, such as reviewing the design yourself.
 
 IF the page cannot be served, HOLD the same conversation in the chat.
