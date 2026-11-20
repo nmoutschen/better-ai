@@ -49,7 +49,7 @@ FOR a **behavioural** skill, GRADE the qualities its rules ask of the result and
 - a case where the rule should change the result, such as a text whose main point comes last;
 - a guard case where applying the rule harms, such as a text that is already clear and must keep its length, its facts and its structure.
 
-A behavioural skill's cases list no `reads`: its rules are in SKILL.md. RUN the `skill-not-invoked` condition as well, which installs the skill and sends the request without its slash command, because agents are meant to load a behavioural skill for the work by themselves. REPORT how often the agent loaded it, and the pass rate with and without it, so a failure to load is told apart from a failure to follow.
+A behavioural skill's cases list no `reads`: its rules are in SKILL.md. RUN the `skill-installed` condition as well, which installs the skill and sends the request without its slash command, because agents are meant to load a behavioural skill for the work by themselves. REPORT how often the agent loaded it, and the pass rate with and without it, so a failure to load is told apart from a failure to follow.
 
 ## 8. Read the run before blaming the skill
 

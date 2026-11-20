@@ -3,11 +3,11 @@
 Conditions: `no-skill` sends the request as is, `skill` installs the skill and invokes it with its slash
 command, `one-sentence` appends the one-sentence instruction for the case's first source to the request,
 `short-skill` installs a skill of the same name whose body is every sentence of `one_sentence.yaml` and invokes
-it the same way, and `skill-not-invoked` installs the skill and sends the request as is, so the agent must load
+it the same way, and `skill-installed` installs the skill and sends the request as is, so the agent must load
 the skill itself.
 
 A skill's kind, `behavioural` or `procedural`, is `metadata.kind` in its SKILL.md frontmatter. Behavioural skills
-also run `skill-not-invoked` by default, because agents are meant to load them for the work without a command.
+also run `skill-installed` by default, because agents are meant to load them for the work without a command.
 
 A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, source, reads, situation, request,
 graders),
@@ -34,17 +34,17 @@ NO_SKILL = "no-skill"
 WITH_SKILL = "skill"
 ONE_SENTENCE = "one-sentence"
 SHORT_SKILL = "short-skill"
-NOT_INVOKED = "skill-not-invoked"
-CONDITIONS = (NO_SKILL, WITH_SKILL, ONE_SENTENCE, SHORT_SKILL, NOT_INVOKED)
+SKILL_INSTALLED = "skill-installed"
+CONDITIONS = (NO_SKILL, WITH_SKILL, ONE_SENTENCE, SHORT_SKILL, SKILL_INSTALLED)
 SKILL_CONDITIONS = (WITH_SKILL, SHORT_SKILL)
-INSTALLED_CONDITIONS = (WITH_SKILL, SHORT_SKILL, NOT_INVOKED)
+INSTALLED_CONDITIONS = (WITH_SKILL, SHORT_SKILL, SKILL_INSTALLED)
 BEHAVIOURAL = "behavioural"
 PROCEDURAL = "procedural"
 KINDS = (BEHAVIOURAL, PROCEDURAL)
 # one-sentence names the tested rule, so it is a per-rule diagnostic rather than a default comparison.
 DEFAULT_CONDITIONS = {
     PROCEDURAL: (NO_SKILL, WITH_SKILL, SHORT_SKILL),
-    BEHAVIOURAL: (NO_SKILL, WITH_SKILL, SHORT_SKILL, NOT_INVOKED),
+    BEHAVIOURAL: (NO_SKILL, WITH_SKILL, SHORT_SKILL, SKILL_INSTALLED),
 }
 SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
 
@@ -136,10 +136,10 @@ def replays(directory: Path) -> dict[str, dict[str, Any]]:
 def condition_prompt(request: str, condition: str, skill: str, sentence: str | None = None) -> str:
     """Build the prompt for a condition.
 
-    no-skill and skill-not-invoked send the request as is, skill and short-skill prefix the skill's slash
+    no-skill and skill-installed send the request as is, skill and short-skill prefix the skill's slash
     command, and one-sentence appends the sentence for the case's first source to the request.
     """
-    if condition in (NO_SKILL, NOT_INVOKED):
+    if condition in (NO_SKILL, SKILL_INSTALLED):
         return request
     if condition in SKILL_CONDITIONS:
         return f"/{skill} {request}"

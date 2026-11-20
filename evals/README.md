@@ -37,7 +37,7 @@ uv run inspect eval eval.py -T skill=code-better --epochs 3 --max-samples 6 --no
 ```
 
 This runs the default conditions three times per case: no-skill, skill and
-short-skill, and for a behavioural skill also skill-not-invoked. The kind is
+short-skill, and for a behavioural skill also skill-installed. The kind is
 `metadata.kind` in the skill's frontmatter (see `PRINCIPLES.md`, section 7).
 
 Task options (`-T name=value`):
@@ -45,7 +45,7 @@ Task options (`-T name=value`):
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `skill` | required | Skill folder name, such as `code-better`. |
-| `condition` | by the skill's kind | `no-skill`, `skill`, `one-sentence`, `short-skill`, `skill-not-invoked`, or a list such as `no-skill,skill`. |
+| `condition` | by the skill's kind | `no-skill`, `skill`, `one-sentence`, `short-skill`, `skill-installed`, or a list such as `no-skill,skill`. |
 | `rule`, `cases` | all | Only one rule (`-T rule=report-accurately`) or some case ids (`-T cases=help-label,meter-zero`). |
 | `agent` | `claude_code` | `fake` plays each case's first good replay instead; no model calls. |
 | `model` | `sonnet` | Claude Code `--model` for the agent. |
@@ -73,7 +73,7 @@ Conditions:
 - **short-skill** installs a skill with the same name and frontmatter whose
   body is every sentence of `one_sentence.yaml`, and sends `/<skill> <request>`
   like **skill**. It separates the skill's length from its content.
-- **skill-not-invoked** installs the skill like **skill** and sends the request
+- **skill-installed** installs the skill like **skill** and sends the request
   as is, so the skill applies only if the agent loads it itself. It runs by
   default for behavioural skills, which agents are meant to load for the work
   without a command.
@@ -254,7 +254,7 @@ score.
 ## Skill loaded without a command
 
 A third scorer, `skill_loaded` (`grading/loaded.py`), scores the
-skill-not-invoked condition only: 1 when the agent or a sub-agent called the
+skill-installed condition only: 1 when the agent or a sub-agent called the
 harness's skill tool with the skill's name, or read the installed SKILL.md, and
 0 otherwise. The skill tool's name comes from `agent.py`. The report shows how
 many runs loaded the skill and the pass rate with and without it.

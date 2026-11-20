@@ -6,8 +6,8 @@
 Conditions: `no-skill` sends the request as is, `skill` installs the skill and prefixes `/<skill>`,
 `one-sentence` appends the sentence for the case's first source from `one_sentence.yaml`,
 `short-skill` installs a skill of the same name holding all those sentences and invokes it like `skill`,
-`skill-not-invoked` installs the skill and sends the request as is.
-The default runs no-skill, skill and short-skill, plus skill-not-invoked for a behavioural skill; one-sentence is a diagnostic for rules where the skill trails. The agent is the real Claude Code CLI (`agent=claude_code`, model from
+`skill-installed` installs the skill and sends the request as is.
+The default runs no-skill, skill and short-skill, plus skill-installed for a behavioural skill; one-sentence is a diagnostic for rules where the skill trails. The agent is the real Claude Code CLI (`agent=claude_code`, model from
 `-T model=`) or a scripted fake (`agent=fake`) that plays each case's good replay. The judge model is
 `-T judge_model=` (default: a different model from the agent; `none` skips judges). Inspect's own
 `--model` is unused: the CLI calls the API itself, so the task sets the `none` model.

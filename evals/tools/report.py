@@ -37,8 +37,8 @@ COMPARISONS = (
     ("short-skill", "no-skill"),
     ("skill", "one-sentence"),
     ("skill", "short-skill"),
-    ("skill-not-invoked", "no-skill"),
-    ("skill", "skill-not-invoked"),
+    ("skill-installed", "no-skill"),
+    ("skill", "skill-installed"),
 )
 RESAMPLES = 10_000
 RANDOM_SEED = 0
@@ -299,10 +299,10 @@ def skill_read_lines(results: list[SampleResult]) -> list[str]:
 
 
 def loaded_lines(results: list[SampleResult]) -> list[str]:
-    """Format how often skill-not-invoked runs loaded the skill, and the pass rate with and without it."""
+    """Format how often skill-installed runs loaded the skill, and the pass rate with and without it."""
     runs = [sample for sample in results if sample.skill_loaded is not None and not sample.error]
     if not runs:
-        return ["No skill-not-invoked runs."]
+        return ["No skill-installed runs."]
     lines = [f"{'skill loaded':14} {'runs':>5} {'pass rate':>10}"]
     for label, value in (("yes", 1.0), ("no", 0.0)):
         group = [sample.passed for sample in runs if sample.skill_loaded == value and not math.isnan(sample.passed)]
@@ -389,7 +389,7 @@ def main(argv: list[str] | None = None) -> int:
         ("Comparisons between conditions (paired by case)", comparison_lines(results)),
         ("Cost and time per condition", condition_cost_lines(results)),
         ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(results)),
-        ("Skill loaded without a command (skill-not-invoked)", loaded_lines(results)),
+        ("Skill loaded without a command (skill-installed)", loaded_lines(results)),
         ("Lint issues added to changed Python files (observed, not scored)", lint_lines(results)),
         ("Side actions per condition", side_action_lines(results)),
         ("Samples", case_lines(results)),

@@ -14,7 +14,7 @@ def test_condition_prompts() -> None:
     """no-skill is the request, skill the slash command, one-sentence the request plus the rule's sentence."""
     assert cases.condition_prompt("Fix it.", "no-skill", "code-better") == "Fix it."
     assert cases.condition_prompt("Fix it.", "skill", "code-better") == "/code-better Fix it."
-    assert cases.condition_prompt("Fix it.", "skill-not-invoked", "write-better") == "Fix it."
+    assert cases.condition_prompt("Fix it.", "skill-installed", "write-better") == "Fix it."
     assert cases.condition_prompt("Fix it.", "one-sentence", "code-better", "Ask first.") == "Fix it.\n\nAsk first."
     with pytest.raises(ValueError):
         cases.condition_prompt("Fix it.", "one-sentence", "code-better")
@@ -113,10 +113,10 @@ def test_earlier_work_is_the_last_commit(tmp_path: Path) -> None:
 
 
 def test_default_conditions_follow_the_skill_kind() -> None:
-    """A behavioural skill also runs skill-not-invoked by default; a procedural one does not."""
+    """A behavioural skill also runs skill-installed by default; a procedural one does not."""
     assert cases.skill_kind("write-better") == "behavioural"
     assert cases.skill_kind("code-better") == "procedural"
-    assert cases.default_conditions("write-better") == ["no-skill", "skill", "short-skill", "skill-not-invoked"]
+    assert cases.default_conditions("write-better") == ["no-skill", "skill", "short-skill", "skill-installed"]
     assert cases.default_conditions("code-better") == ["no-skill", "skill", "short-skill"]
 
 

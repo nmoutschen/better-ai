@@ -1,6 +1,6 @@
 """Grade whether the agent loaded the skill by itself, in the condition that installs it without invoking it.
 
-In `skill-not-invoked`, the skill is installed but the request has no slash command, so the skill applies only
+In `skill-installed`, the skill is installed but the request has no slash command, so the skill applies only
 if the agent loads it. The `skill_loaded` scorer, separate from the rule's scorer, scores 1 when the agent, or a
 sub-agent, called the harness's skill tool with the skill's name or read the skill's SKILL.md, and 0 otherwise.
 It gives no score in other conditions. The report splits the condition's pass rate by it, so a failure from not
@@ -15,7 +15,7 @@ from inspect_ai.scorer import Score, Scorer, Target, mean, scorer
 from inspect_ai.solver import TaskState
 
 from skill_evals.agent import READ_TOOL, SHELL_TOOL, SKILL_TOOL
-from skill_evals.cases import NOT_INVOKED
+from skill_evals.cases import SKILL_INSTALLED
 from skill_evals.grading.reads import shell_paths, skill_path
 
 
@@ -47,10 +47,10 @@ def loaded(messages: list[ChatMessage], skill: str) -> bool:
 
 @scorer(metrics=[mean()])
 def skill_loaded() -> Scorer:
-    """Score 1 when a skill-not-invoked run loaded the skill itself, 0 when not; no score in other conditions."""
+    """Score 1 when a skill-installed run loaded the skill itself, 0 when not; no score in other conditions."""
 
     async def score(state: TaskState, target: Target) -> Score | None:
-        if state.metadata["condition"] != NOT_INVOKED:
+        if state.metadata["condition"] != SKILL_INSTALLED:
             return None
         was_loaded = loaded(state.messages, state.metadata["skill"])
         explanation = "Loaded the skill." if was_loaded else "Did not load the skill."
