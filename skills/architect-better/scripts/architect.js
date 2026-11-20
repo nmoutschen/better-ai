@@ -108,9 +108,11 @@ function perspectiveTables(perspectives, findings, parts, reviewed, removedLabel
   }).join('');
 }
 
-function reviewSummary(labels, names) {
+function reviewSummary(labels, names, removed = []) {
   const rerun = names.join(', ') + (names.length === 1 ? ' runs' : ' run') + ' again';
-  if (labels.length) return 'Changed since the review: ' + labels.join(', ') + '.' + (names.length ? ' ' + rerun + '.' : '');
+  const gone = removed.length ? ' Removed: ' + removed.join(', ') + '.' : '';
+  if (labels.length) return (labels.length > removed.length ? 'Changed since the review: ' + labels.filter(l => !removed.includes(l)).join(', ') + '.' : '').trim()
+    + gone + (names.length ? ' ' + rerun + '.' : '');
   if (names.length) return rerun + ': not reviewed yet.';
   return 'Nothing changed since the review.';
 }
@@ -452,7 +454,8 @@ function start(data) {
     const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
     const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
     const labels = data.since.map(key => data.change_labels[key]);
-    $('.review-summary').textContent = review ? reviewSummary(labels, reviewNames) : stats + scope;
+    const removed = (data.removed || []).map(key => data.change_labels[key]);
+    $('.review-summary').textContent = review ? reviewSummary(labels, reviewNames, removed).trim() : stats + scope;
     toggleReview(reviewMenu.hidden);
   });
   runReview.addEventListener('click', () => {

@@ -409,6 +409,7 @@ def model(data):
     return {
         **result,
         "since": list(changes),
+        "removed": [key for key in changes if key not in parts],
         "change_labels": {key: labels.get(key, key) for key in changes},
         "removed_labels": {ref: labels.get(key, key) for ref, key in finding_parts.items() if ref not in parts},
         "rerun": rerun,
