@@ -434,3 +434,51 @@ def test_comparisons_pinned() -> None:
         ("skill-installed", "no-skill"),
         ("skill", "skill-installed"),
     )
+
+
+def errored_judge(started: str = "") -> report.SampleResult:
+    """One run of sample a-skill whose judge could not run."""
+    run = judged(True, started)
+    run.judges = {"judge": {"verdict": None, "error": "timed out"}}
+    return run
+
+
+def sample_error(started: str = "") -> report.SampleResult:
+    """One run of sample a-skill that failed before any grader ran."""
+    return report.SampleResult(
+        "a-skill", "a", "skill", "1.1", math.nan, error="RuntimeError: 429", started=started
+    )
+
+
+def test_duplicate_with_one_errored_judge_stops() -> None:
+    """The label cannot say which run it means, even when one copy's judge gave no verdict."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    with pytest.raises(ValueError, match="a-skill"):
+        report.validate_labels([judged(True, "t1"), errored_judge("t2")], labels)
+
+
+def test_duplicate_with_a_sample_error_stops() -> None:
+    """A copy that errored before grading still makes the label ambiguous."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    with pytest.raises(ValueError, match="a-skill"):
+        report.validate_labels([judged(True, "t1"), sample_error("t2")], labels)
+
+
+def test_sample_error_copy_of_another_sample_does_not_stop() -> None:
+    """Only a sample a label names makes a duplicate matter."""
+    labels = [{"sample": "other", "grader": "judge", "verdict": "PASS"}]
+    report.validate_labels([judged(True, "t1"), sample_error("t2")], labels)
+
+
+def test_latest_resolves_duplicates_with_errors() -> None:
+    """After `--latest` one run per sample is left, so the labels validate."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    for other in (errored_judge("t2"), sample_error("t2")):
+        report.validate_labels(report.latest([judged(True, "t1"), other]), labels)
+
+
+def test_single_errored_judge_with_a_label_is_unmatched() -> None:
+    """A judge that could not run gives no verdict, so its label is listed, not compared."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    report.validate_labels([errored_judge()], labels)
+    assert len(report.unmatched_labels([errored_judge()], labels)) == 2
