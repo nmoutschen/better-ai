@@ -171,3 +171,51 @@ def test_rule_key_orders_invocation_numbers_then_names() -> None:
     """Invocation first, numbered rules in numeric order, then named rules alphabetically."""
     rules = ["report-accurately", "1.10", "ask-or-proceed", "1.2", "invocation"]
     assert sorted(rules, key=report.rule_key) == ["invocation", "1.2", "1.10", "ask-or-proceed", "report-accurately"]
+
+
+def grading_error_rows() -> list[report.SampleResult]:
+    """One scored sample, one with a grading error, one agent timeout, in two conditions."""
+    return [
+        report.SampleResult("a-skill", "a", "skill", "1.1", 1, {"input_tokens": 5}, 0.5, 0.1, 30),
+        report.SampleResult(
+            "b-skill", "b", "skill", "1.1", math.nan, cost=0.4, seconds=20, grading_errors={"judge": "timed out"}
+        ),
+        report.SampleResult("c-no-skill", "c", "no-skill", "1.1", math.nan, error="RuntimeError: timed out after 1800 s"),
+    ]
+
+
+def test_grading_errors_are_counted_per_condition() -> None:
+    """Grading errors and sample errors are counted per condition, in the pass table area."""
+    lines = report.error_lines(grading_error_rows())
+    skill = next(line for line in lines if line.startswith("skill "))
+    no_skill = next(line for line in lines if line.startswith("no-skill"))
+    assert skill.split()[1:] == ["2", "0", "1"] and no_skill.split()[1:] == ["1", "1", "0"]
+
+
+def test_grading_errors_are_left_out_of_rates_and_marked() -> None:
+    """The pass table counts only scored samples; case lines mark the grading error; totals count it."""
+    assert "1/1" in report.pass_table(grading_error_rows())[1]
+    lines = report.case_lines(grading_error_rows())
+    assert next(line for line in lines if line.startswith("b-skill")).split()[1] == "GERR"
+    assert "3 samples, 1 errors, 1 grading errors" in lines[-1]
+
+
+def test_errors_are_not_averaged_in_as_zero_cost_and_time() -> None:
+    """Cost and time means use only the runs that finished and were graded."""
+    text = "\n".join(report.condition_cost_lines(grading_error_rows()))
+    skill = next(line for line in text.splitlines() if line.startswith("skill "))
+    assert skill.split()[1:3] == ["1", "0.500"] and not any(
+        line.startswith("no-skill") for line in text.splitlines()
+    )
+
+
+def test_read_result_reads_grading_errors() -> None:
+    """Grading errors come from the score metadata and make the sample unscored."""
+    score = SimpleNamespace(
+        value={"all": math.nan, "judge": math.nan}, metadata={"grading_errors": {"judge": "timed out"}}
+    )
+    sample = SimpleNamespace(
+        id="x", epoch=1, error=None, scores={"grade_cases": score}, metadata={"case": "x", "condition": "skill"}
+    )
+    result = report.read_result(sample)  # type: ignore[arg-type]
+    assert result.grading_errors == {"judge": "timed out"} and math.isnan(result.passed)

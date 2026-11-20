@@ -196,3 +196,18 @@ def test_every_skill_declares_its_kind() -> None:
     """Every skill in the repository has metadata.kind in its frontmatter."""
     for skill_md in sorted((cases.REPO / "skills").glob("*/SKILL.md")):
         assert cases.skill_kind(skill_md.parent.name) in cases.KINDS
+
+
+async def test_agent_timeout_is_a_sample_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run cut off at the timeout raises, naming the timeout, instead of being scored as a finished run."""
+
+    async def fake_cli(*args: object, **options: object) -> tuple[str, str, bool]:
+        return '{"type": "assistant", "message": {"id": "m", "content": []}}', "", True
+
+    monkeypatch.setattr(agent, "sandbox", lambda: None)
+    monkeypatch.setattr(agent, "claude_cli", fake_cli)
+    monkeypatch.setattr(agent, "secrets", lambda: ())
+    state = type("State", (), {"metadata": {}, "input_text": "Fix it"})()
+    solve = agent.claude_code(timeout=7)
+    with pytest.raises(RuntimeError, match="timed out after 7 seconds"):
+        await solve(state, None)  # type: ignore[arg-type]

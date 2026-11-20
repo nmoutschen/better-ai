@@ -128,3 +128,27 @@ async def test_malformed_judge_output(plant: Plant, monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(judge, "claude_cli", fake_cli)
     passed, info = await judge.judge({"rubric": "r"}, state, repo, "opus")  # type: ignore[arg-type]
     assert passed is False and info["malformed"] == "last line is not a verdict"
+
+
+@pytest.mark.parametrize(
+    ("cli", "reason"),
+    [
+        (("", "", True), "timed out"),
+        ((json.dumps({"is_error": True, "subtype": "error_during_execution", "result": ""}), "429", False), "error"),
+        (("", "", False), "no JSON"),
+        ((json.dumps({"result": ""}), "", False), "no reply"),
+    ],
+)
+async def test_judge_that_could_not_run_is_not_a_verdict(
+    plant: Plant, monkeypatch: pytest.MonkeyPatch, cli: tuple[str, str, bool], reason: str
+) -> None:
+    """A timeout, a CLI error or no reply gives no verdict (None, not False) and records why."""
+    repo = await plant({"f.py": ""})
+    state = SimpleNamespace(input_text="Do", messages=[ChatMessageUser(content="Do")], output=ModelOutput())
+
+    async def fake_cli(*args: Any, **options: Any) -> tuple[str, str, bool]:
+        return cli
+
+    monkeypatch.setattr(judge, "claude_cli", fake_cli)
+    passed, info = await judge.judge({"rubric": "r"}, state, repo, "opus")  # type: ignore[arg-type]
+    assert passed is None and info["verdict"] is None and reason in info["error"]
