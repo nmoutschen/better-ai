@@ -1,5 +1,5 @@
 id: readme-goal
-rule: '1.2'
+rule: name-the-goal
 source:
 - SKILL.md#1.2
 situation: The section was meant to let a new contributor run the tests. It installs requirements.txt, which lacks pytest,

@@ -17,7 +17,8 @@ evals/
     agent.py              runs Claude Code (or the scripted fake) in the sandbox
     transcript.py         stream-json -> Inspect messages, usage, cost, time
     sandbox/              Dockerfile, compose.yaml, allowlist proxy
-    grading/              scorer.py, files.py (result checks), judge.py, reads.py (skill files read), loaded.py
+    grading/              scorer.py, files.py (result checks), judge.py, reads.py (skill files read), loaded.py,
+                          commands.py, lint.py, new_lint_issues.py
   tools/
     validate_cases.py     replays good and bad runs through the result checks
     check_coverage.py     skill sections and files the cases point to
@@ -55,7 +56,8 @@ Task options (`-T name=value`):
 Inspect's own `--model` is not used: the CLI calls the API itself, so the task
 sets Inspect's `none` model. A sample whose Claude Code run ends in an error,
 such as a rate limit, is a sample error; add `--no-fail-on-error` to let the
-rest of the run continue and `inspect eval-retry` to rerun it.
+rest of the run continue and `inspect eval-retry` to rerun it. An agent run that
+hits `timeout` also raises, so it is a sample error too, never scored on partial work.
 
 Conditions:
 
@@ -224,14 +226,16 @@ starting commit or run a hidden check on a disposable copy of it:
 | `command_passes`, `command_fails` | `cmd`, optional `files`, `timeout` | The Bash command exits zero, or nonzero, on a copy of the submitted tree. |
 | `catches_bug` | `restore` or `files`, optional `tests` | A test file the agent added or changed passes on the submitted code and fails on an assertion once the bug is back (planted files restored, or replaced by `files`). |
 | `any_of` | `graders` | The first listed grader that passes passes it; later ones, such as a judge, do not run. |
-| `ran_after_last_edit` | `pattern` | A shell command matching the regex ran after the agent's last edit (`grading/commands.py`). Reads the transcript, not the tree. |
 | `ran_command` | `pattern` | A shell command matching the regex ran at any point, such as `git log` (`grading/commands.py`). Reads the transcript, not the tree. |
 
 Hidden commands find their files under `$GRADE_FILES` and the planted commit
 in `$START_COMMIT`. Use `PYTHONPATH=. python "$GRADE_FILES/check.py"` to let a
 hidden test import a planted module. A timeout (60 seconds or the spec's
-`timeout`) or a sandbox error scores 0 and is listed under `notes` in the
-score metadata.
+`timeout`) fails the check and is listed under `notes` in the score metadata. Any
+other sandbox error (the check could not run) is a grading error: the scorer
+raises, naming the grader and the cause, so the sample is a sample error that
+`inspect eval-retry` reruns. `inspect score` cannot re-score it, because it
+starts no sandbox.
 
 The judge (`type: judge`, field `rubric`, optional `observe: {cmd: ...}`)
 grades how the agent worked: what it read before editing, what it ran on the
@@ -242,8 +246,9 @@ the request, the transcript as numbered steps (each command with its result
 and exit code, each edit, each read with its range), the final reply, the Git
 diff against the starting commit, the Markdown notes the agent wrote, and with
 `observe` the output of a command run on a copy of the tree. Its last line
-must be exactly `VERDICT: PASS` or `VERDICT: FAIL`; anything else scores 0 and
-is marked malformed. Score metadata keeps each judge's reply, verdict, model,
+must be exactly `VERDICT: PASS` or `VERDICT: FAIL`; a reply whose last line is
+anything else scores 0 and is marked malformed. A judge that times out, reports
+an error or prints no reply is a grading error like the above. Score metadata keeps each judge's reply, verdict, model,
 tokens and cost under `judges`.
 
 Write each rubric for one case and one rule: name the rule, the planted facts,
@@ -255,12 +260,21 @@ final code when it ran after the last edit to the files it exercises.
 
 A second scorer, `skill_reads` (`grading/reads.py`), checks in the skill
 condition whether the agent read every skill file the case lists under
-`reads`, other than `SKILL.md`, which the slash command loads. A read is a
-Read tool call on a file in `~/.claude/skills/<skill>/`, or a Bash command
-that prints one (`cat`, `head`, `sed`...), by the agent or by a sub-agent; the
-tool names and the skills folder come from `agent.py`. It scores 1 or 0, with
-the files read and the missing ones in its metadata, and gives no score in
-other conditions or in cases that expect no reads. It is a separate scorer, as
+`reads`, other than `SKILL.md`, which the slash command loads. It works in two
+steps. A script counts a Read tool call on a file in
+`~/.claude/skills/<skill>/` that did not fail, by the agent or by a
+sub-agent; the tool names and the skills folder come from `agent.py`. For the
+files still missing, one judge call per sample (the same `claude -p` judge
+and `judge_model`, asked only when something is missing) says for each file
+whether the transcript shows the agent, or a sub-agent it started, printing
+its content by any means (`cat`, `sed`, a loop...). Only files the judge also
+finds unread are missed. A judge that cannot run makes the sample a sample
+error; with `judge_model=none` the script's result stands. It scores 1 or 0,
+with the files the script found (`read`), the files the judge found
+(`judge_read`), `missing`, who decided (`decided_by`) and the judge's reply in
+its metadata, and gives no score in other conditions or in cases that expect no
+reads. Re-scoring a log with `inspect score` needs a sandbox only when the
+judge is asked. It is a separate scorer, as
 Inspect advises for an independent judgment, so the rule's `all` is unchanged.
 The report fails a skill run that missed a read and also shows its rule-only
 score.
@@ -296,7 +310,13 @@ Label judged graders of real runs in `judge_labels/<skill>.yaml` (format in
 uv run python -m tools.report logs/<file>.eval --labels judge_labels/code-better.yaml
 ```
 
-prints the agreement per rubric and overall.
+prints the agreement per rubric and overall, per skill and agent model. One rule decides which run
+a label means: it must match exactly one run in all the logs (after `--latest`), by sample, epoch and
+grader, and by `agent_model` when the label names one. A run whose judge errored, and a run that ended in a
+sample error, count as matches, because the label may have been written on them. A label with zero or several
+matches stops the report before anything prints and names the runs it matched (agent model, log): add
+`agent_model: <model>` to the label or pass `--latest`. A label whose one run has no verdict is listed with
+the reason. Duplicate runs of samples no label names do not matter.
 
 ## Report
 
@@ -304,15 +324,20 @@ prints the agreement per rubric and overall.
 uv run python -m tools.report logs/<dir>/*.eval [more.eval ...] [--latest]
 ```
 
-prints the pass rate of `all` per rule and condition, the paired comparisons
+prints one section per skill and agent model (a mixed folder of logs is split),
+each headed with the skill, agent model, judge model, Claude Code version and
+skill commit (flagged dirty when the skill folder had uncommitted changes, `dirty ?` when the log does not say). A
+section holds the pass rate of `all` per rule and condition, the paired comparisons
 between conditions, cost and time per condition, the skill files read in the
 skill condition (per expected file, and files read where no case expects
-them), one line per sample with
+them), per case how many skill-installed runs loaded the skill and the pass rate
+when it did and when it did not, one line per sample with
 tokens (input, output, cache read, cache write), agent cost, judge cost and
-time, the totals, any sample errors, and per condition how many runs committed or rewrote
+time, the totals, any sample errors, how many samples per condition are sample errors, by cause (agent timeout, grading error, other), left out of the pass rates and the cost and time means, and per condition how many runs committed or rewrote
 history. Every sample records its commits under `side_actions` in the score metadata; only cases
 that use `no_commit` score it. With `--latest`, each case and
-condition keeps only the runs of the most recently started log that has it, so
+condition keeps only the runs of the most recently started log that has it for
+that skill and agent model, so
 a re-run after a fix replaces the runs it fixes; without it, every run of every
 log counts.
 

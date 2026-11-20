@@ -49,13 +49,14 @@ def skill_eval(
     """Build the eval for one skill: `condition` is a condition or a list, by default the skill kind's; `rule` and `cases` filter."""
     if agent not in AGENTS:
         raise ValueError(f"Agents are {', '.join(AGENTS)}")
-    conditions = parse_conditions(condition or default_conditions(check_skill(skill)))
+    skill = check_skill(skill)
+    conditions = parse_conditions(condition or default_conditions(skill))
     # Inspect parses unquoted CLI values as YAML, so a rule such as 1.5 arrives as a float.
     rule = None if rule is None else str(rule)
     case_ids = (
         [case_id.strip() for case_id in (cases.split(",") if isinstance(cases, str) else cases)] if cases else None
     )
-    dataset = samples(check_skill(skill), conditions, rule, case_ids, scripted=agent == "fake")
+    dataset = samples(skill, conditions, rule, case_ids, scripted=agent == "fake")
     if not dataset:
         raise ValueError(f"No cases for {skill!r} with rule {rule!r}, cases {cases!r}, conditions {conditions}")
     judge_model = judge_model or default_judge(agent, model)
@@ -67,7 +68,7 @@ def skill_eval(
         solver=solver,
         # The rule's score first; skill_reads and lint_issues_added are independent, so they are separate
         # scorers (Inspect's advice). lint_issues_added only observes: it is never part of a pass or fail.
-        scorer=[grade_cases(keys, judge_model), skill_reads(), skill_loaded(), lint_issues_added()],
+        scorer=[grade_cases(keys, judge_model), skill_reads(judge_model), skill_loaded(), lint_issues_added()],
         sandbox=("docker", COMPOSE),
         model="none/none",
         metadata={"skill": skill, "conditions": conditions, "rule": rule, "judge_model": judge_model}

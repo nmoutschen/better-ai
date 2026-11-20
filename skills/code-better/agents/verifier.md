@@ -33,7 +33,7 @@ None. PUT everything in the output.
 
 IF `log` is given and not none, a dashboard shows the user your work from it. CREATE it, and ADD one line at the end for each event as it happens, never editing earlier lines. START each line with its kind, and keep it to one short sentence:
 
-- `start: verifier, task <n>, <branch>` when you begin;
+- `start: <what you begin with>` when you begin;
 - `step: <what you just checked or found>` after each requirement you check and each finding you confirm;
 - `handed back: <passes | fails>, <one short reason>` at the end.
 

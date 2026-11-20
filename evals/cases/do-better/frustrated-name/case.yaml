@@ -1,5 +1,5 @@
 id: frustrated-name
-rule: '6'
+rule: lead-with-result
 source:
 - SKILL.md#6
 situation: After an earlier correction about Maria's name, the draft greets her as Marie. The user is frustrated and says

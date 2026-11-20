@@ -406,13 +406,17 @@ class Dashboard(unittest.TestCase):
                 "| 1 | Order query | feature | R1 | t1 | done |\n| 2 | Orders page | feature | R2 | t2 | todo |\n\n"
                 "## Progress notes\n"
             )
+            (folder / "specs.md").write_text(
+                "| ID | Requirement | Source | Checked by |\n|---|---|---|---|\n| R1 | The query shall list late orders. | d | t1 |\n"
+            )
             (folder / "logs").mkdir()
-            (folder / "logs" / "b1.md").write_text(
-                "start: builder, task 2, code/late-2\nstep: wrote the check\nasked: which sort order\n"
+            (folder / "logs" / "b1.json").write_text(
+                '{"role": "builder", "task": "2", "mode": "feature", "branch": "code/late-2"}'
             )
-            (folder / "logs" / "v1.md").write_text(
-                "start: verifier, task 1, code/late-1\nhanded back: passes, all met\n"
-            )
+            (folder / "logs" / "b1.md").write_text("start: reading\nstep: wrote the check\nasked: which sort order\n")
+            (folder / "logs" / "v1.json").write_text('{"role": "verifier", "task": "1", "mode": "feature"}')
+            (folder / "logs" / "v1.md").write_text("start: reading\nhanded back: passes, all met\n")
+            (folder / "logs" / "b2.json").write_text('{"role": "builder", "task": "1"}')  # started, no log line yet
             (folder / "decisions").mkdir()
             (folder / "decisions" / "D-1.md").write_text("id: D-1\nasked: Sort by days late?\nstatus: waiting\n")
             data = dashboard.load(folder)
@@ -423,6 +427,10 @@ class Dashboard(unittest.TestCase):
             (agents["b1"]["role"], agents["b1"]["task"], agents["b1"]["state"]), ("builder", "2", "waiting")
         )
         self.assertEqual((agents["v1"]["role"], agents["v1"]["state"]), ("verifier", "finished"))
+        self.assertEqual(agents["b1"]["mode"], "feature")
+        self.assertEqual((agents["b2"]["task"], agents["b2"]["state"]), ("1", "working"))
+        self.assertEqual(data["tasks"][0]["requirements"], ["R1"])
+        self.assertEqual(data["requirements"], {"R1": "The query shall list late orders."})
         self.assertEqual(data["decisions"][0]["status"], "waiting")
 
 

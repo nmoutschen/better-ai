@@ -22,7 +22,11 @@ button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px
 .bar i { display:block; height:100%; background:var(--cream); }
 
 /* The agents, on the untinted surround */
-.view { min-height:0; overflow-y:auto; padding:12px 20px; }
+/* The agents scroll; the task list stays pinned under them, five rows high, and scrolls on its own past five. */
+.view { min-height:0; display:flex; flex-direction:column; }
+.agents-pane { flex:1; min-height:0; overflow-y:auto; padding:12px 20px; }
+.tasks-pane { flex:none; padding:4px 20px 12px; border-top:2px solid var(--line); background:var(--paper, inherit); }
+.tasks-pane[hidden] { display:none; }
 .view h2 { margin:8px 0 12px; font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
 .cards { list-style:none; margin:0 0 24px; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(20rem, 1fr)); gap:12px; }
 .card { display:block; width:100%; height:100%; text-align:left; background:var(--cream); border:1px solid var(--line); border-left:4px solid var(--umber);
@@ -55,13 +59,44 @@ button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px
 .key li { display:inline-flex; align-items:center; gap:6px; }
 .chip.finished { color:var(--moss-dark); }
 .ago { margin:6px 0 0; font-size:12px; color:var(--muted); }
-.done-list { list-style:none; margin:0; padding:0; }
-.done-list button { display:block; width:100%; text-align:left; border:0; border-left:4px solid var(--line); background:none; padding:4px 8px; margin:0 0 6px;
-  font:400 14px/1.4 var(--sans); color:var(--ink); cursor:pointer; }
-.done-list button:hover span { text-decoration:underline; }
-.done-list b { font-size:12px; letter-spacing:.08em; text-transform:uppercase; margin-right:8px; }
-.finished summary { cursor:pointer; margin:8px 0 12px; font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
 .view .empty { color:var(--muted); font-style:italic; }
+/* What the agent must make true: the requirements of its task, one line each, in full in the pop-up and the task list. */
+.reqs { list-style:none; margin:0 0 6px; padding:0 0 6px; border-bottom:1px solid var(--line); font-size:13px; }
+.card .reqs li { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.card .reqs li:last-child { white-space:nowrap; }
+.reqs b, .req-list b { font:700 11px var(--sans); letter-spacing:.06em; margin-right:6px; color:var(--umber); }
+.req-list { list-style:none; margin:6px 0 8px; padding:0; }
+.req-list li { margin:4px 0; padding-left:3.2em; text-indent:-3.2em; overflow-wrap:anywhere; }
+.req-list .missing { color:var(--muted); font-style:italic; }
+.check { margin:4px 0 8px; font-size:13px; color:var(--ink); overflow-wrap:anywhere; }
+.check code { font:400 12px/1.4 ui-monospace, Menlo, monospace; }
+
+/* The task list: one folded row per task, opened to show its requirements, its check and its agents. */
+.tasks { list-style:none; margin:0; padding:0; border-top:1px solid var(--line); max-height:calc(5 * 37px); overflow-y:auto; }
+.tasks > li { border-bottom:1px solid var(--line); background:var(--cream); }
+.tasks summary { display:flex; align-items:center; gap:10px; padding:8px 12px; cursor:pointer; font:400 14px/1.4 var(--sans); color:var(--ink); }
+.tasks summary:hover .t { text-decoration:underline; }
+.tasks summary::-webkit-details-marker { display:none; }
+.tasks summary::before { content:"▸"; flex:none; width:1em; color:var(--muted); }
+.tasks details[open] summary::before { content:"▾"; }
+.tasks .n { flex:none; width:2em; font:700 13px var(--sans); color:var(--muted); }
+.tasks .t { flex:1; min-width:0; }
+.tasks .on { flex:none; font-size:12px; color:var(--muted); }
+.tasks .tstat { flex:none; width:9em; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; font:700 11px var(--sans); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
+.tasks .tstat svg { width:13px; height:13px; }
+.tasks .tstat.done { color:var(--moss-dark); }
+.tasks .tstat.blocked { color:var(--error); }
+/* Past five rows the list scrolls, with a scroll bar that stays visible. macOS hides scroll bars until you scroll,
+   and Firefox lets no page change that, so the page hides the browser's bar and draws its own track and thumb. */
+.tasks-box { display:flex; gap:4px; }
+.tasks-box .tasks { flex:1; min-width:0; scrollbar-width:none; }
+.tasks-box .tasks::-webkit-scrollbar { display:none; }
+.sbar { flex:none; width:10px; position:relative; background:var(--linen); cursor:pointer; }
+.sbar[hidden] { display:none; }
+.sbar i { position:absolute; left:2px; right:2px; background:var(--muted); cursor:grab; }
+.sbar i:active { cursor:grabbing; }
+.tasks .body { padding:0 12px 10px calc(12px + 3em + 20px); }
+.tasks .agents button { border:0; background:none; padding:0; margin-right:12px; font:700 12px var(--sans); color:var(--ink); text-decoration:underline; cursor:pointer; }
 
 /* The pop-up for an agent */
 .qpop { position:fixed; z-index:5; width:min(36rem, calc(100vw - 24px)); max-height:calc(100vh - 20px); overflow:auto; background:var(--cream);
@@ -90,10 +125,15 @@ button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px
 <p class="offline" id="offline" role="status" hidden>The dashboard is closed. Ask the agent to restart it.</p>
 <div class="work">
   <main class="view">
+   <div class="agents-pane">
     <h2>Agents</h2>
     <ul class="key" id="key" title="Key"></ul>
     <ul class="cards" id="cards"></ul>
-    <details class="finished" id="finished-sec" hidden><summary id="finished-h">Finished</summary><ul class="done-list" id="finished"></ul></details>
+   </div>
+   <section class="tasks-pane" id="tasks-sec" aria-labelledby="tasks-h" hidden>
+    <h2 id="tasks-h">Tasks</h2>
+    <div class="tasks-box"><ul class="tasks" id="tasks"></ul><div class="sbar" id="sbar" aria-hidden="true" hidden><i id="sthumb"></i></div></div>
+   </section>
   </main>
   <aside class="notes" aria-labelledby="notes-h">
     <div class="notes-top">
@@ -128,13 +168,14 @@ const DONE = new Set(["done", "merged"]);
 let D = null, OPEN = null, REPLIES = -1, CLOSED_PAGE = false;  // OPEN: the agent the pop-up shows, as {id, anchor}
 
 // An agent's log line without its first word, as a person reads it: "step: wrote the check" shows "wrote the check".
-const words = line => { const m = String(line).match(/^(start|step|asked|blocked|handed back)\s*:\s*(.*)$/i);
-  return m ? (m[1].toLowerCase() === "step" ? m[2] : `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()}: ${m[2]}`) : line; };
+const KINDS = ["start", "step", "asked", "blocked", "handed back"];
+const words = line => { const i = String(line).indexOf(":"), kind = i < 0 ? "" : line.slice(0, i).trim().toLowerCase(), rest = line.slice(i + 1).trim();
+  return !KINDS.includes(kind) ? line : kind === "step" ? rest : `${kind[0].toUpperCase()}${kind.slice(1)}: ${rest}`; };
 // Who the agent is: its name, with its role only when the name does not already say it.
 // Who the agent is and what it does: its name, its role, and for a builder the mode of its task.
 // The mode of the agent's task shows as a tag with one colour per mode; a verifier's tag is its task's mode.
 const MODES = {feature: "feature", "bug fix": "bugfix", bugfix: "bugfix", refactor: "refactor", tests: "tests"};
-const modeOf = a => String((taskOf(a) || {}).mode || "").trim().toLowerCase();
+const modeOf = a => String(a.mode || "").trim().toLowerCase();
 const modeClass = a => { const m = modeOf(a); return m && m !== "none" ? "m-" + (MODES[m] || "other") : "m-other"; };
 const modeTag = a => { const m = modeOf(a); return m && m !== "none" ? `<span class="mode ${modeClass(a)}">${esc(m)}</span>` : ""; };
 // One icon per state, drawn in currentColor so blocked and quiet take the red of their text.
@@ -149,26 +190,75 @@ const ICON = {
 const stateIcon = (a, now) => { const s = stateOf(a, now), w = word(a, now);
   return `<span class="state ${s}" role="img" aria-label="${esc(w)}" title="${esc(w)}">${ICON[s]}${s === "quiet" ? esc(w.replace(/^quiet /, "")) : ""}</span>`; };
 const who = a => esc(a.name);
-const taskOf = a => (D.tasks || []).find(t => t.id === a.task);
-const taskLabel = a => { const t = taskOf(a); return a.task ? `Task ${a.task}${t ? ": " + t.task : ""}` : "No task named"; };
+const taskOf = a => a.task ? (D.tasks || []).find(t => t.id === a.task) : undefined;
+// A task's requirements with their text from specs.md; an ID the spec does not hold shows as missing, not hidden.
+const reqsOf = t => ((t || {}).requirements || []).map(id => [id, (D.requirements || {})[id]]);
+const reqItems = t => reqsOf(t).map(([id, text]) => `<li dir="auto"><b>${esc(id)}</b>${text ? esc(text) : '<span class="missing">not in the spec</span>'}</li>`).join("");
+const taskLabel = a => { const t = taskOf(a); return t ? `${t.id}: ${t.task}` : a.task ? `Task ${a.task}` : "No task named"; };
 
 // ---------- The agents ----------
 function drawAgents(d) {
   setHTML($("key"), ["working", "waiting", "blocked", "quiet"].map(s => `<li><span class="state ${s}">${ICON[s]}</span>${s === "waiting" ? "waiting on coordinator" : s}</li>`).join(""));
   // The stuck agents first, then by task number, so the user finds both a problem and a given task without reading every card.
-  const num = a => parseFloat(a.task) || Infinity, now = d.now;
+  // The tasks keep tasks.md's order, so the agents follow it too.
+  const num = a => { const i = (d.tasks || []).findIndex(t => t.id === a.task); return i < 0 ? Infinity : i; }, now = d.now;
   const live = d.agents.filter(a => a.state !== "finished")
     .sort((a, z) => ORDER[stateOf(a, now)] - ORDER[stateOf(z, now)] || num(a) - num(z) || a.name.localeCompare(z.name));
-  const done = d.agents.filter(a => a.state === "finished").sort((a, z) => num(a) - num(z));
   setHTML($("cards"), live.map(a => `<li><button type="button" class="card ${stateOf(a, now)} ${modeClass(a)}" data-a="${esc(a.name)}">
       <p class="meta">${modeTag(a)} ${stateIcon(a, now)} ${who(a)}</p>
       <h3 dir="auto">${esc(taskLabel(a))}</h3>
-      <ol>${a.lines.filter(l => !/^start\s*:/i.test(l)).slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
+      ${reqsOf(taskOf(a)).length ? `<ul class="reqs">${reqItems(taskOf(a))}</ul>` : ""}
+      <ol>${a.lines.filter(l => l.slice(0, l.indexOf(":")).trim().toLowerCase() !== "start").slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
       <p class="ago">Updated ${ago(d.now - a._changed)}</p></button></li>`).join("")
     || `<li class="empty">No agent is working right now.</li>`);
-  $("finished-sec").hidden = !done.length; $("finished-h").textContent = `Finished (${done.length})`;
-  setHTML($("finished"), done.map(a => `<li><button type="button" data-a="${esc(a.name)}"><b>${esc(a.name)}</b> <span dir="auto">${esc(taskLabel(a))}. ${esc(words(a.lines[a.lines.length - 1] || ""))}</span></button></li>`).join(""));
 }
+// ---------- The tasks ----------
+const TICON = {todo: '<svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  done: ICON.finished, blocked: ICON.blocked, active: ICON.working};
+function drawTasks(d) {
+  const tasks = d.tasks || [];
+  $("tasks-sec").hidden = !tasks.length;
+  // The heading says how many tasks are done of how many, since past five rows the list scrolls and the rest are out of sight.
+  $("tasks-h").textContent = `Tasks: ${tasks.filter(t => DONE.has(t.status)).length} of ${tasks.length} done`;
+  // The tasks keep their own order, the one tasks.md gives; a task an agent works on reads "in progress".
+  setHTML($("tasks"), tasks.map(t => {
+    const live = d.agents.filter(a => a.task && a.task === t.id && a.state !== "finished");
+    const st = DONE.has(t.status) ? "done" : t.status === "blocked" ? "blocked" : live.length ? "active" : "todo";
+    const word = st === "active" ? "in progress" : st;
+    const tag = has(t.mode) ? `<span class="mode m-${MODES[t.mode.trim().toLowerCase()] || "other"}">${esc(t.mode)}</span>` : "";
+    const open = OPENTASKS.has(t.id) ? " open" : "";
+    return `<li><details data-t="${esc(t.id)}"${open}><summary><span class="n">${esc(t.id)}</span>
+      <span class="tstat ${st}">${TICON[st]}${word}</span>${tag}<span class="t" dir="auto">${esc(t.task)}</span>
+      ${live.length ? `<span class="on">${esc(live.map(a => a.name).join(", "))}</span>` : ""}</summary>
+      <div class="body">${reqsOf(t).length ? `<ul class="req-list">${reqItems(t)}</ul>` : '<p class="empty">No requirement named.</p>'}
+      ${has(t.check) ? `<p class="check">Check: <code>${esc(t.check)}</code></p>` : ""}
+      ${live.length ? `<p class="agents">${live.map(a => `<button type="button" data-a="${esc(a.name)}">${esc(a.name)}</button>`).join("")}</p>` : ""}</div></details></li>`;
+  }).join(""));
+}
+// The task list's own scroll bar: shown only when the list holds more than it shows, its thumb sized and placed from
+// the list's scroll. Dragging the thumb scrolls the list; a click on the track moves it by one view. The wheel and
+// the keyboard scroll the list itself, as usual.
+function syncBar() {
+  const ul = $("tasks"), bar = $("sbar"), th = $("sthumb"), h = ul.clientHeight, full = ul.scrollHeight;
+  bar.hidden = full <= h + 1; if (bar.hidden) return;
+  const size = Math.max(24, h * h / full);
+  th.style.height = size + "px"; th.style.top = (ul.scrollTop / (full - h)) * (h - size) + "px";
+}
+$("tasks").addEventListener("scroll", syncBar, {passive: true});
+addEventListener("resize", syncBar);
+$("sbar").addEventListener("pointerdown", ev => {
+  const ul = $("tasks"), th = $("sthumb");
+  if (ev.target !== th) { ul.scrollTop += (ev.offsetY < th.offsetTop ? -1 : 1) * ul.clientHeight; return; }
+  ev.preventDefault(); th.setPointerCapture(ev.pointerId);
+  const y0 = ev.clientY, top0 = ul.scrollTop, rate = (ul.scrollHeight - ul.clientHeight) / (ul.clientHeight - th.offsetHeight);
+  const move = e => { ul.scrollTop = top0 + (e.clientY - y0) * rate; };
+  th.addEventListener("pointermove", move);
+  th.addEventListener("pointerup", () => th.removeEventListener("pointermove", move), {once: true});
+});
+// Which task rows the user opened, so a refresh every two seconds does not fold them again.
+const OPENTASKS = new Set();
+document.addEventListener("toggle", ev => { const t = ev.target.dataset && ev.target.dataset.t;
+  if (t !== undefined) { ev.target.open ? OPENTASKS.add(t) : OPENTASKS.delete(t); syncBar(); } }, true);
 function setHTML(el, html) { if (el._html !== html) el.innerHTML = el._html = html; }
 
 // ---------- The conversation: page.js; the dashboard adds the coordinator's decisions and questions ----------
@@ -208,8 +298,8 @@ function decisionItem(c, state, actions) {
     : step === 2 ? "answered by you" : "decided";
   const from = [has(x.from) ? x.from : "", has(x.task) ? "task " + x.task : ""].filter(Boolean).join(", ");
   // The answer the coordinator copied shows only when the user gave it in the chat: an answer from the page is in the thread.
-  const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer: ${x.answer}`)
-    : status === "decided" && has(x.decision) ? md(`Decided: ${x.decision}`) : "";
+  const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer:\n\n${x.answer}`)
+    : status === "decided" && has(x.decision) ? md(`Decided:\n\n${x.decision}`) : "";
   const item = li(`msg decision ${status}`, `${headHTML("Coordinator", x.at, label)}${from ? `<p class="what">From ${esc(from)}</p>` : ""}
     ${md(x.asked || "")}${after}`);
   item.dataset.d = x.id;
@@ -263,11 +353,14 @@ function placePop(anchor) {
 function fillPop() {
   const el = $("pop"); if (!el || !D) return;
   const ta = el.querySelector("textarea"), typed = ta ? ta.value : "", focused = ta && document.activeElement === ta;
-  const a = D.agents.find(x => x.name === OPEN.id); if (!a) return closePop();
+  // An agent that handed back leaves the page, its pop-up too.
+  const a = D.agents.find(x => x.name === OPEN.id && x.state !== "finished"); if (!a) return closePop();
   const label = `Message about ${a.name}'s work`;
   const html = `<button type="button" class="x" aria-label="Close">×</button>
     <p class="meta">${modeTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>
     <h3 dir="auto">${esc(taskLabel(a))}</h3>
+    ${reqsOf(taskOf(a)).length ? `<ul class="req-list">${reqItems(taskOf(a))}</ul>` : ""}
+    ${taskOf(a) && has(taskOf(a).check) ? `<p class="check">Check: <code>${esc(taskOf(a).check)}</code></p>` : ""}
     <ol class="steps">${a.lines.map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
     <ul class="thread"></ul>
     <form class="ask popask"><textarea aria-label="${esc(label)}" placeholder="${esc(label)}"></textarea><button type="submit" class="btn">Send</button></form>`;
@@ -329,8 +422,10 @@ function render(d) {
       : stat(0, "open questions"))
     + (CLOSED_PAGE ? stat("Closed", `since ${new Date(d.now * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`) : ""));
   drawAgents(d);
+  drawTasks(d);
+  syncBar();
   const replies = (d.conversation || []).filter(e => e.action === "reply");
-  if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + replies[replies.length - 1].text.slice(0, 120), "ok");
+  if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + pageMarkdownText(replies[replies.length - 1].text).slice(0, 120), "ok");
   REPLIES = replies.length;
   if (OPEN) fillPop();
 }

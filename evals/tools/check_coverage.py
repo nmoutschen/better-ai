@@ -5,8 +5,8 @@ numbered rule heading of `skills/<skill>/SKILL.md`, the slug of an unnumbered `#
 `SKILL.md#ask-the-user`, `SKILL.md#invocation`, or another file of the
 skill folder, such as `modes/bug-fix.md`. Its `reads` lists the skill files the skill condition should
 read. The report lists the sections and files no case points to, and cases whose sources or reads do not
-exist. A case's `rule` names the behaviour it tests, independent of the skill's sections, so it is not checked
-here. The keys of `cases/<skill>/one_sentence.yaml` must be sources too. Unknown sources, reads or sentence
+exist. A case's `rule` names the behaviour it tests, independent of the skill's sections: a rule made only of
+digits and dots is a section number and exits 1. The keys of `cases/<skill>/one_sentence.yaml` must be sources too. Unknown sources, reads or sentence
 keys exit 1; uncovered sections and files are only reported.
 
     uv run python -m tools.check_coverage code-better
@@ -23,6 +23,7 @@ from skill_evals import cases
 
 HEADING = re.compile(r"^(#{2,6})\s+([0-9]+(?:\.[0-9]+)*)(?:[.:)]?\s|$)")
 NAMED = re.compile(r"^###\s+([^0-9\s].*?)\s*$")
+NUMERIC_RULE = re.compile(r"[0-9]+(?:\.[0-9]+)*")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 
 
@@ -78,7 +79,7 @@ def read_paths(case: dict[str, Any]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Print the coverage report for one skill; return 1 when a case names an unknown source or read."""
+    """Print the coverage report for one skill; return 1 when a case names an unknown source or read, or has a numeric rule."""
     parser = argparse.ArgumentParser(description="Compare a skill's rules and files with its eval cases.")
     parser.add_argument("skill")
     skill = cases.check_skill(parser.parse_args(argv).skill)
@@ -91,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         for path in [*map(str, case.get("source") or []), *read_paths(case)]
         if path not in sources or path == "SKILL.md"
     ]
+    numeric = [case["id"] for case in found if NUMERIC_RULE.fullmatch(str(case.get("rule")))]
     no_source = [case["id"] for case in found if not case.get("source")]
     dangling += [f"one_sentence.yaml ({key})" for key in cases.source_sentences(skill) if key not in sources]
     no_sentence = sorted(
@@ -102,7 +104,8 @@ def main(argv: list[str] | None = None) -> int:
     print("Cases without a source:", ", ".join(no_source) or "none")
     print("First sources without a sentence:", ", ".join(no_sentence) or "none")
     print("Cases with unknown sources or reads:", ", ".join(dangling) or "none")
-    return int(bool(dangling or no_source))
+    print("Cases with a numeric rule:", ", ".join(numeric) or "none")
+    return int(bool(dangling or no_source or numeric))
 
 
 if __name__ == "__main__":

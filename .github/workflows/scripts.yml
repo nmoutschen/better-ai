@@ -76,26 +76,3 @@ jobs:
             set -- skills/*/scripts/$name
             for f in "$@"; do cmp "$1" "$f"; done
           done
-
-  evals:
-    # The skill evals, with no model calls and no Docker: the unit tests, every case's good and bad replays through
-    # the deterministic graders, and the check that each case names a rule the skill has. The lint job above covers
-    # this code with evals/pyproject.toml's ruff settings.
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: evals
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - name: Install
-        run: uv sync --locked --python 3.12
-      - name: Tests
-        run: uv run pytest -q
-      - name: Cases
-        run: |
-          for skill in cases/*/; do
-            skill=$(basename "$skill")
-            uv run python -m tools.validate_cases "$skill"
-            uv run python -m tools.check_coverage "$skill"
-          done

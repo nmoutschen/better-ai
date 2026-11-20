@@ -4,7 +4,7 @@ Use these principles to write or change the eval cases and graders of a skill. T
 
 ## 1. Grade with a script what a script can decide
 
-GRADE with a script the facts an exact comparison decides: the diff, the files that must not change, a hidden check that the result works, whether a test the agent wrote fails once the bug is back, and exact values in a result, such as a total, a date or a word limit. GRADE with a script, too, what a pattern finds in the transcript's tool calls, such as which of the skill's own files the agent read. DO NOT grade with a pattern what a correct answer may say in other words: that is meaning, for the judge.
+GRADE with a script the facts an exact comparison decides: the diff, the files that must not change, a hidden check that the result works, whether a test the agent wrote fails once the bug is back, and exact values in a result, such as a total, a date or a word limit. GRADE with a script, too, what a tool call states exactly, such as the skill's own files a read tool opened. WHERE the fact is which of the skill's files the agent read, and it can be in a shell command, such as a file printed by `cat` or a sub-agent, DO NOT parse the command with a pattern: it misses some reads and invents others. LET the script decide what it can, and ASK the judge about the rest, one call per sample and only when the script found something missing. DO NOT grade with a pattern what a correct answer may say in other words: that is meaning, for the judge.
 
 KEEP hidden checks out of the sandbox until grading, and RUN them on a copy of the final tree. A hidden check FAILS on the untouched repository, unless the case states why it passes there.
 
@@ -12,7 +12,7 @@ KEEP hidden checks out of the sandbox until grading, and RUN them on a copy of t
 
 USE the judge for what only reading can decide: the meaning of a text, in the reply or in a file the agent wrote, such as whether an email keeps a fact or a checklist puts its steps in a valid order; whether the agent asked before building and what it asked; whether its claims are true; whether it explained or held back; and whether it ran a check after its last edit to the files that check exercises.
 
-GIVE the judge the request as the user wrote it, not the condition's prompt, the transcript as numbered steps, the final reply, the diff and the notes the agent wrote. RUN it on a different model from the agent's, with no tools. ITS last line is the verdict; anything else scores 0.
+GIVE the judge the request as the user wrote it, not the condition's prompt, the transcript as numbered steps, the final reply, the diff and the notes the agent wrote. RUN it on a different model from the agent's, with no tools. ITS last line is the verdict; a reply whose last line is not one scores 0. A judge that timed out, errored or printed no reply is not a score: raise, so the sample is a sample error that `inspect eval-retry` reruns. A hidden check that times out is a fail.
 
 WRITE each rubric for one case and one rule: the planted facts, the numbered conditions to PASS, the conditions that FAIL, and what does not count. GRADE the outcomes the user asked for and the case's own rule. DO NOT fail an agent for a misstep it corrected itself, or for a true remark about something the user did not ask about.
 

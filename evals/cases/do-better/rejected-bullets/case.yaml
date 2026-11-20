@@ -1,5 +1,5 @@
 id: rejected-bullets
-rule: '2.1'
+rule: compare-with-request
 source:
 - SKILL.md#2.1
 situation: The user already rejected bullet points and bold for this blurb, which goes in an email body. Now they find the
