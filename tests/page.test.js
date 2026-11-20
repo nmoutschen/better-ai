@@ -367,3 +367,26 @@ test('italics can close right before bold', () => {
 test("a notice keeps a space between nested blocks' words", () => {
   assert.equal(context.pageMarkdownText('- a\n  - b'), 'a b');
 });
+
+test('element selectors use the nearest document-unique id in a page or slide', () => {
+  // The simple fixture IDs need no escaping. The stub also checks which IDs are passed to CSS.escape.
+  const escaped = [];
+  context.CSS = { escape: id => { escaped.push(id); return id; } };
+  const doc = { querySelectorAll: () => [outside, section, first, second, name].filter(node => node.id) };
+  const element = (tagName, id, parentElement, previousElementSibling) =>
+    ({ nodeType: 1, ownerDocument: doc, tagName, id, parentElement, previousElementSibling });
+  doc.documentElement = element('HTML');
+  doc.body = element('BODY', '', doc.documentElement);
+  const outside = element('DIV', 'repeat', doc.body);
+  const section = element('SECTION', 'anchor', doc.body, outside);
+  const first = element('P', '', section);
+  const second = element('P', 'repeat', section, first);
+  const name = element('SPAN', 'name', second);
+
+  assert.equal(context.pageElementSelector(name), '#name');
+  assert.equal(context.pageElementSelector(second), '#anchor > p:nth-of-type(2)');
+  assert.equal(context.pageElementSelector(second, section), 'p:nth-of-type(2)');
+  section.id = '';
+  assert.equal(context.pageElementSelector(second), 'body > section:nth-of-type(1) > p:nth-of-type(2)');
+  assert.deepEqual(escaped, ['name', 'anchor']);
+});

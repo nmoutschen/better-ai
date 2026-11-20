@@ -74,5 +74,6 @@ jobs:
           # each skill carries a copy of the ones it uses.
           for name in page.css page.py page.js; do
             set -- skills/*/scripts/$name
+            test -f "skills/architect-better/scripts/$name" || exit 1
             for f in "$@"; do cmp "$1" "$f"; done
           done

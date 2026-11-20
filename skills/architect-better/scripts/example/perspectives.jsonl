@@ -1,0 +1,4 @@
+{"name": "Security", "applies": true, "why": "The change adds a local server that takes input.", "from": "built in (STRIDE)"}
+{"name": "Observability", "applies": true, "why": "Agents and the server write logs the page reads.", "from": "built in"}
+{"name": "API standards", "applies": false, "why": "No public API changes.", "from": "repo: none found"}
+{"name": "Data and privacy", "applies": false, "why": "No personal data is stored or sent.", "from": "built in"}
