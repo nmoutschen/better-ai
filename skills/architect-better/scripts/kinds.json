@@ -1,0 +1,177 @@
+[
+  {
+    "name": "person",
+    "label": "Person",
+    "use": "A human who uses or operates the system: the user, an operator.",
+    "group": "C4 elements",
+    "icon": "person"
+  },
+  {
+    "name": "system",
+    "label": "Software system",
+    "use": "The whole system being designed, shown as one box at the context level.",
+    "group": "C4 elements",
+    "icon": "system"
+  },
+  {
+    "name": "external",
+    "label": "External system",
+    "use": "A software system outside the team's control: a vendor API, another team's service.",
+    "group": "C4 elements",
+    "icon": "external"
+  },
+  {
+    "name": "component",
+    "label": "Component",
+    "use": "A part inside one container, such as a module or a package; used at the component level.",
+    "group": "C4 elements",
+    "icon": "component"
+  },
+  {
+    "name": "page",
+    "label": "Web app",
+    "use": "Something a person looks at in a browser or on a screen: a web page, a dashboard.",
+    "group": "Container kinds",
+    "icon": "page"
+  },
+  {
+    "name": "service",
+    "label": "Server-side app",
+    "use": "Running code that serves requests or runs a CLI: a server, an API, a daemon.",
+    "group": "Container kinds",
+    "icon": "service"
+  },
+  {
+    "name": "job",
+    "label": "Function",
+    "use": "Code that runs on a trigger or a timer, not as a long-running server.",
+    "group": "Container kinds",
+    "icon": "job"
+  },
+  {
+    "name": "store",
+    "label": "Database",
+    "use": "Durable structured data: a database, a folder of records.",
+    "group": "Container kinds",
+    "icon": "store"
+  },
+  {
+    "name": "file",
+    "label": "File",
+    "use": "Documents or files read and written whole: specs, configs, uploads.",
+    "group": "Container kinds",
+    "icon": "file"
+  },
+  {
+    "name": "files",
+    "label": "File store",
+    "use": "A collection of files read or written as whole documents.",
+    "group": "Container kinds",
+    "icon": "file"
+  },
+  {
+    "name": "queue",
+    "label": "Queue",
+    "use": "Messages or events passed in order. C4 shows these either as a container or as the label on an arrow.",
+    "group": "Container kinds",
+    "icon": "queue"
+  },
+  {
+    "name": "agent",
+    "label": "Agent",
+    "use": "An AI agent that acts in a loop with tools: a coordinator, a builder.",
+    "group": "AI",
+    "icon": "agent"
+  },
+  {
+    "name": "model",
+    "label": "Model",
+    "use": "A language or ML model the system calls for one answer, such as an LLM judge. An agent acts in a loop with tools; a model does not.",
+    "group": "AI",
+    "icon": "model-net"
+  },
+  {
+    "name": "compute",
+    "label": "Compute instance",
+    "use": "A virtual machine or bare server the team runs code on.",
+    "group": "Cloud building blocks",
+    "icon": "compute"
+  },
+  {
+    "name": "cluster",
+    "label": "Container cluster",
+    "use": "A cluster that schedules containers, such as Kubernetes.",
+    "group": "Cloud building blocks",
+    "icon": "cluster"
+  },
+  {
+    "name": "balancer",
+    "label": "Load balancer",
+    "use": "Spreads incoming requests over several instances.",
+    "group": "Cloud building blocks",
+    "icon": "balancer"
+  },
+  {
+    "name": "gateway",
+    "label": "API gateway",
+    "use": "The front door for API calls: routing, auth, rate limits.",
+    "group": "Cloud building blocks",
+    "icon": "gateway"
+  },
+  {
+    "name": "cdn",
+    "label": "CDN",
+    "use": "Copies of static content served close to users.",
+    "group": "Cloud building blocks",
+    "icon": "cdn"
+  },
+  {
+    "name": "cache",
+    "label": "Cache",
+    "use": "A fast, managed copy of data kept elsewhere, safe to lose.",
+    "group": "Cloud building blocks",
+    "icon": "cache"
+  },
+  {
+    "name": "dns",
+    "label": "DNS",
+    "use": "Maps names to addresses.",
+    "group": "Cloud building blocks",
+    "icon": "dns"
+  },
+  {
+    "name": "identity",
+    "label": "Identity / auth",
+    "use": "Who users and services are, and what they may do.",
+    "group": "Cloud building blocks",
+    "icon": "identity"
+  },
+  {
+    "name": "secrets",
+    "label": "Secrets / keys",
+    "use": "Stores and serves keys, tokens and passwords.",
+    "group": "Cloud building blocks",
+    "icon": "secrets"
+  },
+  {
+    "name": "network",
+    "label": "Network boundary",
+    "use": "A private network or subnet that boxes sit inside.",
+    "group": "Cloud building blocks",
+    "icon": "network"
+  },
+  {
+    "name": "firewall",
+    "label": "Firewall / WAF",
+    "use": "Filters traffic coming into a network or an app.",
+    "group": "Cloud building blocks",
+    "icon": "firewall"
+  },
+  {
+    "name": "monitoring",
+    "label": "Monitoring / logs",
+    "use": "Collects metrics, logs and traces, and raises alerts.",
+    "group": "Cloud building blocks",
+    "icon": "monitoring"
+  }
+]
