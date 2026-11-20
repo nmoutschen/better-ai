@@ -1,5 +1,5 @@
 # One sentence per source, keyed as in a case's `source`: that section's core instruction in skills/write-better/SKILL.md
-# (drafted 2026-11-20, not yet reviewed). The one-sentence condition appends the sentence for a case's first source to
+# (drafted and reviewed 2026-11-20). The one-sentence condition appends the sentence for a case's first source to
 # its request; the short skill holds every sentence.
 "SKILL.md#invocation": "If I ask you to review a text, report each problem with the passage and a proposed rewrite and don't change the text; if I ask for a rewrite, a text that is already clear keeps its length and structure."
 "SKILL.md#1.1": "Before writing, look up who the reader is and follow any writing guide or stated preference of mine or the project's."
