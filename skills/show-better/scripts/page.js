@@ -20,6 +20,7 @@
 // o.accept       a done item offers Accept (default true); without it, a done item is finished
 // o.filter       the thread has Open and All (default true); without it, one list in time order
 // o.waiting(c, state)  an entry that waits for the user, shown last (default: the agent's own unanswered question)
+// o.latestLast   order the items by their newest message, replies included, so the newest is at the bottom, waiting ones last (default: by first message)
 // o.readOnly     a copy of the page to read: no actions
 // o.stream       read the log from the server's /events (default true); otherwise the page calls setLog
 // o.afterSend()  called once the server saved an action
@@ -179,7 +180,7 @@ function pageConversation(o) {
   }
   function renderThread() {
     var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
-    var model = pageThread(log, itemKinds, o.waiting), entries = model.entries, open = model.open;
+    var model = pageThread(log, itemKinds, o.waiting, o.latestLast), entries = model.entries, open = model.open;
     state = model.state;
     // A box the user is typing in survives the redraw, with its text and cursor, and keeps its item on the page until
     // it is sent or cancelled, even when the item has left Open meanwhile.
@@ -230,7 +231,7 @@ function pageConversation(o) {
   }
   // The user's items that match, without actions, such as the comments on one question.
   function nodes(match) {
-    return pageThread(log, itemKinds, o.waiting).entries
+    return pageThread(log, itemKinds, o.waiting, o.latestLast).entries
       .filter(function (c) { return itemKinds.indexOf(c.kind) >= 0 && match(c.e); })
       .map(function (c) { return entryNode(c, false); });
   }
@@ -304,7 +305,9 @@ function pageWords(e) { return e.note != null ? e.note : e.text; }
 // The thread as the log makes it, without the page: each item's state, the entries in the order they show, with the
 // replies under them, and the entries Open lists. Kept apart from the drawing so it can be tested without a browser.
 // WAITING(c, state) says which entries wait for the user and come last; by default, the agent's own question.
-function pageThread(log, itemKinds, waiting) {
+// LATESTLAST puts the entries in the order of their newest message, replies included, not of their first; the waiting
+// ones still come last.
+function pageThread(log, itemKinds, waiting, latestLast) {
   var entries = [], byKey = {}, state = {};
   log.forEach(function (e) {
     if (e.action === 'status') state[e.to] = e.status;
@@ -315,20 +318,21 @@ function pageThread(log, itemKinds, waiting) {
     // A reply under a finished item is a follow-up: the item goes back to the agent.
     else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
   });
-  log.forEach(function (e) {
+  log.forEach(function (e, i) {
     // What an event answers: an answer to a decision names the decision; the rest name it in `to`.
     var to = e.action === 'answer' ? e.decision : e.to;
     if (e.action === 'comment' || e.action === 'delete') {
       var c = byKey[e.id];
-      if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [] }; entries.push(c); }
+      if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [], last: i }; entries.push(c); }
       else if (e.action === 'delete') c.deleted = true;
       else { c.e = e; c.edited = true; c.deleted = false; }
-    } else if ((e.action === 'reply' || e.action === 'answer' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && to)) && to && byKey[to]) { byKey[to].replies.push(e); if (e.id) byKey[e.id] = byKey[to]; }
+    } else if ((e.action === 'reply' || e.action === 'answer' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && to)) && to && byKey[to]) { byKey[to].replies.push(e); byKey[to].last = i; if (e.id) byKey[e.id] = byKey[to]; }
     else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
-    else { var n = { kind: e.action, e: e, replies: [] }; if (e.id) byKey[e.id] = n; entries.push(n); }
+    else { var n = { kind: e.action, e: e, replies: [], last: i }; if (e.id) byKey[e.id] = n; entries.push(n); }
   });
   // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
   // comes last, next to the message box.
+  if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
   var waits = waiting ? function (c) { return waiting(c, state); }
     : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); };
   entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
