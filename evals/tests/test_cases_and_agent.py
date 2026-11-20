@@ -44,6 +44,40 @@ def test_samples_per_case_and_condition() -> None:
     )
 
 
+def test_unknown_case_id_or_skill_fails() -> None:
+    """A case id or skill that matches no case folder is an error that names it, not a silent skip."""
+    with pytest.raises(ValueError, match="invoice-half-upp"):
+        cases.samples("code-better", ["no-skill"], None, ["invoice-half-up", "invoice-half-upp"])
+    with pytest.raises(ValueError, match="nonexistent-skill"):
+        cases.case_dirs("nonexistent-skill")
+
+
+def write_case(tmp_path: Path, text: str, folder: str = "a-case") -> Path:
+    """Write a case.yaml with a minimal valid body plus `text`, and return the case folder."""
+    directory = tmp_path / folder
+    (directory / "repo").mkdir(parents=True)
+    (directory / "repo" / "main.py").write_text("x = 1\n")
+    (directory / "case.yaml").write_text(text)
+    return directory
+
+
+VALID_CASE = "id: a-case\nrule: some-behaviour\nsituation: S.\nrequest: R.\ngraders:\n  - type: notes_only\n"
+
+
+def test_case_yaml_keys_are_checked(tmp_path: Path) -> None:
+    """A valid case loads; an unknown top-level key, an unknown grader field, or an id that is not the folder fails."""
+    assert cases.load_case(write_case(tmp_path, VALID_CASE))["id"] == "a-case"
+    with pytest.raises(ValueError, match="a-case.*read"):
+        cases.load_case(write_case(tmp_path / "1", VALID_CASE + "read: [SKILL.md]\n"))
+    with pytest.raises(ValueError, match="a-case.*paterns"):
+        cases.load_case(write_case(tmp_path / "2", VALID_CASE + "  - type: ran_command\n    paterns: x\n"))
+    nested = VALID_CASE + "  - type: any_of\n    graders:\n      - type: file_contains\n        pth: main.py\n"
+    with pytest.raises(ValueError, match="a-case.*pth"):
+        cases.load_case(write_case(tmp_path / "3", nested))
+    with pytest.raises(ValueError, match="a-case.*other-name"):
+        cases.load_case(write_case(tmp_path / "4", VALID_CASE.replace("id: a-case", "id: other-name")))
+
+
 def test_invalid_skill_name() -> None:
     """Skill names are plain folder names."""
     with pytest.raises(ValueError):
