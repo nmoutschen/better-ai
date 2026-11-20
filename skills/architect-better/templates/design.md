@@ -36,6 +36,11 @@ Diagrams: <link to design JSON>
 ## Decisions summary
 
 - <Choice>: <recommendation, drivers, trade-off, rejected alternatives and reasons, or link to the decision record>
+  - Assumes: <what must stay true for this choice to hold>
+
+## Departures from existing patterns
+
+- <Pattern not followed>: <why>
 
 ## Unresolved questions
 

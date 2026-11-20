@@ -52,8 +52,6 @@ PICK the one mode that fits the work. READ its file: it is MANDATORY, and the ne
 
 ### 3. Run the mode
 
-IF the change adds a module, a data model, a dependency or a migration and no design covers it, POINT the user to `/architect-better` and RESUME implementation with its design and spec. IF the skill is unavailable, KEEP minimal design notes in `.code/<change>/` with the approach and any decisions the user needs to make.
-
 WHEN an architect-better spec covers the change, USE it for the mode's requirements and UPDATE it in place when needed.
 
 FOLLOW every step of the mode's file, in order. The mode ends once its checks pass on the final code, or once you stop as its limits say.
@@ -93,6 +91,10 @@ ASK the user, USING `/ask-better` if available, in these cases:
 - **Conflicts.** ASK about a test that contradicts a requirement, two requirements that conflict, and a requirement that cannot or should not hold as written, with the change you propose and what the user would see differently. DO NOT build to your own version until it is agreed. ONCE agreed, REVISE the requirement in place.
 
 TREAT a constraint the user set as a requirement. ADD each answer to the spec; your own proposals are not answers. KEEP building the parts your questions do not affect.
+
+### Design for structural changes
+
+IF the change adds a module, a data model, a dependency or a migration and no design covers it, STOP and POINT the user to `/architect-better`. BUILD only once its design and spec exist. IF that skill is unavailable, SAY so and MARK the change **not finished**.
 
 ### Working notes
 

@@ -5,7 +5,7 @@ description: Use when the work splits into several tasks that each need their ow
 
 # Mode: coordinate
 
-You are the coordinator. Builders write the code, verifiers check it, and you keep the design, the spec and the task list correct. DO NOT build or verify parts yourself: an agent cannot approve its own work. This is also a design choice to save cost, because you are likely the most expensive model in the session.
+You are the coordinator. Builders write the code, verifiers check it, and you coordinate the build from the design where one exists and keep the spec and task list correct. DO NOT build or verify parts yourself: an agent cannot approve its own work. This is also a design choice to save cost, because you are likely the most expensive model in the session.
 
 IF you cannot start sub-agents, this mode cannot run: STOP before you build anything, and TELL the user WHY.
 
@@ -13,7 +13,7 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 ## 1. Prepare the spec and task list
 
-IF a spec already covers the change, USE it and UPDATE it in place where needed. OTHERWISE, READ [../templates/specs.md](../templates/specs.md) and WRITE the requirements of the whole change in `.code/<change>/specs.md`, in the template's format. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
+IF an existing spec covers the change, including a spec from `/architect-better`, USE it and UPDATE it in place where needed. OTHERWISE, READ [../templates/specs.md](../templates/specs.md) and WRITE the requirements of the whole change in `.code/<change>/specs.md`, in the template's format. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
 SPLIT the work into tasks by part, such as one module or one flow per task, never by role. EACH task fits in one context, and names its mode and its requirements. WRITE them in `.code/<change>/tasks.md`: READ [../templates/tasks.md](../templates/tasks.md) and WRITE the list in its format.
 

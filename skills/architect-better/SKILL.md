@@ -15,13 +15,8 @@ Being invoked does NOT mean designing now. The work can end with questions or an
 
 ## Principles
 
-1. Models recovering architecture from code miss relationships. The recovered view needs a check against the code.
-2. Models linking requirements to sources make false matches. Low-confidence links need a human check.
-3. Highlighting changes in the diagram makes differences easier to find than showing two diagrams side by side. Evidence for keeping the layout stable is inconclusive.
-4. STRIDE findings have modest precision. A one-off review can become a checklist exercise.
-5. Tool vendors often make claims without supporting evidence.
-6. Design documents commonly cover goals, non-goals, trade-offs, rejected alternatives, drawbacks and unresolved questions. Their shared structure is a convention.
-7. Sharing a layout between Before and After, using a live page for debate, and reviewing by perspective on approval are design choices.
+1. Models recovering architecture from code miss relationships.
+2. Sharing a layout between Before and After, using a live page for debate, and reviewing by perspective on approval are design choices.
 
 ## Instructions
 
@@ -52,11 +47,11 @@ REPORT the result and its limits. LINK the deliverables and name any decisions t
 
 ### Ask the user
 
-FOLLOW `/ask-better` if available. OTHERWISE, ASK only when the answer changes the design or resolves a material uncertainty in the audit. GIVE the concrete consequence of each option or a proposal the user can correct.
+USE `/ask-better` if available. OTHERWISE, ASK only when the answer changes the design or resolves a material uncertainty in the audit. GIVE the concrete consequence of each option or a proposal the user can correct.
 
 ### Files
 
-FOLLOW the repo's conventions for designs, decision records and specs. USE `.architect/<change>/` when there is no convention. KEEP the user's request word for word in the change folder as `request.md` when writing a design.
+LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP `design.md`, `design.json` and a word-for-word copy of the user's request as `request.md` together in the repo's design location for the change. KEEP decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` for the design files, request and spec, and `.architect/<change>/decisions/` for decision records.
 
 ### Live page conversation
 
@@ -64,8 +59,10 @@ REPLY in the page, in one or two short sentences. KEEP `working` on the items yo
 
 ### Diagram kinds
 
-USE only kinds from the register exposed by `scripts/diagram.py`.
+RUN `python3 scripts/diagram.py register --out <file>.html` from this skill's directory to see the available diagram kinds. USE only kinds from that register.
 
 ### Missing capabilities
 
-IF a required capability is missing, KEEP the step's purpose and do what you can with the available tools. USE the chat when the page is unavailable, and a separate pass when a reviewer cannot start. IF code-better’s spec template is unavailable, KEEP one EARS rule per row with its ID, source and check. REPORT what was unavailable and what remains unchecked. LABEL a separate pass as your own review.
+IF you cannot do a step, because a call was denied or the harness lacks a tool, MARK the work **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own, such as reviewing the design yourself.
+
+IF the page cannot be served, HOLD the same conversation in the chat.

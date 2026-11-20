@@ -13,9 +13,21 @@ READ the user's request, the relevant repo instructions and docs, existing desig
 
 ## 2. Draw the system as it is
 
-DRAW the current containers and flows in `design.json` in the change folder, from the code or existing design docs. USE the design JSON accepted by `scripts/diagram.py`. CHECK each box, relationship and flow step against the code. MARK what you could not verify.
+DRAW the current containers and flows in `design.json` in the design location, from the code or existing design docs. USE the design JSON accepted by `scripts/diagram.py`. CHECK each box, relationship and flow step against the code. MARK what you could not verify.
 
-RUN `python3 scripts/architect.py serve <change folder>` from the skill directory and GIVE the user the address. SHOW Before and ASK the user to confirm or correct it in the page. HANDLE their response with the commands in step 5. IF the change introduces a system or flow, SHOW its absence in Before.
+RUN these commands from this skill's directory. USE the full path of the change folder for `<folder>`.
+
+RUN `python3 scripts/diagram.py check <folder>/design.json` and `python3 scripts/diagram.py render <folder>/design.json --out <folder>/diagrams`.
+
+- RUN `python3 scripts/architect.py serve <folder>` to start the page and GIVE the user its address.
+- RUN `python3 scripts/architect.py wait <folder>` to wait for new actions. WHEN it returns, START it again and HANDLE those actions.
+- RUN `python3 scripts/architect.py pending <folder>` to read open items and their threads on each wake or resume.
+- RUN `python3 scripts/architect.py reply <folder> "<text>" --to <id>` to reply under the item you answer.
+- RUN `python3 scripts/architect.py status <folder> seen|asked|working|done|accepted <id>...` to track each item.
+
+SHOW Before and ASK the user to confirm or correct it in the page. IF the change introduces a system or flow, SHOW its absence in Before. WAIT for the user’s confirmation or correction and APPLY any corrections.
+
+MARK each item `seen` when it arrives, `asked` when you need an answer, and `done` when answered or applied. MARK it `accepted` when the user accepts it in words. TREAT a reply to a finished item as work to do.
 
 ## 3. Agree the requirements
 
@@ -27,27 +39,17 @@ DRAFT quality attributes from the request and current system as observable scena
 
 USE Attribute-Driven Design (ADD 3.0). IN each iteration, PICK the requirements and constraints that drive the design of the part in scope. COMPARE options against those drivers. CHOOSE an approach for the draft, ASSIGN responsibilities and interfaces, and WALK the scenarios through it. USE gaps or trade-offs from that walk to choose the next iteration.
 
-UPDATE `design.json` with the proposed containers, relationships and flows. USE the same boxes as flow participants. KEEP Before and After in the same layout and scale. PRESERVE part identities across Before and After, and link the same exchange across Containers and Flows. RUN `scripts/diagram.py` to check and render the JSON. CHECK that additions and removals are visible in the rendered views.
+UPDATE `design.json` with the proposed containers, relationships and flows. USE the same boxes as flow participants. KEEP Before and After in the same layout and scale. PRESERVE part identities across Before and After, and link the same exchange across Containers and Flows. CHECK and render the updated JSON as in step 2. CHECK that the rendered views highlight additions and removals, because highlighting makes changes easier to find.
 
-READ and FOLLOW [../templates/design.md](../templates/design.md). WRITE `design.md` in the design location, linking the JSON. RECORD decisions as outputs of each iteration. SHOW the recommendation, trade-offs, rejected alternatives and reasons. FLAG options that rely on unsupported vendor claims.
+READ and FOLLOW [../templates/design.md](../templates/design.md) for the conventional design document structure. WRITE `design.md` in the design location, linking the JSON. RECORD decisions as outputs of each iteration. SHOW the recommendation, trade-offs, rejected alternatives and reasons. CHECK the evidence for vendor claims, because vendors often make claims without supporting evidence. FLAG options that rely on unsupported claims.
 
-LIST each perspective and whether it applies, with a reason based on what the change touches and the applicable repo standards. USE the perspectives in step 6. KEEP unresolved questions in the design and conversation.
+LIST each perspective and whether it applies, with a reason based on what the change touches and the applicable repo standards. KEEP unresolved questions in the design and conversation.
 
 ## 5. Debate and iterate in the page
 
-KEEP the page served. SHOW Overview, Requirements, Containers, Flows, Perspectives, Decision records and Spec. OPEN each tab on its content. SHOW all flows together. USE the same Before or After setting in Containers and Flows. INVITE comments on boxes, arrows and flow steps. SHOW the options and recommendation for decisions under discussion.
+KEEP the page served. SHOW Overview, Requirements, Containers, Flows, Perspectives, Decision records and Spec. OPEN each tab directly on its content. DO NOT add an agent-written line explaining what the section is. SHOW all flows together. USE the same Before or After setting in Containers and Flows. INVITE comments on boxes, arrows and flow steps. SHOW the options and recommendation for decisions under discussion.
 
-RUN these commands from the skill directory. USE the full path of the change folder.
-
-| Command | When |
-|---|---|
-| `python3 scripts/architect.py serve <change folder>` | Start the page if it is not running. |
-| `python3 scripts/architect.py wait <change folder>` | Wait for new actions. When it returns, start it again and handle those actions. |
-| `python3 scripts/architect.py pending <change folder>` | Read open items and their threads on each wake or resume. |
-| `python3 scripts/architect.py reply <change folder> "<reply>" --to <id>` | Reply under the item you answer. |
-| `python3 scripts/architect.py status <change folder> seen\|asked\|working\|done\|accepted <id>...` | Track every item. |
-
-MARK each item `seen` when it arrives, `asked` when you need an answer, and `done` when answered or applied. MARK it `accepted` when the user accepts it in words. TREAT a reply to a finished item as work to do. UPDATE the files and rendered views as the user corrects the design. WHEN the design is ready for review, ASK the user to choose Approve….
+UPDATE the files and rendered views as the user corrects the design. WHEN the design is ready for review, ASK the user to choose Approve….
 
 ## 6. Review the approved design
 
@@ -55,7 +57,7 @@ WHEN the user chooses Approve…, READ and FOLLOW [../agents/perspective-reviewe
 
 | Perspective | What to check |
 |---|---|
-| Security | Use STRIDE, starting with the highest-risk assets, trust boundaries and flows. Check the impact and the proposed mitigation. |
+| Security | Use STRIDE, starting with the highest-risk assets, trust boundaries and flows. Check the impact and the proposed mitigation, because a one-off review can become a checklist exercise. |
 | Observability | Check how operators detect and diagnose failures on the affected paths. |
 | API standards | Check contracts, failure responses and compatibility against the applicable standards. |
 | Data and privacy | Check what data moves, who can access it and what persists. |
@@ -67,11 +69,11 @@ DEBATE findings in the page and UPDATE the design where needed. CLOSE findings t
 
 ## 7. Record decisions and extract the spec
 
-WHEN the approved design and its review are settled, READ and FOLLOW [../templates/decision.md](../templates/decision.md). WRITE one file per choice worth recording at `decisions/<id>.md` in the decision record location. LINK its drivers to requirement IDs. RECORD the chosen option, rejected alternatives with reasons and the main drawback. KEEP open questions in the design and conversation. SHOW the records with Change and fold the rejected alternatives in the page.
+WHEN the approved design and its review are settled, READ and FOLLOW [../templates/decision.md](../templates/decision.md). WRITE one file per choice worth recording as `<id>.md` in the decision record location. LINK its drivers to requirement IDs. RECORD the chosen option, rejected alternatives with reasons and the main drawback. KEEP open questions in the design and conversation. SHOW the records with Change and fold the rejected alternatives in the page.
 
 READ and FOLLOW code-better's `templates/specs.md`. WRITE `specs.md` in the spec location, or use the repo's spec format when it has one. EXTRACT every MUST and MUST NOT stated or implied by the design and decisions as one verifiable EARS statement per rule. LINK each rule to its source and name how it can be checked.
 
-READ and FOLLOW [../agents/spec-checker.md](../agents/spec-checker.md). FILL IN its inputs and START a separate checker. WAIT for its report. HOLD spec edits and hand-back while it runs. FIX confirmed omissions and unsupported links, and have the checker verify the revised mapping. ASK the user to resolve low-confidence links and carry any unresolved ones into the hand-back.
+READ and FOLLOW [../agents/spec-checker.md](../agents/spec-checker.md). FILL IN its inputs and START a separate checker. WAIT for its report. HOLD spec edits and hand-back while it runs. FIX confirmed omissions and unsupported links, and have the checker verify the revised mapping. ASK the user to resolve low-confidence links, because models make false matches between requirements and sources. CARRY unresolved links into the hand-back.
 
 ## 8. Hand back for implementation
 
