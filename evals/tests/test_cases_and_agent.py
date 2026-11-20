@@ -196,3 +196,15 @@ def test_every_skill_declares_its_kind() -> None:
     """Every skill in the repository has metadata.kind in its frontmatter."""
     for skill_md in sorted((cases.REPO / "skills").glob("*/SKILL.md")):
         assert cases.skill_kind(skill_md.parent.name) in cases.KINDS
+
+
+def test_sandbox_images_are_pinned() -> None:
+    """Node and tinyproxy are pinned to exact versions, and the proxy image tag names the tinyproxy version."""
+    import re
+
+    sandbox_dir = agent.Path(agent.__file__).with_name("sandbox")
+    assert re.search(r"^FROM node:22\.\d+\.\d+-bookworm-slim AS node$", (sandbox_dir / "Dockerfile").read_text(), re.M)
+    proxy = (sandbox_dir / "proxy.Dockerfile").read_text()
+    tinyproxy = re.search(r"apk add --no-cache tinyproxy=(\S+)", proxy)
+    assert tinyproxy
+    assert f"image: better-ai-evals-proxy:tinyproxy-{tinyproxy[1]}\n" in (sandbox_dir / "compose.yaml").read_text()
