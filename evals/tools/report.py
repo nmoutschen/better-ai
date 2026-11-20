@@ -124,13 +124,9 @@ def latest(results: list[SampleResult]) -> list[SampleResult]:
     return [result for result in results if result.started == newest[result.case, result.condition]]
 
 
-def rule_key(rule: str) -> tuple[int, list[int], str]:
-    """Sort invocation first, then numbered rules in numeric order, then named rules alphabetically."""
-    if rule == "invocation":
-        return (0, [], "")
-    if all(part.isdigit() for part in rule.split(".")):
-        return (1, [int(part) for part in rule.split(".")], "")
-    return (2, [], rule)
+def rule_key(rule: str) -> tuple[int, str]:
+    """Sort invocation first, then the rules alphabetically."""
+    return (0 if rule == "invocation" else 1, rule)
 
 
 def pass_table(results: list[SampleResult]) -> list[str]:

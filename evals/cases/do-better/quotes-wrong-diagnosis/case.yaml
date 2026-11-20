@@ -1,5 +1,5 @@
 id: quotes-wrong-diagnosis
-rule: '2.2'
+rule: check-competing-explanations
 source:
 - SKILL.md#2.2
 situation: 'The user says the comparison is too long, but what makes it unusable is that it gives each supplier''s price in

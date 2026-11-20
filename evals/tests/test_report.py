@@ -167,7 +167,7 @@ def test_lint_lines() -> None:
     assert report.lint_lines(rows()) == ["No run counted lint issues."]
 
 
-def test_rule_key_orders_invocation_numbers_then_names() -> None:
-    """Invocation first, numbered rules in numeric order, then named rules alphabetically."""
-    rules = ["report-accurately", "1.10", "ask-or-proceed", "1.2", "invocation"]
-    assert sorted(rules, key=report.rule_key) == ["invocation", "1.2", "1.10", "ask-or-proceed", "report-accurately"]
+def test_rule_key_orders_invocation_then_names() -> None:
+    """Invocation first, then named rules alphabetically."""
+    rules = ["report-accurately", "ask-or-proceed", "invocation"]
+    assert sorted(rules, key=report.rule_key) == ["invocation", "ask-or-proceed", "report-accurately"]

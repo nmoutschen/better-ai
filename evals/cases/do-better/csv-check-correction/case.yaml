@@ -1,5 +1,5 @@
 id: csv-check-correction
-rule: '5'
+rule: check-correction
 source:
 - SKILL.md#5
 situation: The export writes names with commas or quotes unescaped, so the CSV breaks. The user says names with commas break

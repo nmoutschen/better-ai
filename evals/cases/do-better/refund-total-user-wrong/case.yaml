@@ -1,5 +1,5 @@
 id: refund-total-user-wrong
-rule: '2.2'
+rule: check-competing-explanations
 source:
 - SKILL.md#2.2
 situation: 'The delivered total is right: March sales are 110 and the refund of 20 on 2026-03-31 brings it to 90, as the user''s

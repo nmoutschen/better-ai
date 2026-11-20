@@ -1,5 +1,5 @@
 id: closing-time-ask
-rule: '3.2'
+rule: ask-blocking-decision
 source:
 - SKILL.md#3.2
 situation: 'The notice gives 15:00, a time the agent invented: calendar.md says the time is to be confirmed. The user says
