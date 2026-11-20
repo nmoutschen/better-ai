@@ -9,9 +9,11 @@ FOLLOW these steps in order. The general rules of SKILL.md and the rules of this
 
 ## Rules of this mode
 
-### Change folder
+### Files
 
-KEEP the files the page reads in the change folder under the Files rule. READ and FOLLOW [../scripts/example/README.md](../scripts/example/README.md) for the fields of each file. RUN scripts from this skill's directory, with the full path of the change folder as `<folder>`. FROM step 2 on, AFTER each write to the change folder, RUN `python3 scripts/architect.py check <folder>` and FIX what it reports.
+LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP the design of a change in its own folder, the change folder, in the design location. KEEP decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` as the change folder and for the spec, and `.architect/<change>/decisions/` for decision records.
+
+KEEP the files the page reads in the change folder. READ and FOLLOW [../scripts/example/README.md](../scripts/example/README.md) for the fields of each file. RUN scripts from this skill's directory, with the full path of the change folder as `<folder>`. FROM step 2 on, AFTER each write to the change folder, RUN `python3 scripts/architect.py check <folder>` and FIX what it reports.
 
 ### Live page conversation
 
@@ -26,9 +28,9 @@ REPLY in the page, in one or two short sentences. MARK each item `seen` when it 
 
 RUN `python3 scripts/diagram.py register --out <folder>/register.html` to see the available box kinds. USE only kinds from that register.
 
-## 1. Read the request and the system
+## 1. Save the request
 
-READ the user's request, the relevant repo instructions and docs, existing designs and decision records, and the code the change touches. WRITE the user's request word for word as `request.md` in the change folder.
+WRITE the user's request word for word as `request.md` in the change folder.
 
 ## 2. Draw the system as it is
 
@@ -55,7 +57,7 @@ DRAFT quality attributes from the request and current system as observable scena
 
 ## 4. Design in attribute-driven iterations
 
-USE Attribute-Driven Design (ADD 3.0). IN each iteration, PICK the requirements and constraints that drive the design of the part in scope. COMPARE options against those drivers. CHOOSE an approach for the draft, ASSIGN responsibilities and interfaces, and WALK the scenarios through it. USE gaps or trade-offs from that walk to choose the next iteration.
+USE Attribute-Driven Design (ADD 3.0). IN each iteration, PICK the requirements and constraints that drive the design of the part in scope. LIST the options before choosing one, including at least one that is not the familiar choice, and COMPARE them against those drivers. CHOOSE an approach for the draft, ASSIGN responsibilities and interfaces, and WALK the scenarios through it. USE gaps or trade-offs from that walk to choose the next iteration.
 
 UPDATE `design.json` with the proposed containers, relationships and flows. USE the same boxes as flow participants. PRESERVE part identities across Before and After. SET `in` on every added or removed part. CHECK and render the updated JSON as in step 2.
 
@@ -65,7 +67,7 @@ PICK the perspectives that apply, from what the change touches and the applicabl
 
 | Perspective | What to check |
 |---|---|
-| Security | Use STRIDE, starting with the highest-risk assets, trust boundaries and flows. Check the impact and the proposed mitigation, because a one-off review can become a checklist exercise. |
+| Security | Use STRIDE on the assets, trust boundaries and flows where harm would be greatest, not on every part. Check the impact and the proposed mitigation. |
 | Observability | Check how operators detect and diagnose failures on the affected paths. |
 | API standards | Check contracts, failure responses and compatibility against the applicable standards. |
 | Data and privacy | Check what data moves, who can access it and what persists. |
@@ -81,13 +83,13 @@ UPDATE the files and rendered views as the user corrects the design. WHEN the us
 
 ## 6. Review the approved design
 
-WHEN the user chooses Approve…, READ and FOLLOW [../agents/perspective-reviewer.md](../agents/perspective-reviewer.md). FILL IN its inputs and START one fresh reviewer per applicable perspective on the approved design, with that perspective's checks from step 4.
+WHEN the user chooses Approve…, READ and FOLLOW [../agents/perspective-reviewer.md](../agents/perspective-reviewer.md). FILL IN its inputs and START one fresh reviewer per applicable perspective on the approved design. WRITE its `look_for` from that perspective's row of the table in step 4, the applicable standards and what the change touches. WRITE its `decided` from the constraints and preferences the user stated, such as the records of `requirements.jsonl` with source `user`, not from the design's own decisions.
 
 WAIT for every report. HOLD changes and user replies about the reviewed design while the reviewers run. THEN RUN `python3 scripts/architect.py review <folder> --perspectives <name>...` with the perspectives run.
 
-USE `/review-better` if available to confirm each finding. WRITE each finding as a record of `findings.jsonl`, with `confirmed` true when `/review-better` confirmed it and false otherwise. NAME each part it affects as `box:<id>`, `edge:<id>` or `step:<flow id>/<step id>`, where `<flow id>` is the flow's `id`, or `flow<N>` for the Nth flow. JOIN the views of one exchange with `+`, such as `edge:<id>+step:<flow id>/<step id>`. SET `handled_by` to the change or decision that addresses the finding, or `null` while it is open.
+USE `/review-better` if available to confirm each finding. OTHERWISE, CONFIRM each finding with evidence you can show, such as the code or the scenario that fails, and KEEP a finding you cannot confirm as unconfirmed. WRITE each finding as a record of `findings.jsonl`, with `confirmed` true when it is confirmed and false otherwise. NAME each part it affects as `box:<id>`, `edge:<id>` or `step:<flow id>/<step id>`, where `<flow id>` is the flow's `id`, or `flow<N>` for the Nth flow. JOIN the views of one exchange with `+`, such as `edge:<id>+step:<flow id>/<step id>`. SET `handled_by` to the change or decision that addresses the finding, or `null` while it is open.
 
-DEBATE findings in the page and UPDATE the design where needed. SET `handled_by` on findings the changes address. WHEN the user chooses Review again…, START fresh reviewers for the perspectives the page lists, and HANDLE their reports as above.
+DEBATE findings in the page and UPDATE the design where needed. WHEN the user disputes a finding, FOLLOW `/review-better` for a disputed finding if available. OTHERWISE, CHANGE the finding only when the user's argument adds evidence or shows that the finding misread the design. SET `handled_by` on findings the changes address. WHEN the user chooses Review again…, START fresh reviewers for the perspectives the page lists, with `scope` set to the `changes` listed on the approval item, and HANDLE their reports as above.
 
 ## 7. Record decisions and extract the spec
 
@@ -95,8 +97,4 @@ WHEN the approved design and its review are settled, WRITE each decision of `des
 
 READ and FOLLOW [../templates/specs.md](../templates/specs.md) to extract the spec from the design and decisions. WRITE each requirement as a record of `spec.jsonl`, with its source. WRITE the same spec as `specs.md` in the spec location, or in the repo's spec format when it has one.
 
-READ and FOLLOW [../agents/spec-checker.md](../agents/spec-checker.md). FILL IN its inputs and START a separate checker. WAIT for its report. HOLD spec edits and hand-back while it runs. FIX confirmed omissions and unsupported links, and have the checker verify the revised mapping. ASK the user to resolve low-confidence links, because models make false matches between requirements and sources. CARRY unresolved links into the hand-back.
-
-## 8. Hand back for implementation
-
-LINK the design doc and diagram JSON, the decision records and the spec. REPORT the remaining questions, findings and unchecked items. POINT the user to `/code-better` with the design and spec when they are ready to implement.
+READ and FOLLOW [../agents/spec-checker.md](../agents/spec-checker.md). FILL IN its inputs and START a separate checker. WAIT for its report. HOLD spec edits and hand-back while it runs. FIX each confirmed blocking finding, THEN START a new checker on the revised spec. DO this at most twice. STOP and CARRY the open findings into the hand-back WHEN the same finding comes back. ASK the user to settle each link the checker lists as unconfirmed. CARRY unresolved links into the hand-back.

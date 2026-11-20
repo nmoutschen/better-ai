@@ -33,3 +33,16 @@ Choose **Approve…** to start perspective reviews. When a finding appears, sele
 - Decision records with their drivers, chosen options, rejected alternatives and main drawbacks.
 - An implementation spec with verifiable requirements and source links, ready for [`/code-better`](code-better.md).
 - In audit mode, a report of findings tied to diagram parts. The audit makes no changes.
+
+<details>
+<summary><b>Works with</b></summary>
+
+- [`/ask-better`](ask-better.md) for the questions about gaps and requirements.
+- [`/decide-better`](decide-better.md) when you choose between design options.
+- [`/review-better`](review-better.md) to confirm the perspective reviewers' findings and to hold a finding you dispute.
+- [`/write-better`](write-better.md) for the final report.
+- [`/do-better`](do-better.md) when you reject the result.
+- [`/code-better`](code-better.md) builds from the design and spec, and points you here for a structural change without a design.
+- `/review-better` uses `/architect-better`'s checks when it reviews a software design.
+
+</details>
