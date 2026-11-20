@@ -293,6 +293,8 @@ def test_read_results_reads_the_run_description_from_the_log(monkeypatch: pytest
     (result,) = report.read_results([Path("x.eval")])
     assert (result.skill, result.agent_model, result.judge_model) == ("code-better", "opus", "sonnet")
     assert (result.agent_version, result.skill_commit, result.skill_dirty) == ("2.1.0", "abc1234def", True)
+    log.eval.metadata = {}
+    assert report.read_results([Path("x.eval")])[0].skill_dirty is None
 
 
 def test_group_header_names_skill_models_version_and_commit_with_dirty_flag() -> None:
@@ -324,13 +326,69 @@ def test_two_groups_print_two_sections_without_mixing_pass_rates(
     assert "0/1" in second and "100%" not in second
 
 
-def test_labels_found_in_any_group_are_not_listed_as_unmatched() -> None:
-    """The same sample id in two agent models' logs is not a duplicate across groups."""
+def two_model_runs() -> list[report.SampleResult]:
+    """The same sample id judged in an opus group and a sonnet group."""
     a, b = judged(True), judged(False)
     a.agent_model, b.agent_model = "opus", "sonnet"
+    return [a, b]
+
+
+def test_label_matching_runs_of_two_agent_models_is_an_error() -> None:
+    """A label has no agent model, so it cannot say which group's run it judged."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    with pytest.raises(ValueError, match=r"a-skill.*opus.*sonnet"):
+        report.validate_labels(two_model_runs(), labels)
+
+
+def test_label_with_agent_model_selects_one_group() -> None:
+    """An agent_model field picks the group; agreement ignores labels for other models."""
+    a, b = two_model_runs()
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS", "agent_model": "opus"}]
+    report.validate_labels([a, b], labels)
     assert report.unmatched_labels([a, b], labels) == []
     assert report.agreement([a], labels)[0].split()[-2:] == ["1/1", "agree"]
+    assert report.agreement([b], labels) == ["no labelled judge verdicts in these logs"]
+
+
+def test_label_naming_a_model_with_no_run_is_unmatched() -> None:
+    """A label for an agent model that has no such run is listed as unmatched."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS", "agent_model": "haiku"}]
+    assert len(report.unmatched_labels(two_model_runs(), labels)) == 2
+
+
+def test_main_stops_before_printing_when_a_label_spans_groups(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """The ambiguity is found before the first section prints."""
+    labels = tmp_path / "labels.yaml"
+    labels.write_text("- {sample: a-skill, grader: judge, verdict: PASS}\n")
+    monkeypatch.setattr(report, "read_results", lambda paths: two_model_runs())
+    with pytest.raises(SystemExit, match="a-skill"):
+        report.main(["x.eval", "--labels", str(labels)])
+    assert capsys.readouterr().out == ""
+
+
+def test_duplicate_run_in_a_later_group_stops_before_printing(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """A duplicate key in the second group does not leave the first group's sections printed."""
+    runs = two_model_runs()
+    twin = judged(False)
+    twin.agent_model = "sonnet"
+    labels = tmp_path / "labels.yaml"
+    labels.write_text("- {sample: a-skill, grader: judge, verdict: PASS, agent_model: opus}\n")
+    monkeypatch.setattr(report, "read_results", lambda paths: [*runs, twin])
+    with pytest.raises(SystemExit):
+        report.main(["x.eval", "--labels", str(labels)])
+    assert capsys.readouterr().out == ""
+
+
+def test_log_without_skill_dirty_shows_unknown() -> None:
+    """Only a log that says the skill folder was clean is shown clean."""
+    result = grouped("code-better", "opus", 1)
+    result.skill_commit = "abc1234def"
+    result.skill_dirty = None
+    assert "abc1234 (dirty ?)" in "\n".join(report.group_header([result]))
 
 
 def installed(case: str, loaded: float | None, passed: float) -> report.SampleResult:
