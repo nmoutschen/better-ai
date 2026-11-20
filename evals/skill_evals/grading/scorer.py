@@ -68,8 +68,6 @@ class Grading:
             if passed is None:
                 raise GradingError(redact(f"{key}: judge could not run: {info.get('error', 'gave no verdict')}"))
             return int(passed)
-        if kind == "ran_after_last_edit":
-            return int(commands.ran_after_last_edit(spec, self.state.messages))
         if kind == "ran_command":
             return int(commands.ran_command(spec, self.state.messages))
         if kind not in GRADERS:

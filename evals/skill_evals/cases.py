@@ -67,7 +67,6 @@ GRADER_FIELDS: dict[str, tuple[str, ...]] = {
     "note_written": (),
     "notes_only": (),
     "planted_unchanged": ("except",),
-    "ran_after_last_edit": ("pattern",),
     "ran_command": ("pattern",),
 }
 

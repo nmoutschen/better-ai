@@ -258,3 +258,34 @@ async def test_agent_timeout_is_a_sample_error(monkeypatch: pytest.MonkeyPatch) 
     solve = agent.claude_code(timeout=7)
     with pytest.raises(RuntimeError, match="timed out after 7 seconds"):
         await solve(state, None)  # type: ignore[arg-type]
+
+
+def test_lint_cases_grade_the_lint_run_with_the_judge() -> None:
+    """Each code-better lint case judges whether ruff ran after the last edit, keeps its script checks, and has no command-pattern grader for it."""
+    assert "ran_after_last_edit" not in cases.GRADER_FIELDS
+    directories = [path for path in cases.case_dirs("code-better") if path.name.startswith("lint-")]
+    assert len(directories) == 7
+    for directory in directories:
+        graders = cases.load_case(directory)["graders"]
+        types = [grader["type"] for grader in graders]
+        assert "ran_after_last_edit" not in types, directory.name
+        assert "command_passes" in types and "planted_unchanged" in types, directory.name
+        rubrics = [grader["rubric"] for grader in graders if grader["type"] == "judge"]
+        assert len(rubrics) == 1, directory.name
+        assert "ruff" in rubrics[0] and "PASS only if" in rubrics[0] and "FAIL" in rubrics[0], directory.name
+        assert "whether or not a ruff check follows the pop" in rubrics[0], directory.name
+        assert "The ruff check that counts is the last one run on the agent's final code" in rubrics[0], directory.name
+        assert "A run by a sub-agent the agent started counts." in rubrics[0], directory.name
+        assert "different from what the last ruff check saw" not in rubrics[0], directory.name
+        assert "that leaves a .py file different from the agent's own code before the command" in rubrics[0], (
+            directory.name
+        )
+        assert (
+            "the last `ruff check` run on the agent's own code (not on the planted code while its changes were set aside)"
+            in rubrics[0]
+        ), directory.name
+        assert "any tool call or command that writes or changes a .py file in the repository, such as" in rubrics[0], (
+            directory.name
+        )
+        assert "Edits by a sub-agent the agent started count as edits too." in rubrics[0], directory.name
+        assert "the file edit and file write tools" in rubrics[0], directory.name

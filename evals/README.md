@@ -226,7 +226,6 @@ starting commit or run a hidden check on a disposable copy of it:
 | `command_passes`, `command_fails` | `cmd`, optional `files`, `timeout` | The Bash command exits zero, or nonzero, on a copy of the submitted tree. |
 | `catches_bug` | `restore` or `files`, optional `tests` | A test file the agent added or changed passes on the submitted code and fails on an assertion once the bug is back (planted files restored, or replaced by `files`). |
 | `any_of` | `graders` | The first listed grader that passes passes it; later ones, such as a judge, do not run. |
-| `ran_after_last_edit` | `pattern` | A shell command matching the regex ran after the agent's last edit (`grading/commands.py`). Reads the transcript, not the tree. |
 | `ran_command` | `pattern` | A shell command matching the regex ran at any point, such as `git log` (`grading/commands.py`). Reads the transcript, not the tree. |
 
 Hidden commands find their files under `$GRADE_FILES` and the planted commit
