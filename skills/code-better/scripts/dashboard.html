@@ -187,8 +187,10 @@ function events(d) {
 // step:begin
 // A question to the user moves forward only: 0 Waiting for you, 1 You answered, 2 Applied; a decision has none (-1).
 // The user's latest answer is an item with its own state: when the coordinator asked back (`asked`), the user is up again.
-const decisionStep = (status, answer, st) => status === "answered" ? 2 : status !== "waiting" ? -1
-  : !answer ? 0 : st[answer.id] === "asked" ? 0 : ["done", "accepted"].includes(st[answer.id]) ? 2 : 1;
+// An `answered` file is Applied, unless the coordinator asked back in the thread since: then the user is up again.
+const decisionStep = (status, answer, st) => status !== "waiting" && status !== "answered" ? -1
+  : answer && st[answer.id] === "asked" ? 0 : status === "answered" ? 2
+  : !answer ? 0 : ["done", "accepted"].includes(st[answer.id]) ? 2 : 1;
 // step:end
 const decisionStatus = x => String(x.status || "decided").trim().toLowerCase();
 const answerOf = c => c.replies.filter(r => r.action === "answer").pop();

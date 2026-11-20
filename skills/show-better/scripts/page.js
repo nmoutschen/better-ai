@@ -20,7 +20,7 @@
 // o.accept       a done item offers Accept (default true); without it, a done item is finished
 // o.filter       the thread has Open and All (default true); without it, one list in time order
 // o.waiting(c, state)  an entry that waits for the user, shown last (default: the agent's own unanswered question)
-// o.latestLast   order the items by their newest message, replies included, so the newest is at the bottom (default: by first message)
+// o.latestLast   order the items by their newest message, replies included, so the newest is at the bottom, waiting ones last (default: by first message)
 // o.readOnly     a copy of the page to read: no actions
 // o.stream       read the log from the server's /events (default true); otherwise the page calls setLog
 // o.afterSend()  called once the server saved an action
@@ -305,8 +305,8 @@ function pageWords(e) { return e.note != null ? e.note : e.text; }
 // The thread as the log makes it, without the page: each item's state, the entries in the order they show, with the
 // replies under them, and the entries Open lists. Kept apart from the drawing so it can be tested without a browser.
 // WAITING(c, state) says which entries wait for the user and come last; by default, the agent's own question.
-// LATESTLAST puts the entries in the order of their newest message, replies included, not of their first, and keeps
-// the waiting ones in that order too.
+// LATESTLAST puts the entries in the order of their newest message, replies included, not of their first; the waiting
+// ones still come last.
 function pageThread(log, itemKinds, waiting, latestLast) {
   var entries = [], byKey = {}, state = {};
   log.forEach(function (e) {
@@ -335,7 +335,7 @@ function pageThread(log, itemKinds, waiting, latestLast) {
   if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
   var waits = waiting ? function (c) { return waiting(c, state); }
     : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); };
-  if (!latestLast) entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
+  entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
   // Open: the user's items not yet accepted, with what was said under them, and the entries waiting for the user.
   var open = entries.filter(function (c) {
     return (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waits(c);

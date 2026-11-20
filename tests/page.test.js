@@ -240,7 +240,7 @@ test('a question the coordinator asked back about waits for the user again, unti
   assert.equal(shows('waiting', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
   // The file already says answered: when the coordinator asks back, the latest answer decides, not the file.
   assert.equal(shows('answered', a1, { 'a-1': 'asked' }), 'Waiting for you');
-  assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'seen' }), 'You answered');
+  assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'seen' }), 'Applied');  // answered again: the file's word stands
   assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
   assert.equal(shows('answered', null, {}), 'Applied');  // answered in the chat: no item in the thread
 });
@@ -266,7 +266,7 @@ test('a decision card renders for a waiting, an answered-then-asked and a decide
   assert.equal(reAsked.head, '10:00');
   assert.match(reAsked.foot, /Waiting for you/);
   assert.ok(reAsked.item.classList.list.includes('open-q'));
-  assert.equal(run('answered', ['a-1', 'a-2'], { 'a-1': 'asked', 'a-2': 'seen' }).head, 'answered, waiting for the coordinator');
+  assert.equal(run('answered', ['a-1', 'a-2'], { 'a-1': 'asked', 'a-2': 'seen' }).head, 'answered by you');
   assert.equal(run('answered', ['a-1', 'a-2'], { 'a-2': 'done' }).head, 'answered by you');
   const decided = run('decided', [], {});
   assert.equal(decided.head, 'decided');
