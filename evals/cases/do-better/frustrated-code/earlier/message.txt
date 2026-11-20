@@ -1,0 +1,8 @@
+Count refunds in the monthly total, second try
+
+Asked: add refunds to the monthly total in sales.py. Refunds are rows with a
+negative amount, and they should reduce the month's total.
+
+Your correction on the first version: "Refunds still aren't counted, March
+shows 110." Rewrote the month filter with start and end dates. March now
+comes to 90. test_sales.py passes.

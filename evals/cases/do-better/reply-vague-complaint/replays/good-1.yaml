@@ -1,0 +1,24 @@
+actions:
+- read: reply.md
+- read: calendar.md
+- write: reply.md
+  content: 'Hi Maria,
+
+
+    Thanks for sending the draft numbers. I can''t make Thursday at 10:00, as I''m on a hiring panel all morning.
+
+
+    Would Thursday at 15:00 or Friday at 9:30 work instead? Either gives us the full 45 minutes, and I''ll have read the draft
+    numbers by then.
+
+
+    Let me know which suits you and I''ll send an invitation.
+
+
+    Best,
+
+    Alex
+
+    '
+reply: reply.md now offers two times, Thursday 15:00 or Friday 9:30, and is under 120 words. I had offered one time and gone
+  over the limit.

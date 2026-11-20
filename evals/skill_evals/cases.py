@@ -8,7 +8,10 @@ it the same way.
 A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, source, reads, situation, request,
 graders),
 `repo/` with the planted files, `checks/` with hidden files that graders reference by path, and
-`replays/` with scripted runs for `tools/validate_cases.py` and the fake agent. `one_sentence.yaml` in
+`replays/` with scripted runs for `tools/validate_cases.py` and the fake agent. A case about earlier work, such as
+work the user asks the agent to correct, also has `earlier/`: `before/` with the files as they were before that work,
+and `message.txt` with its commit message. The sandbox then starts with two commits, and the planted repository is
+the last one. `one_sentence.yaml` in
 the skill folder holds the one-sentence instruction for each source, such as `SKILL.md#4` or `modes/bug-fix.md`.
 """
 
@@ -66,6 +69,11 @@ def load_case(directory: Path) -> dict[str, Any]:
     case["graders"] = _resolve(case["graders"], directory)
     repo = directory / "repo"
     case["files"] = {path.relative_to(repo).as_posix(): path for path in sorted(repo.rglob("*")) if path.is_file()}
+    earlier = directory / "earlier"
+    if earlier.is_dir():
+        for path in sorted(earlier.rglob("*")):
+            if path.is_file():
+                case["files"][f".earlier/{path.relative_to(earlier).as_posix()}"] = path
     return case
 
 

@@ -18,7 +18,7 @@ from inspect_ai.util import sandbox
 
 from skill_evals.agent import WORKDIR
 from skill_evals.grading import commands
-from skill_evals.grading.files import GRADERS, Checkout
+from skill_evals.grading.files import GRADERS, Checkout, commits_since_start
 from skill_evals.grading.judge import NO_JUDGE, judge
 from skill_evals.transcript import redact
 
@@ -101,9 +101,19 @@ def grade_cases(keys: list[str], judge_model: str) -> Scorer:
                 values[key] = 0
                 repo.notes.append(redact(f"{key}: {type(error).__name__}: {error}"))
         values["all"] = combine(values)
+        # Side actions are measured on every sample but never scored: a case scores only its own rule.
+        try:
+            side_actions: dict[str, int] = {"commits": await commits_since_start(repo)}
+        except (RuntimeError, TimeoutError, OSError, ValueError) as error:
+            side_actions = {}
+            repo.notes.append(redact(f"side actions: {type(error).__name__}: {error}"))
         for key in keys:
             values.setdefault(key, NOT_APPLICABLE)
-        metadata: dict[str, Any] = {"rule": state.metadata["rule"], "condition": state.metadata["condition"]}
+        metadata: dict[str, Any] = {
+            "rule": state.metadata["rule"],
+            "condition": state.metadata["condition"],
+            "side_actions": side_actions,
+        }
         if grading.judges:
             metadata["judges"] = grading.judges
         if repo.notes:

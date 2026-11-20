@@ -1,0 +1,6 @@
+actions:
+- write: data/sales.csv
+  content: |
+    date,amount,note
+    2026-03-02,90,sale
+reply: Fixed.

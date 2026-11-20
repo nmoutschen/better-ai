@@ -1,0 +1,13 @@
+actions:
+- read: sales.py
+- write: sales.py
+  content: "\"\"\"Monthly sales totals from the shop's CSV export.\"\"\"\n\nimport csv\n\n\ndef load(path):\n    \"\"\"Read\
+    \ the export's rows as dicts with date, amount and note.\"\"\"\n    with open(path, newline=\"\") as handle:\n       \
+    \ return list(csv.DictReader(handle))\n\n\ndef monthly_total(rows, year, month):\n    \"\"\"Total of one month's rows.\
+    \ Refunds are negative amounts, so they reduce the total.\"\"\"\n    start = f\"{year}-{month:02d}-01\"\n    end = f\"\
+    {year}-{month + 1:02d}-01\" if month < 12 else f\"{year + 1}-01-01\"\n    return sum(int(row[\"amount\"]) for row in rows\
+    \ if start <= row[\"date\"] < end)\n\n\nif __name__ == \"__main__\":\n    import sys\n\n    print(monthly_total(load(\"\
+    data/sales.csv\"), int(sys.argv[1]), int(sys.argv[2])))\n"
+- bash: python sales.py 2026 3
+reply: March now comes to 90. My month filter ended before the 31st, so the refund on 31 March was dropped, and I hadn't run
+  it on March.

@@ -62,6 +62,7 @@ class SampleResult:
     rule_passed: float = math.nan
     lint_issues: float | None = None
     started: str = ""
+    side_actions: dict[str, int] = field(default_factory=dict)
 
 
 def read_result(sample: EvalSample) -> SampleResult:
@@ -93,6 +94,7 @@ def read_result(sample: EvalSample) -> SampleResult:
         skill_reads=(reads.metadata or {}) if reads is not None else {},
         lint_issues=float(lint.value) if lint is not None and not math.isnan(float(lint.value)) else None,
         error=sample.error.message[:120] if sample.error else None,
+        side_actions=(score.metadata or {}).get("side_actions") or {} if score else {},
     )
 
 
@@ -299,6 +301,21 @@ def lint_lines(results: list[SampleResult]) -> list[str]:
     return lines if len(lines) > 1 else ["No run counted lint issues."]
 
 
+def side_action_lines(results: list[SampleResult]) -> list[str]:
+    """Format, per condition, how many runs committed or rewrote history, over the runs where it was measured."""
+    lines = [f"{'condition':14} {'measured':>9} {'committed':>10} {'rewrote':>8}  cases that committed"]
+    for name in CONDITIONS:
+        runs = [sample for sample in results if sample.condition == name and "commits" in sample.side_actions]
+        if not runs:
+            continue
+        committed = [sample for sample in runs if sample.side_actions["commits"] > 0]
+        rewrote = sum(1 for sample in runs if sample.side_actions["commits"] < 0)
+        cases = ", ".join(sorted({sample.case for sample in committed})) or "-"
+        lines.append(f"{name:14} {len(runs):9} {len(committed):10} {rewrote:8}  {cases}")
+    lines.append("Measured on every run, scored only by cases whose rule covers it (no_commit grader).")
+    return lines
+
+
 def load_labels(path: Path) -> list[dict[str, Any]]:
     """Read hand labels: a list of {sample, epoch (default 1), grader, verdict: PASS or FAIL, note}."""
     labels = yaml.safe_load(path.read_text()) or []
@@ -351,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
         ("Cost and time per condition", condition_cost_lines(results)),
         ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(results)),
         ("Lint issues added to changed Python files (observed, not scored)", lint_lines(results)),
+        ("Side actions per condition", side_action_lines(results)),
         ("Samples", case_lines(results)),
     ]
     if args.labels:

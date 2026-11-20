@@ -1,0 +1,7 @@
+Compare the tote bag quotes
+
+Asked: compare the three supplier quotes in quotes/ in comparison.md, so I
+can pick a supplier for our order of 500 bags.
+
+Wrote comparison.md as a table with the cost of 500 bags from each supplier,
+lead time and notes.

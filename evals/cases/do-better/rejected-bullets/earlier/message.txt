@@ -1,0 +1,8 @@
+Rewrite the volunteer evening blurb as prose
+
+Asked: write a blurb for the volunteer evening from facts.md, for this
+month's newsletter email, in blurb.md.
+
+Your correction on the first version: "No bullet points or bold, this goes
+in the body of an email. Make it read like a note from me."
+Rewrote blurb.md as one paragraph.

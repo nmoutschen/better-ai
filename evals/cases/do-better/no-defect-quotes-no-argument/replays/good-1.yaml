@@ -1,0 +1,5 @@
+actions:
+- read: comparison.md
+- bash: cat quotes/*.md
+reply: 'I checked each figure against the quotes and they are right: 500 bags cost 1,050 EUR from BrightBag, 1,200 from Alder
+  Print and 1,285 from Canvas & Co. I found nothing to fix. Should I add a recommendation?'

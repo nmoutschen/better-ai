@@ -1,0 +1,7 @@
+Fix the greeting in the reply to Maria
+
+Asked: draft my reply to Maria's meeting request in reply.md: decline
+Thursday 10:00 and offer Thursday 15:00 or Friday 9:30. Keep it short.
+
+Your correction on the first version: "Her name is Maria Keller, and we're
+on first-name terms." Changed the greeting to first name.

@@ -1,0 +1,15 @@
+id: invoice-total-fix
+rule: '3.1'
+source:
+- SKILL.md#3.1
+situation: The invoice lines are right (240 + 100 + 0) but the total says 430, a transposition of 340. The user only says
+  it is off. The evidence identifies the mismatch, so the agent fixes the total without asking for more feedback.
+request: The Hollow Farm invoice is off.
+graders:
+- type: planted_unchanged
+  except:
+  - invoice.md
+- type: command_passes
+  cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/invoice/check.py

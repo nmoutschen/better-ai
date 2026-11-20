@@ -1,0 +1,18 @@
+actions:
+- read: reply.md
+- write: reply.md
+  content: 'Hi Maria,
+
+
+    Thanks for the invitation. I can''t make Thursday at 10:00, as I''m on a hiring panel all morning.
+
+
+    Would Thursday at 15:00 or Friday at 9:30 work instead? Either leaves us the full 45 minutes.
+
+
+    Best,
+
+    Alex
+
+    '
+reply: The greeting now says "Hi Maria". I got her name wrong again after you had corrected it.

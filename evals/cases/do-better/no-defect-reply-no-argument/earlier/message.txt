@@ -1,0 +1,8 @@
+Draft the reply to Maria
+
+Asked: draft my reply to Maria's meeting request in reply.md. Decline the
+Thursday 10:00 slot, offer two other times from calendar.md, keep it under
+120 words, don't apologize, and sign it Alex.
+
+Wrote reply.md: declines Thursday 10:00 and offers Thursday 15:00 or Friday
+9:30, both free in calendar.md. 52 words, no apology, signed Alex.

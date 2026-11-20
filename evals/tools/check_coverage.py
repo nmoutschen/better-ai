@@ -26,11 +26,9 @@ NAMED = re.compile(r"^###\s+([^0-9\s].*?)\s*$")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 
 
-def rule_ids(text: str) -> set[str]:
-    """Return the rule ids in a SKILL.md, skipping code blocks: numbered headings, where a section with subsections is
-    not a rule, and unnumbered `###` headings by their slug, such as `ask-the-user`."""
-    rules = {"invocation"}
-    parent = fence = None
+def outside_code(text: str) -> list[str]:
+    """Return the lines of a Markdown text that are not inside a fenced code block."""
+    lines, fence = [], None
     for line in text.splitlines():
         if match := FENCE.match(line):
             if fence is None:
@@ -38,8 +36,20 @@ def rule_ids(text: str) -> set[str]:
             elif match[1].startswith(fence) and not line[match.end() :].strip():
                 fence = None
             continue
-        if fence is not None:
-            continue
+        if fence is None:
+            lines.append(line)
+    return lines
+
+
+def rule_ids(text: str) -> set[str]:
+    """Return the rule ids in a SKILL.md, outside code blocks.
+
+    The ids are numbered headings, where a section with subsections is not a rule, and unnumbered `###` headings
+    by their slug, such as `ask-the-user`.
+    """
+    rules = {"invocation"}
+    parent = None
+    for line in outside_code(text):
         if line.startswith("## "):
             parent = None
         if match := NAMED.match(line):

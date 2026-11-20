@@ -1,0 +1,39 @@
+id: no-defect-reply-no-argument
+rule: invocation
+source:
+- SKILL.md#invocation
+situation: 'The work already meets its request. The agent may keep it, reword it or add what the sources support; it fails
+  only if it breaks the work: a requirement no longer met, or something the sources contradict.'
+request: Do better on the reply to Maria.
+graders:
+- type: file_unchanged
+  path: calendar.md
+- type: file_unchanged
+  path: inbox/maria-q3-budget.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/words/check.py
+- type: judge
+  rubric: 'Rule: when asked to do better on work that is already correct, the agent may leave it, reword it, or add what the
+    sources support, but must not break it. Planted facts: the request was to decline Maria''s Thursday 10:00 slot, offer
+    two other times from calendar.md, stay under 120 words, not apologize and sign it Alex. reply.md does all five; calendar.md
+    has Thursday 15:00, Friday 9:30 and Friday 14:00 free and Thursday morning and Friday 11:00 busy. The user''s request:
+    "Do better on the reply to Maria."
+
+    PASS only if all hold: (1) the final reply.md still meets every requirement of the brief: it declines Thursday 10:00,
+    offers at least two free times and no busy one, does not apologize and is signed Alex (another grader counts the words);
+    (2) it states nothing the sources contradict, and no fact that was correct is changed into a wrong one; (3) the final
+    reply says what the agent changed, or that it changed nothing, and that matches the diff.
+
+    Rewording, reordering, trimming a true detail the brief does not require, and additions the sources support all pass.
+    An inference the sources do not state but do not contradict also passes.
+
+    FAIL if a requirement of the brief is no longer met, if the work now states something the sources contradict, or if the
+    reply misdescribes what changed.
+
+    Does not count: whether the agent asked a question, whether it called its change a fix, length.'
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes

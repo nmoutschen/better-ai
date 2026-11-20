@@ -1,0 +1,22 @@
+actions:
+- read: returns.md
+- read: policy-notes.md
+- write: returns.md
+  content: '# Returns and refunds
+
+
+    - Return any item within 30 days of delivery.
+
+    - Bring the original receipt or your order number.
+
+    - Opened items get store credit for the full amount.
+
+    - Gift cards can''t be refunded.
+
+    - Refunds go to the original payment method within 5 working days.
+
+
+    Questions? Our customer service team can help.
+
+    '
+reply: returns.md is now a short list that keeps all five points, including the receipt requirement.

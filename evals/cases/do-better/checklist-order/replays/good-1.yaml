@@ -1,0 +1,20 @@
+actions:
+- read: it-notes.md
+- write: checklist.md
+  content: '# New starter checklist
+
+
+    1. Pick up the laptop from IT.
+
+    2. Create the company account.
+
+    3. Set up the VPN.
+
+    4. Complete the security training.
+
+    5. Get repository access from the team lead.
+
+    6. Clone the code repositories.
+
+    '
+reply: checklist.md now follows the order the IT notes require; I had sorted the steps alphabetically.

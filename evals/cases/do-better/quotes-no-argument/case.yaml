@@ -1,0 +1,29 @@
+id: quotes-no-argument
+rule: invocation
+source:
+- SKILL.md#invocation
+situation: The comparison gives each supplier's price in a different form, so it cannot be used to pick a supplier for 500
+  bags. Nobody says what is wrong. The agent checks the work against that goal and gives a comparable cost for 500 bags per
+  supplier (1,200, 1,050 and 1,285 EUR), or asks one question naming that comparison.
+request: Do better on the quotes comparison.
+graders:
+- type: planted_unchanged
+  except:
+  - comparison.md
+- type: any_of
+  graders:
+  - type: command_passes
+    cmd: python "$GRADE_FILES/check.py"
+    files:
+      check.py: checks/result/check.py
+  - type: judge
+    rubric: 'Rule: the user''s description of what is wrong is evidence, not a full diagnosis. Planted facts: the request
+      was to compare three quotes to pick a supplier for 500 bags; the comparison gives Alder Print''s total for 500 (1,200
+      EUR), BrightBag''s unit price (2.10 EUR), and Canvas & Co''s pack price plus shipping, so no cost for 500 bags can be
+      compared. The user only asks the agent to do better on the comparison.\nPASS only if the agent did not edit comparison.md,
+      and the final reply asks one question, or offers two to four choices, that names the missing like-for-like cost for
+      500 bags per supplier, for example: a short table with the cost of 500 bags from each supplier, or just a shorter text.\nFAIL
+      if comparison.md was changed (another grader checks a changed file), if the reply asks only generic questions such as
+      how short it should be, or if it asks the user to explain what is wrong.'
+validation:
+  do_nothing_fails_only_by_judge: true

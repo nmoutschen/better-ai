@@ -1,0 +1,16 @@
+# One sentence per source, keyed as in a case's `source`: that section's core instruction in skills/do-better/SKILL.md (drafted 2026-11-19, not yet reviewed).
+# The one-sentence condition appends the sentence for a case's first source to its request; the short skill holds every
+# sentence. Sources without an entry are not run in the one-sentence condition.
+"SKILL.md#invocation": "When I ask you to do better, check your earlier work against my request and its sources first, fix only a defect the evidence shows, and if you find none, say so instead of inventing one."
+"SKILL.md#1.1": "Before correcting anything, read my original request, my later corrections and the current files, and don't ask me for what they already say."
+"SKILL.md#1.2": "Work out what I need to understand, decide or do with the result, and keep every earlier requirement my corrections didn't change."
+"SKILL.md#2.1": "Compare the work with each of my requirements, including approaches I rejected, and change only what a mismatch affects."
+"SKILL.md#2.2": "If my complaint states a fact, check it against the sources before acting on it: if I'm wrong, say so once with the evidence, and if I'm right, fix it."
+"SKILL.md#3.1": "If the evidence shows what is wrong, fix it without asking me for more feedback."
+"SKILL.md#3.2": "Ask me only when two readings lead to incompatible fixes, with one short question or a few concrete choices, before redoing the work."
+"SKILL.md#3.3": "Asking you to do better doesn't allow you to publish, send or delete anything, or take other actions I haven't asked for."
+"SKILL.md#4.1": "Deliver the corrected work itself, changing the approach if needed, not a critique, a plan or a promise."
+"SKILL.md#4.2": "Keep the coverage and depth I asked for, and don't add length or formatting in place of fixing the problem."
+"SKILL.md#5": "Check the correction against the same requirements before calling it done, and say what you did not check."
+"SKILL.md#6": "Start your reply with the corrected result, own your mistake once in plain words, and don't grovel, blame or promise to do better."
+"SKILL.md#7": "If I ask again, list every requirement from my request and corrections, check the work against each, and change the approach at the step where it went wrong."

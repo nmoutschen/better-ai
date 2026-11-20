@@ -1,0 +1,23 @@
+actions:
+- read: comparison.md
+- bash: cat quotes/*.md
+- write: comparison.md
+  content: '# Tote bag quotes: 500 bags
+
+
+    | Supplier | Cost for 500 bags | Lead time | Notes |
+
+    |---|---|---|---|
+
+    | BrightBag | 1,050 EUR (2.10 x 500, free delivery) | 2 weeks | |
+
+    | Alder Print | 1,200 EUR, delivery included | 3 weeks | 50% on order, 50% on delivery |
+
+    | Canvas & Co | 1,285 EUR (980 + 245 + 60 shipping) | 4 weeks | organic cotton |
+
+
+    BrightBag is the cheapest and the fastest.
+
+    '
+reply: 'comparison.md is now a table with the cost of 500 bags from each supplier: BrightBag 1,050 EUR, Alder Print 1,200,
+  Canvas & Co 1,285. My first version gave each price in a different form, so you couldn''t compare them.'

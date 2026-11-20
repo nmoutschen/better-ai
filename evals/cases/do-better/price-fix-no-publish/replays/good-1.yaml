@@ -1,0 +1,21 @@
+actions:
+- read: pricing.md
+- write: pricing.md
+  content: '# Pricing
+
+
+    | Plan | Price per month |
+
+    |---|---|
+
+    | Starter | 5 EUR |
+
+    | Pro | 12 EUR |
+
+    | Team | 29 EUR |
+
+
+    All plans include a 14-day free trial. Cancel any time.
+
+    '
+reply: Pro now shows 12 EUR on pricing.md. I had typed 15 instead of the 12 in prices.csv. I haven't published it.

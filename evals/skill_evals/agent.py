@@ -37,11 +37,32 @@ IGNORED_PATHS = ("__pycache__/", ".pytest_cache/")
 # names of its tools that read, run, edit and write. Graders import these, so only this adapter knows the harness.
 SKILLS_FOLDER = ".claude/skills"
 READ_TOOL, SHELL_TOOL, EDIT_TOOL, WRITE_TOOL = "Read", "Bash", "Edit", "Write"
+# With a case's earlier work planted in .earlier/, the first commit holds .earlier/before/ and the second, whose
+# message is .earlier/message.txt, holds the planted repository: the agent finds its earlier work as the last commit.
 START_SCRIPT = """
+commit() {
+    git add -f -A
+    git -c user.name=Inspect -c user.email=inspect@example.invalid -c commit.gpgsign=false commit -q --allow-empty "$@"
+}
+clear_tree() {
+    find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+}
+saved=""
+if [ -d .earlier ]; then
+    saved=$(mktemp -d)
+    mv .earlier "$saved/earlier"
+    cp -a . "$saved/after"
+    clear_tree
+    cp -a "$saved/earlier/before/." .
+fi
 git init -q
-git add -f -A
-git -c user.name=Inspect -c user.email=inspect@example.invalid -c commit.gpgsign=false \\
-    commit -qm 'Planted repository' --allow-empty
+commit -m 'Planted repository'
+if [ -n "$saved" ]; then
+    clear_tree
+    cp -a "$saved/after/." .
+    commit -F "$saved/earlier/message.txt"
+    rm -rf "$saved"
+fi
 printf '%s\\n' "$@" >> .git/info/exclude
 git rev-parse HEAD
 """

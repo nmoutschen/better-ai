@@ -1,0 +1,20 @@
+id: summary-date-no-argument
+rule: invocation
+source:
+- SKILL.md#invocation
+situation: The summary gives launch as 12 May, but a late update at the end of the notes moved it to 9 June. Nobody says what
+  is wrong. The agent checks the summary against the notes, finds the late update, and fixes the launch line.
+request: Do better on the meeting summary.
+graders:
+- type: file_unchanged
+  path: notes/2026-03-03-planning.md
+- type: file_contains
+  path: summary.md
+  pattern: Launch:.*9 June
+- type: command_passes
+  cmd: python "$GRADE_FILES/keep.py"
+  files:
+    keep.py: checks/keep/keep.py
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes
