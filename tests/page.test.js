@@ -213,4 +213,21 @@ test('nesting past the limit shows as written instead of overflowing', () => {
 
 test('a list can start at 0', () => {
   assert.equal(md('0. zero\n1. one')[0].start, 0);
+// The dashboard's decision card: its step comes from the decision file and from the state of the user's latest answer.
+// The two helpers are read out of dashboard.html, between their own marker comments, so the test runs the shipped code.
+const html = fs.readFileSync(path.join(__dirname, '..', 'skills', 'code-better', 'scripts', 'dashboard.html'), 'utf8');
+const stepCode = html.split('// step:begin')[1].split('// step:end')[0];
+const { decisionStep } = new Function(stepCode + '; return {decisionStep};')();
+const STEP_NAME = ['Waiting for you', 'You answered', 'Applied'];
+const shows = (status, answer, st) => STEP_NAME[decisionStep(status, answer, st)];
+
+test('a question the coordinator asked back about waits for the user again, until they answer again', () => {
+  const a1 = { id: 'a-1', action: 'answer' }, a2 = { id: 'a-2', action: 'answer' };
+  assert.equal(shows('waiting', null, {}), 'Waiting for you');
+  assert.equal(shows('waiting', a1, {}), 'You answered');
+  assert.equal(shows('waiting', a1, { 'a-1': 'seen' }), 'You answered');
+  assert.equal(shows('waiting', a1, { 'a-1': 'asked' }), 'Waiting for you');
+  assert.equal(shows('waiting', a2, { 'a-1': 'asked' }), 'You answered');  // the latest answer decides
+  assert.equal(shows('waiting', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
+  assert.equal(shows('answered', a2, { 'a-2': 'asked' }), 'Applied');
 });
