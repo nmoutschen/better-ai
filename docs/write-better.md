@@ -34,7 +34,6 @@ For example:
 
 Use a neighbouring skill instead when:
 
-- You want to learn a topic over several turns: use [`/teach-better`](teach-better.md).
 - A long, dense document needs visual panels before it: use [`/show-better`](show-better.md).
 
 </details>
@@ -96,7 +95,6 @@ It calls:
 - [`/ask-better`](ask-better.md) if it must ask about the goal.
 - [`/decide-better`](decide-better.md) when the text is for a decision you make.
 - [`/review-better`](review-better.md) to review a text without rewriting it.
-- [`/teach-better`](teach-better.md) when the goal is to learn over several turns.
 - [`/show-better`](show-better.md) to introduce a long, dense document with visual panels.
 
 It is called by most skills, for the text you read:
@@ -106,7 +104,6 @@ It is called by most skills, for the text you read:
 - [`/research-better`](research-better.md) to present its findings.
 - [`/review-better`](review-better.md) for its report.
 - [`/show-better`](show-better.md) to check the wording of panels.
-- [`/teach-better`](teach-better.md) for explanations, and for answers when you want the result, not a lesson.
 - [`/interview-me`](interview-me.md) for the wording of your guides.
 - [`/do-better`](do-better.md) to check a correction to text.
 

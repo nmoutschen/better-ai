@@ -25,7 +25,6 @@ See [`/interview-me`](interview-me.md).
 | Build or change code | [`/code-better`](code-better.md) |
 | Design or build a page or screen | [`/design-better`](design-better.md) |
 | Research a topic from sources | [`/research-better`](research-better.md) |
-| Learn a topic so you can use it without AI | [`/teach-better`](teach-better.md) |
 | Get a dense document introduced with visual panels | [`/show-better`](show-better.md) |
 | Make a decision you will live with | [`/decide-better`](decide-better.md) |
 | Review text, code, an interface or a plan | [`/review-better`](review-better.md) |

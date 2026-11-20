@@ -13,7 +13,6 @@ Researches a topic from sources instead of the model's training data, and writes
 
 Use something else nearby:
 
-- To learn a topic yourself, use [`/teach-better`](teach-better.md). It calls `/research-better` first.
 - To introduce the finished report with visual panels, use [`/show-better`](show-better.md).
 
 ## How to run it
@@ -66,7 +65,6 @@ When the board's server stops, a strip says the board is closed; ask the agent t
 ## Works with
 
 - [`/write-better`](write-better.md) writes the final report.
-- [`/teach-better`](teach-better.md) calls `/research-better` before a lesson on a topic that is not trivial.
 
 ## What it needs
 
