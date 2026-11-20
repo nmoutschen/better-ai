@@ -346,6 +346,51 @@ class Scripts(unittest.TestCase):
                 [sys.executable, "-I", script, "watch", str(folder), "--no-browser"], folder, "board.json"
             )
 
+    def test_code_better_dashboard(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            script = str(ROOT / "skills" / "code-better" / "scripts" / "dashboard.py")
+            self.serve_and_talk(
+                [sys.executable, "-I", script, "watch", str(folder), "--no-browser"], folder, "dashboard.json"
+            )
+
+
+class Dashboard(unittest.TestCase):
+    """What code-better's dashboard reads from a change folder: the tasks, the agents' logs and the decisions."""
+
+    def test_load_reads_tasks_agents_and_decisions(self):
+        spec = importlib.util.spec_from_file_location(
+            "dashboard", ROOT / "skills" / "code-better" / "scripts" / "dashboard.py"
+        )
+        dashboard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(dashboard)
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            (folder / "tasks.md").write_text(
+                "# Tasks: Late orders\n\nDesign: d.md\n\n"
+                "| # | Task | Mode | Requirements | Check | Status |\n|---|---|---|---|---|---|\n"
+                "| 1 | Order query | feature | R1 | t1 | done |\n| 2 | Orders page | feature | R2 | t2 | todo |\n\n"
+                "## Progress notes\n"
+            )
+            (folder / "logs").mkdir()
+            (folder / "logs" / "b1.md").write_text(
+                "start: builder, task 2, code/late-2\nstep: wrote the check\nasked: which sort order\n"
+            )
+            (folder / "logs" / "v1.md").write_text(
+                "start: verifier, task 1, code/late-1\nhanded back: passes, all met\n"
+            )
+            (folder / "decisions").mkdir()
+            (folder / "decisions" / "D-1.md").write_text("id: D-1\nasked: Sort by days late?\nstatus: waiting\n")
+            data = dashboard.load(folder)
+        self.assertEqual(data["name"], "Late orders")
+        self.assertEqual([(t["id"], t["status"]) for t in data["tasks"]], [("1", "done"), ("2", "todo")])
+        agents = {a["name"]: a for a in data["agents"]}
+        self.assertEqual(
+            (agents["b1"]["role"], agents["b1"]["task"], agents["b1"]["state"]), ("builder", "2", "waiting")
+        )
+        self.assertEqual((agents["v1"]["role"], agents["v1"]["state"]), ("verifier", "finished"))
+        self.assertEqual(data["decisions"][0]["status"], "waiting")
+
 
 if __name__ == "__main__":
     unittest.main()

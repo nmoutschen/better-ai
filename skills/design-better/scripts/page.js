@@ -93,6 +93,8 @@ function pageConversation(o) {
     function close() {
       var host = box.parentNode; box.remove(); if (from) from.style.visibility = '';
       if (host) host.querySelectorAll('.foot .answer, .foot .change').forEach(function (b) { b.style.visibility = ''; });
+      // Focus goes back to the button that opened the box, so a keyboard user who cancels stays at the item.
+      if (from && document.contains(from)) from.focus({ preventScroll: true });
     }
     function sendIt() {
       var r = ta.value.trim(); if (!r) return ta.focus();
