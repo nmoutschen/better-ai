@@ -445,9 +445,7 @@ def errored_judge(started: str = "") -> report.SampleResult:
 
 def sample_error(started: str = "") -> report.SampleResult:
     """One run of sample a-skill that failed before any grader ran."""
-    return report.SampleResult(
-        "a-skill", "a", "skill", "1.1", math.nan, error="RuntimeError: 429", started=started
-    )
+    return report.SampleResult("a-skill", "a", "skill", "1.1", math.nan, error="RuntimeError: 429", started=started)
 
 
 def test_duplicate_with_one_errored_judge_stops() -> None:

@@ -20,7 +20,7 @@ import argparse
 import math
 import random
 import statistics
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -415,23 +415,27 @@ def load_labels(path: Path) -> list[dict[str, Any]]:
     return labels
 
 
+def _duplicate_text(what: str) -> str:
+    """Say that two runs share a key and how to resolve it."""
+    return f"Two runs have {what}: pass --latest to keep the newest log's run, or give each log its own report"
+
+
 def judge_verdicts(results: list[SampleResult]) -> dict[tuple[str, int, str], Any]:
     """Map (sample, epoch, grader) to the judge's verdict, leaving out a judge that could not run.
 
-    Raises ValueError when two runs have the same key, since a label cannot tell which one it means.
+    Raises ValueError when two runs have the same key, whether or not their judges ran, since a label
+    cannot tell which one it means.
     """
     verdicts: dict[tuple[str, int, str], Any] = {}
+    seen: set[tuple[str, int, str]] = set()
     for sample in results:
         for grader, info in sample.judges.items():
-            if "error" in info:  # a judge that could not run gave no verdict to compare
-                continue
             key = (sample.sample_id, sample.epoch, grader)
-            if key in verdicts:
-                raise ValueError(
-                    f"Two runs have sample {key[0]!r}, epoch {key[1]}, grader {key[2]!r}: "
-                    "pass --latest to keep the newest log's run, or give each log its own report"
-                )
-            verdicts[key] = info.get("verdict")
+            if key in seen:
+                raise ValueError(_duplicate_text(f"sample {key[0]!r}, epoch {key[1]}, grader {key[2]!r}"))
+            seen.add(key)
+            if "error" not in info:  # a judge that could not run gave no verdict to compare
+                verdicts[key] = info.get("verdict")
     return verdicts
 
 
@@ -453,6 +457,12 @@ def validate_labels(results: list[SampleResult], labels: list[dict[str, Any]]) -
     """
     groups = group_results(results)
     verdicts = {name: judge_verdicts(group) for name, group in groups.items()}
+    for (_, model), group in groups.items():
+        counts = Counter((run.sample_id, run.epoch) for run in group)
+        for label in labels:
+            key = label_key(label)
+            if label_applies(label, model) and counts[key[0], key[1]] > 1:
+                raise ValueError(_duplicate_text(f"sample {key[0]!r}, epoch {key[1]}"))
     for label in labels:
         key = label_key(label)
         models = sorted(
