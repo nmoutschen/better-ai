@@ -285,9 +285,7 @@ def test_read_results_reads_the_run_description_from_the_log(monkeypatch: pytest
         "skill_commit": "abc1234def",
         "skill_dirty": True,
     }
-    sample = SimpleNamespace(
-        id="x", epoch=1, error=None, scores={}, metadata={"case": "x", "condition": "skill"}
-    )
+    sample = SimpleNamespace(id="x", epoch=1, error=None, scores={}, metadata={"case": "x", "condition": "skill"})
     log = SimpleNamespace(
         eval=SimpleNamespace(metadata=metadata), stats=SimpleNamespace(started_at="t"), samples=[sample]
     )
@@ -324,3 +322,12 @@ def test_two_groups_print_two_sections_without_mixing_pass_rates(
     assert out.count("# Skill code-better, agent model") == 2
     assert "agent model opus" in first and "100%" in first and "0%" not in first.replace("100%", "")
     assert "0/1" in second and "100%" not in second
+
+
+def test_labels_found_in_any_group_are_not_listed_as_unmatched() -> None:
+    """The same sample id in two agent models' logs is not a duplicate across groups."""
+    a, b = judged(True), judged(False)
+    a.agent_model, b.agent_model = "opus", "sonnet"
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    assert report.unmatched_labels([a, b], labels) == []
+    assert report.agreement([a], labels)[0].split()[-2:] == ["1/1", "agree"]

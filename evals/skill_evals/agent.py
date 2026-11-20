@@ -178,6 +178,12 @@ def skill_commit(skill: str) -> str:
     return subprocess.run(command, cwd=REPO, text=True, capture_output=True, check=False).stdout.strip()
 
 
+def skill_dirty(skill: str) -> bool:
+    """Return whether the skill's folder has uncommitted changes, so a run is not tied to a commit it did not use."""
+    command = ["git", "status", "--porcelain", "--", f"skills/{skill}"]
+    return bool(subprocess.run(command, cwd=REPO, text=True, capture_output=True, check=False).stdout.strip())
+
+
 async def install_skill(sandbox_env: SandboxEnvironment, skill: str, short: bool = False) -> None:
     """Copy the skill as is into the agent user's ~/.claude/skills/<skill>/, or only the short SKILL.md."""
     source = REPO / "skills" / skill
@@ -305,7 +311,13 @@ def fake_agent() -> Solver:
 def agent_metadata(agent: str, model: str, skill: str) -> dict[str, Any]:
     """Describe the agent for the task metadata."""
     version = "scripted" if agent == "fake" else CLAUDE_CODE_VERSION
-    return {"agent": agent, "agent_model": model, "agent_version": version, "skill_commit": skill_commit(skill)}
+    return {
+        "agent": agent,
+        "agent_model": model,
+        "agent_version": version,
+        "skill_commit": skill_commit(skill),
+        "skill_dirty": skill_dirty(skill),
+    }
 
 
 def dockerfile_version() -> str:

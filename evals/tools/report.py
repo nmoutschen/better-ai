@@ -68,6 +68,12 @@ class SampleResult:
     skill_loaded: float | None = None
     started: str = ""
     side_actions: dict[str, int] = field(default_factory=dict)
+    skill: str = "?"
+    agent_model: str = "?"
+    judge_model: str = "?"
+    agent_version: str = "?"
+    skill_commit: str = ""
+    skill_dirty: bool = False
 
 
 def read_result(sample: EvalSample) -> SampleResult:
@@ -106,24 +112,55 @@ def read_result(sample: EvalSample) -> SampleResult:
 
 
 def read_results(paths: list[Path]) -> list[SampleResult]:
-    """Read every sample of every log, noting when its log started."""
+    """Read every sample of every log, noting when its log started and what it ran on."""
     results = []
     for path in paths:
         log = read_eval_log(str(path))
+        metadata = log.eval.metadata or {}
         for sample in log.samples or []:
             result = read_result(sample)
             result.started = log.stats.started_at or ""
+            result.skill = str(metadata.get("skill", "?"))
+            result.agent_model = str(metadata.get("agent_model", "?"))
+            result.judge_model = str(metadata.get("judge_model", "?"))
+            result.agent_version = str(metadata.get("agent_version", "?"))
+            result.skill_commit = str(metadata.get("skill_commit", ""))
+            result.skill_dirty = bool(metadata.get("skill_dirty", False))
             results.append(result)
     return results
 
 
 def latest(results: list[SampleResult]) -> list[SampleResult]:
-    """Keep, for each case and condition, only the runs from the most recently started log that has it."""
-    newest: dict[tuple[str, str], str] = {}
+    """Keep, for each skill, agent model, case and condition, only the runs from the most recently started log."""
+    newest: dict[tuple[str, str, str, str], str] = {}
     for result in results:
-        key = (result.case, result.condition)
+        key = (result.skill, result.agent_model, result.case, result.condition)
         newest[key] = max(newest.get(key, ""), result.started)
-    return [result for result in results if result.started == newest[result.case, result.condition]]
+    return [
+        result
+        for result in results
+        if result.started == newest[result.skill, result.agent_model, result.case, result.condition]
+    ]
+
+
+def group_results(results: list[SampleResult]) -> dict[tuple[str, str], list[SampleResult]]:
+    """Split the results by (skill, agent model), so that runs of different models are never pooled."""
+    groups: dict[tuple[str, str], list[SampleResult]] = defaultdict(list)
+    for result in results:
+        groups[result.skill, result.agent_model].append(result)
+    return dict(sorted(groups.items()))
+
+
+def group_header(results: list[SampleResult]) -> list[str]:
+    """Name what a group ran on: skill, agent model, judge model, Claude Code version and skill commit."""
+    skill, agent_model = results[0].skill, results[0].agent_model
+    commits = sorted({f"{r.skill_commit[:7] or '?'}{' (dirty)' if r.skill_dirty else ''}" for r in results})
+    judges = sorted({r.judge_model for r in results})
+    versions = sorted({r.agent_version for r in results})
+    return [
+        f"# Skill {skill}, agent model {agent_model}",
+        f"judge model {', '.join(judges)} · Claude Code {', '.join(versions)} · skill commit {', '.join(commits)}",
+    ]
 
 
 def rule_key(rule: str) -> tuple[int, str]:
@@ -393,9 +430,9 @@ def label_key(label: dict[str, Any]) -> tuple[str, int, str]:
 
 
 def unmatched_labels(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
-    """List the hand labels that match no judge verdict in the results, such as a mistyped sample id."""
-    verdicts = judge_verdicts(results)
-    missing = [label_key(label) for label in labels if label_key(label) not in verdicts]
+    """List the hand labels that match no judge verdict in any group of the results, such as a mistyped sample id."""
+    found = {key for group in group_results(results).values() for key in judge_verdicts(group)}
+    missing = [label_key(label) for label in labels if label_key(label) not in found]
     if not missing:
         return []
     return [
@@ -437,29 +474,37 @@ def main(argv: list[str] | None = None) -> int:
     results = read_results(args.logs)
     if args.latest:
         results = latest(results)
-    sections = [
-        ("Pass rate (all) per rule and condition", pass_table(results)),
-        ("Errors per condition (left out of pass rates, cost and time)", error_lines(results)),
-        ("Comparisons between conditions (paired by case)", comparison_lines(results)),
-        ("Cost and time per condition", condition_cost_lines(results)),
-        ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(results)),
-        ("Skill loaded without a command (skill-installed)", loaded_lines(results)),
-        ("Lint issues added to changed Python files (observed, not scored)", lint_lines(results)),
-        ("Side actions per condition", side_action_lines(results)),
-        ("Samples", case_lines(results)),
-    ]
-    if args.labels:
-        labels = load_labels(args.labels)
+    labels = load_labels(args.labels) if args.labels else None
+    for group in group_results(results).values():
+        print("\n" + "\n".join(group_header(group)))
+        sections = [
+            ("Pass rate (all) per rule and condition", pass_table(group)),
+            ("Errors per condition (left out of pass rates, cost and time)", error_lines(group)),
+            ("Comparisons between conditions (paired by case)", comparison_lines(group)),
+            ("Cost and time per condition", condition_cost_lines(group)),
+            ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(group)),
+            ("Skill loaded without a command (skill-installed)", loaded_lines(group)),
+            ("Lint issues added to changed Python files (observed, not scored)", lint_lines(group)),
+            ("Side actions per condition", side_action_lines(group)),
+            ("Samples", case_lines(group)),
+        ]
+        if labels is not None:
+            try:
+                sections.append(("Judge agreement with hand labels", agreement(group, labels)))
+            except ValueError as error:
+                raise SystemExit(str(error)) from error
+        for title, lines in sections:
+            print(f"\n## {title}\n" + "\n".join(lines))
+        errors = [f"{sample.sample_id}: {sample.error}" for sample in group if sample.error]
+        if errors:
+            print("\n## Sample errors\n" + "\n".join(errors))
+    if labels is not None:
         try:
-            lines = [*agreement(results, labels), *unmatched_labels(results, labels)]
+            unmatched = unmatched_labels(results, labels)
         except ValueError as error:
             raise SystemExit(str(error)) from error
-        sections.append(("Judge agreement with hand labels", lines))
-    for title, lines in sections:
-        print(f"\n## {title}\n" + "\n".join(lines))
-    errors = [f"{sample.sample_id}: {sample.error}" for sample in results if sample.error]
-    if errors:
-        print("\n## Sample errors\n" + "\n".join(errors))
+        if unmatched:
+            print("\n## Labels without a run\n" + "\n".join(unmatched))
     return 0
 
 
