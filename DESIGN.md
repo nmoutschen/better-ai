@@ -70,34 +70,33 @@ Boards use these tokens for every type size. Write `font-size:var(--text-small)`
 
 Code in messages is `ui-monospace` at .9em. Slides and drawings, such as the research map and architect-better's diagrams, keep their own sizes: they are documents and pictures that scale with their frame.
 
-The article page uses rem sizes, as n14n.dev:
+An article page, such as the website or a document a skill writes, uses these tokens, as n14n.dev:
 
-| Name | Size | Typeface and weight | Use |
+| Token | Size | Typeface and weight | Use |
 |---|---|---|---|
-| article title | 2.75rem (2rem under 700px) | serif 700, line height 1.15 | the title of an article page |
-| lead | 1.25rem | serif 400, line height 1.55 | the paragraph under an article title |
-| prose | 17px | serif 400, line height 1.75 | article text, at most 42rem wide (about 70 characters) |
+| `--text-site` | 1.5rem | sans 700 | the site's name in the site header |
+| `--text-article-title` | 2.75rem | serif 700, line height 1.15 | the title of an article page; 2rem under 700px, set in page.css |
+| `--text-lead` | 1.25rem | serif 400, line height 1.55 | the paragraph under an article title |
+| `--text-prose` | 17px | serif 400, line height 1.75 | article text, at most 42rem wide (about 70 characters) |
 
 - Use a token from this table. A new size is a change to this document.
 - Uppercase only for labels of two or three words. Never for sentences.
 
 ## Spacing and layout
 
-Boards use these tokens for every padding, margin and gap: `--space-N` is N × 2px. Write `padding:var(--space-5) var(--space-6)`, and `calc(-1 * var(--space-6))` for a negative margin. 1px is a hairline, such as a tag's top padding, not a space.
+Boards use these tokens for every padding, margin and gap, named by what the space does. Write `padding:var(--space-item)`, and `calc(-1 * var(--space-item))` for a negative margin. 1px is a hairline, such as a tag's top padding, not a space.
 
-| Token | Value | Typical use |
+| Token | Value | Use |
 |---|---|---|
-| `--space-1` | 2px | between lines of a list, a badge's side |
-| `--space-2` | 4px | between a mark and its word |
-| `--space-3` | 6px | between tags, under a heading in a card |
-| `--space-4` | 8px | between buttons, a pop-up's inner gaps |
-| `--space-5` | 10px | inside a conversation item, above and below |
-| `--space-6` | 12px | inside an item at the sides, between cards, above the view |
-| `--space-8` | 16px | between sections of the side column, between tabs |
-| `--space-10` | 20px | the sides of the header, the view and the side column |
-| `--space-12` | 24px | between groups of cards, around a slide |
-| `--space-16` | 32px | between the header's title and its figures |
-| `--space-20` | 40px | the bottom of a scrolling view |
+| `--space-tight` | 4px | inside small things: a badge, a tag; between a mark and its word, between lines of a list |
+| `--space-control` | 8px | between controls: buttons, tags, the parts of a pop-up |
+| `--space-item` | 12px | inside an item or a card, between cards, above the view |
+| `--space-section` | 16px | between sections of a column, between tabs |
+| `--space-edge` | 20px | the sides of the header, the view and the side column |
+| `--space-group` | 24px | between groups of cards, around a slide |
+| `--space-wide` | 40px | between the header's title and its figures, the end of a scrolling view |
+
+When no role fits, pick the token whose role is closest, and do not add a value.
 
 Slides keep their own spacing, as their type.
 
@@ -124,7 +123,7 @@ From top to bottom, then left to right. Every board has all of them, in this ord
 | Side column | `aside.notes` | the conversation, and what else the agent says (see Side column) | the thread only |
 | Toast, pop-ups | `div.toast`, `.qpop`, `.pop` | over everything, outside `.work` | no |
 
-Padding is `--space-10` (20px) at the sides of the header, the view and the side column, and `--space-6` (12px) above the view's first row (tabs bring their own `--space-8`).
+Padding is `--space-edge` at the sides of the header, the view and the side column, and `--space-item` above the view's first row (tabs bring their own `--space-section`).
 
 ### Headers
 
@@ -245,13 +244,13 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ### Article page parts
 
-- Site header: the site's name in sans, 1.5rem 700, with what the page is in muted. It does not have to be n14n.dev's header.
+- Site header: the site's name in sans 700 at `--text-site`, with what the page is in muted. It does not have to be n14n.dev's header.
 - Title: serif, with the terracotta band under it; a lead paragraph under the band.
 - Figure: a sand-bordered box, its caption under a rule.
 
 ## Rules
 
-- Use only the colours, type sizes, spaces and components in this document, by their token, because one board that drifts makes the others look inconsistent. Correct: `color:var(--muted); padding:var(--space-4)`. Wrong: `color:#777; padding:9px`.
+- Use only the colours, type sizes, spaces and components in this document, by their token, because one board that drifts makes the others look inconsistent. Correct: `color:var(--muted); padding:var(--space-control)`. Wrong: `color:#777; padding:9px`.
 - Make a shared part shared: if two boards need the same rule, it goes in page.css, because copies drift. Correct: `.legend` in page.css. Wrong: the same `.key` rules in two boards.
 - Square corners everywhere, except the round comment pins and numbered markers, because n14n never rounds boxes.
 - One shadow (`--shadow`), on things that float over the page only.
@@ -268,4 +267,5 @@ None. A conflict between a rule above and a page is listed here until the user d
 - 2026-11-20: first version, drawn from the five boards. Added the names `--moss`, `--terracotta-dark`, `--white`, `--shadow`, `--surround-dark`, `--frame` and `--frame-dark` for values the boards already used. Moved the stats header, meter, section label, legend, pop-up, question box, decision item and the "not watching" notice into page.css. The research board's waiting figure is now a button that goes to the waiting decision, as on code-better's dashboard. architect-better's comment box now has the shared pop-up border, shadow and textarea, and its "architect is away" notice the shared `.unwatched` style it lacked.
 - 2026-11-20: small buttons, tags, progress words and the canvas and slide labels went from 10px to 11px (the user's decision): text that carries meaning is never under 11px.
 - 2026-11-20: the agents at work moved from the side column to the top of the view on research-better's board, as on code-better's dashboard; the side column holds the conversation only. architect-better's view has 20px at the sides, as the other boards; the `--pad` token is gone.
-- 2026-11-20: spacing and type sizes became tokens (`--space-N`, `--text-*`) in every board. Off-scale values moved to the nearest step: 3px to 4, 5 to 6, 7 to 8, 14 to 16, 18 to 20, 28 to 24, 48 to 40. Type sizes merged: 13px into 14 (`--text-message`), 16 and 18 into 17 (`--text-heading`), 22 into 20 (`--text-title`). On linen, muted text and the progress words use ink, and research-better's "contested" uses `--terracotta-dark`.
+- 2026-11-20: spacing and type sizes became tokens (`--space-*`, `--text-*`) in every board. Off-scale values moved to the nearest step: 3px to 4, 5 to 6, 7 to 8, 14 to 16, 18 to 20, 28 to 24, 48 to 40. Type sizes merged: 13px into 14 (`--text-message`), 16 and 18 into 17 (`--text-heading`), 22 into 20 (`--text-title`). On linen, muted text and the progress words use ink, and research-better's "contested" uses `--terracotta-dark`.
+- 2026-11-20: spacing tokens named by role, in seven steps instead of eleven (the user's choice): 2px became 4, 6 became 8, 10 became 12, and 32 became 40.

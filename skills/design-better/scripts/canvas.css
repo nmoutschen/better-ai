@@ -1,6 +1,6 @@
 /* What only the canvas shows: the versions, their controls, the comment box and the decision panel. The shared look
    is in page.css, loaded first. */
-.seg button.ico { display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-5); opacity:.8;
+.seg button.ico { display:inline-flex; align-items:center; gap:var(--space-control); padding:var(--space-control) var(--space-item); opacity:.8;
   font:700 var(--text-label) var(--sans); letter-spacing:.06em; text-transform:uppercase; }
 .seg button.ico[aria-pressed="true"] { opacity:1; }
 .seg button.ico svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
@@ -9,25 +9,25 @@
 .chip--dark { background:var(--surround-dark); }
 /* Settings changed rarely sit in the Display menu. */
 .more { position:relative; }
-.morebtn { display:inline-flex; align-items:center; gap:var(--space-3); border:1px solid var(--cream); background:transparent; color:var(--cream);
-  padding:var(--space-3) var(--space-5); cursor:pointer; font:700 var(--text-label) var(--sans); letter-spacing:.06em; text-transform:uppercase; }
+.morebtn { display:inline-flex; align-items:center; gap:var(--space-control); border:1px solid var(--cream); background:transparent; color:var(--cream);
+  padding:var(--space-control) var(--space-item); cursor:pointer; font:700 var(--text-label) var(--sans); letter-spacing:.06em; text-transform:uppercase; }
 .morebtn svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; }
 .morebtn[aria-expanded="true"] { background:var(--cream); color:var(--umber); }
-.menu { position:absolute; right:0; top:calc(100% + 6px); z-index:4; display:grid; gap:var(--space-2); min-width:12rem;
-  padding:var(--space-5) var(--space-6) var(--space-6); background:var(--umber); border:1px solid var(--cream); box-shadow:var(--shadow); }
+.menu { position:absolute; right:0; top:calc(100% + 6px); z-index:4; display:grid; gap:var(--space-tight); min-width:12rem;
+  padding:var(--space-item) var(--space-item) var(--space-item); background:var(--umber); border:1px solid var(--cream); box-shadow:var(--shadow); }
 .menu[hidden] { display:none; }
-.menu-h { margin:var(--space-2) 0 var(--space-1); font:700 var(--text-label) var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--cream); opacity:.8; }
+.menu-h { margin:var(--space-tight) 0 var(--space-tight); font:700 var(--text-label) var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--cream); opacity:.8; }
 /* ---------- Versions ---------- */
-main { min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:var(--space-6) var(--space-10) var(--space-5);
+main { min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:var(--space-item) var(--space-edge) var(--space-item);
   background:var(--surround); color:var(--ink); }
 main > section { flex:1; min-height:0; display:flex; flex-direction:column; }
 main > section[hidden] { display:none; }
-.row { flex:1; min-height:0; display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:var(--space-10); align-items:stretch; }
+.row { flex:1; min-height:0; display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:var(--space-edge); align-items:stretch; }
 figure { margin:0; min-width:0; min-height:0; display:flex; flex-direction:column; position:relative; }
-.label { display:flex; justify-content:space-between; align-items:baseline; gap:var(--space-6); margin:0 0 var(--space-4); }
+.label { display:flex; justify-content:space-between; align-items:baseline; gap:var(--space-item); margin:0 0 var(--space-control); }
 .label b { font:700 var(--text-body)/1.3 var(--sans); color:var(--heading); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.label .acts { flex:none; display:flex; gap:var(--space-3); align-items:center; justify-content:flex-end; }
-.full { border:1px solid var(--ink); background:transparent; height:30px; padding:0 var(--space-5); cursor:pointer; font:700 var(--text-small) var(--sans);
+.label .acts { flex:none; display:flex; gap:var(--space-control); align-items:center; justify-content:flex-end; }
+.full { border:1px solid var(--ink); background:transparent; height:30px; padding:0 var(--space-item); cursor:pointer; font:700 var(--text-small) var(--sans);
   letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
 .full:hover { background:var(--ink); color:var(--cream); }
 .stage { flex:1; min-height:0; display:flex; justify-content:center; align-items:flex-start; }
@@ -35,8 +35,8 @@ figure { margin:0; min-width:0; min-height:0; display:flex; flex-direction:colum
 .screen { position:relative; flex:none; overflow:hidden; max-width:100%; border:1px solid var(--frame); background:var(--white); }
 .screen iframe { display:block; border:0; transform-origin:0 0; background:var(--white); }
 /* Verdicts, shown with three or more versions. */
-.vbtn { border:1px solid var(--ink); background:transparent; color:var(--ink); height:30px; min-width:30px; padding:0 var(--space-4);
-  cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:var(--space-3); font:700 var(--text-small) var(--sans);
+.vbtn { border:1px solid var(--ink); background:transparent; color:var(--ink); height:30px; min-width:30px; padding:0 var(--space-control);
+  cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:var(--space-control); font:700 var(--text-small) var(--sans);
   letter-spacing:.08em; text-transform:uppercase; }
 .vbtn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; }
 .vbtn[data-verdict="up"][aria-pressed="true"] { background:var(--moss-dark); border-color:var(--moss-dark); color:var(--cream); }
@@ -45,7 +45,7 @@ figure { margin:0; min-width:0; min-height:0; display:flex; flex-direction:colum
    so it keeps scrolling with the shown one. Tabs in the viewer pick the version. */
 main.switch .row { grid-template-columns:minmax(0, 1fr); position:relative; }
 main.switch figure:not(.current) { position:absolute; inset:0; width:100%; visibility:hidden; }
-main .pick { align-self:flex-start; margin:0 0 var(--space-5); border-color:var(--ink); }
+main .pick { align-self:flex-start; margin:0 0 var(--space-item); border-color:var(--ink); }
 main .pick button { color:var(--ink); }
 main .pick button + button { border-left-color:var(--ink); }
 main .pick button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
@@ -61,19 +61,19 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .msg .n { display:inline-flex; width:24px; height:24px; border-radius:50%; background:var(--terracotta); color:var(--heading);
   font:700 var(--text-small) var(--sans); align-items:center; justify-content:center; }
 .msg .with { color:var(--muted); }
-.verdict { display:inline-block; font:700 var(--text-label) var(--sans); letter-spacing:.08em; text-transform:uppercase; padding:1px var(--space-3);
-  margin-right:var(--space-4); vertical-align:1px; }
+.verdict { display:inline-block; font:700 var(--text-label) var(--sans); letter-spacing:.08em; text-transform:uppercase; padding:1px var(--space-control);
+  margin-right:var(--space-control); vertical-align:1px; }
 .verdict.up { background:var(--moss-dark); color:var(--cream); }
 .verdict.down { background:var(--terracotta); color:var(--heading); }
-.decide { border:1px solid var(--sand); background:var(--white); padding:var(--space-4) var(--space-5); margin-bottom:var(--space-5); }
-.decide .menu-h { color:var(--muted); margin:0 0 var(--space-3); }
-.dopt { display:flex; align-items:center; gap:var(--space-3); font-size:var(--text-message); margin:var(--space-2) 0; cursor:pointer; }
+.decide { border:1px solid var(--sand); background:var(--white); padding:var(--space-control) var(--space-item); margin-bottom:var(--space-item); }
+.decide .menu-h { color:var(--muted); margin:0 0 var(--space-control); }
+.dopt { display:flex; align-items:center; gap:var(--space-control); font-size:var(--text-message); margin:var(--space-tight) 0; cursor:pointer; }
 .dopt input { accent-color:var(--umber); }
-.carry .menu-h { margin-top:var(--space-4); }
-.carried { margin:var(--space-1) 0; font-size:var(--text-message); color:var(--ink); }
+.carry .menu-h { margin-top:var(--space-control); }
+.carried { margin:var(--space-tight) 0; font-size:var(--text-message); color:var(--ink); }
 .status { margin:0; font-size:var(--text-message); }
 .status.error { color:var(--error); font-weight:700; }
 .copy[hidden] { display:none; }
-.pop .verdicts { display:flex; gap:var(--space-3); margin-bottom:var(--space-4); }
+.pop .verdicts { display:flex; gap:var(--space-control); margin-bottom:var(--space-control); }
 .vcomment { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-.vcomment:focus { position:static; width:auto; height:30px; clip-path:none; padding:0 var(--space-5); border:1px solid var(--ink); background:var(--cream); font:700 var(--text-small) var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.vcomment:focus { position:static; width:auto; height:30px; clip-path:none; padding:0 var(--space-item); border:1px solid var(--ink); background:var(--cream); font:700 var(--text-small) var(--sans); letter-spacing:.08em; text-transform:uppercase; }

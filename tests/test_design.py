@@ -111,7 +111,7 @@ class Design(unittest.TestCase):
             for path, n, line in board_css()
             if RAW_SPACE.search(line) or RAW_TEXT.search(line)
         ]
-        self.assertEqual(raw, [], "px values where DESIGN.md asks for --space-N or --text-* tokens")
+        self.assertEqual(raw, [], "px values where DESIGN.md asks for --space-* or --text-* tokens")
 
     def test_pages_use_only_named_colours(self):
         allowed = {hex6(c) for v in design_table().values() for c in COLOUR.findall(v)}

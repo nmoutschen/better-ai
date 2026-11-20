@@ -1,6 +1,6 @@
 /* What only show-better's page shows: the strip, the slides, the comment box and the exported presentation. The
    shared look of the bar, the conversation, the buttons and the toast is in page.css, loaded first. */
-.seg button.ico, .tool { display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-5);
+.seg button.ico, .tool { display:inline-flex; align-items:center; gap:var(--space-control); padding:var(--space-control) var(--space-item);
   font:700 var(--text-label) var(--sans); letter-spacing:.06em; text-transform:uppercase; }
 .seg button.ico svg, .tool svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
 .tool { border:1px solid var(--cream); background:transparent; color:var(--cream); cursor:pointer; }
@@ -14,23 +14,23 @@ body:not(.live) .work { grid-template-columns:minmax(0, 1fr); }
 /* ---------- The strip: one segment per slide, grouped under its part; only the current slide is marked ---------- */
 main { min-height:0; overflow:hidden; display:flex; flex-direction:column; background:var(--surround); }
 /* On linen, muted grey falls under 4.5:1: the strip's part names use ink. */
-.route { --muted:var(--ink); flex:none; display:flex; align-items:center; gap:var(--space-8); padding:var(--space-5) var(--space-10) var(--space-6); border-bottom:1px solid var(--line); background:var(--linen); }
+.route { --muted:var(--ink); flex:none; display:flex; align-items:center; gap:var(--space-section); padding:var(--space-item) var(--space-edge) var(--space-item); border-bottom:1px solid var(--line); background:var(--linen); }
 .route .btn { flex:none; }
 /* Part names cut and segments shrink before the strip scrolls; it never shows a scrollbar over the numbers. */
-.strip { flex:1; display:flex; gap:var(--space-4); min-width:0; margin:0; padding:0; list-style:none; overflow-x:auto; scrollbar-width:none; }
-.grp { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--space-3); }
+.strip { flex:1; display:flex; gap:var(--space-control); min-width:0; margin:0; padding:0; list-style:none; overflow-x:auto; scrollbar-width:none; }
+.grp { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--space-control); }
 .grp .pname { font:700 var(--text-label)/1.2 var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:12px; }
 .grp.on .pname { color:var(--heading); }
-.segs { display:flex; gap:var(--space-2); }
-.segs button { flex:1 1 0; min-width:14px; height:24px; border:0; padding:0 var(--space-2); cursor:pointer; background:var(--line);
+.segs { display:flex; gap:var(--space-tight); }
+.segs button { flex:1 1 0; min-width:14px; height:24px; border:0; padding:0 var(--space-tight); cursor:pointer; background:var(--line);
   font:700 var(--text-label) var(--sans); color:var(--ink); }
 .segs button[aria-current="step"] { background:var(--umber); color:var(--cream); }
 .segs button:hover { outline:1px solid var(--umber); }
 .count { flex:none; font:400 var(--text-message) var(--sans); color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
 
 /* ---------- The stage: one 16:9 slide, centred, scrolling inside when taller ---------- */
-.stage { flex:1; min-height:0; overflow:auto; padding:var(--space-12); display:flex; }
+.stage { flex:1; min-height:0; overflow:auto; padding:var(--space-group); display:flex; }
 body.commenting .slide, body.commenting .slide * { cursor:crosshair; }
 
 /* ---------- A slide, in n14n's Journal style. A project style replaces only these --s- variables. ---------- */
@@ -98,7 +98,7 @@ text.has-detail:hover, text.has-detail.sel, .has-detail:hover > text { text-deco
 .compare.stacked { grid-template-columns:minmax(0, 1fr); gap:18px; }
 
 /* Comment pins: numbered, placed where the user clicked, coloured by the item's state as in the conversation. */
-.pin { position:absolute; z-index:3; width:24px; height:24px; margin:calc(-1 * var(--space-6)) 0 0 calc(-1 * var(--space-6)); border-radius:50%; background:var(--terracotta);
+.pin { position:absolute; z-index:3; width:24px; height:24px; margin:calc(-1 * var(--space-item)) 0 0 calc(-1 * var(--space-item)); border-radius:50%; background:var(--terracotta);
   color:var(--heading); font:700 var(--text-small)/24px var(--sans); text-align:center; box-shadow:0 0 0 2px var(--cream); cursor:pointer; }
 .pin[data-state="seen"], .pin[data-state="replied"], .pin[data-state="followup"] { background:var(--sand); }
 .pin[data-state="asked"] { background:var(--cream); color:var(--umber); box-shadow:0 0 0 2px var(--umber); }
@@ -162,9 +162,9 @@ text.has-detail:hover, text.has-detail.sel, .has-detail:hover > text { text-deco
 .slide .narrow li { margin:0 0 6px; }
 
 @media (max-width:600px) {
-  .route { flex-wrap:wrap; gap:var(--space-4); padding:var(--space-4) var(--space-6); }
+  .route { flex-wrap:wrap; gap:var(--space-control); padding:var(--space-control) var(--space-item); }
   .strip { order:3; flex-basis:100%; }
-  .stage { padding:var(--space-6); }
+  .stage { padding:var(--space-item); }
   .slide { aspect-ratio:auto; align-self:flex-start; height:max-content; margin:0 auto; padding:24px 20px 16px; }
   .headline { font-size:22px; }
   .slide .title { font-size:28px; }
