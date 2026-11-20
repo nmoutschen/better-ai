@@ -9,9 +9,10 @@ Usage:
   python3 dashboard.py status CHANGE seen|asked|working|done|accepted ID...
   python3 dashboard.py pending CHANGE                           list the user's items that are not done
 
-CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it: tasks.md, the agents'
-logs in logs/ (their format is in agents/builder.md and agents/verifier.md) and the coordinator's decisions and
-questions in decisions/ (templates/decision.md). The page shows the agents at work and their latest steps, the tasks done, and a conversation
+CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it: tasks.md, specs.md, in
+logs/ one JSON file per agent with its role, task, mode and branch (modes/coordinate.md) and the agent's log (its
+format is in agents/builder.md and agents/verifier.md) and the coordinator's decisions and
+questions in decisions/ (templates/decision.md). The page shows the agents at work and their latest steps, the tasks with the requirements of specs.md, and a conversation
 with the coordinator in which its decisions and its questions to the user appear. The user writes to the coordinator,
 asks about an agent, answers a question or replies to a decision. Each action is a JSON-RPC call from the page; the
 script appends it to conversation.jsonl in the folder and prints it to stdout. `wait` is for harnesses that only
@@ -23,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import http.server
+import json
 import re
 import sys
 import threading
@@ -83,35 +85,64 @@ def read_tasks(path: Path) -> tuple:
                 "id": row.get("#", ""),
                 "task": row["task"],
                 "mode": row.get("mode", ""),
+                "requirements": [r.strip() for r in row.get("requirements", "").split(",") if r.strip()],
+                "check": row.get("check that tells done from not done", row.get("check", "")),
                 "status": row.get("status", "").lower(),
             }
         )
     return name, tasks
 
 
-def read_agent(path: Path) -> dict:
-    """An agent's role, task and state from its log: the last `start:` line names the role and task, the last line
-    the state. A line that starts with no known word counts as a step, so a slip never hides an agent."""
-    lines = [line.strip() for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
-    agent = {
-        "name": path.stem,
-        "role": "",
-        "task": "",
-        "branch": "",
-        "state": "working",
-        "lines": lines[-40:],
-        "_changed": path.stat().st_mtime,
-    }
+def read_requirements(path: Path) -> dict:
+    """Each requirement's text by its ID, from the table in specs.md (templates/specs.md)."""
+    if not path.exists():
+        return {}
+    head, found = None, {}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.lstrip().startswith("|"):
+            head = None
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-+:?", c) for c in cells if c):
+            continue
+        if head is None:
+            head = [c.lower() for c in cells]
+            continue
+        row = dict(zip(head, cells, strict=False))
+        if row.get("id") and row.get("requirement") and not row["id"].startswith("<"):
+            found[row["id"]] = row["requirement"]
+    return found
+
+
+def read_agent(logs: Path, name: str) -> dict:
+    """An agent from its two files in logs/: what it works on from <name>.json, which the coordinator writes when it
+    starts the agent (role, task, mode, branch), and its state from the last line of <name>.md, the log the agent
+    writes. A log line that starts with no known word counts as a step, so a slip never hides an agent."""
+    card, log = logs / f"{name}.json", logs / f"{name}.md"
+    try:
+        about = json.loads(card.read_text(encoding="utf-8")) if card.exists() else {}
+    except ValueError:
+        about = {}
+    about = about if isinstance(about, dict) else {}
+    lines = [x.strip() for x in log.read_text(encoding="utf-8", errors="replace").splitlines() if x.strip()] if log.exists() else []
+    state = "working"
     for line in lines:
-        word, _, rest = line.partition(":")
-        word = word.strip().lower()
-        if word == "start":
-            parts = [p.strip() for p in rest.split(",")]
-            agent["role"] = parts[0].lower() if parts else ""
-            agent["task"] = re.sub(r"^task\s*#?", "", parts[1], flags=re.I) if len(parts) > 1 else ""
-            agent["branch"] = parts[2] if len(parts) > 2 else ""
-        agent["state"] = STEPS.get(word, "working")
-    return agent
+        state = STEPS.get(line.partition(":")[0].strip().lower(), "working")
+    return {
+        "name": name,
+        **{key: str(about.get(key, "")) for key in ("role", "task", "mode", "branch")},
+        "state": state,
+        "lines": lines[-40:],
+        "_changed": max(f.stat().st_mtime for f in (card, log) if f.exists()),
+    }
+
+
+def read_agents(logs: Path) -> list:
+    """Every agent of the change, by the names of its files in logs/, so an agent shows as soon as it is started."""
+    if not logs.is_dir():
+        return []
+    names = sorted({f.stem for f in logs.iterdir() if f.suffix in (".md", ".json")})
+    return [read_agent(logs, name) for name in names]
 
 
 def load(change: Path) -> dict:
@@ -119,7 +150,8 @@ def load(change: Path) -> dict:
     return {
         "name": name or change.name,
         "tasks": tasks,
-        "agents": [read_agent(path) for path in md_files(change / "logs")],
+        "requirements": read_requirements(change / "specs.md"),
+        "agents": read_agents(change / "logs"),
         "decisions": [read_entry(path) for path in md_files(change / "decisions")],
         "conversation": conversation(change).events(),
         "now": time.time(),

@@ -40,7 +40,7 @@ WHILE you work, TELL the coordinator, in plain words, anything SKILL.md tells yo
 
 IF `log` is not "none", the coordinator's dashboard shows the user your work from it. CREATE it, and ADD one line at the end for each event as it happens, never editing earlier lines. START each line with its kind, and keep it to one short sentence:
 
-- `start: builder, task <n>, <branch>` when you begin;
+- `start: <what you begin with>` when you begin;
 - `step: <what you just did or found>` after each step of your mode, such as `step: wrote the check for R3; it fails as expected`;
 - `asked: <what you sent the coordinator, in a few words>` each time you message it;
 - `blocked: <what you need>` when you cannot go on;
