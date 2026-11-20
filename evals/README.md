@@ -310,7 +310,13 @@ Label judged graders of real runs in `judge_labels/<skill>.yaml` (format in
 uv run python -m tools.report logs/<file>.eval --labels judge_labels/code-better.yaml
 ```
 
-prints the agreement per rubric and overall.
+prints the agreement per rubric and overall, per skill and agent model. One rule decides which run
+a label means: it must match exactly one run in all the logs (after `--latest`), by sample, epoch and
+grader, and by `agent_model` when the label names one. A run whose judge errored, and a run that ended in a
+sample error, count as matches, because the label may have been written on them. A label with zero or several
+matches stops the report before anything prints and names the runs it matched (agent model, log): add
+`agent_model: <model>` to the label or pass `--latest`. A label whose one run has no verdict is listed with
+the reason. Duplicate runs of samples no label names do not matter.
 
 ## Report
 
@@ -318,15 +324,20 @@ prints the agreement per rubric and overall.
 uv run python -m tools.report logs/<dir>/*.eval [more.eval ...] [--latest]
 ```
 
-prints the pass rate of `all` per rule and condition, the paired comparisons
+prints one section per skill and agent model (a mixed folder of logs is split),
+each headed with the skill, agent model, judge model, Claude Code version and
+skill commit (flagged dirty when the skill folder had uncommitted changes, `dirty ?` when the log does not say). A
+section holds the pass rate of `all` per rule and condition, the paired comparisons
 between conditions, cost and time per condition, the skill files read in the
 skill condition (per expected file, and files read where no case expects
-them), one line per sample with
+them), per case how many skill-installed runs loaded the skill and the pass rate
+when it did and when it did not, one line per sample with
 tokens (input, output, cache read, cache write), agent cost, judge cost and
 time, the totals, any sample errors, how many samples per condition are sample errors, by cause (agent timeout, grading error, other), left out of the pass rates and the cost and time means, and per condition how many runs committed or rewrote
 history. Every sample records its commits under `side_actions` in the score metadata; only cases
 that use `no_commit` score it. With `--latest`, each case and
-condition keeps only the runs of the most recently started log that has it, so
+condition keeps only the runs of the most recently started log that has it for
+that skill and agent model, so
 a re-run after a fix replaces the runs it fixes; without it, every run of every
 log counts.
 

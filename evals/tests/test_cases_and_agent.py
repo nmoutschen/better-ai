@@ -289,3 +289,18 @@ def test_lint_cases_grade_the_lint_run_with_the_judge() -> None:
         )
         assert "Edits by a sub-agent the agent started count as edits too." in rubrics[0], directory.name
         assert "the file edit and file write tools" in rubrics[0], directory.name
+
+
+def test_agent_metadata_flags_a_dirty_skill_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The run metadata records whether the skill's folder had uncommitted changes."""
+    folder = tmp_path / "skills" / "demo"
+    folder.mkdir(parents=True)
+    (folder / "SKILL.md").write_text("one\n")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run([*git, "add", "."], cwd=tmp_path, check=True)
+    subprocess.run([*git, "commit", "-qm", "x"], cwd=tmp_path, check=True)
+    monkeypatch.setattr(agent, "REPO", tmp_path)
+    assert agent.agent_metadata("fake", "m", "demo")["skill_dirty"] is False
+    (folder / "SKILL.md").write_text("two\n")
+    assert agent.agent_metadata("fake", "m", "demo")["skill_dirty"] is True
