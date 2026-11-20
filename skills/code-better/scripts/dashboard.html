@@ -413,7 +413,7 @@ function render(d) {
   drawTasks(d);
   syncBar();
   const replies = (d.conversation || []).filter(e => e.action === "reply");
-  if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + replies[replies.length - 1].text.slice(0, 120), "ok");
+  if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + pageMarkdownText(replies[replies.length - 1].text).slice(0, 120), "ok");
   REPLIES = replies.length;
   conv.setLog(events(d), (d.decisions || []).map(x => [x.id, x.status, x.answer, x.decision, x._changed]));
   if (OPEN) fillPop();

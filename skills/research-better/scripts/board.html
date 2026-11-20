@@ -509,7 +509,7 @@ function render(d) {
   const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, OPEN && OPEN.id === q.id]).concat([b.short]));
   if (key !== LAYOUT) { LAYOUT = key; drawMap(D); if (FITTED) fit(); }
   const replies = (d.conversation || []).filter(e => e.action === "reply");
-  if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + replies[replies.length - 1].text.slice(0, 120), "ok");
+  if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + pageMarkdownText(replies[replies.length - 1].text).slice(0, 120), "ok");
   REPLIES = replies.length;
   drawAgents(D);
   // Redraw when the log changes, when a question a worker's message names changes, and every half minute while a

@@ -235,3 +235,35 @@ test('a year at the start of a line does not start a list mid-paragraph', () => 
   assert.deepEqual(md('Released in\n2024. Then more.').map(b => b.tag), ['p']);
   assert.deepEqual(md('Steps:\n1. a\n2. b').map(b => b.tag), ['p', 'ol']);
 });
+
+test('bold and italic together', () => {
+  assert.deepEqual(md('***x***')[0].children, [{ tag: 'strong', children: [{ tag: 'em', children: [t('x')] }] }]);
+});
+
+test('marks can span a line break, which stays a break', () => {
+  assert.deepEqual(md('**bold\nacross** end')[0].children,
+    [{ tag: 'strong', children: [t('bold'), { tag: 'br' }, t('across')] }, t(' end')]);
+  assert.deepEqual(md('`a\nb`')[0].children, [{ tag: 'code', children: [t('a b')] }]);
+});
+
+test('an indented fence takes its indentation off the code', () => {
+  assert.deepEqual(md('  ```\n  x\n    y\n  ```')[0].children[0].children, [t('x\n  y')]);
+  assert.deepEqual(md('- a\n\t```\n\tx\n\t```')[0].children[0].children[1].children[0].children, [t('x')]);
+});
+
+test('headings drop their closing #s only after a space', () => {
+  assert.deepEqual(md('## Plan ##')[0].children[0].children, [t('Plan')]);
+  assert.deepEqual(md('# C#')[0].children[0].children, [t('C#')]);
+});
+
+test("a notice shows the message's words without marks", () => {
+  assert.equal(context.pageMarkdownText('## Done\n- **b**old `x`\n- [spec](https://a.com)'), 'Done bold x spec');
+});
+
+test('long messages with unclosed marks stay fast', () => {
+  for (const text of ['**a '.repeat(50000), '# a' + ' '.repeat(50000), '_a '.repeat(50000), '`'.repeat(100000)]) {
+    const start = Date.now();
+    md(text);
+    assert.ok(Date.now() - start < 500, `${JSON.stringify(text.slice(0, 6))}… took ${Date.now() - start} ms`);
+  }
+});
