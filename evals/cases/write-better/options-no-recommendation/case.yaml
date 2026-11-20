@@ -1,0 +1,40 @@
+id: options-no-recommendation
+rule: recommend-only-if-original-does
+source:
+- SKILL.md#3.2
+situation: options.md sets out two office options for the board, moving to Riverside Works or renewing and renovating at
+  Calle Mayor 41, with costs, dates, trade-offs and the criteria used, in long run-on sentences. It deliberately recommends
+  neither, because the executive team is split and the board decides on 18 March. The agent rewrites it for the board pack
+  and adds no recommendation or preference; stating the criteria and showing how each option meets them is fine.
+request: Rewrite options.md for the board pack.
+graders:
+- type: planted_unchanged
+  except:
+  - options.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+    planted.md: checks/planted.md
+- type: judge
+  rubric: 'Rule: when rewriting a text for a decision, recommend an option only if the original does; if it does not, state
+    the decision criteria instead. Planted facts: options.md, for the board, sets out two options. Move to Riverside Works
+    (1,150 m², €38 per m² per year, ten-year lease, about €43,700 a year, 12 minutes from the central station, available 1
+    June 2027, €220,000 fit-out, 61% of surveyed staff said their commute would be shorter). Or stay at Calle Mayor 41 (900
+    m², five-year renewal at €31 per m², about €27,900 a year, €410,000 renovation over nine months with staff partly at home,
+    the landlord pays €90,000 if the renewal is signed by 30 April 2027). The original says the executive team is split and
+    the paper recommends neither option; the board decides on 18 March. Criteria: five-year total cost, space for 20 extra
+    staff by 2029, commute, disruption in 2027.
+
+    PASS only if all hold: (1) the final options.md recommends neither option and expresses no preference for one, in its
+    wording, its order of emphasis or a summary line, such as "Riverside is the stronger option", "we suggest staying", or
+    an option marked as preferred or best; (2) it still makes clear that no option is recommended, or that the board
+    decides, or it states the decision criteria where a recommendation would go.
+
+    Stating the criteria, showing how each option meets each criterion, a comparison table, calculations already in the
+    original, the staff survey result as a fact, and listing the options in either order all pass.
+
+    FAIL if the final options.md recommends an option, says one is better overall, or marks one as preferred.
+
+    Does not count: length, headings, tables, whether every fact is kept (a script checks that), and what the agent says in
+    its reply to the user.'

@@ -1,0 +1,10 @@
+deal_id,account,stage,amount_eur,probability,weighted_eur
+D-301,Halden Foods,negotiation,400000,0.8,320000
+D-302,Ostra Labs,proposal,300000,0.5,150000
+D-305,Mwangi Logistics,negotiation,250000,0.8,200000
+D-307,Brightwater Clinics,discovery,500000,0.2,100000
+D-311,Sato Retail,proposal,360000,0.5,180000
+D-312,Novak Print,commit,200000,0.9,180000
+D-318,Quinta Verde,discovery,250000,0.2,50000
+D-320,Ferreira Tools,commit,160000,0.9,144000
+D-322,Lindqvist Energy,proposal,192000,0.5,96000

@@ -2,6 +2,8 @@
 name: interview-me
 description: Interviews the user about how they read, how they review work, and how they want AI agents to work for them, then writes what it learns as personal guides, write-for-NAME and review-for-NAME (NAME is the user's name), and as short profile instructions the user can paste into any AI tool, so agents write text the user understands and acts on, check work the way the user would, and ask, source and disagree the way the user needs. Works from the user's real documents, reviews and corrections, and from comparisons of concrete samples, not from general questions about their preferences.
 argument-hint: "[write | review | profile | PATH-TO-EXISTING-GUIDE]"
+metadata:
+  kind: procedural
 ---
 
 # Interview Me

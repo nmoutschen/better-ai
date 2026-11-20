@@ -38,7 +38,20 @@ NAME each case after its situation, such as `order-ref-skipped-tests`, and SET i
 
 MAP each case to where the skill states that behaviour now, in `source`, and to the skill files a skill run must read, in `reads`. WHEN the skill is restructured, UPDATE `source` and `reads`, and the one-sentence instructions keyed by source, in the same change.
 
-## 7. Read the run before blaming the skill
+## 7. Grade a skill by its kind
+
+A skill's kind is `metadata.kind` in its frontmatter (see section 6.8 of the repository's `PRINCIPLES.md`). It sets what the cases look for and which conditions run by default.
+
+FOR a **procedural** skill, PLANT a task the workflow covers and GRADE whether each step happened: the documents a step writes, the checks it runs, the sub-agents it starts and waits for, and the skill's own files it must read, listed under `reads`. A case targets one step an agent tends to skip.
+
+FOR a **behavioural** skill, GRADE the qualities its rules ask of the result and of the agent's conduct, not the order of the work. A behavioural skill also does harm by applying a rule where it does not fit, so WRITE two kinds of case:
+
+- a case where the rule should change the result, such as a text whose main point comes last;
+- a guard case where applying the rule harms, such as a text that is already clear and must keep its length, its facts and its structure.
+
+A behavioural skill's cases list no `reads`: its rules are in SKILL.md. RUN the `skill-installed` condition as well, which installs the skill and sends the request without its slash command, because agents are meant to load a behavioural skill for the work by themselves. REPORT how often the agent loaded it, and the pass rate with and without it, so a failure to load is told apart from a failure to follow.
+
+## 8. Read the run before blaming the skill
 
 BEFORE changing a skill because a case fails, READ the failing runs: the judge's reasons, the final reply and the transcript. A failure may come from the grader, the case or the harness instead:
 
@@ -50,6 +63,6 @@ BEFORE changing a skill because a case fails, READ the failing runs: the judge's
 
 FIX the grader, the case or the adapter WHEN that is the cause, and VALIDATE the case with its scripted runs. CHANGE the skill only for a failure the agent's own behaviour explains.
 
-## 8. Test a skill change on a pilot before a full run
+## 9. Test a skill change on a pilot before a full run
 
 STATE each skill change as a hypothesis: the behaviour it should change, the evidence for it, and the cases that show it. RUN those cases, and a fixed set of about ten cases that covers the skill's main steps, a few times each, and COMPARE them with the same cases before the change. CHANGE one thing at a time where you can. RUN the full eval only once the pilots reach a satisfactory rate, and KEEP the pilot logs to compare against.

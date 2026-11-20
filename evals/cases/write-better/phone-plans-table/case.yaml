@@ -1,0 +1,16 @@
+id: phone-plans-table
+rule: show-relations
+source:
+- SKILL.md#3.4
+situation: plans.md compares three mobile plans in prose, on price, data, contract length and roaming, for a team lead, Amara,
+  who must choose one. The GOAL is to decide and the content is a comparison, so the agent adds a table that shows each plan
+  against each criterion, and keeps every price, allowance, condition and limit.
+request: Rewrite plans.md so Amara can pick a plan for the team.
+graders:
+- type: planted_unchanged
+  except:
+  - plans.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/plans/check.py

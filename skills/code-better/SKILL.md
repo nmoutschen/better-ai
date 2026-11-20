@@ -2,6 +2,8 @@
 name: code-better
 description: Helps an AI agent build, check, review and audit code against a design or a request, so that it builds what the user needs, keeps the change small and correct, proves each requirement with a check, and leaves the user able to trust and maintain the result without reading every line.
 argument-hint: "[TASK]"
+metadata:
+  kind: procedural
 ---
 
 # Code Better

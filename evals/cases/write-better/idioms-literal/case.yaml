@@ -1,0 +1,38 @@
+id: idioms-literal
+rule: say-it-literally
+source:
+- SKILL.md#4.8
+situation: update.md is a weekly update for the Lisbon office full of idioms (in the weeds, ballpark, soonish, dropped the
+  ball, circle back, moved the needle, low-hanging fruit) and asks for headcount numbers "soonish". team.md says most readers
+  read English as a second language and lists the numbers as due on Wednesday 9 December 2026, 17:00. The agent replaces or
+  explains the idioms and states the due date.
+request: Rewrite update.md for the Lisbon team.
+graders:
+- type: planted_unchanged
+  except:
+  - update.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+- type: judge
+  rubric: 'Rule 4.8: replace metaphors, idioms, hints and exaggeration with direct statements, or explain them; when the reader
+    must do something, state what and by when. Planted facts: update.md is a weekly update for the Lisbon office; team.md
+    says most readers read English as a second language, some through a translation tool, and lists the Q4 headcount numbers
+    as due to Finance on Wednesday 9 December 2026, 17:00 Lisbon time, from each team lead. update.md uses the idioms "in
+    the weeds", "ballpark" (twice), "soonish", "dropped the ball", "circle back" (twice), "moved the needle" and "low-hanging
+    fruit", and asks for the numbers "soonish".
+
+
+    PASS only if all hold: (1) in the final update.md, each of these idioms is replaced by a literal statement or explained
+    in plain words where it appears; (2) the headcount request says what to send (the Q4 headcount numbers, to Finance) and
+    by when (9 December, with or without the 17:00 time); (3) the replacements keep the meaning, in particular that a rough
+    figure is acceptable for contractors while permanent roles must be exact.
+
+
+    FAIL if any planted idiom remains unexplained, if the request still has no due date or a vague one ("soon", "this week"),
+    if the contractor/permanent distinction is lost, or if update.md is unchanged.
+
+
+    Does not count: other common phrases such as "signs off" or "lock the budget" if left in, wording, length, greeting and
+    sign-off, whether the request names team leads.'

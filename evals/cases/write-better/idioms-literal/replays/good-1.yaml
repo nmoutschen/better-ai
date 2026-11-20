@@ -1,0 +1,23 @@
+actions:
+- read: update.md
+- read: team.md
+- write: update.md
+  content: |
+    # Weekly update: Lisbon
+
+    Hi all,
+
+    This is a short update, because we are busy with planning for the end of the year.
+
+    **Headcount.** Team leads: please send your team's Q4 headcount numbers to Finance by Wednesday 9 December 2026, 17:00 Lisbon time. Finance needs them to fix the 2027 budget. For contractors, a rough estimate is enough. For permanent roles, the numbers must be exact. Last year, a few teams sent their numbers late, and the whole budget was delayed by a week.
+
+    **Desk move.** We still plan to move to the Rua do Ouro floor on 18 January. Facilities will send the floor plan when the landlord approves it. We have a budget of about EUR 40,000 for new desks and chairs.
+
+    **Support queue.** The new triage rules made a clear difference: the average first response time fell from 9 hours to 4 hours since October. Thank you to everyone who helped. The next easy improvement is the 230 tickets older than 30 days. Sofia's team will handle those first.
+
+    **Reviews.** Annual reviews start after the move. I will send more information in January.
+
+    Have a good week,
+    Daniel
+reply: 'I rewrote update.md in literal English for readers of English as a second language, replacing each idiom. The headcount
+  request now gives the due date from team.md: Wednesday 9 December 2026, 17:00 Lisbon time.'

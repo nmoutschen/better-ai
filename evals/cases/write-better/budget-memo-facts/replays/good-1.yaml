@@ -1,0 +1,31 @@
+actions:
+- read: budget-memo.md
+- write: budget-memo.md
+  content: |
+    To: Department heads
+    From: Adwoa Mensah, Finance
+    Subject: 2027 operating budget and what it means for your department
+
+    The 2027 operating budget is €4.82 million, but your department's discretionary spending will be 6% lower than in 2026. We recommend that each department defers non-essential equipment purchases to Q3, when we will know more about the hiring freeze.
+
+    ## The total
+
+    The budget rises 3.5% from €4.66 million in 2026. Most of that increase is already committed to the salary adjustments agreed in the spring and to the higher energy contract, so the room for new spending is smaller than the total suggests. Finance will send each of you your exact figure by the end of this week.
+
+    ## Limits on spending
+
+    - Travel is capped at €1,200 per person per year, for all staff on the payroll. A trip that would take a person over the cap needs the managing director's written approval before it is booked.
+    - The training fund is €85,000, shared across all departments. It excludes contractors, who are still trained through their own agencies.
+
+    ## Spending that depends on a condition
+
+    - Operations' two new posts are funded only if the hiring freeze lifts in March. If it does not, the money returns to the central reserve.
+    - Software licences come to €310,000. Of that, €60,000 for the new booking system is released only if the Kumasi office pilot meets its 90% uptime target by 30 April.
+
+    ## Dates
+
+    - 15 January 2027: send your spending plan to finance, using the attached template. Late plans get the default allocation.
+    - 12 June: first review of actual spending. Departments more than 10% over their allocation will present a recovery plan.
+
+    If you have questions, contact me directly.
+reply: I restructured budget-memo.md with the main point and the recommendation first, then headings for limits, conditional spending and dates. I checked every amount, date, condition and limit against the original.

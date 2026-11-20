@@ -1,0 +1,10 @@
+actions:
+- read: release-notes.md
+reply: |
+  Three things to fix before you send it:
+
+  1. The change customers must act on is buried. "As part of this release, the CSV export in the old format will stop working on 1 February 2027..." sits under "Other changes", after the settings note. Move it to the top, for example: "Action needed by 1 February 2027: the old CSV export format stops working on that date. If a spreadsheet or script imports Fernpad exports, switch it to the new format, described in the help centre under 'Exporting your data'. Exports created before that date are not affected."
+  2. "We also resolved PLAT-2291" uses an internal ticket label customers can't read. Say what was fixed: "We fixed [the problem in customers' words], which several of you reported in October."
+  3. "Dark mode is coming soon" doesn't say when. Give the month if you know it ("Dark mode arrives in [month]"), or drop the timing: "We are working on dark mode and offline editing for checklists."
+
+  I didn't change the file.

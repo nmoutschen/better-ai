@@ -1,0 +1,36 @@
+actions:
+- read: results/summary.csv
+- read: results/notes.md
+- write: loadtest-summary.md
+  content: |
+    # checkout-api load test, 2026-11-17
+
+    checkout-api meets its SLO (p95 under 400 ms, errors under 1%) up to 500 concurrent users, and breaks it at 750 users,
+    where the p95 latency reaches 1,480 ms and 6.8% of requests fail. Last year's Black Friday peak, about 620 concurrent
+    checkout users, falls between those two stages, so this test does not show whether checkout-api holds at that load.
+
+    | Concurrent users | Requests/s | p95 latency | Error rate |
+    | --- | --- | --- | --- |
+    | 100 | 410 | 120 ms | 0.0% |
+    | 250 | 1,010 | 160 ms | 0.1% |
+    | 500 | 1,950 | 310 ms | 0.4% |
+    | 750 | 2,210 | 1,480 ms | 6.8% |
+
+    ## Why it breaks at 750 users
+
+    Almost all errors at 750 users are HTTP 503s, and they start when the database connection pool reaches its maximum of 50
+    connections. CPU on the app nodes stayed under 60%, and throughput rose only from 1,950 to 2,210 requests/s between 500
+    and 750 users, so requests queue for a database connection.
+
+    ## Limits of this test
+
+    The test ran on staging, whose database is smaller than production's (4 vCPU against 16) and holds about a third of the
+    data. Production may answer queries faster, but the connection pool limit is the same setting, 50, in both.
+
+    ## Possible next steps from the notes
+
+    The notes suggest raising the pool to 100 and rerunning the 750-user stage, and looking at slow queries on the payment
+    step.
+reply: The summary is in loadtest-summary.md. I assumed it is for the team deciding whether checkout-api is ready for this
+  year's Black Friday peak, so it leads with where the service breaks against last year's peak; tell me if it is for another
+  reader or purpose.

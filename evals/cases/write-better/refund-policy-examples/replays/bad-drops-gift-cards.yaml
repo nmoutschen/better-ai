@@ -1,0 +1,13 @@
+actions:
+- write: refund-guide.md
+  content: |
+    # Deciding whether a refund is allowed
+
+    1. Did the customer ask within 30 days of delivery, and is the item unused and in its original packaging? Then refund it.
+    2. Is the item faulty, and was it delivered less than 12 months ago? Then refund it, even if it was used.
+    3. Personalised items are refunded only if faulty.
+
+    **Example.** Wanjiru received a teapot 12 days ago and has not used it. The refund is allowed.
+
+    **Example.** Mateo's bowl cracked eight months after delivery. The refund is allowed.
+reply: Wrote refund-guide.md.

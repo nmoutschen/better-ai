@@ -1,0 +1,26 @@
+actions:
+- write: help-article.md
+  content: |
+    # Getting started with workspaces
+
+    A workspace is where your team keeps its boards, files and conversations in Tallyboard. Everything you create belongs to exactly one workspace, so set up your workspace before you invite anyone.
+
+    ## Create your first workspace
+
+    1. On the home screen, click **New workspace** in the top-left corner.
+    2. Give the workspace a name of up to 40 characters. You can change the name later.
+    3. Choose who can see it: **Private** (only people you invite) or **Shared** (everyone in your organisation can find it and ask to join).
+    4. Click **Create**. Tallyboard opens your new workspace with an empty board.
+
+    ## Invite people
+
+    Open the workspace and click **Invite** in the top bar. Enter one email address per line. On the Free plan a workspace can have up to 25 members; on the Team plan there is no limit. Invited people get an email and join the workspace when they accept.
+
+    ## Limits on the Free plan
+
+    You can own up to 3 workspaces on the Free plan. If you need another workspace, delete one you no longer use or upgrade to the Team plan.
+
+    ## Rename or delete a workspace
+
+    Only the owner can rename or delete a workspace. Open **Workspace settings** from the menu next to its name. Deleting removes its boards and files.
+reply: Rewrote the article for new users.

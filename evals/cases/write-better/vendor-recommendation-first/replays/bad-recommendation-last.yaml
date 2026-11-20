@@ -1,0 +1,17 @@
+actions:
+- write: vendor-comparison.md
+  content: |
+    # Freight vendor comparison
+
+    Our contract with Ostrava Logistik ends on 31 December 2026, at €2.08 per parcel. Last year we shipped 1.1 million parcels, about 8% of them chilled goods that need cold-chain transport. We ran a tender for a three-year contract from 1 January 2027.
+
+    | Vendor | Price per parcel | On-time rate | Cold chain |
+    |---|---|---|---|
+    | Baobab Carriers | €2.10 | 93% | yes |
+    | Kestrel Freight | €1.94 | 96.5% | from Q2 2027 |
+    | Tidewater Lines | €2.05 | 94% | yes, minimum 1.2 million parcels a year |
+
+    Ostrava Logistik has agreed to a short extension for chilled goods at the current price.
+
+    We recommend Kestrel Freight: it saves about €154,000 a year, but chilled goods stay with Ostrava Logistik until Q2 2027.
+reply: Tightened the comparison into a table.

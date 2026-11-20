@@ -1,0 +1,12 @@
+actions:
+- write: options.md
+  content: |
+    # Office options for 2027
+
+    The board decides on 18 March whether to move to Riverside Works or stay at Calle Mayor 41, whose lease ends on 31 August 2027. This paper recommends neither.
+
+    - Riverside Works: 1,150 m², €38 per m² per year (about €43,700), ten-year lease, 12-minute walk from the central station, available 1 June 2027. 61% of staff surveyed said their commute would be shorter.
+    - Calle Mayor 41: 900 m², five-year renewal at €31 per m² per year (about €27,900), nine months of works with staff at home about three days a week.
+
+    Moving and disruption costs are not included. Both fit the capital budget. Criteria: five-year cost, space for 20 extra staff by 2029, commute, disruption.
+reply: Condensed the options paper.

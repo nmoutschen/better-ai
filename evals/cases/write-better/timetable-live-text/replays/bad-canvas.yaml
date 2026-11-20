@@ -1,0 +1,26 @@
+actions:
+- read: schedule.md
+- write: timetable/index.html
+  content: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Clean-up day timetable</title></head>
+    <body>
+    <canvas id="t" width="720" height="900"></canvas>
+    <script>
+      const rows = [
+        ["08:30", "Check-in, Old Boathouse", "Nkechi Obi"],
+        ["09:00", "Safety briefing, Old Boathouse", "Rafael Souza"],
+        ["09:30-12:00", "Mill Bridge / Willow Bank / Weir car park", "Hana Sato, Dev Patel, Lucía Fernández"],
+        ["12:00", "Lunch, St Brigid's Hall", "Grace Mensah"],
+        ["13:00-15:00", "Sorting and weighing, St Brigid's Hall yard", "Tomasz Nowak"],
+        ["15:30", "Wrap-up, Old Boathouse", "Nkechi Obi"],
+      ];
+      const ctx = document.getElementById("t").getContext("2d");
+      ctx.font = "20px sans-serif";
+      rows.forEach((row, i) => row.forEach((cell, j) => ctx.fillText(cell, 10 + j * 240, 40 + i * 60)));
+    </script>
+    </body>
+    </html>
+reply: Drew the timetable on a canvas in timetable/index.html so it keeps its layout on any phone.

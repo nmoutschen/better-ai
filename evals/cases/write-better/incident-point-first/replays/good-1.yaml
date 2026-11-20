@@ -1,0 +1,34 @@
+actions:
+- read: incident-report.md
+- write: incident-report.md
+  content: |
+    # Incident report: duplicate card charges after payments release 4.13
+
+    We should roll back the payments service to version 4.12 by Friday 20 November, because release 4.13 still creates
+    about 40 duplicate charges every day. We need your approval, because the rollback takes Apple Pay off web checkout until
+    the proper fix ships, around 4 December.
+
+    So far 312 customers have been charged twice, €8,400 in total, and none has been refunded. Finance will refund them in
+    one batch once the rollback stops new duplicates.
+
+    ## What happened
+
+    On Monday 16 November at 10:40 CET we deployed version 4.13 of the payments service. The release added Apple Pay to web
+    checkout and changed how the service retries a card payment when the bank does not answer within 8 seconds. When a bank
+    answered after that timeout, the service had already sent a retry, and both the original payment and the retry went
+    through. The first customer reported a double charge at 13:15, and support opened an incident after two more by 15:00.
+
+    On Tuesday 17 November we shipped 4.13.1, which raised the timeout to 15 seconds. This reduced the duplicates but did not
+    stop them, because banks in two countries regularly take longer than 15 seconds during their evening peak. On Wednesday
+    18 November finance pulled the full list of duplicate charges since the release.
+
+    ## Options
+
+    Rolling back to 4.12 stops the duplicates, because 4.12's retry logic does not create them. The rollback takes about an
+    hour with no downtime. Its cost is Apple Pay on web checkout, which 2.1% of web payments have used since Monday.
+
+    The proper fix is to send an idempotency key with each payment, so that the bank rejects the second attempt. It takes
+    about two weeks, including tests with our three acquiring banks, so it would ship around 4 December at the earliest.
+    Waiting for it instead of rolling back would add about 40 duplicate charges a day until then.
+reply: incident-report.md now opens with the rollback recommendation and the approval you need from the CTO, followed by what
+  happened and the options. I checked that every number and date from the original is still there.

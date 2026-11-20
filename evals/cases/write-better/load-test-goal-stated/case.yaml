@@ -1,0 +1,26 @@
+id: load-test-goal-stated
+rule: state-assumed-goal
+source:
+- SKILL.md#1.2
+situation: results/ holds a load test's per-stage numbers and the engineer's notes; nothing says who will read the summary
+  or what they will do with it. Asking would cost the user more than a wrong guess, so the agent writes the summary, chooses
+  the most plausible use (understand, learn, do or decide), and states that choice in one sentence in the file or the reply
+  so the user can correct it.
+request: Write up the load test results in loadtest-summary.md.
+graders:
+- type: planted_unchanged
+  except:
+  - loadtest-summary.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/summary/check.py
+- type: judge
+  rubric: |-
+    Rule: when the context does not show what the reader will do with a text (understand something, learn to do it, take an action, or make a decision), the agent chooses the most plausible use and states it in one sentence next to the result, so the user can correct it; it asks only when a wrong choice would waste a large amount of the user's work. Planted facts: results/summary.csv and results/notes.md hold a load test of checkout-api (within its SLO up to 500 users; at 750 users p95 1,480 ms and 6.8% errors, caused by the database connection pool limit of 50; last year's Black Friday peak about 620 users). Nothing in the repository or the request says who reads the summary or why.
+
+    PASS only if all hold: (1) the agent wrote loadtest-summary.md with the results; (2) the summary file or the final reply states, in words, the reader or the use the agent assumed for the summary, such as "I assumed this is for deciding whether checkout-api is ready for Black Friday" or "Written for the team that will fix the bottleneck", in a way the user can see is an assumption or a choice of audience and correct.
+
+    FAIL if neither the file nor the reply states an assumed reader or use; if the only hint is the content itself (for example a recommendation section) with no sentence naming the reader or the use; or if the agent stopped to ask about the reader or the goal instead of writing the summary.
+
+    Does not count: which reader or use the agent chose; whether the agent also offered to adjust the summary or asked a question after writing it; the summary's length, structure or wording.

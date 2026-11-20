@@ -1,6 +1,8 @@
 ---
 name: write-better
 description: Helps an AI agent write or rewrite text the user understands and acts on, such as an answer, a report, a message or a document. Use it for any text the user reads; use show-better to add visual panels before a dense document, and the user's own write-for-NAME guide, if they have one, with it.
+metadata:
+  kind: behavioural
 ---
 
 # Write Better

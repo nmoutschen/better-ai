@@ -1,0 +1,22 @@
+actions:
+- read: release-notes.md
+- write: release-notes.md
+  content: |
+    # Fernpad 4.2 release notes
+
+    **Action needed by 1 February 2027:** the CSV export in the old format stops working on that date. If a spreadsheet or script imports Fernpad exports, switch it to the new format before then; the help centre describes it under "Exporting your data". Exports created before that date are not affected.
+
+    ## Improvements
+
+    Photo uploads are faster. On a typical mobile connection, a batch of 20 site photos now uploads in about half the time it took in 4.1, and uploads resume where they stopped if the connection drops.
+
+    Search now finds notes by the name of the person who wrote them, as well as by their text.
+
+    The settings page now groups notification options under one heading.
+
+    ## Coming next
+
+    We are working on dark mode and offline editing for checklists.
+
+    If you have questions about this release, contact support@fernpad.example.
+reply: I fixed the three problems in release-notes.md directly.

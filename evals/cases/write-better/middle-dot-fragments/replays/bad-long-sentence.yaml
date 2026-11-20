@@ -1,0 +1,26 @@
+actions:
+- write: digest.md
+  content: |
+    # Northside Cycling Club: November digest
+
+    The club has 42 members, 3 of whom are new, and 2 events coming up.
+
+    ## Welcome
+
+    Welcome to Amina Diallo, Jonas Berg and Priya Raman, who joined this month. Some of you rode with them on the hill loop last Sunday. Between them, they have more than twenty years of touring experience. The committee has been looking for new ride leaders since the spring, and hopes they will share that experience by leading a ride in the new year.
+
+    ## Coming up
+
+    - Sunday ride: 7 December at 08:00, from Harbour Gate, 65 km.
+    - Winter social: 13 December at 19:00, at The Old Ropeworks. Tickets cost £8.
+
+    ## Club news
+
+    The membership fee, which has not changed since 2022, when it rose from £20 to £25 after the insurance renewal, will stay at £25 for 2027, although if you also pay for the optional track sessions at the velodrome, which the club subsidises, the track supplement will rise from £30 to £36 from 1 January.
+
+    The club's lights and helmets rule still applies on every ride. Please check your lights before the Sunday ride. It starts before sunrise, and the first 10 km along the canal are unlit. Anyone without working lights will be asked to wait for the second group.
+
+    Use your lights and wear your helmet on every ride.
+
+    If you have questions, write to secretary@northsidecc.example.
+reply: Made it easier to read.

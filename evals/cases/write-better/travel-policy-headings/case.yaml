@@ -1,0 +1,25 @@
+id: travel-policy-headings
+rule: navigable-headings
+source:
+- SKILL.md#3.3
+situation: travel-policy.md is a 500-word policy with no headings, covering approvals, booking, the daily allowance and expense-claim
+  deadlines. Staff look up one rule at a time, so the agent adds descriptive headings that say what each section holds, and
+  keeps every amount, limit and deadline.
+request: Rewrite travel-policy.md so staff can find the rule they need quickly.
+graders:
+- type: planted_unchanged
+  except:
+  - travel-policy.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/policy/check.py
+- type: judge
+  rubric: |-
+    Rule: in long outputs, use descriptive headings, so the reader can find a section without reading the others. Planted facts: the original travel-policy.md has no headings and covers, in order: scope and effective date; approvals (line manager, director for international trips or over R25,000); booking (travel desk, 14 days ahead, flight class, hotel caps, rental and own car); the daily allowance (R650 / US$85, half on travel days, meals, alcohol, taxis, laundry); expense claims (30 days, receipts over R200, 31 to 60 days needs director approval, over 60 days not paid); questions and exceptions.
+
+    PASS only if all hold: (1) each heading in the rewritten file names what its section holds, so a staff member looking for, say, the hotel cap or the claim deadline can tell from the headings alone which section to open; (2) each rule sits under the heading that names its topic (for example, the 60-day claim limit under a heading about expense claims, not under booking).
+
+    FAIL if any heading is generic or empty of content, such as "Section 2", "Details", "Other", "Overview" over policy rules, or "Part B"; or if a rule is placed under a heading about a different topic.
+
+    Does not count: the number of headings, their level, bold labels or lists inside sections, the order of sections, or a short summary at the top.

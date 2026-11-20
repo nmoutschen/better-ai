@@ -1,0 +1,15 @@
+actions:
+- read: warranty.md
+- write: warranty-summary.md
+  content: |
+    # Corvo e-bike warranty: summary for support
+
+    Applies to Corvo e-bikes bought new from Corvo or an authorised dealer on or after 1 March 2026.
+
+    - Frame and motor: manufacturing defects are covered for 5 years from purchase, but only 2 years for bikes used commercially, such as for delivery or rental.
+    - Battery: covered against capacity loss below 70% for 2 years or 500 full charge cycles, whichever comes first, unless it was charged with a charger that is not an original Corvo charger.
+    - Collection and return: free anywhere on the mainland for a valid claim; on the islands the customer pays a flat €35.
+    - Not covered: normal wear (tyres, brake pads, chains, grips), accidents, crashes, misuse, and modifications not made by Corvo or an authorised dealer.
+    - Claims: the customer gives the frame number (under the bottom bracket) and proof of purchase. Confirm validity within 3 working days and book collection; repairs take up to 10 working days from arrival at the workshop.
+    - New owners keep the warranty if they have the original proof of purchase.
+reply: I wrote warranty-summary.md as a six-item list, with each exception in the same item as the cover it limits.

@@ -1,0 +1,14 @@
+actions:
+- write: budget-memo.md
+  content: |
+    To: Department heads
+    From: Adwoa Mensah, Finance
+
+    The 2027 budget is slightly higher than in 2026, but discretionary spending is lower. We recommend deferring non-essential equipment purchases to Q3.
+
+    - Travel is capped per person per year; trips over the cap need the managing director's approval.
+    - The training fund excludes contractors.
+    - Two Operations posts are funded only if the hiring freeze lifts in March; otherwise the money returns to the reserve.
+    - The booking system money is released only if the Kumasi pilot meets its uptime target by 30 April.
+    - Spending plans are due 15 January 2027 (late plans get the default allocation); review on 12 June, with a recovery plan for departments well over. Finance sends figures this week.
+reply: Made it quicker to read.

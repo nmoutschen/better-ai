@@ -1,0 +1,14 @@
+actions:
+- read: incident-report.md
+- write: incident-report.md
+  content: |
+    # Incident report: duplicate card charges after payments release 4.13
+
+    We should roll back the payments service to version 4.12 by Friday 20 November, because release 4.13 still creates
+    about 40 duplicate charges every day. We need your approval, because the rollback takes Apple Pay off web checkout until
+    the proper fix ships, around 4 December.
+
+    Release 4.13 retried slow card payments too early, so some customers paid twice. A first fix on 17 November reduced the
+    duplicates but did not stop them. The proper fix, an idempotency key on each payment, would ship around 4 December at the
+    earliest. The rollback takes about an hour with no downtime; Apple Pay accounts for 2.1% of web payments.
+reply: incident-report.md now opens with the recommendation.

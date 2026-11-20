@@ -1,0 +1,38 @@
+id: refund-policy-examples
+rule: varied-examples
+source:
+- SKILL.md#4.5
+situation: 'refund-policy.md gives a shop''s refund rules: 30 days if unused, faulty items within 12 months even if used,
+  personalised items only if faulty, gift cards never. New support staff will apply them to new requests. The agent writes
+  refund-guide.md with at least two worked examples that differ on the surface and reach the policy''s outcome.'
+request: Write a short guide in refund-guide.md teaching new support staff to decide whether a refund request is allowed.
+graders:
+- type: planted_unchanged
+  except:
+  - refund-guide.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+- type: judge
+  rubric: 'Rule 4.5: when the reader must apply an idea to new cases, give at least two worked examples that differ on the
+    surface. Planted facts: refund-policy.md says the online shop refunds an item asked for within 30 days of delivery if
+    unused and in its original packaging; a faulty or damaged item at any time within 12 months of delivery, even if used;
+    personalised (engraved or custom-glazed) items only if faulty; gift cards never. The user asked for a short guide teaching
+    new support staff to decide whether a refund request is allowed, so staff must apply the rules to requests they have not
+    seen.
+
+
+    PASS only if all hold: (1) refund-guide.md contains at least two worked examples, each a specific refund request (an item,
+    a situation, a time since delivery or a condition) carried through to a decision; (2) at least two of the examples differ
+    on the surface, such as a different product, customer or situation, not the same request with only a number changed; (3)
+    each example names the rule that decides it and reaches the outcome refund-policy.md gives for that request.
+
+
+    FAIL if refund-guide.md has fewer than two worked examples, if its examples only restate a rule without a specific request,
+    if all examples are the same scenario with one detail changed, if any example reaches a wrong outcome under the policy,
+    or if refund-guide.md does not exist.
+
+
+    Does not count: the names or cultures in the examples, how many rules the examples cover beyond the above, length, layout,
+    extra process detail such as the EUR 200 approval.'

@@ -1,0 +1,36 @@
+id: release-notes-review
+rule: review-without-rewriting
+source:
+- SKILL.md#invocation
+situation: release-notes.md goes to customers tomorrow. It has three clear problems. The change customers must act on (the
+  old CSV export format stops working on 1 February 2027) is buried in "Other changes" after a settings note; an internal
+  ticket label, PLAT-2291, is not explained; and "Dark mode is coming soon" is vague. The user asks for a review, so the agent
+  reports each problem with the passage and a proposed rewrite, and does not change the file. A do-nothing run passes the
+  script checks; only the judge fails it.
+request: Can you review release-notes.md before I send it to customers tomorrow?
+graders:
+- type: planted_unchanged
+- type: file_unchanged
+  path: release-notes.md
+- type: judge
+  rubric: 'Rule: when asked to review a text without rewriting it, report where it breaks the writing rules, with the passage
+    and a proposed rewrite for each problem, and do not change the text. Planted problems in release-notes.md, written for
+    customers: (a) the change customers must act on, that the CSV export in the old format stops working on 1 February 2027
+    so spreadsheets and scripts that import exports must switch to the new format, is buried in the "Other changes" section
+    after a note about the settings page, instead of coming first; (b) "We also resolved PLAT-2291, which several of you
+    reported in October" uses an internal ticket label customers cannot interpret; (c) "Dark mode is coming soon" is vague
+    about when.
+
+    PASS only if all hold: (1) the final reply, or a review note the agent wrote, names each of the three problems (a), (b)
+    and (c); (2) for each of the three, it points to the passage, by quoting it or naming it unambiguously; (3) for each of
+    the three, it proposes a rewrite or a concrete replacement text. A rewrite may use a placeholder for a fact the agent
+    cannot know, such as what PLAT-2291 fixed or the month dark mode ships, or may propose removing the vague sentence;
+    (4) release-notes.md is unchanged.
+
+    FAIL if any of the three problems is missing, if a problem is named with no proposed rewrite or replacement, or if the
+    agent changed release-notes.md.
+
+    Does not count: other true findings, such as the opening that announces improvements without stating them; the order of
+    the findings; whether the agent offers to apply the changes.'
+validation:
+  do_nothing_fails_only_by_judge: true

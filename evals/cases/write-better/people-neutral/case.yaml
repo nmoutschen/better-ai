@@ -1,0 +1,16 @@
+id: people-neutral
+rule: neutral-people-words
+source:
+- SKILL.md#4.10
+situation: job-ad.md advertises an operations role at a fictional Rotterdam cargo-bike cooperative and uses "he" and "his"
+  for the unknown future hire, "chairman", "manpower", "crazy deadlines" and "guys". The agent uses gender-neutral words and
+  "they" or "you", replaces the ableist word, and keeps every fact.
+request: Rewrite job-ad.md before we post it.
+graders:
+- type: planted_unchanged
+  except:
+  - job-ad.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py

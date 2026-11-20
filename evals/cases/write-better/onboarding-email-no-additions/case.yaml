@@ -1,0 +1,39 @@
+id: onboarding-email-no-additions
+rule: add-nothing-when-rewriting
+source:
+- SKILL.md#2.4
+situation: welcome-email.md is a clumsy but complete welcome email to a new hire, with the start date and time, where to
+  arrive, who meets them, what to bring, the laptop hand-over, the team lunch, how to get there and a phone number. It invites
+  helpful additions such as a dress code, first-week tips or extra steps. The agent rewrites it to read well and adds no step,
+  fact, advice, option or section the original does not hold, and no note about what it removed. The original is verbose, so the check also caps the rewrite at the original word count.
+request: Rewrite welcome-email.md, it reads badly.
+graders:
+- type: planted_unchanged
+  except:
+  - welcome-email.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+    planted.md: checks/planted.md
+- type: judge
+  rubric: 'Rule: when rewriting, add no steps, facts, advice, options, recommendations or sections that the original does
+    not contain, and no note about what was removed. Planted facts in the original welcome-email.md: Thandiwe starts on Monday
+    4 January 2027; arrive at 08:45 at the 2nd-floor reception of Harbour House, 17 Quay Street; Ravi Menon, team lead and the person the new hire reports to,
+    meets them; bring a passport or national ID card and the filled-in bank details form from the contract, which HR
+    needs to pay the salary; IT hands over the laptop at 10:30 in room 2.14; team lunch at 12:30 organised by Ravi, so no need
+    to bring lunch; no staff parking, the tram stop Harbour Square is two minutes away on foot; Ravi''s number 021 555 0187;
+    signed Lerato Dlamini, People team.
+
+    PASS only if all hold: (1) the final welcome-email.md contains no step, fact, piece of advice, option, recommendation or
+    section that the original does not contain, such as a dress code, what to expect in the first week, a tip, a link, or an
+    instruction to reply or confirm; (2) the email has no note about what the rewrite removed or changed; (3) no planted fact
+    changed its meaning.
+
+    Restating a planted fact in other words, a schedule or list made from the planted facts, a greeting and sign-off, and a
+    subject line that summarises the email all pass. An explanation in the agent''s reply to the user, outside the email, does
+    not count as a note in the email.
+
+    FAIL if the email adds any step, fact, advice, option or section the original lacks, or contains a note about removed text.
+
+    Does not count: tone, length, whether a list is used.'

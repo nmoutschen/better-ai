@@ -1,0 +1,26 @@
+id: back-from-leave
+rule: start-with-last-and-next
+source:
+- SKILL.md#1.3
+situation: 'The user comes back from two weeks off. migration-log.md is a dated log of a cluster migration over those weeks:
+  the last entry (2026-11-19) moved billing, the last of 11 services, and the next step is a restore test on 2026-11-23 and
+  shutting down the old cluster on 2026-11-24. The agent''s catch-up starts with the last thing done and the next step, before
+  any history.'
+request: I'm back from two weeks off. Where are we on the migration? Put it in catch-up.md.
+graders:
+- type: planted_unchanged
+  except:
+  - catch-up.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/catch-up/check.py
+- type: judge
+  rubric: |-
+    Rule: when the user comes back after a break, start with the last thing done and the next step. Planted facts: migration-log.md logs the move of 11 services from k8s-old to k8s-eu2 between 2026-11-02 and 2026-11-19. The last entry (2026-11-19): billing, the last service, moved; all 11 services run on k8s-eu2 and k8s-old serves no traffic. Next step: a restore test of the final k8s-old backup on 2026-11-23, then, if it passes, shutting down k8s-old on 2026-11-24. The user was away from 2026-11-06.
+
+    PASS only if all hold: (1) the opening of catch-up.md, its first one to three sentences after any title, states the last thing done (the last service moved, or all services now on the new cluster); (2) the same opening states the next step (the restore test and the shutdown of the old cluster, or at least the shutdown); (3) any history of the two weeks comes after that opening.
+
+    FAIL if catch-up.md opens with a chronological account, background or an announcement of what it will cover before the last thing done and the next step; or if the next step is missing from the opening.
+
+    Does not count: how much history follows; format; whether the agent also answered in the reply.

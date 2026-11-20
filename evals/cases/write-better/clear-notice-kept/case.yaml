@@ -1,0 +1,22 @@
+id: clear-notice-kept
+rule: keep-clear-text
+source:
+- SKILL.md#invocation
+situation: notice.md is a short tenant notice about a water shut-off that already meets the skill. It gives the point first, the date
+  and times, what to do, what happens after, and whom to contact, in short plain sentences. The agent keeps its length,
+  structure and every fact; light edits or no edit both pass, and saying it is already clear is fine. A do-nothing run passes
+  the check on purpose, because leaving a clear text as it is is a correct answer.
+request: Rewrite notice.md for the tenants.
+graders:
+- type: planted_unchanged
+  except:
+  - notice.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+    planted.md: checks/planted.md
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes

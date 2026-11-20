@@ -1,0 +1,38 @@
+actions:
+- read: travel-policy.md
+- write: travel-policy.md
+  content: |
+    This policy applies to all staff of Umhlanga Engineering who travel for work. It takes effect on 1 January 2027 and
+    replaces the 2024 version.
+
+    You need approval for a trip before you book anything. For travel within South Africa, your line manager approves the
+    trip in the travel portal. For travel outside South Africa, and for any trip where the estimated total cost is over
+    R25,000, the divisional director must approve it as well; allow five working days for this. Trips that were not approved
+    are not reimbursed, even if the travel itself was necessary.
+
+    All flights and hotels are booked through the travel desk, either in the travel portal or by emailing
+    travel@umhlanga-eng.example, at least 14 days before departure where possible. Bookings made less than 14 days ahead need
+    a short reason in the portal. You fly economy class, except on flights longer than 6 hours, where premium economy is
+    allowed. Business class is never reimbursed. Hotels are capped at R1,800 per night, or R2,500 per night in Johannesburg
+    and Cape Town; if you need to stay above the cap, for example at a conference hotel, ask the travel desk before booking.
+    Rental cars need the same approval as the trip and must be the smallest category that fits the people and equipment
+    travelling. If you use your own car, you can claim R4.84 per kilometre, based on the distance shown in the travel
+    portal's route planner, not on your odometer.
+
+    While you travel, you receive a daily allowance for meals and small expenses instead of claiming each meal. The
+    allowance is R650 per day within South Africa and US$85 per day outside South Africa. On the day you leave and the day
+    you return, you receive half the daily allowance. If a meal is included in your hotel rate or provided at a conference,
+    the allowance is not reduced, but you cannot also claim that meal. Alcohol is never reimbursed. Taxis and ride-hailing
+    between the airport, the hotel and the work site are reimbursed in full; other taxi trips need a short reason. Laundry is
+    reimbursed only on trips longer than 5 nights.
+
+    After the trip, submit an expense claim in the portal within 30 days of your return date. Attach a receipt for every
+    expense over R200; for smaller expenses, a list in the claim is enough. Your line manager reviews the claim, and finance
+    pays approved claims with the next monthly salary run. Claims submitted between 31 and 60 days after your return also
+    need your director's approval, and claims submitted more than 60 days after your return are not paid. If you lose a
+    receipt for an expense over R200, fill in the missing-receipt form in the portal; you can use it at most twice a year.
+
+    If you have a question about this policy, ask the travel desk first. Questions about a specific claim go to the finance
+    team at expenses@umhlanga-eng.example. Only the chief financial officer can approve an exception to this policy, in
+    writing and before the trip.
+reply: Tightened the wording of travel-policy.md.

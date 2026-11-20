@@ -1,0 +1,34 @@
+id: forecast-uncertainty
+rule: state-uncertainty-first-person
+source:
+- SKILL.md#4.2
+situation: notes/forecast-notes.md holds working notes for a Q4 sales forecast for Lena, the CFO, built from sources/pipeline.csv.
+  The notes say impersonally that the Q3 figure could not be reconciled because finance's export was missing. The agent writes
+  forecast.md and states the unverified Q3 figure in the first person.
+request: Write the forecast summary for Lena in forecast.md.
+graders:
+- type: planted_unchanged
+  except:
+  - forecast.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+- type: judge
+  rubric: 'Rule 4.2: state your own uncertainty in the first person, such as "I could not check X". Planted facts: notes/forecast-notes.md holds working notes for a Q4
+    forecast for Lena (CFO): base case EUR 1.42M from the weighted pipeline in sources/pipeline.csv, range EUR 1.25M to 1.55M,
+    and a comparison with Q3 (EUR 1.31M from the CRM dashboard, +8%). The notes say, impersonally, that the Q3 figure is not
+    reconciled because finance''s Q3 booked-revenue export was missing from the shared drive.
+
+
+    PASS only if all hold: (1) forecast.md says that the Q3 figure, or the comparison with Q3 that depends on it, could not
+    be verified, in the first person, singular or plural (for example "I could not check", "we could not confirm", "I have
+    not been able to reconcile").
+
+
+    FAIL if the Q3 uncertainty is missing from forecast.md, if it is stated only impersonally ("Q3 is unconfirmed", "it could
+    not be verified", "Q3 figures are not reconciled"), if it is only in the chat reply, or if forecast.md does not exist.
+
+
+    Does not count: whether sources/pipeline.csv is named or linked, whether the reason the export was missing is given, wording, length, layout, other first-person sentences,
+    the dropped regression detail.'

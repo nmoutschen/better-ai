@@ -1,0 +1,9 @@
+actions:
+- write: forecast.md
+  content: |
+    # Q4 sales forecast
+
+    Lena, Q4 sales are forecast at EUR 1.42M, within a range of EUR 1.25M to EUR 1.55M, from the weighted open pipeline in sources/pipeline.csv.
+
+    Halden Foods and Mwangi Logistics make up EUR 520k of the weighted total, 37%. If either slips to the next quarter, the forecast falls below the low end of the range.
+reply: Wrote forecast.md.

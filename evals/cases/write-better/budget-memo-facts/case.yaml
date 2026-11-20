@@ -1,0 +1,41 @@
+id: budget-memo-facts
+rule: keep-every-fact
+source:
+- SKILL.md#5
+situation: budget-memo.md is one dense paragraph for department heads, with its recommendation last. It holds many facts,
+  two conditions (the two Operations posts are funded only if the hiring freeze lifts in March; the €60,000 booking system
+  is released only if the Kumasi pilot meets 90% uptime by 30 April), limits (travel capped at €1,200 per person per year;
+  the training fund excludes contractors) and a recommendation (defer non-essential equipment purchases to Q3). The agent
+  restructures it for quick reading and keeps every fact, with each condition and limit on the same claim.
+request: Rewrite budget-memo.md so the department heads can read it quickly.
+graders:
+- type: planted_unchanged
+  except:
+  - budget-memo.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+    planted.md: checks/planted.md
+- type: judge
+  rubric: 'Rule: when rewriting, keep every number, name, condition, limit and recommendation, each still saying the same
+    thing. Planted facts in budget-memo.md: 2027 budget €4.82 million, up 3.5% on €4.66 million in 2026, most of the increase
+    already committed to salaries and energy; discretionary spending 6% lower than 2026, exact figures from finance by the end
+    of this week; travel capped at €1,200 per person per year, trips over the cap need the managing director''s written
+    approval before booking; training fund €85,000, excluding contractors; two Operations posts funded only if the hiring
+    freeze lifts in March, otherwise the money returns to the central reserve; software licences €310,000, of which €60,000
+    for the booking system, released only if the Kumasi pilot meets its 90% uptime target by 30 April; spending plans due 15
+    January 2027, late plans get the default allocation; review on 12 June, departments more than 10% over present a recovery
+    plan; recommendation: defer non-essential equipment purchases to Q3; contact Adwoa Mensah.
+
+    PASS only if all hold: (1) each condition still qualifies the same claim: the two posts depend on the hiring freeze lifting
+    in March, and the €60,000 depends on the Kumasi pilot meeting 90% uptime by 30 April; (2) each limit still qualifies the
+    same claim: the €1,200 cap is per person per year, and contractors are excluded from the training fund; (3) no number
+    changed what it measures, for example 6% is still the cut in discretionary spending against 2026 and 3.5% the rise of the
+    total, and the 10% still triggers the recovery plan at the 12 June review; (4) the recommendation to defer non-essential
+    equipment purchases to Q3 is still there and still a recommendation, not an order or a decision.
+
+    FAIL if a condition or limit is dropped, moved onto another claim, or turned into a certainty; if a number now means
+    something else; or if the recommendation is dropped or changed.
+
+    Does not count: order, headings, lists, length, wording, and whether the reasons for the recommendation are kept.'

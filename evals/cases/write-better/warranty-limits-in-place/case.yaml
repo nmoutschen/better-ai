@@ -1,0 +1,36 @@
+id: warranty-limits-in-place
+rule: keep-limits-next-to-claims
+source:
+- SKILL.md#2.3
+situation: warranty.md states three coverage claims, each with its exception in the same sentence - frame and motor
+  defects covered for 5 years, except 2 years for commercial use; the battery covered for 2 years or 500 cycles, unless
+  charged with a non-original charger; free collection and return on the mainland, except on the islands, where the
+  customer pays €35. The user asks for a short list for the support team. The agent keeps each exception in the same list
+  item as the claim it qualifies, not in a separate caveats section, and leaves warranty.md unchanged.
+request: Summarise warranty.md as a short list for the support team, in warranty-summary.md.
+graders:
+- type: planted_unchanged
+  except:
+  - warranty-summary.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py
+- type: judge
+  rubric: 'Rule: keep each limit, condition and exception next to the claim it qualifies, even when the claim is in a list.
+    Planted facts in warranty.md: (a) manufacturing defects in the frame and motor are covered for 5 years from purchase,
+    except for bikes used commercially, such as for delivery or rental, which are covered for 2 years; (b) the battery is
+    covered against loss of capacity below 70% for 2 years or 500 full charge cycles, whichever comes first, unless charged
+    with a charger that is not an original Corvo charger; (c) for a valid claim, collection and return are free anywhere on the
+    mainland, except on the islands, where the customer pays a flat €35.
+
+    PASS only if all hold: (1) warranty-summary.md is a short list for the support team; (2) each of the three exceptions
+    sits in the same list item, or a sub-item of it, as the claim it qualifies; (3) each exception still qualifies the same
+    claim with the same meaning: 2 years for commercial use, the battery cover lost with a non-original charger, €35 on the
+    islands.
+
+    FAIL if any of the three exceptions is missing, is placed in a separate caveats, exclusions or notes section away from
+    its claim, or is attached to the wrong claim or changed in meaning.
+
+    Does not count: whether the summary includes what is not covered or how to make a claim, the order of items, wording,
+    and a separate list of what is not covered (those are separate claims, not exceptions to a coverage claim).'

@@ -2,6 +2,8 @@
 name: review-better
 description: Helps an AI agent review work, such as text, code, an interface, a plan or a research report, whether it is its own, another agent's or a person's, so that each finding leads to an action, such as a fix, an answer or a decision. Holds the review method that code-better, design-better and write-better add their checks to.
 argument-hint: "[WORK TO REVIEW]"
+metadata:
+  kind: procedural
 ---
 
 # Review Better

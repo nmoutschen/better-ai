@@ -2,6 +2,8 @@
 name: do-better
 description: Helps an AI agent correct work that does not meet the user's intent, including defects the agent finds itself in work it already delivered.
 argument-hint: "[WHAT IS WRONG]"
+metadata:
+  kind: behavioural
 ---
 
 # Do Better

@@ -15,6 +15,7 @@ def test_condition_prompts() -> None:
     """no-skill is the request, skill the slash command, one-sentence the request plus the rule's sentence."""
     assert cases.condition_prompt("Fix it.", "no-skill", "code-better") == "Fix it."
     assert cases.condition_prompt("Fix it.", "skill", "code-better") == "/code-better Fix it."
+    assert cases.condition_prompt("Fix it.", "skill-installed", "write-better") == "Fix it."
     assert cases.condition_prompt("Fix it.", "one-sentence", "code-better", "Ask first.") == "Fix it.\n\nAsk first."
     with pytest.raises(ValueError):
         cases.condition_prompt("Fix it.", "one-sentence", "code-better")
@@ -181,3 +182,17 @@ def test_history_rejects_bad_steps(tmp_path: Path) -> None:
         write_tree(case_dir, {**base, **extra})
         with pytest.raises(ValueError, match=error):
             cases.load_case(case_dir)
+
+
+def test_default_conditions_follow_the_skill_kind() -> None:
+    """A behavioural skill also runs skill-installed by default; a procedural one does not."""
+    assert cases.skill_kind("write-better") == "behavioural"
+    assert cases.skill_kind("code-better") == "procedural"
+    assert cases.default_conditions("write-better") == ["no-skill", "skill", "short-skill", "skill-installed"]
+    assert cases.default_conditions("code-better") == ["no-skill", "skill", "short-skill"]
+
+
+def test_every_skill_declares_its_kind() -> None:
+    """Every skill in the repository has metadata.kind in its frontmatter."""
+    for skill_md in sorted((cases.REPO / "skills").glob("*/SKILL.md")):
+        assert cases.skill_kind(skill_md.parent.name) in cases.KINDS

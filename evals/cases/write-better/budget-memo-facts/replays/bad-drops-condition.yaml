@@ -1,0 +1,15 @@
+actions:
+- write: budget-memo.md
+  content: |
+    To: Department heads
+    From: Adwoa Mensah, Finance
+
+    The 2027 operating budget is €4.82 million, up 3.5% from €4.66 million. Discretionary spending is 6% lower than in 2026; finance sends your figure by the end of this week. We recommend deferring non-essential equipment purchases to Q3.
+
+    - Travel: €1,200 per person per year; over the cap needs the managing director's approval.
+    - Training fund: €85,000, excluding contractors.
+    - Operations gets two new posts.
+    - Software licences: €310,000, including €60,000 for the new booking system.
+    - Spending plans due 15 January 2027; late plans get the default allocation.
+    - Review on 12 June; departments more than 10% over present a recovery plan.
+reply: Shortened the memo into a list.

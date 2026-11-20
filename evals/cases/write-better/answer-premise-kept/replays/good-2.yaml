@@ -1,0 +1,9 @@
+actions:
+- write: answer.md
+  content: |
+    Hi Kofi,
+
+    To use single sign-on you need the Business plan (€12/user/month); it isn't available on Basic. You can switch from Settings > Billing, and it takes effect straight away.
+
+    Mireille Dubois, Ledgerwick Support
+reply: Shortened answer.md.

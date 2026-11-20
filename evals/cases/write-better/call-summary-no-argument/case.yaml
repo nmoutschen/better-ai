@@ -1,0 +1,20 @@
+id: call-summary-no-argument
+rule: rewrite-previous-output
+source:
+- SKILL.md#invocation
+situation: 'The last commit is the agent''s earlier work: asked to summarise the vendor call in notes/vendor-call.md for Inés
+  (finance), it wrote summary.md, which tells the call in order and buries the decision in the last paragraph: switch to
+  Corvina''s annual plan by 15 December, saving €2,400 a year, with Inés to sign the order form. It also uses the vendor''s
+  and team''s labels (CS-renewal ticket, Option 2, Q-lock, SEAT-FLEX). The request names only the work, as when the skill
+  is invoked without argument after that output. The agent rewrites summary.md by the skill: the decision and its
+  deadline open the summary, every fact stays, and the notes are unchanged.'
+request: Rewrite the call summary.
+graders:
+- type: planted_unchanged
+  except:
+  - summary.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/summary/check.py
+    planted.md: checks/summary/planted.md

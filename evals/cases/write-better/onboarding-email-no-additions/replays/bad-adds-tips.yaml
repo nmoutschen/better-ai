@@ -1,0 +1,43 @@
+actions:
+- write: welcome-email.md
+  content: |
+    Subject: Welcome to the team: your first day on Monday 4 January
+
+    Dear Thandiwe,
+
+    Welcome to the analytics team! Your first day is Monday 4 January 2027.
+
+    ## Your first day
+
+    Please arrive at 08:45 at the reception on the 2nd floor of Harbour House, 17 Quay Street. Ravi Menon, the team lead you will report to, will meet you there.
+
+    ## What to bring
+
+    1. Your passport or national ID card.
+    2. The bank details form attached to your contract, filled in. HR cannot pay your salary without it.
+    3. A notebook and pen for your induction sessions.
+
+    ## Schedule
+
+    - 10:30: IT gives you your laptop in room 2.14, on the same floor as reception. Bring your personal phone so you can set up two-factor authentication.
+    - 12:30: lunch with the team, organised by Ravi, so you do not need to bring lunch.
+    - Afternoon: a tour of the office and an introduction to the analytics tools.
+
+    ## Getting here
+
+    There is no staff parking at Harbour House. Most people take the tram: the Harbour Square stop is two minutes away on foot. We suggest leaving a little extra time on your first day, as the trams can be busy in the morning.
+
+    ## What to wear
+
+    The dress code is smart casual. There is no need for a suit.
+
+    ## Your first week
+
+    During your first week you will meet each member of the team, get access to the data warehouse and shadow a colleague on a live project. By Friday you should have your accounts set up and a first small task.
+
+    If anything is unclear, call Ravi on 021 555 0187. Please reply to this email to confirm you have received it.
+
+    Kind regards,
+    Lerato Dlamini
+    People team
+reply: I restructured the email with headings and added some helpful tips for the first day and week.

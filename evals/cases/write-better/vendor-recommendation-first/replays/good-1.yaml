@@ -1,0 +1,27 @@
+actions:
+- read: vendor-comparison.md
+- write: vendor-comparison.md
+  content: |
+    # Freight vendor recommendation: Kestrel Freight
+
+    The operations and finance teams recommend that the board awards the three-year freight contract from 1 January 2027 to Kestrel Freight.
+
+    - Main reason: Kestrel has the lowest price (€1.94 per parcel) and the best on-time rate (96.5%), saving about €154,000 a year against the €2.08 we pay Ostrava Logistik today.
+    - Main drawback: Kestrel has no cold-chain capacity until Q2 2027, so our chilled goods would stay with Ostrava Logistik on a short extension until then.
+
+    ## The bids
+
+    | Vendor | Price per parcel | On-time rate | Cold chain | Note |
+    |---|---|---|---|---|
+    | Kestrel Freight | €1.94 | 96.5% | from Q2 2027 | lowest price, best on-time rate |
+    | Tidewater Lines | €2.05 | 94% | yes | requires at least 1.2 million parcels a year |
+    | Baobab Carriers | €2.10 | 93% | yes, all regions | |
+
+    On-time rates are measured against the delivery window promised to the customer, over the past year.
+
+    ## Background
+
+    Our contract with Ostrava Logistik, which has carried our parcels since 2021, ends on 31 December 2026. Its price has risen each year to €2.08 per parcel. Last year we shipped 1.1 million parcels, about 8% of them chilled goods that need cold-chain transport. The operations team ran a tender in July, and three vendors bid by the 15 September deadline. Ostrava Logistik did not bid, but has agreed in principle to a short extension for chilled goods only, at the current price.
+
+    The operations team checked references for all three vendors, and the finance team reviewed each bid against the 2027 budget.
+reply: I moved the recommendation of Kestrel Freight, its main reason and its main drawback to the top, then put the bids in a table and the background last.

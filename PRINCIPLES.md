@@ -127,9 +127,20 @@ WHEN a skill serves a page where the user writes to the agent, such as design-be
 
 The skill TELLS the agent the same rules for its side, in the same words: reply in the page, in one or two short sentences; mark `working` only what it is changing now; and once an answer leads to a change, mark the item done and ask the next question as a new message.
 
-### 6.8. Structure a skill as ordered steps and general rules
+### 6.8. Structure a skill by its kind
 
-Agents skip what a skill leaves vague, what it says only in passing, and what it buries among rules that do not apply to the work. STRUCTURE a skill that runs a workflow so its order and scope are explicit:
+A skill is one of two kinds, and its kind sets its structure and how it is evaluated (see `evals/PRINCIPLES.md`):
+
+- A **procedural** skill is a workflow the agent runs as the task itself, such as building code, running research or reviewing work. It fails when the agent skips a step, a file or a sub-agent.
+- A **behavioural** skill sets qualities the agent keeps in work it is already doing, such as writing text, correcting earlier work, asking a question or supporting a decision. It fails when the agent does not apply a rule, or applies it where it does harm, such as rewriting text that was already clear.
+
+TELL them apart by how a run fails: IF a run can fail by skipping a step, the skill is procedural. DECLARE the kind in the SKILL.md frontmatter as `metadata.kind: procedural` or `metadata.kind: behavioural`.
+
+Agents skip what a skill leaves vague, what it says only in passing, and what it buries among rules that do not apply to the work.
+
+#### Procedural skills
+
+STRUCTURE a procedural skill so its order and scope are explicit:
 
 - **SKILL.md** HAS, in this order: the lines that say what invoking it means (section 6.3), `## Principles`, `## Instructions`, then `## General rules`.
 - **Instructions** OPEN with "FOLLOW these steps in order", and HOLD one numbered `###` heading per step. The heading NAMES the step's action. The order lives in the step numbers: DO NOT write order as "before X, do Y" or "do Y after X" inside rules.
@@ -139,10 +150,23 @@ Agents skip what a skill leaves vague, what it says only in passing, and what it
 - **Every document the agent writes** is NAMED in the step that writes it, with when to write it, its path, and its template. READ a template only for a document you write.
 - **A step that starts a sub-agent** SAYS to wait for its report and what not to do meanwhile, such as writing to the user. Starting is not finishing: agents hand back while the sub-agent still runs.
 - **One fallback for a missing capability**, in the general rules, not one per step. A fallback in a step reads as permission to skip that step.
-- **Plain verbs over coined terms.** WRITE "ASK the user", not a term such as "send up" that needs its own definition.
-- **No partial lists that add nothing.** USE "such as" only when the examples define the category; a list of examples that does not change what the agent does is noise.
 
 Each point comes from evals of `/code-better`, where agents skipped mode files and the verifier until the steps were numbered and the files named as mandatory, and handed back before the verifier finished until the step said to wait.
+
+#### Behavioural skills
+
+STRUCTURE a behavioural skill so each rule can be checked against the result:
+
+- **SKILL.md** HAS, in this order: the lines that say what invoking it means (section 6.3), `## Principles`, then numbered `##` sections that group the rules by concern, with one numbered `###` heading per rule.
+- **Sections** FOLLOW the order in which their rules come up in the work, but each rule applies whenever its condition holds. DO NOT write "FOLLOW these steps in order": a behavioural skill has no step that must run on every use.
+- **Each rule** STATES a quality of the result or of the agent's conduct, and when it applies, so that a reader can check a result against it.
+- **No modes, sub-agents or pages.** WHEN the work needs one, it is a workflow: PUT it in a procedural skill and NAME that skill (section 6.4), as `/write-better` names `/show-better`.
+- **The description** SAYS when the work needs the skill, so that an agent loads it without the user's slash command.
+
+#### Both kinds
+
+- **Plain verbs over coined terms.** WRITE "ASK the user", not a term such as "send up" that needs its own definition.
+- **No partial lists that add nothing.** USE "such as" only when the examples define the category; a list of examples that does not change what the agent does is noise.
 
 ### 6.9. Give modes and agents one frontmatter
 

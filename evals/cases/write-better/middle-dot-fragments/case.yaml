@@ -1,0 +1,17 @@
+id: middle-dot-fragments
+rule: plain-sentences
+source:
+- SKILL.md#4.7
+situation: digest.md is a cycling club's monthly digest with lines of fragments joined by middle dots ("42 members · 3 new
+  · 2 events", event lines, a slogan) and three 60-70-word sentences with clauses nested in clauses. The agent writes plain
+  sentences or phrases instead of dot-joined fragments, splits the long sentences, and keeps every fact. The script's 40-word
+  limit is a generous bound, not the skill's.
+request: Rewrite digest.md so it's easier to read.
+graders:
+- type: planted_unchanged
+  except:
+  - digest.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/check.py

@@ -1,0 +1,16 @@
+id: annual-report-bold
+rule: bold-few-key-ideas
+source:
+- SKILL.md#3.6
+situation: report.md is a volunteer group's annual summary of about 480 words with no emphasis, going into the members' newsletter.
+  The agent bolds a few short phrases that carry the key ideas, so members can find them on a quick scan, without bolding
+  whole sentences, labels or every number, and keeps every fact.
+request: Rewrite report.md for the members' newsletter.
+graders:
+- type: planted_unchanged
+  except:
+  - report.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/report/check.py
