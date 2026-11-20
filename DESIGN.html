@@ -21,16 +21,33 @@
      tools, or #1E1E1E for dark (the Display menu). A mid-grey would favour mid-tones. */
   --surround:#F5F5F5; --surround-dark:#1E1E1E; --frame:#BDBDBD; --frame-dark:#5A5A5A;
   --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
+  /* Type sizes of the boards. Slides and drawings, such as the research map, keep their own. */
+  --text-label:11px; --text-small:12px; --text-message:14px; --text-body:15px; --text-heading:17px; --text-title:20px;
+  /* Type styles: weight, size, line height and typeface together. Write font:var(--font-message), and override only
+     the line height when a box needs it, such as a pin's number. */
+  --font-label:700 var(--text-label)/1.3 var(--sans); --font-small:400 var(--text-small)/1.4 var(--sans);
+  --font-small-strong:700 var(--text-small)/1.3 var(--sans); --font-message:400 var(--text-message)/1.45 var(--sans);
+  --font-message-strong:700 var(--text-message)/1.4 var(--sans); --font-body:400 var(--text-body)/1.55 var(--sans);
+  --font-body-strong:700 var(--text-body)/1.3 var(--sans); --font-subtitle:400 var(--text-body)/1.4 var(--serif);
+  --font-heading:700 var(--text-heading)/1.3 var(--serif); --font-title:700 var(--text-title)/1.2 var(--serif);
+  --font-figure:700 var(--text-title)/1.1 var(--sans); --font-code:400 .9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Type sizes of an article page (the website, a document a skill writes), as n14n.dev. */
+  --text-site:1.5rem; --text-article-title:2.75rem; --text-lead:1.25rem; --text-prose:17px;
+  --font-site:700 var(--text-site)/1.2 var(--sans); --font-article-title:700 var(--text-article-title)/1.15 var(--serif);
+  --font-lead:400 var(--text-lead)/1.55 var(--serif); --font-prose:400 var(--text-prose)/1.75 var(--serif);
+  /* Spacing, named by role. Only these; 1px is a hairline, not a space. */
+  --space-tight:4px; --space-control:8px; --space-item:12px; --space-section:16px; --space-edge:20px; --space-group:24px;
+  --space-wide:40px;
   --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E");
-  --pad:max(40px, (100% - 110rem) / 2);
 }
+@media (max-width:700px) { :root { --text-article-title:2rem; } }
 * { box-sizing:border-box; }
 :focus-visible { outline:2px solid var(--umber); outline-offset:2px; }
 
 /* ---------- Layout: one window, no page scroll; each version scrolls inside its own frame ---------- */
 html { height:100%; }
 body { margin:0; height:100%; display:flex; flex-direction:column; overflow:hidden; background:var(--cream); color:var(--ink);
-  font:400 15px/1.55 var(--sans); -webkit-font-smoothing:antialiased; }
+  font:var(--font-body); -webkit-font-smoothing:antialiased; }
 .band { height:6px; background:var(--umber) var(--saya); background-size:13px 7.5px; }
 .work { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(20rem, 24rem); }
 @media (max-width:900px) {
@@ -41,104 +58,117 @@ body { margin:0; height:100%; display:flex; flex-direction:column; overflow:hidd
 }
 
 /* ---------- Top bar: the n14n umber block, with the question and the controls ---------- */
-header { flex:none; display:flex; flex-wrap:wrap; gap:10px 32px; align-items:center; justify-content:space-between;
-  padding:12px 20px; background:var(--umber); color:var(--cream); }
-h1 { font:700 20px/1.2 var(--serif); color:var(--cream); margin:0; }
+header { flex:none; display:flex; flex-wrap:wrap; gap:var(--space-item) var(--space-wide); align-items:center; justify-content:space-between;
+  padding:var(--space-item) var(--space-edge); background:var(--umber); color:var(--cream); }
+h1 { font:var(--font-title); color:var(--cream); margin:0; }
 
 /* The stats header: the page's title on the left, its figures on the right. It never wraps; the title cuts off. */
 header.bar--stats { flex-wrap:nowrap; align-items:flex-end; }
 header.bar--stats > div { min-width:0; }
 header.bar--stats h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.stats { flex:none; display:flex; gap:24px; align-items:flex-end; margin:0; font-size:12px; }
+.stats { flex:none; display:flex; gap:var(--space-group); align-items:flex-end; margin:0; font-size:var(--text-small); }
 .stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
-.stat b { font:700 20px/1.1 var(--sans); }
-.stat .of { font-size:14px; opacity:.8; }
+.stat b { font:var(--font-figure); }
+.stat .of { font-size:var(--text-message); opacity:.8; }
 /* A figure that takes the user somewhere is a button, underlined like a link; a plain figure is not. */
 button.stat { border:0; background:none; padding:0; color:inherit; font:inherit; cursor:pointer; }
 button.stat b { text-decoration:underline; text-underline-offset:3px; }
 button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px; }
 /* Progress under a figure: a cream outline that fills. */
-.meter { width:140px; height:8px; border:1px solid var(--cream); margin-top:4px; display:flex; }
+.meter { width:140px; height:8px; border:1px solid var(--cream); margin-top:var(--space-tight); display:flex; }
 .meter i { display:block; height:100%; background:var(--cream); }
 
 /* A section label: small uppercase sans, as "Agents" and "Conversation". */
-.section-h, .notes h2 { margin:0; font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+.section-h, .notes h2 { margin:0; font:var(--font-small-strong); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
 
 /* A legend: one mark and a plain word per state. */
-ul.legend { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; color:var(--ink); }
-ul.legend li { display:inline-flex; align-items:center; gap:6px; }
+ul.legend { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-section); font-size:var(--text-small); color:var(--ink); }
+ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control); }
+
+/* The question header: the title with the question under it, and the page's controls on the right. A two-option
+   setting is one button that shows the current option: both options share one cell, so it keeps the longer one's width;
+   the first option shows cream and the second umber, so the colour also tells which is on. */
+.question { font:var(--font-subtitle); margin:var(--space-tight) 0 0; max-width:65ch; }
+.controls { display:flex; flex-wrap:wrap; gap:var(--space-control) var(--space-item); align-items:center; color:var(--cream); }
+.controls > .seg.cycle { display:inline-grid; }
+.controls > .seg.cycle button { grid-area:1 / 1; justify-content:center; border:0; }
+.controls > .seg.cycle button[aria-pressed="false"] { visibility:hidden; }
+.controls > .seg.cycle button:first-child[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
+.controls > .seg.cycle button:last-child[aria-pressed="true"] { background:transparent; color:var(--cream); }
 
 /* Segmented controls: one of several options, the chosen one filled. */
 .seg { display:inline-flex; border:1px solid var(--cream); }
 .seg[hidden] { display:none; }
-.seg button { border:0; background:transparent; color:var(--cream); padding:7px 14px; cursor:pointer;
-  font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.seg button { border:0; background:transparent; color:var(--cream); padding:var(--space-control) var(--space-section); cursor:pointer;
+  font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; }
 .seg button + button { border-left:1px solid var(--cream); }
 .seg button[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
 
 
 .seg--light { border-color:var(--ink); }
-.seg--light button { color:var(--ink); padding:4px 10px; font-size:11px; }
+.seg--light button { color:var(--ink); padding:var(--space-tight) var(--space-item); font-size:var(--text-label); }
 .seg--light button + button { border-left-color:var(--ink); }
 .seg--light button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
 
 /* Tabs: a tablist of buttons, with optional count or check badges. */
 .tabs { position:sticky; top:0; z-index:2; display:flex; gap:0; background:var(--cream); border-bottom:2px solid var(--ink);
-  margin:0 0 24px; padding-top:16px; }
-.tabs button[role="tab"] { font:600 14px var(--sans); color:var(--ink); background:none; border:0; border-bottom:3px solid transparent;
-  padding:8px 16px; margin-bottom:-2px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  margin:0 0 var(--space-group); padding-top:var(--space-section); }
+.tabs button[role="tab"] { font:var(--font-message-strong); color:var(--ink); background:none; border:0; border-bottom:3px solid transparent;
+  padding:var(--space-control) var(--space-section); margin-bottom:calc(-1 * var(--space-tight)); cursor:pointer; display:flex; align-items:center; gap:var(--space-control); }
 .tabs button[aria-selected="true"] { border-bottom-color:var(--terracotta); color:var(--heading); }
 .tabs .count { flex:none; white-space:nowrap;
-  font:700 11px var(--sans); font-variant-numeric:tabular-nums; background:var(--umber); color:var(--cream); padding:1px 6px; }
+  font:var(--font-label); font-variant-numeric:tabular-nums; background:var(--umber); color:var(--cream); padding:1px var(--space-control); }
 .tabs .count.ok { background:var(--moss-dark); }
 
-.scroll-setting { display:grid; gap:4px; }
+.scroll-setting { display:grid; gap:var(--space-tight); }
 .scroll-setting[hidden] { display:none; }
 
 
 /* ---------- Conversation ---------- */
-.notes { min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:16px 0 0;
+.notes { min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:var(--space-section) 0 0;
   border-left:2px solid var(--ink); background:var(--cream); color:var(--ink); }
-.notes-top { display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:24px; padding:0 20px; margin-bottom:12px; }
-.thread { flex:1; min-height:0; overflow:auto; list-style:none; margin:0; padding:0 20px 12px; }
-.thread > li { display:block; margin:0 0 12px; }
+.notes-top { display:flex; justify-content:space-between; align-items:center; gap:var(--space-item); min-height:24px; padding:0 var(--space-edge); margin-bottom:var(--space-item); }
+.thread { flex:1; min-height:0; overflow:auto; list-style:none; margin:0; padding:0 var(--space-edge) var(--space-item); }
+.thread > li { display:block; margin:0 0 var(--space-item); }
 
 /* An item: the user's comment, message or decision, with the replies under it and its state at the end. */
-.thread > li.msg { padding:10px 12px; background:var(--white); border:1px solid var(--line); }
+.thread > li.msg { padding:var(--space-item) var(--space-item); background:var(--white); border:1px solid var(--line); }
 .thread > li.msg.agent { background:var(--linen); border-color:var(--sand); border-left:4px solid var(--moss-dark); }
-.msg .head { display:flex; flex-wrap:wrap; gap:2px 8px; align-items:center; margin-bottom:4px; font-size:12px; color:var(--muted); }
+.msg .head { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:center; margin-bottom:var(--space-tight); font-size:var(--text-small); color:var(--muted); }
 .msg .who { font-weight:700; color:var(--heading); }
 .msg.agent .who { color:var(--umber); }
-/* On linen, names and times use umber and ink: moss and muted fall under 4.5:1 there. */
-.msg.agent .when, .thread .reply:not(.mine) .when { color:var(--ink); }
+/* On linen, muted and moss-dark text fall under 4.5:1: muted text uses ink there, and so do the progress words, whose
+   bars keep their colour. */
+.msg.agent, .thread .reply:not(.mine) { --muted:var(--ink); }
+.msg.agent .progress, .thread .reply:not(.mine) .progress { color:var(--ink); }
 .msg .re { font-style:italic; }
-.msg .body { margin:4px 0 0; white-space:pre-wrap; font-size:14px; line-height:1.45; }
+.msg .body { margin:var(--space-tight) 0 0; white-space:pre-wrap; font-size:var(--text-message); line-height:1.45; }
 /* A message in Markdown: its blocks keep a small gap, and wide code or tables scroll inside the message. */
 .body.md { white-space:normal; overflow-wrap:anywhere; }
 .body.md > * { margin:0; }
-.body.md > * + *, .body.md li > * + * { margin-top:6px; }
-.body.md ul, .body.md ol { padding-left:20px; }
+.body.md > * + *, .body.md li > * + * { margin-top:var(--space-control); }
+.body.md ul, .body.md ol { padding-left:var(--space-edge); }
 /* Inside the thread's own list, a list would start at the nested bullet: set the usual ones. */
 .body.md ul { list-style:disc; }
 .body.md ul ul { list-style:circle; }
 .body.md ol { list-style:decimal; }
-.body.md li + li { margin-top:2px; }
-.body.md .md-h { margin-top:10px; color:var(--heading); }
+.body.md li + li { margin-top:var(--space-tight); }
+.body.md .md-h { margin-top:var(--space-item); color:var(--heading); }
 .body.md .md-h:first-child { margin-top:0; }
-.body.md blockquote { padding-left:10px; border-left:2px solid var(--sand); color:var(--muted); }
-.body.md code { font:400 .9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--linen); padding:1px 4px; }
-.body.md pre { overflow-x:auto; padding:8px 10px; background:var(--linen); border:1px solid var(--line); white-space:pre; overflow-wrap:normal; }
+.body.md blockquote { padding-left:var(--space-item); border-left:2px solid var(--sand); color:var(--muted); }
+.body.md code { font:var(--font-code); background:var(--linen); padding:1px var(--space-tight); }
+.body.md pre { overflow-x:auto; padding:var(--space-control) var(--space-item); background:var(--linen); border:1px solid var(--line); white-space:pre; overflow-wrap:normal; }
 .body.md pre code { padding:0; background:none !important; }
-.body.md table { display:block; overflow-x:auto; border-collapse:collapse; font-size:13px; overflow-wrap:normal; }
-.body.md th, .body.md td { padding:3px 8px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+.body.md table { display:block; overflow-x:auto; border-collapse:collapse; font-size:var(--text-message); overflow-wrap:normal; }
+.body.md th, .body.md td { padding:var(--space-tight) var(--space-control); border:1px solid var(--line); text-align:left; vertical-align:top; }
 .body.md th { background:var(--linen); color:var(--heading); }
 .body.md hr { border:0; border-top:1px solid var(--line); }
 .body.md a { color:var(--umber); }
 /* On linen, the agent's code and table heads take cream, so they still stand out. */
 .msg.agent .body.md :is(code, pre, th), .thread .reply:not(.mine) .body.md :is(code, pre, th) { background:var(--cream); }
 .msg .link { margin-left:auto; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
-.msg .head .link + .link { margin-left:8px; }
-.msg .answered { font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
+.msg .head .link + .link { margin-left:var(--space-control); }
+.msg .answered { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
 /* The item's left edge carries its state, so it reads at a glance in a long thread. */
 .thread > li.msg[data-state] { border-left-width:4px; }
 .thread > li.msg[data-state="seen"], .thread > li.msg[data-state="replied"], .thread > li.msg[data-state="followup"] { border-left-color:var(--sand); }
@@ -148,38 +178,38 @@ ul.legend li { display:inline-flex; align-items:center; gap:6px; }
 .thread > li.msg[data-state="reopened"] { border-left-color:var(--error); }
 /* Where a comment points: a small quote above the user's words, so every message reads alike. */
 .crumb { display:block; }
-.crumb .path { display:block; font:400 12px/1.4 var(--sans); color:var(--muted); }
+.crumb .path { display:block; font:var(--font-small); color:var(--muted); }
 /* One typeface for the whole label: the path muted, then what the element is, muted, and what it says. */
-.crumb .el { display:block; font:400 15px/1.4 var(--sans); color:var(--heading); margin-top:2px; }
+.crumb .el { display:block; font:var(--font-body); color:var(--heading); margin-top:var(--space-tight); }
 .crumb .role { color:var(--muted); }
-.thread .crumb { margin:2px 0 0; padding-left:8px; border-left:2px solid var(--line); }
-.thread .crumb .path { font-size:11px; }
-.thread .crumb .el { font:400 13px/1.4 var(--sans); color:var(--muted); margin-top:0; }
+.thread .crumb { margin:var(--space-tight) 0 0; padding-left:var(--space-control); border-left:2px solid var(--line); }
+.thread .crumb .path { font-size:var(--text-label); }
+.thread .crumb .el { font:var(--font-message); color:var(--muted); margin-top:0; }
 
 /* Replies sit under the item, edge to edge. The item's own left edge already marks it, so a reply shows by its
    background and label, not a second bar. */
-.thread .reply { margin:10px -12px -10px; padding:8px 12px 10px; background:var(--linen); border-top:1px solid var(--line); }
+.thread .reply { margin:var(--space-item) calc(-1 * var(--space-item)) calc(-1 * var(--space-item)); padding:var(--space-control) var(--space-item) var(--space-item); background:var(--linen); border-top:1px solid var(--line); }
 .thread .reply .who { color:var(--umber); }
-.thread .reply .body { margin:2px 0 0; }
+.thread .reply .body { margin:var(--space-tight) 0 0; }
 .thread .reply.mine { background:var(--white); }
 .thread .reply.mine .who { color:var(--heading); }
 /* The agent's own message is its first reply block, flush with the item so its text lines up with every other item. */
-.thread > li.msg.agent > .reply:first-child { margin:-10px -12px 0; padding:10px 12px 0; border:0; background:none; }
+.thread > li.msg.agent > .reply:first-child { margin:calc(-1 * var(--space-item)) calc(-1 * var(--space-item)) 0; padding:var(--space-item) var(--space-item) 0; border:0; background:none; }
 /* The state row closes the item, aligned with its text. A reply pulls its bottom edge 10px down; 16px leaves the same
    6px gap as without one. */
-.thread .foot { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; margin:6px 0 0; font-size:12px; color:var(--muted); }
-.thread .reply + .foot { margin-top:16px; }
-.thread .reply:has(+ .foot) { padding-bottom:2px; }
+.thread .foot { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:center; margin:var(--space-control) 0 0; font-size:var(--text-small); color:var(--muted); }
+.thread .reply + .foot { margin-top:var(--space-section); }
+.thread .reply:has(+ .foot) { padding-bottom:var(--space-tight); }
 .thread .foot .answer { margin-left:auto; }
 .thread .foot .answer + .answer { margin-left:0; }
 .thread .foot .mini:first-of-type { margin-left:auto; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer;
-  font:700 12px/18px var(--sans); }
+  font:var(--font-small-strong); line-height:18px; }
 .mini:hover { border-color:var(--ink); }
 /* Progress: three short bars fill as the agent sees an item, works on it and finishes it. */
-.progress { white-space:nowrap; display:inline-flex; align-items:center; gap:6px; font:700 11px var(--sans); letter-spacing:.08em;
+.progress { white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-control); font:var(--font-label); letter-spacing:.08em;
   text-transform:uppercase; color:var(--muted); }
-.progress .bars { display:inline-flex; gap:2px; }
+.progress .bars { display:inline-flex; gap:var(--space-tight); }
 .progress .bars i { width:10px; height:4px; background:var(--line); }
 .progress.seen .bars i.on, .progress.replied .bars i.on, .progress.followup .bars i.on { background:var(--sand); }
 .progress.asked, .progress.working { color:var(--umber); }
@@ -188,94 +218,94 @@ ul.legend li { display:inline-flex; align-items:center; gap:6px; }
 .progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
 .progress.done, .progress.accepted { color:var(--moss-dark); }
 .progress.done .bars i.on, .progress.accepted .bars i.on { background:var(--moss-dark); }
-.progress.accepted::after { content:"\2713"; font-size:12px; }
+.progress.accepted::after { content:"\2713"; font-size:var(--text-small); }
 .progress.reopened { color:var(--error); }
 .progress.reopened .bars i { background:var(--terracotta); opacity:.5; }
 @keyframes pulse-bar { 50% { opacity:.35; } }
 @media (prefers-reduced-motion: reduce) { .progress .bars i { animation:none !important; } }
 /* The box for a reason to reopen, or for an answer. A reply above pulls its bottom edge down by the item's padding;
    20px gives that space back. */
-.why { margin-top:10px; }
-.thread .reply + .why { margin-top:20px; }
+.why { margin-top:var(--space-item); }
+.thread .reply + .why { margin-top:var(--space-edge); }
 
 /* The message box, with the decision panel above it. */
-.composer { border-top:1px solid var(--line); padding:12px 20px 14px; background:var(--cream); }
-.notes label { display:block; font-size:14px; margin:8px 0 4px; }
+.composer { border-top:1px solid var(--line); padding:var(--space-item) var(--space-edge) var(--space-section); background:var(--cream); }
+.notes label { display:block; font-size:var(--text-message); margin:var(--space-control) 0 var(--space-tight); }
 
 /* ---------- Buttons, fields, the comment box and the toast ---------- */
-.btn { border:1px solid var(--umber); background:var(--umber); color:var(--cream); padding:8px 16px; cursor:pointer;
-  font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.btn { border:1px solid var(--umber); background:var(--umber); color:var(--cream); padding:var(--space-control) var(--space-section); cursor:pointer;
+  font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; }
 .btn--quiet { background:transparent; color:var(--ink); border:1px solid var(--ink); }
-.btn--sm { padding:3px 10px; font-size:11px; }
-.notes textarea { width:100%; min-height:4.5em; font:400 15px/1.5 var(--sans); color:var(--ink); background:var(--white);
-  border:1px solid var(--muted); padding:8px 10px; resize:vertical; }
+.btn--sm { padding:var(--space-tight) var(--space-item); font-size:var(--text-label); }
+.notes textarea { width:100%; min-height:4.5em; font:var(--font-body); color:var(--ink); background:var(--white);
+  border:1px solid var(--muted); padding:var(--space-control) var(--space-item); resize:vertical; }
 .composer textarea { min-height:3.2em; }
-.why textarea { min-height:3em; font:400 14px/1.45 var(--sans); padding:6px 8px; }
+.why textarea { min-height:3em; font:var(--font-message); padding:var(--space-control) var(--space-control); }
 /* Pop-ups: a question, an agent or a comment box, over the page. Each page sets the width. */
 .qpop, .pop { position:fixed; z-index:5; width:min(34rem, calc(100vw - 24px)); max-height:calc(100vh - 20px); overflow:auto;
-  background:var(--cream); color:var(--ink); border:2px solid var(--ink); box-shadow:var(--shadow); padding:12px; font-size:14px; }
+  background:var(--cream); color:var(--ink); border:2px solid var(--ink); box-shadow:var(--shadow); padding:var(--space-item); font-size:var(--text-message); }
 .pop[hidden] { display:none; }
 /* The comment box: where the comment points, the words, then Send, Cancel and Delete. */
-.pop { width:min(22rem, calc(100vw - 24px)); font-size:15px; }
-.pop .target { margin:0 0 8px; font-size:13px; color:var(--muted); overflow-wrap:anywhere; }
-.pop textarea { width:100%; min-height:4.5em; font:400 15px/1.5 var(--sans); color:var(--ink); background:var(--white);
-  border:1px solid var(--muted); padding:8px 10px; resize:vertical; }
-.pop .row2 { display:flex; gap:8px; align-items:center; margin-top:8px; }
+.pop { width:min(22rem, calc(100vw - 24px)); font-size:var(--text-body); }
+.pop .target { margin:0 0 var(--space-control); font-size:var(--text-message); color:var(--muted); overflow-wrap:anywhere; }
+.pop textarea { width:100%; min-height:4.5em; font:var(--font-body); color:var(--ink); background:var(--white);
+  border:1px solid var(--muted); padding:var(--space-control) var(--space-item); resize:vertical; }
+.pop .row2 { display:flex; gap:var(--space-control); align-items:center; margin-top:var(--space-control); }
 .pop .remove { margin-left:auto; }
 .pop .remove[hidden] { display:none; }
-.qpop h3 { font:700 17px/1.3 var(--serif); color:var(--heading); margin:6px 0 8px; }
-.qpop p, .qpop li, .qpop textarea, .qpop .thread .body { font:400 14px/1.45 var(--sans); }
-.qpop .x { position:absolute; top:8px; right:8px; border:0; background:none; font:700 18px var(--sans); color:var(--muted); cursor:pointer; }
+.qpop h3 { font:var(--font-heading); color:var(--heading); margin:var(--space-control) 0 var(--space-control); }
+.qpop p, .qpop li, .qpop textarea, .qpop .thread .body { font:var(--font-message); }
+.qpop .x { position:absolute; top:8px; right:8px; border:0; background:none; font:var(--font-body-strong); font-size:var(--text-heading); color:var(--muted); cursor:pointer; }
 .qpop .crumb { display:none; }
-.qpop .thread { flex:none; overflow:visible; padding:0; margin:12px 0 0; }
+.qpop .thread { flex:none; overflow:visible; padding:0; margin:var(--space-item) 0 0; }
 /* A question box with its button beside it. */
-.ask { display:flex; gap:8px; align-items:stretch; margin-top:12px; }
-.ask textarea { flex:1; min-height:3em; font:400 14px/1.45 var(--sans); color:var(--ink); background:var(--white); border:1px solid var(--muted); padding:6px 8px; resize:vertical; }
+.ask { display:flex; gap:var(--space-control); align-items:stretch; margin-top:var(--space-item); }
+.ask textarea { flex:1; min-height:3em; font:var(--font-message); color:var(--ink); background:var(--white); border:1px solid var(--muted); padding:var(--space-control) var(--space-control); resize:vertical; }
 
 /* An agent's decision in the conversation, and the line that says what it is about. */
 .thread .crumb button { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; }
 .thread > li.msg.decision { border-left:4px solid var(--umber); }
 .thread > li.msg.decision > .head .who { color:var(--umber); }
 .thread > li.msg.decision > .head .when { color:var(--umber); font-weight:700; }
-.msg .what { margin:2px 0 0; font:700 12px/1.4 var(--sans); color:var(--ink); }
+.msg .what { margin:var(--space-tight) 0 0; font:var(--font-small-strong); color:var(--ink); }
 
 /* Above the message box when no agent is watching, so a note sent then is not lost in silence. */
-.unwatched { margin:0 0 12px; padding:8px 12px; background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:500 13px/1.45 var(--sans); }
+.unwatched { margin:0 0 var(--space-item); padding:var(--space-control) var(--space-item); background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:var(--font-message); }
 .unwatched[hidden] { display:none; }
 
 .toast { position:fixed; z-index:6; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(36rem, calc(100vw - 32px));
-  background:var(--umber); color:var(--cream); padding:12px 20px; font:700 15px/1.4 var(--sans);
+  background:var(--umber); color:var(--cream); padding:var(--space-item) var(--space-edge); font:var(--font-body-strong);
   box-shadow:var(--shadow); }
 .toast.ok { background:var(--moss-dark); }
 .toast.error { background:var(--error); }
 .toast[hidden] { display:none; }
 
-.notes .empty { margin:0 0 16px; padding:0 20px; }
-.why .row2 { display:flex; gap:8px; margin-top:6px; }
-.notes .send { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; margin-top:12px; }
-.sys { padding:10px 0; border-top:1px solid var(--line); font-size:12px; color:var(--muted); text-align:center; }
+.notes .empty { margin:0 0 var(--space-section); padding:0 var(--space-edge); }
+.why .row2 { display:flex; gap:var(--space-control); margin-top:var(--space-control); }
+.notes .send { display:flex; flex-wrap:wrap; gap:var(--space-item) var(--space-edge); align-items:center; margin-top:var(--space-item); }
+.sys { padding:var(--space-item) 0; border-top:1px solid var(--line); font-size:var(--text-small); color:var(--muted); text-align:center; }
 /* Under the bar when the agent's server stops answering, so a quiet page is not mistaken for a quiet agent. */
-.offline { flex:none; margin:0; padding:8px 20px; background:var(--error); color:var(--cream); font:700 14px/1.4 var(--sans); }
+.offline { flex:none; margin:0; padding:var(--space-control) var(--space-edge); background:var(--error); color:var(--cream); font:var(--font-message-strong); }
 .offline[hidden] { display:none; }
 </style>
 <style>
 /* Only the layout of this reference page; every colour, type size and component comes from page.css. */
 main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 .ref section { max-width:64rem; padding-top:24px; }
-.ref h2.big { font:700 22px/1.3 var(--serif); color:var(--heading); margin:0 0 4px; }
-.ref section > h3 { font:700 15px var(--sans); color:var(--heading); margin:24px 0 8px; }
+.ref h2.big { font:var(--font-title); color:var(--heading); margin:0 0 var(--space-tight); }
+.ref section > h3 { font:var(--font-body-strong); color:var(--heading); margin:var(--space-group) 0 var(--space-control); }
 .ref p.lead { color:var(--muted); margin:0 0 16px; max-width:65ch; }
 .ref .row { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; margin:0 0 8px; }
 .swatches { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(15rem, 1fr)); gap:12px; }
 .swatches li { border:1px solid var(--line); background:var(--cream); }
-.swatches .chip { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; padding:0 12px; font:700 15px var(--sans); }
+.swatches .chip { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:var(--space-control); padding:0 var(--space-item); font:var(--font-body-strong); }
 .swatches .info { padding:8px 12px 10px; font-size:13px; line-height:1.4; }
-.swatches code { font:400 12px ui-monospace, Menlo, monospace; }
+.swatches code { font:var(--font-code); }
 .swatches b { color:var(--heading); }
 .swatches .role { color:var(--ink); margin-top:2px; }
 .type { width:100%; border-collapse:collapse; }
 .type td, .type th { text-align:left; vertical-align:baseline; padding:10px 12px 10px 0; border-bottom:1px solid var(--line); }
-.type th { font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.type th { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
 .type td:first-child { width:9rem; font-size:12px; color:var(--muted); }
 .specimen { border:1px solid var(--line); background:var(--cream); padding:16px; }
 .ref .qpop.demo { position:relative; max-width:34rem; }
@@ -288,22 +318,63 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 .ref .on-umber { background:var(--umber); padding:12px; }
 .ref svg.fig { max-width:100%; height:auto; }
 .ref td.stat { display:table-cell; }
-.t-title { font:700 20px/1.2 var(--serif); color:var(--heading); }
-.t-card { font:700 16px/1.3 var(--serif); color:var(--heading); }
-.t-body { font:400 15px/1.55 var(--sans); }
-.t-message { font:400 14px/1.45 var(--sans); }
-.t-small { font:400 12px/1.4 var(--sans); color:var(--muted); }
-.t-prose { font:400 17px/1.75 var(--serif); max-width:42rem; }
+.t-title { font:var(--font-title); color:var(--heading); }
+.t-card { font:var(--font-heading); color:var(--heading); }
+.t-body { font:var(--font-body); }
+.t-message { font:var(--font-message); }
+.t-small { font:var(--font-small); color:var(--muted); }
+.t-label { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
+.spaces { list-style:none; margin:0; padding:0; display:grid; gap:var(--space-tight); }
+.spaces li { display:grid; grid-template-columns:8rem 3rem 1fr; align-items:center; gap:var(--space-control); font-size:var(--text-message); }
+.spaces i { display:block; height:var(--space-control); background:var(--sand); }
+.t-prose { font:var(--font-prose); max-width:42rem; }
 .ref .offline.demo { max-width:34rem; }
-.article { border:1px solid var(--line); background:var(--cream); padding:24px 28px 28px; }
-.article .site { font:700 1.5rem var(--sans); color:var(--heading); margin:0 0 16px; }
+/* Wireframes of the board layouts: square cream boxes with thin sand borders, the header in umber. */
+.wires { display:grid; grid-template-columns:repeat(auto-fill, minmax(26rem, 1fr)); gap:24px; margin:0; }
+.wires figure { margin:0; }
+.wires figcaption { margin-top:8px; font-size:14px; line-height:1.45; }
+.wires figcaption b { color:var(--heading); }
+.wire { display:grid; grid-template-rows:4px auto 1fr; height:300px; border:1px solid var(--sand); background:var(--cream); font:400 11px/1.3 var(--sans); color:var(--ink); }
+.wire.tall { height:420px; }
+.wire > .b { background:var(--umber) var(--saya); background-size:13px 7.5px; }
+.wire > .h { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; padding:6px 10px; background:var(--umber); color:var(--cream); }
+.wire > .h .t { font:700 13px/1.2 var(--serif); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wire > .h .t small { display:block; font:400 11px/1.3 var(--serif); opacity:.85; }
+.wire > .h .r { display:flex; gap:10px; white-space:nowrap; }
+.wire > .h .r span { border:1px solid var(--cream); padding:1px 5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.wire > .h .r b { display:block; font-size:12px; text-align:right; }
+.wire > .w { display:grid; grid-template-columns:1fr 34%; min-height:0; }
+.wire.stack > .w { grid-template-columns:1fr; grid-template-rows:1fr auto; }
+.wire .v { display:flex; flex-direction:column; gap:6px; padding:8px; min-height:0; }
+.wire .v.grey { background:var(--surround); }
+.wire .n { display:flex; flex-direction:column; gap:6px; padding:8px; border-left:2px solid var(--ink); min-height:0; }
+.wire.stack .n { border-left:0; border-top:2px solid var(--ink); }
+.wire .x { border:1px solid var(--sand); background:var(--cream); padding:4px 6px; }
+.wire .x.shade { background:var(--linen); }
+.wire .x.grow { flex:1; min-height:0; }
+.wire .wrow > .x.fixed { flex:none; }
+.wire .wrow.fill { flex:1; min-height:0; }
+.wire .v:not(.grey) .wrow.fill { align-items:flex-start; }
+.wire .x.bare { background:none; border:0; }
+.wire .v.flush { padding:0; }
+.wire .x.route { border:0; border-bottom:1px solid var(--line); }
+.wire .x.slide { margin:auto; width:80%; aspect-ratio:16 / 9; }
+.wire .x.sel { outline:2px solid var(--terracotta); outline-offset:-2px; }
+.wire .wrow { display:flex; gap:6px; margin:0; }
+.wire .wrow > .x { flex:1; }
+.wire .lbl { font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.wire .s { color:var(--muted); }
+.wire .s::before { content:"\2195\00a0"; }
+.wire .tabsw { display:flex; gap:10px; border-bottom:2px solid var(--ink); padding:2px 0 3px; font-weight:700; }
+.wire .tabsw span:first-child { border-bottom:2px solid var(--terracotta); margin-bottom:-5px; }
+.article { border:1px solid var(--line); background:var(--cream); padding:var(--space-group); }
+.article .site { font:var(--font-site); color:var(--heading); margin:0 0 var(--space-section); }
 .article .site span { color:var(--muted); font-weight:400; }
-.article .atitle { font:700 2.75rem/1.15 var(--serif); color:var(--heading); margin:16px 0 0; }
-.article .terra { height:10px; margin:24px 0; background:var(--terracotta) var(--saya); background-size:13px 7.5px; max-width:42rem; }
-.article .alead { font:400 1.25rem/1.55 var(--serif); color:var(--ink); margin:0 0 16px; max-width:42rem; }
-.article .prose { font:400 17px/1.75 var(--serif); color:var(--ink); margin:0; max-width:42rem; }
+.article .atitle { font:var(--font-article-title); color:var(--heading); margin:var(--space-section) 0 0; }
+.article .terra { height:10px; margin:var(--space-group) 0; background:var(--terracotta) var(--saya); background-size:13px 7.5px; max-width:42rem; }
+.article .alead { font:var(--font-lead); color:var(--ink); margin:0 0 var(--space-section); max-width:42rem; }
+.article .prose { font:var(--font-prose); color:var(--ink); margin:0; max-width:42rem; }
 .article .band { height:10px; }
-@media (max-width:700px) { .article .atitle { font-size:2rem; } }
 </style></head>
 <body>
 <div class="band"></div>
@@ -328,18 +399,23 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
     <h2 class="big" id="h-type">Type</h2>
     <p class="lead">Libre Baskerville for titles and prose to read; Space Grotesk for the interface.</p>
     <table class="type">
-      <thead><tr><th scope="col">Name</th><th scope="col">Sample</th></tr></thead>
+      <thead><tr><th scope="col">Style</th><th scope="col">Sample</th></tr></thead>
       <tbody>
-        <tr><td>title, serif 20 / 700</td><td class="t-title">Export invoices as CSV</td></tr>
-        <tr><td>card title, serif 16 / 700</td><td class="t-card">3: Fix rounding of VAT totals</td></tr>
-        <tr><td>stat, sans 20 / 700</td><td class="stat"><b>2<span class="of"> / 6</span></b></td></tr>
-        <tr><td>body, sans 15 / 400</td><td class="t-body">Round VAT per line or on the invoice total? The ticket says both.</td></tr>
-        <tr><td>message, sans 14 / 400</td><td class="t-message">Applied the default: treating it as unsupported and recording the issue as a gap.</td></tr>
-        <tr><td>small, sans 12 / 400</td><td class="t-small">Updated just now</td></tr>
-        <tr><td>label, sans 12 / 700</td><td><span class="section-h">Conversation</span></td></tr>
-        <tr><td>prose, serif 17 / 400</td><td class="t-prose">A board shows what the agent is doing and what waits for you, in one window.</td></tr>
+        <tr><td><code>--font-title</code></td><td class="t-title">Export invoices as CSV</td></tr>
+        <tr><td><code>--font-heading</code></td><td class="t-card">3: Fix rounding of VAT totals</td></tr>
+        <tr><td><code>--font-body</code></td><td class="t-body">Round VAT per line or on the invoice total? The ticket says both.</td></tr>
+        <tr><td><code>--font-message</code></td><td class="t-message">Applied the default: treating it as unsupported and recording the issue as a gap.</td></tr>
+        <tr><td><code>--font-small</code></td><td class="t-small">Updated just now</td></tr>
+        <tr><td><code>--font-label</code></td><td class="t-label">Waiting for you</td></tr>
+        <tr><td><code>--font-prose</code></td><td class="t-prose">A board shows what the agent is doing and what waits for you, in one window.</td></tr>
       </tbody>
     </table>
+  </section>
+
+  <section aria-labelledby="h-space">
+    <h2 class="big" id="h-space">Spacing</h2>
+    <p class="lead">Every padding, margin and gap on a board is one of these, named by what the space does.</p>
+    <ul class="spaces" id="spaces"></ul>
   </section>
 
   <section aria-labelledby="h-comp">
@@ -412,6 +488,79 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
       <text x="466" y="50" font-family="Space Grotesk" font-size="15" fill="#33302B">Dashboard page</text>
       <text x="466" y="70" font-family="Space Grotesk" font-size="12" fill="#78736B">selected</text>
     </svg>
+  </section>
+
+  <section aria-labelledby="h-layout">
+    <h2 class="big" id="h-layout">Board layout</h2>
+    <p class="lead">Every board has the same areas: band, header, view, side column. The page never scrolls; the parts marked ↕ scroll inside themselves. A new board picks one header and one view pattern.</p>
+    <div class="wires">
+      <figure>
+        <div class="wire" role="img" aria-label="Research board: stats header; a tool row with the legend and zoom buttons over a map; a side column with the agents at work, then the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Agent-made local apps<small>Choose an approach for building agent apps</small></div><div class="r"><b>19 / 21 closed</b><b>1 for you</b></div></div>
+          <div class="w">
+            <div class="v"><div class="wrow"><div class="x">answered, to do, contested</div><div class="x fixed">+ &minus; Fit</div></div><div class="x grow"><span class="s">pans and zooms</span><br>Map of the research questions</div></div>
+            <div class="n"><div class="lbl">Agents</div><div class="x"><span class="s">up to 20</span><br>w1 WebGen references</div><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Tool row and canvas</b>, research-better. Stats header. Up to twenty agents scroll in the side column, so the map keeps its height.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Code dashboard: stats header; agent cards that scroll, a task list fixed at the bottom; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Export invoices as CSV</div><div class="r"><b>1 / 7 done</b><b>1 question</b></div></div>
+          <div class="w">
+            <div class="v"><div class="lbl">Agents</div><div class="wrow fill"><div class="x"><span class="s">cards</span><br>3: Fix rounding of VAT totals</div><div class="x">2: Export endpoint</div></div><div class="lbl">Tasks: 1 of 7 done</div><div class="x"><span class="s">five rows</span><br>1 Done, CSV writer</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Cards and fixed list</b>, code-better. Stats header. The list stays in view under the cards.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Architect design page: stats header; tabs fixed at the top of the view over one section; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Design: Live dashboard</div><div class="r"><b>2 / 6 accepted</b><b>2 questions</b></div></div>
+          <div class="w">
+            <div class="v"><div class="tabsw"><span>Overview</span><span>Requirements</span><span>Flows</span></div><div class="x grow"><span class="s">the view</span><br>Containers: one diagram, its findings beside it</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the architect<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Tabs and sections</b>, architect-better. Stats header. The tabs stay at the top while the section scrolls.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Design canvas: question header with view controls; two versions side by side on a grey surround; the conversation with Decide.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Orders<small>Which layout shows late orders first?</small></div><div class="r"><span>Desktop</span><span>Comment</span></div></div>
+          <div class="w">
+            <div class="v grey"><div class="wrow"><div class="x bare">A, one list</div><div class="x bare">B, late first</div></div><div class="wrow fill"><div class="x"><span class="s">each</span><br>version A</div><div class="x sel"><span class="s">each</span><br>version B</div></div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>Comments on the versions</div><div class="x">Message to the agent<br><b>SEND</b>&nbsp; DECIDE&hellip;</div></div>
+          </div>
+        </div>
+        <figcaption><b>Versions side by side</b>, design-better. Question header. Each version scrolls inside its own frame.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Show-better slides: question header; a route with Previous, the slide strip and Next; one slide centred; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">A page can send your click back<small>Can a page your agent built reach it?</small></div><div class="r"><span>Comment</span></div></div>
+          <div class="w">
+            <div class="v grey flush"><div class="x shade route">PREVIOUS &nbsp;[1][2][3][4] &nbsp;1 of 8 &nbsp;NEXT</div><div class="x slide">One slide, 16:9, centred on the surround</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the agent<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Strip and stage</b>, show-better. Question header. Opened as a file, the side column is hidden.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire stack tall" role="img" aria-label="A board under 900px wide: the view first, the side column under it, and the page scrolls.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Export invoices as CSV</div><div class="r"><b>1 / 7 done</b></div></div>
+          <div class="w">
+            <div class="v"><div class="x grow">The view, 85% of the window height</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x shade">thread</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Under 900px</b>, every board. The side column moves under the view, and the page scrolls.</figcaption>
+      </figure>
+    </div>
   </section>
 
   <section aria-labelledby="h-article">
@@ -1100,6 +1249,12 @@ document.getElementById("swatches").replaceChildren(...COLOURS.map(([name, role,
   li.append(chip, info); return li;
 }));
 document.getElementById("n-colours").textContent = COLOURS.length;
+// The spacing scale, drawn from page.css.
+document.getElementById("spaces").replaceChildren(...["tight", "control", "item", "section", "edge", "group", "wide"].map(n => {
+  const li = document.createElement("li"), bar = document.createElement("i");
+  li.innerHTML = `<code>--space-${n}</code><span>${v("space-" + n)}</span>`;
+  bar.style.width = `var(--space-${n})`; li.append(bar); return li;
+}));
 
 const conv = pageConversation({ served: false, stream: false, name: "reference page", agent: "Agent", latestLast: true,
   unsent: "This reference page has no agent." });

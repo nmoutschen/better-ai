@@ -16,7 +16,7 @@ better-ai's pages share one look: the live pages the skills serve (boards) and t
 | What only one board shows | `board.html`, `dashboard.html`, `canvas.css`, `show.css`, `architect.css` | Uses only the tokens and components below. |
 | This document | `DESIGN.md`, `DESIGN.html` | The names here are the names in page.css. DESIGN.html holds copies of page.css and page.js, so it works as a single file: after changing either, paste it again into DESIGN.html (the test says which). |
 
-`tests/test_design.py` fails when a page uses a colour that is not in the colour table below, or when the table and page.css disagree.
+`tests/test_design.py` fails when a page uses a colour that is not in the colour table below, a raw px value for a space or a type size, a `font` shorthand that is not a `--font-*` token, or when this document and page.css disagree.
 
 ## What it must express
 
@@ -57,32 +57,140 @@ Light only. Every colour a page uses is one of these. Write it as `var(--name)` 
 
 Two typefaces, loaded from Google Fonts: **Libre Baskerville** (`--serif`) for titles and prose to read, **Space Grotesk** (`--sans`) for the interface.
 
-| Name | Typeface | Size | Weight | Line height | Use |
-|---|---|---|---|---|---|
-| title | serif | 20px | 700 | 1.2 | the board's title in the header bar |
-| stat | sans | 20px | 700 | 1.1 | a figure in the header; its "/ total" at 14px |
-| card title | serif | 16–17px | 700 | 1.3 | a card or pop-up heading |
-| body | sans | 15px | 400 | 1.55 | the board's body text and fields |
-| message | sans | 14px | 400 | 1.45 | text in the conversation, pop-ups and cards |
-| small | sans | 12–13px | 400 | 1.4 | times, metadata, the legend |
-| label | sans | 11–12px | 700, uppercase, .08–.1em spacing | 1.2 | section labels, buttons, tags, progress words. Never under 11px |
-| code | ui-monospace | .9em | 400 | 1.4 | code in messages |
-| article title | serif | 2.75rem (2rem under 700px) | 700 | 1.15 | the title of an article page |
-| lead | serif | 1.25rem | 400 | 1.55 | the paragraph under an article title |
-| prose | serif | 17px | 400 | 1.75 | article text, at most 42rem wide (about 70 characters) |
+A type style is one token that sets weight, size, line height and typeface together. Write `font:var(--font-message)`. Override only what a box needs, such as `line-height:24px` to centre a pin's number. Labels add their spacing and case: `letter-spacing:.08em; text-transform:uppercase`.
 
-- Use a size from this table. A new size is a change to this document.
+| Token | Value | Use |
+|---|---|---|
+| `--font-label` | `700 var(--text-label)/1.3 var(--sans)` | buttons, tags, progress words, table heads, in uppercase |
+| `--font-small` | `400 var(--text-small)/1.4 var(--sans)` | times, metadata, the legend |
+| `--font-small-strong` | `700 var(--text-small)/1.3 var(--sans)` | section labels (uppercase), names in the conversation |
+| `--font-message` | `400 var(--text-message)/1.45 var(--sans)` | the conversation, pop-ups, cards, tables |
+| `--font-message-strong` | `700 var(--text-message)/1.4 var(--sans)` | tabs, a name or number that leads a row |
+| `--font-body` | `400 var(--text-body)/1.55 var(--sans)` | the board's body text and fields |
+| `--font-body-strong` | `700 var(--text-body)/1.3 var(--sans)` | a version's label, a strong line in a pop-up |
+| `--font-subtitle` | `400 var(--text-body)/1.4 var(--serif)` | the goal or question under the board's title |
+| `--font-heading` | `700 var(--text-heading)/1.3 var(--serif)` | a card, pop-up or section heading |
+| `--font-title` | `700 var(--text-title)/1.2 var(--serif)` | the board's title |
+| `--font-figure` | `700 var(--text-title)/1.1 var(--sans)` | a figure in the stats header; its "/ total" in `--text-message` |
+| `--font-code` | `400 .9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace` | code in messages |
+
+The styles are built from these sizes:
+
+| Token | Size |
+|---|---|
+| `--text-label` | 11px |
+| `--text-small` | 12px |
+| `--text-message` | 14px |
+| `--text-body` | 15px |
+| `--text-heading` | 17px |
+| `--text-title` | 20px |
+
+Slides and drawings, such as the research map and architect-better's diagrams, keep their own type: they are documents and pictures that scale with their frame.
+
+An article page, such as the website or a document a skill writes, uses these, as n14n.dev:
+
+| Token | Value | Use |
+|---|---|---|
+| `--font-site` | `700 var(--text-site)/1.2 var(--sans)` | the site's name in the site header |
+| `--font-article-title` | `700 var(--text-article-title)/1.15 var(--serif)` | the title of an article page |
+| `--font-lead` | `400 var(--text-lead)/1.55 var(--serif)` | the paragraph under an article title |
+| `--font-prose` | `400 var(--text-prose)/1.75 var(--serif)` | article text, at most 42rem wide (about 70 characters) |
+| `--text-site` | 1.5rem | |
+| `--text-article-title` | 2.75rem | 2rem under 700px, set in page.css |
+| `--text-lead` | 1.25rem | |
+| `--text-prose` | 17px | |
+
+- Use a style from these tables. A new style or size is a change to this document.
 - Uppercase only for labels of two or three words. Never for sentences.
 
 ## Spacing and layout
 
-Spacing values, in px: 2, 4, 6, 8, 10, 12, 16, 20, 24, 32, 40. Use these only. They are not tokens yet.
+Boards use these tokens for every padding, margin and gap, named by what the space does. Write `padding:var(--space-item)`, and `calc(-1 * var(--space-item))` for a negative margin. 1px is a hairline, such as a tag's top padding, not a space.
+
+| Token | Value | Use |
+|---|---|---|
+| `--space-tight` | 4px | inside small things: a badge, a tag; between a mark and its word, between lines of a list |
+| `--space-control` | 8px | between controls: buttons, tags, the parts of a pop-up |
+| `--space-item` | 12px | inside an item or a card, between cards, above the view |
+| `--space-section` | 16px | between sections of a column, between tabs |
+| `--space-edge` | 20px | the sides of the header, the view and the side column |
+| `--space-group` | 24px | between groups of cards, around a slide |
+| `--space-wide` | 40px | between the header's title and its figures, the end of a scrolling view |
+
+When no role fits, pick the token whose role is closest, and do not add a value.
+
+Slides keep their own spacing, as their type.
 
 | Layout | Rule |
 |---|---|
-| Board | Band (6px), header bar, then a grid: the board's own view, and the conversation column at `minmax(20rem, 24rem)` behind a 2px ink rule. Each part scrolls inside itself. Under 900px the column moves below and the page scrolls. |
-| Board padding | 20px at the sides of the header, the view and the conversation. |
+| Board | See Board layout below. |
 | Article page | Band (10px), a header, the title with a terracotta band under it, then the prose column, max 42rem. A figure or a side panel may sit beside the prose from 960px. |
+
+## Board layout
+
+A board fills the window and never scrolls as a page: each area scrolls inside itself, so the header and the message box stay in view. [DESIGN.html](DESIGN.html) draws each layout below.
+
+### Areas
+
+From top to bottom, then left to right. Every board has all of them, in this order.
+
+| Area | Markup | Holds | Scrolls |
+|---|---|---|---|
+| Band | `div.band` | the sayagata band, 6px | no |
+| Header | `header` | the title, and the figures or the controls (see Headers) | no |
+| Offline notice | `p.offline` | only when the server stops answering | no |
+| Work | `div.work` | a grid: the view, then the side column at `minmax(20rem, 24rem)` behind a 2px ink rule | no |
+| View | `main` | what the agent is working on; one of the view patterns below | inside itself |
+| Side column | `aside.notes` | the conversation, and what else the agent says (see Side column) | the thread only |
+| Toast, pop-ups | `div.toast`, `.qpop`, `.pop` | over everything, outside `.work` | no |
+
+Padding is `--space-edge` at the sides of the header, the view and the side column, and `--space-item` above the view's first row (tabs bring their own `--space-section`).
+
+### Headers
+
+| Header | Markup | Use when | Board |
+|---|---|---|---|
+| Stats header | `header.bar--stats`: the title (and a goal line under it) on the left, `.stats` on the right | the agent works on its own, and the user comes back to see how far it is and what waits for them | research, code, architect |
+| Question header | `header`: `.ttl` with the title and `p.question` under it on the left, `.controls` on the right | the page asks the user one question, and the user works the page with modes and views | canvas, show |
+
+- The stats header never wraps: the title cuts off. The question header wraps its controls under the title on a narrow window.
+- In the question header, keep to the controls used on every visit. Put settings changed rarely in a menu, as the canvas's Display menu.
+- A board never has both: figures go in the stats header, a question goes in the question header.
+
+### View patterns
+
+| Pattern | Layout of the view | Board |
+|---|---|---|
+| Tool row and canvas | `.tools`: the legend on the left, the view's buttons on the right; then one drawing that takes the rest of the height and pans and zooms inside its frame | research |
+| Cards and fixed list | the agents at work as cards: a section label and legend, then cards in a grid that scroll; under them a list fixed at the bottom of the view, five rows high, scrolling on its own | code |
+| Tabs and sections | `.tabs` fixed at the top of the view, then one section at a time; the view scrolls under the tabs | architect |
+| Versions side by side | a label row per version (its name, Full size, and thumbs up and down from three versions), then the versions in equal columns on the neutral surround, each scrolling inside its frame | canvas |
+| Strip and stage | `nav.route`: Previous, the strip of slides, the count, Next; then one slide centred on the surround | show |
+
+- A new board uses one of these patterns. A new pattern is a change to this document.
+- Put what the user acts on most at the top of the view, and what they read for detail below it or in a pop-up.
+- A drawing, a version or a slide sits on `--surround` or in a 1px `--line` frame. Panels of text sit on cream.
+
+### Side column
+
+From top to bottom:
+
+The side column holds the conversation, and above it a list of the agents at work when they are not what the view shows.
+
+1. Optional: the agents at work, with a section label, at most 30% of the height, scrolling on its own (research). Put them here when a run can have many agents, up to about twenty, and the view shows something else, such as the map. Put them in the view, as cards, when the agents are what the user watches (code).
+2. `.notes-top`: the label "Conversation", and the All / Open filter when the board has items the user accepts.
+3. `p.empty` until the first message; it says what the user can click to comment, and that they can write below.
+4. `ol.thread`: the items in time order. What waits for the user comes last, next to the message box.
+5. `.composer`: a panel for a decision when one is open (`.decide`), the `.unwatched` notice, the label "Message to …" naming the agent, the box, then `.send`: Send first, then the quiet buttons (Decide…, Copy all, Review again…), then the status line.
+
+- What waits for the user comes last in the thread. On a board with a stats header, a button figure there also counts it and goes to it.
+- A page opened as a file, with no agent, hides the side column and the view takes the whole width (show-better).
+
+### Narrow windows
+
+- Under 900px, the work stops being a grid: the view comes first at 85% of the window height, the side column under it behind a 2px ink rule, and the page scrolls.
+- The stats header keeps one row and cuts the title. The question header puts its controls under the title.
+- Boards are made for a desktop window. Phones are not tested.
 
 ## Components
 
@@ -126,7 +234,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 | `.btn--sm` | an action inside a conversation item |
 | `.mini` | a small square action, such as a thumbs up |
 
-- Labels are uppercase sans, 12px (11px small). Square corners. A button names its action.
+- Labels are uppercase `--font-small-strong` (`--font-label` on a small button). Square corners. A button names its action.
 
 ### Conversation
 
@@ -158,13 +266,13 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ### Article page parts
 
-- Site header: the site's name in sans, 1.5rem 700, with what the page is in muted. It does not have to be n14n.dev's header.
+- Site header: the site's name in `--font-site`, with what the page is in muted. It does not have to be n14n.dev's header.
 - Title: serif, with the terracotta band under it; a lead paragraph under the band.
 - Figure: a sand-bordered box, its caption under a rule.
 
 ## Rules
 
-- Use only the colours, sizes and components in this document, because one board that drifts makes the others look inconsistent. Correct: `color:var(--muted)`. Wrong: `color:#777`.
+- Use only the colours, type sizes, spaces and components in this document, by their token, because one board that drifts makes the others look inconsistent. Correct: `color:var(--muted); padding:var(--space-control); font:var(--font-message)`. Wrong: `color:#777; padding:9px; font:400 14px/1.4 var(--sans)`.
 - Make a shared part shared: if two boards need the same rule, it goes in page.css, because copies drift. Correct: `.legend` in page.css. Wrong: the same `.key` rules in two boards.
 - Square corners everywhere, except the round comment pins and numbered markers, because n14n never rounds boxes.
 - One shadow (`--shadow`), on things that float over the page only.
@@ -174,14 +282,13 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ## Known conflicts
 
-Each of these breaks a rule above. They stay until the user decides.
-
-- research-better's board writes "contested" claims in terracotta text (`.chip.bad`, 2.9:1 on cream). Alternative: `--terracotta-dark`, as architect-better's "1 comment".
-- `--muted` text on linen is 4.0:1, under 4.5:1. page.css already switches times on linen to ink; other muted text on linen should do the same.
-- The board type scale has more sizes than it needs (11, 12, 13, 14, 15px for small text). Merging them changes how boards look.
-- Spacing values are not named in code.
+None. A conflict between a rule above and a page is listed here until the user decides it.
 
 ## Changes and exceptions
 
 - 2026-11-20: first version, drawn from the five boards. Added the names `--moss`, `--terracotta-dark`, `--white`, `--shadow`, `--surround-dark`, `--frame` and `--frame-dark` for values the boards already used. Moved the stats header, meter, section label, legend, pop-up, question box, decision item and the "not watching" notice into page.css. The research board's waiting figure is now a button that goes to the waiting decision, as on code-better's dashboard. architect-better's comment box now has the shared pop-up border, shadow and textarea, and its "architect is away" notice the shared `.unwatched` style it lacked.
 - 2026-11-20: small buttons, tags, progress words and the canvas and slide labels went from 10px to 11px (the user's decision): text that carries meaning is never under 11px.
+- 2026-11-20: architect-better's view has 20px at the sides, as the other boards; the `--pad` token is gone. The agents at work stay in the side column on research-better's board (a run can have twenty) and in the view on code-better's dashboard (they are the work): the side column rule says when to use which.
+- 2026-11-20: spacing and type sizes became tokens (`--space-*`, `--text-*`) in every board. Off-scale values moved to the nearest step: 3px to 4, 5 to 6, 7 to 8, 14 to 16, 18 to 20, 28 to 24, 48 to 40. Type sizes merged: 13px into 14 (`--text-message`), 16 and 18 into 17 (`--text-heading`), 22 into 20 (`--text-title`). On linen, muted text and the progress words use ink, and research-better's "contested" uses `--terracotta-dark`.
+- 2026-11-20: spacing tokens named by role, in seven steps instead of eleven (the user's choice): 2px became 4, 6 became 8, 10 became 12, and 32 became 40.
+- 2026-11-20: type styles became tokens (`--font-*`): each sets weight, size, line height and typeface, and replaces the full shorthand written in each rule. Line heights of the same style were made equal (1.4, 1.45 and 1.5 became the style's one value), and weight 600, which the page never loaded, became 700.

@@ -1,5 +1,5 @@
-"""DESIGN.md and the pages agree: every colour a page uses is in DESIGN.md's colour table, and the table's values are
-the ones page.css defines.
+"""DESIGN.md and the pages agree: every colour a page uses is in DESIGN.md's colour table, the boards write spaces and
+type sizes with the tokens only, and DESIGN.md's tables of colours, type and spacing hold the values page.css defines.
 
 Run with `python3 -m unittest discover tests`.
 """
@@ -36,10 +36,50 @@ def design_table() -> dict:
     return dict(rows)
 
 
+def design_tokens(heading: str) -> dict:
+    """A token table under a DESIGN.md heading: {name: value} from rows that start with a `--token` and its value."""
+    text = (ROOT / "DESIGN.md").read_text(encoding="utf-8")
+    section = text.split(f"## {heading}", 1)[1].split("\n## ", 1)[0]
+    return dict(re.findall(r"^\| `(--[a-z0-9-]+)` \| `?([^`|]+?)`? \|", section, re.M))
+
+
+def board_css():
+    """The boards' own CSS, as (file, line number, line): page.css after its tokens, each board's styles, and show-better's
+    page up to its slides. Slides and drawings (the research map) keep their own sizes."""
+    scripts = ROOT / "skills"
+    page_css = PAGE_CSS.read_text(encoding="utf-8")
+    start = page_css[: page_css.index("\n}\n")].count("\n") + 2
+    yield from ((PAGE_CSS, n, line) for n, line in enumerate(page_css.splitlines(), 1) if n >= start)
+    for name in ("research-better/scripts/board.html", "code-better/scripts/dashboard.html"):
+        text = (scripts / name).read_text(encoding="utf-8")
+        first = text[: text.index("/*__PAGE_CSS__*/")].count("\n") + 1
+        last = text[: text.index("</style>")].count("\n") + 1
+        for n, line in enumerate(text.splitlines(), 1):
+            if first <= n <= last and ".map" not in line:
+                yield scripts / name, n, line
+    for name in ("design-better/scripts/canvas.css", "architect-better/scripts/architect.css"):
+        for n, line in enumerate((scripts / name).read_text(encoding="utf-8").splitlines(), 1):
+            yield scripts / name, n, line
+    show = scripts / "show-better/scripts/show.css"
+    for n, line in enumerate(show.read_text(encoding="utf-8").splitlines(), 1):
+        if line.startswith("/* ---------- A slide"):
+            break
+        yield show, n, line
+
+
+# A px value in a padding, margin or gap, or as the size in a font or font-size; 0 and 1px (a hairline) are allowed.
+RAW_SPACE = re.compile(
+    r"(?<![\w-])(?:padding|margin|(?:row-|column-)?gap)(?:-[a-z]+)*\s*:[^;}]*?(?<![\d.])(?!1px)\d+(?:\.\d+)?px"
+)
+RAW_TEXT = re.compile(r"(?<![\w-])(?:font\s*:\s*(?:[a-z0-9]+\s+)*?|font-size\s*:\s*)\d+(?:\.\d+)?px")
+# A font shorthand must be a type style token, or inherit.
+RAW_FONT = re.compile(r"(?<![\w-])font\s*:\s*(?!var\(--font-|inherit)")
+
+
 def page_css_tokens() -> dict:
     root = PAGE_CSS.read_text(encoding="utf-8").split(":root {", 1)[1].split("\n}", 1)[0]
     root = re.sub(r"/\*.*?\*/", "", root, flags=re.S)
-    return {m.group(1): m.group(2).strip() for m in re.finditer(r"(--[a-z-]+):([^;]+);", root)}
+    return {m.group(1): m.group(2).strip() for m in re.finditer(r"(--[a-z0-9-]+):([^;]+);", root)}
 
 
 COLOUR = re.compile(r"#[0-9A-Fa-f]{3,8}\b|rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+[^)]*\)")
@@ -58,6 +98,22 @@ class Design(unittest.TestCase):
         for name, value in table.items():
             self.assertIn(name, css, f"{name} is in DESIGN.md but not in page.css")
             self.assertEqual(value.replace(" ", ""), css[name].replace(" ", ""), name)
+
+    def test_the_type_and_spacing_tables_match_page_css(self):
+        css = page_css_tokens()
+        for heading, prefix in (("Type", "--text-"), ("Type", "--font-"), ("Spacing and layout", "--space-")):
+            table = {name: value for name, value in design_tokens(heading).items() if name.startswith(prefix)}
+            in_css = {name: value for name, value in css.items() if name.startswith(prefix)}
+            self.assertTrue(table, f"no token table under {heading} in DESIGN.md")
+            self.assertEqual(table, in_css, f"DESIGN.md's {heading} table and page.css disagree")
+
+    def test_boards_write_spaces_and_type_sizes_with_tokens(self):
+        raw = [
+            f"{path.relative_to(ROOT)}:{n}: {line.strip()[:90]}"
+            for path, n, line in board_css()
+            if RAW_SPACE.search(line) or RAW_TEXT.search(line) or RAW_FONT.search(line)
+        ]
+        self.assertEqual(raw, [], "values where DESIGN.md asks for --space-*, --text-* or --font-* tokens")
 
     def test_pages_use_only_named_colours(self):
         allowed = {hex6(c) for v in design_table().values() for c in COLOUR.findall(v)}
