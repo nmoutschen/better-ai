@@ -355,3 +355,24 @@ def test_loaded_lines_per_case() -> None:
     assert rows_["b"] == ["1", "0", "-", "100%"]
     assert "c" not in rows_ and "d" not in rows_
     assert report.loaded_lines(rows()) == ["No skill-installed runs."]
+
+
+def test_every_comparison_names_known_conditions() -> None:
+    """A renamed condition cannot leave a comparison that silently never runs."""
+    from skill_evals.cases import CONDITIONS
+
+    assert report.COMPARISONS
+    assert all(name in CONDITIONS for pair in report.COMPARISONS for name in pair)
+
+
+def test_comparisons_pinned() -> None:
+    """The comparisons stay as they are."""
+    assert report.COMPARISONS == (
+        ("skill", "no-skill"),
+        ("one-sentence", "no-skill"),
+        ("short-skill", "no-skill"),
+        ("skill", "one-sentence"),
+        ("skill", "short-skill"),
+        ("skill-installed", "no-skill"),
+        ("skill", "skill-installed"),
+    )
