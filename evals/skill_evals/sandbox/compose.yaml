@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: proxy.Dockerfile
-    image: better-ai-evals-proxy:latest
+    image: better-ai-evals-proxy:tinyproxy-1.11.2-r0
     networks: [inner, outer]
 
 networks:
