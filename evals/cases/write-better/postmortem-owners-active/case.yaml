@@ -1,0 +1,30 @@
+id: postmortem-owners-active
+rule: choose-voice-by-actor
+source:
+- SKILL.md#4.4
+situation: 'postmortem.md, a VPN outage postmortem for the infrastructure team, writes its action items and key events in
+  the passive voice with the actor hidden: "The runbook ... will be updated", "The alert threshold will be lowered", "A peer
+  review step will be added", "A firewall rule ... was changed", "the rule was reverted". actions.md names who did or
+  owns each: Kwame Asante changed the rule, Mei Lin declared the incident and reverted it, Ayşe Demir owns the runbook,
+  Tomás Herrera the alert threshold, Mei Lin the peer review step; the change calendar item has no owner yet, and the
+  service desk callers are not named. The agent''s rewrite says who acts, in the active voice, wherever the actor is known,
+  keeps the passive only where the actor is unknown or irrelevant, and keeps every fact.'
+request: Rewrite postmortem.md for the team; everyone needs to know who does what next.
+graders:
+- type: planted_unchanged
+  except:
+  - postmortem.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/postmortem/check.py
+    planted.md: checks/postmortem/planted.md
+- type: judge
+  rubric: |-
+    Rule: use the active voice when the actor matters, and the passive voice when the actor is unknown or irrelevant, or to keep the topic at the start of the sentence. Planted facts: the original postmortem.md wrote its action items and key events in the passive with the actor hidden. actions.md names the actors: Kwame Asante made the firewall rule change at 08:52; Mei Lin declared the incident at 09:48 and reverted the rule at 10:20; Kwame confirmed the sessions restored at 11:07; Ayşe Demir owns the runbook update (due 24 November), Tomás Herrera the alert threshold change from 50% to 10% (due 17 November), Mei Lin the peer review step (due 1 December); moving the change calendar to the wiki has no owner yet; the service desk callers are not named.
+
+    PASS only if all hold: (1) each of the three action items with an owner says who will do it, with the owner as the subject of an active sentence or as the named owner of that item in a list or table (for example "Ayşe Demir: add a rollback step..." or "Tomás will lower..."); (2) the key events with a known actor, at least the rule change and the revert, say who acted; (3) the change calendar item does not invent an owner: it is passive, says no owner yet, or says the team will pick one; (4) no fact changed: times, dates, percentages and who did what match actions.md.
+
+    FAIL if any owned action item still hides its owner behind a passive such as "will be updated" with no name next to it, if the owners appear only in a separate list away from their actions, if an owner or actor is attributed to the wrong item, or if an owner is invented for the calendar item.
+
+    Does not count: passive sentences elsewhere whose actor is unknown or irrelevant (such as "No data was lost" or "No alert was raised"), headings, length, or whether the lessons section is kept.

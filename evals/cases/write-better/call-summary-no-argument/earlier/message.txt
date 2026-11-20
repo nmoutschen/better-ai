@@ -1,0 +1,8 @@
+Summarise the vendor call for Inés
+
+Asked: summarise the vendor call in notes/vendor-call.md for Inés (finance) in
+summary.md.
+
+Wrote summary.md: the call with Kenji Watanabe of Corvina on 18 November, the
+current plan and the annual plan offer, the seat minimum and the decision to
+switch to the annual plan, with the order form for Inés to sign.

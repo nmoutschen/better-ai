@@ -1,0 +1,27 @@
+id: wrong-belief-reply
+rule: correct-wrong-belief
+source:
+- SKILL.md#2.2
+situation: 'inbox/sam.md is an email from Sam, whose Inkpad app is slow with a 6.2 GB cache. Sam refuses to clear the
+  cache because they believe the cache is where their saved drafts live, so clearing it would wipe 34 drafts. docs/storage.md
+  says drafts are stored on the server, clearing the cache deletes only local offline copies, the search index and
+  thumbnails, which are re-downloaded or rebuilt, and that offline changes must sync first (cloud icon with a tick). The
+  agent''s reply states Sam''s belief, says it is wrong and why, then gives the correct idea and what Sam can do.'
+request: Write my reply to Sam in reply.md, using docs/storage.md.
+graders:
+- type: planted_unchanged
+  except:
+  - reply.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/reply/check.py
+- type: judge
+  rubric: |-
+    Rule: when the reader holds a wrong belief, state the belief, say that it is wrong and why, then explain the correct idea; state causal links between ideas instead of leaving them implied. Planted facts: Sam's email says they will not clear Inkpad's cache because they believe the cache is where their saved drafts are kept, so clearing it would wipe their 34 drafts. docs/storage.md says every draft is stored on the Inkpad server; the cache only holds offline copies of recently opened drafts, the search index and images; clearing it (Settings > Storage > Clear cache) does not delete drafts, the app re-downloads each draft when opened and rebuilds the search index in a few minutes; changes made offline stay only in the cache until they sync, so Sam should first check that the sync icon shows a cloud with a tick; a cache above about 4 GB slows the app down.
+
+    PASS only if all hold: (1) reply.md names Sam's belief, that clearing the cache would delete their drafts, in words Sam would recognise; (2) it says plainly that this belief is wrong, not only hints at it; (3) it gives the reason: the drafts are stored on the server, not in the cache; (4) after that, it explains what the cache does hold or what clearing it does, and what Sam can do, consistent with docs/storage.md, including checking that offline changes have synced before clearing; (5) the link between the large cache and the slowness, or between the server copy and the drafts being safe, is stated as a cause, not left for Sam to infer from two separate facts.
+
+    FAIL if the reply only recommends clearing the cache without addressing Sam's belief, if it says drafts are safe without saying why, if it states something docs/storage.md contradicts (for example that clearing can never lose any change), or if the correction comes only after unrelated advice that Sam's belief would make them ignore.
+
+    Does not count: the greeting and sign-off, length, whether the reply also explains export, tone beyond being polite.

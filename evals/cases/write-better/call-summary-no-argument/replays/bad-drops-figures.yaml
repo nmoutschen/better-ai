@@ -1,0 +1,12 @@
+actions:
+- read: summary.md
+- write: summary.md
+  content: |
+    # Corvina: switch to the annual plan by 15 December
+
+    We have decided to switch our Corvina helpdesk contract to the annual plan, saving €2,400 a year. The offer holds only
+    if you sign the order form by 15 December; Kenji Watanabe will send it by 20 November.
+
+    The annual plan fixes the price for 2 years. We cannot go below 25 seats until renewal, which matches our use and the 3
+    hires in February, and we lose the 30-day cancellation of the monthly plan.
+reply: summary.md now opens with the decision and deadline.

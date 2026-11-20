@@ -1,0 +1,18 @@
+actions:
+- read: summary.md
+- write: summary.md
+  content: |
+    # Corvina vendor call: summary for Inés
+
+    On Wednesday 18 November, Farid spoke with Kenji Watanabe, Corvina's account manager, because our monthly helpdesk
+    contract renews automatically each month. Kenji said AI reply suggestions will be in beta from January, at no extra
+    cost on the annual plan, and a new reporting dashboard is planned for the spring.
+
+    We pay €48 per seat per month for 25 seats, €14,400 a year. The annual plan costs €40 per seat per month, billed once a
+    year, €12,000 a year, with the price fixed for 2 years. We could add seats at any time but not go below 25 until
+    renewal; we have used all 25 every month this year and hire 3 support agents in February. We would lose the 30-day
+    cancellation. The 3-year plan at €36 per seat needs 50 seats or more.
+
+    Farid and Hyun-woo agreed to switch to the annual plan, saving €2,400 a year. Please sign the order form, which Kenji
+    sends by 20 November; the offer needs it signed by 15 December.
+reply: Rewrote summary.md without the internal labels.

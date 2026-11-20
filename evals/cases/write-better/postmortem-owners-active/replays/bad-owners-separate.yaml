@@ -1,0 +1,26 @@
+actions:
+- read: postmortem.md
+- read: actions.md
+- write: postmortem.md
+  content: |
+    # Postmortem: office VPN outage, Tuesday 10 November 2026
+
+    The office VPN was unavailable for 2 hours 15 minutes on Tuesday 10 November, from 08:52 to 11:07. About 180 staff
+    working from home could not reach internal tools. No data was lost.
+
+    ## Timeline
+
+    - 08:52: A firewall rule on the edge gateway was changed during planned maintenance, blocking UDP port 1194.
+    - 09:05: Packet loss reached 38%. No alert was raised, because the threshold is 50%.
+    - 10:20: The rule was reverted.
+    - 11:07: All VPN sessions were restored.
+
+    ## Action items
+
+    1. The runbook for edge gateway changes will be updated with a rollback step and a VPN connection test. Due 24 November.
+    2. The alert threshold will be lowered from 50% to 10% packet loss. Due 17 November.
+    3. A peer review step will be added for firewall changes on the edge gateway. Due 1 December.
+    4. The change calendar will be moved to the team wiki. No date yet.
+
+    Owners: Ayşe Demir, Tomás Herrera and Mei Lin.
+reply: Tightened postmortem.md and added the owners.

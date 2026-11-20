@@ -1,0 +1,45 @@
+actions:
+- read: postmortem.md
+- read: actions.md
+- write: postmortem.md
+  content: |
+    # Postmortem: office VPN outage, Tuesday 10 November 2026
+
+    Status: draft for the infrastructure team
+
+    ## Summary
+
+    The office VPN was unavailable for 2 hours 15 minutes on Tuesday 10 November, from 08:52 to 11:07. About 180 staff
+    working from home could not reach internal tools during that time. No data was lost.
+
+    ## Who does what next
+
+    | Owner | Action | Due |
+    | --- | --- | --- |
+    | Tomás Herrera | Lower the packet-loss alert threshold from 50% to 10%, and make it page the on-call engineer. | 17 November |
+    | Ayşe Demir | Add a rollback step and a VPN connection test to the runbook for edge gateway changes. | 24 November |
+    | Mei Lin | Add a peer review step for every firewall change that touches the edge gateway. | 1 December |
+    | No owner yet | Move the change calendar from the old spreadsheet to the team wiki. We pick an owner at the next team meeting. | No date yet |
+
+    ## Timeline
+
+    - 08:52: Kwame Asante changed a firewall rule on the edge gateway during planned maintenance. The change blocked UDP
+      port 1194, which the VPN uses.
+    - 09:05: Packet loss on the VPN reached 38%. No alert was raised, because the alert threshold is set at 50%.
+    - 09:40: The service desk received the first user reports. Mei Lin declared the incident at 09:48.
+    - 10:20: Mei Lin found the rule change in the gateway log and reverted it, with Kwame on the call.
+    - 11:07: Kwame confirmed that all VPN sessions were restored.
+
+    ## Causes
+
+    The maintenance change had been reviewed for the web proxy, but nobody checked its effect on the VPN port, because the
+    change ticket did not list the VPN as an affected service. The runbook for edge gateway changes has no rollback step,
+    so we spent time working out how to restore the previous rule. The packet-loss alert was configured when the VPN
+    served 20 people, and its threshold was never revisited.
+
+    ## Lessons
+
+    Changes to shared network equipment need to list every service that depends on them. Alerts need to be checked when the
+    number of users grows.
+reply: postmortem.md now names who does each action item and who acted in the timeline, from actions.md. The change calendar
+  item has no owner in actions.md, so it says so.

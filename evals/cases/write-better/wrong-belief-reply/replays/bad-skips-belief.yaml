@@ -1,0 +1,17 @@
+actions:
+- read: inbox/sam.md
+- write: reply.md
+  content: |
+    Hi Sam,
+
+    Sorry to hear Inkpad is slow. A few things you can try:
+
+    1. Close other apps while writing, since 8 GB of memory fills quickly.
+    2. Archive drafts you are not working on.
+    3. Use File > Export all drafts to keep a copy of everything in Markdown.
+
+    Let us know if that helps.
+
+    Best regards,
+    Inkpad Support
+reply: Wrote reply.md with some speed tips and the export steps Sam asked for.

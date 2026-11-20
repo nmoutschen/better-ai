@@ -1,0 +1,32 @@
+actions:
+- read: schedule.md
+- write: timetable/index.html
+  content: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>River Lark clean-up day: timetable</title>
+    <style>
+      body { font-family: system-ui, sans-serif; font-size: 1.1rem; line-height: 1.5; margin: 1rem; max-width: 40rem; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { text-align: left; vertical-align: top; padding: 0.4rem; border-bottom: 1px solid #ccc; }
+    </style>
+    </head>
+    <body>
+    <h1>River Lark clean-up day, Saturday 28 November</h1>
+    <table>
+      <tr><th>Time</th><th>What and where</th><th>Who</th></tr>
+      <tr><td>08:30</td><td>Check-in, gloves, grabbers and bags at the Old Boathouse. Under-16s need a signed consent form.</td><td>Nkechi Obi</td></tr>
+      <tr><td>09:00</td><td>Safety briefing (about 20 minutes), Old Boathouse</td><td>Rafael Souza</td></tr>
+      <tr><td>09:30–12:00</td><td>Litter picking. Group 1: Mill Bridge. Group 2: Willow Bank (muddy, bring wellies). Group 3: Weir car park and the footpath behind it.</td><td>Group 1: Hana Sato. Group 2: Dev Patel. Group 3: Lucía Fernández.</td></tr>
+      <tr><td>12:00</td><td>Lunch at St Brigid's Hall (vegetarian and vegan options; tell Grace about allergies at check-in)</td><td>Grace Mensah</td></tr>
+      <tr><td>13:00–15:00</td><td>Sorting and weighing, yard behind St Brigid's Hall</td><td>Tomasz Nowak</td></tr>
+      <tr><td>15:30</td><td>Wrap-up and group photo, Old Boathouse</td><td>Nkechi Obi</td></tr>
+    </table>
+    <p>Lost or need help? Call Nkechi on <a href="tel:07700900418">07700 900 418</a>.</p>
+    </body>
+    </html>
+reply: The timetable is in timetable/index.html, a single page that fits a phone screen. Its text is real text, so volunteers
+  can zoom it or have it read aloud.
