@@ -247,3 +247,15 @@ test('with latestLast, an item whose reply is the newest message comes last, so 
 test("the dashboard's conversation opts in to latestLast", () => {
   assert.match(html, /latestLast: true/);
 });
+
+test('with latestLast, a question waiting for the user does not stay below a newer message', () => {
+  const log = [
+    { action: 'reply', id: 'q1', to: null, text: 'Which size?' },
+    { action: 'note', id: 'm2', note: 'newer' },
+  ];
+  const waiting = c => c.e.id === 'q1';
+  assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'q1']);  // the other pages keep it last
+  const t = context.pageThread(log, ITEMS, waiting, true);
+  assert.deepEqual(ids(t.entries), ['q1', 'm2']);
+  assert.ok(ids(t.open).includes('q1'));  // it still counts as open
+});
