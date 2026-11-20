@@ -204,7 +204,9 @@
   // C switches between commenting and using the versions, and Escape closes the comment box. A click in a version
   // moves the focus into its frame, so each version's document listens too (see instrument).
   function shortcut(e) {
-    var t = e.target, typing = t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable);
+    if (e.defaultPrevented) return;  // the version handled the key itself
+    // composedPath()[0] is the field itself when it sits inside a web component's shadow root.
+    var t = e.composedPath ? e.composedPath()[0] : e.target, typing = t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable);
     if ((e.key === 'c' || e.key === 'C') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) setMode(!commenting);
     if (e.key === 'Escape' && !pop.hidden) closePop();
   }
