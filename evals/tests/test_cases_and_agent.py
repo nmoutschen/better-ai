@@ -172,7 +172,7 @@ def test_history_is_planted_commit_by_commit(tmp_path: Path, final_differs: bool
     write_tree(
         case_dir,
         {
-            "case.yaml": "id: history-case\nrule: r\nsituation: s\nrequest: r\ngraders: []\n",
+            "case.yaml": "id: case\nrule: r\nsituation: s\nrequest: r\ngraders: []\n",
             **{f"repo/{path}": text for path, text in final.items()},
             "history/01-start/files/tax.py": "RATE = 0.2\n",
             "history/01-start/files/old.py": "x = 1\n",
@@ -206,14 +206,15 @@ def test_history_is_planted_commit_by_commit(tmp_path: Path, final_differs: bool
 
 def test_history_rejects_bad_steps(tmp_path: Path) -> None:
     """A history step needs a message, sets only author and date, and a case has earlier/ or history/, not both."""
-    base = {"case.yaml": "id: c\nrule: r\nsituation: s\nrequest: r\ngraders: []\n", "repo/a.py": "a = 1\n"}
+    base = {"repo/a.py": "a = 1\n"}
     for extra, error in (
         ({"history/01/files/a.py": "a = 0\n"}, "no message.txt"),
         ({"history/01/message.txt": "m\n", "history/01/commit.env": "GIT_DIR=/tmp\n"}, "GIT_DIR"),
         ({"history/01/message.txt": "m\n", "earlier/message.txt": "m\n"}, "not both"),
     ):
         case_dir = tmp_path / error.replace(" ", "-").replace(".", "")
-        write_tree(case_dir, {**base, **extra})
+        case_yaml = f"id: {case_dir.name}\nrule: r\nsituation: s\nrequest: r\ngraders: []\n"
+        write_tree(case_dir, {**base, **extra, "case.yaml": case_yaml})
         with pytest.raises(ValueError, match=error):
             cases.load_case(case_dir)
 
