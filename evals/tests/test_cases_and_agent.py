@@ -243,3 +243,18 @@ def test_sandbox_images_are_pinned() -> None:
     tinyproxy = re.search(r"apk add --no-cache tinyproxy=(\S+)", proxy)
     assert tinyproxy
     assert f"image: better-ai-evals-proxy:tinyproxy-{tinyproxy[1]}\n" in (sandbox_dir / "compose.yaml").read_text()
+
+
+def test_lint_cases_grade_the_lint_run_with_the_judge() -> None:
+    """Each code-better lint case judges whether ruff ran after the last edit, keeps its script checks, and has no command-pattern grader for it."""
+    assert "ran_after_last_edit" not in cases.GRADER_FIELDS
+    directories = [path for path in cases.case_dirs("code-better") if path.name.startswith("lint-")]
+    assert len(directories) == 7
+    for directory in directories:
+        graders = cases.load_case(directory)["graders"]
+        types = [grader["type"] for grader in graders]
+        assert "ran_after_last_edit" not in types, directory.name
+        assert "command_passes" in types and "planted_unchanged" in types, directory.name
+        rubrics = [grader["rubric"] for grader in graders if grader["type"] == "judge"]
+        assert len(rubrics) == 1, directory.name
+        assert "ruff" in rubrics[0] and "PASS only if" in rubrics[0] and "FAIL" in rubrics[0], directory.name
