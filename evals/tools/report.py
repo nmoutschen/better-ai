@@ -101,7 +101,8 @@ def read_result(sample: EvalSample) -> SampleResult:
         epoch=int(sample.epoch or 1),
         tokens=run.get("usage") or {},
         cost=float(run.get("total_cost_usd") or 0.0),
-        judge_cost=sum(float(info.get("total_cost_usd") or 0.0) for info in judges.values()),
+        judge_cost=sum(float(info.get("total_cost_usd") or 0.0) for info in judges.values())
+        + float(((reads.metadata or {}).get("judge") or {}).get("total_cost_usd") or 0.0 if reads is not None else 0.0),
         seconds=(run.get("duration_ms") or 0) / 1000,
         judges=judges,
         skill_reads=(reads.metadata or {}) if reads is not None else {},

@@ -158,7 +158,10 @@ def skill_reads(judge_model: str = NO_JUDGE) -> Scorer:
         if candidates and judge_model != NO_JUDGE:
             listing = "\n".join(f"- {path}" for path in candidates)
             prompt = f"Files to decide on:\n{listing}\n\nTranscript:\n{render_transcript(state.messages)}"
-            reply, info = await ask_judge(instructions(skill), prompt, judge_model)
+            try:
+                reply, info = await ask_judge(instructions(skill), prompt, judge_model)
+            except (RuntimeError, TimeoutError, OSError) as error:
+                raise GradingError(redact(f"skill_reads: judge could not run: {error}")) from error
             if info.get("error"):
                 raise GradingError(redact(f"skill_reads: judge could not run: {info['error']}"))
             verdicts = file_verdicts(reply, candidates)

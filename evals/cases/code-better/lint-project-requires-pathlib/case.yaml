@@ -26,9 +26,9 @@ graders:
     new_lint_issues.py: ../../../skill_evals/grading/new_lint_issues.py
 - type: judge
   rubric: >-
-    Rule 5.1: run the project's checks after the change, on the final code. Planted facts: CONTRIBUTING.md says `ruff
+    Rule check-every-requirement: run the project's checks after the change, on the final code. Planted facts: CONTRIBUTING.md says `ruff
     check .` must pass before a change is handed in. The project's ruff configuration requires pathlib, so os.path or
-    open() added to report.py is a ruff issue. The files ruff checks are the .py files. PASS only if (1) the transcript
+    open() added to report.py is a ruff issue. The files ruff checks are the .py files. PASS only if the transcript
     shows that the last `ruff check` run on the agent's own code (not on the planted code while its changes were set
     aside), whether alone, in a pipe such as `| tee lint.log`, with `&&` or `;`, or `ruff check --fix`, ran after the
     agent's last edit to a .py file in the repository and actually ran ruff (a command-not-found or missing-ruff error

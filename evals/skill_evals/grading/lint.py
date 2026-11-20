@@ -14,7 +14,7 @@ from inspect_ai.solver import TaskState
 from inspect_ai.util import sandbox
 
 from skill_evals.agent import WORKDIR
-from skill_evals.grading.files import Checkout
+from skill_evals.grading.files import Checkout, GradingError
 from skill_evals.transcript import redact
 
 SCRIPT = Path(__file__).with_name("new_lint_issues.py")
@@ -30,7 +30,11 @@ def lint_issues_added() -> Scorer:
     async def score(state: TaskState, target: Target) -> Score | None:
         repo = Checkout(sandbox(), state.store.get("start_commit"), WORKDIR)
         command = f'python "$GRADE_FILES/{SCRIPT.name}" --isolated --select {RULES}'
-        result = await repo.snapshot_run(command, hidden={SCRIPT.name: SCRIPT.read_text()})
+        try:
+            result = await repo.snapshot_run(command, hidden={SCRIPT.name: SCRIPT.read_text()})
+        except GradingError as error:
+            # An observation never fails a sample that was graded already.
+            return Score.unscored(reason="scoring_failed", explanation=redact(error.detail[-500:]))
         lines = (result.stdout.strip().splitlines() if result else []) or [""]
         if lines[-1] == NO_CHANGE:
             return None

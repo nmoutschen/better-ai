@@ -78,17 +78,23 @@ async def play_actions(sandbox_env: LocalSandboxEnvironment, actions: list[dict[
             await sandbox_env.exec(["bash", "-c", action["bash"]], timeout=60)
 
 
-def nested_commands(specs: list[dict[str, Any]], prefix: str = "") -> list[tuple[str, dict[str, Any]]]:
+def nested_commands(specs: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
     """Return each command_passes grader inside an any_of, with the key the scorer gives it, such as any_of.1."""
     found = []
     for key, spec in zip(grader_keys(specs), specs, strict=True):
-        key = f"{prefix}{key}"
         if spec["type"] == "any_of":
-            for number, inner in enumerate(spec["graders"], 1):
-                if inner["type"] == "command_passes":
-                    found.append((f"{key}.{number}", inner))
-                elif inner["type"] == "any_of":
-                    found += nested_commands([inner], f"{key}.{number}.")
+            found += _nested_in(key, spec)
+    return found
+
+
+def _nested_in(key: str, spec: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """Return the command_passes graders inside the any_of that has the given key, numbered as the scorer numbers them."""
+    found = []
+    for number, inner in enumerate(spec["graders"], 1):
+        if inner["type"] == "command_passes":
+            found.append((f"{key}.{number}", inner))
+        elif inner["type"] == "any_of":
+            found += _nested_in(f"{key}.{number}", inner)
     return found
 
 
