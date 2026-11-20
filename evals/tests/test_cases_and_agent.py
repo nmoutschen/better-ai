@@ -258,3 +258,6 @@ def test_lint_cases_grade_the_lint_run_with_the_judge() -> None:
         rubrics = [grader["rubric"] for grader in graders if grader["type"] == "judge"]
         assert len(rubrics) == 1, directory.name
         assert "ruff" in rubrics[0] and "PASS only if" in rubrics[0] and "FAIL" in rubrics[0], directory.name
+        assert "whether or not a ruff check follows the pop" in rubrics[0], directory.name
+        assert "The ruff check that counts is the last one run on the agent's final code" in rubrics[0], directory.name
+        assert "A run by a sub-agent the agent started counts." in rubrics[0], directory.name
