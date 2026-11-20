@@ -356,17 +356,22 @@ def skill_read_lines(results: list[SampleResult]) -> list[str]:
 
 
 def loaded_lines(results: list[SampleResult]) -> list[str]:
-    """Format how often skill-installed runs loaded the skill, and the pass rate with and without it."""
+    """Format, per case, the skill-installed runs, how many loaded the skill, and the pass rate with and without it."""
     runs = [sample for sample in results if sample.skill_loaded is not None and not sample.error]
     if not runs:
         return ["No skill-installed runs."]
-    lines = [f"{'skill loaded':14} {'runs':>5} {'pass rate':>10}"]
-    for label, value in (("yes", 1.0), ("no", 0.0)):
-        group = [sample.passed for sample in runs if sample.skill_loaded == value and not math.isnan(sample.passed)]
-        rate = f"{statistics.mean(group):10.0%}" if group else f"{'-':>10}"
-        lines.append(f"{label:14} {len(group):5} {rate}")
-    not_loaded = sorted({sample.case for sample in runs if sample.skill_loaded == 0.0})
-    lines.append(f"Cases with a run that did not load it: {', '.join(not_loaded) or '-'}")
+
+    def rate(group: list[SampleResult]) -> str:
+        scored = [sample.passed for sample in group if not math.isnan(sample.passed)]
+        return f"{statistics.mean(scored):.0%}" if scored else "-"
+
+    width = max(len("case"), *(len(sample.case) for sample in runs)) + 2
+    lines = [f"{'case':{width}} {'runs':>5} {'loaded':>7} {'pass loaded':>12} {'pass not loaded':>16}"]
+    for case in sorted({sample.case for sample in runs}):
+        own = [sample for sample in runs if sample.case == case]
+        yes = [sample for sample in own if sample.skill_loaded == 1.0]
+        no = [sample for sample in own if sample.skill_loaded != 1.0]
+        lines.append(f"{case:{width}} {len(own):5} {len(yes):7} {rate(yes):>12} {rate(no):>16}")
     return lines
 
 
