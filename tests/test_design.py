@@ -68,7 +68,9 @@ def board_css():
 
 
 # A px value in a padding, margin or gap, or as the size in a font or font-size; 0 and 1px (a hairline) are allowed.
-RAW_SPACE = re.compile(r"(?<![\w-])(?:padding|margin|(?:row-|column-)?gap)(?:-[a-z]+)*\s*:[^;}]*?(?<![\d.])(?!1px)\d+(?:\.\d+)?px")
+RAW_SPACE = re.compile(
+    r"(?<![\w-])(?:padding|margin|(?:row-|column-)?gap)(?:-[a-z]+)*\s*:[^;}]*?(?<![\d.])(?!1px)\d+(?:\.\d+)?px"
+)
 RAW_TEXT = re.compile(r"(?<![\w-])(?:font\s*:\s*(?:[a-z0-9]+\s+)*?|font-size\s*:\s*)\d+(?:\.\d+)?px")
 
 
@@ -104,8 +106,11 @@ class Design(unittest.TestCase):
             self.assertEqual(table, in_css, f"DESIGN.md's {heading} table and page.css disagree")
 
     def test_boards_write_spaces_and_type_sizes_with_tokens(self):
-        raw = [f"{path.relative_to(ROOT)}:{n}: {line.strip()[:90]}" for path, n, line in board_css()
-               if RAW_SPACE.search(line) or RAW_TEXT.search(line)]
+        raw = [
+            f"{path.relative_to(ROOT)}:{n}: {line.strip()[:90]}"
+            for path, n, line in board_css()
+            if RAW_SPACE.search(line) or RAW_TEXT.search(line)
+        ]
         self.assertEqual(raw, [], "px values where DESIGN.md asks for --space-N or --text-* tokens")
 
     def test_pages_use_only_named_colours(self):
