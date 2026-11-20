@@ -231,3 +231,19 @@ test('a question the coordinator asked back about waits for the user again, unti
   assert.equal(shows('waiting', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
   assert.equal(shows('answered', a2, { 'a-2': 'asked' }), 'Applied');
 });
+
+test('with latestLast, an item whose reply is the newest message comes last, so the newest message is at the bottom', () => {
+  const log = [
+    { action: 'note', id: 'm1', note: 'first' },
+    { action: 'note', id: 'm2', note: 'second' },
+    { action: 'reply', id: 'r1', to: 'm1', text: 'answer to the first' },
+  ];
+  assert.deepEqual(ids(context.pageThread(log, ITEMS, null, true).entries), ['m2', 'm1']);
+  assert.deepEqual(ids(context.pageThread(log, ITEMS).entries), ['m1', 'm2']);  // the other pages keep their order
+  const later = log.concat({ action: 'note', id: 'm3', note: 'third' });
+  assert.deepEqual(ids(context.pageThread(later, ITEMS, null, true).entries), ['m2', 'm1', 'm3']);
+});
+
+test("the dashboard's conversation opts in to latestLast", () => {
+  assert.match(html, /latestLast: true/);
+});
