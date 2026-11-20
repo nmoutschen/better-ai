@@ -235,8 +235,8 @@ const conv = pageConversation({
   // No accept step: the coordinator answers or acts, and an answered item is finished.
   steps: ["seen", "working", "done"], labels: {done: "Answered"}, shown: st => st === "accepted" ? "done" : st,
   accept: false, filter: false, latestLast: true,
-  // A question waiting for the user comes last, next to the message box, until they answer it; so does a message of
-  // theirs that the coordinator asked about.
+  // A question waiting for the user, or a message of theirs the coordinator asked about, counts as open; it keeps its
+  // place in time, so the newest message is always last.
   waiting: (c, state) => c.kind === "decision" ? decisionStep(decisionStatus(c.e.x), answerOf(c), state) === 0 : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
   afterSend: () => tick(),
 });

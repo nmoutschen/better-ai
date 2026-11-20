@@ -305,7 +305,8 @@ function pageWords(e) { return e.note != null ? e.note : e.text; }
 // The thread as the log makes it, without the page: each item's state, the entries in the order they show, with the
 // replies under them, and the entries Open lists. Kept apart from the drawing so it can be tested without a browser.
 // WAITING(c, state) says which entries wait for the user and come last; by default, the agent's own question.
-// LATESTLAST puts the entries in the order of their newest message, replies included, not of their first.
+// LATESTLAST puts the entries in the order of their newest message, replies included, not of their first, and keeps
+// the waiting ones in that order too.
 function pageThread(log, itemKinds, waiting, latestLast) {
   var entries = [], byKey = {}, state = {};
   log.forEach(function (e) {
@@ -334,7 +335,7 @@ function pageThread(log, itemKinds, waiting, latestLast) {
   if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
   var waits = waiting ? function (c) { return waiting(c, state); }
     : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); };
-  entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
+  if (!latestLast) entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
   // Open: the user's items not yet accepted, with what was said under them, and the entries waiting for the user.
   var open = entries.filter(function (c) {
     return (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waits(c);
