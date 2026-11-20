@@ -213,6 +213,8 @@ test('nesting past the limit shows as written instead of overflowing', () => {
 
 test('a list can start at 0', () => {
   assert.equal(md('0. zero\n1. one')[0].start, 0);
+});
+
 // The dashboard's decision card: its step comes from the decision file and from the state of the user's latest answer.
 // The two helpers are read out of dashboard.html, between their own marker comments, so the test runs the shipped code.
 const html = fs.readFileSync(path.join(__dirname, '..', 'skills', 'code-better', 'scripts', 'dashboard.html'), 'utf8');
@@ -223,8 +225,8 @@ const fakeEl = () => ({ className: '', dataset: {}, html: '', classList: { add(c
   append(n) { this.html += n.html; }, insertAdjacentHTML(_w, v) { this.html += v; } });
 const fakeDoc = { createElement: fakeEl };
 const fakeConv = { progress: s => ({ html: `<span class="progress">${s}</span>` }) };
-const { decisionStep, decisionItem } = new Function('document', 'conv', 'esc', 'has',
-  stepCode + '; return {decisionStep, decisionItem};')(fakeDoc, fakeConv, s => String(s), v => v && v !== 'none');
+const { decisionStep, decisionItem } = new Function('document', 'conv', 'esc', 'has', 'md',
+  stepCode + '; return {decisionStep, decisionItem};')(fakeDoc, fakeConv, s => String(s), v => v && v !== 'none', s => String(s));
 const STEP_NAME = ['Waiting for you', 'You answered', 'Applied'];
 const shows = (status, answer, st) => STEP_NAME[decisionStep(status, answer, st)];
 
@@ -236,7 +238,11 @@ test('a question the coordinator asked back about waits for the user again, unti
   assert.equal(shows('waiting', a1, { 'a-1': 'asked' }), 'Waiting for you');
   assert.equal(shows('waiting', a2, { 'a-1': 'asked' }), 'You answered');  // the latest answer decides
   assert.equal(shows('waiting', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
-  assert.equal(shows('answered', a2, { 'a-2': 'asked' }), 'Applied');
+  // The file already says answered: when the coordinator asks back, the latest answer decides, not the file.
+  assert.equal(shows('answered', a1, { 'a-1': 'asked' }), 'Waiting for you');
+  assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'seen' }), 'You answered');
+  assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
+  assert.equal(shows('answered', null, {}), 'Applied');  // answered in the chat: no item in the thread
 });
 
 test('a decision card renders for a waiting, an answered-then-asked and a decided decision, and its head agrees with its foot', () => {
@@ -256,6 +262,12 @@ test('a decision card renders for a waiting, an answered-then-asked and a decide
   const applied = run('waiting', ['a-1'], { 'a-1': 'done' });
   assert.equal(applied.head, 'answered by you');
   assert.match(applied.foot, /Applied/);
+  const reAsked = run('answered', ['a-1'], { 'a-1': 'asked' });  // the file says answered, the coordinator asked back
+  assert.equal(reAsked.head, '10:00');
+  assert.match(reAsked.foot, /Waiting for you/);
+  assert.ok(reAsked.item.classList.list.includes('open-q'));
+  assert.equal(run('answered', ['a-1', 'a-2'], { 'a-1': 'asked', 'a-2': 'seen' }).head, 'answered, waiting for the coordinator');
+  assert.equal(run('answered', ['a-1', 'a-2'], { 'a-2': 'done' }).head, 'answered by you');
   const decided = run('decided', [], {});
   assert.equal(decided.head, 'decided');
   assert.doesNotMatch(decided.foot, /Waiting for you|You answered|Applied/);
@@ -277,14 +289,16 @@ test("the dashboard's conversation opts in to latestLast", () => {
   assert.match(html, /latestLast: true/);
 });
 
-test('with latestLast, a question waiting for the user does not stay below a newer message', () => {
+test('with latestLast, threads sort by their latest message and a question waiting for the user stays at the bottom', () => {
   const log = [
     { action: 'reply', id: 'q1', to: null, text: 'Which size?' },
     { action: 'note', id: 'm2', note: 'newer' },
   ];
   const waiting = c => c.e.id === 'q1';
-  assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'q1']);  // the other pages keep it last
+  assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'q1']);
   const t = context.pageThread(log, ITEMS, waiting, true);
-  assert.deepEqual(ids(t.entries), ['q1', 'm2']);
+  assert.deepEqual(ids(t.entries), ['m2', 'q1']);  // the newer message does not push the question up
   assert.ok(ids(t.open).includes('q1'));  // it still counts as open
+  const more = log.concat([{ action: 'note', id: 'm3', note: 'third' }, { action: 'reply', id: 'r1', to: 'm2', text: 'answer' }]);
+  assert.deepEqual(ids(context.pageThread(more, ITEMS, waiting, true).entries), ['m3', 'm2', 'q1']);  // the rest by latest message
 });
