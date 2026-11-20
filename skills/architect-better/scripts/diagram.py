@@ -62,7 +62,7 @@ def validate(design: dict) -> list[str]:
     edges = containers.get("edges", [])
     groups = containers.get("groups", [])
     node_ids = index(nodes, "Container nodes")
-    index(edges, "Container edges")
+    edge_ids = index(edges, "Container edges")
     index(groups, "Container groups")
     for node in nodes:
         if node["kind"] not in KINDS:
@@ -80,16 +80,30 @@ def validate(design: dict) -> list[str]:
             members.add(member)
     if "flow" in design:
         errors.append("Use a flows list instead of flow")
+    targets = node_ids | {f"edge:{ident}" for ident in edge_ids}
+    step_counts = Counter()
     for i, flow in enumerate(design.get("flows", []), 1):
-        participant_ids = index(flow["participants"], f"Flow {i} participants")
-        index(flow["steps"], f"Flow {i} steps")
+        participants = []
         for participant in flow["participants"]:
+            if isinstance(participant, dict):
+                participants.append(participant)
+            else:
+                errors.append(f"Flow {i} participant {participant!r}: expected an object with id and box")
+        participant_ids = index(participants, f"Flow {i} participants")
+        step_ids = index(flow["steps"], f"Flow {i} steps")
+        step_counts.update(step_ids)
+        targets.update(f"flow{i}:step:{ident}" for ident in step_ids)
+        for participant in participants:
             reference(participant, "box", node_ids, f"Flow {i} participant")
         for step in flow["steps"]:
             for field in ("from", "to"):
                 reference(step, field, participant_ids, f"Flow {i} step")
             if step.get("kind", "request") not in ARROWS:
                 errors.append(f"Flow {i} step {step['id']!r}: unknown kind {step['kind']!r}")
+    targets.update(f"step:{ident}" for ident, count in step_counts.items() if count == 1)
+    for target in design.get("findings", {}):
+        if target not in targets:
+            errors.append(f"Finding target {target!r}: missing or ambiguous diagram part")
     return errors
 
 

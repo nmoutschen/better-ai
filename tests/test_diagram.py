@@ -139,12 +139,26 @@ class DiagramTests(unittest.TestCase):
         self.design["flows"].append(second)
         self.design["findings"] = {
             "flow1:step:s6": [("S1", "Check the first flow", "security")],
-            "step:s6": [("O1", "Ambiguous target", "observability")],
         }
         positions = diagram.layout(self.design)
         for flow, view, expected in ((first, "flow1", ["security"]), (second, "flow3", [])):
             root = ET.fromstring(diagram.svg_flow(flow, "after", positions, view))
             self.assertEqual([mark.get("data-p") for mark in root.findall(".//svg:g[@class='mark']", NS)], expected)
+
+    def test_check_names_unknown_finding_targets(self):
+        targets = ("missing-box", "edge:missing-edge", "step:missing-step", "flow1:step:missing-step")
+        self.design["findings"] = dict.fromkeys(targets, [])
+        errors = diagram.validate(self.design)
+        for target in targets:
+            with self.subTest(target=target):
+                self.assertIn(f"Finding target {target!r}: missing or ambiguous diagram part", errors)
+
+    def test_check_names_string_participant(self):
+        self.design["flows"][0]["participants"].append("missing-participant")
+        self.assertIn(
+            "Flow 1 participant 'missing-participant': expected an object with id and box",
+            diagram.validate(self.design),
+        )
 
     def test_findings_are_hidden_and_follow_parts_across_views(self):
         self.design["findings"] = {

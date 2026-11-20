@@ -12,7 +12,6 @@ import http.server
 import json
 import sys
 import webbrowser
-from collections import Counter
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -21,7 +20,16 @@ sys.path.insert(0, str(HERE))
 import diagram  # noqa: E402
 import page  # noqa: E402
 
-FILES = ("design.json", "requirements.json", "perspectives.json", "decisions.json", "spec.json", "request.md")
+FILES = (
+    "design.json",
+    "request.md",
+    "requirements.jsonl",
+    "perspectives.jsonl",
+    "findings.jsonl",
+    "reviews.jsonl",
+    "decisions.jsonl",
+    "spec.jsonl",
+)
 ASSETS = {
     "/": ("architect.html", "text/html"),
     "/page.css": ("page.css", "text/css"),
@@ -39,19 +47,42 @@ def require(condition, message):
 
 
 def fields(record, **schema):
+    require(isinstance(record, dict), f"expected an object with {', '.join(schema)}")
     for key, kind in schema.items():
         require(type(record.get(key)) is kind, f"{key}: expected {kind.__name__}")
 
 
-def index(records):
-    require(isinstance(records, list), "expected a list of records")
-    result = {}
-    for item in records:
-        fields(item, id=str)
-        ident = item["id"]
-        require(ident and ident not in result, f"empty or duplicate ID {ident!r}")
-        result[ident] = item
-    return result
+def read_text(folder, name):
+    try:
+        return (folder / name).read_bytes().decode("utf-8")
+    except FileNotFoundError:
+        if name == "reviews.jsonl":
+            return ""
+        raise ValueError(f"{name}:1: missing file") from None
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f"{name}:1: {exc}") from exc
+
+
+def read_records(folder, name, validate, unique=None):
+    records, seen, errors = [], set(), []
+    content = read_text(folder, name)
+    lines = content.removesuffix("\n").split("\n") if content else []
+    for line, raw in enumerate(lines, 1):
+        try:
+            record = json.loads(raw)
+            require(isinstance(record, dict), "expected an object")
+            if unique:
+                fields(record, **{unique: str})
+                value = record[unique]
+                require(value.strip() and value not in seen, f"empty or duplicate {unique} {value!r}")
+            validate(record)
+            records.append(record)
+            if unique:
+                seen.add(value)
+        except (AttributeError, KeyError, OSError, TypeError, ValueError) as exc:
+            errors.append(f"{name}:{line}: {exc}")
+    require(not errors, "\n".join(errors))
+    return records
 
 
 def source_file(folder, path):
@@ -72,98 +103,95 @@ def source_file(folder, path):
 def read_folder(folder: Path) -> dict:
     """Read and validate the page files, including traced references and diagram targets."""
     folder = folder.resolve()
-    data = {}
-    for name in FILES:
-        try:
-            raw = (folder / name).read_text(encoding="utf-8")
-            data[Path(name).stem] = raw if name == "request.md" else json.loads(raw)
-        except (OSError, ValueError) as exc:
-            raise ValueError(f"{name}: {exc}") from exc
-    design = data["design"]
+    request = read_text(folder, "request.md")
+    try:
+        design = json.loads(read_text(folder, "design.json"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"design.json:{exc.lineno}: {exc.msg}") from exc
     try:
         fields(design, title=str, summary=str, scope=str, accepted=list, containers=dict, flows=list)
         require(set(design["accepted"]) <= set(TABS), "unknown accepted section")
         errors = diagram.validate(design)
-        require(not errors, "; ".join(errors))
+        require(not errors, "\n".join(errors))
         for flow in design["flows"]:
             fields(flow, name=str)
-    except (AttributeError, KeyError, TypeError, ValueError) as exc:
-        raise ValueError(f"design.json: {exc}") from exc
-
-    sources = {}
-    try:
-        for req in index(data["requirements"]).values():
-            fields(req, kind=str, text=str, source=dict)
-            source = req["source"]
-            if source == {"guessed": True}:
-                continue
-            fields(source, file=str)
-            target = sources[source["file"]] = source_file(folder, source["file"])
-            if source["file"] == "request.md":
-                fields(source, sentence=str)
-                require(source["sentence"] and source["sentence"] in data["request"], "request sentence is missing")
-            if "line" in source:
-                fields(source, line=int)
-                require(
-                    0 < source["line"] <= len(target.read_text(encoding="utf-8").splitlines()), "invalid source line"
-                )
-            if "symbol" in source:
-                fields(source, symbol=str)
-    except (AttributeError, KeyError, OSError, TypeError, ValueError) as exc:
-        raise ValueError(f"requirements.json: {exc}") from exc
-
-    req_ids = {r["id"] for r in data["requirements"]}
-    try:
-        for decision in index(data["decisions"]).values():
-            fields(decision, title=str, drivers=list, chosen=str, alternatives=list, drawback=str)
-            require(set(decision["drivers"]) <= req_ids, f"{decision['id']}: unknown driver")
-            for alternative in decision["alternatives"]:
-                fields(alternative, option=str, why=str)
-    except (AttributeError, TypeError, ValueError) as exc:
-        raise ValueError(f"decisions.json: {exc}") from exc
-
-    try:
+            if "id" in flow:
+                fields(flow, id=str)
         parts = diagram_parts(design)
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
-        raise ValueError(f"design.json: {exc}") from exc
-    try:
-        fields(data["perspectives"], perspectives=list)
-        perspectives = index(data["perspectives"]["perspectives"])
-        for perspective in perspectives.values():
-            fields(perspective, name=str, applies=bool, why=str, source=str, findings=list)
-            if "columns" in perspective:
-                fields(perspective["columns"], finding=str, response=str)
-            require(perspective["applies"] or not perspective["findings"], "findings require an applicable perspective")
-            for finding in index(perspective["findings"]).values():
-                fields(finding, parts=list, finding=str, response=str)
-                if "category" in finding:
-                    fields(finding, category=str)
-                require(finding["parts"], f"{finding['id']}: expected at least one part")
-                for group in finding["parts"]:
-                    require(
-                        isinstance(group, list) and group and set(group) <= parts.keys(),
-                        f"{finding['id']}: unknown or ambiguous diagram part in {group!r}",
-                    )
-        review = data["perspectives"].get("review")
-        if review is not None:
-            fields(review, changes=list, rerun=list)
-            require(all(isinstance(change, str) for change in review["changes"]), "expected change descriptions")
-            require(
-                set(review["rerun"]) <= {k for k, p in perspectives.items() if p["applies"]}, "invalid review scope"
-            )
-        else:
-            require(not any(p["findings"] for p in perspectives.values()), "findings require a completed review")
-    except (AttributeError, TypeError, ValueError) as exc:
-        raise ValueError(f"perspectives.json: {exc}") from exc
+        raise ValueError("\n".join(f"design.json:1: {error}" for error in str(exc).splitlines())) from exc
 
-    try:
-        require(isinstance(data["spec"], list), "expected a list of spec rows")
-        for row in data["spec"]:
-            fields(row, origin=str, count=int, example=str, source=str)
-            require(row["count"] > 0, "expected a positive rule count")
-    except (AttributeError, TypeError, ValueError) as exc:
-        raise ValueError(f"spec.json: {exc}") from exc
-    return {**data, "parts": parts, "sources": sources}
+    sources = {}
+
+    def requirement(record):
+        fields(record, kind=str, text=str, source=dict)
+        require(record["kind"] in ("functional", "quality", "constraint"), "unknown requirement kind")
+        source = record["source"]
+        fields(source, type=str)
+        match source["type"]:
+            case "request":
+                fields(source, sentence=str)
+                require(source["sentence"] and source["sentence"] in request, "request sentence is missing")
+                sources["request.md"] = source_file(folder, "request.md")
+            case "file":
+                fields(source, file=str, symbol=str)
+                sources[source["file"]] = source_file(folder, source["file"])
+            case "user":
+                fields(source, at=str)
+            case "guessed":
+                pass
+            case _:
+                raise ValueError(f"unknown source type {source['type']!r}")
+
+    def perspective(record):
+        fields(record, applies=bool, why=str, **{"from": str})
+
+    def references(values, allowed, label):
+        for value in values:
+            require(isinstance(value, str) and value in allowed, f"unknown {label} {value!r}")
+
+    def finding(record):
+        fields(record, perspective=str, parts=list, text=str)
+        require(record["perspective"] in applicable, f"unknown or inapplicable perspective {record['perspective']!r}")
+        require(
+            "handled_by" in record and (record["handled_by"] is None or isinstance(record["handled_by"], str)),
+            "handled_by: expected string or null",
+        )
+        require(record["parts"], "parts: expected at least one diagram part")
+        for group in record["parts"]:
+            require(isinstance(group, str), "parts: expected a string")
+            references(group.split("+"), parts, "diagram part")
+
+    def review(record):
+        fields(record, at=str, perspectives=list, changed=list)
+        references(record["perspectives"], applicable, "review perspective")
+        references(record["changed"], parts, "changed part")
+
+    def decision(record):
+        fields(record, title=str, drivers=list, chosen=str, rejected=list, drawback=str)
+        references(record["drivers"], req_ids, "driver")
+        for rejected in record["rejected"]:
+            fields(rejected, option=str, why=str)
+
+    def spec_row(record):
+        fields(record, requirement=str, source=str, checked_by=str)
+
+    requirements = read_records(folder, "requirements.jsonl", requirement, "id")
+    req_ids = {record["id"] for record in requirements}
+    perspectives = read_records(folder, "perspectives.jsonl", perspective, "name")
+    applicable = {record["name"] for record in perspectives if record["applies"]}
+    return {
+        "design": design,
+        "request": request,
+        "requirements": requirements,
+        "perspectives": perspectives,
+        "findings": read_records(folder, "findings.jsonl", finding, "id"),
+        "reviews": read_records(folder, "reviews.jsonl", review),
+        "decisions": read_records(folder, "decisions.jsonl", decision, "id"),
+        "spec": read_records(folder, "spec.jsonl", spec_row, "id"),
+        "parts": parts,
+        "sources": sources,
+    }
 
 
 def diagram_parts(design):
@@ -191,9 +219,9 @@ def diagram_parts(design):
             "view": "containers",
             "ids": ids("c", "edge", ident),
         }
-    counts = Counter(step["id"] for flow in design["flows"] for step in flow["steps"])
     for i, flow in enumerate(design["flows"], 1):
         view = f"flow{i}"
+        flow_id = flow.get("id", view)
         for participant in flow["participants"]:
             parts[f"box:{participant['box']}"]["ids"].extend(ids(view, "box", participant["id"]))
         for step, number in zip(flow["steps"], diagram.step_numbers(flow), strict=True):
@@ -205,35 +233,36 @@ def diagram_parts(design):
                 "view": "flows",
                 "mark": f"{view}:step:{ident}",
             }
-            parts[part["mark"]] = part
-            if counts[ident] == 1:
-                parts[f"step:{ident}"] = part
+            key = f"step:{flow_id}/{ident}"
+            require(key not in parts, f"duplicate diagram part {key!r}")
+            parts[key] = part
     return parts
 
 
 def model(data):
     design = data["design"]
     marks = {}
-    for perspective in data["perspectives"]["perspectives"]:
-        for finding in perspective["findings"]:
-            for key in dict.fromkeys(part for group in finding["parts"] for part in group):
+    if data["reviews"]:
+        for finding in data["findings"]:
+            for key in dict.fromkeys(part for group in finding["parts"] for part in group.split("+")):
                 target = data["parts"][key].get("mark", key.removeprefix("box:"))
-                badge = [finding["id"], finding["finding"], perspective["id"]]
-                if badge not in marks.setdefault(target, []):
-                    marks[target].append(badge)
-    layout = diagram.layout({**design, "findings": marks})
-    containers = {s: diagram.svg_containers(layout, s) for s in diagram.STATES}
-    flows = [
-        {
-            "name": flow["name"],
-            "new": flow.get("in") == ["after"],
-            "versions": {
-                s: diagram.svg_flow(flow, s, layout, f"flow{i}") if diagram.visible(flow, s) else ""
-                for s in diagram.STATES
-            },
-        }
-        for i, flow in enumerate(design["flows"], 1)
-    ]
+                marks.setdefault(target, []).append([finding["id"], finding["text"], finding["perspective"]])
+    try:
+        layout = diagram.layout({**design, "findings": marks})
+        containers = {s: diagram.svg_containers(layout, s) for s in diagram.STATES}
+        flows = [
+            {
+                "name": flow["name"],
+                "new": flow.get("in") == ["after"],
+                "versions": {
+                    s: diagram.svg_flow(flow, s, layout, f"flow{i}") if diagram.visible(flow, s) else ""
+                    for s in diagram.STATES
+                },
+            }
+            for i, flow in enumerate(design["flows"], 1)
+        ]
+    except (AttributeError, IndexError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"design.json:1: {exc}") from exc
     result = {k: v for k, v in data.items() if k not in ("sources", "request", "design")}
     return {
         **result,
@@ -280,7 +309,7 @@ def serve(folder: Path, port: int, open_browser: bool) -> None:
                     files = [*(folder / name for name in FILES), *(HERE / name for name, _ in ASSETS.values())]
                     rev = hashlib.sha256()
                     for path in files:
-                        rev.update(path.read_bytes())
+                        rev.update(read_text(path.parent, path.name).encode())
                     self.send(200, rev.hexdigest().encode(), "text/plain")
                 elif url.path == "/source":
                     args = parse_qs(url.query)

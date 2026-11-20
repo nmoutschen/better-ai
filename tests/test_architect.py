@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -38,9 +39,9 @@ class Architect(unittest.TestCase):
 
     def update(self, name, fn):
         path = self.folder / name
-        value = json.loads(path.read_text())
+        value = [json.loads(line) for line in path.read_text().splitlines()]
         fn(value)
-        path.write_text(json.dumps(value))
+        path.write_text("".join(json.dumps(record) + "\n" for record in value))
 
     def test_shared_page_files_match_design_better(self):
         shared = ROOT / "skills" / "design-better" / "scripts"
@@ -55,22 +56,71 @@ class Architect(unittest.TestCase):
         self.assertEqual(data["requirements"][0]["source"]["sentence"], view["requirements"][0]["text"])
         self.assertEqual(set(view["containers"]), {"before", "after"})
         self.assertEqual(len(view["flows"]), len(data["design"]["flows"]))
-        self.assertIn('data-p="security"', view["containers"]["after"])
-        self.assertNotIn('data-p="security"', view["containers"]["before"])
+        self.assertIn('data-p="Security"', view["containers"]["after"])
+        self.assertNotIn('data-p="Security"', view["containers"]["before"])
         self.assertIn('id="flow1-after-step-s6"', view["flows"][0]["versions"]["after"])
-        self.assertIn('data-p="security"', view["flows"][0]["versions"]["after"])
+        self.assertIn('data-p="Security"', view["flows"][0]["versions"]["after"])
         self.browser.assert_not_called()
 
-    def test_unreviewed_folder_renders_without_finding_badges(self):
-        def clear_review(data):
-            del data["review"]
-            for perspective in data["perspectives"]:
-                perspective["findings"].clear()
+    def test_reader_loads_every_contract_file(self):
+        data = architect.read_folder(self.folder)
+        for name in architect.FILES:
+            with self.subTest(name=name):
+                raw = (self.folder / name).read_text()
+                key = Path(name).stem
+                if name.endswith(".jsonl"):
+                    self.assertTrue(data[key])
+                    self.assertEqual(data[key], [json.loads(line) for line in raw.splitlines()])
+                elif name == "design.json":
+                    self.assertEqual(data[key], json.loads(raw))
+                else:
+                    self.assertEqual(data[key], raw)
 
-        self.update("perspectives.json", clear_review)
+    def test_reader_keeps_unicode_line_separators_inside_a_record(self):
+        path = self.folder / "spec.jsonl"
+        path.write_text(path.read_text().replace("Inspect the server", "Inspect\u2028the server"))
+        self.assertEqual(
+            architect.read_folder(self.folder)["spec"][1]["checked_by"], "Inspect\u2028the server bind address."
+        )
+
+    def test_check_reports_invalid_diagram_render_input(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        design["containers"]["edges"][0]["label"] = 42
+        path.write_text(json.dumps(design))
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()) as output:
+            self.command("check")
+        self.assertIn("design.json:1:", output.getvalue())
+
+    def test_unreviewed_folder_omits_findings_controls_and_badges(self):
+        (self.folder / "reviews.jsonl").unlink()
         view = architect.model(architect.read_folder(self.folder))
-        self.assertNotIn("review", view["perspectives"])
+        self.assertEqual(view["reviews"], [])
         self.assertNotIn('class="mark"', view["containers"]["after"])
+        result = subprocess.run(
+            [
+                "node",
+                "-e",
+                """
+                const vm = require('node:vm');
+                const fs = require('node:fs');
+                const data = JSON.parse(fs.readFileSync(0, 'utf8'));
+                const source = fs.readFileSync(process.argv[1], 'utf8');
+                const context = {data, fetch: () => new Promise(() => {}),
+                  document: {querySelector: () => ({})}};
+                vm.runInNewContext(source, context);
+                process.stdout.write(vm.runInNewContext(
+                  'controls(data.perspectives, data.reviews.at(-1))', context));
+                """,
+                str(SCRIPTS / "architect.js"),
+            ],
+            input=json.dumps(view),
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        self.assertIn('aria-label="State"', result.stdout)
+        self.assertNotIn('aria-label="Findings"', result.stdout)
 
     def test_editing_a_requirement_changes_its_confirmation_fingerprint(self):
         def wording():
@@ -79,30 +129,43 @@ class Architect(unittest.TestCase):
 
         before = wording()
         self.update(
-            "requirements.json",
+            "requirements.jsonl",
             lambda reqs: next(req for req in reqs if req["id"] == "Q1").update(text="A" * 6000),
         )
         after = wording()
         self.assertNotEqual(before, after)
         self.assertEqual(len(after), 64)
 
-    def test_check_rejects_unknown_driver(self):
-        self.update("decisions.json", lambda data: data[0]["drivers"].append("missing"))
-        with self.assertRaises(SystemExit) as error, contextlib.redirect_stderr(io.StringIO()) as output:
-            self.command("check")
-        self.assertEqual(error.exception.code, 2)
-        self.assertIn("decisions.json: D1: unknown driver", output.getvalue())
+    def test_check_reports_bad_record_with_file_and_line(self):
+        cases = [
+            ("requirements.jsonl", {"kind": "Responsiveness"}, "unknown requirement kind"),
+            ("perspectives.jsonl", {"applies": "true"}, "applies: expected bool"),
+            ("findings.jsonl", {"handled_by": 42}, "handled_by: expected string or null"),
+            ("reviews.jsonl", {"changed": ["box:missing"]}, "unknown changed part 'box:missing'"),
+            ("decisions.jsonl", {"drivers": ["missing"]}, "unknown driver 'missing'"),
+            ("spec.jsonl", {"checked_by": []}, "checked_by: expected str"),
+        ]
+        for name, change, message in cases:
+            with self.subTest(name=name):
+                file = self.folder / name
+                self.update(name, lambda rows, change=change: rows[1].update(change))
+                with self.assertRaises(SystemExit) as error, contextlib.redirect_stderr(io.StringIO()) as output:
+                    self.command("check")
+                self.assertEqual(error.exception.code, 2)
+                self.assertIn(f"{name}:2: {message}", output.getvalue())
+                shutil.copyfile(SCRIPTS / "example" / name, file)
 
     def test_reader_rejects_unknown_finding_part(self):
-        self.update(
-            "perspectives.json", lambda data: data["perspectives"][0]["findings"][0]["parts"][0].append("step:x")
-        )
-        with self.assertRaisesRegex(ValueError, "perspectives.json: T1: unknown"):
+        self.update("findings.jsonl", lambda rows: rows[0]["parts"].append("edge:e3+step:flow1/missing"))
+        with self.assertRaisesRegex(ValueError, "findings.jsonl:1: unknown diagram part 'step:flow1/missing'"):
             architect.read_folder(self.folder)
 
     def test_reader_rejects_source_outside_change(self):
-        self.update("requirements.json", lambda reqs: reqs[0].update(source={"file": "../outside.md"}))
-        with self.assertRaisesRegex(ValueError, "requirements.json: invalid source path"):
+        self.update(
+            "requirements.jsonl",
+            lambda reqs: reqs[0].update(source={"type": "file", "file": "../outside.md", "symbol": "name"}),
+        )
+        with self.assertRaisesRegex(ValueError, "requirements.jsonl:1: invalid source path"):
             architect.read_folder(self.folder)
 
     def test_pending_and_status_follow_review_requests(self):

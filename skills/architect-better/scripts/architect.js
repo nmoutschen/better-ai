@@ -26,9 +26,9 @@ function editor(label, value = '') {
 const changeButton = '<button class="btn btn--quiet btn--sm" type="button" data-edit>Change</button>';
 
 function sourceLink(source) {
-  if (source.guessed) return chip('guessed', 'guess');
-  const query = new URLSearchParams({file: source.file});
-  if (source.line) query.set('line', source.line);
+  if (source.type === 'guessed') return chip('guessed', 'guess');
+  if (source.type === 'user') return 'You, on this page<br>' + text(source.at);
+  const query = new URLSearchParams({file: source.type === 'request' ? 'request.md' : source.file});
   return '<a class="src" href="/source?' + text(query) + '" target="_blank" rel="noopener">' +
     (source.sentence ? text(source.sentence) : text(source.file) +
       (source.symbol ? '<br>' + text(source.symbol) : '')) + '</a>';
@@ -38,7 +38,7 @@ function requirementRows(requirements) {
   return requirements.map(req => row([
     '<strong>' + text(req.id) + '</strong>', text(req.kind), text(req.text) + editor('New wording for ' + req.id, req.text),
     '<span class="req-source">' + sourceLink(req.source) + '</span>',
-    '<div class="row-actions">' + changeButton + (req.source.guessed ?
+    '<div class="row-actions">' + changeButton + (req.source.type === 'guessed' ?
       '<button class="btn btn--sm answer" type="button" data-confirm aria-label="Confirm the guess">✓</button>' : '') + '</div>'
   ], 'id="req-' + text(req.id) + '" data-record="' + text(req.id) + '"'));
 }
@@ -48,14 +48,14 @@ function decisionRecords(decisions) {
     const drivers = decision.drivers.map(id =>
       '<a class="chip req" href="#req-' + encodeURIComponent(id) + '" data-driver="' + text(id) + '">' + text(id) + '</a>'
     ).join(' ');
-    const alternatives = decision.alternatives.map(alt =>
+    const alternatives = decision.rejected.map(alt =>
       '<li><strong>' + text(alt.option) + '</strong><span class="muted">Not chosen: ' + text(alt.why) + '</span></li>'
     ).join('');
     return '<article class="dec" id="dec-' + text(decision.id) + '" data-record="' + text(decision.id) + '">' +
       '<div class="dh"><span>' + text(decision.id) + '</span><h3>' + text(decision.title) + '</h3>' + changeButton + '</div>' +
       editor('What should change in ' + decision.id) + '<p class="drv">Driven by ' + drivers + '</p>' +
       '<div class="chosen"><span class="lbl">Chosen</span><p>' + text(decision.chosen) + '</p></div>' +
-      '<details class="rej"><summary>Rejected alternatives (' + decision.alternatives.length +
+      '<details class="rej"><summary>Rejected alternatives (' + decision.rejected.length +
       ')</summary><ul class="alts">' + alternatives + '</ul></details>' +
       '<p class="drawback"><span class="lbl">Main drawback</span> ' + text(decision.drawback) + '</p></article>';
   }).join('');
@@ -66,7 +66,7 @@ function controls(perspectives, review) {
     options.map(([key, name]) => '<button type="button" data-' + attr + '="' + text(key) +
       '" aria-pressed="false">' + text(name) + '</button>').join('') + '</div>';
   return '<div class="controls">' + segment('State', 'version', [['before', 'Before'], ['after', 'After']]) +
-    (review ? segment('Findings', 'findings', [['', 'No findings'], ...perspectives.map(p => [p.id, p.name])]) : '') + '</div>';
+    (review ? segment('Findings', 'findings', [['', 'No findings'], ...perspectives.map(p => [p.name, p.name])]) : '') + '</div>';
 }
 
 function figures(versions) {
@@ -74,26 +74,25 @@ function figures(versions) {
     (svg || '<p class="muted">This flow does not exist before the change.</p>') + '</div>').join('');
 }
 
-function perspectiveTables(perspectives, parts, reviewed) {
+function perspectiveTables(perspectives, findings, parts, reviewed) {
   const summary = table(['Perspective', 'Applicability', 'Why', 'From'], perspectives.map(p =>
     row(['<strong>' + text(p.name) + '</strong>', p.applies ? chip('Applies', 'ok') : chip('Does not apply'),
-      text(p.why), '<span class="muted">' + text(p.source) + '</span>'])));
+      text(p.why), '<span class="muted">' + text(p.from) + '</span>'])));
   if (!reviewed) return summary + '<p>' + chip('Review runs once you approve the design') + '</p>';
   return summary + perspectives.filter(p => p.applies).map(p => {
-    const category = p.findings.some(f => f.category);
-    const headers = ['ID', ...(category ? ['Threat'] : []), 'Part', p.columns?.finding || 'Finding', p.columns?.response || 'Response'];
-    const rows = p.findings.map(f => {
-      const links = f.parts.map(group => {
+    const headers = ['ID', 'Part', 'Finding', 'Handled by'];
+    const rows = findings.filter(f => f.perspective === p.name).map(f => {
+      const links = f.parts.map(part => {
+        const group = part.split('+');
         const refs = group.map(id => parts[id]);
         const first = refs[0];
         const icon = first.icon ? '<svg viewBox="-1 -1 16 16" width="13" height="13" aria-hidden="true">' +
           first.icon + '</svg>' : '<span aria-hidden="true">→</span>';
         return '<a class="boxref ' + first.kind + '" href="#panel-' + first.view + '" data-parts="' +
-          text(JSON.stringify(group)) + '" data-perspective="' + text(p.id) + '" data-badge="' + text(f.id) + '">' +
+          text(JSON.stringify(group)) + '" data-perspective="' + text(p.name) + '" data-badge="' + text(f.id) + '">' +
           icon + '<span>' + refs.map(ref => text(ref.label)).join(' · ') + '</span></a>';
       }).join('<br>');
-      return row(['<strong>' + text(f.id) + '</strong>', ...(category ? [text(f.category || '')] : []),
-        links, text(f.finding), text(f.response)]);
+      return row(['<strong>' + text(f.id) + '</strong>', links, text(f.text), text(f.handled_by ?? 'Open')]);
     });
     return '<h3>' + text(p.name) + '</h3>' + (rows.length ? table(headers, rows) : '<p class="muted">No findings.</p>');
   }).join('');
@@ -107,9 +106,10 @@ function start(data) {
   const reviewMenu = $('#review-menu');
   const reviewToggle = $('#review-toggle');
   const runReview = $('#run-review');
-  const {perspectives, review} = data.perspectives;
+  const {perspectives} = data;
+  const review = data.reviews.at(-1);
   const applicable = perspectives.filter(p => p.applies);
-  const reviewIds = review ? review.rerun : applicable.map(p => p.id);
+  const reviewNames = review ? review.perspectives : applicable.map(p => p.name);
   const items = ['comment', 'note', 'approve', 'confirm'];
   const waiting = (entry, states) => states[entry.e.id] === 'asked' ||
     (entry.kind === 'reply' && !entry.e.to && entry.e.id && !entry.replies.some(reply => reply.action === 'note'));
@@ -146,16 +146,16 @@ function start(data) {
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
     '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'open') : '') + '</h3>' +
     figures(flow.versions)).join(''));
-  section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.parts, review));
+  section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review));
   section('decisions', 'Decision records', decisionRecords(data.decisions));
-  section('spec', 'Spec', table(['From', 'Rules', 'Example rule', 'Source'], data.spec.map(rule =>
-    row([text(rule.origin), text(rule.count), '<code>' + text(rule.example) + '</code>', chip(rule.source, 'req')]))));
+  section('spec', 'Spec', table(['ID', 'Requirement', 'Source', 'Checked by'], data.spec.map(rule =>
+    row([text(rule.id), text(rule.requirement), text(rule.source), text(rule.checked_by)]))));
 
   for (const [key, part] of Object.entries(data.parts)) {
     for (const id of part.ids) {
       const target = byId(id);
       if (!target) continue;
-      partByElement.set(target, {key: part.mark || key, title: part.label});
+      partByElement.set(target, {key: key, title: part.label});
       target.setAttribute('tabindex', '0');
       target.setAttribute('role', 'button');
       target.setAttribute('aria-label', 'Comment on ' + part.label);
@@ -411,7 +411,6 @@ function start(data) {
     if (entry) showConversation(entry.e.id);
   });
 
-  const reviewNames = applicable.filter(p => reviewIds.includes(p.id)).map(p => p.name);
   reviewToggle.textContent = review ? 'Review again…' : 'Approve…';
   $('.menu-h', reviewMenu).textContent = review ? 'Review the changes' : 'Approve the design';
   runReview.textContent = review ? 'Run the review again' : 'Approve and run the review';
@@ -420,17 +419,17 @@ function start(data) {
     reviewToggle.setAttribute('aria-expanded', String(open));
   }
   reviewToggle.addEventListener('click', () => {
-    const changes = review?.changes.length ? 'Changed since the review: ' + review.changes.join('; ') + '. ' : '';
+    const changes = review?.changed.length ? 'Changed parts: ' + review.changed.join(', ') + '. ' : '';
     const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
     const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
-    $('.review-summary').textContent = (review ? changes || 'No changes recorded since the review. ' : stats) + scope;
+    $('.review-summary').textContent = (review ? changes || 'No changed parts recorded. ' : stats) + scope;
     toggleReview(reviewMenu.hidden);
   });
   runReview.addEventListener('click', () => {
     runReview.disabled = true;
     const label = review ? 'Review requested again' : 'Design approved';
-    conversation.send('approve', {id: 'approval-' + Date.now().toString(36), again: !!review, perspectives: reviewIds,
-      changes: review?.changes || [], text: label + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')},
+    conversation.send('approve', {id: 'approval-' + Date.now().toString(36), again: !!review, perspectives: reviewNames,
+      changes: review?.changed || [], text: label + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')},
     'Review request', () => { toggleReview(false); runReview.disabled = false; },
     () => { runReview.disabled = false; });
   });
