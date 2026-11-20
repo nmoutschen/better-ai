@@ -11,11 +11,9 @@ IF you cannot start sub-agents, this mode cannot run: STOP before you build anyt
 
 FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
-## 1. Write the spec, the design and the task list
+## 1. Prepare the spec and task list
 
-READ [../templates/specs.md](../templates/specs.md). THEN WRITE the requirements of the whole change in `.code/<change>/specs.md`, in the template's format. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
-
-IF the change adds a module, a data model, a dependency or a migration, and no design covers it, WRITE `.code/<change>/design.md`: READ [../templates/design.md](../templates/design.md) and WRITE it in its format.
+IF a spec already covers the change, USE it and UPDATE it in place where needed. OTHERWISE, READ [../templates/specs.md](../templates/specs.md) and WRITE the requirements of the whole change in `.code/<change>/specs.md`, in the template's format. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
 SPLIT the work into tasks by part, such as one module or one flow per task, never by role. EACH task fits in one context, and names its mode and its requirements. WRITE them in `.code/<change>/tasks.md`: READ [../templates/tasks.md](../templates/tasks.md) and WRITE the list in its format.
 
