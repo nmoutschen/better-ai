@@ -259,3 +259,68 @@ def test_labels_without_a_run_are_listed() -> None:
     lines = report.unmatched_labels([judged(True)], labels)
     assert len(lines) == 2 and "a-skil" in lines[1] and "epoch 2" in lines[1] and "a-skill" not in lines[1]
     assert report.unmatched_labels([judged(True)], labels[:1]) == []
+
+
+def grouped(skill: str, model: str, passed: float, started: str = "") -> report.SampleResult:
+    """One scored skill-condition run of case a for a (skill, agent model) group."""
+    return report.SampleResult(
+        f"a-skill-{model}", "a", "skill", "1.1", passed, skill=skill, agent_model=model, started=started
+    )
+
+
+def test_latest_keeps_runs_of_different_agent_models_apart() -> None:
+    """A newer log of one agent model does not replace the runs of another agent model."""
+    opus = grouped("code-better", "opus", 1, "2026-01-01")
+    sonnet = grouped("code-better", "sonnet", 0, "2026-01-02")
+    assert report.latest([opus, sonnet]) == [opus, sonnet]
+
+
+def test_read_results_reads_the_run_description_from_the_log(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skill, agent model, judge model, Claude Code version and skill commit come from the eval metadata."""
+    metadata = {
+        "skill": "code-better",
+        "agent_model": "opus",
+        "judge_model": "sonnet",
+        "agent_version": "2.1.0",
+        "skill_commit": "abc1234def",
+        "skill_dirty": True,
+    }
+    sample = SimpleNamespace(
+        id="x", epoch=1, error=None, scores={}, metadata={"case": "x", "condition": "skill"}
+    )
+    log = SimpleNamespace(
+        eval=SimpleNamespace(metadata=metadata), stats=SimpleNamespace(started_at="t"), samples=[sample]
+    )
+    monkeypatch.setattr(report, "read_eval_log", lambda path: log)
+    (result,) = report.read_results([Path("x.eval")])
+    assert (result.skill, result.agent_model, result.judge_model) == ("code-better", "opus", "sonnet")
+    assert (result.agent_version, result.skill_commit, result.skill_dirty) == ("2.1.0", "abc1234def", True)
+
+
+def test_group_header_names_skill_models_version_and_commit_with_dirty_flag() -> None:
+    """The header names what the section ran on; a dirty skill folder is flagged."""
+    result = grouped("code-better", "opus", 1)
+    result.judge_model, result.agent_version = "sonnet", "2.1.0"
+    result.skill_commit, result.skill_dirty = "abc1234def", True
+    header = "\n".join(report.group_header([result]))
+    assert "code-better" in header and "agent model opus" in header and "judge model sonnet" in header
+    assert "Claude Code 2.1.0" in header and "abc1234 (dirty)" in header
+    result.skill_dirty = False
+    assert "dirty" not in "\n".join(report.group_header([result]))
+
+
+def test_two_groups_print_two_sections_without_mixing_pass_rates(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """One section per (skill, agent model), each with its own header and pass rate."""
+    monkeypatch.setattr(
+        report,
+        "read_results",
+        lambda paths: [grouped("code-better", "opus", 1), grouped("code-better", "sonnet", 0)],
+    )
+    assert report.main(["x.eval"]) == 0
+    out = capsys.readouterr().out
+    first, second = out.split("# Skill code-better, agent model sonnet")[0], out.split("agent model sonnet")[1]
+    assert out.count("# Skill code-better, agent model") == 2
+    assert "agent model opus" in first and "100%" in first and "0%" not in first.replace("100%", "")
+    assert "0/1" in second and "100%" not in second
