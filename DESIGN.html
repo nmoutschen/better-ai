@@ -23,8 +23,18 @@
   --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
   /* Type sizes of the boards. Slides and drawings, such as the research map, keep their own. */
   --text-label:11px; --text-small:12px; --text-message:14px; --text-body:15px; --text-heading:17px; --text-title:20px;
+  /* Type styles: weight, size, line height and typeface together. Write font:var(--font-message), and override only
+     the line height when a box needs it, such as a pin's number. */
+  --font-label:700 var(--text-label)/1.3 var(--sans); --font-small:400 var(--text-small)/1.4 var(--sans);
+  --font-small-strong:700 var(--text-small)/1.3 var(--sans); --font-message:400 var(--text-message)/1.45 var(--sans);
+  --font-message-strong:700 var(--text-message)/1.4 var(--sans); --font-body:400 var(--text-body)/1.55 var(--sans);
+  --font-body-strong:700 var(--text-body)/1.3 var(--sans); --font-subtitle:400 var(--text-body)/1.4 var(--serif);
+  --font-heading:700 var(--text-heading)/1.3 var(--serif); --font-title:700 var(--text-title)/1.2 var(--serif);
+  --font-figure:700 var(--text-title)/1.1 var(--sans); --font-code:400 .9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
   /* Type sizes of an article page (the website, a document a skill writes), as n14n.dev. */
   --text-site:1.5rem; --text-article-title:2.75rem; --text-lead:1.25rem; --text-prose:17px;
+  --font-site:700 var(--text-site)/1.2 var(--sans); --font-article-title:700 var(--text-article-title)/1.15 var(--serif);
+  --font-lead:400 var(--text-lead)/1.55 var(--serif); --font-prose:400 var(--text-prose)/1.75 var(--serif);
   /* Spacing, named by role. Only these; 1px is a hairline, not a space. */
   --space-tight:4px; --space-control:8px; --space-item:12px; --space-section:16px; --space-edge:20px; --space-group:24px;
   --space-wide:40px;
@@ -37,7 +47,7 @@
 /* ---------- Layout: one window, no page scroll; each version scrolls inside its own frame ---------- */
 html { height:100%; }
 body { margin:0; height:100%; display:flex; flex-direction:column; overflow:hidden; background:var(--cream); color:var(--ink);
-  font:400 var(--text-body)/1.55 var(--sans); -webkit-font-smoothing:antialiased; }
+  font:var(--font-body); -webkit-font-smoothing:antialiased; }
 .band { height:6px; background:var(--umber) var(--saya); background-size:13px 7.5px; }
 .work { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(20rem, 24rem); }
 @media (max-width:900px) {
@@ -50,7 +60,7 @@ body { margin:0; height:100%; display:flex; flex-direction:column; overflow:hidd
 /* ---------- Top bar: the n14n umber block, with the question and the controls ---------- */
 header { flex:none; display:flex; flex-wrap:wrap; gap:var(--space-item) var(--space-wide); align-items:center; justify-content:space-between;
   padding:var(--space-item) var(--space-edge); background:var(--umber); color:var(--cream); }
-h1 { font:700 var(--text-title)/1.2 var(--serif); color:var(--cream); margin:0; }
+h1 { font:var(--font-title); color:var(--cream); margin:0; }
 
 /* The stats header: the page's title on the left, its figures on the right. It never wraps; the title cuts off. */
 header.bar--stats { flex-wrap:nowrap; align-items:flex-end; }
@@ -58,7 +68,7 @@ header.bar--stats > div { min-width:0; }
 header.bar--stats h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .stats { flex:none; display:flex; gap:var(--space-group); align-items:flex-end; margin:0; font-size:var(--text-small); }
 .stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
-.stat b { font:700 var(--text-title)/1.1 var(--sans); }
+.stat b { font:var(--font-figure); }
 .stat .of { font-size:var(--text-message); opacity:.8; }
 /* A figure that takes the user somewhere is a button, underlined like a link; a plain figure is not. */
 button.stat { border:0; background:none; padding:0; color:inherit; font:inherit; cursor:pointer; }
@@ -69,7 +79,7 @@ button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px
 .meter i { display:block; height:100%; background:var(--cream); }
 
 /* A section label: small uppercase sans, as "Agents" and "Conversation". */
-.section-h, .notes h2 { margin:0; font:700 var(--text-small) var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+.section-h, .notes h2 { margin:0; font:var(--font-small-strong); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
 
 /* A legend: one mark and a plain word per state. */
 ul.legend { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-section); font-size:var(--text-small); color:var(--ink); }
@@ -78,7 +88,7 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 /* The question header: the title with the question under it, and the page's controls on the right. A two-option
    setting is one button that shows the current option: both options share one cell, so it keeps the longer one's width;
    the first option shows cream and the second umber, so the colour also tells which is on. */
-.question { font:400 var(--text-body)/1.4 var(--serif); margin:var(--space-tight) 0 0; max-width:65ch; }
+.question { font:var(--font-subtitle); margin:var(--space-tight) 0 0; max-width:65ch; }
 .controls { display:flex; flex-wrap:wrap; gap:var(--space-control) var(--space-item); align-items:center; color:var(--cream); }
 .controls > .seg.cycle { display:inline-grid; }
 .controls > .seg.cycle button { grid-area:1 / 1; justify-content:center; border:0; }
@@ -90,7 +100,7 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .seg { display:inline-flex; border:1px solid var(--cream); }
 .seg[hidden] { display:none; }
 .seg button { border:0; background:transparent; color:var(--cream); padding:var(--space-control) var(--space-section); cursor:pointer;
-  font:700 var(--text-small) var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+  font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; }
 .seg button + button { border-left:1px solid var(--cream); }
 .seg button[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
 
@@ -103,11 +113,11 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 /* Tabs: a tablist of buttons, with optional count or check badges. */
 .tabs { position:sticky; top:0; z-index:2; display:flex; gap:0; background:var(--cream); border-bottom:2px solid var(--ink);
   margin:0 0 var(--space-group); padding-top:var(--space-section); }
-.tabs button[role="tab"] { font:600 var(--text-message) var(--sans); color:var(--ink); background:none; border:0; border-bottom:3px solid transparent;
+.tabs button[role="tab"] { font:var(--font-message-strong); color:var(--ink); background:none; border:0; border-bottom:3px solid transparent;
   padding:var(--space-control) var(--space-section); margin-bottom:calc(-1 * var(--space-tight)); cursor:pointer; display:flex; align-items:center; gap:var(--space-control); }
 .tabs button[aria-selected="true"] { border-bottom-color:var(--terracotta); color:var(--heading); }
 .tabs .count { flex:none; white-space:nowrap;
-  font:700 var(--text-label) var(--sans); font-variant-numeric:tabular-nums; background:var(--umber); color:var(--cream); padding:1px var(--space-control); }
+  font:var(--font-label); font-variant-numeric:tabular-nums; background:var(--umber); color:var(--cream); padding:1px var(--space-control); }
 .tabs .count.ok { background:var(--moss-dark); }
 
 .scroll-setting { display:grid; gap:var(--space-tight); }
@@ -146,7 +156,7 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .body.md .md-h { margin-top:var(--space-item); color:var(--heading); }
 .body.md .md-h:first-child { margin-top:0; }
 .body.md blockquote { padding-left:var(--space-item); border-left:2px solid var(--sand); color:var(--muted); }
-.body.md code { font:400 .9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--linen); padding:1px var(--space-tight); }
+.body.md code { font:var(--font-code); background:var(--linen); padding:1px var(--space-tight); }
 .body.md pre { overflow-x:auto; padding:var(--space-control) var(--space-item); background:var(--linen); border:1px solid var(--line); white-space:pre; overflow-wrap:normal; }
 .body.md pre code { padding:0; background:none !important; }
 .body.md table { display:block; overflow-x:auto; border-collapse:collapse; font-size:var(--text-message); overflow-wrap:normal; }
@@ -158,7 +168,7 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .msg.agent .body.md :is(code, pre, th), .thread .reply:not(.mine) .body.md :is(code, pre, th) { background:var(--cream); }
 .msg .link { margin-left:auto; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
 .msg .head .link + .link { margin-left:var(--space-control); }
-.msg .answered { font:700 var(--text-label) var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
+.msg .answered { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
 /* The item's left edge carries its state, so it reads at a glance in a long thread. */
 .thread > li.msg[data-state] { border-left-width:4px; }
 .thread > li.msg[data-state="seen"], .thread > li.msg[data-state="replied"], .thread > li.msg[data-state="followup"] { border-left-color:var(--sand); }
@@ -168,13 +178,13 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .thread > li.msg[data-state="reopened"] { border-left-color:var(--error); }
 /* Where a comment points: a small quote above the user's words, so every message reads alike. */
 .crumb { display:block; }
-.crumb .path { display:block; font:400 var(--text-small)/1.4 var(--sans); color:var(--muted); }
+.crumb .path { display:block; font:var(--font-small); color:var(--muted); }
 /* One typeface for the whole label: the path muted, then what the element is, muted, and what it says. */
-.crumb .el { display:block; font:400 var(--text-body)/1.4 var(--sans); color:var(--heading); margin-top:var(--space-tight); }
+.crumb .el { display:block; font:var(--font-body); color:var(--heading); margin-top:var(--space-tight); }
 .crumb .role { color:var(--muted); }
 .thread .crumb { margin:var(--space-tight) 0 0; padding-left:var(--space-control); border-left:2px solid var(--line); }
 .thread .crumb .path { font-size:var(--text-label); }
-.thread .crumb .el { font:400 var(--text-message)/1.4 var(--sans); color:var(--muted); margin-top:0; }
+.thread .crumb .el { font:var(--font-message); color:var(--muted); margin-top:0; }
 
 /* Replies sit under the item, edge to edge. The item's own left edge already marks it, so a reply shows by its
    background and label, not a second bar. */
@@ -194,10 +204,10 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .thread .foot .answer + .answer { margin-left:0; }
 .thread .foot .mini:first-of-type { margin-left:auto; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer;
-  font:700 var(--text-small)/18px var(--sans); }
+  font:var(--font-small-strong); line-height:18px; }
 .mini:hover { border-color:var(--ink); }
 /* Progress: three short bars fill as the agent sees an item, works on it and finishes it. */
-.progress { white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-control); font:700 var(--text-label) var(--sans); letter-spacing:.08em;
+.progress { white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-control); font:var(--font-label); letter-spacing:.08em;
   text-transform:uppercase; color:var(--muted); }
 .progress .bars { display:inline-flex; gap:var(--space-tight); }
 .progress .bars i { width:10px; height:4px; background:var(--line); }
@@ -224,13 +234,13 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 
 /* ---------- Buttons, fields, the comment box and the toast ---------- */
 .btn { border:1px solid var(--umber); background:var(--umber); color:var(--cream); padding:var(--space-control) var(--space-section); cursor:pointer;
-  font:700 var(--text-small) var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+  font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; }
 .btn--quiet { background:transparent; color:var(--ink); border:1px solid var(--ink); }
 .btn--sm { padding:var(--space-tight) var(--space-item); font-size:var(--text-label); }
-.notes textarea { width:100%; min-height:4.5em; font:400 var(--text-body)/1.5 var(--sans); color:var(--ink); background:var(--white);
+.notes textarea { width:100%; min-height:4.5em; font:var(--font-body); color:var(--ink); background:var(--white);
   border:1px solid var(--muted); padding:var(--space-control) var(--space-item); resize:vertical; }
 .composer textarea { min-height:3.2em; }
-.why textarea { min-height:3em; font:400 var(--text-message)/1.45 var(--sans); padding:var(--space-control) var(--space-control); }
+.why textarea { min-height:3em; font:var(--font-message); padding:var(--space-control) var(--space-control); }
 /* Pop-ups: a question, an agent or a comment box, over the page. Each page sets the width. */
 .qpop, .pop { position:fixed; z-index:5; width:min(34rem, calc(100vw - 24px)); max-height:calc(100vh - 20px); overflow:auto;
   background:var(--cream); color:var(--ink); border:2px solid var(--ink); box-shadow:var(--shadow); padding:var(--space-item); font-size:var(--text-message); }
@@ -238,33 +248,33 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 /* The comment box: where the comment points, the words, then Send, Cancel and Delete. */
 .pop { width:min(22rem, calc(100vw - 24px)); font-size:var(--text-body); }
 .pop .target { margin:0 0 var(--space-control); font-size:var(--text-message); color:var(--muted); overflow-wrap:anywhere; }
-.pop textarea { width:100%; min-height:4.5em; font:400 var(--text-body)/1.5 var(--sans); color:var(--ink); background:var(--white);
+.pop textarea { width:100%; min-height:4.5em; font:var(--font-body); color:var(--ink); background:var(--white);
   border:1px solid var(--muted); padding:var(--space-control) var(--space-item); resize:vertical; }
 .pop .row2 { display:flex; gap:var(--space-control); align-items:center; margin-top:var(--space-control); }
 .pop .remove { margin-left:auto; }
 .pop .remove[hidden] { display:none; }
-.qpop h3 { font:700 var(--text-heading)/1.3 var(--serif); color:var(--heading); margin:var(--space-control) 0 var(--space-control); }
-.qpop p, .qpop li, .qpop textarea, .qpop .thread .body { font:400 var(--text-message)/1.45 var(--sans); }
-.qpop .x { position:absolute; top:8px; right:8px; border:0; background:none; font:700 var(--text-heading) var(--sans); color:var(--muted); cursor:pointer; }
+.qpop h3 { font:var(--font-heading); color:var(--heading); margin:var(--space-control) 0 var(--space-control); }
+.qpop p, .qpop li, .qpop textarea, .qpop .thread .body { font:var(--font-message); }
+.qpop .x { position:absolute; top:8px; right:8px; border:0; background:none; font:var(--font-body-strong); font-size:var(--text-heading); color:var(--muted); cursor:pointer; }
 .qpop .crumb { display:none; }
 .qpop .thread { flex:none; overflow:visible; padding:0; margin:var(--space-item) 0 0; }
 /* A question box with its button beside it. */
 .ask { display:flex; gap:var(--space-control); align-items:stretch; margin-top:var(--space-item); }
-.ask textarea { flex:1; min-height:3em; font:400 var(--text-message)/1.45 var(--sans); color:var(--ink); background:var(--white); border:1px solid var(--muted); padding:var(--space-control) var(--space-control); resize:vertical; }
+.ask textarea { flex:1; min-height:3em; font:var(--font-message); color:var(--ink); background:var(--white); border:1px solid var(--muted); padding:var(--space-control) var(--space-control); resize:vertical; }
 
 /* An agent's decision in the conversation, and the line that says what it is about. */
 .thread .crumb button { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; }
 .thread > li.msg.decision { border-left:4px solid var(--umber); }
 .thread > li.msg.decision > .head .who { color:var(--umber); }
 .thread > li.msg.decision > .head .when { color:var(--umber); font-weight:700; }
-.msg .what { margin:var(--space-tight) 0 0; font:700 var(--text-small)/1.4 var(--sans); color:var(--ink); }
+.msg .what { margin:var(--space-tight) 0 0; font:var(--font-small-strong); color:var(--ink); }
 
 /* Above the message box when no agent is watching, so a note sent then is not lost in silence. */
-.unwatched { margin:0 0 var(--space-item); padding:var(--space-control) var(--space-item); background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:500 var(--text-message)/1.45 var(--sans); }
+.unwatched { margin:0 0 var(--space-item); padding:var(--space-control) var(--space-item); background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:var(--font-message); }
 .unwatched[hidden] { display:none; }
 
 .toast { position:fixed; z-index:6; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(36rem, calc(100vw - 32px));
-  background:var(--umber); color:var(--cream); padding:var(--space-item) var(--space-edge); font:700 var(--text-body)/1.4 var(--sans);
+  background:var(--umber); color:var(--cream); padding:var(--space-item) var(--space-edge); font:var(--font-body-strong);
   box-shadow:var(--shadow); }
 .toast.ok { background:var(--moss-dark); }
 .toast.error { background:var(--error); }
@@ -275,27 +285,27 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .notes .send { display:flex; flex-wrap:wrap; gap:var(--space-item) var(--space-edge); align-items:center; margin-top:var(--space-item); }
 .sys { padding:var(--space-item) 0; border-top:1px solid var(--line); font-size:var(--text-small); color:var(--muted); text-align:center; }
 /* Under the bar when the agent's server stops answering, so a quiet page is not mistaken for a quiet agent. */
-.offline { flex:none; margin:0; padding:var(--space-control) var(--space-edge); background:var(--error); color:var(--cream); font:700 var(--text-message)/1.4 var(--sans); }
+.offline { flex:none; margin:0; padding:var(--space-control) var(--space-edge); background:var(--error); color:var(--cream); font:var(--font-message-strong); }
 .offline[hidden] { display:none; }
 </style>
 <style>
 /* Only the layout of this reference page; every colour, type size and component comes from page.css. */
 main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 .ref section { max-width:64rem; padding-top:24px; }
-.ref h2.big { font:700 22px/1.3 var(--serif); color:var(--heading); margin:0 0 4px; }
-.ref section > h3 { font:700 15px var(--sans); color:var(--heading); margin:24px 0 8px; }
+.ref h2.big { font:var(--font-title); color:var(--heading); margin:0 0 var(--space-tight); }
+.ref section > h3 { font:var(--font-body-strong); color:var(--heading); margin:var(--space-group) 0 var(--space-control); }
 .ref p.lead { color:var(--muted); margin:0 0 16px; max-width:65ch; }
 .ref .row { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; margin:0 0 8px; }
 .swatches { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(15rem, 1fr)); gap:12px; }
 .swatches li { border:1px solid var(--line); background:var(--cream); }
-.swatches .chip { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; padding:0 12px; font:700 15px var(--sans); }
+.swatches .chip { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:var(--space-control); padding:0 var(--space-item); font:var(--font-body-strong); }
 .swatches .info { padding:8px 12px 10px; font-size:13px; line-height:1.4; }
-.swatches code { font:400 12px ui-monospace, Menlo, monospace; }
+.swatches code { font:var(--font-code); }
 .swatches b { color:var(--heading); }
 .swatches .role { color:var(--ink); margin-top:2px; }
 .type { width:100%; border-collapse:collapse; }
 .type td, .type th { text-align:left; vertical-align:baseline; padding:10px 12px 10px 0; border-bottom:1px solid var(--line); }
-.type th { font:700 11px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.type th { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
 .type td:first-child { width:9rem; font-size:12px; color:var(--muted); }
 .specimen { border:1px solid var(--line); background:var(--cream); padding:16px; }
 .ref .qpop.demo { position:relative; max-width:34rem; }
@@ -308,16 +318,16 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 .ref .on-umber { background:var(--umber); padding:12px; }
 .ref svg.fig { max-width:100%; height:auto; }
 .ref td.stat { display:table-cell; }
-.t-title { font:700 var(--text-title)/1.2 var(--serif); color:var(--heading); }
-.t-card { font:700 var(--text-heading)/1.3 var(--serif); color:var(--heading); }
-.t-body { font:400 var(--text-body)/1.55 var(--sans); }
-.t-message { font:400 var(--text-message)/1.45 var(--sans); }
-.t-small { font:400 var(--text-small)/1.4 var(--sans); color:var(--muted); }
-.t-label { font:700 var(--text-label)/1.2 var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.t-title { font:var(--font-title); color:var(--heading); }
+.t-card { font:var(--font-heading); color:var(--heading); }
+.t-body { font:var(--font-body); }
+.t-message { font:var(--font-message); }
+.t-small { font:var(--font-small); color:var(--muted); }
+.t-label { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
 .spaces { list-style:none; margin:0; padding:0; display:grid; gap:var(--space-tight); }
 .spaces li { display:grid; grid-template-columns:8rem 3rem 1fr; align-items:center; gap:var(--space-control); font-size:var(--text-message); }
 .spaces i { display:block; height:var(--space-control); background:var(--sand); }
-.t-prose { font:400 var(--text-prose)/1.75 var(--serif); max-width:42rem; }
+.t-prose { font:var(--font-prose); max-width:42rem; }
 .ref .offline.demo { max-width:34rem; }
 /* Wireframes of the board layouts: square cream boxes with thin sand borders, the header in umber. */
 .wires { display:grid; grid-template-columns:repeat(auto-fill, minmax(26rem, 1fr)); gap:24px; margin:0; }
@@ -358,12 +368,12 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 .wire .tabsw { display:flex; gap:10px; border-bottom:2px solid var(--ink); padding:2px 0 3px; font-weight:700; }
 .wire .tabsw span:first-child { border-bottom:2px solid var(--terracotta); margin-bottom:-5px; }
 .article { border:1px solid var(--line); background:var(--cream); padding:var(--space-group); }
-.article .site { font:700 var(--text-site) var(--sans); color:var(--heading); margin:0 0 var(--space-section); }
+.article .site { font:var(--font-site); color:var(--heading); margin:0 0 var(--space-section); }
 .article .site span { color:var(--muted); font-weight:400; }
-.article .atitle { font:700 var(--text-article-title)/1.15 var(--serif); color:var(--heading); margin:var(--space-section) 0 0; }
+.article .atitle { font:var(--font-article-title); color:var(--heading); margin:var(--space-section) 0 0; }
 .article .terra { height:10px; margin:var(--space-group) 0; background:var(--terracotta) var(--saya); background-size:13px 7.5px; max-width:42rem; }
-.article .alead { font:400 var(--text-lead)/1.55 var(--serif); color:var(--ink); margin:0 0 var(--space-section); max-width:42rem; }
-.article .prose { font:400 var(--text-prose)/1.75 var(--serif); color:var(--ink); margin:0; max-width:42rem; }
+.article .alead { font:var(--font-lead); color:var(--ink); margin:0 0 var(--space-section); max-width:42rem; }
+.article .prose { font:var(--font-prose); color:var(--ink); margin:0; max-width:42rem; }
 .article .band { height:10px; }
 </style></head>
 <body>
@@ -389,15 +399,15 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
     <h2 class="big" id="h-type">Type</h2>
     <p class="lead">Libre Baskerville for titles and prose to read; Space Grotesk for the interface.</p>
     <table class="type">
-      <thead><tr><th scope="col">Token</th><th scope="col">Sample</th></tr></thead>
+      <thead><tr><th scope="col">Style</th><th scope="col">Sample</th></tr></thead>
       <tbody>
-        <tr><td><code>--text-title</code>, serif 700</td><td class="t-title">Export invoices as CSV</td></tr>
-        <tr><td><code>--text-heading</code>, serif 700</td><td class="t-card">3: Fix rounding of VAT totals</td></tr>
-        <tr><td><code>--text-body</code>, sans 400</td><td class="t-body">Round VAT per line or on the invoice total? The ticket says both.</td></tr>
-        <tr><td><code>--text-message</code>, sans 400</td><td class="t-message">Applied the default: treating it as unsupported and recording the issue as a gap.</td></tr>
-        <tr><td><code>--text-small</code>, sans 400</td><td class="t-small">Updated just now</td></tr>
-        <tr><td><code>--text-label</code>, sans 700, uppercase</td><td class="t-label">Waiting for you</td></tr>
-        <tr><td><code>--text-prose</code>, serif 400</td><td class="t-prose">A board shows what the agent is doing and what waits for you, in one window.</td></tr>
+        <tr><td><code>--font-title</code></td><td class="t-title">Export invoices as CSV</td></tr>
+        <tr><td><code>--font-heading</code></td><td class="t-card">3: Fix rounding of VAT totals</td></tr>
+        <tr><td><code>--font-body</code></td><td class="t-body">Round VAT per line or on the invoice total? The ticket says both.</td></tr>
+        <tr><td><code>--font-message</code></td><td class="t-message">Applied the default: treating it as unsupported and recording the issue as a gap.</td></tr>
+        <tr><td><code>--font-small</code></td><td class="t-small">Updated just now</td></tr>
+        <tr><td><code>--font-label</code></td><td class="t-label">Waiting for you</td></tr>
+        <tr><td><code>--font-prose</code></td><td class="t-prose">A board shows what the agent is doing and what waits for you, in one window.</td></tr>
       </tbody>
     </table>
   </section>

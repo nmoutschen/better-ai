@@ -16,7 +16,7 @@ better-ai's pages share one look: the live pages the skills serve (boards) and t
 | What only one board shows | `board.html`, `dashboard.html`, `canvas.css`, `show.css`, `architect.css` | Uses only the tokens and components below. |
 | This document | `DESIGN.md`, `DESIGN.html` | The names here are the names in page.css. DESIGN.html holds copies of page.css and page.js, so it works as a single file: after changing either, paste it again into DESIGN.html (the test says which). |
 
-`tests/test_design.py` fails when a page uses a colour that is not in the colour table below, a raw px value for a space or a type size, or when this document and page.css disagree.
+`tests/test_design.py` fails when a page uses a colour that is not in the colour table below, a raw px value for a space or a type size, a `font` shorthand that is not a `--font-*` token, or when this document and page.css disagree.
 
 ## What it must express
 
@@ -57,29 +57,50 @@ Light only. Every colour a page uses is one of these. Write it as `var(--name)` 
 
 Two typefaces, loaded from Google Fonts: **Libre Baskerville** (`--serif`) for titles and prose to read, **Space Grotesk** (`--sans`) for the interface.
 
-Boards use these tokens for every type size. Write `font-size:var(--text-small)` or `font:700 var(--text-label) var(--sans)`.
+A type style is one token that sets weight, size, line height and typeface together. Write `font:var(--font-message)`. Override only what a box needs, such as `line-height:24px` to centre a pin's number. Labels add their spacing and case: `letter-spacing:.08em; text-transform:uppercase`.
 
-| Token | Size | Typeface and weight | Use |
-|---|---|---|---|
-| `--text-label` | 11px | sans 700, uppercase, .08–.1em spacing | buttons, tags, progress words, table heads. Nothing under it |
-| `--text-small` | 12px | sans 400 or 700 | times, metadata, the legend, section labels (uppercase) |
-| `--text-message` | 14px | sans 400 | the conversation, pop-ups, cards, tables, secondary lines |
-| `--text-body` | 15px | sans 400 | the board's body text and fields |
-| `--text-heading` | 17px | serif 700 | a card, pop-up or section heading |
-| `--text-title` | 20px | serif 700, or sans 700 for a header figure | the board's title; a figure in the stats header, its "/ total" in `--text-message` |
+| Token | Value | Use |
+|---|---|---|
+| `--font-label` | `700 var(--text-label)/1.3 var(--sans)` | buttons, tags, progress words, table heads, in uppercase |
+| `--font-small` | `400 var(--text-small)/1.4 var(--sans)` | times, metadata, the legend |
+| `--font-small-strong` | `700 var(--text-small)/1.3 var(--sans)` | section labels (uppercase), names in the conversation |
+| `--font-message` | `400 var(--text-message)/1.45 var(--sans)` | the conversation, pop-ups, cards, tables |
+| `--font-message-strong` | `700 var(--text-message)/1.4 var(--sans)` | tabs, a name or number that leads a row |
+| `--font-body` | `400 var(--text-body)/1.55 var(--sans)` | the board's body text and fields |
+| `--font-body-strong` | `700 var(--text-body)/1.3 var(--sans)` | a version's label, a strong line in a pop-up |
+| `--font-subtitle` | `400 var(--text-body)/1.4 var(--serif)` | the goal or question under the board's title |
+| `--font-heading` | `700 var(--text-heading)/1.3 var(--serif)` | a card, pop-up or section heading |
+| `--font-title` | `700 var(--text-title)/1.2 var(--serif)` | the board's title |
+| `--font-figure` | `700 var(--text-title)/1.1 var(--sans)` | a figure in the stats header; its "/ total" in `--text-message` |
+| `--font-code` | `400 .9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace` | code in messages |
 
-Code in messages is `ui-monospace` at .9em. Slides and drawings, such as the research map and architect-better's diagrams, keep their own sizes: they are documents and pictures that scale with their frame.
+The styles are built from these sizes:
 
-An article page, such as the website or a document a skill writes, uses these tokens, as n14n.dev:
+| Token | Size |
+|---|---|
+| `--text-label` | 11px |
+| `--text-small` | 12px |
+| `--text-message` | 14px |
+| `--text-body` | 15px |
+| `--text-heading` | 17px |
+| `--text-title` | 20px |
 
-| Token | Size | Typeface and weight | Use |
-|---|---|---|---|
-| `--text-site` | 1.5rem | sans 700 | the site's name in the site header |
-| `--text-article-title` | 2.75rem | serif 700, line height 1.15 | the title of an article page; 2rem under 700px, set in page.css |
-| `--text-lead` | 1.25rem | serif 400, line height 1.55 | the paragraph under an article title |
-| `--text-prose` | 17px | serif 400, line height 1.75 | article text, at most 42rem wide (about 70 characters) |
+Slides and drawings, such as the research map and architect-better's diagrams, keep their own type: they are documents and pictures that scale with their frame.
 
-- Use a token from this table. A new size is a change to this document.
+An article page, such as the website or a document a skill writes, uses these, as n14n.dev:
+
+| Token | Value | Use |
+|---|---|---|
+| `--font-site` | `700 var(--text-site)/1.2 var(--sans)` | the site's name in the site header |
+| `--font-article-title` | `700 var(--text-article-title)/1.15 var(--serif)` | the title of an article page |
+| `--font-lead` | `400 var(--text-lead)/1.55 var(--serif)` | the paragraph under an article title |
+| `--font-prose` | `400 var(--text-prose)/1.75 var(--serif)` | article text, at most 42rem wide (about 70 characters) |
+| `--text-site` | 1.5rem | |
+| `--text-article-title` | 2.75rem | 2rem under 700px, set in page.css |
+| `--text-lead` | 1.25rem | |
+| `--text-prose` | 17px | |
+
+- Use a style from these tables. A new style or size is a change to this document.
 - Uppercase only for labels of two or three words. Never for sentences.
 
 ## Spacing and layout
@@ -212,7 +233,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 | `.btn--sm` | an action inside a conversation item |
 | `.mini` | a small square action, such as a thumbs up |
 
-- Labels are uppercase sans, `--text-small` (`--text-label` on a small button). Square corners. A button names its action.
+- Labels are uppercase `--font-small-strong` (`--font-label` on a small button). Square corners. A button names its action.
 
 ### Conversation
 
@@ -244,13 +265,13 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ### Article page parts
 
-- Site header: the site's name in sans 700 at `--text-site`, with what the page is in muted. It does not have to be n14n.dev's header.
+- Site header: the site's name in `--font-site`, with what the page is in muted. It does not have to be n14n.dev's header.
 - Title: serif, with the terracotta band under it; a lead paragraph under the band.
 - Figure: a sand-bordered box, its caption under a rule.
 
 ## Rules
 
-- Use only the colours, type sizes, spaces and components in this document, by their token, because one board that drifts makes the others look inconsistent. Correct: `color:var(--muted); padding:var(--space-control)`. Wrong: `color:#777; padding:9px`.
+- Use only the colours, type sizes, spaces and components in this document, by their token, because one board that drifts makes the others look inconsistent. Correct: `color:var(--muted); padding:var(--space-control); font:var(--font-message)`. Wrong: `color:#777; padding:9px; font:400 14px/1.4 var(--sans)`.
 - Make a shared part shared: if two boards need the same rule, it goes in page.css, because copies drift. Correct: `.legend` in page.css. Wrong: the same `.key` rules in two boards.
 - Square corners everywhere, except the round comment pins and numbered markers, because n14n never rounds boxes.
 - One shadow (`--shadow`), on things that float over the page only.
@@ -269,3 +290,4 @@ None. A conflict between a rule above and a page is listed here until the user d
 - 2026-11-20: the agents at work moved from the side column to the top of the view on research-better's board, as on code-better's dashboard; the side column holds the conversation only. architect-better's view has 20px at the sides, as the other boards; the `--pad` token is gone.
 - 2026-11-20: spacing and type sizes became tokens (`--space-*`, `--text-*`) in every board. Off-scale values moved to the nearest step: 3px to 4, 5 to 6, 7 to 8, 14 to 16, 18 to 20, 28 to 24, 48 to 40. Type sizes merged: 13px into 14 (`--text-message`), 16 and 18 into 17 (`--text-heading`), 22 into 20 (`--text-title`). On linen, muted text and the progress words use ink, and research-better's "contested" uses `--terracotta-dark`.
 - 2026-11-20: spacing tokens named by role, in seven steps instead of eleven (the user's choice): 2px became 4, 6 became 8, 10 became 12, and 32 became 40.
+- 2026-11-20: type styles became tokens (`--font-*`): each sets weight, size, line height and typeface, and replaces the full shorthand written in each rule. Line heights of the same style were made equal (1.4, 1.45 and 1.5 became the style's one value), and weight 600, which the page never loaded, became 700.

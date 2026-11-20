@@ -1,7 +1,7 @@
 /* What only show-better's page shows: the strip, the slides, the comment box and the exported presentation. The
    shared look of the bar, the conversation, the buttons and the toast is in page.css, loaded first. */
 .seg button.ico, .tool { display:inline-flex; align-items:center; gap:var(--space-control); padding:var(--space-control) var(--space-item);
-  font:700 var(--text-label) var(--sans); letter-spacing:.06em; text-transform:uppercase; }
+  font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; }
 .seg button.ico svg, .tool svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
 .tool { border:1px solid var(--cream); background:transparent; color:var(--cream); cursor:pointer; }
 .tool:hover { background:var(--cream); color:var(--umber); }
@@ -19,15 +19,15 @@ main { min-height:0; overflow:hidden; display:flex; flex-direction:column; backg
 /* Part names cut and segments shrink before the strip scrolls; it never shows a scrollbar over the numbers. */
 .strip { flex:1; display:flex; gap:var(--space-control); min-width:0; margin:0; padding:0; list-style:none; overflow-x:auto; scrollbar-width:none; }
 .grp { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--space-control); }
-.grp .pname { font:700 var(--text-label)/1.2 var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+.grp .pname { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:12px; }
 .grp.on .pname { color:var(--heading); }
 .segs { display:flex; gap:var(--space-tight); }
 .segs button { flex:1 1 0; min-width:14px; height:24px; border:0; padding:0 var(--space-tight); cursor:pointer; background:var(--line);
-  font:700 var(--text-label) var(--sans); color:var(--ink); }
+  font:var(--font-label); color:var(--ink); }
 .segs button[aria-current="step"] { background:var(--umber); color:var(--cream); }
 .segs button:hover { outline:1px solid var(--umber); }
-.count { flex:none; font:400 var(--text-message) var(--sans); color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.count { flex:none; font:var(--font-message); color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
 
 /* ---------- The stage: one 16:9 slide, centred, scrolling inside when taller ---------- */
 .stage { flex:1; min-height:0; overflow:auto; padding:var(--space-group); display:flex; }
@@ -99,7 +99,7 @@ text.has-detail:hover, text.has-detail.sel, .has-detail:hover > text { text-deco
 
 /* Comment pins: numbered, placed where the user clicked, coloured by the item's state as in the conversation. */
 .pin { position:absolute; z-index:3; width:24px; height:24px; margin:calc(-1 * var(--space-item)) 0 0 calc(-1 * var(--space-item)); border-radius:50%; background:var(--terracotta);
-  color:var(--heading); font:700 var(--text-small)/24px var(--sans); text-align:center; box-shadow:0 0 0 2px var(--cream); cursor:pointer; }
+  color:var(--heading); font:var(--font-small-strong); line-height:24px; text-align:center; box-shadow:0 0 0 2px var(--cream); cursor:pointer; }
 .pin[data-state="seen"], .pin[data-state="replied"], .pin[data-state="followup"] { background:var(--sand); }
 .pin[data-state="asked"] { background:var(--cream); color:var(--umber); box-shadow:0 0 0 2px var(--umber); }
 .pin[data-state="done"] { background:var(--moss-dark); color:var(--cream); }
@@ -108,7 +108,7 @@ text.has-detail:hover, text.has-detail.sel, .has-detail:hover > text { text-deco
 @keyframes pin-pulse { 0% { box-shadow:0 0 0 2px var(--cream), 0 0 0 0 rgba(232,114,92,.9); } 100% { box-shadow:0 0 0 2px var(--cream), 0 0 0 18px rgba(232,114,92,0); } }
 @media (prefers-reduced-motion: reduce) { .pin { animation:none !important; } }
 .msg .n { display:inline-flex; width:24px; height:24px; border-radius:50%; background:var(--terracotta); color:var(--heading);
-  font:700 var(--text-small) var(--sans); align-items:center; justify-content:center; }
+  font:var(--font-small-strong); align-items:center; justify-content:center; }
 .msg.deleted { opacity:.55; }
 
 
@@ -183,7 +183,7 @@ text.has-detail:hover, text.has-detail.sel, .has-detail:hover > text { text-deco
 body.present { background:var(--surround); }
 .present .deck { position:fixed; inset:0; }
 .present .slide { position:absolute; left:50%; top:50%; width:1000px; margin:0; transform-origin:center; }
-.pcount { position:fixed; right:18px; bottom:12px; margin:0; font:400 13px var(--sans); color:var(--muted); font-variant-numeric:tabular-nums; }
+.pcount { position:fixed; right:18px; bottom:12px; margin:0; font:var(--font-message); color:var(--muted); font-variant-numeric:tabular-nums; }
 
 @media print {
   body { height:auto; overflow:visible; display:block; }

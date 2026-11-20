@@ -72,6 +72,8 @@ RAW_SPACE = re.compile(
     r"(?<![\w-])(?:padding|margin|(?:row-|column-)?gap)(?:-[a-z]+)*\s*:[^;}]*?(?<![\d.])(?!1px)\d+(?:\.\d+)?px"
 )
 RAW_TEXT = re.compile(r"(?<![\w-])(?:font\s*:\s*(?:[a-z0-9]+\s+)*?|font-size\s*:\s*)\d+(?:\.\d+)?px")
+# A font shorthand must be a type style token, or inherit.
+RAW_FONT = re.compile(r"(?<![\w-])font\s*:\s*(?!var\(--font-|inherit)")
 
 
 def page_css_tokens() -> dict:
@@ -99,8 +101,8 @@ class Design(unittest.TestCase):
 
     def test_the_type_and_spacing_tables_match_page_css(self):
         css = page_css_tokens()
-        for heading, prefix in (("Type", "--text-"), ("Spacing and layout", "--space-")):
-            table = design_tokens(heading)
+        for heading, prefix in (("Type", "--text-"), ("Type", "--font-"), ("Spacing and layout", "--space-")):
+            table = {name: value for name, value in design_tokens(heading).items() if name.startswith(prefix)}
             in_css = {name: value for name, value in css.items() if name.startswith(prefix)}
             self.assertTrue(table, f"no token table under {heading} in DESIGN.md")
             self.assertEqual(table, in_css, f"DESIGN.md's {heading} table and page.css disagree")
@@ -109,9 +111,9 @@ class Design(unittest.TestCase):
         raw = [
             f"{path.relative_to(ROOT)}:{n}: {line.strip()[:90]}"
             for path, n, line in board_css()
-            if RAW_SPACE.search(line) or RAW_TEXT.search(line)
+            if RAW_SPACE.search(line) or RAW_TEXT.search(line) or RAW_FONT.search(line)
         ]
-        self.assertEqual(raw, [], "px values where DESIGN.md asks for --space-* or --text-* tokens")
+        self.assertEqual(raw, [], "values where DESIGN.md asks for --space-*, --text-* or --font-* tokens")
 
     def test_pages_use_only_named_colours(self):
         allowed = {hex6(c) for v in design_table().values() for c in COLOUR.findall(v)}
