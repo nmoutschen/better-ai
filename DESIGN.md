@@ -161,8 +161,8 @@ Padding is `--space-edge` at the sides of the header, the view and the side colu
 
 | Pattern | Layout of the view | Board |
 |---|---|---|
-| Tool row and canvas | the agents at work in one row; `.tools`: the legend on the left, the view's buttons on the right; then one drawing that takes the rest of the height and pans and zooms inside its frame | research |
-| Cards and fixed list | the agents at work: a section label and legend, then cards in a grid that scroll; under them a list fixed at the bottom of the view, five rows high, scrolling on its own | code |
+| Tool row and canvas | `.tools`: the legend on the left, the view's buttons on the right; then one drawing that takes the rest of the height and pans and zooms inside its frame | research |
+| Cards and fixed list | the agents at work as cards: a section label and legend, then cards in a grid that scroll; under them a list fixed at the bottom of the view, five rows high, scrolling on its own | code |
 | Tabs and sections | `.tabs` fixed at the top of the view, then one section at a time; the view scrolls under the tabs | architect |
 | Versions side by side | a label row per version (its name, Full size, and thumbs up and down from three versions), then the versions in equal columns on the neutral surround, each scrolling inside its frame | canvas |
 | Strip and stage | `nav.route`: Previous, the strip of slides, the count, Next; then one slide centred on the surround | show |
@@ -175,12 +175,13 @@ Padding is `--space-edge` at the sides of the header, the view and the side colu
 
 From top to bottom:
 
-The side column holds the conversation only. The agents at work belong to the view, at its top, because they are part of what the agent is doing.
+The side column holds the conversation, and above it a list of the agents at work when they are not what the view shows.
 
-1. `.notes-top`: the label "Conversation", and the All / Open filter when the board has items the user accepts.
-2. `p.empty` until the first message; it says what the user can click to comment, and that they can write below.
-3. `ol.thread`: the items in time order. What waits for the user comes last, next to the message box.
-4. `.composer`: a panel for a decision when one is open (`.decide`), the `.unwatched` notice, the label "Message to …" naming the agent, the box, then `.send`: Send first, then the quiet buttons (Decide…, Copy all, Review again…), then the status line.
+1. Optional: the agents at work, with a section label, at most 30% of the height, scrolling on its own (research). Put them here when a run can have many agents, up to about twenty, and the view shows something else, such as the map. Put them in the view, as cards, when the agents are what the user watches (code).
+2. `.notes-top`: the label "Conversation", and the All / Open filter when the board has items the user accepts.
+3. `p.empty` until the first message; it says what the user can click to comment, and that they can write below.
+4. `ol.thread`: the items in time order. What waits for the user comes last, next to the message box.
+5. `.composer`: a panel for a decision when one is open (`.decide`), the `.unwatched` notice, the label "Message to …" naming the agent, the box, then `.send`: Send first, then the quiet buttons (Decide…, Copy all, Review again…), then the status line.
 
 - What waits for the user comes last in the thread. On a board with a stats header, a button figure there also counts it and goes to it.
 - A page opened as a file, with no agent, hides the side column and the view takes the whole width (show-better).
@@ -287,7 +288,7 @@ None. A conflict between a rule above and a page is listed here until the user d
 
 - 2026-11-20: first version, drawn from the five boards. Added the names `--moss`, `--terracotta-dark`, `--white`, `--shadow`, `--surround-dark`, `--frame` and `--frame-dark` for values the boards already used. Moved the stats header, meter, section label, legend, pop-up, question box, decision item and the "not watching" notice into page.css. The research board's waiting figure is now a button that goes to the waiting decision, as on code-better's dashboard. architect-better's comment box now has the shared pop-up border, shadow and textarea, and its "architect is away" notice the shared `.unwatched` style it lacked.
 - 2026-11-20: small buttons, tags, progress words and the canvas and slide labels went from 10px to 11px (the user's decision): text that carries meaning is never under 11px.
-- 2026-11-20: the agents at work moved from the side column to the top of the view on research-better's board, as on code-better's dashboard; the side column holds the conversation only. architect-better's view has 20px at the sides, as the other boards; the `--pad` token is gone.
+- 2026-11-20: architect-better's view has 20px at the sides, as the other boards; the `--pad` token is gone. The agents at work stay in the side column on research-better's board (a run can have twenty) and in the view on code-better's dashboard (they are the work): the side column rule says when to use which.
 - 2026-11-20: spacing and type sizes became tokens (`--space-*`, `--text-*`) in every board. Off-scale values moved to the nearest step: 3px to 4, 5 to 6, 7 to 8, 14 to 16, 18 to 20, 28 to 24, 48 to 40. Type sizes merged: 13px into 14 (`--text-message`), 16 and 18 into 17 (`--text-heading`), 22 into 20 (`--text-title`). On linen, muted text and the progress words use ink, and research-better's "contested" uses `--terracotta-dark`.
 - 2026-11-20: spacing tokens named by role, in seven steps instead of eleven (the user's choice): 2px became 4, 6 became 8, 10 became 12, and 32 became 40.
 - 2026-11-20: type styles became tokens (`--font-*`): each sets weight, size, line height and typeface, and replaces the full shorthand written in each rule. Line heights of the same style were made equal (1.4, 1.45 and 1.5 became the style's one value), and weight 600, which the page never loaded, became 700.

@@ -54,13 +54,13 @@ svg.map { display:block; width:100%; height:100%; }
 .thread > li.msg.worker { border-left:4px solid var(--sand); }
 .msg .qlink { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; text-align:left; }
 .msg .added { margin:var(--space-tight) 0 0; font-size:var(--text-small); color:var(--muted); }
-/* The agents at work, at the top of the view as on code-better's dashboard: one line each, side by side, so the map
-   keeps most of the height. Past a fifth of the window the row scrolls. */
-.agentsec { flex:none; max-height:20vh; overflow-y:auto; margin:0 0 var(--space-item); }
+/* The agents at work, at the top of the side column: a run can have twenty, and a list there scrolls on its own
+   (at most 30% of the height) without taking room from the map. */
+.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-bottom:1px solid var(--line); padding:0 var(--space-edge) var(--space-item); margin-bottom:var(--space-section); }
 .agentsec h2 { margin:0 0 var(--space-control); }
-.agents { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--space-control) var(--space-section); }
-.agents button { display:block; max-width:28rem; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
-  padding:var(--space-tight) var(--space-control); margin:0; font:var(--font-message); color:var(--ink); cursor:pointer; }
+.agents { list-style:none; margin:0; padding:0; }
+.agents button { display:block; width:100%; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
+  padding:var(--space-tight) var(--space-control); margin:0 0 var(--space-control); font:var(--font-message); color:var(--ink); cursor:pointer; }
 .agents button.verifier { border-color:var(--moss-dark); }
 .agents button:hover span { text-decoration:underline; }
 .agents .dry { display:block; font-style:normal; font-size:var(--text-small); color:var(--error); }
@@ -72,7 +72,6 @@ svg.map { display:block; width:100%; height:100%; }
 <p class="offline" id="offline" role="status" hidden>The board is closed. Ask the agent to restart it.</p>
 <div class="work">
   <main class="view">
-    <section class="agentsec" aria-labelledby="agents-h"><h2 class="section-h" id="agents-h">Agents</h2><ul class="agents" id="agents"></ul></section>
     <div class="tools">
       <ul class="legend" title="Key">
         <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="#6B7F5E" stroke="#33302B" stroke-width=".75"/></svg>answered</li>
@@ -90,6 +89,7 @@ svg.map { display:block; width:100%; height:100%; }
     <div class="zoomwrap"><svg class="map" id="map" viewBox="70 25 800 560" role="group" aria-label="Map of the research questions"><g id="content"></g></svg></div>
   </main>
   <aside class="notes" aria-labelledby="notes-h">
+    <section class="agentsec" aria-labelledby="agents-h"><h2 class="section-h" id="agents-h">Agents</h2><ul class="agents" id="agents"></ul></section>
     <div class="notes-top">
       <h2 id="notes-h">Conversation</h2>
     </div>
