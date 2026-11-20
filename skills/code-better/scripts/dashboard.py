@@ -124,7 +124,11 @@ def read_agent(logs: Path, name: str) -> dict:
     except ValueError:
         about = {}
     about = about if isinstance(about, dict) else {}
-    lines = [x.strip() for x in log.read_text(encoding="utf-8", errors="replace").splitlines() if x.strip()] if log.exists() else []
+    lines = (
+        [x.strip() for x in log.read_text(encoding="utf-8", errors="replace").splitlines() if x.strip()]
+        if log.exists()
+        else []
+    )
     state = "working"
     for line in lines:
         state = STEPS.get(line.partition(":")[0].strip().lower(), "working")
