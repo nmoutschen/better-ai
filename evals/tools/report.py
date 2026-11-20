@@ -26,7 +26,9 @@ from typing import Any
 import yaml
 from inspect_ai.log import EvalSample, read_eval_log
 
+from skill_evals.agent import AGENT_TIMEOUT_MESSAGE
 from skill_evals.cases import CONDITIONS
+from skill_evals.grading.files import GRADING_ERROR_MESSAGE
 
 EVALS = Path(__file__).resolve().parents[1]
 
@@ -59,7 +61,6 @@ class SampleResult:
     seconds: float = 0.0
     judges: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
-    grading_errors: dict[str, str] = field(default_factory=dict)
     epoch: int = 1
     skill_reads: dict[str, Any] = field(default_factory=dict)
     rule_passed: float = math.nan
@@ -77,7 +78,6 @@ def read_result(sample: EvalSample) -> SampleResult:
     values = score.value if score and isinstance(score.value, dict) else {}
     run = metadata.get("claude_code") or {}
     judges = (score.metadata or {}).get("judges", {}) if score else {}
-    grading_errors = (score.metadata or {}).get("grading_errors", {}) if score else {}
     reads = scores.get("skill_reads")
     lint = scores.get("lint_issues_added")
     loaded = scores.get("skill_loaded")
@@ -100,7 +100,6 @@ def read_result(sample: EvalSample) -> SampleResult:
         skill_reads=(reads.metadata or {}) if reads is not None else {},
         lint_issues=float(lint.value) if lint is not None and not math.isnan(float(lint.value)) else None,
         skill_loaded=float(loaded.value) if loaded is not None else None,
-        grading_errors=grading_errors,
         error=sample.error.message[:120] if sample.error else None,
         side_actions=(score.metadata or {}).get("side_actions") or {} if score else {},
     )
@@ -155,19 +154,25 @@ def pass_table(results: list[SampleResult]) -> list[str]:
     return lines
 
 
-def error_lines(results: list[SampleResult]) -> list[str]:
-    """Count, per condition, the samples, the sample errors (agent run failed or timed out) and the grading errors.
+def error_cause(message: str) -> str:
+    """Name the cause of a sample error from its message: agent timeout, grading error, or other."""
+    if AGENT_TIMEOUT_MESSAGE in message:
+        return "agent timeout"
+    return "grading error" if GRADING_ERROR_MESSAGE in message else "other"
 
-    Both kinds are left out of the pass rates and of the cost and time means; grading errors can be scored again
-    with `inspect score`, sample errors rerun with `inspect eval-retry`.
+
+def error_lines(results: list[SampleResult]) -> list[str]:
+    """Count, per condition, the samples and the sample errors by cause.
+
+    Sample errors are left out of the pass rates and of the cost and time means; `inspect eval-retry` reruns them.
     """
-    lines = [f"{'condition':18} {'samples':>8} {'sample errors':>14} {'grading errors':>15}"]
+    causes = ("agent timeout", "grading error", "other")
+    lines = [f"{'condition':18} {'samples':>8} " + " ".join(f"{cause:>14}" for cause in causes)]
     for name in CONDITIONS:
         runs = [sample for sample in results if sample.condition == name]
         if runs:
-            errors = sum(1 for sample in runs if sample.error)
-            grading = sum(1 for sample in runs if sample.grading_errors and not sample.error)
-            lines.append(f"{name:18} {len(runs):8} {errors:14} {grading:15}")
+            found = [error_cause(sample.error) for sample in runs if sample.error]
+            lines.append(f"{name:18} {len(runs):8} " + " ".join(f"{found.count(cause):14}" for cause in causes))
     return lines
 
 
@@ -256,15 +261,7 @@ def case_lines(results: list[SampleResult]) -> list[str]:
     lines = [f"{'sample':42} all  {'tokens in/out/cache-read/cache-write':36}  cost  judge   time"]
     total: dict[str, int] = defaultdict(int)
     for sample in sorted(results, key=lambda sample: (sample.case, sample.condition, sample.epoch)):
-        outcome = (
-            "ERR"
-            if sample.error
-            else "GRD"
-            if sample.grading_errors
-            else "-"
-            if math.isnan(sample.passed)
-            else str(int(sample.passed))
-        )
+        outcome = "ERR" if sample.error else "-" if math.isnan(sample.passed) else str(int(sample.passed))
         lines.append(
             f"{sample.sample_id + (f' #{sample.epoch}' if sample.epoch > 1 else ''):42} {outcome:>3}  {tokens_text(sample.tokens):36} "
             f"{sample.cost:6.3f} {sample.judge_cost:6.3f} {sample.seconds:5.0f}s"
@@ -275,22 +272,19 @@ def case_lines(results: list[SampleResult]) -> list[str]:
     judge_cost = sum(sample.judge_cost for sample in results)
     seconds = sum(sample.seconds for sample in results)
     errors = sum(1 for sample in results if sample.error)
-    grading = sum(1 for sample in results if sample.grading_errors and not sample.error)
-    label = f"total: {len(results)} samples, {errors} errors, {grading} grading errors"
+    label = f"total: {len(results)} samples, {errors} errors"
     lines.append(f"{label:46} {tokens_text(total):36} {cost:6.3f} {judge_cost:6.3f} {seconds:5.0f}s")
     return lines
 
 
 def condition_cost_lines(results: list[SampleResult]) -> list[str]:
-    """Format cost, time and tokens per condition: mean and median per run, over runs with neither a sample error nor a grading error."""
+    """Format cost, time and tokens per condition: mean and median per run, over runs without a sample error."""
     lines = [
         f"{'condition':18} {'runs':>5} {'cost mean':>10} {'median':>8} {'time mean':>10} {'median':>8} "
         f"{'out tokens':>11} {'total cost':>11}"
     ]
     for name in CONDITIONS:
-        runs = [
-            sample for sample in results if sample.condition == name and not sample.error and not sample.grading_errors
-        ]
+        runs = [sample for sample in results if sample.condition == name and not sample.error]
         if not runs:
             continue
         costs = [sample.cost for sample in runs]
@@ -383,6 +377,7 @@ def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list
         (sample.sample_id, sample.epoch, grader): info.get("verdict")
         for sample in results
         for grader, info in sample.judges.items()
+        if "error" not in info  # a judge that could not run gave no verdict to compare
     }
     cases = {sample.sample_id: sample.case for sample in results}
     per_rubric: dict[tuple[str, str], list[bool]] = defaultdict(list)

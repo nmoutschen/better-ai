@@ -231,10 +231,11 @@ starting commit or run a hidden check on a disposable copy of it:
 Hidden commands find their files under `$GRADE_FILES` and the planted commit
 in `$START_COMMIT`. Use `PYTHONPATH=. python "$GRADE_FILES/check.py"` to let a
 hidden test import a planted module. A timeout (60 seconds or the spec's
-`timeout`) or a sandbox error is a grading error: the grader is not 0, the
-sample's `all` is unscored, and `grading_errors` in the score metadata names
-the grader and why (the cause is also under `notes`). `inspect score` scores
-the run again.
+`timeout`) fails the check and is listed under `notes` in the score metadata. Any
+other sandbox error (the check could not run) is a grading error: the scorer
+raises, naming the grader and the cause, so the sample is a sample error that
+`inspect eval-retry` reruns. `inspect score` cannot re-score it, because it
+starts no sandbox.
 
 The judge (`type: judge`, field `rubric`, optional `observe: {cmd: ...}`)
 grades how the agent worked: what it read before editing, what it ran on the
@@ -313,7 +314,7 @@ between conditions, cost and time per condition, the skill files read in the
 skill condition (per expected file, and files read where no case expects
 them), one line per sample with
 tokens (input, output, cache read, cache write), agent cost, judge cost and
-time, the totals, any sample errors, how many samples per condition were left out as sample errors or grading errors, and per condition how many runs committed or rewrote
+time, the totals, any sample errors, how many samples per condition are sample errors, by cause (agent timeout, grading error, other), left out of the pass rates and the cost and time means, and per condition how many runs committed or rewrote
 history. Every sample records its commits under `side_actions` in the score metadata; only cases
 that use `no_commit` score it. With `--latest`, each case and
 condition keeps only the runs of the most recently started log that has it, so

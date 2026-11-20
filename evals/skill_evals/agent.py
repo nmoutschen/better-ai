@@ -27,6 +27,7 @@ from skill_evals.transcript import Run, parse_stream, redact
 
 WORKDIR = "/work"
 AGENT_USER = "agent"
+AGENT_TIMEOUT_MESSAGE = "Claude Code timed out"
 TOKEN_VARIABLES = ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN")
 # Web tools would let the agent look answers up; scheduling tools keep a non-interactive run open until a
 # wake-up fires, long after the work is done.
@@ -231,7 +232,7 @@ def claude_code(model: str = "sonnet", timeout: int = 1800) -> Solver:
             # Raised like any Claude Code failure, so the sample is an Inspect sample error: left out of pass rates
             # and of cost and time averages, never scored on partial work as $0 and 0 s.
             state.metadata["claude_code"]["timed_out"] = True
-            raise RuntimeError(f"Claude Code timed out after {timeout} seconds")
+            raise RuntimeError(f"{AGENT_TIMEOUT_MESSAGE} after {timeout} seconds")
         if run.error:
             raise RuntimeError(f"Claude Code failed: {run.error[:500]}\n{stderr[-1000:]}")
         return state

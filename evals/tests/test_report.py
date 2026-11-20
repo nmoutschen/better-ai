@@ -178,7 +178,7 @@ def error_rows() -> list[report.SampleResult]:
     return [
         report.SampleResult("a-skill", "a", "skill", "1.1", 1, {"input_tokens": 5}, 0.5, 0.1, 30),
         report.SampleResult(
-            "b-skill", "b", "skill", "1.1", math.nan, error="GradingError: judge: timed out after 600 seconds"
+            "b-skill", "b", "skill", "1.1", math.nan, error="Grading error: judge: timed out after 600 seconds"
         ),
         report.SampleResult(
             "c-no-skill",
@@ -213,11 +213,11 @@ def test_read_result_keeps_the_error_text() -> None:
     sample = SimpleNamespace(
         id="x",
         epoch=1,
-        error=SimpleNamespace(message="GradingError: judge: 429"),
+        error=SimpleNamespace(message="Grading error: judge: 429"),
         scores={},
         metadata={"case": "x", "condition": "skill"},
     )
-    assert report.read_result(sample).error == "GradingError: judge: 429"  # type: ignore[arg-type]
+    assert report.read_result(sample).error == "Grading error: judge: 429"  # type: ignore[arg-type]
 
 
 def test_agreement_skips_a_judge_that_errored() -> None:

@@ -12,7 +12,7 @@ KEEP hidden checks out of the sandbox until grading, and RUN them on a copy of t
 
 USE the judge for what only reading can decide: the meaning of a text, in the reply or in a file the agent wrote, such as whether an email keeps a fact or a checklist puts its steps in a valid order; whether the agent asked before building and what it asked; whether its claims are true; whether it explained or held back; and whether it ran a check after its last edit to the files that check exercises.
 
-GIVE the judge the request as the user wrote it, not the condition's prompt, the transcript as numbered steps, the final reply, the diff and the notes the agent wrote. RUN it on a different model from the agent's, with no tools. ITS last line is the verdict; a reply whose last line is not one scores 0. A judge that timed out, errored or printed no reply is not a score: leave the sample unscored and count it.
+GIVE the judge the request as the user wrote it, not the condition's prompt, the transcript as numbered steps, the final reply, the diff and the notes the agent wrote. RUN it on a different model from the agent's, with no tools. ITS last line is the verdict; a reply whose last line is not one scores 0. A judge that timed out, errored or printed no reply is not a score: raise, so the sample is a sample error that `inspect eval-retry` reruns. A hidden check that times out is a fail.
 
 WRITE each rubric for one case and one rule: the planted facts, the numbered conditions to PASS, the conditions that FAIL, and what does not count. GRADE the outcomes the user asked for and the case's own rule. DO NOT fail an agent for a misstep it corrected itself, or for a true remark about something the user did not ask about.
 
