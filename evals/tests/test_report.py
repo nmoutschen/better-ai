@@ -236,11 +236,11 @@ def judged(passed: bool, started: str = "") -> report.SampleResult:
     )
 
 
-def test_agreement_errors_on_two_runs_with_the_same_key() -> None:
+def test_two_runs_with_the_same_key_stop_the_report() -> None:
     """Two logs with the same (sample, epoch, grader) cannot say which run a label belongs to."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
     with pytest.raises(ValueError, match="a-skill"):
-        report.agreement([judged(True, "2026-01-01"), judged(False, "2026-01-02")], labels)
+        report.resolve_labels([judged(True, "2026-01-01"), judged(False, "2026-01-02")], labels)
 
 
 def test_agreement_after_latest_uses_the_newest_run() -> None:
@@ -250,15 +250,16 @@ def test_agreement_after_latest_uses_the_newest_run() -> None:
     assert report.agreement(newest, labels)[0].split()[-2:] == ["0/1", "agree"]
 
 
-def test_labels_without_a_run_are_listed() -> None:
-    """A label whose sample is not in the logs, such as a typo, is printed, not dropped."""
+def test_label_matching_no_run_stops_and_is_named() -> None:
+    """A label whose sample is not in the logs, such as a typo, stops the report and is named."""
     labels = [
         {"sample": "a-skill", "grader": "judge", "verdict": "PASS"},
         {"sample": "a-skil", "epoch": 2, "grader": "judge", "verdict": "FAIL"},
     ]
-    lines = report.unmatched_labels([judged(True)], labels)
-    assert len(lines) == 2 and "a-skil" in lines[1] and "epoch 2" in lines[1] and "a-skill" not in lines[1]
-    assert report.unmatched_labels([judged(True)], labels[:1]) == []
+    with pytest.raises(ValueError, match=r"a-skil.*epoch 2.*no run") as stopped:
+        report.resolve_labels([judged(True)], labels)
+    assert "'a-skill'" not in str(stopped.value)
+    assert [run.sample_id for _, run in report.resolve_labels([judged(True)], labels[:1])] == ["a-skill"]
 
 
 def grouped(skill: str, model: str, passed: float, started: str = "") -> report.SampleResult:
@@ -336,24 +337,28 @@ def two_model_runs() -> list[report.SampleResult]:
 def test_label_matching_runs_of_two_agent_models_is_an_error() -> None:
     """A label has no agent model, so it cannot say which group's run it judged."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    with pytest.raises(ValueError, match=r"a-skill.*opus.*sonnet"):
-        report.validate_labels(two_model_runs(), labels)
+    runs = two_model_runs()
+    runs[0].log, runs[1].log = "first.eval", "second.eval"
+    with pytest.raises(ValueError, match=r"a-skill.*opus.*first\.eval.*sonnet.*second\.eval"):
+        report.resolve_labels(runs, labels)
 
 
 def test_label_with_agent_model_selects_one_group() -> None:
     """An agent_model field picks the group; agreement ignores labels for other models."""
     a, b = two_model_runs()
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS", "agent_model": "opus"}]
-    report.validate_labels([a, b], labels)
+    report.resolve_labels([a, b], labels)
     assert report.unmatched_labels([a, b], labels) == []
+    assert [run.agent_model for _, run in report.resolve_labels([a, b], labels)] == ["opus"]
     assert report.agreement([a], labels)[0].split()[-2:] == ["1/1", "agree"]
     assert report.agreement([b], labels) == ["no labelled judge verdicts in these logs"]
 
 
-def test_label_naming_a_model_with_no_run_is_unmatched() -> None:
-    """A label for an agent model that has no such run is listed as unmatched."""
+def test_label_naming_a_model_with_no_run_stops() -> None:
+    """A label for an agent model that has no such run matches no run."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS", "agent_model": "haiku"}]
-    assert len(report.unmatched_labels(two_model_runs(), labels)) == 2
+    with pytest.raises(ValueError, match=r"a-skill.*no run"):
+        report.resolve_labels(two_model_runs(), labels)
 
 
 def test_main_stops_before_printing_when_a_label_spans_groups(
@@ -452,31 +457,105 @@ def test_duplicate_with_one_errored_judge_stops() -> None:
     """The label cannot say which run it means, even when one copy's judge gave no verdict."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
     with pytest.raises(ValueError, match="a-skill"):
-        report.validate_labels([judged(True, "t1"), errored_judge("t2")], labels)
+        report.resolve_labels([judged(True, "t1"), errored_judge("t2")], labels)
 
 
 def test_duplicate_with_a_sample_error_stops() -> None:
     """A copy that errored before grading still makes the label ambiguous."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
     with pytest.raises(ValueError, match="a-skill"):
-        report.validate_labels([judged(True, "t1"), sample_error("t2")], labels)
+        report.resolve_labels([judged(True, "t1"), sample_error("t2")], labels)
 
 
 def test_sample_error_copy_of_another_sample_does_not_stop() -> None:
     """Only a sample a label names makes a duplicate matter."""
     labels = [{"sample": "other", "grader": "judge", "verdict": "PASS"}]
-    report.validate_labels([judged(True, "t1"), sample_error("t2")], labels)
+    labelled = judged(True)
+    labelled.sample_id = "other"
+    report.resolve_labels([labelled, judged(True, "t1"), sample_error("t2")], labels)
 
 
 def test_latest_resolves_duplicates_with_errors() -> None:
     """After `--latest` one run per sample is left, so the labels validate."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
     for other in (errored_judge("t2"), sample_error("t2")):
-        report.validate_labels(report.latest([judged(True, "t1"), other]), labels)
+        report.resolve_labels(report.latest([judged(True, "t1"), other]), labels)
 
 
 def test_single_errored_judge_with_a_label_is_unmatched() -> None:
     """A judge that could not run gives no verdict, so its label is listed, not compared."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    report.validate_labels([errored_judge()], labels)
+    report.resolve_labels([errored_judge()], labels)
     assert len(report.unmatched_labels([errored_judge()], labels)) == 2
+
+
+def model_run(model: str, kind: str) -> report.SampleResult:
+    """One run of sample a-skill by `model`: judged (True), `errored judge` or `sample error`."""
+    run = {"judged": judged(True), "errored judge": errored_judge(), "sample error": sample_error()}[kind]
+    run.agent_model = model
+    return run
+
+
+@pytest.mark.parametrize("kind", ["errored judge", "sample error"])
+def test_label_with_one_copy_errored_in_another_model_stops(kind: str) -> None:
+    """A copy with no verdict still counts as a match, so the label cannot be scored against the other model."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    with pytest.raises(ValueError, match=r"a-skill.*opus.*sonnet"):
+        report.resolve_labels([model_run("opus", kind), model_run("sonnet", "judged")], labels)
+    labels[0]["agent_model"] = "sonnet"
+    assert [run.agent_model for _, run in report.resolve_labels([model_run("opus", kind), model_run("sonnet", "judged")], labels)] == ["sonnet"]
+
+
+@pytest.mark.parametrize("kind", ["errored judge", "sample error"])
+def test_single_run_without_a_verdict_is_listed_with_its_reason(kind: str) -> None:
+    """One matching run with no verdict is not compared; it is listed with why."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    lines = report.unmatched_labels([model_run("opus", kind)], labels)
+    assert len(lines) == 2 and kind in lines[1] and "a-skill" in lines[1]
+    assert report.agreement([model_run("opus", kind)], labels) == ["no labelled judge verdicts in these logs"]
+
+
+def test_duplicate_of_an_unlabelled_sample_does_not_stop() -> None:
+    """Only the samples labels name matter: a duplicate elsewhere, in any model, is ignored."""
+    other = judged(False, "t2")
+    other.sample_id = "b-skill"
+    twin = judged(True, "t1")
+    twin.sample_id = "b-skill"
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    assert len(report.resolve_labels([judged(True), twin, other], labels)) == 1
+
+
+def test_several_epochs_and_graders_do_not_stop() -> None:
+    """Runs of other epochs, and other graders of the same run, are not matches."""
+    first = judged(True)
+    first.judges = {"judge": {"verdict": True}, "judge_2": {"verdict": False}}
+    second = judged(False)
+    second.epoch = 2
+    second.judges = dict(first.judges)
+    labels = [
+        {"sample": "a-skill", "grader": "judge", "verdict": "PASS", "epoch": 2},
+        {"sample": "a-skill", "grader": "judge_2", "verdict": "FAIL"},
+    ]
+    resolved = report.resolve_labels([first, second], labels)
+    assert [run.epoch for _, run in resolved] == [2, 1]
+    assert report.agreement([first, second], labels)[-1].split()[-3:] == ["1/2", "agree", "(50%)"]
+
+
+def test_duplicate_within_a_model_stops_unless_latest() -> None:
+    """Two copies in one model make the label ambiguous; `--latest` leaves the newest."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS", "agent_model": "opus"}]
+    copies = [model_run("opus", "judged"), model_run("opus", "errored judge")]
+    copies[0].started, copies[1].started = "t1", "t2"
+    with pytest.raises(ValueError, match="a-skill"):
+        report.resolve_labels(copies, labels)
+    assert len(report.resolve_labels(report.latest(copies), labels)) == 1
+
+
+def test_resolution_across_groups_uses_the_one_resolved_run() -> None:
+    """A label without agent_model resolves to the one run, wherever it is; other groups see no label."""
+    opus, sonnet = model_run("opus", "judged"), model_run("sonnet", "judged")
+    sonnet.sample_id = "b-skill"
+    labels = [{"sample": "b-skill", "grader": "judge", "verdict": "FAIL"}]
+    report.resolve_labels([opus, sonnet], labels)
+    assert report.agreement([sonnet], labels)[-1].split()[-3:] == ["0/1", "agree", "(0%)"]
+    assert report.agreement([opus], labels) == ["no labelled judge verdicts in these logs"]
