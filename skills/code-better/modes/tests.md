@@ -9,7 +9,7 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 ## 1. Update the spec
 
-WRITE a spec for every change, however small: a one-line change needs one requirement. READ [../templates/specs.md](../templates/specs.md). THEN WRITE the behaviour the tests must cover in `.code/<change>/specs.md`, in the template's format. TAKE each expected value from the spec, the design or the documented behaviour, never from what the code does. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
+KEEP a spec for every change, however small: a one-line change needs one requirement. IF no existing spec covers the change, READ [../templates/specs.md](../templates/specs.md) and WRITE `.code/<change>/specs.md` in the template's format. WRITE the behaviour the tests must cover in the spec. TAKE each expected value from the spec, the design or the documented behaviour, never from what the code does. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
 WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.md` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task todo.
 

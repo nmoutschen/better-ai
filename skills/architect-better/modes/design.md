@@ -24,7 +24,7 @@ REPLY in the page, in one or two short sentences. MARK each item `seen` when it 
 
 ### Box kinds
 
-RUN `python3 scripts/diagram.py register --out <file>.html` to see the available box kinds. USE only kinds from that register.
+RUN `python3 scripts/diagram.py register --out <folder>/register.html` to see the available box kinds. USE only kinds from that register.
 
 ## 1. Read the request and the system
 
@@ -57,7 +57,7 @@ DRAFT quality attributes from the request and current system as observable scena
 
 USE Attribute-Driven Design (ADD 3.0). IN each iteration, PICK the requirements and constraints that drive the design of the part in scope. COMPARE options against those drivers. CHOOSE an approach for the draft, ASSIGN responsibilities and interfaces, and WALK the scenarios through it. USE gaps or trade-offs from that walk to choose the next iteration.
 
-UPDATE `design.json` with the proposed containers, relationships and flows. USE the same boxes as flow participants. KEEP Before and After in the same layout and scale. PRESERVE part identities across Before and After, and link the same exchange across Containers and Flows. CHECK and render the updated JSON as in step 2. CHECK that the rendered views highlight additions and removals, because highlighting makes changes easier to find.
+UPDATE `design.json` with the proposed containers, relationships and flows. USE the same boxes as flow participants. PRESERVE part identities across Before and After. SET `in` on every added or removed part. CHECK and render the updated JSON as in step 2.
 
 READ and FOLLOW [../templates/design.md](../templates/design.md) for the conventional design document structure. WRITE `design.md` in the change folder, linking the JSON. RECORD each decision in `design.md` as an output of its iteration, with the recommendation, trade-offs, rejected alternatives and reasons. CHECK the evidence for vendor claims, because vendors often make claims without supporting evidence. FLAG options that rely on unsupported claims.
 
@@ -93,7 +93,7 @@ DEBATE findings in the page and UPDATE the design where needed. SET `handled_by`
 
 WHEN the approved design and its review are settled, WRITE each decision of `design.md` worth recording as a record of `decisions.jsonl`. READ and FOLLOW [../templates/decision.md](../templates/decision.md), and WRITE each of these decisions as `<id>.md` in the decision record location.
 
-READ and FOLLOW code-better's spec template, [../../code-better/templates/specs.md](../../code-better/templates/specs.md) (`skills/code-better/templates/specs.md` in this repo). EXTRACT every MUST and MUST NOT stated or implied by the design and decisions as one verifiable EARS statement per rule. WRITE each as a record of `spec.jsonl`, with the design section, decision ID or request sentence it comes from as its source. WRITE the same spec as `specs.md` in the spec location, or in the repo's spec format when it has one.
+READ and FOLLOW [../templates/specs.md](../templates/specs.md) to extract the spec from the design and decisions. WRITE each requirement as a record of `spec.jsonl`, with its source. WRITE the same spec as `specs.md` in the spec location, or in the repo's spec format when it has one.
 
 READ and FOLLOW [../agents/spec-checker.md](../agents/spec-checker.md). FILL IN its inputs and START a separate checker. WAIT for its report. HOLD spec edits and hand-back while it runs. FIX confirmed omissions and unsupported links, and have the checker verify the revised mapping. ASK the user to resolve low-confidence links, because models make false matches between requirements and sources. CARRY unresolved links into the hand-back.
 

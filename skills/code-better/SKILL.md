@@ -52,7 +52,7 @@ PICK the one mode that fits the work. READ its file: it is MANDATORY, and the ne
 
 ### 3. Run the mode
 
-WHEN an architect-better spec covers the change, USE it for the mode's requirements and UPDATE it in place when needed.
+WHEN an existing spec covers the change, such as one from `/architect-better` or from earlier work on this change in `.code/<change>/`, USE it for the mode's requirements and UPDATE it in place where needed.
 
 FOLLOW every step of the mode's file, in order. The mode ends once its checks pass on the final code, or once you stop as its limits say.
 

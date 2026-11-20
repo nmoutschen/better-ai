@@ -206,9 +206,12 @@ def read_folder(folder: Path) -> dict:
         require(record["parts"], "parts: expected at least one diagram part")
         for group in record["parts"]:
             require(isinstance(group, str), "parts: expected a string")
-            part_references(group.split("+"), parts, "part")
+            part_references(group.split("+"), finding_parts, "part")
+
+    previous_hashes = {}
 
     def review(record):
+        nonlocal previous_hashes
         fields(record, at=str, perspectives=list, changed=list, hashes=dict)
         fingerprints = record["hashes"]
         for key, digest in fingerprints.items():
@@ -217,7 +220,18 @@ def read_folder(folder: Path) -> dict:
                 f"hashes: invalid part or SHA-256 fingerprint for {key!r}",
             )
         references(record["perspectives"], None, "review perspective")
-        part_references(record["changed"], fingerprints, "changed part")
+        if "labels" in record:
+            fields(record, labels=dict)
+            require(
+                record["labels"].keys() == fingerprints.keys()
+                and all(isinstance(label, str) for label in record["labels"].values()),
+                "labels: expected a string label for every hashed part",
+            )
+        if "aliases" in record:
+            fields(record, aliases=dict)
+            references(record["aliases"].values(), fingerprints, "alias target")
+        part_references(record["changed"], fingerprints.keys() | previous_hashes.keys(), "changed part")
+        previous_hashes = fingerprints
 
     def decision(record):
         fields(record, title=str, drivers=list, chosen=str, rejected=list, drawback=str)
@@ -235,16 +249,24 @@ def read_folder(folder: Path) -> dict:
     req_ids = {record["id"] for record in requirements} if requirements is not None else None
     perspectives = records("perspectives", perspective, "name")
     applicable = {record["name"] for record in perspectives if record["applies"]} if perspectives is not None else None
+    reviews = records("reviews", review)
+    finding_parts = None if parts is None else {}
+    if finding_parts is not None:
+        for recorded in reviews or []:
+            finding_parts.update((key, key) for key in recorded["hashes"])
+            finding_parts.update(recorded.get("aliases", {}))
+        finding_parts.update((key, part["key"]) for key, part in parts.items())
     data = {
         "design": design,
         "request": request,
         "requirements": requirements,
         "perspectives": perspectives,
         "findings": records("findings", finding, "id"),
-        "reviews": records("reviews", review),
+        "reviews": reviews,
         "decisions": records("decisions", decision, "id"),
         "spec": records("spec", spec_row, "id"),
         "parts": parts,
+        "finding_parts": finding_parts,
         "hashes": hashes,
         "sources": sources,
     }
@@ -321,7 +343,7 @@ def diagram_parts(design):
 
 def changed_parts(hashes, review):
     previous = review["hashes"] if review else {}
-    return [key for key, digest in hashes.items() if previous.get(key) != digest]
+    return [key for key in dict.fromkeys((*hashes, *previous)) if hashes.get(key) != previous.get(key)]
 
 
 def render_diagrams(design, marks):
@@ -347,26 +369,48 @@ def render_diagrams(design, marks):
 def model(data):
     design = data["design"]
     review = data["reviews"][-1] if data["reviews"] else None
-    since = changed_parts(data["hashes"], review)
-    changed = set(since)
-    marks, affected = {}, set()
+    changes = dict.fromkeys(changed_parts(data["hashes"], review))
+    parts = data["parts"]
+    finding_parts = data["finding_parts"]
+    marks, findings_by_perspective = {}, {}
     for finding in data["findings"]:
-        keys = {data["parts"][part]["key"] for group in finding["parts"] for part in group.split("+")}
-        if changed.intersection(keys):
-            affected.add(finding["perspective"])
+        keys = {finding_parts[part] for group in finding["parts"] for part in group.split("+")}
+        findings_by_perspective.setdefault(finding["perspective"], set()).update(keys)
         if review:
-            for key in sorted(keys):
-                target = data["parts"][key].get("mark", key.removeprefix("box:"))
+            for key in sorted(keys.intersection(parts)):
+                target = parts[key].get("mark", key.removeprefix("box:"))
                 marks.setdefault(target, []).append([finding["id"], finding["text"], finding["perspective"]])
-    ran = review["perspectives"] if review else []
-    rerun = [
-        p["name"] for p in data["perspectives"] if p["applies"] and (p["name"] in affected or p["name"] not in ran)
-    ]
+
+    with_findings = set().union(*findings_by_perspective.values())
+    last_reviews, labels = {}, {}
+    for recorded in data["reviews"]:
+        labels.update(recorded.get("labels", {}))
+        for name in recorded["perspectives"]:
+            last_reviews[name] = recorded
+    labels.update((key, part["label"]) for key, part in parts.items())
+
+    rerun = []
+    for perspective in data["perspectives"]:
+        if not perspective["applies"]:
+            continue
+        name = perspective["name"]
+        last = last_reviews.get(name)
+        own_findings = findings_by_perspective.get(name, set())
+        affected = (
+            [key for key in changed_parts(data["hashes"], last) if key in own_findings or key not in with_findings]
+            if last
+            else []
+        )
+        if last is None or affected:
+            rerun.append(name)
+            changes.update(dict.fromkeys(affected))
     containers, flows = render_diagrams(design, marks)
-    result = {k: v for k, v in data.items() if k not in ("sources", "request", "design", "hashes")}
+    result = {k: v for k, v in data.items() if k not in ("sources", "request", "design", "hashes", "finding_parts")}
     return {
         **result,
-        "since": since,
+        "since": list(changes),
+        "change_labels": {key: labels.get(key, key) for key in changes},
+        "removed_labels": {ref: labels.get(key, key) for ref, key in finding_parts.items() if ref not in parts},
         "rerun": rerun,
         **{k: design[k] for k in ("title", "summary", "scope", "accepted")},
         "requirements": [
@@ -378,6 +422,7 @@ def model(data):
 
 
 def record_review(folder, perspectives):
+    require_writable_folder(folder)
     with (folder / "reviews.jsonl").open("a+", encoding="utf-8") as log:
         fcntl.flock(log, fcntl.LOCK_EX)
         data = read_folder(folder)
@@ -390,7 +435,11 @@ def record_review(folder, perspectives):
             "perspectives": list(dict.fromkeys(perspectives)),
             "changed": changed_parts(data["hashes"], previous),
             "hashes": data["hashes"],
+            "labels": {key: data["parts"][key]["label"] for key in data["hashes"]},
         }
+        aliases = {key: part["key"] for key, part in data["parts"].items() if key != part["key"]}
+        if aliases:
+            record["aliases"] = aliases
         log.seek(0)
         content = log.read()
         separator = "\n" if content and not content.endswith("\n") else ""
@@ -409,11 +458,15 @@ def conversation(folder: Path) -> page.Conversation:
     )
 
 
-def serve(folder: Path, port: int, open_browser: bool) -> None:
+def require_writable_folder(folder):
     require(
         not folder.resolve().is_relative_to(HERE.parents[1]),
         "serve writes conversation files; use a copy of the change folder outside skills/",
     )
+
+
+def serve(folder: Path, port: int, open_browser: bool) -> None:
+    require_writable_folder(folder)
     model(read_folder(folder))
     conv = conversation(folder)
 
@@ -501,6 +554,8 @@ def main(argv=None):
         parser.error(f"{folder} is not a directory")
     conv = conversation(folder)
     try:
+        if args.command in ("wait", "reply", "status"):
+            require_writable_folder(folder)
         if args.command == "check":
             model(read_folder(folder))
             print(f"Valid change folder: {folder}")

@@ -15,7 +15,7 @@ CHECK the affected structure and responsibilities before inspecting individual p
 
 ## 2. Run the review
 
-PICK perspectives from what the audit touches. CHECK security with risk-first STRIDE, observability, API standards, data and privacy, and applicable repo standards. WHEN applying STRIDE, START with the highest-risk parts and CHECK the impact and mitigation, because a one-off review can become a checklist exercise. STATE why each perspective applies or does not apply.
+PICK perspectives from what the audit touches. CHECK security with STRIDE: START with the highest-risk parts and CHECK the impact and mitigation, because a one-off review can become a checklist exercise. CHECK observability, API standards, data and privacy, and applicable repo standards. STATE why each perspective applies or does not apply.
 
 READ and FOLLOW [../agents/perspective-reviewer.md](../agents/perspective-reviewer.md). START one fresh reviewer per applicable perspective. GIVE each the design, requirements, decisions, relevant evidence and diagram references. KEEP your reasoning and verdict out of the brief. WAIT for every report and HOLD the hand-back while reviewers run.
 

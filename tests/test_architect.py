@@ -100,9 +100,15 @@ class Architect(unittest.TestCase):
             first["hashes"]["box:server"], hashlib.sha256(json.dumps(node, sort_keys=True).encode()).hexdigest()
         )
         self.assertEqual(set(first["changed"]), set(first["hashes"]))
+        self.assertEqual(first["labels"]["box:server"], node["label"])
+        self.assertEqual(first["labels"].keys(), first["hashes"].keys())
         view = architect.model(architect.read_folder(self.folder))
         self.assertEqual(view["since"], [])
         self.assertEqual(view["rerun"], ["Observability"])
+        self.assertEqual(
+            self.render_javascript(view, "reviewSummary([], data.rerun)"),
+            "Observability runs again: not reviewed yet.",
+        )
         node["detail"] = "New details"
         design_path.write_text(json.dumps(design))
         view = architect.model(architect.read_folder(self.folder))
@@ -113,6 +119,64 @@ class Architect(unittest.TestCase):
         self.assertEqual(last["changed"], ["box:server"])
         self.assertEqual(set(last["hashes"]), set(first["hashes"]))
         self.assertEqual(architect.model(architect.read_folder(self.folder))["rerun"], [])
+
+    def test_unchanged_example_does_not_rerun_an_earlier_perspective(self):
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["since"], [])
+        self.assertEqual(view["rerun"], [])
+        self.assertEqual(
+            self.render_javascript(view, "reviewSummary([], data.rerun)"), "Nothing changed since the review."
+        )
+
+    def test_reruns_findings_since_each_perspectives_last_review(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        server = next(node for node in design["containers"]["nodes"] if node["id"] == "server")
+        server["detail"] = "Revised server"
+        path.write_text(json.dumps(design))
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["rerun"], ["Security"])
+
+        self.command("review", "--perspectives", "Observability")
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["rerun"], ["Security"])
+        self.assertEqual(view["since"], ["box:server"])
+
+    def test_changed_part_without_findings_reruns_all_applicable_perspectives(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        user = next(node for node in design["containers"]["nodes"] if node["id"] == "user")
+        user["detail"] = "New user details"
+        path.write_text(json.dumps(design))
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["since"], ["box:user"])
+        self.assertEqual(view["rerun"], ["Security", "Observability"])
+
+    def test_removed_part_keeps_review_label_and_reruns_its_perspective(self):
+        path = self.folder / "design.json"
+        data = architect.read_folder(self.folder)
+        label = data["parts"]["edge:e3"]["label"]
+        design = json.loads(path.read_text())
+        design["containers"]["edges"] = [edge for edge in design["containers"]["edges"] if edge["id"] != "e3"]
+        path.write_text(json.dumps(design))
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["since"], ["edge:e3"])
+        self.assertEqual(view["change_labels"]["edge:e3"], label)
+        self.assertEqual(view["rerun"], ["Security"])
+        self.assertEqual(
+            self.render_javascript(view, "reviewSummary(data.since.map(key => data.change_labels[key]), data.rerun)"),
+            f"Changed since the review: {label}. Security runs again.",
+        )
+        self.assertIn(
+            label,
+            self.render_javascript(
+                view, "perspectiveTables(data.perspectives, data.findings, data.parts, true, data.removed_labels)"
+            ),
+        )
+        self.command("review", "--perspectives", "Security")
+        last = architect.read_folder(self.folder)["reviews"][-1]
+        self.assertEqual(last["changed"], ["edge:e3"])
+        self.assertNotIn("edge:e3", last["hashes"])
 
     def test_named_and_numbered_flow_references_resolve_to_one_part(self):
         path = self.folder / "design.json"
@@ -126,6 +190,21 @@ class Architect(unittest.TestCase):
             ValueError, r"use box:<id>, edge:<id>, step:<flow id>/<step id> \(flow ids: .*Read"
         ):
             architect.read_folder(self.folder)
+
+    def test_removed_step_accepts_its_historical_numbered_alias(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        flow = design["flows"][0]
+        flow["id"] = "Read"
+        path.write_text(json.dumps(design))
+        self.command("review", "--perspectives", "Security", "Observability")
+        flow["steps"] = [step for step in flow["steps"] if step["id"] != "s6"]
+        path.write_text(json.dumps(design))
+
+        view = architect.model(architect.read_folder(self.folder))
+        self.assertEqual(view["since"], ["step:Read/s6"])
+        self.assertEqual(view["rerun"], ["Security"])
+        self.assertEqual(view["removed_labels"]["step:flow1/s6"], view["change_labels"]["step:Read/s6"])
 
     def test_check_collects_errors_across_files(self):
         (self.folder / "request.md").unlink()
@@ -188,6 +267,20 @@ class Architect(unittest.TestCase):
         self.assertIn("Dashboard page to dashboard.py: POST /rpc (Flows, step 2c)", html)
         self.assertIn("Coordinator agent to dashboard.py: wait ends with the answer (Flows, step 2d)", html)
 
+    def test_thread_comment_lookup_works_before_any_rendered_hook(self):
+        event = {"id": "C1", "action": "comment", "on": {"id": "target"}, "comment": "Original"}
+        edited = {**event, "comment": "Edited"}
+        deleted = {"id": "C1", "action": "delete"}
+        result = self.render_javascript(
+            {"events": [event, edited, deleted]},
+            """JSON.stringify([
+              threadComment(data.events.slice(0, 1), 'C1'),
+              threadComment(data.events.slice(0, 2), 'C1'),
+              threadComment(data.events, 'C1')
+            ])""",
+        )
+        self.assertEqual(json.loads(result), [event, edited, None])
+
     def render_javascript(self, view, expression):
         result = subprocess.run(
             [
@@ -199,7 +292,7 @@ class Architect(unittest.TestCase):
                 const data = JSON.parse(fs.readFileSync(0, 'utf8'));
                 const source = fs.readFileSync(process.argv[1], 'utf8');
                 const context = {data, fetch: () => new Promise(() => {}),
-                  document: {querySelector: () => ({})}};
+                  document: {querySelector: () => ({}), getElementById: id => id === 'target' ? {} : null}};
                 vm.runInNewContext(source, context);
                 process.stdout.write(vm.runInNewContext(process.argv[2], context));
                 """,
@@ -276,6 +369,26 @@ class Architect(unittest.TestCase):
     def test_serve_refuses_to_write_into_the_example(self):
         with self.assertRaisesRegex(ValueError, "use a copy"):
             architect.serve(SCRIPTS / "example", 0, False)
+
+    def test_writing_commands_refuse_the_example(self):
+        for command in (
+            ["wait", "--timeout", "0"],
+            ["reply", "Text"],
+            ["status", "working", "A1"],
+            ["review", "--perspectives", "Security"],
+        ):
+            with (
+                self.subTest(command=command[0]),
+                patch.object(architect, "HERE", self.folder.parent.resolve() / "skill" / "scripts"),
+                contextlib.redirect_stderr(io.StringIO()) as output,
+            ):
+                with self.assertRaises(SystemExit) as error:
+                    architect.main([command[0], str(self.folder), *command[1:]])
+                self.assertEqual(error.exception.code, 2)
+                self.assertIn(
+                    "serve writes conversation files; use a copy of the change folder outside skills/",
+                    output.getvalue(),
+                )
 
     def test_serve_uses_browser_only_when_requested(self):
         for open_browser in (False, True):

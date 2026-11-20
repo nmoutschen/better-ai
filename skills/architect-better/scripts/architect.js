@@ -76,7 +76,7 @@ function figures(versions) {
     (svg || '<p class="muted">This flow does not exist before the change.</p>') + '</div>').join('');
 }
 
-function perspectiveTables(perspectives, findings, parts, reviewed) {
+function perspectiveTables(perspectives, findings, parts, reviewed, removedLabels = {}) {
   const summary = table(['Perspective', 'Applicability', 'Why', 'From'], perspectives.map(p =>
     row(['<strong>' + text(p.name) + '</strong>', p.applies ? chip('Applies', 'ok') : chip('Does not apply'),
       text(p.why), '<span class="muted">' + text(p.from) + '</span>'])));
@@ -87,6 +87,9 @@ function perspectiveTables(perspectives, findings, parts, reviewed) {
       const links = f.parts.map(part => {
         const group = part.split('+');
         const refs = group.map(id => parts[id]);
+        if (refs.some(ref => !ref)) {
+          return text(group.map(id => parts[id]?.label ?? removedLabels[id]).join(' · '));
+        }
         const first = refs[0];
         const icon = first.icon ? '<svg viewBox="-1 -1 16 16" width="13" height="13" aria-hidden="true">' +
           first.icon + '</svg>' : '<span aria-hidden="true">→</span>';
@@ -103,6 +106,18 @@ function perspectiveTables(perspectives, findings, parts, reviewed) {
     });
     return '<h3>' + text(p.name) + '</h3>' + (rows.length ? table(headers, rows) : '<p class="muted">No findings.</p>');
   }).join('');
+}
+
+function reviewSummary(labels, names) {
+  const rerun = names.join(', ') + (names.length === 1 ? ' runs' : ' run') + ' again';
+  if (labels.length) return 'Changed since the review: ' + labels.join(', ') + '.' + (names.length ? ' ' + rerun + '.' : '');
+  if (names.length) return rerun + ': not reviewed yet.';
+  return 'Nothing changed since the review.';
+}
+
+function threadComment(log, id) {
+  const event = log.findLast(event => event.id === id && (event.action === 'comment' || event.action === 'delete'));
+  return event?.action === 'comment' && byId(event.on?.id) ? event : undefined;
 }
 
 function start(data) {
@@ -153,7 +168,7 @@ function start(data) {
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
     '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'open') : '') + '</h3>' +
     figures(flow.versions)).join(''));
-  section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review));
+  section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
   section('decisions', 'Decision records', decisionRecords(data.decisions));
   section('spec', 'Spec', table(['ID', 'Requirement', 'Source', 'Checked by'], data.spec.map(rule =>
     row([text(rule.id), text(rule.requirement), text(rule.source), text(rule.checked_by)]))));
@@ -282,7 +297,7 @@ function start(data) {
   const conversation = pageConversation({
     served: true, name: 'design page', agent: 'Architect', itemKinds: items, latestLast: true, waiting,
     kinds: {approve: logItem, confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.comment),
-    byId: id => locate(commentsById.get(id) || {}) && commentsById.get(id),
+    byId: id => threadComment(conversation.log(), id),
     reveal, edit: editComment, remove: event => commentLayer.remove(event), showLabel: n => 'Show comment ' + n,
     busy: () => !pop.hidden || !reviewMenu.hidden || !!$('.edit:not([hidden])'),
     beforeReload: () => sessionStorage.setItem(revKey, JSON.stringify({tab, version, findings, scroll: view.scrollTop})),
@@ -428,6 +443,7 @@ function start(data) {
   reviewToggle.textContent = review ? 'Review again…' : 'Approve…';
   $('.menu-h', reviewMenu).textContent = review ? 'Review the changes' : 'Approve the design';
   runReview.textContent = review ? 'Run the review again' : 'Approve and run the review';
+  runReview.disabled = !!review && !reviewNames.length;
   function toggleReview(open) {
     reviewMenu.hidden = !open;
     reviewToggle.setAttribute('aria-expanded', String(open));
@@ -435,11 +451,8 @@ function start(data) {
   reviewToggle.addEventListener('click', () => {
     const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
     const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
-    const labels = data.since.map(key => data.parts[key].label);
-    const changed = 'Changed since the review: ' + labels.join(', ') + '.';
-    const rerun = reviewNames.length ? ' ' + reviewNames.join(', ') + (reviewNames.length === 1 ? ' runs' : ' run') + ' again.' : '';
-    $('.review-summary').textContent = review ?
-      (labels.length ? changed + rerun : 'Nothing changed since the review.') : stats + scope;
+    const labels = data.since.map(key => data.change_labels[key]);
+    $('.review-summary').textContent = review ? reviewSummary(labels, reviewNames) : stats + scope;
     toggleReview(reviewMenu.hidden);
   });
   runReview.addEventListener('click', () => {
