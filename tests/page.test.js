@@ -244,11 +244,11 @@ test('a decision card renders for a waiting, an answered-then-asked and a decide
     replies: answers.map(id => ({ action: 'answer', id })) });
   const run = (status, answers, st) => { const [item, foot] = decisionItem(card(status, answers), st, true); return { head: item.html.match(/class="when">([^<]*)</)[1], foot: foot.html, item }; };
   const waiting = run('waiting', [], {});
-  assert.equal(waiting.head, '');
+  assert.equal(waiting.head, '10:00');  // the time, not a state
   assert.match(waiting.foot, /Waiting for you/);
   assert.ok(waiting.item.classList.list.includes('open-q'));
   const asked = run('waiting', ['a-1'], { 'a-1': 'asked' });
-  assert.equal(asked.head, '');
+  assert.equal(asked.head, '10:00');
   assert.match(asked.foot, /Waiting for you/);
   const answered = run('waiting', ['a-1'], {});
   assert.equal(answered.head, 'answered, waiting for the coordinator');
