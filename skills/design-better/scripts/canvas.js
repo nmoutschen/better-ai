@@ -64,6 +64,9 @@
   // Scrolling: frames of one screen size scroll together. The position is matched between elements with the
   // same id in both versions, such as headings, so versions of different length stay on the same section.
   // This works only for versions embedded from files; a page loaded from an address cannot be followed.
+  // An id counts only where it is unique in its document: versions can repeat an id, and the first match is then
+  // often the wrong element.
+  function idCount(doc, id) { return doc.querySelectorAll('#' + CSS.escape(id)).length; }
   var quietUntil = new WeakMap();
   function tops(win, ids) {
     var doc = win.document, end = doc.documentElement.scrollHeight;
@@ -77,7 +80,7 @@
   }
   function sharedIds(a, b) {
     return Array.prototype.map.call(a.document.querySelectorAll('[id]'), function (el) { return el.id; })
-      .filter(function (id) { return id && b.document.getElementById(id); });
+      .filter(function (id) { return id && idCount(a.document, id) === 1 && idCount(b.document, id) === 1; });
   }
   function match(from, to) {
     try {
@@ -200,7 +203,7 @@
   function selectorOf(el) {
     var parts = [];
     while (el && el.nodeType === 1 && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
-      if (el.id) { parts.unshift('#' + CSS.escape(el.id)); break; }
+      if (el.id && idCount(el.ownerDocument, el.id) === 1) { parts.unshift('#' + CSS.escape(el.id)); break; }
       var tag = el.tagName.toLowerCase(), n = 1, sib = el;
       while ((sib = sib.previousElementSibling)) if (sib.tagName === el.tagName) n++;
       parts.unshift(tag + ':nth-of-type(' + n + ')');
