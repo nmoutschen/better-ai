@@ -227,3 +227,35 @@ def test_agreement_skips_a_judge_that_errored() -> None:
     )
     lines = report.agreement([errored], [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}])
     assert lines == ["no labelled judge verdicts in these logs"]
+
+
+def judged(passed: bool, started: str = "") -> report.SampleResult:
+    """One run of sample a-skill whose judge gave the verdict `passed`."""
+    return report.SampleResult(
+        "a-skill", "a", "skill", "1.1", 1, judges={"judge": {"verdict": passed}}, started=started
+    )
+
+
+def test_agreement_errors_on_two_runs_with_the_same_key() -> None:
+    """Two logs with the same (sample, epoch, grader) cannot say which run a label belongs to."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    with pytest.raises(ValueError, match="a-skill"):
+        report.agreement([judged(True, "2026-01-01"), judged(False, "2026-01-02")], labels)
+
+
+def test_agreement_after_latest_uses_the_newest_run() -> None:
+    """`--latest` keeps one run per sample, so the label is compared with that run."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    newest = report.latest([judged(True, "2026-01-01"), judged(False, "2026-01-02")])
+    assert report.agreement(newest, labels)[0].split()[-2:] == ["0/1", "agree"]
+
+
+def test_labels_without_a_run_are_listed() -> None:
+    """A label whose sample is not in the logs, such as a typo, is printed, not dropped."""
+    labels = [
+        {"sample": "a-skill", "grader": "judge", "verdict": "PASS"},
+        {"sample": "a-skil", "epoch": 2, "grader": "judge", "verdict": "FAIL"},
+    ]
+    lines = report.unmatched_labels([judged(True)], labels)
+    assert len(lines) == 2 and "a-skil" in lines[1] and "epoch 2" in lines[1] and "a-skill" not in lines[1]
+    assert report.unmatched_labels([judged(True)], labels[:1]) == []
