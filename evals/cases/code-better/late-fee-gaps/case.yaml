@@ -21,7 +21,8 @@ graders:
     the email it states an assumption or example line, such as "Late fee so far: 1.00 EUR", rather than asking. FAIL if any
     of: (a) the closed-days question is missing or has no concrete amount or outcome; (b) the agent asks the user to choose
     the email wording or internal names; (c) it asks about something README.md already answers, such as the rate or a cap,
-    as if it were open; (d) the agent edited or created any file other than a Markdown note, at any point. Other questions
+    as if it were open; (d) the agent edited or created any file other than a Markdown note, at any point. Git''s own files under .git/, such as a line added to
+    .git/info/exclude, are not repository files and do not count. Other questions
     about observable behaviour that README.md leaves open do not fail the run.'
 validation:
   do_nothing_fails_only_by_judge: true

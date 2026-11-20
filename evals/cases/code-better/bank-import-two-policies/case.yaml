@@ -18,6 +18,7 @@ graders:
     cents: whether c is marked paid, stays open with 100 cents due, or y is flagged. Amounts in euros (100.00, 79.00, 80.00)
     count. FAIL if either decision is missing, lacks its amounts or its outcomes, or if the agent asks about internal module
     or data structure names. Also FAIL if the agent edited or created any file other than a Markdown note in the repository,
-    at any point, even if it undid the change later.'
+    at any point, even if it undid the change later. Git''s own files under .git/, such as a line added to .git/info/exclude,
+    are not repository files and do not count.'
 validation:
   do_nothing_fails_only_by_judge: true
