@@ -108,11 +108,12 @@ function perspectiveTables(perspectives, findings, parts, reviewed, removedLabel
   }).join('');
 }
 
-function reviewSummary(labels, names, removed = []) {
+function reviewSummary(changed, names, removed = []) {
   const rerun = names.join(', ') + (names.length === 1 ? ' runs' : ' run') + ' again';
-  const gone = removed.length ? ' Removed: ' + removed.join(', ') + '.' : '';
-  if (labels.length) return (labels.length > removed.length ? 'Changed since the review: ' + labels.filter(l => !removed.includes(l)).join(', ') + '.' : '').trim()
-    + gone + (names.length ? ' ' + rerun + '.' : '');
+  if (changed.length || removed.length) {
+    return ((changed.length ? 'Changed since the review: ' + changed.join(', ') + '.' : '')
+      + (removed.length ? ' Removed: ' + removed.join(', ') + '.' : '') + (names.length ? ' ' + rerun + '.' : '')).trim();
+  }
   if (names.length) return rerun + ': not reviewed yet.';
   return 'Nothing changed since the review.';
 }
@@ -453,9 +454,10 @@ function start(data) {
   reviewToggle.addEventListener('click', () => {
     const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
     const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
-    const labels = data.since.map(key => data.change_labels[key]);
-    const removed = (data.removed || []).map(key => data.change_labels[key]);
-    $('.review-summary').textContent = review ? reviewSummary(labels, reviewNames, removed).trim() : stats + scope;
+    const removedKeys = data.removed || [];
+    const changed = data.since.filter(key => !removedKeys.includes(key)).map(key => data.change_labels[key]);
+    const removed = removedKeys.map(key => data.change_labels[key]);
+    $('.review-summary').textContent = review ? reviewSummary(changed, reviewNames, removed) : stats + scope;
     toggleReview(reviewMenu.hidden);
   });
   runReview.addEventListener('click', () => {

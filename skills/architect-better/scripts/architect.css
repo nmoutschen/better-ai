@@ -52,7 +52,7 @@ button.stat b { text-decoration:underline; text-underline-offset:3px; }
 .tabs { overflow:auto; }
 .tabs button { white-space:nowrap; }
 .row-actions { display:flex; gap:4px; width:112px; }
-.fig svg g[role="button"] { cursor:crosshair; }
+.fig svg g[role="button"], .fig svg g[role="button"] * { cursor:crosshair; }
 .fig svg g[role="button"] > path:first-child,
 .fig svg g[role="button"] > line:first-child { pointer-events:stroke; }
 .fig svg g[role="button"]:focus-visible { outline:3px solid var(--terracotta); }
@@ -69,12 +69,12 @@ button.stat b { text-decoration:underline; text-underline-offset:3px; }
 .pop textarea { display:block; width:100%; min-height:5em; font:inherit; margin:8px 0; }
 .comment-actions { display:flex; gap:8px; }
 /* Comment pins and the commenting cursor match design-better's canvas. */
-.fig svg, .fig svg * { cursor:crosshair; }
-.pin { position:absolute; width:24px; height:24px; transform:translate(-50%, -50%); border-radius:50%; background:#E8725C;
-  color:#1C1A17; font:700 12px/24px var(--sans); text-align:center; box-shadow:0 0 0 2px var(--cream); cursor:pointer; }
-.pin[data-state="seen"], .pin[data-state="replied"] { background:#C4B69C; }
+.pin { position:absolute; width:24px; height:24px; transform:translate(-50%, -50%); border-radius:50%; background:var(--terracotta);
+  color:var(--heading); font:700 12px/24px var(--sans); text-align:center; box-shadow:0 0 0 2px var(--cream); cursor:pointer; }
+.pin[data-state="seen"], .pin[data-state="replied"] { background:var(--sand); }
 .pin[data-state="asked"] { background:var(--cream); color:var(--umber); box-shadow:0 0 0 2px var(--umber); }
-.pin[data-state="working"] { background:#E8725C; }
+.pin[data-state="working"] { background:var(--terracotta); }
+.pin[data-state="reopened"] { box-shadow:0 0 0 2px var(--cream), 0 0 0 4px var(--error); }
 .pin[data-state="done"] { background:var(--moss-dark); color:var(--cream); }
 .pin[data-state="accepted"] { display:none; }
 .btn:disabled { opacity:.45; cursor:default; }
