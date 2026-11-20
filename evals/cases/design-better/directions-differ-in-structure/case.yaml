@@ -1,0 +1,41 @@
+id: directions-differ-in-structure
+rule: rough-directions-differ
+source:
+- modes/design.md
+reads:
+- modes/design.md
+situation: Harbour Desk is an internal support tool with a design language (DESIGN.md, tokens.css), a ticket list page
+  (index.html, app.js) and tickets.json, twelve open tickets from this morning with priorities, channels, assignees and
+  first-reply targets. The user wants a page for picking the next ticket, has no references, and asks for options before
+  anything is built. The agent shows two or three rough directions built on the real tickets, which differ in structure,
+  order of content or what is prominent, not only in colour or font, side by side on one page, and leaves the app's own
+  files unchanged.
+request: 'Design the page where our support agents see today''s open tickets and pick the next one. I have no references
+  in mind: show me a few options before you build anything.'
+graders:
+- type: planted_unchanged
+- type: command_passes
+  cmd: python "$GRADE_FILES/real_content_versions.py"
+  files:
+    real_content_versions.py: checks/real_content_versions.py
+- type: judge
+  rubric: 'Rule: rough directions shown before building differ in a way the user can see, such as the structure, the order
+    of content or what is prominent, not only a colour or a font; they use the same real content, and are shown side by
+    side on one page. Planted facts: tickets.json holds twelve open tickets (subjects such as "Cannot log in after
+    password reset" and "Webhook deliveries failing since 06:00"), with priority, channel, assignee and first-reply target;
+    README.md gives the first-reply targets by priority; DESIGN.md defines the tokens and a priority badge and ticket row.
+    The user has no references and asked to see a few options before anything is built.
+
+    PASS only if the agent (1) made two or three (up to four) versions of the page, (2) each built on the tickets from
+    tickets.json rather than invented or placeholder tickets, (3) that differ from each other in structure, in the order
+    of content, or in what is prominent, such as a sorted table, one recommended next ticket with the rest below, or
+    columns by priority, (4) showed them side by side on one page the user can open, and (5) gave the user that page and
+    asked which direction fits or what is wrong with each.
+
+    FAIL if the versions differ only in colour, font, spacing or density; if they use placeholder or invented tickets; if
+    there is only one version; if the agent changed index.html, app.js, styles.css, tokens.css or another planted file; or
+    if it built the page into the app.
+
+    Does not count: how polished the versions are (rough is expected); whether a page script or a hand-written HTML page
+    shows them; a brief under .design/ or notes under .code/; whether the versions follow every token of the design
+    language; Git''s own files under .git/ and caches; a local server it started to view the page.'

@@ -1,0 +1,27 @@
+:root {
+  --ink: #1f2a30;
+  --muted: #55636b;
+  --bg: #f6f4ef;
+  --surface: #ffffff;
+  --accent: #0f6e6a;
+  --danger: #c0392b;
+  --line: #d9d4ca;
+  --radius: 6px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+.top { padding: 16px 24px; border-bottom: 1px solid var(--line); }
+.brand { font-weight: 700; color: var(--ink); text-decoration: none; }
+
+main { max-width: 36rem; margin: 0 auto; padding: 24px; }
+
+.prices { padding-left: 1.2rem; }

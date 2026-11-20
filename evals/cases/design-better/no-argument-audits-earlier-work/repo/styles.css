@@ -1,0 +1,55 @@
+:root {
+  --ink: #1f2a30;
+  --muted: #55636b;
+  --bg: #f6f4ef;
+  --surface: #ffffff;
+  --accent: #0f6e6a;
+  --danger: #c0392b;
+  --line: #d9d4ca;
+  --radius: 6px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+.top { padding: 16px 24px; border-bottom: 1px solid var(--line); }
+.brand { font-weight: 700; color: var(--ink); text-decoration: none; }
+
+main { max-width: 36rem; margin: 0 auto; padding: 24px; }
+
+.prices { padding-left: 1.2rem; }
+
+.top { display: flex; justify-content: space-between; align-items: center; }
+.cta { color: var(--accent); font-weight: 600; text-decoration: none; }
+
+.signup { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+.signup input,
+.signup select {
+  display: block;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+}
+.signup input.invalid,
+.signup select.invalid { border-color: var(--danger); background: #fdf0ee; }
+.signup button {
+  padding: 12px 20px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.done { background: var(--surface); border-left: 4px solid var(--accent); padding: 16px 20px; }

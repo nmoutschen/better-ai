@@ -1,0 +1,14 @@
+reply: 'I set the button to "Save email" and put three label options side by side in .design/email-button/index.html in case you prefer another.'
+actions:
+- read: settings.html
+- bash: perl -pi -e 's|<button type="submit" class="button">Submit</button>|<button type="submit" class="button">Save email</button>|' settings.html
+- write: .design/email-button/index.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>Email button labels</title>
+    <link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../../styles.css"></head>
+    <body><div style="display:flex;gap:1rem">
+    <section class="panel"><h2>A</h2><button class="button">Save email</button></section>
+    <section class="panel"><h2>B</h2><button class="button">Update email address</button></section>
+    <section class="panel"><h2>C</h2><button class="button">Change email</button></section>
+    </div></body></html>

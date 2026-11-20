@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kade Street shifts, Molen Coffee</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Kade Street shifts</h1>
+    <div>
+      <label for="person">Signed in as</label>
+      <select id="person"></select>
+    </div>
+  </header>
+  <main>
+    <section aria-labelledby="mine-heading">
+      <h2 id="mine-heading">Your shifts this week</h2>
+      <ul class="shift-list" id="my-shifts"></ul>
+    </section>
+    <section aria-labelledby="rota-heading" id="rota-section" hidden>
+      <h2 id="rota-heading">Store rota</h2>
+      <ul class="shift-list" id="rota"></ul>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

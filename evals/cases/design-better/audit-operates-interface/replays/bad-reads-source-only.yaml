@@ -1,0 +1,7 @@
+reply: >-
+  From the code: Continue is a div with onclick, so it is not keyboard accessible, and errors show as "Invalid
+  input" in a banner. The date field has no label and the image alt is "image".
+actions:
+- read: booking.html
+- read: booking.js
+- bash: grep -n 'onclick\|placeholder\|alt=' booking.html

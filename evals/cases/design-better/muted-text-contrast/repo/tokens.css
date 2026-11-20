@@ -1,0 +1,24 @@
+/* Kettle & Crumb design tokens. See DESIGN.md before changing a value. */
+:root {
+  --surface: #ffffff;
+  --text: #262626;
+  --text-muted: #a3a3a3;
+  --brand: #c2410c;
+  --brand-ink: #ffffff;
+  --border: #e5e5e5;
+  --error: #b91c1c;
+
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-heading: "Fraunces", Georgia, serif;
+  --size-body: 16px;
+  --size-small: 13px;
+  --size-h1: 28px;
+  --size-h2: 20px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+}

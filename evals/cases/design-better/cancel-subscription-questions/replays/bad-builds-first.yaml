@@ -1,0 +1,14 @@
+reply: 'Added a Cancel membership button to the Membership card. It asks for confirmation and calls POST /api/member/cancel.
+  I assumed members keep access until the end of the paid month.'
+actions:
+- read: account.html
+- bash: perl -pi -e 's|      <a class="button-secondary" href="/plans">Change plan</a>|      <a class="button-secondary" href="/plans">Change plan</a>\n      <button type="button" class="button-secondary" id="cancel">Cancel membership</button>|' account.html
+- bash: |
+    cat >> account.js <<'JS'
+
+    document.getElementById("cancel").addEventListener("click", () => {
+      if (confirm("Cancel your membership? You keep access until the end of the month you paid for.")) {
+        fetch("/api/member/cancel", { method: "POST", credentials: "include" }).then(() => location.reload());
+      }
+    });
+    JS

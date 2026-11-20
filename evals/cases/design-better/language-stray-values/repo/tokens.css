@@ -1,0 +1,20 @@
+:root {
+  --text: #1d2b36;
+  --text-soft: #4c5d69;
+  --bg: #f7f9fa;
+  --surface: #ffffff;
+  --brand: #1f6f8b;
+  --brand-dark: #17566c;
+  --border: #d6dee3;
+
+  --font: "Source Sans 3", system-ui, sans-serif;
+  --size-s: 14px;
+  --size-m: 16px;
+  --size-l: 20px;
+  --size-xl: 28px;
+
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+}

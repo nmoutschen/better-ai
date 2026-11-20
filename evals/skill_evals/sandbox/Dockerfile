@@ -1,5 +1,5 @@
-# Sandbox for one eval sample: Python for the planted repositories, Node for Claude Code, and git for
-# the starting commit. Built once by compose; each sample gets a fresh container.
+# Sandbox for one eval sample: Python for the planted repositories, Node for Claude Code, git for the
+# starting commit, and a headless Chromium with Playwright for cases that render and operate a page. Built once by compose; each sample gets a fresh container.
 FROM node:22-bookworm-slim AS node
 
 FROM python:3.12.12-slim-bookworm
@@ -9,10 +9,19 @@ ARG CLAUDE_CODE_VERSION=2.1.327
 ARG RUFF_VERSION=0.17.5
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates \
+    && apt-get install -y --no-install-recommends git ca-certificates libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir "ruff==${RUFF_VERSION}"
+
+# Playwright for Python and its Chromium, shared by every user, so an agent can render and operate a page
+# and a hidden check can read a rendered page's computed styles.
+ARG PLAYWRIGHT_VERSION=1.65.2
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN pip install --no-cache-dir "playwright==${PLAYWRIGHT_VERSION}" \
+    && playwright install --with-deps chromium \
+    && chmod -R a+rX /opt/ms-playwright \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules

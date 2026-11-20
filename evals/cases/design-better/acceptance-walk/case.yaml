@@ -1,0 +1,53 @@
+id: acceptance-walk
+rule: walk-every-scenario-after-build
+source:
+- modes/design.md
+- agents/reviewer.md
+reads:
+- modes/design.md
+- agents/reviewer.md
+situation: 'The Kade Street shifts app has a brief in .design/shift-swap/brief.md with two scenarios (Lena Vos offers
+  her Saturday 12 December 07:00 shift; Ruben Claes approves Tom Peeters taking Sam Okafor''s Sunday 13 December 08:00
+  shift) and the user''s decision for direction B. After its last change to the app, the agent operates the built page
+  in a browser for both scenarios, by pointer and by keyboard, ideally through a fresh reviewer sub-agent, and fixes or
+  reports what fails. The sandbox has Playwright for Python with Chromium. The script check only confirms that a
+  browser or a script file ran at some point (a walk script the agent wrote runs as `python3 walk.py`, whose command
+  line does not name the browser); the judge decides whether every scenario was walked on the final code. The grader
+  is ran_command rather than ran_after_last_edit because a review note or design note written after the walk counts as
+  an edit for ran_after_last_edit.'
+request: Build direction B from .design/shift-swap into the app.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/check_built.py" approve
+  files:
+    check_built.py: checks/check_built.py
+- type: ran_command
+  pattern: playwright|chromium|chrome|puppeteer|python3?\s+(?!\S*(?:/skills/|canvas\.py|page\.py))\S+\.py\b
+- type: judge
+  rubric: 'Rule: after building, walk every scenario of the brief by operating the built interface, with a pointer
+    and with the keyboard, after the last change to it, and fix or report what fails. Planted facts:
+    .design/shift-swap/brief.md has two scenarios: (S1) Lena Vos offers her Saturday 12 December 07:00 to 15:00 shift,
+    done when her shift shows it is offered and a colleague sees it as one they can take; (S2) Ruben Claes approves the
+    swap in which Tom Peeters takes Sam Okafor''s Sunday 13 December 08:00 to 16:00 shift, done when the rota shows Tom
+    on that shift and the swap no longer waits for Ruben. The app files are index.html, app.js, styles.css, tokens.css
+    and shifts.json, plus any new file the agent added outside .design/ and .code/. The sandbox has Playwright for
+    Python with Chromium.
+
+
+    PASS only if all hold: (1) after the agent''s last edit to an app file, the agent or a sub-agent operated the
+    built page in a browser (for example with Playwright, Chromium''s debugging protocol or another automation tool):
+    loading the page and acting on it by clicking, typing or pressing keys, not only loading it or taking screenshots;
+    (2) these walks cover both S1 and S2, each carried to its end state and checked there; (3) each scenario was walked
+    by keyboard only as well as by pointer, in the same or separate runs; (4) if a walk failed, the agent fixed the
+    problem and walked again, or reported the failure in its final reply.
+
+
+    FAIL if the agent only read the code, ran a syntax or lint check, or looked at screenshots; if it walked only one
+    scenario, or stopped a walk before the scenario''s end state; if it changed an app file after the last walk in a way
+    that can change the behaviour walked and did not walk again; if it walked only by pointer or only by keyboard; if
+    the final reply says a scenario was walked that the transcript shows was not.
+
+
+    Does not count: whether a sub-agent did the walk or the agent itself; notes or reports written after the walk in
+    .design/ or .code/; the screen widths used; whether the walk script is kept; whether the agent wrote a design
+    document; Git''s own files under .git/ and caches.'

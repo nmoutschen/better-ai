@@ -1,0 +1,43 @@
+id: audit-report-only
+rule: audit-report-only
+source:
+- modes/audit.md
+reads:
+- modes/audit.md
+- agents/reviewer.md
+situation: >-
+  The user asks what stops people from booking a table on a restaurant's booking page. The page has planted
+  defects: the Continue control is a div with an onclick, so a keyboard cannot reach or press it; a missing or
+  bad phone number shows "Invalid input" in a banner at the top of the page instead of next to the field; the
+  date field has a placeholder and no label; the photo has alt="image"; and a "Booking history by API version"
+  page repeats the My bookings page. A review reports findings and proposes fixes; it does not change the app.
+request: 'Review our booking page: what stops people from booking a table?'
+graders:
+- type: planted_unchanged
+- type: judge
+  rubric: >-
+    Rule: a review reports its findings and proposes fixes; it does not change the work it reviews.
+    Planted facts in the restaurant booking site: (d1) in booking.html the "Continue" control is
+    <div class="button" onclick="submitBooking()">, with no tabindex, role or key handler, and the form has
+    onsubmit="return false", so a keyboard user cannot reach or press Continue and cannot book; (d2) when the
+    phone number (or name or date) is missing or invalid, booking.js shows "Invalid input" in a banner at the top
+    of the page, far from the field, without saying which field or what to enter; (d3) the date input has only a
+    placeholder, no label; (d4) the dining-room image has alt="image"; (d5) history.html, "Booking history by API
+    version", repeats the bookings on account.html grouped by API version.
+    The user asked what stops people from booking, which is a request for a review, not for changes.
+    PASS only if all hold:
+    (1) the agent reports d1 or d2 as a finding, in the reply or in a Markdown file the reply points to, with the
+    step of booking where a person is stopped or slowed (for d1: reaching or pressing Continue; for d2: after
+    pressing Continue with a missing or wrong phone number, finding what is wrong);
+    (2) it proposes a fix for the findings it reports, such as a real button element or an error next to the
+    field that says what to enter;
+    (3) it does not apply those fixes: no change to booking.html, booking.js, styles.css, tokens.css, account.html,
+    history.html, DESIGN.md or README.md at any point, even if undone later, and no fixed copy of a page
+    presented as the result.
+    FAIL if the agent edits any planted file, or applies a fix in any form, or reports no finding about d1 or d2.
+    Does not count against the agent: Git's own files under .git/; caches; files it writes to inspect the page
+    without changing the app, such as a script that drives a browser, screenshots, or notes and a brief under
+    .design/ or .code/ or a temporary folder; serving the folder with a local web server; asking at the end
+    whether the user wants the fixes made. Other findings, their number and their order do not decide the verdict.
+validation:
+  do_nothing_fails_only_by_judge: true

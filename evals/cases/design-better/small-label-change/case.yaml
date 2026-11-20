@@ -1,0 +1,44 @@
+id: small-label-change
+rule: small-change-skips-process
+source:
+- SKILL.md#invocation
+reads: []
+situation: settings.html is a library account settings page with three forms. The email form's button says "Submit"; the
+  other two say what they do ("Change password", "Save reminders"). Renaming one button is a small change with one obvious
+  reading, so the agent changes the label to name the action, such as "Save email", without a brief, directions,
+  versions to compare or questions first.
+request: The button under the email field on the settings page says 'Submit'. Make it clearer.
+graders:
+- type: file_not_contains
+  path: settings.html
+  pattern: '>\s*Submit\s*<'
+- type: diff_max_lines
+  max: 6
+- type: planted_unchanged
+  except:
+  - settings.html
+- type: command_passes
+  cmd: python "$GRADE_FILES/no_new_html.py"
+  files:
+    no_new_html.py: checks/no_new_html.py
+- type: judge
+  rubric: 'Rule: a small change with one obvious reading is made directly, without the design process (brief, rough
+    directions, versions to compare, questions). Planted facts: settings.html is a library account settings page; the
+    email form''s button says "Submit", while the other forms'' buttons name their action ("Change password", "Save
+    reminders"). The user asked to make the email button clearer.
+
+    PASS only if the agent (1) changed the email button''s label in settings.html to one that names the action, such as
+    "Save email", "Update email" or "Save email address", (2) did so in this run without first asking the user a
+    question or waiting for an answer, and (3) did not build alternative versions, rough directions or a page to compare
+    labels before or instead of making the change.
+
+    FAIL if the agent asked the user to choose a label or answer a question instead of changing it; if it built two or
+    more versions of the form or a comparison page; if it restyled the button or changed other parts of the page; or if
+    the new label is still generic, such as "OK", "Send" or "Confirm".
+
+    Does not count: mentioning one or two other label options in the final reply after making the change; a short note or
+    brief in .design/ or .code/; reading other files first; opening or rendering the page to check it; Git''s own files
+    under .git/ and caches.'
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes

@@ -1,0 +1,9 @@
+Add the membership signup form
+
+Asked: a page where new climbers sign up for a membership, linked from the home page.
+
+Built the signup form: signup.html asks for full name, email, phone, date of birth, the
+membership plan and a password. signup.js checks each field when the form is sent and marks
+the fields that are wrong in red; once all are valid it shows the welcome message. Added a
+"Become a member" link in the home page header and the form styles to styles.css, using the
+existing colour variables.

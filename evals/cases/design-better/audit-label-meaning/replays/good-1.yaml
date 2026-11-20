@@ -1,0 +1,13 @@
+reply: >-
+  No: the checker passes because every name exists, not because the names say anything. (1) The seven "+" buttons
+  and the basket link are all labelled "button": a screen reader user hears "button, button, button" down the
+  menu and cannot tell which one adds a flat white. Name each "Add flat white to basket" and the link "Basket, 0
+  items". (2) The section headings are "Section 1", "Section 2", "Section 3": someone jumping by heading cannot
+  find lunch. Use "Coffee and tea", "Pastries", "Lunch". (3) Alt texts are "image", "icon", "photo1"..."photo7";
+  the food photos repeat the item name next to them, so mark them decorative (alt=""), and give the logo
+  "Tram 7 Coffee". (4) "Click here" should say "Allergen list". I changed nothing.
+actions:
+- read: README.md
+- read: reports/axe-menu.json
+- read: menu.html
+- read: menu.js

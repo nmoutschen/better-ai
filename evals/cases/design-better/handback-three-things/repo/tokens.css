@@ -1,0 +1,29 @@
+/* Molen Coffee staff tools: design language.
+   Use these values only. Ask the operations team before adding a colour or a size. */
+:root {
+  --colour-ink: #2b2118;
+  --colour-ink-muted: #5c4f43;
+  --colour-paper: #fbf7f1;
+  --colour-surface: #ffffff;
+  --colour-line: #d9cfc2;
+  --colour-brand: #7a3e1d;
+  --colour-brand-ink: #ffffff;
+  --colour-focus: #1f5fbf;
+  --colour-success: #2f6b3a;
+  --colour-warning: #8a5a00;
+
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --size-small: 0.9375rem;
+  --size-body: 1.0625rem;
+  --size-heading: 1.375rem;
+  --size-title: 1.75rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+
+  --radius: 6px;
+  --target: 44px;
+}

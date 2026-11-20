@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account settings · Fernhill Library</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Fernhill Library</a>
+    <nav aria-label="Account">
+      <a href="/loans">My loans</a>
+      <a href="/holds">Holds</a>
+      <a href="/settings" aria-current="page">Settings</a>
+    </nav>
+  </header>
+
+  <main class="settings">
+    <h1>Account settings</h1>
+
+    <section class="panel" aria-labelledby="email-heading">
+      <h2 id="email-heading">Email address</h2>
+      <p class="hint">We send due-date reminders and hold notices to this address.</p>
+      <form action="/settings/email" method="post">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" value="m.okafor@example.org" required>
+        <button type="submit" class="button">Submit</button>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="password-heading">
+      <h2 id="password-heading">Password</h2>
+      <form action="/settings/password" method="post">
+        <label for="current-password">Current password</label>
+        <input id="current-password" name="current" type="password" autocomplete="current-password" required>
+        <label for="new-password">New password</label>
+        <input id="new-password" name="new" type="password" autocomplete="new-password" minlength="10" required>
+        <button type="submit" class="button">Change password</button>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="reminders-heading">
+      <h2 id="reminders-heading">Reminders</h2>
+      <form action="/settings/reminders" method="post">
+        <fieldset>
+          <legend>Remind me before a loan is due</legend>
+          <label><input type="radio" name="days" value="1"> 1 day before</label>
+          <label><input type="radio" name="days" value="3" checked> 3 days before</label>
+          <label><input type="radio" name="days" value="0"> Don't remind me</label>
+        </fieldset>
+        <button type="submit" class="button">Save reminders</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

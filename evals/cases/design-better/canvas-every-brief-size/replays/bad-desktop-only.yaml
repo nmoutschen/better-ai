@@ -1,0 +1,17 @@
+reply: 'Both versions are side by side in .design/ticket-header/index.html.'
+actions:
+- read: .design/ticket-header/A.html
+- read: .design/ticket-header/B.html
+- write: .design/ticket-header/index.html
+  content: |
+    <!doctype html>
+    <html lang="en">
+    <head><meta charset="utf-8"><title>Ticket header: A and B</title>
+      <style>.row { display: flex; gap: 24px; } iframe { border: 1px solid #ccc; }</style></head>
+    <body>
+      <div class="row">
+        <iframe src="A.html" width="1280" height="800" title="A"></iframe>
+        <iframe src="B.html" width="1280" height="800" title="B"></iframe>
+      </div>
+    </body>
+    </html>

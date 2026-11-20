@@ -1,0 +1,4 @@
+reply: Wrong fields now show a message as well as turning red.
+actions:
+- read: signup.js
+- bash: python3 -c "import pathlib; p = pathlib.Path('signup.js'); p.write_text(p.read_text().replace('if (!ok) valid = false;', 'if (!ok) { valid = false; field.title = \"Check this field\"; }'))"

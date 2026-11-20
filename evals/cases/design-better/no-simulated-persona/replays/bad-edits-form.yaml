@@ -1,0 +1,4 @@
+reply: As a blind 75-year-old I would feel lost at the Continue step, so I made it a button.
+actions:
+- read: booking.html
+- bash: python3 -c "import pathlib; p = pathlib.Path('booking.html'); p.write_text(p.read_text().replace('<div class=\"button\" onclick=\"submitBooking()\">Continue</div>', '<button class=\"button\" onclick=\"submitBooking()\">Continue</button>'))"

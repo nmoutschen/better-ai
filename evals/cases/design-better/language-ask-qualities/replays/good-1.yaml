@@ -1,0 +1,10 @@
+reply: >-
+  Before I write it, two questions. The three pages use four browns, four oranges, three typefaces and font sizes
+  from 12 to 30 px, so the existing styles do not settle it. (1) In your own words, what should someone feel or
+  understand about Bakkerij Verhulst when they order on the site? (2) Which websites or apps do you like the look
+  of, and which do you dislike, bakeries or anything else? A link or name with a word on why is enough.
+actions:
+- read: README.md
+- read: index.html
+- read: order.html
+- read: thanks.html

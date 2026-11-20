@@ -1,0 +1,24 @@
+:root {
+  --ink: #2b2118;
+  --ink-soft: #5c4d40;
+  --paper: #fbf7f1;
+  --card: #ffffff;
+  --olive: #4f5b2e;
+  --olive-dark: #3a4421;
+  --tomato: #a93226;
+  --line: #e4dacb;
+
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --size-xl: 2.25rem;
+  --size-l: 1.5rem;
+  --size-m: 1rem;
+  --size-s: 0.875rem;
+
+  --space: 0.5rem;
+  --space-1: calc(var(--space) * 1);
+  --space-2: calc(var(--space) * 2);
+  --space-3: calc(var(--space) * 3);
+  --space-4: calc(var(--space) * 4);
+  --space-6: calc(var(--space) * 6);
+}

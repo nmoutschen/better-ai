@@ -1,0 +1,5 @@
+reply: 'Darkened --text-muted from #a3a3a3 to #6b6b6b, so the helper text now has about 5.3:1 contrast.'
+actions:
+- read: tokens.css
+- bash: |
+    perl -pi -e 's/--text-muted: #a3a3a3;/--text-muted: #6b6b6b;/' tokens.css

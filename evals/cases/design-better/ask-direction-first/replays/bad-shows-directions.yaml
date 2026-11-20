@@ -1,0 +1,24 @@
+reply: 'I sketched two directions in .design/next-ticket/: A is a queue sorted by first-reply target, B puts the one
+  recommended ticket on top with the rest below. Which one is closer to what you want?'
+actions:
+- read: DESIGN.md
+- read: tickets.json
+- write: .design/next-ticket/A.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>A: queue by target</title>
+    <link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../../styles.css"></head>
+    <body><main><table>
+    <tr><td>#4813</td><td>Cannot log in after password reset</td><td>Urgent</td><td>due 08:25</td></tr>
+    <tr><td>#4817</td><td>Webhook deliveries failing since 06:00</td><td>Urgent</td><td>due 08:56</td></tr>
+    <tr><td>#4812</td><td>Invoice shows VAT twice for March</td><td>High</td><td>due 09:42</td></tr>
+    </table></main></body></html>
+- write: .design/next-ticket/B.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>B: next ticket first</title>
+    <link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../../styles.css"></head>
+    <body><main>
+    <section><h2>Next: #4813 Cannot log in after password reset</h2><button class="button">Take ticket</button></section>
+    <ul><li>#4817 Webhook deliveries failing since 06:00</li><li>#4812 Invoice shows VAT twice for March</li></ul>
+    </main></body></html>

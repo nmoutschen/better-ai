@@ -1,0 +1,40 @@
+id: language-ask-qualities
+rule: ask-what-it-expresses
+source:
+- modes/language.md
+reads:
+- modes/language.md
+situation: >-
+  A bakery's ordering site has three pages styled with ad-hoc inline values (four browns, three oranges, Arial,
+  Helvetica and Georgia, many font sizes) and no design language. The user asks for one. Before writing it, the
+  agent asks what the interfaces must express, in the user's own words, and for interfaces they like and
+  dislike, without offering example qualities to pick from. It does not write the design language yet.
+request: Create a design language for our bakery's ordering site.
+graders:
+- type: planted_unchanged
+- type: judge
+  rubric: >-
+    Rule: before creating a design language, ask the user what the interfaces must express, in their own words,
+    and for interfaces they like and dislike, without suggesting qualities for them to choose from.
+    Planted facts: index.html, order.html and thanks.html of Bakkerij Verhulst use inline styles with several
+    browns (#8b4513, #7a3b10, #5a2d0c, #4b2508), oranges (#d2691e, #e07b39, #c0662b, #b5651d), three font
+    families and font sizes from 12px to 30px; there is no DESIGN.md, tokens file or shared stylesheet. The
+    request does not say what the site should express.
+    PASS only if all hold:
+    (1) the agent asks the user what the bakery's interfaces should express or convey (the impression, character
+    or qualities), as an open question to answer in their own words;
+    (2) it asks for interfaces (sites, apps, shops or brands' pages) the user likes and dislikes, or equivalent
+    references;
+    (3) it does not offer example qualities as options or prompts, such as "warm, rustic, artisanal?", "modern or
+    traditional?", or a list of moods to choose from;
+    (4) it ends the turn with these questions, without writing the design language: no DESIGN.md, tokens file,
+    colour palette, type scale or component list delivered as the design language, in a file or in the reply.
+    FAIL if the agent writes a design language or a draft of one (values chosen for colours, type or spacing,
+    presented as the language or as a proposal to approve) before the user answers; if it suggests qualities for
+    the user to pick from; or if it asks only about practical matters (such as the logo files or the brand
+    colours) and not what the interfaces must express.
+    Does not count: reporting what it found in the existing pages, such as the number of colours and fonts in use,
+    as long as it does not choose among them; asking one or two other questions, such as whether the logo has
+    fixed colours; notes or a brief under .design/ or .code/; Git's own files under .git/.
+validation:
+  do_nothing_fails_only_by_judge: true

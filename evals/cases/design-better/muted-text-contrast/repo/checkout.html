@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Checkout · Kettle &amp; Crumb</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="checkout">
+    <form action="/checkout" method="post">
+      <h1>Checkout</h1>
+
+      <h2>Delivery</h2>
+      <div class="field">
+        <label for="name">Full name</label>
+        <input id="name" name="name" autocomplete="name" required aria-describedby="name-help">
+        <p class="helper" id="name-help">As it appears on your doorbell or letterbox.</p>
+      </div>
+      <div class="field">
+        <label for="address">Street and house number</label>
+        <input id="address" name="address" autocomplete="street-address" required>
+      </div>
+      <div class="field">
+        <label for="postcode">Postcode</label>
+        <input id="postcode" name="postcode" autocomplete="postal-code" required aria-describedby="postcode-help">
+        <p class="helper" id="postcode-help">We deliver fresh bread within Utrecht and Amersfoort only.</p>
+      </div>
+      <div class="field">
+        <label for="phone">Phone</label>
+        <input id="phone" name="phone" type="tel" autocomplete="tel" required aria-describedby="phone-help">
+        <p class="helper" id="phone-help">We'll only call if the courier can't find you.</p>
+      </div>
+      <div class="field">
+        <label for="slot">Delivery slot</label>
+        <select id="slot" name="slot" aria-describedby="slot-help">
+          <option>Saturday 7:00 to 9:00</option>
+          <option>Saturday 9:00 to 11:00</option>
+          <option>Sunday 8:00 to 10:00</option>
+        </select>
+        <p class="helper" id="slot-help">Orders close Thursday at 20:00 for weekend delivery.</p>
+      </div>
+
+      <h2>Payment</h2>
+      <div class="field">
+        <label for="method">Pay with</label>
+        <select id="method" name="method">
+          <option>iDEAL</option>
+          <option>Card</option>
+        </select>
+      </div>
+
+      <button type="submit" class="button-primary">Pay €23.40</button>
+    </form>
+
+    <aside class="summary" aria-labelledby="summary-heading">
+      <h2 id="summary-heading">Your order</h2>
+      <ul>
+        <li><span>Sourdough loaf <span class="detail">× 2</span></span><span>€11.00</span></li>
+        <li><span>Cardamom buns <span class="detail">box of 4</span></span><span>€8.40</span></li>
+        <li><span>Delivery <span class="detail">Saturday</span></span><span>€4.00</span></li>
+        <li><strong>Total</strong><strong>€23.40</strong></li>
+      </ul>
+    </aside>
+  </main>
+</body>
+</html>
