@@ -1,0 +1,159 @@
+/* The shared look of skill pages that talk to the agent: design-better's canvas and research-better's board.
+   Both skills carry an identical copy of this file (the Scripts workflow checks it); each page adds its own file for
+   what only it shows. */
+/* The n14n "Journal" tokens. */
+:root {
+  --cream:#FFFCF7; --linen:#F2EDE5; --sand:#C4B69C; --terracotta:#E8725C; --umber:#5C4033; --moss-dark:#66795A;
+  --ink:#33302B; --heading:#1C1A17; --muted:#78736B; --line:#DDD6CA; --error:#9A3B2A;
+  /* Behind the versions: untinted, because a tinted surround shifts what looks neutral. Near-white as in design
+     tools, or #1E1E1E for dark (the Display menu). A mid-grey would favour mid-tones. */
+  --surround:#F5F5F5;
+  --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
+  --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E");
+  --pad:max(40px, (100% - 110rem) / 2);
+}
+* { box-sizing:border-box; }
+:focus-visible { outline:2px solid var(--umber); outline-offset:2px; }
+
+/* ---------- Layout: one window, no page scroll; each version scrolls inside its own frame ---------- */
+html { height:100%; }
+body { margin:0; height:100%; display:flex; flex-direction:column; overflow:hidden; background:var(--cream); color:var(--ink);
+  font:400 15px/1.55 var(--sans); -webkit-font-smoothing:antialiased; }
+.band { height:6px; background:var(--umber) var(--saya); background-size:13px 7.5px; }
+.work { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(20rem, 24rem); }
+@media (max-width:900px) {
+  body { height:auto; overflow:auto; }
+  .work { grid-template-columns:1fr; }
+  main { height:85vh; }
+  .notes { border-left:0; border-top:2px solid var(--ink); }
+}
+
+/* ---------- Top bar: the n14n umber block, with the question and the controls ---------- */
+header { flex:none; display:flex; flex-wrap:wrap; gap:10px 32px; align-items:center; justify-content:space-between;
+  padding:12px 20px; background:var(--umber); color:var(--cream); }
+h1 { font:700 20px/1.2 var(--serif); color:var(--cream); margin:0; }
+
+/* Segmented controls: one of several options, the chosen one filled. */
+.seg { display:inline-flex; border:1px solid var(--cream); }
+.seg[hidden] { display:none; }
+.seg button { border:0; background:transparent; color:var(--cream); padding:7px 14px; cursor:pointer;
+  font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.seg button + button { border-left:1px solid var(--cream); }
+.seg button[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
+
+
+.scroll-setting { display:grid; gap:4px; }
+.scroll-setting[hidden] { display:none; }
+
+
+/* ---------- Conversation ---------- */
+.notes { min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:16px 0 0;
+  border-left:2px solid var(--ink); background:var(--cream); color:var(--ink); }
+.notes-top { display:flex; justify-content:space-between; align-items:center; gap:12px; min-height:24px; padding:0 20px; margin-bottom:12px; }
+.notes h2 { margin:0; font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+.notes .filter { border-color:var(--ink); }
+.notes .filter button { color:var(--ink); padding:4px 10px; font-size:11px; }
+.notes .filter button + button { border-left-color:var(--ink); }
+.notes .filter button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
+.thread { flex:1; min-height:0; overflow:auto; list-style:none; margin:0; padding:0 20px 12px; }
+.thread > li { display:block; margin:0 0 12px; }
+
+/* An item: the user's comment, message or decision, with the replies under it and its state at the end. */
+.thread > li.msg { padding:10px 12px; background:#fff; border:1px solid var(--line); }
+.thread > li.msg.agent { background:var(--linen); border-color:var(--sand); border-left:4px solid var(--moss-dark); }
+.msg .head { display:flex; flex-wrap:wrap; gap:2px 8px; align-items:center; margin-bottom:4px; font-size:12px; color:var(--muted); }
+.msg .who { font-weight:700; color:var(--heading); }
+.msg.agent .who { color:var(--umber); }
+/* On linen, names and times use umber and ink: moss and muted fall under 4.5:1 there. */
+.msg.agent .when, .thread .reply:not(.mine) .when { color:var(--ink); }
+.msg .re { font-style:italic; }
+.msg .body { margin:4px 0 0; white-space:pre-wrap; font-size:14px; line-height:1.45; }
+.msg .link { margin-left:auto; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
+.msg .head .link + .link { margin-left:8px; }
+.msg .answered { font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
+/* The item's left edge carries its state, so it reads at a glance in a long thread. */
+.thread > li.msg[data-state] { border-left-width:4px; }
+.thread > li.msg[data-state="seen"], .thread > li.msg[data-state="replied"], .thread > li.msg[data-state="followup"] { border-left-color:var(--sand); }
+.thread > li.msg[data-state="asked"] { border-left-color:var(--umber); }
+.thread > li.msg[data-state="working"] { border-left-color:var(--terracotta); }
+.thread > li.msg[data-state="done"], .thread > li.msg[data-state="accepted"] { border-left-color:var(--moss-dark); }
+.thread > li.msg[data-state="reopened"] { border-left-color:var(--error); }
+/* Where a comment points: a small quote above the user's words, so every message reads alike. */
+.crumb { display:block; }
+.crumb .path { display:block; font:400 12px/1.4 var(--sans); color:var(--muted); }
+/* One typeface for the whole label: the path muted, then what the element is, muted, and what it says. */
+.crumb .el { display:block; font:400 15px/1.4 var(--sans); color:var(--heading); margin-top:2px; }
+.crumb .role { color:var(--muted); }
+.thread .crumb { margin:2px 0 0; padding-left:8px; border-left:2px solid var(--line); }
+.thread .crumb .path { font-size:11px; }
+.thread .crumb .el { font:400 13px/1.4 var(--sans); color:var(--muted); margin-top:0; }
+
+/* Replies sit under the item, edge to edge. The item's own left edge already marks it, so a reply shows by its
+   background and label, not a second bar. */
+.thread .reply { margin:10px -12px -10px; padding:8px 12px 10px; background:var(--linen); border-top:1px solid var(--line); }
+.thread .reply .who { color:var(--umber); }
+.thread .reply .body { margin:2px 0 0; }
+.thread .reply.mine { background:#fff; }
+.thread .reply.mine .who { color:var(--heading); }
+/* The agent's own message is its first reply block, flush with the item so its text lines up with every other item. */
+.thread > li.msg.agent > .reply:first-child { margin:-10px -12px 0; padding:10px 12px 0; border:0; background:none; }
+/* The state row closes the item, aligned with its text. A reply pulls its bottom edge 10px down; 16px leaves the same
+   6px gap as without one. */
+.thread .foot { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; margin:6px 0 0; font-size:12px; color:var(--muted); }
+.thread .reply + .foot { margin-top:16px; }
+.thread .reply:has(+ .foot) { padding-bottom:2px; }
+.thread .foot .answer { margin-left:auto; }
+.thread .foot .answer + .answer { margin-left:0; }
+.thread .foot .mini:first-of-type { margin-left:auto; }
+.mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
+  font:700 12px/18px var(--sans); }
+.mini:hover { border-color:var(--ink); }
+/* Progress: three short bars fill as the agent sees an item, works on it and finishes it. */
+.progress { white-space:nowrap; display:inline-flex; align-items:center; gap:6px; font:700 10px var(--sans); letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted); }
+.progress .bars { display:inline-flex; gap:2px; }
+.progress .bars i { width:10px; height:4px; background:var(--line); }
+.progress.seen .bars i.on, .progress.replied .bars i.on, .progress.followup .bars i.on { background:var(--sand); }
+.progress.asked, .progress.working { color:var(--umber); }
+.progress.asked .bars i.on { background:var(--umber); }
+.progress.working .bars i.on { background:var(--terracotta); }
+.progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
+.progress.done, .progress.accepted { color:var(--moss-dark); }
+.progress.done .bars i.on, .progress.accepted .bars i.on { background:var(--moss-dark); }
+.progress.accepted::after { content:"\2713"; font-size:12px; }
+.progress.reopened { color:var(--error); }
+.progress.reopened .bars i { background:var(--terracotta); opacity:.5; }
+@keyframes pulse-bar { 50% { opacity:.35; } }
+@media (prefers-reduced-motion: reduce) { .progress .bars i { animation:none !important; } }
+/* The box for a reason to reopen, or for an answer. A reply above pulls its bottom edge down by the item's padding;
+   20px gives that space back. */
+.why { margin-top:10px; }
+.thread .reply + .why { margin-top:20px; }
+
+/* The message box, with the decision panel above it. */
+.composer { border-top:1px solid var(--line); padding:12px 20px 14px; background:var(--cream); }
+.notes label { display:block; font-size:14px; margin:8px 0 4px; }
+
+/* ---------- Buttons, fields, the comment box and the toast ---------- */
+.btn { border:1px solid var(--umber); background:var(--umber); color:var(--cream); padding:8px 16px; cursor:pointer;
+  font:700 12px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.btn--quiet { background:transparent; color:var(--ink); border:1px solid var(--ink); }
+.btn--sm { padding:3px 10px; font-size:10px; }
+.notes textarea { width:100%; min-height:4.5em; font:400 15px/1.5 var(--sans); color:var(--ink); background:#fff;
+  border:1px solid var(--muted); padding:8px 10px; resize:vertical; }
+.composer textarea { min-height:3.2em; }
+.why textarea { min-height:3em; font:400 14px/1.45 var(--sans); padding:6px 8px; }
+.toast { position:fixed; z-index:6; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(36rem, calc(100vw - 32px));
+  background:var(--umber); color:var(--cream); padding:12px 20px; font:700 15px/1.4 var(--sans);
+  box-shadow:0 8px 24px rgba(28,26,23,.3); }
+.toast.ok { background:var(--moss-dark); }
+.toast.error { background:var(--error); }
+.toast[hidden] { display:none; }
+
+.notes .empty { margin:0 0 16px; padding:0 20px; }
+.why .row2 { display:flex; gap:8px; margin-top:6px; }
+.notes .send { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; margin-top:12px; }
+.sys { padding:10px 0; border-top:1px solid var(--line); font-size:12px; color:var(--muted); text-align:center; }
+/* Under the bar when the agent's server stops answering, so a quiet page is not mistaken for a quiet agent. */
+.offline { flex:none; margin:0; padding:8px 20px; background:var(--error); color:var(--cream); font:700 14px/1.4 var(--sans); }
+.offline[hidden] { display:none; }

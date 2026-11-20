@@ -23,10 +23,19 @@ IF a field is missing, SAY so in the output and review what you have.
 - `spec`: <path, or the requirements inline, without results>
 - `requirements`: <the IDs this change must meet>
 - `decisions`: <paths of the recorded decisions>
+- `log`: <path of your log, `.code/<change>/logs/<agent name>.md`, or none>
 
 ## Messages
 
 None. PUT everything in the output.
+
+## Log
+
+IF `log` is given and not none, a dashboard shows the user your work from it. CREATE it, and ADD one line at the end for each event as it happens, never editing earlier lines. START each line with its kind, and keep it to one short sentence:
+
+- `start: verifier, task <n>, <branch>` when you begin;
+- `step: <what you just checked or found>` after each requirement you check and each finding you confirm;
+- `handed back: <passes | fails>, <one short reason>` at the end.
 
 ## What to look for
 

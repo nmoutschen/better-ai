@@ -72,6 +72,23 @@ Running it does not mean code gets written right away. It can stop at requiremen
 9. **It gets a separate review.** The reviewer sees only the diff, the requirements and the code, not the agent's reasoning.
 10. **It reports back** and offers to explain how the change works.
 
+When the work splits into several tasks that each need their own review, such as an epic of several tickets, it coordinates instead of building: builder agents write each task on its own branch, verifier agents check each one, and the coordinating agent keeps the requirements, the design and the task list correct.
+
+</details>
+
+<details>
+<summary><b>The live dashboard</b></summary>
+
+When it coordinates several agents, it opens a dashboard in your browser, if it can run a command in the background. The dashboard updates as the agents work:
+
+![The live dashboard: figures for tasks done, agents at work and open questions; one card per agent with its task's mode, a state icon and its latest steps, stuck agents first; and a conversation with the coordinator on the right](img/code-better-dashboard.png)
+
+- **The figures** at the top: tasks done, agents at work, and open questions. Click the open questions to jump to the first one.
+- **The agents**, one card each, with its task's mode as a coloured tag and edge, an icon for its state (working, waiting on the coordinator, blocked, or quiet for 15 minutes), and its latest steps. Blocked and quiet agents come first, then the rest by task number. Click a card for the agent's recent log and to ask about its work. Agents that handed back are under Finished.
+- **The conversation** with the coordinating agent: write to it, reply to any message, and see each message move from seen to answered. Each decision the coordinator takes on its own shows there, and you can reply to change it. Its questions to you come last, next to the message box, until you answer. It also asks them in the chat and waits for your answer from either place.
+
+The dashboard reads the change's folder, `.code/<change>/`, and keeps running until you tell the agent you are done with it.
+
 </details>
 
 <details>
@@ -82,6 +99,7 @@ Running it does not mean code gets written right away. It can stop at requiremen
   - **Requirements**: the need, what changes for you, scenarios, constraints, out of scope, assumptions.
   - **Design**: the approach, diagrams of only the parts the change touches, main flows, data changes, decisions.
   - **Plan**: tasks with a check for each, progress notes, open questions.
+  - When it coordinates agents: each agent's log, each decision and question, and your conversation with the coordinator (`conversation.jsonl`).
 - A report:
   - what changed and why, in terms of the requirements
   - the design decisions and assumptions
