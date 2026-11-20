@@ -32,7 +32,7 @@ FOLLOW these steps in order, for every change. DO NOT skip a step because the ch
 
 NAME the user's GOAL: what they must be able to do, decide, or understand once the code works. IF the request states a solution, CHECK that it serves the need behind it. IF it works against the GOAL, SAY so once, with one alternative, THEN FOLLOW the user's decision.
 
-READ the repository's documentation: README.md, docs/, CONTRIBUTING.md, AGENTS.md, and any documentation file relevant for the change. READ the code the change touches, its callers and tests, the design if there is one, and the earlier conversation.
+READ the repository's documentation: README.md, docs/, CONTRIBUTING.md, AGENTS.md, and any documentation file relevant for the change. READ the code the change touches, its callers and tests, the design and spec if there are any, and the earlier conversation.
 
 WHEN sources disagree, FOLLOW the user's instructions, THEN the repo's own files, THEN the existing code's patterns, THEN `.code/conventions.md`, THEN this skill.
 
@@ -51,6 +51,8 @@ PICK the one mode that fits the work. READ its file: it is MANDATORY, and the ne
 | Coordinate | the work splits into several tasks that each need their own review | [modes/coordinate.md](modes/coordinate.md) |
 
 ### 3. Run the mode
+
+WHEN an architect-better spec covers the change, USE it for the mode's requirements and UPDATE it in place when needed.
 
 FOLLOW every step of the mode's file, in order. The mode ends once its checks pass on the final code, or once you stop as its limits say.
 
@@ -89,6 +91,10 @@ ASK the user, USING `/ask-better` if available, in these cases:
 - **Conflicts.** ASK about a test that contradicts a requirement, two requirements that conflict, and a requirement that cannot or should not hold as written, with the change you propose and what the user would see differently. DO NOT build to your own version until it is agreed. ONCE agreed, REVISE the requirement in place.
 
 TREAT a constraint the user set as a requirement. ADD each answer to the spec; your own proposals are not answers. KEEP building the parts your questions do not affect.
+
+### Design for structural changes
+
+IF the change adds a module, a data model, a dependency or a migration and no design covers it, STOP and POINT the user to `/architect-better`. BUILD only once its design and spec exist. IF that skill is unavailable, SAY so and MARK the change **not finished**.
 
 ### Working notes
 

@@ -1,0 +1,26 @@
+[
+  {
+    "origin": "Requirements",
+    "count": 6,
+    "example": "WHEN a builder writes a question, the page SHALL show it within 2 seconds.",
+    "source": "Q1"
+  },
+  {
+    "origin": "Containers",
+    "count": 4,
+    "example": "The dashboard server SHALL bind to 127.0.0.1 only.",
+    "source": "C2"
+  },
+  {
+    "origin": "Flows",
+    "count": 3,
+    "example": "WHEN the coordinator replies with --to, the page SHALL show the reply under that item.",
+    "source": "F4"
+  },
+  {
+    "origin": "Decisions",
+    "count": 2,
+    "example": "IF an agent has no logs/<agent>.json, THEN the page SHALL show the agent without a task.",
+    "source": "D2"
+  }
+]

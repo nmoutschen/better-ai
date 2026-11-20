@@ -9,9 +9,7 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 ## 1. Update the spec
 
-WRITE a spec for every change, however small: a one-line change needs one requirement. READ [../templates/specs.md](../templates/specs.md). THEN WRITE the requirements of this change in `.code/<change>/specs.md`, in the template's format. IF the file exists from earlier work on this change, UPDATE it in place. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
-
-IF the change adds a module, a data model, a dependency or a migration, and no design covers it, ALSO WRITE `.code/<change>/design.md`: READ [../templates/design.md](../templates/design.md) and WRITE it in its format.
+KEEP a spec for every change, however small: a one-line change needs one requirement. IF an existing spec covers the change, including a spec from `/architect-better`, USE it and UPDATE it in place where needed. OTHERWISE, READ [../templates/specs.md](../templates/specs.md) and WRITE the requirements of this change in `.code/<change>/specs.md`, in the template's format. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
 
 WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.md` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task todo.
 
