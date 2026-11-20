@@ -52,5 +52,4 @@ Run `/interview-me` first, then work as usual. See [Getting started](docs/gettin
 | [`/research-better`](docs/research-better.md) | Researches a topic from sources on a shared board, with verified claims, and writes a report. |
 | [`/review-better`](docs/review-better.md) | Reviews text, code, an interface, a plan or a report so each finding leads to an action. |
 | [`/show-better`](docs/show-better.md) | Introduces a dense document with a short story of visual slides you can comment on. |
-| [`/teach-better`](docs/teach-better.md) | Teaches you a topic so you can use it later without AI. |
 | [`/write-better`](docs/write-better.md) | Writes or rewrites text so you can understand and act on it. |
