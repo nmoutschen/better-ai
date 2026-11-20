@@ -2,6 +2,8 @@
 name: show-better
 description: Helps an AI agent introduce a dense document, such as a research paper, a strategy or a design doc, with a short sequence of visual slides the reader goes through before reading it. Each slide shows a relation the reader would otherwise have to work out from the prose, in a form chosen from a wide range (concept maps, actor lanes, forks, set diagrams, slope charts, distributions, hierarchies, quadrants and more). The slides are served as a live page where the reader comments and the agent answers, exported as a presentation, or rendered as plain text for a terminal, and every value is checked against the source.
 argument-hint: "[DOCUMENT OR CONTENT]"
+metadata:
+  kind: procedural
 ---
 
 # Show Better

@@ -22,7 +22,7 @@ from inspect_ai.solver import Generate, Solver, TaskState, solver
 from inspect_ai.util import SandboxEnvironment, sandbox
 from inspect_ai.util._sandbox.events import without_sandbox_events
 
-from skill_evals.cases import REPO, SHORT_SKILL, WITH_SKILL, short_skill
+from skill_evals.cases import INSTALLED_CONDITIONS, REPO, SHORT_SKILL, short_skill
 from skill_evals.transcript import Run, parse_stream, redact
 
 WORKDIR = "/work"
@@ -37,6 +37,8 @@ IGNORED_PATHS = ("__pycache__/", ".pytest_cache/")
 # names of its tools that read, run, edit and write. Graders import these, so only this adapter knows the harness.
 SKILLS_FOLDER = ".claude/skills"
 READ_TOOL, SHELL_TOOL, EDIT_TOOL, WRITE_TOOL = "Read", "Bash", "Edit", "Write"
+# The tool an agent calls to load an installed skill by name, without the user's slash command.
+SKILL_TOOL = "Skill"
 # With a case's earlier work planted in .earlier/, the first commit holds .earlier/before/ and the second, whose
 # message is .earlier/message.txt, holds the planted repository: the agent finds its earlier work as the last commit.
 START_SCRIPT = """
@@ -158,7 +160,7 @@ async def install_skill(sandbox_env: SandboxEnvironment, skill: str, short: bool
 
 @solver
 def prepare_sandbox(skill: str) -> Solver:
-    """Commit the planted files as the agent user and, in the skill conditions, install the full or short skill."""
+    """Commit the planted files as the agent user and, in the conditions that install it, the full or short skill."""
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         sandbox_env = sandbox()
@@ -167,7 +169,7 @@ def prepare_sandbox(skill: str) -> Solver:
             sandbox_env, ["bash", "-ec", START_SCRIPT, "bash", *IGNORED_PATHS], cwd=WORKDIR, user=AGENT_USER
         )
         state.store.set("start_commit", stdout.split()[-1])
-        if state.metadata["condition"] in (WITH_SKILL, SHORT_SKILL):
+        if state.metadata["condition"] in INSTALLED_CONDITIONS:
             await install_skill(sandbox_env, skill, short=state.metadata["condition"] == SHORT_SKILL)
         return state
 

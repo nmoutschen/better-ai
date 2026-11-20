@@ -1,0 +1,21 @@
+actions:
+- read: migration-log.md
+- write: catch-up.md
+  content: |
+    # Where the cluster migration stands
+
+    The last service, billing, moved to k8s-eu2 on 2026-11-19, so all 11 services now run on the new cluster and k8s-old
+    serves no traffic. Next, Nadia runs a restore test of the final k8s-old backup on Monday 2026-11-23; if it passes, we
+    shut down k8s-old on Tuesday 2026-11-24.
+
+    ## What happened while you were away
+
+    - **2026-11-09:** Nadia moved accounts-api. The DNS switch caused 4 minutes of 502 errors, so she lowered the DNS TTL to
+      60 seconds for the remaining moves.
+    - **2026-11-11 to 2026-11-16:** reports and webhooks moved. Webhook deliveries to two customers failed from k8s-eu2
+      because its outgoing IP address was not on their allowlists, so webhooks went back to k8s-old until both customers
+      added the new address. Webhooks have run on k8s-eu2 since 2026-11-16.
+    - **2026-11-17:** audit-log moved.
+    - **2026-11-19:** billing moved. A full invoice dry run on k8s-eu2 matched the totals from k8s-old.
+reply: All 11 services are on the new cluster; next is the restore test on 2026-11-23 and the shutdown of k8s-old on 2026-11-24.
+  Details are in catch-up.md.

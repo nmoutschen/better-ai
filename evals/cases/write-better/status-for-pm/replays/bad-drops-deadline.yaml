@@ -1,0 +1,11 @@
+actions:
+- read: notes.md
+- write: status.md
+  content: |
+    # Billing duplicate credits: status for Dana
+
+    The fix that stops new duplicate credits is live, and 128 of the 140 affected accounts are corrected. Kofi will correct
+    the remaining 12 accounts by hand by 27 November, before the 1 December invoices. The full fix will start in January.
+
+    We still need to decide whether to email the 12 customers before their invoices go out.
+reply: Wrote the status update in status.md.

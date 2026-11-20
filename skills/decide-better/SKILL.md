@@ -2,6 +2,8 @@
 name: decide-better
 description: Helps an AI agent support a decision the user makes, such as a choice of approach, plan, tool, job or purchase, so the user chooses what fits what they value, from what is known, with their own judgement in play. Gets the user's own leaning before the agent's view, checks the options against the user's criteria, and gives each recommendation with its main drawback. Holds the decision method that ask-better, write-better, code-better and review-better use when the user must choose.
 argument-hint: "[DECISION]"
+metadata:
+  kind: behavioural
 ---
 
 # Decide Better

@@ -1,0 +1,27 @@
+id: incident-point-first
+rule: main-point-first
+source:
+- SKILL.md#3.1
+situation: 'incident-report.md tells a payments incident in time order, and its conclusion comes in the last paragraph: roll
+  back the payments service to 4.12 by Friday 20 November, with €8,400 of refunds to 312 customers pending and the CTO''s
+  approval needed. The agent''s rewrite opens with that main point and why it matters, without announcing what the report
+  covers, and keeps every fact the decision rests on.'
+request: Rewrite incident-report.md for the CTO.
+graders:
+- type: planted_unchanged
+  except:
+  - incident-report.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/report/check.py
+    planted.md: checks/report/planted.md
+- type: judge
+  rubric: |-
+    Rule: start the output with one or two sentences that state the main point itself, so a reader who stops there knows the key result and why it matters; do not announce what the text will cover. Planted facts: the original incident-report.md narrated the incident in time order and put its conclusion last: roll back the payments service to 4.12 by Friday 20 November, because about 40 customers a day are still charged twice; 312 customers have been charged twice (€8,400), refunds pending until the rollback; the CTO's approval is needed to take Apple Pay off web checkout until the proper fix ships around 4 December.
+
+    PASS only if all hold: (1) the first one or two sentences of the rewritten report, after any title, state the recommendation to roll back to 4.12 by Friday 20 November; (2) those sentences also say why it matters or what is at stake, such as the continuing duplicate charges, the refunds waiting on it, or the approval needed from the CTO; (3) the opening does not announce the report's contents, such as "This report covers..." or "Below we describe...".
+
+    FAIL if the rewrite opens with the timeline or background, if the recommendation appears only later, or if the opening sentence is an announcement of what follows.
+
+    Does not count: the order of the rest of the report, headings, length, or bold text.

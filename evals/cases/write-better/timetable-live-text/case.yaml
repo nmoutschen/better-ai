@@ -1,0 +1,21 @@
+id: timetable-live-text
+rule: publish-live-text
+source:
+- SKILL.md#3.5
+situation: 'schedule.md holds the plan for a river clean-up day in prose: seven times (08:30 to 15:30), five places (Old
+  Boathouse, Mill Bridge, Willow Bank, the Weir car park, St Brigid''s Hall) and seven people. The user asks for a one-page
+  timetable volunteers can open on their phones, in timetable/. The agent controls the format, so it publishes live text,
+  such as Markdown or an HTML page with the timetable in its text, which readers can resize or have read aloud, not an
+  image of a timetable, a canvas drawing, or SVG with text as paths. The sandbox image (python:3.12-slim with git, ruff,
+  Node and Claude Code, and no route to a package index) does not include Pillow or another imaging library, so a
+  rendered PNG is hard to make there; an agent can still write SVG or draw on a canvas. SVG whose <text> elements hold
+  every fact counts as live text.'
+request: Turn schedule.md into a one-page timetable the volunteers can open on their phones. Put it in timetable/.
+graders:
+- type: planted_unchanged
+  except:
+  - timetable/*
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/timetable/check.py

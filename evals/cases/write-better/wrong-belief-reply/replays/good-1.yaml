@@ -1,0 +1,31 @@
+actions:
+- read: inbox/sam.md
+- read: docs/storage.md
+- write: reply.md
+  content: |
+    Hi Sam,
+
+    Thanks for the detail, it makes the cause clear. You mention that you won't clear the cache because you understand it is
+    where Inkpad keeps your saved drafts. That isn't the case, so clearing it will not delete them: every draft, including
+    all 34 of yours, is stored on the Inkpad server in your account, which is also why they appear when you sign in on
+    another device.
+
+    The cache is a local folder that holds offline copies of drafts you opened recently, the search index and images. It is
+    also the reason the app is slow: above about 4 GB, opening drafts and searching slow down, and yours is at 6.2 GB.
+
+    To clear it safely:
+
+    1. Check the sync icon at the bottom left. If it shows a cloud with a tick, every change has reached the server. If it
+       shows a cloud with an arrow, stay online until it changes, because changes made offline live only in the cache
+       until they sync.
+    2. Go to Settings > Storage > Clear cache.
+    3. Open your drafts as usual. Inkpad re-downloads each one the first time you open it, and rebuilds the search index in
+       a few minutes; search may be incomplete until then.
+
+    If you'd still like a copy on your laptop, File > Export all drafts saves every draft as a Markdown file, but you don't
+    need it before clearing the cache.
+
+    Best regards,
+    Inkpad Support
+reply: Wrote reply.md. It corrects Sam's belief that the cache holds the drafts, explains that drafts are on the server, and
+  gives the steps to clear the cache safely, including the sync check from docs/storage.md.

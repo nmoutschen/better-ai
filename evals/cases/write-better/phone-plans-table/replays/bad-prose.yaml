@@ -1,0 +1,21 @@
+actions:
+- read: plans.md
+- write: plans.md
+  content: |
+    # Mobile plans for the field team
+
+    Amara asked for a comparison of Telvia's three business plans for the nine people on the field team, who travel around
+    the UK and a few times a year to the EU and the US.
+
+    Flex costs £14 per line per month for 15 GB on a one-month rolling contract. Roaming costs £2 per line per day in the
+    EU, and data outside the EU is charged per megabyte at rates not yet confirmed.
+
+    Team costs £19 per line per month (£17.10 with five or more lines, 10% off) for 40 GB, on a 12-month contract, with EU
+    and US roaming included up to 20 GB per month.
+
+    Unlimited costs £27 per line per month for unlimited data (fair-use limit 650 GB), on a 24-month contract, with roaming
+    in 70 countries.
+
+    All plans include unlimited UK calls and texts, and moving numbers costs £25 per line once. Last quarter the team used
+    6 to 22 GB per person per month, with a median of 11 GB.
+reply: Made plans.md shorter, one paragraph per plan.

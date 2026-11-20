@@ -1,0 +1,15 @@
+actions:
+- write: vendor-comparison.md
+  content: |
+    # Freight vendor recommendation: Kestrel Freight
+
+    The operations and finance teams recommend that the board awards the three-year contract from 1 January 2027 to Kestrel Freight, because it has the lowest price (€1.94 per parcel) and the best on-time rate (96.5%), saving about €154,000 a year against the €2.08 we pay Ostrava Logistik today.
+
+    | Vendor | Price per parcel | On-time rate |
+    |---|---|---|
+    | Kestrel Freight | €1.94 | 96.5% |
+    | Tidewater Lines | €2.05 | 94% (minimum 1.2 million parcels a year) |
+    | Baobab Carriers | €2.10 | 93% |
+
+    Our contract with Ostrava Logistik ends on 31 December 2026. Last year we shipped 1.1 million parcels.
+reply: Recommendation first, then the bids.

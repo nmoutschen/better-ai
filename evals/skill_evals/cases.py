@@ -1,9 +1,13 @@
 """Read a skill's case folders and turn them into Inspect samples, one per case and condition.
 
 Conditions: `no-skill` sends the request as is, `skill` installs the skill and invokes it with its slash
-command, `one-sentence` appends the one-sentence instruction for the case's first source to the request, and
+command, `one-sentence` appends the one-sentence instruction for the case's first source to the request,
 `short-skill` installs a skill of the same name whose body is every sentence of `one_sentence.yaml` and invokes
-it the same way.
+it the same way, and `skill-installed` installs the skill and sends the request as is, so the agent must load
+the skill itself.
+
+A skill's kind, `behavioural` or `procedural`, is `metadata.kind` in its SKILL.md frontmatter. Behavioural skills
+also run `skill-installed` by default, because agents are meant to load them for the work without a command.
 
 A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, source, reads, situation, request,
 graders),
@@ -30,10 +34,18 @@ NO_SKILL = "no-skill"
 WITH_SKILL = "skill"
 ONE_SENTENCE = "one-sentence"
 SHORT_SKILL = "short-skill"
-CONDITIONS = (NO_SKILL, WITH_SKILL, ONE_SENTENCE, SHORT_SKILL)
+SKILL_INSTALLED = "skill-installed"
+CONDITIONS = (NO_SKILL, WITH_SKILL, ONE_SENTENCE, SHORT_SKILL, SKILL_INSTALLED)
 SKILL_CONDITIONS = (WITH_SKILL, SHORT_SKILL)
+INSTALLED_CONDITIONS = (WITH_SKILL, SHORT_SKILL, SKILL_INSTALLED)
+BEHAVIOURAL = "behavioural"
+PROCEDURAL = "procedural"
+KINDS = (BEHAVIOURAL, PROCEDURAL)
 # one-sentence names the tested rule, so it is a per-rule diagnostic rather than a default comparison.
-DEFAULT_CONDITIONS = f"{NO_SKILL},{WITH_SKILL},{SHORT_SKILL}"
+DEFAULT_CONDITIONS = {
+    PROCEDURAL: (NO_SKILL, WITH_SKILL, SHORT_SKILL),
+    BEHAVIOURAL: (NO_SKILL, WITH_SKILL, SHORT_SKILL, SKILL_INSTALLED),
+}
 SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 
@@ -42,6 +54,21 @@ def check_skill(skill: str) -> str:
     if not SKILL_NAME.fullmatch(skill):
         raise ValueError(f"Invalid skill name: {skill!r}")
     return skill
+
+
+def skill_kind(skill: str) -> str:
+    """Return the skill's kind from `metadata.kind` in its SKILL.md frontmatter, or raise when it has none."""
+    text = (REPO / "skills" / check_skill(skill) / "SKILL.md").read_text()
+    frontmatter = yaml.safe_load(text.split("---", 2)[1]) or {}
+    kind = (frontmatter.get("metadata") or {}).get("kind")
+    if kind not in KINDS:
+        raise ValueError(f"{skill!r} has metadata.kind {kind!r}; expected one of {', '.join(KINDS)}")
+    return kind
+
+
+def default_conditions(skill: str) -> list[str]:
+    """Return the conditions a run of the skill uses when none are given: they depend on its kind."""
+    return list(DEFAULT_CONDITIONS[skill_kind(skill)])
 
 
 def case_dirs(skill: str) -> list[Path]:
@@ -109,10 +136,10 @@ def replays(directory: Path) -> dict[str, dict[str, Any]]:
 def condition_prompt(request: str, condition: str, skill: str, sentence: str | None = None) -> str:
     """Build the prompt for a condition.
 
-    no-skill sends the request as is, skill and short-skill prefix the skill's slash command, and one-sentence
-    appends the sentence for the case's first source to the request.
+    no-skill and skill-installed send the request as is, skill and short-skill prefix the skill's slash
+    command, and one-sentence appends the sentence for the case's first source to the request.
     """
-    if condition == NO_SKILL:
+    if condition in (NO_SKILL, SKILL_INSTALLED):
         return request
     if condition in SKILL_CONDITIONS:
         return f"/{skill} {request}"

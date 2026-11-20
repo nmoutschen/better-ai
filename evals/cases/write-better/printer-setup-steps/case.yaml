@@ -1,0 +1,26 @@
+id: printer-setup-steps
+rule: steps-for-doing
+source:
+- SKILL.md#3.2
+situation: 'printer-setup.md tells new staff how to add a printer in one long run-on paragraph, with an exact Wi-Fi network,
+  a shared printer path, a driver path, a driver file, a setting and an IT extension. New staff will follow it, so the GOAL
+  is to do something: the agent rewrites it as numbered steps, one instruction each, in a valid order, and keeps every exact
+  value.'
+request: Rewrite printer-setup.md so new staff can follow it on their first day.
+graders:
+- type: planted_unchanged
+  except:
+  - printer-setup.md
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/steps/check.py
+- type: judge
+  rubric: |-
+    Rule: when the reader must do something, give clear and simple step-by-step instructions, as a numbered list with one instruction per step. Planted facts: the original printer-setup.md is one paragraph with these actions in this order: connect to Wi-Fi HARBOUR-STAFF (not HARBOUR-GUEST); open Settings > Bluetooth & devices > Printers & scanners; click Add device; wait for and click "The printer that I want isn't listed"; choose "Select a shared printer by name"; type \\PRNSRV-02\Floor3-Colour; when Windows cannot find a driver, click Have Disk; browse to \\fs01\drivers\ricoh\IMC3000\x64, select IMC3000.inf and click OK; after installation, open Printing preferences and set Colour mode to Black and White; print a test page from the same window. If anything goes wrong, call the IT desk on extension 4410 (Sione).
+
+    PASS only if all hold: (1) the rewritten file gives the actions as a numbered list; (2) each numbered step holds one instruction, or one instruction with what to expect next (a step may group actions that happen in one place, such as opening Settings and going to Printers & scanners, but not several separate actions such as typing the printer path and installing the driver); (3) the steps are in an order a new person could follow: Wi-Fi before adding the printer, the printer path before the driver, the driver before Printing preferences, and the test page after the setting.
+
+    FAIL if a step packs two or more separate actions from different stages, if any step comes before one it depends on, or if an action from the original is missing from the file.
+
+    Does not count: wording, whether the help line is a step or a note, a prerequisite such as the Wi-Fi network given in a short part before the numbered steps, an introductory sentence, or formatting of the paths.

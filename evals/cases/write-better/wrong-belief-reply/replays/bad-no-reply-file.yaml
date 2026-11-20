@@ -1,0 +1,4 @@
+actions:
+- read: inbox/sam.md
+- read: docs/storage.md
+reply: 'Here is a reply you can send: Hi Sam, clearing the cache does not delete your drafts, which are stored on the server.'

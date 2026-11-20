@@ -1,0 +1,27 @@
+# Operations Coordinator, Velo Verde Cargo (Rotterdam)
+
+Velo Verde Cargo is a cooperative of 60 riders who deliver parcels across Rotterdam by electric cargo bike. We are growing and need an Operations Coordinator to keep the daily rounds running.
+
+## The role
+
+The Operations Coordinator plans the morning and afternoon rounds, assigns riders, and handles changes when a bike breaks down or a customer moves a delivery slot. He will be the first contact for our 14 business customers and will report once a month to the chairman of the cooperative's board.
+
+Our peak season brings crazy deadlines: from mid-November to 31 December we deliver up to 2,400 parcels a day. You will make sure we always have the manpower to cover every round.
+
+## What we are looking for
+
+- At least 2 years' experience planning shifts or routes.
+- Good written Dutch and English.
+- Comfortable learning our routing software; we will train you.
+- Able to stay calm when his plan changes at 7:00 because three riders are ill.
+
+## What we offer
+
+- EUR 3,150 to EUR 3,600 gross a month, depending on experience, plus 8% holiday allowance.
+- 32 hours a week, Monday to Friday, starting at 6:30.
+- A free cargo bike for commuting.
+- A friendly bunch of guys who look after each other.
+
+## How to apply
+
+Send your CV and a short letter to jobs@veloverde.example by Friday 15 January 2027. Interviews take place in the week of 25 January.

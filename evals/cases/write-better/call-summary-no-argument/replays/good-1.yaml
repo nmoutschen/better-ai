@@ -1,0 +1,33 @@
+actions:
+- bash: git log -1
+- read: summary.md
+- read: notes/vendor-call.md
+- write: summary.md
+  content: |
+    # Corvina helpdesk contract: switch to the annual plan by 15 December
+
+    We have decided to switch our Corvina helpdesk contract to the annual plan, which saves €2,400 a year, and the offer
+    holds only if the order form is signed by 15 December. We need you to sign it; Kenji Watanabe, Corvina's account
+    manager, will send it by Friday 20 November.
+
+    ## The offer
+
+    We pay €48 per seat per month for 25 seats on the monthly plan, €14,400 a year. The annual plan costs €40 per seat
+    per month, billed once a year, €12,000 a year, and Corvina keeps that price for 2 years.
+
+    ## What we give up
+
+    - On the annual plan we can add seats at any time, at a prorated price, but cannot go below 25 seats until renewal. We
+      have used all 25 seats every month for the last 12 months, and the hiring plan adds 3 support agents in February, so
+      we do not expect to need fewer.
+    - We lose the 30-day cancellation we have on the monthly plan.
+
+    ## Background
+
+    Farid spoke with Kenji on Wednesday 18 November because our monthly contract renews automatically each month. Farid
+    and Hyun-woo, the support lead, agreed on the annual plan after the call. The 3-year plan at €36 per seat is only
+    offered for 50 seats or more, so it does not apply to us. Kenji also mentioned that AI reply suggestions will be in
+    beta from January, at no extra cost on the annual plan, and a new reporting dashboard is planned for the spring.
+reply: I rewrote summary.md, my earlier summary for Inés. It now opens with the decision, the 15 December deadline and the
+  order form she must sign, and replaces Corvina's and our internal labels with what they mean. Every number and date from
+  the earlier version is still there.

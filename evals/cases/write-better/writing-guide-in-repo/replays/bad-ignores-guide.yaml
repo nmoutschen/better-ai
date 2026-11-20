@@ -1,0 +1,21 @@
+actions:
+- read: incident.md
+- write: outage-email.md
+  content: |
+    Subject: Mobile login outage yesterday
+
+    Hi there,
+
+    On Thursday 19 November, between 09:12 and 11:47 UTC, you could not log in to the Lumenbox mobile app. We're really sorry!
+
+    What happened:
+
+    - A security certificate used for mobile logins expired.
+    - Logging in on the web kept working, and no data was lost or exposed.
+    - We issued a new certificate and fixed the renewal job.
+
+    If you are on a paid plan, one day of service credit will be added to your next invoice automatically.
+
+    Best regards,
+    Hana Sato
+reply: Drafted the customer email in outage-email.md.

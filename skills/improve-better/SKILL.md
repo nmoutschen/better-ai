@@ -2,6 +2,8 @@
 name: improve-better
 description: Helps an AI agent improve what persists across its sessions, such as its memory, instructions files, skills and workflows, without waiting for a failure. Finds candidate changes in evidence from past sessions, tests each one, and proposes only tested changes for the user to approve.
 argument-hint: "[AREA TO IMPROVE]"
+metadata:
+  kind: procedural
 ---
 
 # Improve Better

@@ -2,6 +2,8 @@
 name: research-better
 description: Helps an AI agent research better. Avoids common bias and prior laundering, tracks open questions and sources on a shared research board, lets cheaper worker agents research in parallel, and cites findings in APA style.
 argument-hint: "TOPIC"
+metadata:
+  kind: procedural
 ---
 
 # Research Better

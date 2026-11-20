@@ -1,0 +1,4 @@
+actions:
+- read: results/summary.csv
+- read: results/notes.md
+reply: 'Before I write this up: who will read the summary, and what will they use it for?'

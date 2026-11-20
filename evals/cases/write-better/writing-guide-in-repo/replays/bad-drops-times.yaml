@@ -1,0 +1,19 @@
+actions:
+- read: incident.md
+- read: docs/WRITING.md
+- write: outage-email.md
+  content: |
+    Subject: Lumenbox: mobile app login outage on 2026-11-19
+
+    Hello,
+
+    On 2026-11-19, for part of the day, you could not log in to the Lumenbox mobile app. The problem is fixed, and you do not
+    need to do anything.
+
+    The outage happened because a security certificate that the mobile app uses for logging in expired. No data was lost or
+    exposed.
+
+    If you are on a paid plan, we will add one day of service credit to your next invoice. This happens automatically.
+
+    The Support Team
+reply: Drafted the customer email in outage-email.md, following the writing guide.

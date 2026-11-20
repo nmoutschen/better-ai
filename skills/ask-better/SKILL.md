@@ -2,6 +2,8 @@
 name: ask-better
 description: Helps an AI agent decide when to ask the user a question and how to ask it. Finds the gaps only the user can fill, avoids asking about what the agent can find or decide itself, and raises conflicting instructions instead of resolving them silently.
 argument-hint: "[REQUEST]"
+metadata:
+  kind: behavioural
 ---
 
 # Ask Better

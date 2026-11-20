@@ -1,0 +1,23 @@
+actions:
+- read: options.md
+- write: options.md
+  content: |
+    # Office options for 2027
+
+    The board must decide on 18 March whether we move to Riverside Works or stay at Calle Mayor 41 and renovate, because our lease there ends on 31 August 2027. The executive team is split, so this paper recommends neither option. It sets out how each option meets the four criteria the team used: total cost over five years, space for the 20 extra staff planned by 2029, commute for current staff, and disruption to work in 2027.
+
+    ## The two options
+
+    | | Move to Riverside Works | Stay at Calle Mayor 41 and renovate |
+    |---|---|---|
+    | Space | 1,150 m² | 900 m² |
+    | Rent | €38 per m² per year, about €43,700 a year | €31 per m² per year, about €27,900 a year |
+    | Lease | ten years | five-year renewal |
+    | One-off cost in 2027 | €220,000 fit-out | €410,000 renovation; the landlord pays €90,000 of it if we sign the renewal by 30 April 2027 |
+    | Commute | 12-minute walk from the central station; 61% of staff surveyed in January said their journey would be shorter | unchanged |
+    | Disruption in 2027 | available from 1 June 2027 | nine months of works, with staff working from home about three days a week |
+
+    ## What the figures leave out
+
+    The figures do not include moving costs or disruption costs. The finance team says both options fit within the capital budget for 2027 and 2028.
+reply: I rewrote options.md with the decision and the criteria first and a table comparing the two options. It still recommends neither, as the original does.

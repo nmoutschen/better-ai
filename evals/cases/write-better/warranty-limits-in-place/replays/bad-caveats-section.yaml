@@ -1,0 +1,15 @@
+actions:
+- write: warranty-summary.md
+  content: |
+    # Corvo warranty summary
+
+    - Frame and motor defects: covered for 5 years from purchase.
+    - Battery: covered against capacity loss below 70% for 2 years or 500 full charge cycles.
+    - Collection and return: free for valid claims.
+
+    ## Exceptions
+
+    - Commercial use (delivery, rental): frame and motor cover is 2 years.
+    - Charging with a non-original charger voids the battery cover.
+    - Islands: the customer pays €35 for collection and return.
+reply: Wrote the summary with the exceptions grouped at the end.

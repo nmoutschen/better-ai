@@ -2,6 +2,8 @@
 name: teach-better
 description: Helps an AI agent teach the user a new topic so they can use it later without AI. Gives hints and worked examples instead of answers, checks understanding with practice the user does alone, and handles pushback when the user wants the answer.
 argument-hint: "[TOPIC]"
+metadata:
+  kind: procedural
 ---
 
 # Teach Better

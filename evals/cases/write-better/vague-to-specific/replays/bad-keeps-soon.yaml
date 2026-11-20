@@ -1,0 +1,25 @@
+actions:
+- write: delivery-update.md
+  content: |
+    # Delivery changes this spring
+
+    Dear shop owners,
+
+    We are moving to a new warehouse in Ashford Park, and we want you to know what this means for your orders.
+
+    The new warehouse opens soon. While we move stock, deliveries will be slower for 3 weeks, from 12 May to 2 June: they will take 3 working days instead of the usual 2. In our trial runs in March, 84% of orders (1,512 of 1,800) still arrived within the usual 2 working days. After the move, the new sorting line will likely (7 of 10 test runs) handle our full daily volume from the first day, so we expect delivery times to return to normal after 2 June.
+
+    What you can do:
+
+    - Place your usual orders as normal; you do not need to order early.
+    - If you need something urgently during the move, phone your account manager instead of ordering online, so we can pick it by hand.
+    - Check the delivery address in your account; the new warehouse uses it to plan routes.
+
+    The last day for collection from the old Mill Lane depot is Friday 7 May 2027. Collection from Ashford Park will start once the site is ready; we have not set a date yet and will tell you when we have.
+
+    Thank you for your patience. If you have questions, reply to this email or call us on 0161 496 0732 (Monday to Friday, 9:00 to 17:00).
+
+    Kind regards,
+    Farida Hassan
+    Customer Operations, Kiri Tea Traders
+reply: Added the figures from facts.md.
