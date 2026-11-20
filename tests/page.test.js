@@ -253,6 +253,9 @@ test('a decision card renders for a waiting, an answered-then-asked and a decide
   const answered = run('waiting', ['a-1'], {});
   assert.equal(answered.head, 'answered, waiting for the coordinator');
   assert.match(answered.foot, /You answered/);
+  const applied = run('waiting', ['a-1'], { 'a-1': 'done' });
+  assert.equal(applied.head, 'answered by you');
+  assert.match(applied.foot, /Applied/);
   const decided = run('decided', [], {});
   assert.equal(decided.head, 'decided');
   assert.doesNotMatch(decided.foot, /Waiting for you|You answered|Applied/);
