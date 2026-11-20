@@ -15,6 +15,7 @@ from typing import Any
 
 from inspect_ai.model import ChatMessage, ChatMessageAssistant, ChatMessageTool, ChatMessageUser
 from inspect_ai.solver import TaskState
+from inspect_ai.util import SandboxEnvironment
 
 from skill_evals.agent import EDIT_TOOL, READ_TOOL, SHELL_TOOL, WRITE_TOOL, claude_cli, home
 from skill_evals.grading.files import MARKDOWN_NOTE, Checkout
@@ -142,6 +143,27 @@ def parse_output(stdout: str) -> dict[str, Any]:
     }
 
 
+async def run_judge(
+    sandbox_env: SandboxEnvironment, system: str, prompt: str, model: str
+) -> tuple[str, dict[str, Any], str | None]:
+    """Run `claude -p` as the judge user on one prompt; return its reply, what to keep in the metadata, and why it could not run.
+
+    The failure is None when the judge ran: it did not time out, the CLI reported no error and it printed a reply.
+    """
+    args = ["-p", "--output-format", "json", "--model", model, "--tools", "", "--system-prompt", system]
+    args += ["--strict-mcp-config", "--no-session-persistence"]
+    stdout, stderr, timed_out = await claude_cli(
+        sandbox_env, JUDGE_USER, args, cwd=home(JUDGE_USER), stdin=redact(prompt), timeout=600
+    )
+    output = parse_output(stdout)
+    info: dict[str, Any] = {"model": model, "reply": clip(output["reply"], 0, 3000)}
+    info |= {key: output[key] for key in ("total_cost_usd", "usage") if key in output}
+    failure = "timed out" if timed_out else output.get("error") or (None if output["reply"].strip() else "no reply")
+    if failure:
+        info |= {"error": failure, "stderr": stderr[-500:]}
+    return output["reply"], info, failure
+
+
 async def judge(
     spec: dict[str, Any], state: TaskState, repo: Checkout, model: str
 ) -> tuple[bool | None, dict[str, Any]]:
@@ -150,19 +172,12 @@ async def judge(
     The verdict is None when the judge could not run: it timed out, the CLI reported an error, or it printed no reply.
     """
     prompt = f"Rubric:\n{spec['rubric']}\n\nRecord:\n{await record(state, repo, spec)}"
-    args = ["-p", "--output-format", "json", "--model", model, "--tools", "", "--system-prompt", INSTRUCTIONS]
-    args += ["--strict-mcp-config", "--no-session-persistence"]
-    stdout, stderr, timed_out = await claude_cli(
-        repo.sandbox_env, JUDGE_USER, args, cwd=home(JUDGE_USER), stdin=redact(prompt), timeout=600
-    )
-    output = parse_output(stdout)
-    found = verdict(output["reply"])
-    info = {"model": model, "reply": clip(output["reply"], 0, 3000), "verdict": found}
-    info |= {key: output[key] for key in ("total_cost_usd", "usage") if key in output}
-    failure = "timed out" if timed_out else output.get("error") or (None if output["reply"].strip() else "no reply")
+    reply, info, failure = await run_judge(repo.sandbox_env, INSTRUCTIONS, prompt, model)
+    found = verdict(reply)
+    info["verdict"] = found
     if failure:
-        info |= {"verdict": None, "error": failure, "stderr": stderr[-500:]}
+        info["verdict"] = None
         return None, info
     if found is None:
-        info |= {"malformed": "last line is not a verdict", "stderr": stderr[-500:]}
+        info["malformed"] = "last line is not a verdict"
     return bool(found), info
