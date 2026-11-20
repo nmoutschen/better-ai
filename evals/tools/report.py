@@ -367,18 +367,50 @@ def load_labels(path: Path) -> list[dict[str, Any]]:
     return labels
 
 
+def judge_verdicts(results: list[SampleResult]) -> dict[tuple[str, int, str], Any]:
+    """Map (sample, epoch, grader) to the judge's verdict, leaving out a judge that could not run.
+
+    Raises ValueError when two runs have the same key, since a label cannot tell which one it means.
+    """
+    verdicts: dict[tuple[str, int, str], Any] = {}
+    for sample in results:
+        for grader, info in sample.judges.items():
+            if "error" in info:  # a judge that could not run gave no verdict to compare
+                continue
+            key = (sample.sample_id, sample.epoch, grader)
+            if key in verdicts:
+                raise ValueError(
+                    f"Two runs have sample {key[0]!r}, epoch {key[1]}, grader {key[2]!r}: "
+                    "pass --latest to keep the newest log's run, or give each log its own report"
+                )
+            verdicts[key] = info.get("verdict")
+    return verdicts
+
+
+def label_key(label: dict[str, Any]) -> tuple[str, int, str]:
+    """Return the (sample, epoch, grader) a hand label names."""
+    return str(label["sample"]), int(label.get("epoch", 1)), str(label["grader"])
+
+
+def unmatched_labels(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
+    """List the hand labels that match no judge verdict in the results, such as a mistyped sample id."""
+    verdicts = judge_verdicts(results)
+    missing = [label_key(label) for label in labels if label_key(label) not in verdicts]
+    if not missing:
+        return []
+    return [
+        f"{len(missing)} label(s) match no judged run in these logs:",
+        *(f"  {sample} (epoch {epoch}, grader {grader})" for sample, epoch, grader in missing),
+    ]
+
+
 def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
     """Compare judge verdicts with hand labels, per rubric (case and grader) and overall."""
-    verdicts = {
-        (sample.sample_id, sample.epoch, grader): info.get("verdict")
-        for sample in results
-        for grader, info in sample.judges.items()
-        if "error" not in info  # a judge that could not run gave no verdict to compare
-    }
+    verdicts = judge_verdicts(results)
     cases = {sample.sample_id: sample.case for sample in results}
     per_rubric: dict[tuple[str, str], list[bool]] = defaultdict(list)
     for label in labels:
-        key = (str(label["sample"]), int(label.get("epoch", 1)), str(label["grader"]))
+        key = label_key(label)
         if key in verdicts:
             human_passes = str(label["verdict"]).upper() == "PASS"
             per_rubric[cases[key[0]], key[2]].append(verdicts[key] == human_passes)
@@ -417,7 +449,12 @@ def main(argv: list[str] | None = None) -> int:
         ("Samples", case_lines(results)),
     ]
     if args.labels:
-        sections.append(("Judge agreement with hand labels", agreement(results, load_labels(args.labels))))
+        labels = load_labels(args.labels)
+        try:
+            lines = [*agreement(results, labels), *unmatched_labels(results, labels)]
+        except ValueError as error:
+            raise SystemExit(str(error)) from error
+        sections.append(("Judge agreement with hand labels", lines))
     for title, lines in sections:
         print(f"\n## {title}\n" + "\n".join(lines))
     errors = [f"{sample.sample_id}: {sample.error}" for sample in results if sample.error]
