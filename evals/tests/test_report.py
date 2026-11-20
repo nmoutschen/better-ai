@@ -376,12 +376,12 @@ def test_main_stops_before_printing_when_a_label_spans_groups(
 def test_duplicate_run_in_a_later_group_stops_before_printing(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """A duplicate key in the second group does not leave the first group's sections printed."""
+    """A label made ambiguous by a copy in the second group does not leave the first group printed."""
     runs = two_model_runs()
     twin = judged(False)
     twin.agent_model = "sonnet"
     labels = tmp_path / "labels.yaml"
-    labels.write_text("- {sample: a-skill, grader: judge, verdict: PASS, agent_model: opus}\n")
+    labels.write_text("- {sample: a-skill, grader: judge, verdict: PASS, agent_model: sonnet}\n")
     monkeypatch.setattr(report, "read_results", lambda paths: [*runs, twin])
     with pytest.raises(SystemExit):
         report.main(["x.eval", "--labels", str(labels)])
@@ -503,15 +503,18 @@ def test_label_with_one_copy_errored_in_another_model_stops(kind: str) -> None:
     with pytest.raises(ValueError, match=r"a-skill.*opus.*sonnet"):
         report.resolve_labels([model_run("opus", kind), model_run("sonnet", "judged")], labels)
     labels[0]["agent_model"] = "sonnet"
-    assert [run.agent_model for _, run in report.resolve_labels([model_run("opus", kind), model_run("sonnet", "judged")], labels)] == ["sonnet"]
+    assert [
+        run.agent_model
+        for _, run in report.resolve_labels([model_run("opus", kind), model_run("sonnet", "judged")], labels)
+    ] == ["sonnet"]
 
 
-@pytest.mark.parametrize("kind", ["errored judge", "sample error"])
-def test_single_run_without_a_verdict_is_listed_with_its_reason(kind: str) -> None:
+@pytest.mark.parametrize(("kind", "reason"), [("errored judge", "judge error"), ("sample error", "sample error")])
+def test_single_run_without_a_verdict_is_listed_with_its_reason(kind: str, reason: str) -> None:
     """One matching run with no verdict is not compared; it is listed with why."""
     labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
     lines = report.unmatched_labels([model_run("opus", kind)], labels)
-    assert len(lines) == 2 and kind in lines[1] and "a-skill" in lines[1]
+    assert len(lines) == 2 and reason in lines[1] and "a-skill" in lines[1]
     assert report.agreement([model_run("opus", kind)], labels) == ["no labelled judge verdicts in these logs"]
 
 
@@ -538,7 +541,7 @@ def test_several_epochs_and_graders_do_not_stop() -> None:
     ]
     resolved = report.resolve_labels([first, second], labels)
     assert [run.epoch for _, run in resolved] == [2, 1]
-    assert report.agreement([first, second], labels)[-1].split()[-3:] == ["1/2", "agree", "(50%)"]
+    assert report.agreement([first, second], labels)[-1].split()[-3:] == ["2/2", "agree", "(100%)"]
 
 
 def test_duplicate_within_a_model_stops_unless_latest() -> None:
@@ -559,3 +562,18 @@ def test_resolution_across_groups_uses_the_one_resolved_run() -> None:
     report.resolve_labels([opus, sonnet], labels)
     assert report.agreement([sonnet], labels)[-1].split()[-3:] == ["0/1", "agree", "(0%)"]
     assert report.agreement([opus], labels) == ["no labelled judge verdicts in these logs"]
+
+
+def test_main_prints_labels_without_a_verdict_and_stops_on_an_unmatched_label(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """A lone errored judge is listed after the sections; a label with no run stops before any section."""
+    labels = tmp_path / "labels.yaml"
+    labels.write_text("- {sample: a-skill, grader: judge, verdict: PASS}\n")
+    monkeypatch.setattr(report, "read_results", lambda paths: [errored_judge()])
+    assert report.main(["x.eval", "--labels", str(labels)]) == 0
+    assert "## Labels without a verdict" in capsys.readouterr().out
+    labels.write_text("- {sample: typo, grader: judge, verdict: PASS}\n")
+    with pytest.raises(SystemExit, match="typo"):
+        report.main(["x.eval", "--labels", str(labels)])
+    assert capsys.readouterr().out == ""

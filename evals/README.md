@@ -302,12 +302,13 @@ Label judged graders of real runs in `judge_labels/<skill>.yaml` (format in
 uv run python -m tools.report logs/<file>.eval --labels judge_labels/code-better.yaml
 ```
 
-prints the agreement per rubric and overall, per skill and agent model, and lists
-the labels that match no judged run. A label compares with the run of its own
-sample, epoch and grader; if two runs hold the same sample and epoch that a label names, even when one
-of them errored, the report stops and asks for `--latest`. Sample ids are the same for every agent model, so a label that
-matches runs of more than one agent model also stops the report, before anything
-prints, and names the models: add `agent_model: <model>` to the label to pick one.
+prints the agreement per rubric and overall, per skill and agent model. One rule decides which run
+a label means: it must match exactly one run in all the logs (after `--latest`), by sample, epoch and
+grader, and by `agent_model` when the label names one. A run whose judge errored, and a run that ended in a
+sample error, count as matches, because the label may have been written on them. A label with zero or several
+matches stops the report before anything prints and names the runs it matched (agent model, log): add
+`agent_model: <model>` to the label or pass `--latest`. A label whose one run has no verdict is listed with
+the reason. Duplicate runs of samples no label names do not matter.
 
 ## Report
 

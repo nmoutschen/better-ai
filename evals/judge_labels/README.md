@@ -14,7 +14,10 @@ record it before looking at the judge's verdict:
 ```
 
 `uv run python -m tools.report LOG --labels judge_labels/<skill>.yaml` prints
-the agreement per rubric (case and grader) and overall. A label without `agent_model` that matches runs of more than one agent model
-stops the report, naming the models. Labels refer to sample
+the agreement per rubric (case and grader) and overall. A label must match exactly one run in the logs, by sample, epoch, grader and
+`agent_model` when the label names one. A run whose judge errored, and a run that ended in a sample error,
+count as matches. A label that matches no run, or several (two models, two logs of the same run), stops the report
+before anything prints and names the runs it matched: add `agent_model` or pass `--latest`. A label whose one run
+has no verdict is listed with the reason. Labels refer to sample
 ids, so keep each file with the logs it was written from, or start a new file
 for a new run.

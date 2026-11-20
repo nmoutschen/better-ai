@@ -20,7 +20,7 @@ import argparse
 import math
 import random
 import statistics
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -74,6 +74,7 @@ class SampleResult:
     agent_version: str = "?"
     skill_commit: str = ""
     skill_dirty: bool | None = False
+    log: str = ""
 
 
 def read_result(sample: EvalSample) -> SampleResult:
@@ -120,6 +121,7 @@ def read_results(paths: list[Path]) -> list[SampleResult]:
         for sample in log.samples or []:
             result = read_result(sample)
             result.started = log.stats.started_at or ""
+            result.log = path.name
             result.skill = str(metadata.get("skill", "?"))
             result.agent_model = str(metadata.get("agent_model", "?"))
             result.judge_model = str(metadata.get("judge_model", "?"))
@@ -415,93 +417,82 @@ def load_labels(path: Path) -> list[dict[str, Any]]:
     return labels
 
 
-def _duplicate_text(what: str) -> str:
-    """Say that two runs share a key and how to resolve it."""
-    return f"Two runs have {what}: pass --latest to keep the newest log's run, or give each log its own report"
-
-
-def judge_verdicts(results: list[SampleResult]) -> dict[tuple[str, int, str], Any]:
-    """Map (sample, epoch, grader) to the judge's verdict, leaving out a judge that could not run.
-
-    Raises ValueError when two runs have the same key, whether or not their judges ran, since a label
-    cannot tell which one it means.
-    """
-    verdicts: dict[tuple[str, int, str], Any] = {}
-    seen: set[tuple[str, int, str]] = set()
-    for sample in results:
-        for grader, info in sample.judges.items():
-            key = (sample.sample_id, sample.epoch, grader)
-            if key in seen:
-                raise ValueError(_duplicate_text(f"sample {key[0]!r}, epoch {key[1]}, grader {key[2]!r}"))
-            seen.add(key)
-            if "error" not in info:  # a judge that could not run gave no verdict to compare
-                verdicts[key] = info.get("verdict")
-    return verdicts
-
-
 def label_key(label: dict[str, Any]) -> tuple[str, int, str]:
     """Return the (sample, epoch, grader) a hand label names."""
     return str(label["sample"]), int(label.get("epoch", 1)), str(label["grader"])
 
 
-def label_applies(label: dict[str, Any], agent_model: str) -> bool:
-    """Say whether a label may be scored against runs of this agent model: it names no model, or this one."""
-    return "agent_model" not in label or str(label["agent_model"]) == agent_model
+def label_runs(results: list[SampleResult], label: dict[str, Any]) -> list[SampleResult]:
+    """Return every run a label may mean: its sample and epoch, its agent model if it names one.
 
-
-def validate_labels(results: list[SampleResult], labels: list[dict[str, Any]]) -> None:
-    """Raise ValueError before anything prints when a label or a run cannot be matched to one run.
-
-    Each group must have one run per (sample, epoch, grader), and a label without an `agent_model`
-    must match runs of only one agent model, since sample ids are the same for every model.
+    A run counts when its judge for the label's grader ran or errored, and when it ended in a sample
+    error, since either could be the run the label was written on.
     """
-    groups = group_results(results)
-    verdicts = {name: judge_verdicts(group) for name, group in groups.items()}
-    for (_, model), group in groups.items():
-        counts = Counter((run.sample_id, run.epoch) for run in group)
-        for label in labels:
-            key = label_key(label)
-            if label_applies(label, model) and counts[key[0], key[1]] > 1:
-                raise ValueError(_duplicate_text(f"sample {key[0]!r}, epoch {key[1]}"))
+    sample, epoch, grader = label_key(label)
+    return [
+        run
+        for run in results
+        if run.sample_id == sample
+        and run.epoch == epoch
+        and ("agent_model" not in label or str(label["agent_model"]) == run.agent_model)
+        and (grader in run.judges or run.error)
+    ]
+
+
+def verdict_of(run: SampleResult, grader: str) -> bool | None:
+    """Return the judge's verdict for a grader, or None when the judge gave none (it errored, or the run did)."""
+    info = run.judges.get(grader)
+    return None if info is None or "error" in info else info.get("verdict")
+
+
+def resolve_labels(
+    results: list[SampleResult], labels: list[dict[str, Any]]
+) -> list[tuple[dict[str, Any], SampleResult]]:
+    """Pair each label with the one run it matches, or raise ValueError naming every label that has none or several.
+
+    Raised before anything prints. Runs of every group are searched, so a label without `agent_model` that
+    matches runs of two models, or a run and a copy that errored, cannot be scored against the wrong one.
+    """
+    resolved, problems = [], []
     for label in labels:
-        key = label_key(label)
-        models = sorted(
-            {model for (_, model), found in verdicts.items() if key in found and label_applies(label, model)}
+        runs = label_runs(results, label)
+        if len(runs) == 1:
+            resolved.append((label, runs[0]))
+            continue
+        sample, epoch, grader = label_key(label)
+        found = (
+            "matches no run" if not runs else "matches " + "; ".join(f"{r.agent_model} in {r.log or '?'}" for r in runs)
         )
-        if len(models) > 1:
-            raise ValueError(
-                f"Label {key[0]!r} (epoch {key[1]}, grader {key[2]!r}) matches runs of agent models "
-                f"{', '.join(models)}: add `agent_model: <model>` to the label to pick one"
-            )
+        fix = "" if not runs else ": add `agent_model: <model>` to the label or pass --latest to pick one"
+        problems.append(f"Label {sample!r} (epoch {epoch}, grader {grader!r}) {found}{fix}")
+    if problems:
+        raise ValueError("\n".join(problems))
+    return resolved
 
 
 def unmatched_labels(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
-    """List the hand labels that match no judge verdict of an agent model they apply to, such as a mistyped sample id."""
-    found = [(model, key) for (_, model), group in group_results(results).items() for key in judge_verdicts(group)]
-    missing = [
-        label_key(label)
-        for label in labels
-        if not any(key == label_key(label) and label_applies(label, model) for model, key in found)
-    ]
-    if not missing:
-        return []
-    return [
-        f"{len(missing)} label(s) match no judged run in these logs:",
-        *(f"  {sample} (epoch {epoch}, grader {grader})" for sample, epoch, grader in missing),
-    ]
+    """List the labels whose one run has no verdict to compare, such as an errored judge, with the reason."""
+    lines = []
+    for label, run in resolve_labels(results, labels):
+        grader = str(label["grader"])
+        if verdict_of(run, grader) is None:
+            reason = f"sample error: {run.error}" if run.error and grader not in run.judges else "judge error"
+            lines.append(f"  {label['sample']} (epoch {label_key(label)[1]}, grader {grader}): {reason}")
+    return [f"{len(lines)} label(s) have a run without a judge verdict:", *lines] if lines else []
 
 
 def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list[str]:
-    """Compare judge verdicts with hand labels, per rubric (case and grader) and overall."""
-    verdicts = judge_verdicts(results)
-    cases = {sample.sample_id: sample.case for sample in results}
+    """Compare judge verdicts with hand labels, per rubric (case and grader) and overall.
+
+    A label counts here when its one run is in `results`; labels with no run or no verdict are left out.
+    """
     per_rubric: dict[tuple[str, str], list[bool]] = defaultdict(list)
-    model = results[0].agent_model if results else ""
     for label in labels:
-        key = label_key(label)
-        if key in verdicts and label_applies(label, model):
+        runs = label_runs(results, label)
+        grader = str(label["grader"])
+        if len(runs) == 1 and verdict_of(runs[0], grader) is not None:
             human_passes = str(label["verdict"]).upper() == "PASS"
-            per_rubric[cases[key[0]], key[2]].append(verdicts[key] == human_passes)
+            per_rubric[runs[0].case, grader].append(verdict_of(runs[0], grader) == human_passes)
     if not per_rubric:
         return ["no labelled judge verdicts in these logs"]
     lines = [
@@ -528,7 +519,7 @@ def main(argv: list[str] | None = None) -> int:
     labels = load_labels(args.labels) if args.labels else None
     if labels is not None:
         try:
-            validate_labels(results, labels)
+            resolve_labels(results, labels)
         except ValueError as error:
             raise SystemExit(str(error)) from error
     for group in group_results(results).values():
@@ -554,7 +545,7 @@ def main(argv: list[str] | None = None) -> int:
     if labels is not None:
         unmatched = unmatched_labels(results, labels)
         if unmatched:
-            print("\n## Labels without a run\n" + "\n".join(unmatched))
+            print("\n## Labels without a verdict\n" + "\n".join(unmatched))
     return 0
 
 
