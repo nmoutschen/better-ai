@@ -203,7 +203,7 @@ function decisionItem(c, state, actions) {
   const STEP = [["asked", "Waiting for you"], ["replied", "You answered"], ["done", "Applied"]][step];
   // An unanswered question shows its time in the head: the state row under it already says it waits for the user.
   const label = step === 1 ? "answered, waiting for the coordinator" : step === 0 ? ""
-    : status === "answered" ? "answered by you" : "decided";
+    : step === 2 ? "answered by you" : "decided";
   const from = [has(x.from) ? x.from : "", has(x.task) ? "task " + x.task : ""].filter(Boolean).join(", ");
   // The answer the coordinator copied shows only when the user gave it in the chat: an answer from the page is in the thread.
   const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer: ${x.answer}`)
