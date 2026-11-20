@@ -355,19 +355,27 @@ function mdTableStart(lines, i) {
   return lines[i].indexOf('|') >= 0 && i + 1 < lines.length && lines[i + 1].indexOf('|') >= 0 && MD_TABLE_RULE.test(lines[i + 1]) &&
     mdCells(lines[i + 1]).length === mdCells(lines[i]).length;
 }
+// A numbered line starts a list mid-paragraph only from 1, so "in\n2024. Then" stays a sentence.
 function mdStarts(lines, i) {
-  var l = lines[i];
-  return MD_FENCE.test(l) || MD_HEADING.test(l) || MD_RULE.test(l) || MD_QUOTE.test(l) || MD_ITEM.test(l) || mdTableStart(lines, i);
+  var l = lines[i], item = l.match(MD_ITEM);
+  return MD_FENCE.test(l) || MD_HEADING.test(l) || MD_RULE.test(l) || MD_QUOTE.test(l) || mdTableStart(lines, i) ||
+    !!item && (!/\d/.test(item[2]) || parseInt(item[2], 10) === 1);
 }
 // The words of a block, with their marks. A code span keeps the marks in it as written, and so does a backslash.
-var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(([^()\s]+)\)|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*\\])\*|(^|[^\w\\])_(?=[^\s_])([\s\S]*?[^\s_\\])_(?!\w)|(https?:\/\/[^\s<>]*[^\s<>.,;:!?'")\]*_])|\\([\\`*_{}\[\]()#+\-.!|~>])/g;
+var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*\\])\*(?!\*)|(^|[^\w\\])_(?=[^\s_])([\s\S]*?[^\s_\\])_(?!\w)|(https?:\/\/(?:[^\s<>()]|\([^\s<>()]*\))*(?:[^\s<>().,;:!?'"\]*_]|\([^\s<>()]*\)))|\\([\\`*_{}\[\]()#+\-.!|~>])/g;
+// Link text cannot hold another link, such as a bare URL: keep its words only.
+function mdNoLinks(nodes) {
+  return nodes.reduce(function (a, n) {
+    return a.concat(n.tag === 'a' ? mdNoLinks(n.children) : [n.children ? Object.assign({}, n, { children: mdNoLinks(n.children) }) : n]);
+  }, []);
+}
 function mdInline(text) {
   var out = [], last = 0, m, re = new RegExp(MD_INLINE.source, 'g');
   function words(s) { if (!s) return; var prev = out[out.length - 1]; if (prev && prev.tag == null) prev.text += s; else out.push({ text: s }); }
   while ((m = re.exec(text))) {
     words(text.slice(last, m.index)); last = re.lastIndex;
     if (m[1]) out.push({ tag: 'code', children: [{ text: m[2].replace(/^ (.*) $/, '$1') }] });
-    else if (m[3]) out.push(/^(https?:|mailto:)/i.test(m[4]) ? { tag: 'a', href: m[4], children: mdInline(m[3]).reduce(function (a, n) { return a.concat(n.tag === 'a' ? n.children : [n]); }, []) } : { text: m[0] });
+    else if (m[3]) out.push(/^(https?:|mailto:)/i.test(m[4]) ? { tag: 'a', href: m[4], children: mdNoLinks(mdInline(m[3])) } : { text: m[0] });
     else if (m[5]) out.push({ tag: 'strong', children: mdInline(m[5]) });
     else if (m[6]) out.push({ tag: 'del', children: mdInline(m[6]) });
     else if (m[7]) out.push({ tag: 'em', children: mdInline(m[7]) });

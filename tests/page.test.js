@@ -214,3 +214,24 @@ test('nesting past the limit shows as written instead of overflowing', () => {
 test('a list can start at 0', () => {
   assert.equal(md('0. zero\n1. one')[0].start, 0);
 });
+
+test('links with parentheses, as on Wikipedia, keep their whole address', () => {
+  const w = 'https://en.wikipedia.org/wiki/Rust_(programming_language)';
+  assert.deepEqual(md(`[Rust](${w})`)[0].children, [{ tag: 'a', href: w, children: [t('Rust')] }]);
+  assert.deepEqual(md(`See ${w} for more.`)[0].children, [t('See '), { tag: 'a', href: w, children: [t(w)] }, t(' for more.')]);
+  assert.deepEqual(md('(see https://a.com/x)')[0].children, [t('(see '), { tag: 'a', href: 'https://a.com/x', children: [t('https://a.com/x')] }, t(')')]);
+});
+
+test('bold inside italics', () => {
+  assert.deepEqual(md('*a **b** c*')[0].children, [{ tag: 'em', children: [t('a '), { tag: 'strong', children: [t('b')] }, t(' c')] }]);
+});
+
+test('no link inside a link, however deep', () => {
+  assert.deepEqual(md('[**https://a.com**](https://b.com)')[0].children,
+    [{ tag: 'a', href: 'https://b.com', children: [{ tag: 'strong', children: [t('https://a.com')] }] }]);
+});
+
+test('a year at the start of a line does not start a list mid-paragraph', () => {
+  assert.deepEqual(md('Released in\n2024. Then more.').map(b => b.tag), ['p']);
+  assert.deepEqual(md('Steps:\n1. a\n2. b').map(b => b.tag), ['p', 'ol']);
+});

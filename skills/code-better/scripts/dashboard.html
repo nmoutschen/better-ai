@@ -287,8 +287,8 @@ function decisionItem(c, state, actions) {
     : status === "answered" ? "answered by you" : "decided";
   const from = [has(x.from) ? x.from : "", has(x.task) ? "task " + x.task : ""].filter(Boolean).join(", ");
   // The answer the coordinator copied shows only when the user gave it in the chat: an answer from the page is in the thread.
-  const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer: ${x.answer}`)
-    : status === "decided" && has(x.decision) ? md(`Decided: ${x.decision}`) : "";
+  const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer:\n\n${x.answer}`)
+    : status === "decided" && has(x.decision) ? md(`Decided:\n\n${x.decision}`) : "";
   const item = li(`msg decision ${status}`, `${headHTML("Coordinator", x.at, label)}${from ? `<p class="what">From ${esc(from)}</p>` : ""}
     ${md(x.asked || "")}${after}`);
   item.dataset.d = x.id;
