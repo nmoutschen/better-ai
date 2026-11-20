@@ -216,8 +216,15 @@ test('a list can start at 0', () => {
 // The dashboard's decision card: its step comes from the decision file and from the state of the user's latest answer.
 // The two helpers are read out of dashboard.html, between their own marker comments, so the test runs the shipped code.
 const html = fs.readFileSync(path.join(__dirname, '..', 'skills', 'code-better', 'scripts', 'dashboard.html'), 'utf8');
-const stepCode = html.split('// step:begin')[1].split('// step:end')[0];
-const { decisionStep } = new Function(stepCode + '; return {decisionStep};')();
+const stepCode = html.split('// step:begin')[1].split('// item:end')[0];
+// The whole decision card is run too, with a minimal DOM stub: the helpers it uses are the shipped ones.
+const fakeEl = () => ({ className: '', dataset: {}, html: '', classList: { add(c) { this.list.push(c); }, list: [] },
+  set innerHTML(v) { this.html = v; }, get innerHTML() { return this.html; },
+  append(n) { this.html += n.html; }, insertAdjacentHTML(_w, v) { this.html += v; } });
+const fakeDoc = { createElement: fakeEl };
+const fakeConv = { progress: s => ({ html: `<span class="progress">${s}</span>` }) };
+const { decisionStep, decisionItem } = new Function('document', 'conv', 'esc', 'has',
+  stepCode + '; return {decisionStep, decisionItem};')(fakeDoc, fakeConv, s => String(s), v => v && v !== 'none');
 const STEP_NAME = ['Waiting for you', 'You answered', 'Applied'];
 const shows = (status, answer, st) => STEP_NAME[decisionStep(status, answer, st)];
 
@@ -230,6 +237,25 @@ test('a question the coordinator asked back about waits for the user again, unti
   assert.equal(shows('waiting', a2, { 'a-1': 'asked' }), 'You answered');  // the latest answer decides
   assert.equal(shows('waiting', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
   assert.equal(shows('answered', a2, { 'a-2': 'asked' }), 'Applied');
+});
+
+test('a decision card renders for a waiting, an answered-then-asked and a decided decision, and its head agrees with its foot', () => {
+  const card = (status, answers) => ({ e: { x: { id: 'd1', status, asked: 'Which?', at: '2026-11-20T10:00:00' } },
+    replies: answers.map(id => ({ action: 'answer', id })) });
+  const run = (status, answers, st) => { const [item, foot] = decisionItem(card(status, answers), st, true); return { head: item.html.match(/class="when">([^<]*)</)[1], foot: foot.html, item }; };
+  const waiting = run('waiting', [], {});
+  assert.equal(waiting.head, '');
+  assert.match(waiting.foot, /Waiting for you/);
+  assert.ok(waiting.item.classList.list.includes('open-q'));
+  const asked = run('waiting', ['a-1'], { 'a-1': 'asked' });
+  assert.equal(asked.head, '');
+  assert.match(asked.foot, /Waiting for you/);
+  const answered = run('waiting', ['a-1'], {});
+  assert.equal(answered.head, 'answered, waiting for the coordinator');
+  assert.match(answered.foot, /You answered/);
+  const decided = run('decided', [], {});
+  assert.equal(decided.head, 'decided');
+  assert.doesNotMatch(decided.foot, /Waiting for you|You answered|Applied/);
 });
 
 test('with latestLast, an item whose reply is the newest message comes last, so the newest message is at the bottom', () => {
