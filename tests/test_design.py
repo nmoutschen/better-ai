@@ -72,6 +72,15 @@ class Design(unittest.TestCase):
                     stray.append(f"{path.relative_to(ROOT)}:{n}: {m.group(0)}")
         self.assertEqual(stray, [], "colours not named in DESIGN.md")
 
+    def test_design_html_carries_the_current_page_css_and_page_js(self):
+        """DESIGN.html works as a single file, so it holds copies of page.css and page.js: they must be the current ones."""
+        html = (ROOT / "DESIGN.html").read_text(encoding="utf-8")
+        for name, tag in (("page.css", "style"), ("page.js", "script")):
+            match = re.search(rf'<{tag} id="{name.replace(".", "-")}">\n(.*?)</{tag}>', html, re.S)
+            self.assertIsNotNone(match, f"DESIGN.html has no <{tag} id=...> with {name}")
+            current = (ROOT / "skills" / "research-better" / "scripts" / name).read_text(encoding="utf-8")
+            self.assertEqual(match.group(1), current, f"DESIGN.html's copy of {name} is out of date: paste it again")
+
     def test_design_html_lists_the_same_colours(self):
         html = (ROOT / "DESIGN.html").read_text(encoding="utf-8")
         listed = re.findall(r'^  \["([a-z-]+)", "', html.split("const COLOURS = [", 1)[1].split("];", 1)[0], re.M)
