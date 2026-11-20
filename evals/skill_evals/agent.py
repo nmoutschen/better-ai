@@ -1,7 +1,7 @@
 """Run the agent under test in the sample's sandbox: the real Claude Code CLI, or a scripted fake.
 
-`prepare_sandbox` commits the planted files as the starting commit and, in the skill condition, installs the skill in
-the agent user's empty home. `claude_code` runs `claude -p` as that non-root user with the subscription
+`prepare_sandbox` commits the planted files as the starting commit and, in the three installed conditions
+(`INSTALLED_CONDITIONS`), installs the skill in the agent user's empty home. `claude_code` runs `claude -p` as that non-root user with the subscription
 token from the environment Inspect loaded; `fake_agent` plays the case's good replay instead, so the
 whole pipeline can run without a model. Both hand stream-json to `transcript.parse_stream`.
 
@@ -27,6 +27,7 @@ from skill_evals.transcript import Run, parse_stream, redact
 
 WORKDIR = "/work"
 AGENT_USER = "agent"
+AGENT_TIMEOUT_MESSAGE = "Claude Code timed out"
 TOKEN_VARIABLES = ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN")
 # Web tools would let the agent look answers up; scheduling tools keep a non-interactive run open until a
 # wake-up fires, long after the work is done.
@@ -228,8 +229,11 @@ def claude_code(model: str = "sonnet", timeout: int = 1800) -> Solver:
         run = parse_stream(stdout, secrets())
         record_run(state, run, prompt)
         if timed_out:
+            # Raised like any Claude Code failure, so the sample is an Inspect sample error: left out of pass rates
+            # and of cost and time averages, never scored on partial work as $0 and 0 s.
             state.metadata["claude_code"]["timed_out"] = True
-        elif run.error:
+            raise RuntimeError(f"{AGENT_TIMEOUT_MESSAGE} after {timeout} seconds")
+        if run.error:
             raise RuntimeError(f"Claude Code failed: {run.error[:500]}\n{stderr[-1000:]}")
         return state
 
@@ -254,7 +258,7 @@ async def play_action(
         result = await sandbox_env.exec(["cat", path], user=AGENT_USER)
         lines = result.stdout.splitlines()
         text = (
-            "".join(f"{number:6}\t{line}\n" for number, line in enumerate(lines, 1))
+            "".join(f"{line_number:6}\t{line}\n" for line_number, line in enumerate(lines, 1))
             if result.success
             else result.stderr
         )

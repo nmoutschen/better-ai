@@ -15,6 +15,7 @@ from typing import Any
 from inspect_ai.util import ExecResult, OutputLimitExceededError, SandboxEnvironment
 
 COMMAND_TIMEOUT = 60
+GRADING_ERROR_MESSAGE = "Grading error"
 TEST_FILE = re.compile(r"(?:^|/)(?:test_|check_)[^/]*\.py$|_test\.py$")
 CACHE_FILE = re.compile(r"(?:^|/)__pycache__/|(?:^|/)\.pytest_cache/")
 MARKDOWN_NOTE = re.compile(r"\.(?:md|markdown)$", re.IGNORECASE)
@@ -22,6 +23,18 @@ SNAPSHOT_SCRIPT = (
     'mkdir -p "$1/repo" "$1/grade" && cp -a ./. "$1/repo/"'
     ' && find "$1/repo" -name __pycache__ -type d -prune -exec rm -rf {} +'
 )
+
+
+class GradingError(RuntimeError):
+    """A grader could not run (a judge failure or a sandbox error); the sample becomes an Inspect sample error.
+
+    The message starts with `GRADING_ERROR_MESSAGE`, which the report reads to name the cause.
+    """
+
+    def __init__(self, detail: str) -> None:
+        """Keep `detail` (the grader and why) and put the fixed prefix in front of it."""
+        super().__init__(f"{GRADING_ERROR_MESSAGE}: {detail}")
+        self.detail = detail
 
 
 class Checkout:
@@ -90,7 +103,10 @@ class Checkout:
         hidden: dict[str, str] | None = None,
         timeout: int = COMMAND_TIMEOUT,
     ) -> ExecResult[str] | None:
-        """Run a Bash command on a disposable copy of the tree; None after a timeout or sandbox failure.
+        """Run a Bash command on a disposable copy of the tree; None after a timeout or an output flood.
+
+        Those two are the submitted code's behaviour, so they fail the check and leave a note. Any other sandbox
+        failure raises GradingError: the check did not run, and the sample is rerun, not scored.
 
         `restore` puts planted files back, `files` replaces files in the copy, and `hidden` files go
         under `$GRADE_FILES`.
@@ -118,9 +134,11 @@ class Checkout:
             return await self.sandbox_env.exec(
                 ["bash", "-c", command], cwd=f"{directory}/repo", env=env, timeout=timeout, timeout_retry=False
             )
-        except (TimeoutError, OutputLimitExceededError, RuntimeError, OSError, ValueError) as error:
+        except (TimeoutError, OutputLimitExceededError) as error:
             self.notes.append(f"{command[:80]}: {type(error).__name__}: {error}")
             return None
+        except (RuntimeError, OSError, ValueError) as error:
+            raise GradingError(f"{command[:80]}: {type(error).__name__}: {error}") from error
         finally:
             if directory:
                 await self.sandbox_env.exec(["rm", "-rf", "--", directory])

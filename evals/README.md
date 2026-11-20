@@ -56,7 +56,8 @@ Task options (`-T name=value`):
 Inspect's own `--model` is not used: the CLI calls the API itself, so the task
 sets Inspect's `none` model. A sample whose Claude Code run ends in an error,
 such as a rate limit, is a sample error; add `--no-fail-on-error` to let the
-rest of the run continue and `inspect eval-retry` to rerun it.
+rest of the run continue and `inspect eval-retry` to rerun it. An agent run that
+hits `timeout` also raises, so it is a sample error too, never scored on partial work.
 
 Conditions:
 
@@ -231,8 +232,11 @@ starting commit or run a hidden check on a disposable copy of it:
 Hidden commands find their files under `$GRADE_FILES` and the planted commit
 in `$START_COMMIT`. Use `PYTHONPATH=. python "$GRADE_FILES/check.py"` to let a
 hidden test import a planted module. A timeout (60 seconds or the spec's
-`timeout`) or a sandbox error scores 0 and is listed under `notes` in the
-score metadata.
+`timeout`) fails the check and is listed under `notes` in the score metadata. Any
+other sandbox error (the check could not run) is a grading error: the scorer
+raises, naming the grader and the cause, so the sample is a sample error that
+`inspect eval-retry` reruns. `inspect score` cannot re-score it, because it
+starts no sandbox.
 
 The judge (`type: judge`, field `rubric`, optional `observe: {cmd: ...}`)
 grades how the agent worked: what it read before editing, what it ran on the
@@ -243,8 +247,9 @@ the request, the transcript as numbered steps (each command with its result
 and exit code, each edit, each read with its range), the final reply, the Git
 diff against the starting commit, the Markdown notes the agent wrote, and with
 `observe` the output of a command run on a copy of the tree. Its last line
-must be exactly `VERDICT: PASS` or `VERDICT: FAIL`; anything else scores 0 and
-is marked malformed. Score metadata keeps each judge's reply, verdict, model,
+must be exactly `VERDICT: PASS` or `VERDICT: FAIL`; a reply whose last line is
+anything else scores 0 and is marked malformed. A judge that times out, reports
+an error or prints no reply is a grading error like the above. Score metadata keeps each judge's reply, verdict, model,
 tokens and cost under `judges`.
 
 Write each rubric for one case and one rule: name the rule, the planted facts,
@@ -310,7 +315,7 @@ between conditions, cost and time per condition, the skill files read in the
 skill condition (per expected file, and files read where no case expects
 them), one line per sample with
 tokens (input, output, cache read, cache write), agent cost, judge cost and
-time, the totals, any sample errors, and per condition how many runs committed or rewrote
+time, the totals, any sample errors, how many samples per condition are sample errors, by cause (agent timeout, grading error, other), left out of the pass rates and the cost and time means, and per condition how many runs committed or rewrote
 history. Every sample records its commits under `side_actions` in the score metadata; only cases
 that use `no_commit` score it. With `--latest`, each case and
 condition keeps only the runs of the most recently started log that has it, so

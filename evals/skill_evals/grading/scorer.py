@@ -3,7 +3,10 @@
 Graders are deterministic file checks (`files.py`), a check on the transcript's commands (`commands.py`),
 the judge (`judge.py`), or `any_of` a list of these. A case scores only its own rule, so `all` is the score for that rule; the rule, the condition, judge
 replies and grader notes go into the score metadata. A grader that cannot apply in this run (a judge
-when judging is off) scores NaN and is left out of `all`. Whether the agent read the skill's own files is a
+when judging is off) scores NaN and is left out of `all`. A grader that could not run (the judge timed out, reported an
+error or printed no reply, or a check hit a sandbox error) is not 0: the scorer raises `GradingError` naming the grader
+and the cause, so the sample is an Inspect sample error that `inspect eval-retry` reruns (`inspect score` starts no
+sandbox, so it cannot score it again). A hidden check that times out is a fail, not an error. Whether the agent read the skill's own files is a
 separate scorer (`reads.py`), so `all` stays the rule's score.
 """
 
@@ -18,7 +21,7 @@ from inspect_ai.util import sandbox
 
 from skill_evals.agent import WORKDIR
 from skill_evals.grading import commands
-from skill_evals.grading.files import GRADERS, Checkout, commits_since_start
+from skill_evals.grading.files import GRADERS, Checkout, GradingError, commits_since_start
 from skill_evals.grading.judge import NO_JUDGE, judge
 from skill_evals.transcript import redact
 
@@ -44,22 +47,26 @@ class Grading:
         self.judges: dict[str, dict[str, Any]] = {}
 
     async def run(self, key: str, spec: dict[str, Any]) -> float:
-        """Return 1, 0, or NaN for a grader that does not apply in this run."""
+        """Return 1, 0, or NaN for a grader that does not apply in this run; raise GradingError when it could not run."""
+        if spec["type"] == "any_of":
+            return await self.run_any_of(key, spec)
+        try:
+            return await self.run_one(key, spec)
+        except GradingError:
+            raise
+        except (RuntimeError, TimeoutError, OSError, UnicodeDecodeError) as error:
+            raise GradingError(redact(f"{key}: {type(error).__name__}: {error}")) from error
+
+    async def run_one(self, key: str, spec: dict[str, Any]) -> float:
+        """Run one grader that is not `any_of`."""
         kind = spec["type"]
-        if kind == "any_of":
-            # Stop at the first pass, so a judge listed after a deterministic check runs only when needed.
-            skipped = False
-            for number, inner in enumerate(spec["graders"], 1):
-                value = await self.run(f"{key}.{number}", inner)
-                if value == 1:
-                    return 1
-                skipped |= math.isnan(value)
-            return NOT_APPLICABLE if skipped else 0
         if kind == "judge":
             if self.judge_model == NO_JUDGE:
                 return NOT_APPLICABLE
             passed, info = await judge(spec, self.state, self.repo, self.judge_model)
             self.judges[key] = info
+            if passed is None:
+                raise GradingError(redact(f"{key}: judge could not run: {info.get('error', 'gave no verdict')}"))
             return int(passed)
         if kind == "ran_after_last_edit":
             return int(commands.ran_after_last_edit(spec, self.state.messages))
@@ -68,6 +75,25 @@ class Grading:
         if kind not in GRADERS:
             raise ValueError(f"Unknown grader type: {kind!r}")
         return int(await GRADERS[kind](spec, self.repo))
+
+    async def run_any_of(self, key: str, spec: dict[str, Any]) -> float:
+        """Pass at the first inner grader that passes; else raise if one could not run, NaN if one did not apply, else 0."""
+        # Stop at the first pass, so a judge listed after a deterministic check runs only when needed. A pass settles
+        # any_of, so an inner grader that could not run before it no longer matters.
+        skipped = False
+        errors: list[str] = []
+        for number, inner in enumerate(spec["graders"], 1):
+            try:
+                value = await self.run(f"{key}.{number}", inner)
+            except GradingError as error:
+                errors.append(error.detail)
+                continue
+            if value == 1:
+                return 1
+            skipped |= math.isnan(value)
+        if errors:
+            raise GradingError(f"{key}: no inner grader passed and one could not run: {'; '.join(errors)}")
+        return NOT_APPLICABLE if skipped else 0
 
 
 def combine(values: dict[str, float]) -> float:
@@ -97,11 +123,7 @@ def grade_cases(keys: list[str], judge_model: str) -> Scorer:
         grading = Grading(state, repo, judge_model)
         values: dict[str, float] = {}
         for key, spec in zip(grader_keys(state.metadata["graders"]), state.metadata["graders"], strict=True):
-            try:
-                values[key] = await grading.run(key, spec)
-            except (RuntimeError, TimeoutError, OSError, UnicodeDecodeError) as error:
-                values[key] = 0
-                repo.notes.append(redact(f"{key}: {type(error).__name__}: {error}"))
+            values[key] = await grading.run(key, spec)
         values["all"] = combine(values)
         # Side actions are measured on every sample but never scored: a case scores only its own rule.
         try:

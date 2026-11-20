@@ -4,7 +4,9 @@ The judge is `claude -p` with no tools, run as a separate sandbox user with an e
 chosen with `-T judge_model=...` (by default a different model from the agent under test). It reads a
 compact record: the request, the transcript with each command, result and exit code, the final reply,
 the Git diff, the Markdown notes the agent wrote, and an optional observed output. Its last line must
-be exactly `VERDICT: PASS` or `VERDICT: FAIL`; anything else scores 0 and is noted as malformed.
+be exactly `VERDICT: PASS` or `VERDICT: FAIL`; a reply whose last line is anything else scores 0 and is noted as
+malformed. A judge that times out, reports an error or prints no reply gives no verdict (None): the caller raises,
+so the sample is an Inspect sample error that `inspect eval-retry` reruns, instead of scoring 0.
 """
 
 import json
@@ -136,12 +138,17 @@ def parse_output(stdout: str) -> dict[str, Any]:
         "reply": data.get("result") or "",
         "total_cost_usd": float(data.get("total_cost_usd") or 0.0),
         "usage": {key: int(usage.get(key) or 0) for key in ("input_tokens", "output_tokens")},
-        "error": data.get("subtype") if data.get("is_error") else None,
+        "error": (data.get("subtype") or "is_error") if data.get("is_error") else None,
     }
 
 
-async def judge(spec: dict[str, Any], state: TaskState, repo: Checkout, model: str) -> tuple[bool, dict[str, Any]]:
-    """Ask the judge model for a verdict on one rubric; return it with what to keep in the score metadata."""
+async def judge(
+    spec: dict[str, Any], state: TaskState, repo: Checkout, model: str
+) -> tuple[bool | None, dict[str, Any]]:
+    """Ask the judge model for a verdict on one rubric; return it with what to keep in the score metadata.
+
+    The verdict is None when the judge could not run: it timed out, the CLI reported an error, or it printed no reply.
+    """
     prompt = f"Rubric:\n{spec['rubric']}\n\nRecord:\n{await record(state, repo, spec)}"
     args = ["-p", "--output-format", "json", "--model", model, "--tools", "", "--system-prompt", INSTRUCTIONS]
     args += ["--strict-mcp-config", "--no-session-persistence"]
@@ -152,7 +159,10 @@ async def judge(spec: dict[str, Any], state: TaskState, repo: Checkout, model: s
     found = verdict(output["reply"])
     info = {"model": model, "reply": clip(output["reply"], 0, 3000), "verdict": found}
     info |= {key: output[key] for key in ("total_cost_usd", "usage") if key in output}
-    if timed_out or output.get("error") or found is None:
-        info["malformed"] = "timed out" if timed_out else output.get("error") or "last line is not a verdict"
-        info["stderr"] = stderr[-500:]
+    failure = "timed out" if timed_out else output.get("error") or (None if output["reply"].strip() else "no reply")
+    if failure:
+        info |= {"verdict": None, "error": failure, "stderr": stderr[-500:]}
+        return None, info
+    if found is None:
+        info |= {"malformed": "last line is not a verdict", "stderr": stderr[-500:]}
     return bool(found), info

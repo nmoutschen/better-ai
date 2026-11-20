@@ -1,8 +1,13 @@
 """Tests for the deterministic graders in skill_evals/grading/files.py, on local planted repositories."""
 
+from typing import Any
+
+import pytest
 from conftest import Plant
+from inspect_ai.util import OutputLimitExceededError
 
 from skill_evals.grading import files
+from skill_evals.grading.files import Checkout, GradingError
 
 FEES = "def rush(minutes):\n    return 5 if minutes > 15 else 0\n"
 FIXED = "def rush(minutes):\n    return 5 if minutes >= 15 else 0\n"
@@ -137,3 +142,44 @@ async def test_changed_lists_markdown_notes_git_ignores(plant: Plant) -> None:
     await repo.sandbox_env.write_file(".code/fix/tasks.md", "# Tasks\n")
     await repo.sandbox_env.write_file(".code/fix/check.py", "x = 1\n")
     assert await repo.all_changed() == {".code/fix/tasks.md"}
+
+
+def fail_on(repo: Checkout, command: str, error: Exception) -> None:
+    """Make the sandbox raise `error` when it runs `command` through bash -c, as a Docker failure would."""
+    real = repo.sandbox_env.exec
+
+    async def exec_fails(args: list[str], *rest: Any, **options: Any) -> Any:
+        if args[:2] == ["bash", "-c"] and args[2] == command:
+            raise error
+        return await real(args, *rest, **options)
+
+    repo.sandbox_env.exec = exec_fails  # type: ignore[method-assign]
+
+
+@pytest.mark.parametrize("error", [OSError("docker gone"), RuntimeError("exec failed")])
+@pytest.mark.parametrize("grader", [files.command_passes, files.command_fails])
+async def test_hidden_check_sandbox_error_is_a_grading_error(plant: Plant, error: Exception, grader: Any) -> None:
+    """A sandbox error that is not a timeout raises GradingError naming the cause; it is not a fail."""
+    repo = await plant({"a.py": ""})
+    fail_on(repo, "true", error)
+    with pytest.raises(GradingError, match=str(error)):
+        await grader({"cmd": "true"}, repo)
+
+
+@pytest.mark.parametrize("error", [TimeoutError("slow"), OutputLimitExceededError("10 MiB", "output")])
+@pytest.mark.parametrize("grader", [files.command_passes, files.command_fails])
+async def test_hidden_check_timeout_or_flood_still_fails(plant: Plant, error: Exception, grader: Any) -> None:
+    """A check whose run times out or floods the output fails both ways: the agent's code did not finish."""
+    repo = await plant({"a.py": ""})
+    fail_on(repo, "true", error)
+    assert not await grader({"cmd": "true"}, repo)
+    assert repo.notes
+
+
+async def test_catches_bug_raises_on_a_sandbox_error(plant: Plant) -> None:
+    """The graders that run a test file do not skip it when the sandbox fails."""
+    repo = await plant({"a.py": ""})
+    await repo.sandbox_env.write_file("test_a.py", "assert True\n")
+    fail_on(repo, "PYTHONPATH=. python test_a.py", OSError("docker gone"))
+    with pytest.raises(GradingError):
+        await files.catches_bug({}, repo)

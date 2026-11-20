@@ -243,3 +243,18 @@ def test_sandbox_images_are_pinned() -> None:
     tinyproxy = re.search(r"apk add --no-cache tinyproxy=(\S+)", proxy)
     assert tinyproxy
     assert f"image: better-ai-evals-proxy:tinyproxy-{tinyproxy[1]}\n" in (sandbox_dir / "compose.yaml").read_text()
+
+
+async def test_agent_timeout_is_a_sample_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run cut off at the timeout raises, naming the timeout, instead of being scored as a finished run."""
+
+    async def fake_cli(*args: object, **options: object) -> tuple[str, str, bool]:
+        return '{"type": "assistant", "message": {"id": "m", "content": []}}', "", True
+
+    monkeypatch.setattr(agent, "sandbox", lambda: None)
+    monkeypatch.setattr(agent, "claude_cli", fake_cli)
+    monkeypatch.setattr(agent, "secrets", lambda: ())
+    state = type("State", (), {"metadata": {}, "input_text": "Fix it"})()
+    solve = agent.claude_code(timeout=7)
+    with pytest.raises(RuntimeError, match="timed out after 7 seconds"):
+        await solve(state, None)  # type: ignore[arg-type]

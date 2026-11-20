@@ -171,3 +171,59 @@ def test_rule_key_orders_invocation_then_names() -> None:
     """Invocation first, then named rules alphabetically."""
     rules = ["report-accurately", "ask-or-proceed", "invocation"]
     assert sorted(rules, key=report.rule_key) == ["invocation", "ask-or-proceed", "report-accurately"]
+
+
+def error_rows() -> list[report.SampleResult]:
+    """One scored sample and one sample error of each cause, in two conditions."""
+    return [
+        report.SampleResult("a-skill", "a", "skill", "1.1", 1, {"input_tokens": 5}, 0.5, 0.1, 30),
+        report.SampleResult(
+            "b-skill", "b", "skill", "1.1", math.nan, error="Grading error: judge: timed out after 600 seconds"
+        ),
+        report.SampleResult(
+            "c-no-skill",
+            "c",
+            "no-skill",
+            "1.1",
+            math.nan,
+            error="RuntimeError: Claude Code timed out after 1800 seconds",
+        ),
+        report.SampleResult("d-no-skill", "d", "no-skill", "1.1", math.nan, error="RuntimeError: 429"),
+    ]
+
+
+def test_sample_errors_are_counted_per_condition_and_cause() -> None:
+    """Per condition: samples, then errors by cause (agent timeout, grading error, other)."""
+    lines = report.error_lines(error_rows())
+    skill = next(line for line in lines if line.startswith("skill "))
+    no_skill = next(line for line in lines if line.startswith("no-skill"))
+    assert skill.split()[1:] == ["2", "0", "1", "0"] and no_skill.split()[1:] == ["2", "1", "0", "1"]
+
+
+def test_sample_errors_are_left_out_of_rates_and_means_but_finished_runs_keep_cost() -> None:
+    """Pass rates and cost and time means use finished runs only, with their real cost; the total line counts errors."""
+    assert "1/1" in report.pass_table(error_rows())[1]
+    skill = next(line for line in report.condition_cost_lines(error_rows()) if line.startswith("skill "))
+    assert skill.split()[1:3] == ["1", "0.500"]
+    assert "4 samples, 3 errors" in report.case_lines(error_rows())[-1]
+
+
+def test_read_result_keeps_the_error_text() -> None:
+    """A sample error's message reaches the result, which the cause count reads."""
+    sample = SimpleNamespace(
+        id="x",
+        epoch=1,
+        error=SimpleNamespace(message="Grading error: judge: 429"),
+        scores={},
+        metadata={"case": "x", "condition": "skill"},
+    )
+    assert report.read_result(sample).error == "Grading error: judge: 429"  # type: ignore[arg-type]
+
+
+def test_agreement_skips_a_judge_that_errored() -> None:
+    """A judge with no verdict because it could not run is not a disagreement."""
+    errored = report.SampleResult(
+        "a-skill", "a", "skill", "1.1", 0, judges={"judge": {"verdict": None, "error": "timed out"}}
+    )
+    lines = report.agreement([errored], [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}])
+    assert lines == ["no labelled judge verdicts in these logs"]

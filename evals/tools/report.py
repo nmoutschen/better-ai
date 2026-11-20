@@ -26,7 +26,9 @@ from typing import Any
 import yaml
 from inspect_ai.log import EvalSample, read_eval_log
 
+from skill_evals.agent import AGENT_TIMEOUT_MESSAGE
 from skill_evals.cases import CONDITIONS
+from skill_evals.grading.files import GRADING_ERROR_MESSAGE
 
 EVALS = Path(__file__).resolve().parents[1]
 
@@ -148,6 +150,28 @@ def pass_table(results: list[SampleResult]) -> list[str]:
     return lines
 
 
+def error_cause(message: str) -> str:
+    """Name the cause of a sample error from its message: agent timeout, grading error, or other."""
+    if AGENT_TIMEOUT_MESSAGE in message:
+        return "agent timeout"
+    return "grading error" if GRADING_ERROR_MESSAGE in message else "other"
+
+
+def error_lines(results: list[SampleResult]) -> list[str]:
+    """Count, per condition, the samples and the sample errors by cause.
+
+    Sample errors are left out of the pass rates and of the cost and time means; `inspect eval-retry` reruns them.
+    """
+    causes = ("agent timeout", "grading error", "other")
+    lines = [f"{'condition':18} {'samples':>8} " + " ".join(f"{cause:>14}" for cause in causes)]
+    for name in CONDITIONS:
+        runs = [sample for sample in results if sample.condition == name]
+        if runs:
+            found = [error_cause(sample.error) for sample in runs if sample.error]
+            lines.append(f"{name:18} {len(runs):8} " + " ".join(f"{found.count(cause):14}" for cause in causes))
+    return lines
+
+
 def case_means(results: list[SampleResult]) -> dict[str, dict[str, float]]:
     """Average each case's scored runs per condition: {condition: {case: mean of `all`}}."""
     runs: dict[tuple[str, str], list[float]] = defaultdict(list)
@@ -250,7 +274,7 @@ def case_lines(results: list[SampleResult]) -> list[str]:
 
 
 def condition_cost_lines(results: list[SampleResult]) -> list[str]:
-    """Format cost, time and tokens per condition: mean and median per run, over runs without an error."""
+    """Format cost, time and tokens per condition: mean and median per run, over runs without a sample error."""
     lines = [
         f"{'condition':18} {'runs':>5} {'cost mean':>10} {'median':>8} {'time mean':>10} {'median':>8} "
         f"{'out tokens':>11} {'total cost':>11}"
@@ -349,6 +373,7 @@ def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list
         (sample.sample_id, sample.epoch, grader): info.get("verdict")
         for sample in results
         for grader, info in sample.judges.items()
+        if "error" not in info  # a judge that could not run gave no verdict to compare
     }
     cases = {sample.sample_id: sample.case for sample in results}
     per_rubric: dict[tuple[str, str], list[bool]] = defaultdict(list)
@@ -382,6 +407,7 @@ def main(argv: list[str] | None = None) -> int:
         results = latest(results)
     sections = [
         ("Pass rate (all) per rule and condition", pass_table(results)),
+        ("Errors per condition (left out of pass rates, cost and time)", error_lines(results)),
         ("Comparisons between conditions (paired by case)", comparison_lines(results)),
         ("Cost and time per condition", condition_cost_lines(results)),
         ("Skill files read (skill condition; a missed file fails the run)", skill_read_lines(results)),
