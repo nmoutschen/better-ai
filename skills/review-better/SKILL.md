@@ -1,6 +1,6 @@
 ---
 name: review-better
-description: Helps an AI agent review work, such as text, code, an interface, a plan or a research report, whether it is its own, another agent's or a person's, so that each finding leads to an action, such as a fix, an answer or a decision. Holds the review method that code-better, design-better and write-better add their checks to.
+description: Helps an AI agent review work, such as text, code, an interface, a plan or a research report, whether it is its own, another agent's or a person's, so that each finding leads to an action, such as a fix, an answer or a decision. Holds the review method that code-better, design-better, architect-better and write-better add their checks to.
 argument-hint: "[WORK TO REVIEW]"
 metadata:
   kind: procedural
@@ -19,6 +19,7 @@ This file holds the method every review shares: what the review is for, who revi
 |---|---|
 | Code, a diff or a pull request | what `/code-better` looks for in code |
 | An interface or a design language | what `/design-better` looks for in an interface or a design language |
+| A software design, or a system against its design | what `/architect-better` looks for in a design |
 | Text the user reads | what `/write-better` asks of a text |
 
 IF the user has a review guide, such as a `review-for-<name>` skill, ADD its criteria to what to look for. Its blocking criteria are blocking findings in this review.
