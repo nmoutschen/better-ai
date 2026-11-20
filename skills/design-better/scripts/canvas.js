@@ -201,10 +201,14 @@
   document.querySelectorAll('button[data-mode]').forEach(function (b) {
     b.addEventListener('click', function () { setMode(b.dataset.mode === 'comment'); });
   });
-  document.addEventListener('keydown', function (e) {
-    if ((e.key === 'c' || e.key === 'C') && !/INPUT|TEXTAREA/.test(e.target.tagName) && !e.metaKey && !e.ctrlKey) setMode(!commenting);
+  // C switches between commenting and using the versions, and Escape closes the comment box. A click in a version
+  // moves the focus into its frame, so each version's document listens too (see instrument).
+  function shortcut(e) {
+    var t = e.target, typing = t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable);
+    if ((e.key === 'c' || e.key === 'C') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) setMode(!commenting);
     if (e.key === 'Escape' && !pop.hidden) closePop();
-  });
+  }
+  document.addEventListener('keydown', shortcut);
   // A path from the nearest ancestor with a unique id, or from body: a path without an anchor can match a deeper
   // element earlier in the page.
   function selectorOf(el) {
@@ -311,6 +315,7 @@
     doc.documentElement.dataset.dbReady = '1';
     var style = doc.createElement('style'); style.textContent = PIN_CSS; doc.head.appendChild(style);
     doc.documentElement.classList.toggle('db-commenting', commenting);
+    doc.addEventListener('keydown', shortcut);
     doc.addEventListener('click', function (e) {
       if (!menu.hidden) openMenu(false);
       // With a comment box open, a click elsewhere closes it instead of starting another comment.
