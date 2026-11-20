@@ -3,6 +3,8 @@ __pycache__/
 .show
 .teach
 .design
+# Eval cases plant a project's own .design/ folder (briefs, directions) as part of the case.
+!evals/cases/*/*/repo/.design
 .worktrees
 .claude/worktrees
 node_modules
