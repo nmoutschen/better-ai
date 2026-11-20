@@ -67,8 +67,8 @@ NAME components and sections with the words a builder would search for. FOR each
 
 AFTER building with a design language, DO NOT trust that you followed it. SEARCH the code for colours, sizes and spacing values that are not named in the document, and for components that duplicate a listed one. LOOK at the rendered screens side by side for differences between them, because checks of single elements miss problems that span a page.
 
-REPLACE each stray value with a named one, or PROPOSE it as an addition (step 7).
+USE `/code-better` if available to REPLACE each stray value with a named one, or PROPOSE it as an addition (step 7).
 
 ## 7. Change it only with the user
 
-The design language belongs to the user. PROPOSE each addition, change or exception, with the reason and where it applies. DO NOT change it silently to make a screen work. RECORD each accepted change in the document. WHEN a value changes, FIND and UPDATE its uses.
+The design language belongs to the user. PROPOSE each addition, change or exception, with the reason and where it applies. DO NOT change it silently to make a screen work. RECORD each accepted change in the document. WHEN a value changes, USE `/code-better` if available to FIND and UPDATE its uses.

@@ -15,7 +15,7 @@ WRITE the brief's GOAL and scenarios from what the AUDIENCE comes to do, not fro
 
 ## 2. Run the review
 
-START a reviewer for every audit, however small. DO NOT review the interface yourself instead. READ [../agents/reviewer.md](../agents/reviewer.md), FILL IN its Input with the interface, the brief, the design language, every decision the user has made about them, and what to review, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt. WHEN the thing to review is a design language that has an interface built with it, ASK it to review both.
+START a reviewer for every audit, however small. DO NOT review the interface yourself instead. READ [../agents/reviewer.md](../agents/reviewer.md), FILL IN its Input with the interface, the brief, the design language, every decision the user has made about them, and what to review, and START it as its HOW TO USE block says. WHEN the thing to review is a design language that has an interface built with it, ASK it to review both.
 
 WAIT until the reviewer hands back its report. DO NOT write to the user while it runs.
 
@@ -27,10 +27,10 @@ ORDER the findings: structure first, because a review of defects takes the pages
 
 ## 4. Report
 
-REPORT by SKILL.md step 6: the findings in order, each with its proposed fix; the unconfirmed ones in one line each; what works and must be kept; and, for a design language, your reading of whether it expresses what the user wants, separate from the findings.
+REPORT by SKILL.md step 6: the findings in order, each with the scenario step where a person is stopped, what they meet there, such as a screen reader announcing "button" seven times, and the proposed fix; the unconfirmed ones in one line each; what works and must be kept; and, for a design language, your reading of whether it expresses what the user wants, separate from the findings.
 
 IF the user then asks for changes, READ [design.md](design.md) or [language.md](language.md), whichever fits, and FOLLOW it.
 
 ## 5. Correct the work you are building
 
-ONLY WHEN SKILL.md sent you here without argument for an interface the current conversation is building: CORRECT each confirmed finding in that work. FOR a fix inside one screen, FOLLOW SKILL.md's line for small changes; OTHERWISE, READ [design.md](design.md) and FOLLOW it from its step 2. THEN START a new reviewer as step 2 says, and REPORT what you changed and what remains open.
+SKIP this step unless SKILL.md sent you here without argument. ONLY WHEN SKILL.md sent you here without argument for an interface the current conversation is building: CORRECT each confirmed finding in that work. FOR a fix inside one screen, FOLLOW SKILL.md's line for small changes; OTHERWISE, READ [design.md](design.md) and FOLLOW it from its step 2. THEN START a new reviewer as step 2 says, and REPORT what you changed and what remains open.

@@ -55,7 +55,7 @@ ASK the user, as the general rule [Ask the user](#ask-the-user) says, what only 
 
 ### 4. Pick the mode
 
-PICK the one mode that fits the work. READ its file: it is MANDATORY, and the next step cannot run without it.
+PICK the one mode that fits the work. READ its file: it is MANDATORY, and the next step cannot run without it. IF the user agreed in step 1 to create a design language first, RUN [modes/language.md](modes/language.md), THEN the mode the task needs.
 
 | Mode | When | File |
 |---|---|---|
@@ -89,11 +89,11 @@ FOLLOW these rules in every step and every mode.
 
 ### Ask the user
 
-USE `/ask-better` if available. OTHERWISE, ASK at most about three questions, all in one message, each answerable in a few words or by choosing. ASK what only the user knows and what changes the design: what happens to the AUDIENCE's data, money or work, and what they are told. The first questions carry most of the value; many or generic questions cost the user more than they give.
+USE `/ask-better` if available. OTHERWISE, ASK at most about three questions, all in one message, each answerable in a few words or by choosing. COUNT a question a mode asks, such as the design mode's question about the user's direction, among them. ASK what only the user knows and what changes the design: what happens to the AUDIENCE's data, money or work, and what they are told. The first questions carry most of the value; many or generic questions cost the user more than they give.
 
 WHEN a question is about how something looks, such as a colour, a layout or a component, SHOW the versions by [Show versions on one page](#show-versions-on-one-page), and ASK the user to choose. DO NOT ask from a text description when you can render.
 
-FOR every other gap, CHOOSE the most plausible option, PROCEED, and STATE the assumption in the brief and next to the result it affects.
+FOR every other gap, including a technical fact the project does not state, such as an API's address, CHOOSE the most plausible option, PROCEED, and STATE the assumption in the brief and next to the result it affects.
 
 ### Show versions on one page
 

@@ -7,7 +7,7 @@ description: Use for a new interface, or a change to which screens exist, what t
 
 FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
-You design; `/code-better` builds. Two loops run: `/code-better`'s inner loop builds the design and checks the code against its requirements, and this mode's outer loop accepts the result only once a reviewer has walked every scenario in the built interface. Showing directions before building, the design document, small visual batches, and the limits on the acceptance loop are design choices.
+You design; `/code-better` builds. Two loops run: `/code-better`'s inner loop builds the design and checks the code against its requirements, and this mode's outer loop accepts the result only once a reviewer has walked every scenario in the built interface. Showing directions before building, one review of the chosen direction instead of one per round, the design document, small visual batches, and the limits on the acceptance loop are design choices.
 
 ## 1. Show directions before anything is built
 
@@ -18,6 +18,7 @@ SKIP this step WHEN the change keeps the existing structure and the brief leaves
 3. SHOW them by the general rule [Show versions on one page](../SKILL.md#show-versions-on-one-page).
 4. ASK which direction serves each scenario best and what is wrong with each one. DO NOT ask the user to design the fix: people find problems far more reliably than solutions. TREAT what the user picks about the look as their preference, not as evidence that the AUDIENCE can use it.
 5. WAIT for the user's decision. RECORD the chosen direction in the brief.
+6. START a reviewer on the chosen direction, because the user may choose a direction that people cannot use: READ [../agents/reviewer.md](../agents/reviewer.md), FILL IN its Input with the direction's files, the brief and the user's decisions, and START it as its HOW TO USE block says, in the background. DO NOT wait for it: GO ON with steps 2 and 3 while it runs. DO NOT start a reviewer on the directions of earlier rounds.
 
 ## 2. Decide the cases the design leaves out
 
@@ -34,7 +35,13 @@ READ [../templates/design.md](../templates/design.md). WRITE `.design/<slug>/des
 - The design language values and components to use. IF a screen needs one the design language lacks, PROPOSE it to the user, as [language.md](language.md) step 7 says.
 - The requirements `/code-better` builds against: ONE per scenario, stated as the walk from its start to the end the person observes, with its concrete data; and the requirements from the [Design rules](../SKILL.md#design-rules) that only the code can meet, such as labels tied to their fields, native controls with names, keyboard order and visible focus, and the page's language.
 
-## 4. Build with /code-better
+## 4. Settle the review of the direction
+
+WAIT for the reviewer of step 1.6. REPRODUCE each finding in the direction's files. SHOW the user each confirmed finding, with the scenario step where a person is stopped and the fix you propose, together with any open question of step 2, by [Show versions on one page](../SKILL.md#show-versions-on-one-page) WHEN the page is still served. The user decides which fixes to apply: the direction is theirs. APPLY the fixes they accept to the design, and LIST the findings they accept as they are under its Assumptions.
+
+IF the user's answer changes the structure or the flow of the direction, START a new reviewer on it as step 1.6 says, and SETTLE its report the same way. OTHERWISE, GO ON.
+
+## 5. Build with /code-better
 
 USE `/code-better` to build the design, GIVING it `.design/<slug>/design.md` as its design and requirements. IF it is not available, BUILD only what the design needs, REUSE the project's components and patterns, and RUN the project's existing checks.
 
@@ -42,18 +49,22 @@ WHEN the change alters how an existing interface looks, BUILD a few visual chang
 
 WAIT until the build is finished and its checks pass.
 
-## 5. Accept: have a reviewer walk every scenario
+## 6. Accept: have a reviewer walk every scenario
 
-START a reviewer for every build, however small. DO NOT walk the interface yourself instead, because you know what you meant it to do. READ [../agents/reviewer.md](../agents/reviewer.md), FILL IN its Input with the built interface, the brief and the user's decisions, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt.
+A fix is accepted only once a reviewer started after it walked every scenario. DO NOT walk the interface yourself instead, because you know what you meant it to do, and DO NOT hand back a change that no reviewer walked.
 
-WAIT until the reviewer hands back its report. DO NOT write to the user while it runs.
-
-REPRODUCE each finding in the rendered interface. FOR each confirmed finding that stops or slows a scenario, USE `/code-better` to fix it, GIVING it the finding as a defect against the design's requirement; IF it is not available, FIX it in the code and RUN the project's checks. THEN START a new reviewer, which walks ALL scenarios again, not only the one that failed: fixing one problem in an interface often creates another. A fix is accepted only once a reviewer started after it reports no finding against it: DO NOT hand back fixes that no new reviewer walked, unless a limit below stops the loop.
+1. START a reviewer: READ [../agents/reviewer.md](../agents/reviewer.md), FILL IN its Input with the built interface, the brief and the user's decisions, and START it as its HOW TO USE block says.
+2. WAIT until the reviewer hands back its report. DO NOT write to the user while it runs.
+3. REPRODUCE each finding in the rendered interface. IF no finding is confirmed and the reviewer walked every scenario with the pointer and the keyboard, the build is accepted: GO ON to SKILL.md step 6.
+4. FIX each confirmed finding that stops or slows a scenario, and each error an automated checker reported: USE `/code-better`, GIVING it the finding as a defect against the design's requirement; IF it is not available, FIX it in the code and RUN the project's checks.
+5. GO BACK to 1. The new reviewer walks ALL scenarios again, not only the one that failed: fixing one problem in an interface often creates another.
 
 STOP and REPORT the open findings WHEN:
 
 1. The same finding comes back after two fixes.
 2. Three rounds have not made every scenario pass.
 3. A fix breaks a scenario that passed before.
+
+WHEN a limit stops the loop, CHANGE nothing more: REPORT the findings still open instead of fixing them, because a fix that no reviewer walked is unchecked.
 
 DO NOT change a scenario or drop a requirement so that the walk passes. IF a scenario looks wrong, STOP, EXPLAIN why, and ASK the user.

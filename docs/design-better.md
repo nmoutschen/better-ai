@@ -67,6 +67,7 @@ Without an argument, it audits the interface the conversation is building, then 
 3. **It asks a few questions.** At most about three, all at once, each answerable in a few words. A question about how something looks becomes versions you choose between, not a text description.
 4. **In design mode:**
    - It first asks whether you have a direction or references in mind, then shows two or three rough directions that differ in structure or emphasis, not only in colour.
+   - Once you choose a direction, a separate reviewer checks it against the scenarios and usability rules in the background, while the agent works out the states and the design. You get its confirmed findings, each with a proposed fix, and decide which to apply: you may like a direction that people would struggle to use.
    - It decides the empty, loading, error and other edge states with you.
    - It writes `.design/<slug>/design.md`: the chosen direction, the screens and their states, and the requirements, one per scenario plus what only the code can meet, such as labels tied to fields and keyboard access.
    - `/code-better` builds it and its verifier checks the code. Visual changes to an existing interface come in small batches, each shown before and after.
@@ -108,7 +109,7 @@ The report keeps three claims apart: the scenarios can be completed, the checks 
 - [`/code-better`](code-better.md) builds the design, and fixes what the reviewer finds.
 - [`/ask-better`](ask-better.md) for the questions before building.
 - [`/write-better`](write-better.md) for the words in the interface and for the final report.
-- [`/review-better`](review-better.md) to run the review, with design-better's rules as what to look for.
+- [`/review-better`](review-better.md) to run the reviewer, with no change to the work.
 - [`/do-better`](do-better.md) when you reject the result.
 - `/review-better` uses `/design-better`'s checks when it reviews an interface or a design language.
 
