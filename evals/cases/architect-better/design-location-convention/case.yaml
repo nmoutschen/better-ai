@@ -8,7 +8,7 @@ situation: 'The repository documents its design location in docs/designs/README.
   docs/designs/YYYY-MM-<short-name>/, with an earlier design in docs/designs/2026-03-gift-cards/. The user asks for a
   design of an order-history export whose request already settles the costly gaps (who sees what, what is stored,
   failure message, cost), so a correct run goes on to the design mode instead of stopping to ask. The agent makes the change folder under docs/designs/, not in the fallback
-  .architect/, and saves the request there word for word as request.md. A script checks both; nothing here needs reading
+  .architect/, and saves the request there word for word in architect.json. A script checks both; nothing here needs reading
   for meaning, so there is no judge.'
 request: 'Design a way for logged-in customers to download their own order history as a CSV file from their account page, for their own bookkeeping: one row per order with order id, date, book titles, total and status. Only their own orders, behind the session cookie as usual; nothing new is stored, the file is built when they click; if it fails, show the standard error message. No new paid services. Decide anything else yourself and list it as an assumption.'
 graders:

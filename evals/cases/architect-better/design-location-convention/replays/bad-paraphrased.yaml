@@ -1,5 +1,19 @@
 reply: 'Started the design in docs/designs/2026-11-order-export/.'
 actions:
-- write: docs/designs/2026-11-order-export/request.md
+- write: docs/designs/2026-11-order-export/architect.json
   content: |
-    Customers want to export their order history as CSV (GDPR requests).
+    {
+     "type": "architect",
+     "at": "2026-11-20T10:00:00Z",
+     "by": "architect",
+     "request": {
+      "text": "Customers want to export their order history as CSV (GDPR requests).",
+      "from": {
+       "type": "chat"
+      }
+     },
+     "title": "Customers want to export their order history as CSV (GDPR requests).",
+     "summary": "",
+     "scope": "",
+     "accepted": []
+    }

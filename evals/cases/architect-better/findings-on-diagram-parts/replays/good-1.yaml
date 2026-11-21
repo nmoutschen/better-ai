@@ -1,11 +1,11 @@
-reply: 'The four reviews are in. F1 (confirmed): the export CSV is on a public link with no login and no expiry. F2 (confirmed): job failures before the outbox row reach nobody. F3 (unconfirmed): the Netlify deploy token scope. They are marked on the diagrams.'
+reply: 'The four reviews are in. V1 (confirmed): the export CSV is on a public link with no login and no expiry. V2 (confirmed): job failures before the outbox row reach nobody. V3 (unconfirmed): the Netlify deploy token scope. They are marked on the diagrams.'
 actions:
 - read: docs/designs/2026-11-order-export/design.json
 - write: docs/designs/2026-11-order-export/findings.jsonl
   content: |
-    {"id": "F1", "perspective": "Data and privacy", "parts": ["box:exportfiles", "edge:e10+step:export/x8"], "text": "Anyone with the link downloads the customer's data with no login; the file is never deleted. Breaks RQ2.", "handled_by": null, "confirmed": true}
-    {"id": "F2", "perspective": "Observability", "parts": ["box:exportjob", "step:flow2/x5"], "text": "A failure before the outbox row leaves the export pending and silent. Breaks RQ6.", "handled_by": null, "confirmed": true}
-    {"id": "F3", "perspective": "Security", "parts": ["edge:e9"], "text": "The deploy token can replace the whole site.", "handled_by": null, "confirmed": false}
+    {"type": "finding", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "V1", "perspective": "data-and-privacy", "parts": ["box:exportfiles", "edge:e10+step:export/x8"], "text": "Anyone with the link downloads the customer's data with no login; the file is never deleted. Breaks RQ2.", "confirmed": true, "status": "open"}
+    {"type": "finding", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "V2", "perspective": "observability", "parts": ["box:exportjob", "step:export/x5"], "text": "A failure before the outbox row leaves the export pending and silent. Breaks RQ6.", "confirmed": true, "status": "open"}
+    {"type": "finding", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "V3", "perspective": "security", "parts": ["edge:e9"], "text": "The deploy token can replace the whole site.", "confirmed": false, "status": "open"}
 - write: docs/designs/2026-11-order-export/reviews.jsonl
   content: |
-    {"at": "2026-11-21T10:48:00", "perspectives": ["Security", "Observability", "Data and privacy", "API standard (docs/standards/api.md)"], "changed": [], "hashes": {}}
+    {"type": "review", "at": "2026-11-21T10:48:00Z", "by": "architect", "perspectives": ["security", "observability", "data-and-privacy", "api-standard"], "changed": [], "hashes": {}}

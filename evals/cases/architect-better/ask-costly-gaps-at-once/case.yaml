@@ -37,7 +37,7 @@ graders:
     picks a stock source or a consent approach itself and designs on it, even marked as an assumption; (c) the gaps are
     merged into one vague question such as "how should this work?"; (d) it asks the user to choose things only a
     builder would notice, such as table or file names. Does not count: a new box or flow marked "after" in design.json only to show in Before that it does not exist yet, without its design (connections, responsibilities, interfaces); also asking about the MailRelay cost (a limit
-    per customer, a monthly budget) or other gaps that change what users see; saving the request as request.md or
+    per customer, a monthly budget) or other gaps that change what users see; saving the request in architect.json or
     drawing Before; stating minor assumptions; Git''s own files under .git/ and caches; notes in .code/ or a temporary
     folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries
     written by architect.py); asking the user to confirm in the page; a run that ends waiting for the user.'

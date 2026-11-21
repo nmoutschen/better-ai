@@ -2,6 +2,20 @@ reply: 'Before is drawn in docs/designs/2026-11-order-export/ from shop/, jobs/ 
 actions:
 - read: docs/designs/README.md
 - read: docs/architecture.md
-- write: docs/designs/2026-11-order-export/request.md
+- write: docs/designs/2026-11-order-export/architect.json
   content: |
-    Design a way for logged-in customers to download their own order history as a CSV file from their account page, for their own bookkeeping: one row per order with order id, date, book titles, total and status. Only their own orders, behind the session cookie as usual; nothing new is stored, the file is built when they click; if it fails, show the standard error message. No new paid services. Decide anything else yourself and list it as an assumption.
+    {
+     "type": "architect",
+     "at": "2026-11-20T10:00:00Z",
+     "by": "architect",
+     "request": {
+      "text": "Design a way for logged-in customers to download their own order history as a CSV file from their account page, for their own bookkeeping: one row per order with order id, date, book titles, total and status. Only their own orders, behind the session cookie as usual; nothing new is stored, the file is built when they click; if it fails, show the standard error message. No new paid services. Decide anything else yourself and list it as an assumption.",
+      "from": {
+       "type": "chat"
+      }
+     },
+     "title": "Design a way for logged-in customers to download their own order history as a CSV file from their account page, for their own bookkeeping: one row per order with order id, date, book titles, total and status. Only their own orders, behind the session cookie as usual; nothing new is stored, the file is built when they click; if it fails, show the standard error message. No new paid services. Decide anything else yourself and list it as an assumption.",
+     "summary": "",
+     "scope": "",
+     "accepted": []
+    }

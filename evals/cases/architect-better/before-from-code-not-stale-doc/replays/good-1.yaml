@@ -7,22 +7,77 @@ actions:
 - read: shop/api.py
 - read: jobs/send_emails.py
 - read: docs/adr/0002-outbox-for-emails.md
-- write: docs/designs/2026-11-shipping-email/request.md
+- write: docs/designs/2026-11-shipping-email/architect.json
   content: |
-    Customers keep emailing us to ask whether their books have left. When we post a parcel we set the order's status to 'posted' by hand in shop.db, and we'll keep doing that. Design a shipping email for it. Once an order's status is 'posted', the customer who placed it gets one email saying it's on its way, without a tracking number. Store only what is needed to send it once. If it cannot be sent, we see that in the job's log and the customer simply doesn't get it. No new paid service.
-    Decide anything else yourself and list it as an assumption.
+    {
+     "type": "architect",
+     "at": "2026-11-20T10:00:00Z",
+     "by": "architect",
+     "request": {
+      "text": "Customers keep emailing us to ask whether their books have left. When we post a parcel we set the order's status to 'posted' by hand in shop.db, and we'll keep doing that. Design a shipping email for it. Once an order's status is 'posted', the customer who placed it gets one email saying it's on its way, without a tracking number. Store only what is needed to send it once. If it cannot be sent, we see that in the job's log and the customer simply doesn't get it. No new paid service.\nDecide anything else yourself and list it as an assumption.",
+      "from": {
+       "type": "chat"
+      }
+     },
+     "title": "Shipping email",
+     "summary": "",
+     "scope": "",
+     "accepted": []
+    }
 - write: docs/designs/2026-11-shipping-email/design.json
   content: |
-    {"title": "Shipping email",
+    {
+     "type": "design",
+     "at": "2026-11-20T10:00:00Z",
+     "by": "architect",
      "containers": {
-       "nodes": [
-         {"id": "api", "label": "shop API", "kind": "service", "detail": "shop/api.py"},
-         {"id": "db", "label": "shop.db", "kind": "store", "detail": "SQLite: orders, outbox"},
-         {"id": "mailjob", "label": "send_emails", "kind": "job", "detail": "cron every minute (from the docstring; no crontab in the repo)"},
-         {"id": "mailrelay", "label": "MailRelay", "kind": "external", "detail": "SMTP relay"}],
-       "edges": [
-         {"id": "e1", "from": "api", "to": "db", "label": "order + outbox row, one transaction"},
-         {"id": "e2", "from": "mailjob", "to": "db", "label": "reads unsent outbox"},
-         {"id": "e3", "from": "mailjob", "to": "mailrelay", "label": "SMTP"}],
-       "groups": []},
-     "flows": []}
+      "nodes": [
+       {
+        "id": "api",
+        "label": "shop API",
+        "kind": "service",
+        "detail": "shop/api.py"
+       },
+       {
+        "id": "db",
+        "label": "shop.db",
+        "kind": "store",
+        "detail": "SQLite: orders, outbox"
+       },
+       {
+        "id": "mailjob",
+        "label": "send_emails",
+        "kind": "job",
+        "detail": "cron every minute (from the docstring; no crontab in the repo)"
+       },
+       {
+        "id": "mailrelay",
+        "label": "MailRelay",
+        "kind": "external",
+        "detail": "SMTP relay"
+       }
+      ],
+      "edges": [
+       {
+        "id": "e1",
+        "from": "api",
+        "to": "db",
+        "label": "order + outbox row, one transaction"
+       },
+       {
+        "id": "e2",
+        "from": "mailjob",
+        "to": "db",
+        "label": "reads unsent outbox"
+       },
+       {
+        "id": "e3",
+        "from": "mailjob",
+        "to": "mailrelay",
+        "label": "SMTP"
+       }
+      ],
+      "groups": []
+     },
+     "flows": []
+    }

@@ -1,4 +1,4 @@
-reply: 'Added a login check to downloads to settle F1.'
+reply: 'Added a login check to downloads to settle V1.'
 actions:
 - write: shop/api.py
   content: |

@@ -1,0 +1,17 @@
+{
+ "type": "architect",
+ "at": "2026-11-20T10:00:00Z",
+ "by": "architect",
+ "request": {
+  "text": "Customers should be able to download their order history from their account page, as a CSV file. We get a few GDPR access requests a month and answer them by hand today, which takes an hour each.",
+  "from": {
+   "type": "chat"
+  }
+ },
+ "title": "Order history export",
+ "summary": "Customers download their own order history as CSV from their account page.",
+ "scope": "shop API, jobs, SQLite data, outbox emails",
+ "accepted": [
+  "requirements"
+ ]
+}

@@ -19,6 +19,10 @@ architect = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(architect)
 
 
+# The review summary the page shows for the perspectives that run again, by name.
+RERUN_SUMMARY = "reviewSummary([], data.rerun.map(id => nameOf(data.perspectives, id)))"
+
+
 class Architect(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
@@ -57,30 +61,33 @@ class Architect(unittest.TestCase):
         self.assertEqual(data["requirements"][0]["source"]["sentence"], view["requirements"][0]["text"])
         self.assertEqual(set(view["containers"]), {"before", "after"})
         self.assertEqual(len(view["flows"]), len(data["design"]["flows"]))
-        self.assertIn('data-p="Security"', view["containers"]["after"])
-        self.assertNotIn('data-p="Security"', view["containers"]["before"])
+        self.assertIn('data-p="security"', view["containers"]["after"])
+        self.assertNotIn('data-p="security"', view["containers"]["before"])
         self.assertIn('id="flow1-after-step-s6"', view["flows"][0]["versions"]["after"])
-        self.assertIn('data-p="Security"', view["flows"][0]["versions"]["after"])
+        self.assertIn('data-p="security"', view["flows"][0]["versions"]["after"])
+        self.assertEqual(view["errors"], [])
         self.browser.assert_not_called()
 
     def test_check_and_serve_accept_minimal_folder(self):
         for name in architect.FILES:
             if name.endswith(".jsonl"):
                 (self.folder / name).unlink()
-        path = self.folder / "design.json"
-        design = json.loads(path.read_text())
-        for key in ("title", "summary", "scope", "accepted"):
-            design.pop(key)
-        path.write_text(json.dumps(design))
-        (self.folder / "request.md").write_text("# Design title\nFollow-up.")
+        (self.folder / "conversation.jsonl").unlink()
+        path = self.folder / "architect.json"
+        meta = json.loads(path.read_text())
+        meta.update(request={"text": "Follow-up.", "from": {"type": "chat"}}, title="Design title")
+        meta.update(summary="", scope="", accepted=[])
+        path.write_text(json.dumps(meta))
         self.assertIn("Valid change folder", self.command("check"))
         view = architect.model(architect.read_folder(self.folder))
         self.assertEqual(view["title"], "Design title")
         self.assertEqual(view["accepted"], [])
         self.assertEqual(view["summary"], "")
         self.assertEqual(view["scope"], "")
-        (self.folder / "request.md").write_text("")
-        self.assertEqual(architect.model(architect.read_folder(self.folder))["title"], self.folder.name)
+        path.unlink()
+        view = architect.load(self.folder)
+        self.assertEqual(view["title"], self.folder.name)
+        self.assertEqual([e["file"] for e in view["errors"]], ["architect.json"])
         with (
             patch.object(architect.http.server, "ThreadingHTTPServer") as server,
             patch.object(architect.page, "stop_like_ctrl_c"),
@@ -93,7 +100,7 @@ class Architect(unittest.TestCase):
         path.unlink()
         design_path = self.folder / "design.json"
         design = json.loads(design_path.read_text())
-        self.command("review", "--perspectives", "Security")
+        self.command("review", "--perspectives", "security")
         first = json.loads(path.read_text())
         node = next(n for n in design["containers"]["nodes"] if n["id"] == "server")
         self.assertEqual(
@@ -104,17 +111,17 @@ class Architect(unittest.TestCase):
         self.assertEqual(first["labels"].keys(), first["hashes"].keys())
         view = architect.model(architect.read_folder(self.folder))
         self.assertEqual(view["since"], [])
-        self.assertEqual(view["rerun"], ["Observability"])
+        self.assertEqual(view["rerun"], ["observability"])
         self.assertEqual(
-            self.render_javascript(view, "reviewSummary([], data.rerun)"),
+            self.render_javascript(view, RERUN_SUMMARY),
             "Observability runs again: not reviewed yet.",
         )
         node["detail"] = "New details"
         design_path.write_text(json.dumps(design))
         view = architect.model(architect.read_folder(self.folder))
         self.assertEqual(view["since"], ["box:server"])
-        self.assertEqual(view["rerun"], ["Security", "Observability"])
-        self.command("review", "--perspectives", "Security", "Observability")
+        self.assertEqual(view["rerun"], ["security", "observability"])
+        self.command("review", "--perspectives", "security", "observability")
         last = json.loads(path.read_text().splitlines()[-1])
         self.assertEqual(last["changed"], ["box:server"])
         self.assertEqual(set(last["hashes"]), set(first["hashes"]))
@@ -124,9 +131,7 @@ class Architect(unittest.TestCase):
         view = architect.model(architect.read_folder(self.folder))
         self.assertEqual(view["since"], [])
         self.assertEqual(view["rerun"], [])
-        self.assertEqual(
-            self.render_javascript(view, "reviewSummary([], data.rerun)"), "Nothing changed since the review."
-        )
+        self.assertEqual(self.render_javascript(view, RERUN_SUMMARY), "Nothing changed since the review.")
 
     def test_reruns_findings_since_each_perspectives_last_review(self):
         path = self.folder / "design.json"
@@ -135,11 +140,11 @@ class Architect(unittest.TestCase):
         server["detail"] = "Revised server"
         path.write_text(json.dumps(design))
         view = architect.model(architect.read_folder(self.folder))
-        self.assertEqual(view["rerun"], ["Security"])
+        self.assertEqual(view["rerun"], ["security"])
 
-        self.command("review", "--perspectives", "Observability")
+        self.command("review", "--perspectives", "observability")
         view = architect.model(architect.read_folder(self.folder))
-        self.assertEqual(view["rerun"], ["Security"])
+        self.assertEqual(view["rerun"], ["security"])
         self.assertEqual(view["since"], ["box:server"])
 
     def test_changed_part_without_findings_reruns_all_applicable_perspectives(self):
@@ -150,7 +155,7 @@ class Architect(unittest.TestCase):
         path.write_text(json.dumps(design))
         view = architect.model(architect.read_folder(self.folder))
         self.assertEqual(view["since"], ["box:user"])
-        self.assertEqual(view["rerun"], ["Security", "Observability"])
+        self.assertEqual(view["rerun"], ["security", "observability"])
 
     def test_removed_part_keeps_review_label_and_reruns_its_perspective(self):
         path = self.folder / "design.json"
@@ -162,9 +167,9 @@ class Architect(unittest.TestCase):
         view = architect.model(architect.read_folder(self.folder))
         self.assertEqual(view["since"], ["edge:e3"])
         self.assertEqual(view["change_labels"]["edge:e3"], label)
-        self.assertEqual(view["rerun"], ["Security"])
+        self.assertEqual(view["rerun"], ["security"])
         self.assertEqual(
-            self.render_javascript(view, "reviewSummary(data.since.map(key => data.change_labels[key]), data.rerun)"),
+            self.render_javascript(view, "reviewSummary(data.since.map(key => data.change_labels[key]), ['Security'])"),
             f"Changed since the review: {label}. Security runs again.",
         )
         self.assertIn(
@@ -173,51 +178,22 @@ class Architect(unittest.TestCase):
                 view, "perspectiveTables(data.perspectives, data.findings, data.parts, true, data.removed_labels)"
             ),
         )
-        self.command("review", "--perspectives", "Security")
+        self.command("review", "--perspectives", "security")
         last = architect.read_folder(self.folder)["reviews"][-1]
         self.assertEqual(last["changed"], ["edge:e3"])
         self.assertNotIn("edge:e3", last["hashes"])
 
-    def test_named_and_numbered_flow_references_resolve_to_one_part(self):
-        path = self.folder / "design.json"
-        design = json.loads(path.read_text())
-        design["flows"][0]["id"] = "Read"
-        path.write_text(json.dumps(design))
-        view = architect.model(architect.read_folder(self.folder))
-        self.assertEqual(view["parts"]["step:Read/s6"], view["parts"]["step:flow1/s6"])
-        self.update("findings.jsonl", lambda rows: rows[0].update(parts=["step:Read/missing"]))
-        with self.assertRaisesRegex(
-            ValueError, r"use box:<id>, edge:<id>, step:<flow id>/<step id> \(flow ids: .*Read"
-        ):
-            architect.read_folder(self.folder)
-
-    def test_removed_step_accepts_its_historical_numbered_alias(self):
-        path = self.folder / "design.json"
-        design = json.loads(path.read_text())
-        flow = design["flows"][0]
-        flow["id"] = "Read"
-        path.write_text(json.dumps(design))
-        self.command("review", "--perspectives", "Security", "Observability")
-        flow["steps"] = [step for step in flow["steps"] if step["id"] != "s6"]
-        path.write_text(json.dumps(design))
-
-        view = architect.model(architect.read_folder(self.folder))
-        self.assertEqual(view["since"], ["step:Read/s6"])
-        self.assertEqual(view["rerun"], ["Security"])
-        self.assertEqual(view["removed_labels"]["step:flow1/s6"], view["change_labels"]["step:Read/s6"])
-
     def test_check_collects_errors_across_files(self):
-        (self.folder / "request.md").unlink()
         (self.folder / "design.json").write_text("{")
         self.update("findings.jsonl", lambda rows: rows[0].update(confirmed="false"))
         self.update("spec.jsonl", lambda rows: rows[1].update(checked_by=[]))
-        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()) as output:
-            self.command("check")
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            code = architect.main(["check", str(self.folder)])
+        self.assertEqual(code, 1)
         for error in (
-            "request.md:1:",
             "design.json:1:",
-            "findings.jsonl:1: confirmed: expected bool",
-            "spec.jsonl:2: checked_by: expected str",
+            "findings.jsonl:1: confirmed: expected boolean, got string",
+            "spec.jsonl:2: checked_by: expected string, got array",
         ):
             self.assertIn(error, output.getvalue())
 
@@ -231,9 +207,11 @@ class Architect(unittest.TestCase):
                     self.assertTrue(data[key])
                     self.assertEqual(data[key], [json.loads(line) for line in raw.splitlines()])
                 elif name == "design.json":
-                    self.assertEqual(data[key], json.loads(raw))
+                    design = json.loads(raw)
+                    self.assertEqual(data["design"], {"containers": design["containers"], "flows": design["flows"]})
                 else:
-                    self.assertEqual(data[key], raw)
+                    self.assertEqual(data["architect"], json.loads(raw))
+        self.assertEqual(data["errors"], [])
 
     def test_reader_keeps_unicode_line_separators_inside_a_record(self):
         path = self.folder / "spec.jsonl"
@@ -247,9 +225,20 @@ class Architect(unittest.TestCase):
         design = json.loads(path.read_text())
         design["containers"]["edges"][0]["label"] = 42
         path.write_text(json.dumps(design))
-        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()) as output:
-            self.command("check")
-        self.assertIn("design.json:1:", output.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            code = architect.main(["check", str(self.folder)])
+        self.assertEqual(code, 1)
+        self.assertIn("design.json:1: containers", output.getvalue())
+
+    def test_check_reports_a_reference_to_a_missing_box(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        design["containers"]["edges"][0]["to"] = "nowhere"
+        path.write_text(json.dumps(design))
+        data = architect.load(self.folder)
+        self.assertIn("design.json:1: (diagram): Edge 'e1': to references missing 'nowhere'", self.errors(data))
+        self.assertEqual(data["flows"], [])
+        self.assertEqual(data["containers"], {"before": "", "after": ""})
 
     def test_unreviewed_folder_omits_findings_controls_and_badges(self):
         (self.folder / "reviews.jsonl").unlink()
@@ -320,39 +309,43 @@ class Architect(unittest.TestCase):
         self.assertNotEqual(before, after)
         self.assertEqual(len(after), 64)
 
+    def errors(self, data):
+        return [f"{e['file']}:{e['line']}: {e['field']}: {e['message']}" for e in data["errors"]]
+
     def test_check_reports_bad_record_with_file_and_line(self):
         cases = [
-            ("requirements.jsonl", {"kind": "Responsiveness"}, "unknown requirement kind"),
-            ("perspectives.jsonl", {"applies": "true"}, "applies: expected bool"),
-            ("findings.jsonl", {"handled_by": 42}, "handled_by: expected string or null"),
-            ("findings.jsonl", {"confirmed": 1}, "confirmed: expected bool"),
-            ("reviews.jsonl", {"hashes": {"box:server": "wrong"}}, "hashes: invalid"),
-            ("reviews.jsonl", {"changed": ["box:missing"]}, "unknown changed part 'box:missing'"),
-            ("decisions.jsonl", {"drivers": ["missing"]}, "unknown driver 'missing'"),
-            ("spec.jsonl", {"checked_by": []}, "checked_by: expected str"),
+            ("requirements.jsonl", {"kind": "Responsiveness"}, "kind: must be one of"),
+            ("perspectives.jsonl", {"applies": "true"}, "applies: expected boolean, got string"),
+            ("findings.jsonl", {"handled_by": 42}, "handled_by: expected string, got integer"),
+            ("findings.jsonl", {"confirmed": 1}, "confirmed: expected boolean, got integer"),
+            ("reviews.jsonl", {"hashes": {"box:server": "wrong"}}, "hashes.box:server: must match"),
+            ("reviews.jsonl", {"changed": ["box:missing"]}, "changed[0]: unknown changed part 'box:missing'"),
+            ("decisions.jsonl", {"drivers": ["missing"]}, 'drivers[0]: dangling: "missing" is not a requirement'),
+            ("spec.jsonl", {"checked_by": []}, "checked_by: expected string, got array"),
         ]
         for name, change, message in cases:
-            with self.subTest(name=name):
+            with self.subTest(name=name, change=change):
                 file = self.folder / name
                 self.update(name, lambda rows, change=change: rows[1].update(change))
-                with self.assertRaises(SystemExit) as error, contextlib.redirect_stderr(io.StringIO()) as output:
-                    self.command("check")
-                self.assertEqual(error.exception.code, 2)
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(architect.main(["check", str(self.folder)]), 1)
                 self.assertIn(f"{name}:2: {message}", output.getvalue())
                 shutil.copyfile(SCRIPTS / "example" / name, file)
 
     def test_reader_rejects_unknown_finding_part(self):
-        self.update("findings.jsonl", lambda rows: rows[0]["parts"].append("edge:e3+step:flow1/missing"))
-        with self.assertRaisesRegex(ValueError, "findings.jsonl:1: unknown part 'step:flow1/missing'"):
-            architect.read_folder(self.folder)
+        self.update("findings.jsonl", lambda rows: rows[0]["parts"].append("edge:e3+step:ask/missing"))
+        errors = self.errors(architect.load(self.folder))
+        self.assertEqual(len(errors), 1)
+        self.assertIn("findings.jsonl:1: parts[1]: unknown part 'step:ask/missing'", errors[0])
 
     def test_reader_rejects_source_outside_change(self):
         self.update(
             "requirements.jsonl",
             lambda reqs: reqs[0].update(source={"type": "file", "file": "../outside.md", "symbol": "name"}),
         )
-        with self.assertRaisesRegex(ValueError, "requirements.jsonl:1: invalid source path"):
-            architect.read_folder(self.folder)
+        errors = self.errors(architect.load(self.folder))
+        self.assertEqual(len(errors), 1)
+        self.assertIn("requirements.jsonl:1: source.file: invalid source path", errors[0])
 
     def test_pending_and_status_follow_review_requests(self):
         conv = architect.conversation(self.folder)

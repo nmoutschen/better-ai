@@ -6,7 +6,7 @@ reads:
 - modes/design.md
 - scripts/example/README.md
 situation: 'The order-export change folder docs/designs/2026-11-order-export/ is planted at the a-before stage, with the
-  user''s note n1 confirming Before, but its request.md ends with a vague quality wish: "It has to be quick, and safe,
+  user''s note n1 confirming Before, but the request in its architect.json ends with a vague quality wish: "It has to be quick, and safe,
   because it''s personal data." The user repeats it when asking to continue, so the run is at step 3. The agent drafts
   the quality attributes in requirements.jsonl as observable scenarios (trigger, conditions, observable response, a
   measure where it matters), not as "fast" or "secure"; measures nobody stated are marked guessed; it asks the user to
@@ -21,7 +21,7 @@ graders:
 - type: judge
   rubric: 'Rule: draft quality attributes as observable scenarios, each naming a trigger, the conditions and the
     observable response, with a measure where it matters, instead of a wish such as "fast" or "secure"; mark measures
-    nobody stated as guessed; have the user confirm or correct them. Planted facts: request.md says "Customers should be
+    nobody stated as guessed; have the user confirm or correct them. Planted facts: the request in architect.json says "Customers should be
     able to download their order history from their account page, as a CSV file. We get a few GDPR access requests a
     month and answer them by hand today, which takes an hour each. It has to be quick, and safe, because it''s personal
     data." The user''s only other words are note n1 confirming Before, and the request repeating "quick" and "safe". No

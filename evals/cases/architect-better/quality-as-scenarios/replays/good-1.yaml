@@ -1,11 +1,11 @@
 reply: 'Requirements are in the page. "Quick" and "safe" are drafted as RQ3 and RQ4; their measures are my guesses.
   Please confirm or correct them there.'
 actions:
-- read: docs/designs/2026-11-order-export/request.md
+- read: docs/designs/2026-11-order-export/architect.json
 - read: docs/standards/api.md
 - write: docs/designs/2026-11-order-export/requirements.jsonl
   content: |
-    {"id": "RQ1", "kind": "functional", "text": "A logged-in customer can download a CSV of all their orders from their account page.", "source": {"type": "request", "sentence": "Customers should be able to download their order history from their account page, as a CSV file."}}
-    {"id": "RQ2", "kind": "constraint", "text": "The export holds only the requesting customer's data, behind their session cookie (404 for anyone else's).", "source": {"type": "file", "file": "docs/standards/api.md", "symbol": "rule 3"}}
-    {"id": "RQ3", "kind": "quality", "text": "When a customer with up to 500 orders asks for an export on a normal day, the CSV is downloadable within 5 minutes of the request.", "source": {"type": "guessed"}}
-    {"id": "RQ4", "kind": "quality", "text": "When anyone without the customer's session cookie requests their export or its download link, the API answers 404 and returns no data; a download link stops working 24 hours after it is made.", "source": {"type": "guessed"}}
+    {"type": "requirement", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "RQ1", "kind": "functional", "text": "A logged-in customer can download a CSV of all their orders from their account page.", "source": {"type": "request", "sentence": "Customers should be able to download their order history from their account page, as a CSV file."}}
+    {"type": "requirement", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "RQ2", "kind": "constraint", "text": "The export holds only the requesting customer's data, behind their session cookie (404 for anyone else's).", "source": {"type": "file", "file": "docs/standards/api.md", "symbol": "rule 3"}}
+    {"type": "requirement", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "RQ3", "kind": "quality", "text": "When a customer with up to 500 orders asks for an export on a normal day, the CSV is downloadable within 5 minutes of the request.", "source": {"type": "guessed"}}
+    {"type": "requirement", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "RQ4", "kind": "quality", "text": "When anyone without the customer's session cookie requests their export or its download link, the API answers 404 and returns no data; a download link stops working 24 hours after it is made.", "source": {"type": "guessed"}}

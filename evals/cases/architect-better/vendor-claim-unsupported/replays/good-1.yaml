@@ -5,7 +5,7 @@ actions:
   content: |
     # Design: order history export
 
-    Request: [request.md](request.md)
+    Request: [architect.json](architect.json)
     Requirements: RQ1-RQ6 in [requirements.jsonl](requirements.jsonl)
     Diagrams: [design.json](design.json)
 

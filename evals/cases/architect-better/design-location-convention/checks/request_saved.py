@@ -1,6 +1,7 @@
-"""Pass when the request is saved word for word as request.md in a new folder under docs/designs/, the repo's design
-location, and nothing was written to the skill's fallback folder .architect/."""
+"""Pass when the request is saved word for word as the `request.text` of architect.json in a new folder under
+docs/designs/, the repo's design location, and nothing was written to the skill's fallback folder .architect/."""
 
+import json
 import os
 import re
 import subprocess
@@ -27,13 +28,23 @@ new_files = subprocess.run(
     text=True,
     check=True,
 ).stdout.split()
+
+
+def request_text(path: str) -> str:
+    """The request an architect.json holds, or nothing if the file is not one."""
+    try:
+        return json.loads(Path(path).read_text())["request"]["text"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return ""
+
+
 saved = [
     path
     for path in new_files
-    if re.fullmatch(r"docs/designs/[^/]+/request\.md", path) and normalise(REQUEST) in normalise(Path(path).read_text())
+    if re.fullmatch(r"docs/designs/[^/]+/architect\.json", path) and normalise(REQUEST) in normalise(request_text(path))
 ]
 if not saved:
-    sys.exit(f"no new docs/designs/<change>/request.md holds the request word for word; new files: {new_files}")
+    sys.exit(f"no new docs/designs/<change>/architect.json holds the request word for word; new files: {new_files}")
 if Path(".architect").exists():
     sys.exit(".architect/ exists although the repo has a design location")
 print("request saved in", saved)

@@ -1,5 +1,5 @@
-reply: 'F1: the public export link exposes customer data.'
+reply: 'V1: the public export link exposes customer data.'
 actions:
 - write: docs/designs/2026-11-order-export/findings.jsonl
   content: |
-    {"id": "F1", "perspective": "Data and privacy", "parts": ["box:exportfiles"], "text": "Public link, no login.", "confirmed": "yes"}
+    {"type": "finding", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "V1", "perspective": "data-and-privacy", "parts": ["box:exportfiles"], "text": "Public link, no login.", "confirmed": "yes", "status": "open"}

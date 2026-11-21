@@ -79,8 +79,8 @@ def read(folder: Path, name: str):
     return json.loads(text) if name in JSON_FILES else [json.loads(line) for line in text.splitlines()]
 
 
-def base(kind, **more):
-    return {"type": kind, "at": AT, "by": "architect", **more}
+def base(type_, **more):
+    return {"type": type_, "at": AT, "by": "architect", **more}
 
 
 def design():
@@ -174,13 +174,14 @@ class Examples(unittest.TestCase):
     def test_the_example_folder_and_every_planted_eval_folder_check_clean(self):
         folders = [
             SCRIPTS / "example",
-            *sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*")),
+            *sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*/architect.json")),
         ]
         self.assertGreater(len(folders), 10)
+        folders = [f.parent if f.name == "architect.json" else f for f in folders]
         for folder in folders:
             with self.subTest(folder=str(folder.relative_to(ROOT))):
-                files = [p for p in folder.iterdir() if p.is_file() and p.name in (*KINDS, "conversation.jsonl")]
-                self.assertEqual([str(e) for e in schema.check_paths(files, SCHEMAS)], [])
+                self.assertEqual([str(e) for e in schema.check_paths([folder], SCHEMAS)], [])
+                self.assertEqual(run_check(folder)[0], 0)
                 self.assertFalse((folder / "request.md").exists())
 
 
@@ -193,7 +194,7 @@ class OneBadRecordPerKind(unittest.TestCase):
         "design.json": (lambda r: {**r, "flows": [{k: v for k, v in r["flows"][0].items() if k != "id"}]}, "flows"),
         "requirements.jsonl": (lambda r: {**r, "kind": "weird"}, "kind"),
         "perspectives.jsonl": (lambda r: {**r, "from": {"type": "built in"}}, "from"),
-        "findings.jsonl": (lambda r: {**r, "status": "handled"}, "handled_by"),
+        "findings.jsonl": (lambda r: {k: v for k, v in r.items() if k != "handled_by"}, "handled_by"),
         "decisions.jsonl": (lambda r: {**r, "drivers": ["Z9"]}, "drivers"),
         "reviews.jsonl": (lambda r: {**r, "at": "2026-11-20T19:42:54"}, "at"),
         "spec.jsonl": (lambda r: {k: v for k, v in r.items() if k != "statement"}, "statement"),
@@ -229,7 +230,9 @@ class OneBadRecordPerKind(unittest.TestCase):
                 self.assertTrue(str(errors[0].file).endswith(name))
                 data = architect.load(folder)
                 json.dumps(data)
-                listed = [e for e in data["errors"] if e["file"] == name and e["field"].split("[")[0] == field]
+                listed = [
+                    e for e in data["errors"] if e["file"] == name and e["field"].split(".")[0].split("[")[0] == field
+                ]
                 self.assertTrue(listed, f"{name}: the page's errors band lacks it")
                 self.assertEqual(listed[0]["line"], errors[0].line)
                 if name in self.SHOWN:
@@ -323,7 +326,7 @@ class Pointers(unittest.TestCase):
             del made["flows"][0]["id"]
             write(folder, "design.json", [made])
             errors = check(folder)
-            self.assertTrue(any(e.field.startswith("flows[0]") and "id" in e.message for e in errors), errors)
+            self.assertTrue(any(e.field.startswith("flows[0]") and "id" in e.field for e in errors), errors)
             self.assertEqual(run_check(folder)[0], 1)
             data = architect.load(folder)
             self.assertTrue(any(e["file"] == "design.json" for e in data["errors"]))

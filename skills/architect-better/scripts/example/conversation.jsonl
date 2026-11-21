@@ -1,10 +1,10 @@
-{"at": "2026-11-20T16:40:00", "action": "comment", "id": "c1", "n": 1, "on": {"id": "dec-D3", "title": "D3 Long-poll"}, "comment": "Why not server-sent events? They are one-way, but that is the direction we need for replies."}
-{"at": "2026-11-20T16:40:05", "action": "status", "to": "c1", "status": "seen"}
-{"at": "2026-11-20T16:41:00", "action": "reply", "id": "r1", "to": "c1", "text": "SSE could push replies to the page. We still need a separate path for answers to reach the coordinator. Should we try SSE for the page side?"}
-{"at": "2026-11-20T16:41:00", "action": "status", "to": "c1", "status": "asked"}
-{"at": "2026-11-20T16:42:00", "action": "comment", "id": "c2", "n": 2, "on": {"id": "flow1-after-step-s4", "title": "Flows, step 2a"}, "comment": "This should be a response to a request the page sends, not a message from the server."}
-{"at": "2026-11-20T16:42:10", "action": "status", "to": "c2", "status": "working"}
-{"at": "2026-11-20T16:43:00", "action": "comment", "id": "c3", "n": 3, "on": {"id": "req-C2", "title": "C2 Serves on 127.0.0.1"}, "comment": "Say why: the page has no login."}
-{"at": "2026-11-20T16:43:30", "action": "reply", "id": "r3", "to": "c3", "text": "Added: no login, so local only."}
-{"at": "2026-11-20T16:43:30", "action": "status", "to": "c3", "status": "done"}
-{"at": "2026-11-20T16:44:00", "action": "reply", "id": "r4", "text": "Q1 is a guess: is 2 seconds the right bound for a question to show in the page, or is 10 seconds fine?"}
+{"type": "comment", "at": "2026-11-20T16:40:00Z", "by": "user", "id": "c1", "n": 1, "text": "Why not server-sent events? They are one-way, but that is the direction we need for replies.", "on": {"id": "dec-D3", "title": "D3 Long-poll"}}
+{"type": "status", "at": "2026-11-20T16:40:05Z", "by": "architect", "to": "c1", "status": "seen"}
+{"type": "reply", "at": "2026-11-20T16:41:00Z", "by": "architect", "id": "r1", "text": "SSE could push replies to the page. We still need a separate path for answers to reach the coordinator. Should we try SSE for the page side?", "to": "c1"}
+{"type": "status", "at": "2026-11-20T16:41:00Z", "by": "architect", "to": "c1", "status": "asked"}
+{"type": "comment", "at": "2026-11-20T16:42:00Z", "by": "user", "id": "c2", "n": 2, "text": "This should be a response to a request the page sends, not a message from the server.", "on": {"id": "flow1-after-step-s4", "title": "Flows, step 2a"}}
+{"type": "status", "at": "2026-11-20T16:42:10Z", "by": "architect", "to": "c2", "status": "working"}
+{"type": "comment", "at": "2026-11-20T16:43:00Z", "by": "user", "id": "c3", "n": 3, "text": "Say why: the page has no login.", "on": {"id": "req-C2", "title": "C2 Serves on 127.0.0.1"}}
+{"type": "reply", "at": "2026-11-20T16:43:30Z", "by": "architect", "id": "r3", "text": "Added: no login, so local only.", "to": "c3"}
+{"type": "status", "at": "2026-11-20T16:43:30Z", "by": "architect", "to": "c3", "status": "done"}
+{"type": "reply", "at": "2026-11-20T16:44:00Z", "by": "architect", "id": "r4", "text": "Q1 is a guess: is 2 seconds the right bound for a question to show in the page, or is 10 seconds fine?", "to": null}

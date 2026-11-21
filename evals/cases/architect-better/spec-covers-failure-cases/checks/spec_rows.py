@@ -1,5 +1,5 @@
-"""Pass when spec.jsonl in the change folder holds at least one record, each with a non-empty `requirement` and a
-non-empty `source`."""
+"""Pass when spec.jsonl in the change folder holds at least one record, each with a non-empty `statement` and a
+`source` that names a design section, a request sentence, a decision or a requirement."""
 
 import json
 import sys
@@ -22,10 +22,14 @@ for number, line in enumerate(SPEC.read_text().splitlines(), 1):
     if not isinstance(row, dict):
         problems.append(f"{name}: not a JSON object")
         continue
-    for field in ("requirement", "source"):
-        value = row.get(field)
-        if not value or (isinstance(value, str) and not value.strip()):
-            problems.append(f"{name}: {field} is empty or missing")
+    if not isinstance(row.get("statement"), str) or not row["statement"].strip():
+        problems.append(f"{name}: statement is empty or missing")
+    source = row.get("source")
+    kind = source.get("type") if isinstance(source, dict) else None
+    field = {"design": "section", "request": "sentence"}.get(kind, kind)  # decision and requirement name their own kind
+    named = source.get(field) if field else None
+    if not isinstance(named, str) or not named.strip():
+        problems.append(f"{name}: source is empty or names nothing")
 if not rows:
     sys.exit(f"{SPEC} holds no requirement")
 if problems:
