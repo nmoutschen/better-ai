@@ -2,8 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "spec.schema.json",
   "title": "a show-better presentation spec: .show/<slug>/spec.json",
-  "$comment": "The shape of the spec: types, required fields, allowed values. show.py keeps the checks that need the rendering's own knowledge (whether a node an edge names exists, a row's cell count, the overview and focus, an svg's elements), the readability warnings and the digest. A spec is a document a renderer draws, so it has `type` and may have `at` and `by`, not an `id`.",
+  "$comment": "The shape of the spec: types, required fields, allowed values, and what its parts say about each other, which the show_spec hook in schema.py checks: the node an edge names, the set a region names, a lane step's actor, the cells of a matrix or table row, a tree's sums, a map's sections, an action's panel, the overview and the focus. show.py keeps what only the drawing knows (a tree's depth, the number of units, a negative bar, an svg's elements), the readability warnings and the digest. A spec is a document a renderer draws, so it has `type` and may have `at` and `by`, not an `id`.",
   "x-files": ["spec.json"],
+  "x-check": "show_spec",
   "type": "object",
   "required": ["type", "title", "panels"],
   "properties": {
@@ -402,6 +403,13 @@
         {
           "if": {"required": ["template"], "properties": {"template": {"const": "visual"}}},
           "then": {"$ref": "#/$defs/visual"}
+        },
+        {
+          "if": {"required": ["overview"], "properties": {"overview": {"const": true}}},
+          "then": {
+            "required": ["kind"],
+            "properties": {"template": {"enum": ["visual"]}, "kind": {"enum": ["flow", "timeline", "concept", "groups"]}}
+          }
         }
       ]
     },
@@ -575,7 +583,7 @@
       "type": "object",
       "required": ["columns", "rows"],
       "properties": {
-        "columns": {"type": "array", "minItems": 2, "items": {"type": "string"}},
+        "columns": {"type": "array", "minItems": 2, "items": {"type": "string"}, "maxItems": 2},
         "rows": {
           "type": "array",
           "minItems": 1,
@@ -640,8 +648,8 @@
             "type": "object",
             "required": ["x", "y"],
             "properties": {
-              "x": {"type": "number"},
-              "y": {"type": "number"},
+              "x": {"type": "number", "minimum": 0, "maximum": 1},
+              "y": {"type": "number", "minimum": 0, "maximum": 1},
               "label": {"type": "string"},
               "detail": {"$ref": "#/$defs/detail"}
             }
@@ -679,7 +687,11 @@
           "items": {
             "type": "object",
             "required": ["label", "count"],
-            "properties": {"label": {"$ref": "#/$defs/text"}, "count": {"type": "integer"}, "detail": {"$ref": "#/$defs/detail"}}
+            "properties": {
+              "label": {"$ref": "#/$defs/text"},
+              "count": {"type": "integer", "minimum": 1},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
           }
         }
       }
@@ -790,7 +802,11 @@
             "required": ["points"],
             "properties": {
               "name": {"type": "string"},
-              "points": {"type": "array", "minItems": 2, "items": {"type": "array", "minItems": 2}},
+              "points": {
+                "type": "array",
+                "minItems": 2,
+                "items": {"type": "array", "minItems": 2, "prefixItems": [{}, {"type": "number"}]}
+              },
               "detail": {"$ref": "#/$defs/detail"}
             }
           }

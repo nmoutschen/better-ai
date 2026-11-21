@@ -407,7 +407,16 @@ def table_lines(header, rows, W, g, right=frozenset(), hl=frozenset()):
 
 def shape_errors(spec) -> list[str]:
     """What schema.py finds wrong with the spec's shape, one line each, the field first."""
-    return [f"{field}: {message}" for field, message in schema.check_record(spec, ["spec.schema.json"], SCHEMAS)]
+    found = []
+    for field, message in schema.check_record(spec, ["spec.schema.json"], SCHEMAS, cross=True):
+        old = re.fullmatch(r"panels\[\d+\]\.(note|read)", field)
+        if old:  # a spec from before: say where the text goes now
+            message = (
+                f"'{old[1]}' is no longer used: move it into 'source', the one line at the foot of each slide "
+                "that says what the slide rests on and where to read it"
+            )
+        found.append(f"{field}: {message}")
+    return found
 
 
 def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
@@ -441,7 +450,6 @@ def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
                 warnings.append(
                     f"document: the gist of '{x['label']}' is {len(x['gist'])} characters; keep it under 50, a few words"
                 )
-    overview = None  # (panel number, its labels) once a panel sets overview
     for i, p in enumerate(panels, 1):
         where = f"panel {i}"
         template = p.get("template", "visual")
@@ -469,34 +477,15 @@ def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
             elif template == "statement":
                 check_statement(p, where, warnings, digest)
             else:
-                check_title(p, where, len(panels), errors, digest)
+                check_title(p, where, errors, digest)
         except (TypeError, ValueError, KeyError, AttributeError) as exc:
             errors.append(f"{where}: malformed {template} data ({exc})")
         check_source(p, where, spec, warnings, digest)
         check_details(p, digest)
         if p.get("overview"):
-            if overview:
-                errors.append(f"{where}: only one panel may set 'overview'; panel {overview[0]} already does")
-            elif template != "visual" or p.get("kind") not in OVERVIEW_KINDS:
-                errors.append(f"{where}: the overview must be a visual panel of kind {', '.join(OVERVIEW_KINDS)}")
-            else:
-                try:
-                    overview = (i, overview_labels(p))
-                    digest.append("    overview: later panels may mark their place in it with 'focus'")
-                except (TypeError, KeyError, AttributeError):
-                    pass  # the kind's own check has reported the malformed data
+            digest.append("    overview: later panels may mark their place in it with 'focus'")
         if p.get("focus") is not None:
-            focus = _as_list(p["focus"])
-            if overview is None:
-                errors.append(f"{where}: 'focus' needs an earlier panel with \"overview\": true")
-            else:
-                for lab in focus:
-                    if lab not in overview[1]:
-                        errors.append(
-                            f"{where}: focus '{lab}' is not a label in the overview (panel {overview[0]}): "
-                            + ", ".join(overview[1])
-                        )
-                digest.append(f"    where we are: {', '.join(map(str, focus))}")
+            digest.append(f"    where we are: {', '.join(map(str, _as_list(p['focus'])))}")
     if spec.get("style"):
         digest.append("STYLE: " + ", ".join(f"{k}={v}" for k, v in spec["style"].items()))
     if not errors:
@@ -552,14 +541,11 @@ def check_statement(p, where, warnings, digest):
     digest.append(f"    {p['figure']} {p['sentence']}" + (f" ({p['compare']})" if p.get("compare") else ""))
 
 
-def check_title(p, where, n_panels, errors, digest):
+def check_title(p, where, errors, digest):
     if p.get("body"):
         digest.append(f"    {p['body']}")
     for k, a in enumerate(p.get("actions") or [], 1):
         target = a["panel"]
-        if not 1 <= target <= n_panels:
-            errors.append(f"{where}: action '{a['text']}' points to panel {target}; there are {n_panels} panels")
-            continue
         digest.append(f"    {k}. {a['text']} → panel {target} (slide {target + 1})")
 
 
@@ -696,9 +682,6 @@ def count_highlights(items, where, warnings):
 
 def check_map(p, where, errors, warnings, digest, spec=None):
     secs = p.get("sections") or ((spec or {}).get("document") or {}).get("sections")
-    if not secs:
-        errors.append(f"{where}: a map needs 'sections', or a top-level 'document' with 'sections'")
-        return
     if len(secs) > 9:
         warnings.append(f"{where}: {len(secs)} sections; group them into at most 9 parts")
     if p.get("sections"):
@@ -832,9 +815,6 @@ def check_concept(p, where, errors, warnings, digest):
     count_highlights(nodes, where, warnings)
     labels = {n["id"]: n["label"] for n in nodes}
     for e in p["edges"]:
-        if e["from"] not in labels or e["to"] not in labels:
-            errors.append(f"{where}: each edge needs 'from' and 'to' that name node ids")
-            continue
         if len(e["label"]) > 40:
             warnings.append(
                 f"{where}: relation '{e['label']}' is {len(e['label'])} characters; keep relations to a few words and put conditions in the note"
@@ -1147,12 +1127,6 @@ def check_tree(p, where, errors, warnings, digest):
             errors.append(f"{where}: '{n['label']}' is deeper than 4 levels; cut the tree or split it")
             return
         kids = n.get("children") or []
-        if kids and "value" in n and all(_is_num(k.get("value")) for k in kids):
-            total = sum(k["value"] for k in kids)
-            if abs(total - n["value"]) > 1e-9 * max(1, abs(n["value"])) and total > n["value"]:
-                errors.append(
-                    f"{where}: the children of '{n['label']}' sum to {num(total)}, more than its value {num(n['value'])}"
-                )
         digest.append(
             "    "
             + "  " * depth
@@ -1265,14 +1239,10 @@ def _region_order(sets, regions):
 
 
 def check_sets(p, where, errors, warnings, digest):
-    sets = listed(p, "sets", where, warnings, 6, "sets")
+    listed(p, "sets", where, warnings, 6, "sets")
     regions = listed(p, "regions", where, warnings, 12, "regions")
-    names = set(sets)
     for r in regions:
         ins = r["in"]
-        if not all(s in names for s in ins):
-            errors.append(f"{where}: each region needs 'in', a list of set names from 'sets'")
-            continue
         digest.append(
             f"    in {' & '.join(ins)}: {r.get('label', '')} {('(' + num(r['count']) + ')') if 'count' in r else ''}".rstrip()
             + ("  [highlight]" if r.get("highlight") else "")
@@ -1391,9 +1361,6 @@ def check_matrix(p, where, errors, warnings, digest):
     n_hl = 0
     for r in rows:
         cells = r["cells"]
-        if len(cells) != len(cols):
-            errors.append(f"{where}: each row needs a 'label' and one cell per column ({len(cols)})")
-            continue
         out = []
         for c in cells:
             mark = _mark(c)
@@ -1711,10 +1678,7 @@ def t_effects(p, W, g):
 
 def check_pairs(p, where, errors, warnings, digest):
     heads = p["columns"]
-    if len(heads) != 2:
-        errors.append(f'{where}: \'columns\' needs two headings, such as ["Helps when", "Hurts or no gain when"]')
-    else:
-        digest.append(f"    columns: {heads[0]} | {heads[1]}")
+    digest.append(f"    columns: {heads[0]} | {heads[1]}")
     rows = listed(p, "rows", where, warnings, 7, "items")
     count_highlights(rows, where, warnings)
     for r in rows:
@@ -1819,9 +1783,6 @@ def check_quadrant(p, where, errors, warnings, digest):
     items = listed(p, "items", where, warnings, 10, "items")
     count_highlights(items, where, warnings)
     for it in items:
-        if not (0 <= it["x"] <= 1 and 0 <= it["y"] <= 1):
-            errors.append(f"{where}: '{it.get('label')}' needs 'x' and 'y' between 0 and 1")
-            continue
         digest.append(
             f"    {it.get('label')}: x={it['x']}, y={it['y']}{'  [highlight]' if it.get('highlight') else ''}"
         )
@@ -1953,9 +1914,6 @@ def check_units(p, where, errors, warnings, digest):
     total = 0
     for it in parts:
         n = it["count"]
-        if n < 1:
-            errors.append(f"{where}: each part needs a 'label' and a whole-number 'count' of at least 1")
-            continue
         total += n
         digest.append(f"    {n} {it['label']}{'  [highlight]' if it.get('highlight') else ''}")
     if total > LIMITS["units"]:
@@ -2483,10 +2441,6 @@ def check_line(p, where, errors, warnings, digest):
     count_highlights(series, where, warnings)
     for s in series:
         pts = s["points"]
-        ys = [pt[1] for pt in pts]
-        if not all(isinstance(y, (int, float)) and not isinstance(y, bool) for y in ys):
-            errors.append(f"{where}: series '{s.get('name')}' has non-numeric y values")
-            continue
         digest.append(f"    {s.get('name')}: " + ", ".join(f"{x}={num(y)}" for x, y in pts))
     if not p.get("unit"):
         warnings.append(f"{where}: no 'unit'; say what the values measure")
@@ -2679,12 +2633,8 @@ def t_timeline(p, W, g):
 
 
 def check_table(p, where, errors, warnings, digest):
-    cols = p["columns"]
     rows = listed(p, "rows", where, warnings, LIMITS["rows"], "rows")
-    for r, row in enumerate(rows):
-        if len(row) != len(cols):
-            errors.append(f"{where}: row {r + 1} has {len(row)} cells for {len(cols)} columns")
-            continue
+    for row in rows:
         digest.append("    " + " | ".join(str(c) for c in row))
 
 
@@ -2829,15 +2779,11 @@ def t_svg(p, W, g):
 
 
 def check_lanes(p, where, errors, warnings, digest):
-    actors = listed(p, "actors", where, warnings, LIMITS["lanes_actors"], "actors")
+    listed(p, "actors", where, warnings, LIMITS["lanes_actors"], "actors")
     steps = listed(p, "steps", where, warnings, LIMITS["lanes_steps"], "steps")
     count_highlights(steps, where, warnings)
-    names = set(actors)
     prev = None
     for s in steps:
-        if s["actor"] not in names:
-            errors.append(f"{where}: each step needs a 'label' and an 'actor' from 'actors'")
-            continue
         hand = f"  (hand-off from {prev})" if prev is not None and prev != s["actor"] else ""
         digest.append(f"    {s['actor']}: {s['label']}{hand}{'  [highlight]' if s.get('highlight') else ''}")
         prev = s["actor"]
