@@ -476,6 +476,17 @@ class Keywords(unittest.TestCase):
         self.assertEqual(self.errors("a", {"minLength": 1}), [])
         self.assertEqual(self.errors(5, {"pattern": "x", "minLength": 3}), [])  # they apply to strings only
 
+    def test_only_finite_numbers_are_numbers(self):
+        for value in (float("nan"), float("inf"), -float("inf")):
+            problems = self.errors(value, {"type": "number"})
+            self.assertEqual(len(problems), 1, value)
+            self.assertIn("got non-finite number", problems[0][1])
+        self.assertEqual(self.errors(1e300, {"type": "number"}), [])
+        self.assertEqual(
+            self.errors(float("nan"), {"type": ["string", "number"]})[0][1],
+            "expected string or number, got non-finite number",
+        )
+
     def test_min_items_and_items(self):
         s = {"type": "array", "minItems": 1, "items": {"type": "string"}}
         self.assertEqual(self.errors(["a"], s), [])
@@ -956,6 +967,30 @@ class HookSafety(Case):
         self.assertEqual(
             schema.check_record({"a": "bad"}, names, self.schemas, cross=True), [("a", "the hook's finding")]
         )
+
+    def test_whatever_a_validator_raises_is_one_error_for_the_record(self):
+        self.write("probe.jsonl", jsonl({"a": "x"}, {"a": "y"}))
+        for error in (ValueError("boom"), RecursionError(), KeyError("k")):
+            with self.subTest(type(error).__name__), mock.patch.object(schema.Validator, "validate", side_effect=error):
+                message = (
+                    "is nested too deeply to check"
+                    if isinstance(error, RecursionError)
+                    else f"could not be checked: {type(error).__name__}"
+                )
+                self.assertEqual(self.messages("probe.jsonl"), [f"1: (record): {message}", f"2: (record): {message}"])
+                self.assertEqual(
+                    schema.check_record({"a": "x"}, ["probe.schema.json"], self.schemas, cross=True),
+                    [("(record)", message)],
+                )
+
+    def test_a_file_nested_too_deeply_to_read_is_one_error_not_a_traceback(self):
+        for depth in (200, 1200, 50000):
+            with self.subTest(depth):
+                self.write("probe.jsonl", '{"a": ' + "[" * depth + "]" * depth + "}\n")
+                errors = self.messages("probe.jsonl")
+                self.assertEqual(len(errors), 1, errors)
+                self.assertRegex(errors[0], r"^1: \(record\): (is nested too deeply to (check|read)|.*)")
+                self.assertNotIn("Traceback", errors[0])
 
     def test_a_hook_that_raises_is_reported_as_a_failed_check(self):
         self.write("boom.jsonl", jsonl({"a": 1}))

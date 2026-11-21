@@ -866,7 +866,7 @@ class WrongTypes(unittest.TestCase):
                 self.assertTrue(any(e.field.startswith(field) for e in errors), (field, errors))
 
     def test_every_leaf_of_every_valid_spec_set_to_a_wrong_value_gives_an_answer_and_no_exception(self):
-        values = [None, "x", "", -1, 2.5, [], {}, True, ["x"], [{}]]
+        values = [None, "x", "", -1, 2.5, [], {}, True, ["x"], [{}], [[1]], {"label": None}, float("nan"), float("inf")]
 
         def leaves(o, path=()):
             yield path
@@ -892,8 +892,13 @@ class WrongTypes(unittest.TestCase):
                     else:
                         target[path[-1]] = copy.deepcopy(value)
                     try:
-                        show.check(spec)
+                        errors, _, _ = show.check(spec)
                         shape_problems(spec)
+                        if not errors:
+                            clean = show.without_nulls(spec)
+                            show.render(clean)
+                            show.render_text(clean)
+                            show.render_screen_reader(clean)
                     except Exception as error:
                         self.fail(f"{path} = {value!r} in a {base['panels'][0].get('kind')} panel raised {error!r}")
 
@@ -1062,6 +1067,138 @@ class OneKindOfAnswer(unittest.TestCase):
     def test_a_well_shaped_spec_gets_them(self):
         spec = spec_of(edited(visual("concept"), lambda p: p["edges"][0].update({"to": "zzz"})))
         self.assertEqual([f for f, _ in shape_problems(spec)], ["panels[0].edges[0].to"])
+
+
+def deep_tree_spec(depth):
+    node = {"label": "leaf", "value": 1}
+    for _ in range(depth):
+        node = {"label": "n", "children": [node]}
+    return spec_of({"headline": HEAD, "source": "t", "kind": "tree", "root": node})
+
+
+class Nesting(unittest.TestCase):
+    def test_a_tree_nested_very_deeply_is_refused_with_an_error_and_never_raises(self):
+        for depth in (5, 50, 200, 300, 1200, 50000):
+            with self.subTest(depth):
+                spec = deep_tree_spec(depth)
+                errors, _, _ = show.check(spec)
+                self.assertTrue(errors)
+                self.assertTrue(any("levels" in e or "nested too deeply" in e for e in errors), errors[:2])
+                shape_problems(spec)
+
+    def test_the_command_line_checks_a_deep_file_without_a_traceback(self):
+        for depth in (300, 50000):
+            with self.subTest(depth), tempfile.TemporaryDirectory() as d:
+                path = Path(d) / "spec.json"
+                path.write_text(
+                    json.dumps(deep_tree_spec(depth)) if depth < 1000 else '{"a": ' + "[" * depth + "]" * depth + "}"
+                )
+                for script in ("show.py", "schema.py"):
+                    done = subprocess.run(
+                        [sys.executable, "-I", str(SHOW / "scripts" / script), "check", str(path)],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(done.returncode, 1, (script, done.stderr[-200:]))
+                    self.assertNotIn("Traceback", done.stderr + done.stdout, script)
+
+
+class ChildrenAndRenderCrashes(unittest.TestCase):
+    def tree(self, **node):
+        return spec_of(edited(visual("tree"), lambda p: p["root"].update({"children": [{"label": "x", **node}]})))
+
+    def test_a_node_without_a_non_empty_children_list_needs_a_value(self):
+        for name, node in (
+            ("no children", {}),
+            ("null children", {"children": None}),
+            ("empty children", {"children": []}),
+        ):
+            with self.subTest(name):
+                spec = self.tree(**node)
+                self.assertIn("panels[0].root.children[0].value", [f for f, _ in shape_problems(spec)])
+                self.assertTrue(show.check(spec)[0])
+                self.assertEqual(
+                    [
+                        f
+                        for f, _ in shape_problems(
+                            edited(spec, lambda s: s["panels"][0]["root"]["children"][0].update(value=1))
+                        )
+                    ],
+                    [],
+                )
+
+    def test_a_leaf_with_an_empty_children_list_and_a_value_renders(self):
+        spec = self.tree(children=[], value=2)
+        self.assertEqual(show.check(spec)[0], [])
+        show.render(spec)
+        show.render_text(spec)
+
+    def test_a_node_with_children_may_leave_its_value_out(self):
+        spec = self.tree(children=[{"label": "y", "value": 1}])
+        self.assertEqual(shape_problems(spec), [])
+
+    def test_the_values_the_renderer_could_not_draw_are_refused(self):
+        cases = [
+            (
+                "a line point x that is a list",
+                spec_of(edited(visual("line"), lambda p: p["series"][0]["points"][0].__setitem__(0, ["a"]))),
+                "panels[0].series[0].points[0][0]",
+            ),
+            (
+                "a line point x that is an object",
+                spec_of(edited(visual("line"), lambda p: p["series"][0]["points"][0].__setitem__(0, {}))),
+                "panels[0].series[0].points[0][0]",
+            ),
+            (
+                "a map highlight of lists",
+                spec_of(edited(visual("map"), put("highlight", [[1]]))),
+                "panels[0].highlight",
+            ),
+            (
+                "a map highlight of objects",
+                spec_of(edited(visual("map"), put("highlight", [{}]))),
+                "panels[0].highlight",
+            ),
+            (
+                "a matrix column that is an object without a label",
+                spec_of(edited(visual("matrix"), lambda p: p["columns"].__setitem__(0, {}))),
+                "panels[0].columns[0]",
+            ),
+            (
+                "a matrix column that is a number",
+                spec_of(edited(visual("matrix"), lambda p: p["columns"].__setitem__(0, 3))),
+                "panels[0].columns[0]",
+            ),
+            (
+                "a slope label that is empty",
+                spec_of(edited(visual("slope"), lambda p: p["items"][0].update(label=""))),
+                "panels[0].items[0].label",
+            ),
+            (
+                "a number that is NaN",
+                spec_of(edited(visual("bars"), lambda p: p["items"][0].update(value=float("nan")))),
+                "panels[0].items[0].value",
+            ),
+            (
+                "a number that is infinite",
+                spec_of(edited(visual("bars"), lambda p: p["items"][0].update(value=float("inf")))),
+                "panels[0].items[0].value",
+            ),
+        ]
+        for name, spec, field in cases:
+            with self.subTest(name):
+                self.assertTrue(any(f.startswith(field) for f, _ in shape_problems(spec)), shape_problems(spec))
+                self.assertTrue(show.check(spec)[0])
+
+    def test_the_values_the_renderer_can_draw_are_kept(self):
+        for spec in (
+            spec_of(edited(visual("line"), lambda p: p["series"][0]["points"][0].__setitem__(0, 2020))),
+            spec_of(edited(visual("map"), put("highlight", ["s1", 2]))),
+            spec_of(edited(visual("matrix"), lambda p: p["columns"].__setitem__(0, {"label": "c"}))),
+        ):
+            self.assertEqual(show.check(spec)[0], [])
+            show.render(spec)
+            show.render_text(spec)
 
 
 class DesignBetterFixtures(unittest.TestCase):
