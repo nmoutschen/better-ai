@@ -1038,6 +1038,48 @@ class SchemaAudit(Case):
         self.refused({"type": ["string", "x"]}, "type")
         self.refused({"type": ["string", 3]}, "type")
 
+    def test_a_pattern_that_is_not_a_regex_is_refused(self):
+        self.refused({"type": "string", "pattern": "(unclosed"}, "pattern")
+        self.refused({"type": "string", "pattern": 3}, "pattern")
+
+    def test_required_must_be_a_list_of_strings(self):
+        self.refused({"required": "a"}, "required")
+        self.refused({"required": ["a", 3]}, "required")
+        self.refused({"required": {"a": 1}}, "required")
+
+    def test_a_pointer_without_its_file_and_type_is_refused(self):
+        self.refused({"x-points-to": {"type": "spec"}}, "x-points-to")
+        self.refused({"x-points-to": {"file": "spec.jsonl"}}, "x-points-to")
+        self.refused({"x-points-to": "spec.jsonl"}, "x-points-to")
+
+    def test_a_mode_set_without_its_file_and_field_is_refused(self):
+        self.refused({"x-mode-sets": {"field": "mode", "other": ["a"]}}, "x-mode-sets")
+        self.refused({"x-mode-sets": {"file": "code.json", "other": ["a"]}}, "x-mode-sets")
+        self.refused({"x-mode-sets": ["code.json"]}, "x-mode-sets")
+
+    def test_a_check_that_names_no_registered_hook_is_refused_on_load(self):
+        self.refused({"x-check": "no-such-hook"}, "no-such-hook")
+
+    def test_a_registered_hook_loads(self):
+        self.put_schema(
+            {
+                "$id": "ok.schema.json",
+                "x-files": ["ok.jsonl"],
+                "type": "object",
+                "properties": {"a": {"x-check": "verified-needs-passing-verifier"}},
+            }
+        )
+        self.write("ok.jsonl", "{}\n")
+        self.assertEqual(self.messages("ok.jsonl"), [])
+
+    def test_x_files_must_be_a_list_of_strings(self):
+        for files in ("a.jsonl", {"a": 1}, ["a.jsonl", 3]):
+            self.put_schema({"$id": "bad.schema.json", "x-files": files, "type": "object"})
+            self.write("a.jsonl", "{}\n")
+            with self.assertRaises(schema.SchemaError) as caught:
+                self.check("a.jsonl")
+            self.assertIn("x-files", str(caught.exception))
+
     def test_valid_types_and_boolean_additional_properties_load(self):
         self.put_schema(
             {"$id": "ok.schema.json", "x-files": ["ok.jsonl"], "type": ["object"], "additionalProperties": False}
@@ -1077,6 +1119,30 @@ class Retry(Case):
         self.assertIn("not valid JSON", errors[0])
         self.assertEqual(len(calls), 2)
 
+    def test_a_first_read_that_is_not_utf8_is_retried_like_a_parse_failure(self):
+        real = schema.read_text
+        calls = []
+
+        def fake(path):
+            if path.name == "tasks.jsonl":
+                calls.append(path)
+                if len(calls) == 1:
+                    raise UnicodeDecodeError("utf-8", b"\xe2", 0, 1, "unexpected end of data")
+            return real(path)
+
+        self.write("tasks.jsonl", jsonl(task(1)))
+        with mock.patch.object(schema, "read_text", fake), mock.patch.object(schema, "PAUSE", 0):
+            self.assertEqual(self.messages("tasks.jsonl"), [])
+        self.assertEqual(len(calls), 2)
+
+    def test_a_file_that_is_never_utf8_is_reported_not_raised(self):
+        self.write("tasks.jsonl", "")
+        (self.change / "tasks.jsonl").write_bytes(b'{"task": "\xe2"}\n')
+        with mock.patch.object(schema, "PAUSE", 0):
+            errors = self.messages("tasks.jsonl")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("cannot be read", errors[0])
+
     def test_a_clean_file_is_read_once(self):
         fake, calls = self.reads(jsonl(task(1)))
         self.write("tasks.jsonl", "")
@@ -1097,6 +1163,59 @@ class Retry(Case):
         self.write("tasks.jsonl", jsonl(task(1)))
         with mock.patch.object(schema, "read_text", fake), mock.patch.object(schema, "PAUSE", 0):
             self.assertEqual(self.messages("tasks.jsonl"), [])
+
+
+class Records(Case):
+    """One record checked against named schemas, as page.py checks an event before it writes it."""
+
+    PAIR = [
+        {
+            "$id": "common.schema.json",
+            "x-files": ["log.jsonl"],
+            "type": "object",
+            "required": ["type", "at", "by"],
+            "properties": {"type": {"type": "string"}, "at": base_ref("at"), "by": base_ref("by")},
+        },
+        {
+            "$id": "own.schema.json",
+            "x-files": ["log.jsonl"],
+            "type": "object",
+            "properties": {"type": {"enum": ["a", "b"]}},
+        },
+    ]
+
+    def setUp(self):
+        super().setUp()
+        for item in self.PAIR:
+            self.put_schema(item)
+
+    def record(self, **fields):
+        return {"type": "a", "at": AT, "by": "user", **fields}
+
+    def test_a_record_that_meets_every_named_schema_has_no_problems(self):
+        problems = schema.check_record(self.record(), ["common.schema.json", "own.schema.json"], self.schemas)
+        self.assertEqual(problems, [])
+
+    def test_each_named_schema_is_applied(self):
+        names = ["common.schema.json", "own.schema.json"]
+        self.assertEqual([f for f, _ in schema.check_record(self.record(by=""), names, self.schemas)], ["by"])
+        self.assertEqual([f for f, _ in schema.check_record(self.record(type="c"), names, self.schemas)], ["type"])
+
+    def test_an_unknown_schema_name_is_a_schema_error(self):
+        with self.assertRaises(schema.SchemaError):
+            schema.check_record(self.record(), ["nope.schema.json"], self.schemas)
+
+    def test_every_schema_that_names_a_file_with_the_same_pattern_applies_to_it(self):
+        self.write("log.jsonl", jsonl(self.record(), self.record(type="c")))
+        errors = self.messages("log.jsonl")
+        self.assertEqual(len(errors), 1)
+        self.assertTrue(errors[0].startswith("2: type: "), errors)
+
+    def test_a_versioned_pair_may_reuse_an_id(self):
+        for item in self.PAIR:
+            self.put_schema({**item, "x-versioned": True})
+        self.write("log.jsonl", jsonl(self.record(id="c1"), self.record(id="c1")))
+        self.assertEqual(self.messages("log.jsonl"), [])
 
 
 if __name__ == "__main__":

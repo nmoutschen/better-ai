@@ -17,18 +17,18 @@ const ids = list => Array.from(list, c => c.e.id);
 
 test('the agent sets the state of an item', () => {
   const t = thread([
-    { action: 'note', id: 'm1', note: 'hi' },
-    { action: 'status', to: 'm1', status: 'seen' },
-    { action: 'status', to: 'm1', status: 'working' },
+    { type: 'note', id: 'm1', text: 'hi' },
+    { type: 'status', to: 'm1', status: 'seen' },
+    { type: 'status', to: 'm1', status: 'working' },
   ]);
   assert.equal(t.state.m1, 'working');
 });
 
 test("the user's answer ends the agent's wait", () => {
   const t = thread([
-    { action: 'note', id: 'm1', note: 'hi' },
-    { action: 'status', to: 'm1', status: 'asked' },
-    { action: 'note', id: 'm2', to: 'm1', note: 'this one' },
+    { type: 'note', id: 'm1', text: 'hi' },
+    { type: 'status', to: 'm1', status: 'asked' },
+    { type: 'note', id: 'm2', to: 'm1', text: 'this one' },
   ]);
   assert.equal(t.state.m1, 'replied');
   assert.deepEqual(ids(t.entries), ['m1']);  // the answer is part of the item, not a new one
@@ -36,76 +36,76 @@ test("the user's answer ends the agent's wait", () => {
 });
 
 test('a reply under a done or accepted item is a follow-up', () => {
-  for (const finished of [{ action: 'status', to: 'm1', status: 'done' }, { action: 'accept', to: 'm1' }]) {
-    const t = thread([{ action: 'note', id: 'm1', note: 'hi' }, finished, { action: 'note', id: 'm2', to: 'm1', note: 'more' }]);
+  for (const finished of [{ type: 'status', to: 'm1', status: 'done' }, { type: 'accept', to: 'm1' }]) {
+    const t = thread([{ type: 'note', id: 'm1', text: 'hi' }, finished, { type: 'note', id: 'm2', to: 'm1', text: 'more' }]);
     assert.equal(t.state.m1, 'followup');
   }
 });
 
 test('Open lists items not yet accepted, and not deleted comments', () => {
   const t = thread([
-    { action: 'note', id: 'm1', note: 'open' },
-    { action: 'note', id: 'm2', note: 'accepted' },
-    { action: 'accept', to: 'm2' },
-    { action: 'comment', id: 'c1', n: 1, comment: 'gone' },
-    { action: 'delete', id: 'c1' },
-    { action: 'note', id: 'm3', note: 'done' },
-    { action: 'status', to: 'm3', status: 'done' },
+    { type: 'note', id: 'm1', text: 'open' },
+    { type: 'note', id: 'm2', text: 'accepted' },
+    { type: 'accept', to: 'm2' },
+    { type: 'comment', id: 'c1', n: 1, text: 'gone' },
+    { type: 'delete', to: 'c1' },
+    { type: 'note', id: 'm3', text: 'done' },
+    { type: 'status', to: 'm3', status: 'done' },
   ]);
   assert.deepEqual(ids(t.open), ['m1', 'm3']);
 });
 
 test("the agent's own question is open and last until the user answers it", () => {
   const log = [
-    { action: 'reply', id: 'r1', to: null, text: 'Which size?' },
-    { action: 'note', id: 'm1', note: 'later message' },
+    { type: 'reply', id: 'r1', to: null, text: 'Which size?' },
+    { type: 'note', id: 'm1', text: 'later message' },
   ];
   let t = thread(log);
   assert.deepEqual(ids(t.entries), ['m1', 'r1']);
   assert.deepEqual(ids(t.open), ['m1', 'r1']);
-  t = thread(log.concat([{ action: 'note', id: 'm2', to: 'r1', note: 'Large' }]));
+  t = thread(log.concat([{ type: 'note', id: 'm2', to: 'r1', text: 'Large' }]));
   assert.deepEqual(ids(t.open), ['m1']);
   assert.deepEqual(ids(t.entries), ['r1', 'm1']);  // answered, it goes back to its place in time
 });
 
 test('a reply without an id is not a question', () => {
-  const t = thread([{ action: 'reply', to: null, text: 'FYI' }]);
+  const t = thread([{ type: 'reply', to: null, text: 'FYI' }]);
   assert.deepEqual(ids(t.open), []);
 });
 
 test('an edited comment shows once, in its latest form', () => {
   const t = thread([
-    { action: 'comment', id: 'c1', n: 1, comment: 'first' },
-    { action: 'comment', id: 'c1', n: 1, comment: 'second' },
+    { type: 'comment', id: 'c1', n: 1, text: 'first' },
+    { type: 'comment', id: 'c1', n: 1, text: 'second' },
   ]);
   assert.equal(t.entries.length, 1);
-  assert.equal(t.entries[0].e.comment, 'second');
+  assert.equal(t.entries[0].e.text, 'second');
   assert.equal(t.entries[0].edited, true);
 });
 
 test('replies nest under the item they answer, and an answer to a reply finds the same item', () => {
   const t = thread([
-    { action: 'comment', id: 'c1', n: 1, comment: 'x' },
-    { action: 'reply', id: 'r1', to: 'c1', text: 'why?' },
-    { action: 'note', id: 'm1', to: 'r1', note: 'because' },
-    { action: 'reopen', to: 'c1', reason: 'not fixed' },
+    { type: 'comment', id: 'c1', n: 1, text: 'x' },
+    { type: 'reply', id: 'r1', to: 'c1', text: 'why?' },
+    { type: 'note', id: 'm1', to: 'r1', text: 'because' },
+    { type: 'reopen', to: 'c1', text: 'not fixed' },
   ]);
   assert.equal(t.entries.length, 1);
-  assert.deepEqual(Array.from(t.entries[0].replies, r => r.action), ['reply', 'note', 'reopen']);
+  assert.deepEqual(Array.from(t.entries[0].replies, r => r.type), ['reply', 'note', 'reopen']);
   assert.equal(t.state.c1, 'reopened');
 });
 
 test("a page's own item kinds count under Open", () => {
-  const log = [{ action: 'decide', id: 'd1', option: 'A' }, { action: 'verdict', version: 'A', verdict: 'up' }];
+  const log = [{ type: 'decide', id: 'd1', option: 'A' }, { type: 'verdict', version: 'A', verdict: 'up' }];
   assert.deepEqual(ids(thread(log).open), []);
   assert.deepEqual(ids(thread(log, ['comment', 'note', 'decide']).open), ['d1']);
 });
 
 test("an answer to a decision nests under it, and so does the coordinator's reply to that answer", () => {
   const t = thread([
-    { action: 'decision', id: 'D-1', x: { status: 'pending' } },
-    { action: 'answer', id: 'a1', decision: 'D-1', text: 'Use the default.' },
-    { action: 'reply', id: 'r1', to: 'a1', text: 'Applied.' },
+    { type: 'decision', id: 'D-1', x: { status: 'pending' } },
+    { type: 'answer', id: 'a1', decision: 'D-1', text: 'Use the default.' },
+    { type: 'reply', id: 'r1', to: 'a1', text: 'Applied.' },
   ]);
   assert.deepEqual(ids(t.entries), ['D-1']);
   assert.deepEqual(Array.from(t.entries[0].replies, r => r.id), ['a1', 'r1']);
@@ -114,19 +114,14 @@ test("an answer to a decision nests under it, and so does the coordinator's repl
 test("a page's own rule for what waits for the user puts those entries last", () => {
   const waiting = (c, state) => c.kind === 'decision' ? !c.replies.length : c.kind === 'note' && state[c.e.id] === 'asked';
   const log = [
-    { action: 'decision', id: 'D-1', x: {} },
-    { action: 'note', id: 'm1', text: 'a question' },
-    { action: 'status', to: 'm1', status: 'asked' },
-    { action: 'note', id: 'm2', text: 'later' },
+    { type: 'decision', id: 'D-1', x: {} },
+    { type: 'note', id: 'm1', text: 'a question' },
+    { type: 'status', to: 'm1', status: 'asked' },
+    { type: 'note', id: 'm2', text: 'later' },
   ];
   assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'D-1', 'm1']);
-  const answered = log.concat([{ action: 'answer', id: 'a1', decision: 'D-1', text: 'yes' }]);
+  const answered = log.concat([{ type: 'answer', id: 'a1', decision: 'D-1', text: 'yes' }]);
   assert.deepEqual(ids(context.pageThread(answered, ITEMS, waiting).entries), ['D-1', 'm2', 'm1']);
-});
-
-test("a message's words are its note, or its text on the board before it shared page.js", () => {
-  assert.equal(context.pageWords({ note: 'new' }), 'new');
-  assert.equal(context.pageWords({ text: 'old' }), 'old');
 });
 
 // ---------- Markdown in messages: pageMarkdownTree, the tree page.js turns into elements ----------
@@ -231,7 +226,7 @@ const STEP_NAME = ['Waiting for you', 'You answered', 'Applied'];
 const shows = (status, answer, st) => STEP_NAME[decisionStep(status, answer, st)];
 
 test('a question the coordinator asked back about waits for the user again, until they answer again', () => {
-  const a1 = { id: 'a-1', action: 'answer' }, a2 = { id: 'a-2', action: 'answer' };
+  const a1 = { id: 'a-1', type: 'answer' }, a2 = { id: 'a-2', type: 'answer' };
   assert.equal(shows('waiting', null, {}), 'Waiting for you');
   assert.equal(shows('waiting', a1, {}), 'You answered');
   assert.equal(shows('waiting', a1, { 'a-1': 'seen' }), 'You answered');
@@ -247,7 +242,7 @@ test('a question the coordinator asked back about waits for the user again, unti
 
 test('a decision card renders for a waiting, an answered-then-asked and a decided decision, and its head agrees with its foot', () => {
   const card = (status, answers) => ({ e: { x: { id: 'd1', status, asked: 'Which?', at: '2026-11-20T10:00:00' } },
-    replies: answers.map(id => ({ action: 'answer', id })) });
+    replies: answers.map(id => ({ type: 'answer', id })) });
   const run = (status, answers, st) => { const [item, foot] = decisionItem(card(status, answers), st, true); return { head: item.html.match(/class="when">([^<]*)</)[1], foot: foot.html, item }; };
   const waiting = run('waiting', [], {});
   assert.equal(waiting.head, '10:00');  // the time, not a state
@@ -275,13 +270,13 @@ test('a decision card renders for a waiting, an answered-then-asked and a decide
 
 test('with latestLast, an item whose reply is the newest message comes last, so the newest message is at the bottom', () => {
   const log = [
-    { action: 'note', id: 'm1', note: 'first' },
-    { action: 'note', id: 'm2', note: 'second' },
-    { action: 'reply', id: 'r1', to: 'm1', text: 'answer to the first' },
+    { type: 'note', id: 'm1', text: 'first' },
+    { type: 'note', id: 'm2', text: 'second' },
+    { type: 'reply', id: 'r1', to: 'm1', text: 'answer to the first' },
   ];
   assert.deepEqual(ids(context.pageThread(log, ITEMS, null, true).entries), ['m2', 'm1']);
   assert.deepEqual(ids(context.pageThread(log, ITEMS).entries), ['m1', 'm2']);  // the other pages keep their order
-  const later = log.concat({ action: 'note', id: 'm3', note: 'third' });
+  const later = log.concat({ type: 'note', id: 'm3', text: 'third' });
   assert.deepEqual(ids(context.pageThread(later, ITEMS, null, true).entries), ['m2', 'm1', 'm3']);
 });
 
@@ -291,15 +286,15 @@ test("the dashboard's conversation opts in to latestLast", () => {
 
 test('with latestLast, threads sort by their latest message and a question waiting for the user stays at the bottom', () => {
   const log = [
-    { action: 'reply', id: 'q1', to: null, text: 'Which size?' },
-    { action: 'note', id: 'm2', note: 'newer' },
+    { type: 'reply', id: 'q1', to: null, text: 'Which size?' },
+    { type: 'note', id: 'm2', text: 'newer' },
   ];
   const waiting = c => c.e.id === 'q1';
   assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'q1']);
   const t = context.pageThread(log, ITEMS, waiting, true);
   assert.deepEqual(ids(t.entries), ['m2', 'q1']);  // the newer message does not push the question up
   assert.ok(ids(t.open).includes('q1'));  // it still counts as open
-  const more = log.concat([{ action: 'note', id: 'm3', note: 'third' }, { action: 'reply', id: 'r1', to: 'm2', text: 'answer' }]);
+  const more = log.concat([{ type: 'note', id: 'm3', text: 'third' }, { type: 'reply', id: 'r1', to: 'm2', text: 'answer' }]);
   assert.deepEqual(ids(context.pageThread(more, ITEMS, waiting, true).entries), ['m3', 'm2', 'q1']);  // the rest by latest message
 });
 
@@ -449,4 +444,124 @@ test('a verifier shows as a verifier, a builder by its mode', () => {
   assert.equal(agentClass(b), 'm-bugfix');
   assert.equal(agentClass(n), 'm-feature');  // no role: shown as a builder
   assert.match(agentTag({ role: ' Verifier ' }), />verifier</);
+});
+
+// ---------- Sending: what the user sees when the server refuses an event, as against when it cannot be reached ----------
+// pageConversation runs here against a stub document and fetch: the elements are plain objects that keep what the page
+// sets on them, so the test reads the toast, the status line and the message box as the user would.
+const stubElement = extra => Object.assign({
+  value: '', textContent: '', className: '', hidden: false, dataset: {}, listeners: {}, style: {},
+  classList: { toggle() {}, add() {}, remove() {} },
+  addEventListener(type, handler) { this.listeners[type] = handler; },
+  querySelector() { return stubElement(); }, querySelectorAll() { return []; },
+  replaceChildren() {}, append() {}, appendChild() {}, focus() {}, setAttribute() {},
+}, extra);
+const nextTick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+function conversationOn(answer, extra) {
+  const els = { '.toast': stubElement({ hidden: true }), '.notes .status': stubElement(), '#note': stubElement(),
+    '.notes .send .btn': stubElement(), '.thread': stubElement(), '.notes .empty': stubElement() };
+  const sent = [];
+  context.document = { querySelector: s => els[s] || stubElement(), querySelectorAll: () => [], contains: () => true };
+  context.fetch = (url, init) => { sent.push(JSON.parse(init.body)); return answer(); };
+  const applied = [], resets = [];
+  const conv = context.pageConversation(Object.assign({
+    served: true, name: 'canvas', apply: (e, fresh) => applied.push([e, fresh]), reset: () => resets.push(1),
+  }, extra || {}));
+  return { conv, els, sent, applied, resets };
+}
+const rejection = message => () => Promise.resolve({ json: () => Promise.resolve({ jsonrpc: '2.0', id: 1, error: { code: -32602, message } }) });
+const saved = () => Promise.resolve({ json: () => Promise.resolve({ jsonrpc: '2.0', id: 1, result: 'saved' }) });
+const unreachable = () => Promise.reject(new TypeError('Failed to fetch'));
+
+test('a message the server rejects stays in the box, and the page shows the server\'s reason, not that it is closed', async () => {
+  const { els, sent, applied } = conversationOn(rejection('text: required'));
+  els['#note'].value = 'my words';
+  els['.notes .send .btn'].listeners.click({ preventDefault() {} });
+  await nextTick();
+  assert.equal(els['#note'].value, 'my words');
+  assert.match(els['.toast'].textContent, /text: required/);
+  assert.doesNotMatch(els['.toast'].textContent, /closed/);
+  assert.match(els['.toast'].className, /error/);
+  assert.match(els['.notes .status'].textContent, /text: required/);
+  assert.doesNotMatch(els['.notes .status'].textContent, /closed/);
+  // The page sends its words as text and says what the message answers; the server sets the type, the author and the time.
+  assert.equal(sent[0].method, 'note');
+  assert.deepEqual(Object.keys(sent[0].params).sort(), ['id', 'text', 'to']);
+  assert.equal(sent[0].params.text, 'my words');
+  assert.equal(applied.length, 1);
+});
+
+test('a rejected event is undone on the page: the model is rebuilt from the log, which the event never reached', async () => {
+  const { conv, els, applied, resets } = conversationOn(rejection('on.slide: required'));
+  conv.send('comment', { id: 'c1', text: 'x', on: {} }, 'Comment 1');
+  assert.equal(applied.length, 1);
+  assert.equal(applied[0][0].type, 'comment');
+  assert.equal(applied[0][0].by, 'user');
+  assert.match(applied[0][0].at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
+  await nextTick();
+  assert.equal(resets.length, 1);
+  assert.match(els['.toast'].textContent, /on\.slide: required/);
+});
+
+test('when the server cannot be reached the page says the page is closed, and keeps the text too', async () => {
+  const { els, resets } = conversationOn(unreachable);
+  els['#note'].value = 'my words';
+  els['.notes .send .btn'].listeners.click({ preventDefault() {} });
+  await nextTick();
+  assert.equal(els['#note'].value, 'my words');
+  assert.match(els['.toast'].textContent, /closed/);
+  assert.equal(resets.length, 1);
+});
+
+test('a saved message clears the box and is not undone', async () => {
+  const { els, resets } = conversationOn(saved);
+  els['#note'].value = 'my words';
+  els['.notes .send .btn'].listeners.click({ preventDefault() {} });
+  await nextTick();
+  assert.equal(els['#note'].value, '');
+  assert.match(els['.toast'].textContent, /sent/);
+  assert.equal(resets.length, 0);
+});
+
+test('a comment box stays open with its text until the server has saved the comment', () => {
+  const els = { textarea: stubElement({ value: 'my comment' }), '.ok': stubElement(), '.remove': stubElement(), '.cancel': stubElement(), '.target': stubElement() };
+  const pop = stubElement({ querySelector: s => els[s] || stubElement(), offsetWidth: 10, offsetHeight: 10 });
+  context.document = { contains: () => true };
+  const calls = [];
+  const layer = context.pageElementComments({
+    pop, pinClass: 'pin', crumb: () => null, nextNumber: () => 1, params: (d, text) => ({ text, on: {} }),
+    send: (method, params, what, done, fail) => calls.push({ method, params, done, fail }),
+  });
+  layer.open({}, null, null, () => ({ x: 0, y: 0 }));
+  els['.ok'].listeners.click();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'comment');
+  assert.equal(calls[0].params.text, 'my comment');
+  assert.equal(pop.hidden, false);  // still open: a rejection leaves the text where the user can fix it
+  calls[0].done();
+  assert.equal(pop.hidden, true);
+});
+
+test('a deletion points at its comment with to', () => {
+  const els = { textarea: stubElement(), '.ok': stubElement(), '.remove': stubElement(), '.cancel': stubElement(), '.target': stubElement() };
+  const pop = stubElement({ querySelector: s => els[s] || stubElement() });
+  context.document = { contains: () => true };
+  const calls = [];
+  const layer = context.pageElementComments({ pop, pinClass: 'pin', send: (method, params) => calls.push({ method, params }) });
+  layer.remove({ id: 'c1', n: 1 });
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ method: 'delete', params: { to: 'c1' } }]);
+});
+
+test('delete, accept and reopen point at their item with to, and reopen carries its words in text', () => {
+  const t = thread([
+    { type: 'comment', id: 'c1', n: 1, text: 'x' },
+    { type: 'comment', id: 'c2', n: 2, text: 'y' },
+    { type: 'delete', to: 'c1' },
+    { type: 'status', to: 'c2', status: 'done' },
+    { type: 'reopen', to: 'c2', text: 'still wrong' },
+  ]);
+  assert.equal(t.entries[0].deleted, true);
+  assert.equal(t.state.c2, 'reopened');
+  assert.deepEqual(Array.from(t.entries[1].replies, r => r.text), ['still wrong']);
 });
