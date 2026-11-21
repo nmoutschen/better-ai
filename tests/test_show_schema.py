@@ -1,9 +1,11 @@
-"""Tests for show-better's spec.json schema, and for `show.py check`, which validates a spec's shape through schema.py.
+"""Tests for show-better's spec.json schema, and for `show.py check`, which validates a spec through schema.py.
 
-Every valid spec below passed `show.py check` before the schema existed, except that `type` ("slides") is now required;
-every broken one was rejected for its shape before, and is now rejected by schema.py with the field named. Rules that
-need rendering knowledge (a node an edge names, a row's cell count, the overview and focus) stay in show.py: those
-specs pass the schema and are refused by `show.py check`.
+The valid specs below passed `show.py check` before the schema existed, except that `type` ("slides") is now required.
+Every broken one is refused by schema.py with the field named: its shape (types, required fields, allowed values), what
+its parts say about each other (a node an edge names, a row's cell count, the overview and focus: the `show_spec` hook),
+and number limits (`minimum`, `maximum`). show.py keeps only what the drawing needs: a tree deeper than four levels,
+more than 100 units, an svg's elements, and the warnings and the digest; those specs pass the schema and are refused
+by `show.py check`. A field that is optional accepts null as absent, and no wrongly typed value crashes a check.
 """
 
 import copy
@@ -602,15 +604,17 @@ CROSS_BREAKS = [
         "panels[1].focus",
     ),
 ]
+CROSS_BREAKS += [
+    (
+        "a bar is negative",
+        spec_of(edited(visual("bars"), lambda p: p["items"][0].update({"value": -1}))),
+        "panels[0].items[0].value",
+    )
+]
 BROKEN = SHAPE_BREAKS + KIND_BREAKS + CROSS_BREAKS
 
 # What stays in show.py, because the drawing cannot show it: the schema accepts these specs.
 RENDERING_BREAKS = [
-    (
-        "a bar is negative",
-        spec_of(edited(visual("bars"), lambda p: p["items"][0].update({"value": -1}))),
-        "negative",
-    ),
     (
         "units above 100",
         spec_of(edited(visual("units"), lambda p: p["parts"][0].update({"count": 101}))),
@@ -746,6 +750,298 @@ class SlideOnNotes(unittest.TestCase):
     def test_the_slide_page_sends_the_slide_with_each_note(self):
         source = (SHOW / "scripts" / "show.js").read_text(encoding="utf-8")
         self.assertRegex(source, r"noteParams:\s*function \(\) \{ return \{ on: \{ slide: cur \+ 1, part: [^}]*null")
+
+
+# The crashes a verifier found: wrongly typed values the hook once met with a TypeError.
+CRASH_1 = {
+    "type": "slides",
+    "title": "The answer.",
+    "question": "Why?",
+    "panels": [
+        {
+            "headline": HEAD,
+            "source": "t",
+            "kind": "concept",
+            "nodes": [{"id": ["a"], "label": "A"}, {"id": "b", "label": "B"}],
+            "edges": [{"from": "a", "to": "b"}],
+        }
+    ],
+}
+CRASH_2 = {
+    "type": "slides",
+    "title": "The answer.",
+    "question": "Why?",
+    "panels": [
+        {
+            "headline": HEAD,
+            "source": "t",
+            "kind": "tree",
+            "unit": "p",
+            "root": {"label": "All", "value": 5, "children": 3},
+        }
+    ],
+}
+WRONG_TYPES = [
+    ("a concept node id that is a list", CRASH_1, "panels[0].nodes[0].id"),
+    (
+        "a concept node id that is an object",
+        edited(CRASH_1, lambda s: s["panels"][0]["nodes"][0].update(id={})),
+        "panels[0].nodes[0].id",
+    ),
+    (
+        "an edge end that is a list",
+        spec_of(edited(visual("concept"), lambda p: p["edges"][0].update({"from": ["a"]}))),
+        "panels[0].edges[0].from",
+    ),
+    (
+        "an edge end that is an object",
+        spec_of(edited(visual("concept"), lambda p: p["edges"][0].update({"to": {"a": 1}}))),
+        "panels[0].edges[0].to",
+    ),
+    (
+        "a region set that is a list",
+        spec_of(edited(visual("sets"), lambda p: p["regions"][0].update({"in": [["P"]]}))),
+        "panels[0].regions[0].in",
+    ),
+    (
+        "a region set that is an object",
+        spec_of(edited(visual("sets"), lambda p: p["regions"][0].update({"in": [{}]}))),
+        "panels[0].regions[0].in",
+    ),
+    ("tree children that is a number", CRASH_2, "panels[0].root.children"),
+    (
+        "tree children that is a boolean",
+        edited(CRASH_2, lambda s: s["panels"][0]["root"].update(children=True)),
+        "panels[0].root.children",
+    ),
+    (
+        "a lane actor that is a list",
+        spec_of(edited(visual("lanes"), lambda p: p["steps"][0].update({"actor": ["A"]}))),
+        "panels[0].steps[0].actor",
+    ),
+    (
+        "overview labels that are not lists",
+        spec_of(
+            edited(visual("groups"), lambda p: p.update({"overview": True, "groups": [{"label": "G", "items": 3}]})),
+            edited(visual("text"), put("focus", ["G"])),
+        ),
+        "panels[0].groups[0].items",
+    ),
+    (
+        "a focus that is an object",
+        spec_of(overview_panel(), edited(visual("text"), put("focus", {"a": 1}))),
+        "panels[1].focus",
+    ),
+    (
+        "table rows that are not lists",
+        spec_of(edited(visual("table"), lambda p: p.update({"rows": [{"a": 1}, 3]}))),
+        "panels[0].rows[0]",
+    ),
+]
+
+
+class WrongTypes(unittest.TestCase):
+    def test_no_hook_or_check_raises_on_a_wrongly_typed_value_and_the_schema_names_the_field(self):
+        for name, spec, field in WRONG_TYPES:
+            with self.subTest(name):
+                fields = [f for f, _ in shape_problems(spec)]
+                self.assertTrue(any(f.startswith(field) for f in fields), (field, fields))
+                errors, _, _ = show.check(spec)
+                self.assertTrue(any(field in e for e in errors), (field, errors))
+
+    def test_schema_py_check_on_the_file_does_not_raise_either(self):
+        for name, spec, field in WRONG_TYPES:
+            with self.subTest(name), tempfile.TemporaryDirectory() as d:
+                path = Path(d) / "spec.json"
+                path.write_text(json.dumps(spec))
+                errors = schema.check_paths([path], SCHEMAS)
+                self.assertTrue(any(e.field.startswith(field) for e in errors), (field, errors))
+
+    def test_every_leaf_of_every_valid_spec_set_to_a_wrong_value_gives_an_answer_and_no_exception(self):
+        values = [None, "x", "", -1, 2.5, [], {}, True, ["x"], [{}]]
+
+        def leaves(o, path=()):
+            yield path
+            if isinstance(o, dict):
+                for k, v in o.items():
+                    yield from leaves(v, (*path, k))
+            elif isinstance(o, list):
+                for i, v in enumerate(o):
+                    yield from leaves(v, (*path, i))
+
+        bases = [spec_of(visual(k)) for k in KIND_OK] + [spec_of(copy.deepcopy(p)) for p in OTHER_PANELS.values()]
+        for base in bases:
+            for path in leaves(base):
+                if not path:
+                    continue
+                for value in [*values, "<delete>"]:
+                    spec = copy.deepcopy(base)
+                    target = spec
+                    for step in path[:-1]:
+                        target = target[step]
+                    if value == "<delete>":
+                        target.pop(path[-1])
+                    else:
+                        target[path[-1]] = copy.deepcopy(value)
+                    try:
+                        show.check(spec)
+                        shape_problems(spec)
+                    except Exception as error:
+                        self.fail(f"{path} = {value!r} in a {base['panels'][0].get('kind')} panel raised {error!r}")
+
+
+# Optional fields: (kind of panel, path to the field in the panel, or "top" and a path in the spec).
+NULLABLE = [
+    ("top", ["question"]),
+    ("top", ["summary"]),
+    ("top", ["source"]),
+    ("top", ["lang"]),
+    ("top", ["document"]),
+    ("top", ["style"]),
+    ("top", ["at"]),
+    ("top", ["by"]),
+    ("text", ["part"]),
+    ("text", ["source"]),
+    ("text", ["overview"]),
+    ("text", ["focus"]),
+    ("text", ["template"]),
+    ("map", ["highlight"]),
+    ("map", ["sections", 0, "gist"]),
+    ("map", ["sections", 0, "id"]),
+    ("flow", ["steps", 0, "note"]),
+    ("groups", ["groups", 0, "label"]),
+    ("groups", ["groups", 0, "items"]),
+    ("tree", ["unit"]),
+    ("tree", ["root", "children", 0, "value"]),
+    ("tree", ["root", "value"]),
+    ("sets", ["regions", 0, "label"]),
+    ("sets", ["regions", 0, "count"]),
+    ("matrix", ["rows", 0, "group"]),
+    ("matrix", ["rows", 1, "cells", 0, "mark"]),
+    ("effects", ["rows", 0, "outcome"]),
+    ("effects", ["rows", 0, "group"]),
+    ("pairs", ["rows", 0, "left"]),
+    ("pairs", ["rows", 0, "right", 0, "effect"]),
+    ("quadrant", ["items", 0, "label"]),
+    ("units", ["unit"]),
+    ("bars", ["unit"]),
+    ("bars", ["max"]),
+    ("bars", ["items", 0, "label"]),
+    ("bars", ["items", 0, "detail"]),
+    ("slope", ["unit"]),
+    ("slope", ["y_from_zero"]),
+    ("slope", ["y_note"]),
+    ("slope", ["items", 0, "label"]),
+    ("dots", ["unit"]),
+    ("dots", ["groups", 0, "label"]),
+    ("scatter", ["points", 1, "label"]),
+    ("line", ["unit"]),
+    ("line", ["x_label"]),
+    ("line", ["y_from_zero"]),
+    ("line", ["series", 0, "name"]),
+    ("table", ["highlight_rows"]),
+    ("fork", ["branches", 0, "note"]),
+    ("statement", ["compare"]),
+    ("title", ["body"]),
+    ("title", ["actions"]),
+    ("compare", ["a", "detail"]),
+    ("lanes", ["steps", 0, "highlight"]),
+]
+# Required fields stay non-null: (kind of panel, path).
+NOT_NULLABLE = [
+    ("top", ["title"]),
+    ("top", ["panels"]),
+    ("top", ["type"]),
+    ("text", ["headline"]),
+    ("text", ["kind"]),
+    ("text", ["body"]),
+    ("bars", ["items"]),
+    ("bars", ["items", 0, "value"]),
+    ("concept", ["edges", 0, "label"]),
+    ("flow", ["arrow"]),
+    ("flow", ["steps", 0, "label"]),
+    ("statement", ["figure"]),
+    ("statement", ["sentence"]),
+    ("slope", ["from"]),
+    ("fork", ["branches", 0, "outcome"]),
+    ("svg", ["alt"]),
+]
+
+
+def with_value(where, path, value):
+    """The spec of that panel kind with the field set to value, or removed when value is the string <absent>."""
+    if where == "top":
+        spec = spec_of(visual("text"))
+        spec["at"] = AT
+        spec["by"] = "agent"
+        spec["document"] = {"title": "D", "address": "https://example.com/d"}
+        spec["style"] = {"point": "#FF0000"}
+        holder = spec
+    else:
+        panel = copy.deepcopy(OTHER_PANELS[where]) if where in OTHER_PANELS else visual(where)
+        if where == "map":
+            panel["sections"].append({"id": "s2", "label": "More"})
+        if where == "text":
+            panel["overview"] = False
+        spec = spec_of(panel)
+        holder = panel
+    for step in path[:-1]:
+        holder = holder[step]
+    if value == "<absent>":
+        holder.pop(path[-1], None)
+    else:
+        holder[path[-1]] = value
+    return spec
+
+
+class Nulls(unittest.TestCase):
+    def test_an_optional_field_set_to_null_is_accepted_and_means_the_same_as_leaving_it_out(self):
+        for where, path in NULLABLE:
+            with self.subTest(f"{where} {path}"):
+                nulled = with_value(where, path, None)
+                self.assertEqual(shape_problems(nulled), [], "the schema")
+                absent = with_value(where, path, "<absent>")
+                self.assertEqual(show.check(nulled), show.check(absent))
+                self.assertEqual(show.check(nulled)[0], [])
+
+    def test_a_null_means_the_same_to_the_page_and_to_the_text(self):
+        for where, path in NULLABLE:
+            with self.subTest(f"{where} {path}"):
+                a, b = with_value(where, path, None), with_value(where, path, "<absent>")
+                self.assertEqual(show.render(show.without_nulls(a)), show.render(show.without_nulls(b)))
+                self.assertEqual(show.render_text(show.without_nulls(a)), show.render_text(show.without_nulls(b)))
+
+    def test_a_required_field_set_to_null_is_refused(self):
+        for where, path in NOT_NULLABLE:
+            with self.subTest(f"{where} {path}"):
+                spec = with_value(where, path, None)
+                self.assertTrue(shape_problems(spec), "the schema accepted it")
+                self.assertTrue(show.check(spec)[0], "show.py accepted it")
+
+    def test_a_null_in_a_list_is_kept(self):
+        spec = spec_of(visual("matrix"))
+        self.assertEqual(spec["panels"][0]["rows"][0]["cells"][0], None)
+        self.assertEqual(show.without_nulls(spec)["panels"][0]["rows"][0]["cells"], [None, "up"])
+
+    def test_a_pair_row_with_a_null_side_and_an_empty_one_has_nothing_in_it(self):
+        spec = spec_of(edited(visual("pairs"), lambda p: p["rows"][0].update({"left": None, "right": []})))
+        self.assertIn("panels[0].rows[0]", [f for f, _ in shape_problems(spec)])
+
+    def test_a_region_with_an_empty_label_and_a_null_count_is_refused(self):
+        spec = spec_of(edited(visual("sets"), lambda p: p["regions"][0].update({"label": "", "count": None})))
+        self.assertIn("panels[0].regions[0]", [f for f, _ in shape_problems(spec)])
+
+
+class TypeHint(unittest.TestCase):
+    def test_a_spec_without_type_is_told_to_add_it(self):
+        spec = spec_of(visual("text"))
+        del spec["type"]
+        errors, _, _ = show.check(spec)
+        self.assertEqual(errors, ['type: add "type": "slides" at the top of the spec'])
+
+    def test_a_wrong_type_value_keeps_the_schemas_message(self):
+        spec = {**spec_of(visual("text")), "type": "deck"}
+        self.assertEqual(show.check(spec)[0], ['type: must be "slides"'])
 
 
 class DesignBetterFixtures(unittest.TestCase):
