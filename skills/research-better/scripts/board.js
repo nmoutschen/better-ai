@@ -15,14 +15,14 @@ let D = null, LAYOUT = "", OPEN = null, REPLIES = -1, SCROLLED = false, CLOSED_P
 // ---------- Shape the board ----------
 function prepare(d) {
   // A merged question is shown by the one it was merged into; a withdrawn claim is not shown.
-  const merged = Object.fromEntries(d.questions.filter(q => q.status === "merged").map(q => [q.id, q.merged_into]));
+  const merged = Object.fromEntries(d.questions.filter(q => q.status === "merged" && q.merged_into).map(q => [q.id, q.merged_into]));
   const into = id => { for (let i = 0; merged[id] && i < 20; i++) id = merged[id]; return id; };
-  const qs = d.questions.filter(q => q.status !== "out of scope" && q.status !== "merged");
+  const qs = d.questions.filter(q => q.status !== "out of scope" && !merged[q.id]);
   const ids = new Set(qs.map(q => q.id)), qOfSource = {};
   d.claims = d.claims.filter(c => c.status !== "withdrawn");
   d.claims.forEach(c => { if (!qOfSource[c.source]) qOfSource[c.source] = c.question; });
   const searches = {};
-  Object.values(d.logs || {}).forEach(l => (l.searches || []).forEach(r => { searches[r.question] = (searches[r.question] || 0) + 1; }));
+  Object.values(d.logs || {}).forEach(l => (l.searches || []).forEach(r => { const id = into(r.question); searches[id] = (searches[id] || 0) + 1; }));
   qs.forEach(q => {
     q.view = STATE[q.status] ? q.status : "open";
     q.label = has(q.title) ? q.title : shorten(q.question || q.id);
@@ -30,7 +30,8 @@ function prepare(d) {
     q.searches = searches[q.id] || 0;
     q.prio = ["high", "medium", "low"].includes(q.priority) ? q.priority : "";
     // Where it was raised: the question it came after, else the question its origin is or the source's claim belongs to.
-    const o = into(q.raised_in || (q.origin.type === "question" ? q.origin.question : q.origin.type === "source" ? qOfSource[q.origin.source] : null));
+    const origin = q.origin || {};  // an invalid record may lack it
+    const o = into(q.raised_in || (origin.type === "question" ? origin.question : origin.type === "source" ? qOfSource[origin.source] : null));
     q.parent = ids.has(o) && o !== q.id ? o : null;
   });
   // A loop in the origins would hang the layout: cut it at the question that closes it.
@@ -85,9 +86,10 @@ function drawMap(d) {
     const dot = q.view === "proposed" ? hollow("#78736B") : q.view === "not found" ? hollow("#9A3B2A") : q.view === "unclear" ? hollow("#9A3B2A", true)
       : `<circle class="dot filled" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r}" fill="${FILL[cls]}"/>`;
     const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#5C4033" stroke-dasharray="3 2"/>` : "";
+    const mark = q._errors ? `<text class="bang" x="${(x + r + 3).toFixed(0)}" y="${(y - r).toFixed(0)}">!</text>` : "";
     const right = x >= CX, far = dp > 1 ? `<text class="far" x="${(x + (r + 4) * (right ? 1 : -1)).toFixed(0)}" y="${(y + 4).toFixed(0)}" text-anchor="${right ? "start" : "end"}">${esc(q.label)}</text>` : "";
     const who = q.view === "in progress" && has(q.owner) ? `, ${q.owner} on it` : "";
-    out.push(`<g class="q${OPEN && OPEN.id === q.id ? " sel" : ""}" data-q="${esc(q.id)}" tabindex="0" role="button" aria-label="${esc(q.label)}: ${word}${q.prio ? ", " + q.prio + " priority" : ""}${esc(who)}"><title>${esc(q.label)}${q.prio ? ` (${q.prio} priority)` : ""}</title>${ring}${dot}${far}</g>`);
+    out.push(`<g class="q${OPEN && OPEN.id === q.id ? " sel" : ""}" data-q="${esc(q.id)}" tabindex="0" role="button" aria-label="${esc(q.label)}: ${word}${q.prio ? ", " + q.prio + " priority" : ""}${esc(who)}${q._errors ? ", " + esc(notValid(q)) : ""}"><title>${esc(q.label)}${q.prio ? ` (${q.prio} priority)` : ""}${q._errors ? ` - ${esc(notValid(q))}` : ""}</title>${ring}${dot}${mark}${far}</g>`);
   });
   seeds.forEach(s => {  // each slice's name, at the edge, outside every dot
     const a = pos[s.id][2], lx = CX + (RMAX + 26) * Math.cos(a), ly = CY + (RMAX + 26) * Math.sin(a);
@@ -240,7 +242,7 @@ function drawAgents(d) {
   const working = d.qs.filter(q => q.view === "in progress");
   const checkers = {}; d.claims.forEach(c => { if (c.status === "checking") checkers[c.checker] = c; });
   const dry = name => { const l = ((d.logs || {})[name] || {}).searches || []; let n = 0;  // searches in a row that found no new term
-    for (let i = l.length - 1; i >= 0 && !l[i].new_terms.length; i--) n++; return n; };
+    for (let i = l.length - 1; i >= 0 && !(l[i].new_terms || []).length; i--) n++; return n; };
   const rows = working.map(q => { const who = has(q.owner) ? q.owner : "unassigned", n = dry(who);
     return `<li><button type="button" data-a="${esc(who)}" data-for="${esc(q.id)}"><b>${esc(who)}</b><span dir="auto">${esc(q.label)}</span>${n >= 5 ? `<em class="dry">${n} searches with nothing new</em>` : ""}</button></li>`; })
     .concat(Object.keys(checkers).sort().map(v => `<li><button type="button" class="verifier" data-a="${esc(v)}"><b>${esc(v)}</b><span>Checking claims</span></button></li>`));
@@ -282,14 +284,14 @@ function fillPop() {
     const checked = !n ? "" : ver === n ? ", all verified" : ver || failed ? `, ${ver} verified${failed ? `, ${failed} failed` : ""}` : ", none checked yet";
     // The header says what it is, its title and the full question; the answer, the claims and the conversation follow.
     html = `<div class="hd"><p class="kind">Question, <span class="chip ${cls}">${word}</span>${q.view === "in progress" && has(q.owner) ? " by " + esc(q.owner) : ""}${q.prio ? `, ${q.prio} priority` : ""}</p>
-      <h3 dir="auto">${esc(q.label)}</h3>${has(q.question) ? `<p class="full" dir="auto">${esc(q.question)}</p>` : ""}</div>
+      <h3 dir="auto">${esc(q.label)}</h3>${has(q.question) ? `<p class="full" dir="auto">${esc(q.question)}</p>` : ""}${q._errors ? `<p>${invalidHTML(q)}</p>` : ""}</div>
       <div class="bd">${has(q.summary) ? `<p dir="auto">${esc(q.summary)}</p>` : gist ? `<p dir="auto">${esc(gist)}</p>` : ""}
       ${parent ? `<p class="muted" dir="auto">Raised by: ${esc(parent.label)}</p>` : ""}
       <div class="sec"><h4 class="section-h">${n ? `${plural(n, "claim")} from ${plural(srcs, "source")}${checked}` : "No claims yet"}</h4>
       ${n ? `<ul class="claims">${q.claimsList.map(c => { const s = (D.sources.find(x => x.id === c.source) || {});
         const v = c.status, mark = v === "verified" ? "✓" : v === "unverified" ? "✗" : "○";
         const cited = has(s.date) || s.category ? ` (${[s.date, s.category].filter(has).map(esc).join(", ")})` : "";
-        return `<li dir="auto"><span aria-label="${v === "verified" ? "verified" : v === "unverified" ? "failed" : "not checked yet"}">${mark}</span> ${esc(c.claim)} <span class="muted">${esc(s.author || s.publisher || c.source)}${cited}</span></li>`; }).join("")}</ul>` : ""}</div>
+        return `<li dir="auto"><span aria-label="${v === "verified" ? "verified" : v === "unverified" ? "failed" : "not checked yet"}">${mark}</span> ${esc(c.claim)} <span class="muted">${esc(s.author || s.publisher || c.source)}${cited}</span> ${invalidHTML(c)}${s._errors ? " " + invalidHTML({_errors: ["source " + s.id + ": " + s._errors[0]]}) : ""}</li>`; }).join("")}</ul>` : ""}</div>
       <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>`;
     match = e => e.on && e.on.kind === "question" && e.on.id === id;
   } else if (D.claims.some(c => c.checker === id)) {
@@ -378,7 +380,7 @@ function render(d) {
       <span class="meter" aria-hidden="true"><i style="width:${qs.length ? (100 * answered / qs.length).toFixed(0) : 0}%"></i></span></span>`
     + (live ? stat(workers, workers === 1 ? "worker on questions" : "workers on questions") + (answered >= 3 && left ? stat(leftText, "left at this pace") : "") : "")
     + (waitingN && !CLOSED_PAGE ? `<button type="button" class="stat" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "decision waiting for you" : "decisions waiting for you"}</button>` : "") + phase);
-  const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, OPEN && OPEN.id === q.id]).concat([b.short]));
+  const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, q._errors && q._errors[0], OPEN && OPEN.id === q.id]).concat([b.short]));
   if (key !== LAYOUT) { LAYOUT = key; drawMap(D); if (FITTED) fit(); }
   const replies = (d.conversation || []).filter(e => e.type === "reply");
   if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + pageMarkdownText(replies[replies.length - 1].text).slice(0, 120), "ok");
@@ -393,12 +395,17 @@ function render(d) {
 // errors:begin
 // The records the board could not show, each with where it is and what is wrong. The rest of the board is drawn anyway,
 // and the page is reachable, so this band and the closed notice never go together.
+// A record the board still shows although it broke the schema says so, in the error colour, with its first message.
+const notValid = r => r && r._errors && r._errors.length ? `not valid: ${r._errors[0]}` : "";
+const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))}</span>` : "";
 const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> The records they name are left out of the page.</p><ul>`
   + errors.map(e => `<li><code>${esc(e.file)}:${esc(e.line)}</code> ${esc(e.field)}: ${esc(e.message)}${e.by ? ` <span class="by">(by ${esc(e.by)})</span>` : ""}</li>`).join("") + "</ul>";
 function showLoaded(d, els) {
   const errors = d.errors || [];
   els.offline.hidden = true; els.unwatched.hidden = d.listening !== false;
-  els.errors.hidden = !errors.length; els.errors.innerHTML = errors.length ? errorsHTML(errors) : "";
+  // Written only when it changes: the band is a live region, and a rewrite every poll would be read out every time.
+  const html = errors.length ? errorsHTML(errors) : "";
+  els.errors.hidden = !errors.length; if (els.errors.innerHTML !== html) els.errors.innerHTML = html;
 }
 // errors:end
 let fails = 0;

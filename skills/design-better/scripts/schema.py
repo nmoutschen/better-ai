@@ -668,6 +668,14 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
         text = read_checked(path, path.suffix == ".jsonl")
     except (OSError, UnicodeDecodeError) as error:
         return [Error(where, 1, "(file)", f"cannot be read: {error}")]
+    return check_text(path, text, docs, cache)
+
+
+def check_text(path: Path, text: str, docs: dict[str, dict], cache: dict[str, Any] | None = None) -> list[Error]:
+    """The errors of `text` as the content of the file `path`, in line order. A script that shows what a file holds
+    reads it once with `read_checked` and checks that text here, so what it shows is what was checked."""
+    found = _match(path, docs)
+    where = str(path)
     context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
     validator = Validator(docs, context)
     errors: list[Error] = []

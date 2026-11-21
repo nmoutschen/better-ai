@@ -13,7 +13,7 @@
     "by": {"$ref": "base.schema.json#/$defs/by"},
     "id": {"type": "string", "pattern": "^S-[\\w.-]+-\\d+$"},
     "author": {"type": "string", "minLength": 1},
-    "date": {"description": "2024, 2024-03-01 or n.d.", "type": "string", "pattern": "^(\\d{4}(-\\d{2}-\\d{2})?|n\\.d\\.)$"},
+    "date": {"description": "2024, 2024-03, 2024-03-01 or n.d.", "type": "string", "pattern": "^(\\d{4}(-\\d{2}(-\\d{2})?)?|n\\.d\\.)$"},
     "title": {"type": "string", "minLength": 1},
     "publisher": {"type": "string", "minLength": 1},
     "url": {"type": "string", "minLength": 1},

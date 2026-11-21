@@ -52,15 +52,18 @@ ITEMS = ("comment", "note", "answer")  # what the coordinator tracks with status
 
 
 def at_time(record: dict) -> float:
-    """When the record was first written, as seconds; its `at` is always valid by the time it is shown."""
-    return float(timegm(time.strptime(record["at"], "%Y-%m-%dT%H:%M:%SZ")))
+    """When the record was first written, as seconds; 0 for a record whose `at` is missing or not a time."""
+    try:
+        return float(timegm(time.strptime(record["at"], "%Y-%m-%dT%H:%M:%SZ")))
+    except (KeyError, ValueError, TypeError, OverflowError):
+        return 0.0
 
 
 def board_files(board: Path) -> list:
-    """The files that hold the board's records, in name order: brief.json, decisions.jsonl and the files of the
-    questions, claims, sources and logs folders. A file of another shape, such as an old Markdown one, is listed so
-    that it is reported, not silently skipped."""
-    files = [p for pattern in ("brief.*", "decisions.*") for p in sorted(board.glob(pattern)) if p.is_file()]
+    """The files that hold the board's records, in name order: brief.json, decisions.jsonl, the files of the
+    questions, claims, sources and logs folders, and conversation.jsonl (checked here, read by the page's own
+    code). A file of another shape, such as an old Markdown one, is listed so that it is reported, not skipped."""
+    files = [p for pattern in ("brief.*", "decisions.*", LOG) for p in sorted(board.glob(pattern)) if p.is_file()]
     for folder in (*FOLDERS, "logs", "decisions"):
         if (board / folder).is_dir():
             files += [p for p in sorted((board / folder).iterdir()) if p.is_file() and not p.name.startswith(".")]
@@ -68,8 +71,9 @@ def board_files(board: Path) -> list:
 
 
 def scan(board: Path) -> dict:
-    """Every record of the board, each file checked on its own: `brief`, `decisions`, `questions`, `claims`,
-    `sources` and `logs` (agent -> records) hold the valid records, and `errors` lists the others as
+    """Every record of the board, each file read once and checked on its own. `brief`, `decisions` and `logs` (agent
+    -> records) hold the valid records. `questions`, `claims` and `sources` hold every record that parsed as JSON,
+    each invalid one with its messages in `_errors`, so the page shows it marked. `errors` lists every problem as
     {file, line, field, message, by}, `by` only where the record could be read."""
     data: dict = {"brief": {}, "decisions": [], "questions": [], "claims": [], "sources": [], "logs": {}, "errors": []}
     try:
@@ -79,44 +83,79 @@ def scan(board: Path) -> dict:
         return data
     cache: dict = {}
     for path in board_files(board):
-        found = schema.check_file(path, docs, cache)
+        shown = path.relative_to(board).as_posix()
         try:
             text = schema.read_checked(path, path.suffix == ".jsonl")
-        except (OSError, UnicodeDecodeError):
-            text = ""
+        except (OSError, UnicodeDecodeError) as error:
+            data["errors"].append({"file": shown, "line": 1, "field": "(file)", "message": f"cannot be read: {error}"})
+            continue
+        # What is shown below is built from this text, the text that was checked.
+        known = bool(schema._match(path, docs))
+        found = schema.check_text(path, text, docs, cache) if known else []
+        if not known:
+            data["errors"].append(
+                {"file": shown, "line": 1, "field": "(file)", "message": "no schema describes this file"}
+            )
+            continue
         pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
-        if path.suffix == ".jsonl" and pieces[-1] == "":
-            pieces.pop()
-        elif path.suffix != ".jsonl":
+        if path.suffix != ".jsonl":
             pieces = [text]
+        elif pieces[-1] == "":
+            pieces.pop()
         records = {}
         for number, piece in enumerate(pieces, 1):
             with contextlib.suppress(ValueError):
                 records[number] = json.loads(piece)
+        messages: dict = {}
+        reported: set = set()
         for error in found:
-            entry = {"file": path.relative_to(board).as_posix(), "line": error.line}
-            entry |= {"field": error.field, "message": error.message}
+            if (error.line, error.field) in reported:  # one error per field of a line, the first
+                continue
+            reported.add((error.line, error.field))
+            entry = {"file": shown, "line": error.line, "field": error.field, "message": error.message}
             record = records.get(error.line)
             if isinstance(record, dict) and isinstance(record.get("by"), str):
                 entry["by"] = record["by"]
             data["errors"].append(entry)
-        if any(e.field == "(file)" for e in found):  # no schema describes it: nothing to show from it
-            continue
-        bad = {e.line for e in found}
-        good = [r for number, r in records.items() if number not in bad and isinstance(r, dict)]
+            messages.setdefault(error.line, []).append(f"{error.field}: {error.message}")
+        kept = {n: r for n, r in records.items() if isinstance(r, dict)}
+        valid = [r for n, r in kept.items() if n not in messages]
+        parent = path.parent.name
         if path.name == "brief.json":
-            data["brief"] = good[0] if good else {}
+            data["brief"] = valid[0] if valid else {}
         elif path.name == "decisions.jsonl":
-            data["decisions"] += good
-        elif path.parent.name in FOLDERS:
-            data[path.parent.name] += [{**r, "_born": at_time(r)} for r in good]
-        elif path.parent.name == "logs":
-            data["logs"][path.stem] = good
+            data["decisions"] += valid
+        elif parent in FOLDERS:
+            for number, record in kept.items():
+                record = {**record, "_born": at_time(record)}
+                if not isinstance(record.get("id"), str):
+                    record["id"] = path.stem  # the file is named for its id
+                if number in messages:
+                    record["_errors"] = messages[number]
+                data[parent].append(record)
+        elif parent == "logs":
+            data["logs"][path.stem] = valid
     return data
 
 
+SCANS: dict = {}  # board -> (the files' names, sizes and times when it was scanned, that scan)
+
+
+def scan_cached(board: Path) -> dict:
+    """The scan, made again only when a file of the board has changed since the last one, so a page polling every
+    two seconds does not read a large board each time. Treat the result as read-only."""
+    try:
+        files = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) for p in board_files(board))
+    except OSError:  # a file went away between listing and reading: scan again
+        return scan(board)
+    last = SCANS.get(board)
+    if last is None or last[0] != files:
+        SCANS[board] = (files, scan(board))
+    return SCANS[board][1]
+
+
 def load(board: Path) -> dict:
-    data = scan(board)
+    data = scan_cached(board)
     logs = {}
     for agent, records in data["logs"].items():
         logs[agent] = {
@@ -150,14 +189,16 @@ CLOSED = ("answered", "contested", "not found", "unclear")  # the statuses a wor
 ANNOUNCED: set = set()  # (question, worker, status) closes already in the log or present when the viewer started
 
 
-def announce_closes(conv: page.Conversation, initial: bool) -> None:
+def announce_closes(conv: page.Conversation, initial: bool, data: dict | None = None) -> None:
     """Post a message from the worker each time it closes a question, once its one-line answer (gist) is written.
     On a board's first viewer, questions already closed get no message, so an old board does not flood the
     conversation; a resumed viewer posts the closes it missed while it was away."""
     events = conv.events()
     ANNOUNCED.update((e.get("question"), e.get("by"), e.get("status")) for e in events if e.get("type") == "closed")
     first = initial and not any(e.get("type") == "closed" for e in events)
-    for q in scan(conv.folder)["questions"]:
+    for q in (scan_cached(conv.folder) if data is None else data)["questions"]:
+        if "_errors" in q:  # an invalid question is listed in the band; it is not announced
+            continue
         status, gist = q["status"], q.get("gist", "")
         key = (q["id"], q.get("owner"), status)
         if status not in CLOSED or not gist or key in ANNOUNCED:
@@ -178,8 +219,8 @@ def announce_closes(conv: page.Conversation, initial: bool) -> None:
                 print(f"error: closing message for {key[0]} not written: {error}", file=sys.stderr, flush=True)
 
 
-def board_stopped(board: Path) -> bool:
-    return scan(board)["brief"].get("status") == "stopped"
+def board_stopped(board: Path, data: dict | None = None) -> bool:
+    return (scan_cached(board) if data is None else data)["brief"].get("status") == "stopped"
 
 
 # ---------- The conversation: conversation.jsonl in the board, one JSON event per line ----------
@@ -241,11 +282,17 @@ def watch(board: Path, port: int, open_browser: bool, linger: float) -> None:
     try:
         while True:
             time.sleep(1)
-            with conv.lock:  # the page's actions append to the same log
-                announce_closes(conv, initial=False)
-            if stopped_at is None and board_stopped(board):
+            try:  # one scan a tick; a tick that fails is reported and the next one tries again
+                data = scan_cached(board)
+                with conv.lock:  # the page's actions append to the same log
+                    announce_closes(conv, initial=False, data=data)
+                stopped = board_stopped(board, data)
+            except Exception as error:
+                print(f"error: board tick failed: {error!r}", file=sys.stderr, flush=True)
+                continue
+            if stopped_at is None and stopped:
                 stopped_at = time.time()
-            if stopped_at is not None and not board_stopped(board):
+            if stopped_at is not None and not stopped:
                 stopped_at = None  # reopened
             if stopped_at is not None and time.time() - stopped_at > linger:
                 print("Board stopped; viewer exiting. The open page keeps the last state.", flush=True)

@@ -220,7 +220,7 @@ class Invalid(unittest.TestCase):
             folder = Path(d)
             support(folder)
             write_json(folder, "claims/C-w2-9.json", {"claim": "x", "at": "yesterday"})
-            shown = next(c for c in board.load(folder)["claims"] if c["_errors"])
+            shown = next(c for c in board.load(folder)["claims"] if c.get("_errors"))
             self.assertEqual((shown["id"], shown["_born"]), ("C-w2-9", 0.0))
 
     def test_one_bad_file_never_empties_a_column_and_a_line_that_is_not_json_is_only_listed(self):
