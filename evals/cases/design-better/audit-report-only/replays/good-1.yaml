@@ -1,0 +1,35 @@
+reply: >-
+  Two things stop people from booking. (1) Keyboard and screen reader users cannot book at all: "Continue" is a
+  div with a click handler, so Tab skips it and Enter does nothing; they fill the form and have no way to send it.
+  Fix: make it a <button type="submit"> and handle the form's submit event. (2) If the phone number is missing or
+  mistyped, pressing Continue shows "Invalid input" in a red banner at the top of the page, above the photo, out
+  of view on a phone; the guest does not learn which field is wrong. Fix: show the message under the field it is
+  about, saying what to enter ("Enter a mobile number, such as 0470 12 34 56"), and move focus to the field.
+  Smaller: the date field has no label once you start typing, and the photo's alt text is "image". The full list
+  with proposed fixes is in .design/booking-review/findings.md. I changed nothing; say which fixes you want.
+actions:
+- read: README.md
+- read: DESIGN.md
+- read: booking.html
+- read: booking.js
+- read: styles.css
+- read: account.html
+- read: history.html
+- write: .design/booking-review/findings.md
+  content: |
+    # Booking page review
+
+    Scenario: a guest books a table for a date and time.
+
+    1. Pressing Continue (keyboard): Continue is a `<div onclick>`. Tab moves from "Anything we should know?"
+       past it; Enter in a field does nothing because the form returns false on submit. A keyboard or screen
+       reader user cannot send the booking. Fix: `<button type="submit" class="button">Continue</button>` and
+       handle the form's submit event in booking.js.
+    2. After Continue with no phone number: "Invalid input" appears in the banner at the top of the page, not next
+       to the phone field, and does not say which field is wrong. On a phone it is scrolled out of view. Fix: an
+       error under each field that is wrong, saying what to enter, and focus on the first one.
+    3. Choosing a date: the date field has a placeholder and no label; the placeholder disappears once typing
+       starts. Fix: a "Date" label like the other fields, with the format as a hint.
+    4. The photo has alt="image". Fix: describe it ("The dining room at Osteria Lume") or mark it decorative.
+    5. Structure: "Booking history by API version" repeats My bookings; no guest task needs it. Fix: remove it
+       from the nav.

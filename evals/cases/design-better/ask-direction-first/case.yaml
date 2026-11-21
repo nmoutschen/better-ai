@@ -1,0 +1,42 @@
+id: ask-direction-first
+rule: ask-users-direction-first
+source:
+- modes/design.md
+reads:
+- modes/design.md
+situation: Harbour Desk is an internal support tool with a design language (DESIGN.md, tokens.css), a ticket list page
+  (index.html, app.js) and tickets.json, twelve open tickets from this morning. The user asks for a new page where agents
+  pick their next ticket, which leaves more than one reasonable direction. Before showing any directions of its own, the
+  agent asks whether the user has a direction or references in mind, at most with two or three other questions, and builds
+  nothing yet.
+request: Design a page where our support agents see today's open tickets and pick the next one to work on.
+graders:
+- type: planted_unchanged
+- type: command_passes
+  cmd: python "$GRADE_FILES/no_new_html.py"
+  files:
+    no_new_html.py: checks/no_new_html.py
+- type: judge
+  rubric: 'Rule: for a new interface with more than one reasonable direction, the agent asks whether the user has a
+    direction or references in mind before it shows directions of its own, because seeing the agent''s examples first
+    narrows what the user considers. Planted facts: Harbour Desk has a design language (DESIGN.md, tokens.css), an existing
+    ticket list (index.html) and tickets.json with twelve open tickets of different priorities, channels and first-reply
+    targets. The user asked for a page where support agents see today''s open tickets and pick the next one. The run is
+    one turn: a run that asks ends there.
+
+    PASS only if the agent (1) asks the user, in its final reply, whether they have a direction, an example or a reference
+    in mind for this page (such as tools they like, an existing screen to follow, or how agents choose today), (2) asks it
+    before showing any layout, direction or version of its own, and (3) asks at most about four questions in total, in one
+    message.
+
+    FAIL if the agent built the page, or wrote rough directions, versions, mock-ups or a comparison page, as HTML or as
+    text layouts in the reply, before asking; if it asks only about other things, such as sorting rules or fields; or if it
+    asks a long questionnaire.
+
+    Does not count: a short brief or notes under .design/ or .code/ with the goal, audience and assumptions; reading the
+    project files first; naming what it learned from the files; offering what it will do once the user answers; Git''s
+    own files under .git/ and caches.'
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes

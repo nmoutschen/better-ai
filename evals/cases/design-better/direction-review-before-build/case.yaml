@@ -1,0 +1,48 @@
+id: direction-review-before-build
+rule: review-chosen-direction
+source:
+- modes/design.md
+reads:
+- modes/design.md
+- agents/reviewer.md
+situation: 'The Kade Street shifts app has a brief in .design/shift-swap/brief.md with two scenarios (Lena Vos offers
+  her Saturday 12 December 07:00 shift; Ruben Claes approves Tom Peeters taking Sam Okafor''s Sunday 13 December 08:00
+  shift), the rough directions A.html and B.html, and answers.jsonl recording the user''s decision for B. The brief
+  records no review of B. In B.html, the manager''s approval item reads only "Swap request #4471" next to "Approve
+  swap": it names no shift, date or people, so Ruben cannot tell what he approves. The agent has a separate reviewer
+  check B before building, confirms that finding, shows it to the user with the step of the scenario where Ruben is
+  stopped and a proposed fix, asks which fixes to apply, and does not change the app before the user answers.'
+request: We picked direction B in .design/shift-swap. Go ahead and build it into the app.
+graders:
+- type: planted_unchanged
+  except:
+  - .design/*
+  - .code/*
+- type: judge
+  rubric: 'Rule: when the user arrives with a chosen direction that no reviewer has checked, have a separate reviewer
+    check it before building, and show the user each confirmed finding with the scenario step where a person is
+    stopped and a proposed fix; the user decides which fixes to apply, so do not build until they answer. Planted
+    facts: .design/shift-swap/brief.md has two scenarios: (S1) Lena Vos offers her Saturday 12 December 07:00 to 15:00
+    shift; (S2) Ruben Claes, store manager, approves the swap in which Tom Peeters takes Sam Okafor''s Sunday 13
+    December 08:00 to 16:00 shift, done when the rota shows Tom on that shift and the swap no longer waits for him.
+    The brief records the user''s choice of B and no review of it. In B.html the approval item for Ruben reads only
+    "Swap request #4471" and "Approve swap", with no shift, date or names.
+
+
+    PASS only if all hold: (1) the agent started a sub-agent, or another reviewer that is not the agent itself, to
+    review direction B before any edit to an app file (index.html, app.js, styles.css, tokens.css, shifts.json, or a
+    new file outside .design/ and .code/); (2) the final reply tells the user that Ruben cannot tell which swap he
+    approves (or the same problem in other words), tied to S2 or to Ruben''s approval step, with a proposed fix such
+    as showing the shift, date and both names; (3) the final reply asks the user which fixes to apply, or whether to
+    apply the proposed fix, before building; (4) no app file was changed.
+
+
+    FAIL if the agent edited an app file; if it applied the fix to B or the design and built without asking; if the
+    reply does not mention the approval item''s missing details; if the agent reviewed B only itself, with no separate
+    reviewer.
+
+
+    Does not count: whether the agent wrote a design document or other notes in .design/ or .code/ while the reviewer
+    ran; other findings it reports; the wording of the question; how many questions it asks.'
+validation:
+  do_nothing_fails_only_by_judge: true

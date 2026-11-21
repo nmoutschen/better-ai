@@ -1,0 +1,52 @@
+id: colour-one-meaning
+rule: one-meaning-per-colour
+source:
+- SKILL.md#design-rules
+reads: []
+situation: 'architecture.html shows the Ledgerline billing pipeline as a diagram whose legend says green (#2e7d32 border,
+  #e8f5e9 tint, class library, CSS variable --library) means provided by a library or platform, and orange (#e65100,
+  #fff3e0, class ours, --ours) means code we write. checks.json lists seven release checks, four automated and three
+  manual. The user asks for a table of the checks under the diagram marking automated and manual. The table must not
+  give green or orange a second meaning on the page: it marks the status with words, icons or shapes, or with a colour
+  that has no other meaning there. check_colours.py catches only exact reuse of the legend''s values, classes and
+  variables, and passes on the untouched page, which has no table; other shades of green or orange are for the judge.'
+request: Add a table under the diagram listing our checks (from checks.json) and marking which are automated and which
+  are manual.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/check_table.py"
+  files:
+    check_table.py: checks/check_table.py
+- type: command_passes
+  cmd: python "$GRADE_FILES/check_colours.py"
+  files:
+    check_colours.py: checks/check_colours.py
+- type: file_unchanged
+  path: checks.json
+- type: judge
+  rubric: 'Rule: give each colour one meaning on a page; do not reuse a colour that already means something to mean
+    something else. Planted facts: in architecture.html, the diagram''s legend says green (#2e7d32, tint #e8f5e9) means
+    provided by a library or platform, and orange (#e65100, tint #fff3e0) means code we write. checks.json lists seven
+    release checks with whether each is automated (four) or manual (three). The user asked for a table under the
+    diagram that marks which checks are automated and which are manual.
+
+
+    PASS only if all hold: (1) the table marks automated and manual for every check with text, an icon or a shape, so
+    the status does not rest on colour alone; (2) the table does not use green or orange, in the legend''s values or
+    any other shade a reader would see as green or orange, for text, backgrounds, borders, icons or badges that mark the
+    status or anything else; (3) if the table uses any other colour to mark the status, that colour has no other meaning
+    on the page; (4) the diagram and its legend keep their colours and meanings.
+
+
+    FAIL if green or orange, in any shade, marks automated or manual (for example green for automated and orange for
+    manual), or appears in the table with any meaning; if the agent changed the legend''s colours or meanings to make
+    room for the table; if the status is shown by colour alone.
+
+
+    Does not count: neutral colours the page already uses for text, rules and headings, such as the ink, muted ink and
+    rule colours; the table''s layout, columns and wording; extra columns from checks.json; where under the diagram the
+    table sits; whether the reply mentions the colour choice; Git''s own files under .git/, caches, and notes in
+    .design/ or .code/.'
+validation:
+  hidden_checks_pass_untouched:
+  - command_passes_2

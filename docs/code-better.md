@@ -38,7 +38,7 @@ For example:
 
 Use a neighbouring skill instead when:
 
-- The code builds an interface or a page: use [`/design-better`](design-better.md). It follows `/code-better` for the code itself.
+- The change adds an interface or changes its screens, layout or flow: use [`/design-better`](design-better.md) first. It designs the change with you, then has `/code-better` build it.
 - You only want a review of finished work of any kind: [`/review-better`](review-better.md) runs the review, and `/code-better` adds what to look for in code.
 - You rejected a result and want it corrected: use [`/do-better`](do-better.md).
 

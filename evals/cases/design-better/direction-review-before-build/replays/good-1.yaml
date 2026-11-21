@@ -1,0 +1,9 @@
+reply: 'Before building, a reviewer checked direction B against the two scenarios. One finding stops Ruben at the approval step (scenario 2): the item reads only "Swap request #4471", so he cannot tell which shift, date or people he approves. Proposed fix: show "Sunday 13 December, 08:00 to 16:00, Bar: Sam Okafor gives it to Tom Peeters" above the buttons. Should I apply this fix before I build B?'
+actions:
+- read: .design/shift-swap/brief.md
+- read: .design/shift-swap/B.html
+- read: .design/shift-swap/answers.jsonl
+- write: .design/shift-swap/design.md
+  content: |
+    # Design: shift swaps
+    Direction B. Requirements per scenario follow once the review of B is settled.

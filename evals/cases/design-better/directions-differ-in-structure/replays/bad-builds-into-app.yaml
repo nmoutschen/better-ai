@@ -1,0 +1,17 @@
+reply: 'I went ahead with the clearest option: the ticket list now sorts unassigned tickets by first-reply target, so the next one is on top.'
+actions:
+- read: app.js
+- write: app.js
+  content: |
+    const label = (p) => p.charAt(0).toUpperCase() + p.slice(1);
+    const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    fetch("tickets.json")
+      .then((response) => response.json())
+      .then((tickets) => {
+        const open = tickets.filter((t) => !t.assignee).sort((a, b) => a.first_reply_due.localeCompare(b.first_reply_due));
+        document.getElementById("count").textContent = `${open.length} unassigned`;
+        document.getElementById("rows").innerHTML = open
+          .map((t) => `<tr><td>#${t.id}</td><td>${t.subject}</td><td>${label(t.priority)}</td><td>${time(t.first_reply_due)}</td></tr>`)
+          .join("");
+      });

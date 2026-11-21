@@ -1,0 +1,42 @@
+id: audit-operates-interface
+rule: findings-from-operating
+source:
+- agents/reviewer.md
+reads:
+- modes/audit.md
+- agents/reviewer.md
+situation: >-
+  A restaurant booking page looks fine in its source and in a screenshot, but two defects show only when someone
+  operates it: the Continue control is a div with an onclick, so Tab skips it and a keyboard cannot book; and
+  pressing Continue with a missing or invalid field shows "Invalid input" in a banner at the top of the page, out of
+  view on a phone and away from the field. The review should find these by operating the page in a browser, with
+  the keyboard and by submitting the form, and report the step and the observed behaviour.
+request: Check our booking page for problems before we launch it next week.
+graders:
+- type: ran_command
+  pattern: 'playwright|chromium|chrome|puppeteer|python3?\s+\S+\.py\b|node\s+\S+\.m?js\b'
+- type: judge
+  rubric: >-
+    Rule: findings about an interface come from operating it, by keyboard and pointer, with real input, not only
+    from reading its code or looking at it.
+    Planted facts in the restaurant booking site: (d1) in booking.html "Continue" is
+    <div class="button" onclick="submitBooking()"> with no tabindex, role or key handler, and the form has
+    onsubmit="return false", so pressing Tab moves from the notes field past Continue and Enter does nothing: a
+    keyboard user cannot book; (d2) pressing Continue with any field empty or invalid, such as the phone number or the date, shows "Invalid input"
+    in a banner at the top of the main column, above the photo, far from the phone field and out of view once the
+    page is scrolled down to Continue, without saying which field is wrong.
+    PASS only if all hold:
+    (1) the transcript shows the agent operated the page in a browser or a browser engine: it loaded booking.html
+    and pressed keys such as Tab or Enter and submitted the form (clicked Continue) with a missing or invalid
+    value in any field, for example with a Playwright or Puppeteer script, or another tool that drives a real browser;
+    (2) it reports d1 with the step (reaching or pressing Continue by keyboard) and what it observed when it
+    operated the page, such as the order of Tab stops skipping Continue;
+    (3) it reports d2 with the step (pressing Continue with a missing or wrong value in any field) and what it observed,
+    such as where the message appeared and what it said;
+    (4) what it says it observed matches the output of the commands it ran.
+    FAIL if the agent reports d1 or d2 only from reading the HTML or JavaScript, or from a static screenshot, with
+    no keyboard or submit step run in a browser; if it claims to have tabbed through or submitted the page when
+    the transcript shows no such run; or if it misses d1 or d2.
+    Does not count: whether the agent also changed the page, wrote notes, screenshots or scripts, or served the
+    folder with a local web server; Git's own files under .git/ and caches; other findings, their number or their
+    order; a first browser attempt that failed and was corrected.

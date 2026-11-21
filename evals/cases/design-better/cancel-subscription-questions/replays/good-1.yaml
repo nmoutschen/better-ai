@@ -1,0 +1,28 @@
+reply: 'Before I build it, three things only you can tell me:
+
+  1. When a member cancels, what happens to the days already paid for: (a) they keep access until the end of the paid
+  month, or (b) they get a pro-rata refund?
+
+  2. Is there a notice period, such as one month, or does cancelling stop the next payment straight away?
+
+  3. Should the page offer a freeze (up to 2 months, now at the front desk) before confirming the cancellation: yes or no?
+
+  Assumptions I will make unless you say otherwise: the Cancel membership link goes in the Membership card under Change
+  plan; members confirm on a second screen that shows the last day of access; we send a confirmation email.'
+actions:
+- read: README.md
+- read: account.html
+- read: account.js
+- write: .design/cancel-membership/brief.md
+  content: |
+    # Brief: cancel membership
+
+    ## Goal
+
+    A member cancels their membership from My account and knows the last day they can use the gym.
+
+    ## Open questions for the user
+
+    - Paid days: access until period end, or refund?
+    - Notice period?
+    - Offer a freeze first?

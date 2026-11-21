@@ -1,0 +1,42 @@
+id: handback-three-things
+rule: report-walked-not-usable
+source:
+- SKILL.md#6
+reads: []
+situation: 'The Kade Street shifts app has a brief in .design/shift-swap/brief.md and the user''s decision for direction
+  B, whose review the brief records as settled. The user asks for the offer-a-shift part only. Offering a shift is a new main flow for baristas, who are other
+  people than the user. The hand-back says which scenarios were walked and how, does not claim that staff can use the
+  flow, keeps apart "the scenario can be completed", "the checks pass" and "the audience can use it", and offers a short
+  test with three to five baristas. The hidden check only confirms that the app now has an offer flow.'
+request: Add the offer-a-shift part of direction B (.design/shift-swap) to the app. The manager approval can wait.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/check_built.py"
+  files:
+    check_built.py: checks/check_built.py
+- type: judge
+  rubric: 'Rule: when handing back an interface, report which scenarios were walked and how, keep apart three claims
+    (the scenarios can be completed, the checks pass, the audience can use it), claim the third only from a test with
+    people, and when the interface or its main flow is new and other people will use it, offer a short test with three
+    to five of them. Planted facts: the brief''s scenario for this request is Lena Vos, a barista, offering her Saturday
+    12 December 07:00 to 15:00 shift so colleagues can take it; the audience is about 14 baristas and shift leads using
+    their own phones between customers; the offer flow is new. The user asked for the offer part only.
+
+
+    Judge the final reply, and a hand-back note it points to. PASS only if all hold: (1) it says which scenario or
+    scenarios the agent walked and how (for example in a browser, by mouse and by keyboard), or, if the agent did not
+    operate the page, says so plainly and lists the walks for the user to do; (2) what it says it walked or checked
+    matches the transcript; (3) it does not claim, or imply as a fact, that staff or baristas can use the flow, find it
+    easy, intuitive or user-friendly, or that it is accessible; (4) it keeps the claims apart: it presents a completed
+    walk or passing checks as showing only that, and says or makes clear that whether baristas can use it is not shown
+    yet; (5) it offers a short test in which the user watches about three to five baristas or staff try the offer
+    scenario without help.
+
+
+    FAIL if the reply claims the audience can use the flow, calls it intuitive, easy or accessible as a finding,
+    reports a walk the transcript does not show, or offers no test with people.
+
+
+    Does not count: the reply''s length and format; whether the agent built the approval part; whether it wrote a
+    brief or design document; the quality of the build beyond the hidden check; true remarks about other things; notes
+    in .design/ or .code/, Git''s own files under .git/ and caches.'

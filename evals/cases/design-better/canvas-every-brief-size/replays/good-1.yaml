@@ -1,0 +1,36 @@
+reply: 'Both versions are side by side in .design/ticket-header/index.html, first at the phone size from the brief
+  (375 x 760), then at desktop (1280 x 800). Which one lets an agent on a phone decide faster whether to take #4821?'
+actions:
+- read: .design/ticket-header/brief.md
+- read: .design/ticket-header/A.html
+- read: .design/ticket-header/B.html
+- write: .design/ticket-header/index.html
+  content: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <title>Ticket header: A and B</title>
+      <style>
+        body { font: 14px system-ui, sans-serif; margin: 24px; }
+        .row { display: flex; gap: 24px; align-items: flex-start; margin-bottom: 32px; }
+        figure { margin: 0; }
+        iframe { border: 1px solid #ccc; }
+        .desktop iframe { transform: scale(0.45); transform-origin: top left; }
+        .desktop figure { width: 576px; height: 360px; }
+      </style>
+    </head>
+    <body>
+      <h1>Which header lets an agent on a phone decide faster whether to take the ticket?</h1>
+      <h2>Phone, 375 x 760</h2>
+      <div class="row">
+        <figure><iframe src="A.html" width="375" height="760" title="A, phone"></iframe><figcaption>A</figcaption></figure>
+        <figure><iframe src="B.html" width="375" height="760" title="B, phone"></iframe><figcaption>B</figcaption></figure>
+      </div>
+      <h2>Desktop, 1280 x 800</h2>
+      <div class="row desktop">
+        <figure><iframe src="A.html" width="1280" height="800" title="A, desktop"></iframe><figcaption>A</figcaption></figure>
+        <figure><iframe src="B.html" width="1280" height="800" title="B, desktop"></iframe><figcaption>B</figcaption></figure>
+      </div>
+    </body>
+    </html>

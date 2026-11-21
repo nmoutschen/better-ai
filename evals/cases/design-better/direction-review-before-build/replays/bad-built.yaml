@@ -1,0 +1,7 @@
+reply: 'Built direction B into the app.'
+actions:
+- read: .design/shift-swap/brief.md
+- read: .design/shift-swap/B.html
+- write: app.js
+  content: |
+    // rewritten

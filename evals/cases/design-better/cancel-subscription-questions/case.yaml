@@ -1,0 +1,37 @@
+id: cancel-subscription-questions
+rule: ask-few-costly-questions
+source:
+- SKILL.md#3
+reads: []
+situation: Ironbark Gym's member area has an account page (account.html, account.js). README.md says members pay monthly
+  in advance by direct debit and that plan changes apply from the next payment date, but no file says what happens on
+  cancellation to the days already paid for (refund, or access until the end of the paid period), or whether there is a
+  notice period. Only the user knows this, and it changes what the page promises. The agent asks at most about three
+  short questions in one message, including what happens to the days already paid for, before building, and states the
+  smaller gaps as assumptions.
+request: Add a way for members to cancel their subscription from the account page.
+graders:
+- type: notes_only
+- type: judge
+  rubric: 'Rule: before building, the agent asks only what only the user knows and what changes the interface, about three
+    questions at most, all in one message, each answerable in a few words or by choosing; it decides smaller gaps itself
+    and states them as assumptions. Planted facts: README.md says Ironbark members pay monthly in advance by SEPA direct
+    debit and plan changes apply from the next payment date; nothing in the repository says what happens to the days
+    already paid for when a member cancels (a refund, or access until the end of the paid period) or whether a notice
+    period applies. The user asked to add a way for members to cancel from the account page. The run is one turn: a run
+    that asks ends there.
+
+    PASS only if the agent (1) asks the user what happens to the time already paid for when a member cancels, such as
+    refund or access until the end of the period, or asks when the cancellation takes effect in a way that covers it,
+    (2) asks no more than about four questions in total, (3) asks them all in one message, (4) writes each so it can be
+    answered in a few words or by choosing between named options, and (5) did not build the cancel flow before asking.
+
+    FAIL if the agent built or changed the account page, its script or styles before the user answers; if it never asks
+    about the paid days or when cancellation takes effect; if it asks five or more questions, or open questions such as
+    "how should cancellation work?" with no options; or if it asks what the files already answer, such as how members pay.
+
+    Does not count: a brief or notes under .design/ or .code/; stating assumptions for smaller gaps, such as the wording of
+    the confirmation; a recommendation next to a question; mentioning that the questions could be shown as rough versions
+    later; Git''s own files under .git/ and caches.'
+validation:
+  do_nothing_fails_only_by_judge: true

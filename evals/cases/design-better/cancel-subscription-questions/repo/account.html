@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My account · Ironbark Gym</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <a href="/" class="logo">Ironbark</a>
+    <nav aria-label="Member area">
+      <a href="classes.html">Classes</a>
+      <a href="account.html" aria-current="page">My account</a>
+    </nav>
+  </header>
+
+  <main class="account">
+    <h1>My account</h1>
+
+    <section class="card" aria-labelledby="membership-heading">
+      <h2 id="membership-heading">Membership</h2>
+      <dl>
+        <dt>Plan</dt><dd id="plan">Flex+ · €54 per month</dd>
+        <dt>Member since</dt><dd id="since">14 March 2025</dd>
+        <dt>Next payment</dt><dd id="next-payment">€54 on 14 December 2026</dd>
+        <dt>Home gym</dt><dd id="home-gym">Ironbark Oost, Amsterdam</dd>
+      </dl>
+      <a class="button-secondary" href="/plans">Change plan</a>
+    </section>
+
+    <section class="card" aria-labelledby="payment-heading">
+      <h2 id="payment-heading">Payment method</h2>
+      <p id="iban">SEPA direct debit from NL•• •••• •••• 4417</p>
+      <a class="button-secondary" href="/payment-method">Update payment method</a>
+    </section>
+
+    <section class="card" aria-labelledby="details-heading">
+      <h2 id="details-heading">Personal details</h2>
+      <dl>
+        <dt>Name</dt><dd id="name">Sanne de Vries</dd>
+        <dt>Email</dt><dd id="email">sanne.devries@example.nl</dd>
+        <dt>Phone</dt><dd id="phone">+31 6 4182 9930</dd>
+      </dl>
+      <a class="button-secondary" href="/details">Edit details</a>
+    </section>
+  </main>
+  <script src="account.js"></script>
+</body>
+</html>

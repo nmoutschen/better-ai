@@ -1,0 +1,15 @@
+reply: >-
+  Mostly yes; four places use values the design language does not define. (1) contact.html: the booking paragraph
+  has an inline color #333; use the body text colour, var(--text), by removing the inline style. (2) styles.css
+  .price-note: font-size 13px, not on the scale; use var(--size-s) (14px). (3) styles.css .hours: margin-bottom
+  18px, off the 8px grid; use var(--space-2). (4) styles.css .panel, used for the three treatments on
+  services.html, is a second card: same look as .card with raw #fff, #d6dee3 and 24px. Use .card there and
+  delete .panel. I changed nothing; say if you want these applied.
+actions:
+- read: DESIGN.md
+- read: tokens.css
+- read: styles.css
+- read: index.html
+- read: services.html
+- read: contact.html
+- bash: grep -nE '#[0-9a-fA-F]{3,6}|[0-9]+px' styles.css index.html services.html contact.html

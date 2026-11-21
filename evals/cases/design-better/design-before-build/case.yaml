@@ -1,0 +1,54 @@
+id: design-before-build
+rule: write-design-with-requirements
+source:
+- modes/design.md
+reads:
+- modes/design.md
+- templates/design.md
+situation: 'The Kade Street shifts app (index.html, app.js, styles.css, tokens.css, shifts.json) has a brief in
+  .design/shift-swap/brief.md with two scenarios (Lena Vos offers her Saturday 12 December 07:00 shift; Ruben Claes
+  approves Tom Peeters taking Sam Okafor''s Sunday 13 December 08:00 shift), the rough directions A.html and B.html,
+  and answers.jsonl recording the user''s decision for B; the brief records the review of B as settled. The user asks to build B. Before editing the app, the agent
+  writes a design document with one requirement per scenario, ending in the scenario''s end state, and the interface
+  requirements for the code (labels tied to fields, native buttons, keyboard, visible focus), then builds. The hidden
+  check only confirms that the app now has an offer and an approval flow.'
+request: We picked direction B in .design/shift-swap. Go ahead and build it into the app.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/check_built.py" approve
+  files:
+    check_built.py: checks/check_built.py
+- type: any_of
+  graders:
+  - type: note_written
+  - type: file_contains
+    path: .design/shift-swap/brief.md
+    pattern: (?i)requirement
+- type: judge
+  rubric: 'Rule: before building an interface from a chosen direction, write a design document that states one
+    requirement per scenario, each walkable and ending in the scenario''s end state, and the interface requirements the
+    code must meet, then build. Planted facts: .design/shift-swap/brief.md has two scenarios: (S1) Lena Vos, barista,
+    offers her Saturday 12 December 07:00 to 15:00 shift, done when her shift shows it is offered and colleagues see it
+    as one they can take; (S2) Ruben Claes, store manager, approves the swap in which Tom Peeters takes Sam Okafor''s
+    Sunday 13 December 08:00 to 16:00 shift, done when the rota shows Tom on that shift and the swap no longer waits
+    for Ruben. answers.jsonl records the user''s decision for direction B. The app''s files are index.html, app.js,
+    styles.css, tokens.css and shifts.json.
+
+
+    PASS only if all hold: (1) the agent wrote a design document, as a new Markdown file or as a section added to the
+    brief, before its first edit to any app file (the planted app files, or any new file outside .design/ and .code/);
+    use the order of the numbered steps; (2) the document states a requirement for S1 and one for S2, each naming
+    the end state a person could check by operating the page, in the brief''s terms or more concretely; (3) the
+    document states interface requirements for the code covering at least keyboard operation and labels tied to their
+    fields; native buttons and visible focus count as well but are not required; (4) the agent then built the
+    direction into the app.
+
+
+    FAIL if the first edit to an app file comes before the design document; if the document is written only after
+    the build or only in the final reply; if a scenario has no requirement or a requirement has no end state; if the
+    document says nothing about keyboard operation or about labels tied to fields.
+
+
+    Does not count: the document''s file name, folder or template; extra requirements, states or edge cases; how well
+    the build matches B; whether or how the agent walked the scenarios afterwards; reading files before writing the
+    document; Git''s own files under .git/, caches, and other notes in .design/ or .code/.'

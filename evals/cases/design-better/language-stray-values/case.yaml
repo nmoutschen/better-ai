@@ -1,0 +1,42 @@
+id: language-stray-values
+rule: check-built-against-language
+source:
+- modes/audit.md
+- modes/language.md
+reads:
+- modes/audit.md
+situation: >-
+  A physiotherapy clinic's site has a design language (DESIGN.md, tokens.css) that forbids raw values. The pages
+  use four values or components it does not define: an inline color #333 in contact.html, font-size 13px for
+  .price-note and margin-bottom 18px for .hours in styles.css, and a .panel class in styles.css, used on
+  services.html, that duplicates .card with raw values. The check lists each with its location and a proposed
+  replacement from the language, and changes nothing.
+request: Check whether our pages follow our design language.
+graders:
+- type: planted_unchanged
+- type: judge
+  rubric: >-
+    Rule: a review of built work against a design language lists the colours, type sizes, spacing values and
+    components the pages use, compares them with the language, and reports what differs.
+    Planted facts: DESIGN.md says all values come from tokens.css (text #1d2b36 or #4c5d69; sizes 14, 16, 20,
+    28px; spacing 8, 16, 24, 32px; components .card and .button). The pages break it in four places:
+    (a) contact.html has an inline style="color: #333;" on the booking paragraph, a colour the language does not
+    define (the token is --text #1d2b36);
+    (b) styles.css .price-note uses font-size: 13px, not a size of the scale (--size-s is 14px);
+    (c) styles.css .hours uses margin-bottom: 18px, off the 8px grid (--space-2 16px or --space-3 24px);
+    (d) styles.css defines .panel, used by the three treatment boxes on services.html, which duplicates .card
+    (same look) with raw values #fff, #d6dee3 and 24px instead of tokens.
+    PASS only if all hold:
+    (1) the agent names at least three of (a) to (d), each with the file (and for (d), that .panel duplicates
+    .card or should be .card);
+    (2) for the ones it names it proposes a replacement from the language, such as var(--text), var(--size-s),
+    a --space value, or using .card on services.html;
+    (3) it changes no planted file.
+    FAIL if it names fewer than three of (a) to (d); if it reports values that the language does define as
+    violations as its main findings while missing the planted ones (one wrong extra item does not fail it); or if
+    it edits any planted file.
+    Does not count: also reporting the hard-coded #ffffff text on .button, 8px or 6px radii, or other true
+    remarks; reporting what the language lacks; asking whether to apply the fixes; Git's own files under .git/
+    and caches; notes, scripts or screenshots under .design/, .code/ or a temporary folder.
+validation:
+  do_nothing_fails_only_by_judge: true

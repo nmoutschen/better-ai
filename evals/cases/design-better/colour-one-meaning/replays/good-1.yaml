@@ -1,0 +1,124 @@
+reply: 'Added the release checks table under the diagram, with a "How it runs" column that says Automated or Manual in words.
+  I kept it in the page''s neutral ink and rule colours: green and orange already mean library and our code in the diagram''s
+  legend.'
+actions:
+- read: architecture.html
+- read: docs.css
+- read: checks.json
+- write: architecture.html
+  content: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Ledgerline billing: architecture and release checks</title>
+      <link rel="stylesheet" href="docs.css">
+    </head>
+    <body>
+      <main>
+        <h1>Ledgerline billing service</h1>
+        <p>How a monthly invoice is produced, from the usage export to the PDF the customer receives. Read this before
+          changing the billing pipeline or its release checks.</p>
+
+        <h2>Architecture</h2>
+        <figure class="diagram" aria-labelledby="diagram-caption">
+          <ol class="flow">
+            <li class="box library"><strong>Envoy gateway</strong><span>Routes and authenticates API calls</span></li>
+            <li class="box ours"><strong>Usage importer</strong><span>Reads the nightly usage export, rejects malformed rows</span></li>
+            <li class="box ours"><strong>Rating engine</strong><span>Applies each customer's price plan and discounts</span></li>
+            <li class="box library"><strong>PostgreSQL 16</strong><span>Stores rated usage and invoice lines</span></li>
+            <li class="box ours"><strong>Invoice renderer</strong><span>Lays out the invoice from our template</span></li>
+            <li class="box library"><strong>WeasyPrint</strong><span>Turns the rendered HTML into a PDF</span></li>
+            <li class="box library"><strong>Stripe Billing API</strong><span>Charges the card and emails the PDF</span></li>
+          </ol>
+          <figcaption id="diagram-caption">Each step hands its output to the next one, left to right.</figcaption>
+          <ul class="legend" aria-label="Legend">
+            <li><span class="swatch library" aria-hidden="true"></span>Provided by a library or platform</li>
+            <li><span class="swatch ours" aria-hidden="true"></span>Code we write and maintain</li>
+          </ul>
+        </figure>
+
+        <h2>Release checks</h2>
+        <p>Every release of the billing service passes these checks before it reaches production. The list is in
+          <code>checks.json</code>.</p>
+        <table class="checks">
+          <caption>Release checks, and whether each runs by itself</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">What it covers</th><th scope="col">How it runs</th><th scope="col">Owner</th></tr></thead>
+          <tbody>
+            <tr><td>Unit tests</td><td>Rating engine and usage importer</td><td>Automated, in CI</td><td>Billing team</td></tr>
+            <tr><td>Contract tests against Stripe test mode</td><td>Charges and invoice emails</td><td>Automated, in CI</td><td>Billing team</td></tr>
+            <tr><td>Database migration dry run</td><td>Schema changes on a copy of production</td><td>Automated, in CI</td><td>Platform team</td></tr>
+            <tr><td>Dependency licence scan</td><td>Every new or upgraded package</td><td>Automated, in CI</td><td>Platform team</td></tr>
+            <tr><td>Invoice PDF visual review</td><td>Five sample invoices, one per price plan</td><td>Manual, a person signs it off</td><td>Finance</td></tr>
+            <tr><td>Rounding spot check</td><td>Totals of 20 invoices against the finance spreadsheet</td><td>Manual, a person signs it off</td><td>Finance</td></tr>
+            <tr><td>Rollback rehearsal</td><td>Redeploying the previous release on staging</td><td>Manual, a person signs it off</td><td>Billing team</td></tr>
+          </tbody>
+        </table>
+      </main>
+    </body>
+    </html>
+- write: docs.css
+  content: |
+    :root {
+      --ink: #1d232b;
+      --ink-muted: #4f5966;
+      --paper: #ffffff;
+      --rule: #cfd5dc;
+      --library: #2e7d32;
+      --library-tint: #e8f5e9;
+      --ours: #e65100;
+      --ours-tint: #fff3e0;
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 1.0625rem/1.55 "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    }
+
+    main { max-width: 60rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+    h2 { font-size: 1.375rem; margin: 2.5rem 0 1rem; }
+    p { max-width: 38rem; }
+    code { font-size: 0.95em; }
+
+    .diagram { margin: 0; }
+
+    .flow {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      gap: 0.75rem;
+    }
+
+    .box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.75rem;
+      border: 2px solid;
+      border-radius: 6px;
+      font-size: 0.9375rem;
+    }
+
+    .box span { color: var(--ink-muted); }
+
+    .box.library { border-color: var(--library); background: var(--library-tint); }
+    .box.ours { border-color: var(--ours); background: var(--ours-tint); }
+
+    figcaption { margin-top: 0.75rem; color: var(--ink-muted); font-size: 0.9375rem; }
+
+    .legend { list-style: none; display: flex; gap: 1.5rem; padding: 0; margin: 0.75rem 0 0; font-size: 0.9375rem; }
+    .legend li { display: flex; align-items: center; gap: 0.5rem; }
+    .swatch { width: 1rem; height: 1rem; border-radius: 3px; border: 2px solid; }
+    .swatch.library { border-color: var(--library); background: var(--library-tint); }
+    .swatch.ours { border-color: var(--ours); background: var(--ours-tint); }
+
+    .checks { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+    .checks caption { text-align: left; color: var(--ink-muted); margin-bottom: 0.5rem; }
+    .checks th, .checks td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--rule); }

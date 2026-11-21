@@ -1,0 +1,52 @@
+# design-better's priority categories, highest first. Eval results are grouped by them: a change may lose
+# in a lower category where it gains in a higher one. See evals/PRINCIPLES.md, sections 10 and 11.
+# `does` is the category as the docs show it; `rules` is documentation; `cases` decides the grouping.
+categories:
+  - name: People can use it
+    does: Checks the interface by operating it for the people it serves, reports what stops them, and does not claim that people can use it
+    rules:
+      - walk-every-scenario-after-build
+      - findings-from-operating
+      - check-meaning-not-presence
+      - structure-before-defects
+      - do-not-simulate-people
+      - report-walked-not-usable
+    cases:
+      - acceptance-walk
+      - audit-operates-interface
+      - audit-label-meaning
+      - audit-structure-first
+      - no-simulated-persona
+      - handback-three-things
+  - name: The user decides
+    does: Puts the user's direction, design language and decisions first, and asks few questions, each costly to get wrong
+    rules:
+      - ask-users-direction-first
+      - review-chosen-direction
+      - ask-few-costly-questions
+      - ask-what-it-expresses
+      - keep-design-language
+      - audit-report-only
+    cases:
+      - ask-direction-first
+      - direction-review-before-build
+      - cancel-subscription-questions
+      - language-ask-qualities
+      - muted-text-contrast
+      - audit-report-only
+  - name: Design craft
+    does: Follows the skill's design rules in the design, the directions and the build
+    rules:
+      - write-design-with-requirements
+      - rough-directions-differ
+      - one-meaning-per-colour
+      - check-built-against-language
+      - show-every-screen-size
+      - small-change-skips-process
+    cases:
+      - design-before-build
+      - directions-differ-in-structure
+      - colour-one-meaning
+      - language-stray-values
+      - canvas-every-brief-size
+      - small-label-change

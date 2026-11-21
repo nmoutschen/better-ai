@@ -1,0 +1,4 @@
+reply: Fixed the Continue button so it works with a keyboard.
+actions:
+- read: booking.html
+- bash: python3 -c "import pathlib; p = pathlib.Path('booking.html'); p.write_text(p.read_text().replace('<div class=\"button\" onclick=\"submitBooking()\">Continue</div>', '<button type=\"button\" class=\"button\" onclick=\"submitBooking()\">Continue</button>'))"
