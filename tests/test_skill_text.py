@@ -127,6 +127,35 @@ class ResearchBetterText(unittest.TestCase):
         skill = (RESEARCH / "SKILL.md").read_text(encoding="utf-8")
         self.assertNotIn("schema.py check <file>` from this skill's directory", skill)
 
+    def test_the_board_template_has_the_schema_check_sentence(self) -> None:
+        """The conventions in templates/board.md carry the check sentence."""
+        text = (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8")
+        self.assertIn(CHECK_SENTENCE, text)
+
+    def test_text_fixes_from_the_verifier(self) -> None:
+        """A verifier's flag goes in reason or differs, a question's owner may edit its note, the verifier's reason keeps unverified."""
+        skill = (RESEARCH / "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotIn("the claim's the claim's", skill)
+        self.assertIn(
+            "A verifier's flag reaches you in the claim's `reason`, or in its `differs` for source fields.", skill
+        )
+        template = (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8")
+        self.assertIn("the `owner`, `status`, `summary`, `gist` and `note` of a question you own", template)
+        verifier = (RESEARCH / "agents" / "verifier.md").read_text(encoding="utf-8")
+        self.assertIn("If you have a reason to write, the claim is `unverified`.", verifier)
+
+    def test_eval_board_lib_none_treats_the_string_none_as_missing(self) -> None:
+        """board_lib.none is true for None, "", "none" and [], and false for a real value."""
+        sys.path.insert(0, str(ROOT / "evals/cases/research-better/_checks"))
+        try:
+            import board_lib
+        finally:
+            sys.path.pop(0)
+        for value in (None, "", "none", []):
+            self.assertTrue(board_lib.none(value), repr(value))
+        for value in ("text", ["a"], 0):
+            self.assertFalse(board_lib.none(value), repr(value))
+
     def test_no_step_deletes_a_record_others_point_to(self) -> None:
         """The coordinator's steps withdraw, mark a duplicate or merge; none says to delete."""
         skill = (RESEARCH / "SKILL.md").read_text(encoding="utf-8")
