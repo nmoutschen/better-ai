@@ -3,19 +3,21 @@
 # `does` is the category as the docs show it; `rules` is documentation; `cases` decides the grouping.
 categories:
   - name: People can use it
-    does: Checks the interface by operating it for the people it serves, and reports what stops them
+    does: Checks the interface by operating it for the people it serves, reports what stops them, and does not claim that people can use it
     rules:
       - walk-every-scenario-after-build
       - findings-from-operating
       - check-meaning-not-presence
       - structure-before-defects
       - do-not-simulate-people
+      - report-walked-not-usable
     cases:
       - acceptance-walk
       - audit-operates-interface
       - audit-label-meaning
       - audit-structure-first
       - no-simulated-persona
+      - handback-three-things
   - name: The user decides
     does: Puts the user's direction, design language and decisions first, and asks few questions, each costly to get wrong
     rules:
@@ -32,10 +34,6 @@ categories:
       - language-ask-qualities
       - muted-text-contrast
       - audit-report-only
-  - name: Honest hand-back
-    does: Says what was walked and how, and does not claim that people can use it
-    rules: [report-walked-not-usable]
-    cases: [handback-three-things]
   - name: Design craft
     does: Follows the skill's design rules in the design, the directions and the build
     rules:
