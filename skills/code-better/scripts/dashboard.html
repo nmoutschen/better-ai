@@ -71,7 +71,8 @@
 .tasks .t { flex:1; min-width:0; }
 .tasks .on { flex:none; font-size:var(--text-small); color:var(--muted); }
 .tasks .tstat { flex:none; width:11.5em; white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-tight); font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
-.tasks .tstat svg { width:13px; height:13px; }
+.tasks .tstat svg { width:13px; height:13px; flex:none; }
+.tasks .tstat .w { overflow:hidden; text-overflow:ellipsis; }
 .tasks .tstat.verified, .tasks .tstat.merged, .tasks .tstat.done { color:var(--moss-dark); }
 .tasks .tstat.changes { color:var(--terracotta-dark); }
 .tasks .tstat.blocked { color:var(--error); }
@@ -172,6 +173,9 @@ function taskStatus(t, tasks) {
   const [key, word] = TASK_STATUS[s] || ["other", s || "no status"];
   return {key, word};
 }
+// The status word as HTML: it may carry a cell of tasks.md as written, so it is escaped; a long one is cut, in full on hover.
+const statusLabel = (t, tasks) => { const {key, word} = taskStatus(t, tasks);
+  return `<span class="tstat ${key}" title="${esc(word)}">${TICON[key] || ""}<span class="w">${esc(word)}</span></span>`; };
 // status:end
 // One icon per state, drawn in currentColor so blocked and quiet take the red of their text.
 const ICON = {
@@ -214,9 +218,10 @@ const TICON = {todo: svg('<circle cx="7" cy="7" r="5" fill="none" stroke="curren
   built: svg('<circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 7.2l1.8 1.8 3.3-3.8" fill="none" stroke="currentColor" stroke-width="1.6"/>'),
   verifying: svg('<circle cx="6" cy="6" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.7 8.7L12.5 12.5" stroke="currentColor" stroke-width="2"/>'),
   changes: svg('<path d="M11.5 3v4.5H3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.5 4.3L3.2 7.5l3.3 3.2" fill="none" stroke="currentColor" stroke-width="1.8"/>'),
-  verified: ICON.finished, done: ICON.finished,
+  verified: ICON.finished,
   merged: svg('<circle cx="7" cy="7" r="6" fill="currentColor"/><path d="M4.3 7.2l1.9 1.9 3.6-4" fill="none" style="stroke:var(--cream)" stroke-width="1.8"/>'),
   blocked: ICON.blocked, other: svg('<circle cx="7" cy="7" r="2" fill="currentColor"/>')};
+TICON.done = TICON.merged;  // done, in a single-agent list, is what merged is in a coordinated one: the task is finished
 function drawTasks(d) {
   const tasks = d.tasks || [];
   $("tasks-sec").hidden = !tasks.length;
@@ -225,11 +230,10 @@ function drawTasks(d) {
   // The tasks keep their own order, the one tasks.md gives, each with the status tasks.md gives it.
   setHTML($("tasks"), tasks.map(t => {
     const live = d.agents.filter(a => a.task && a.task === t.id && a.state !== "finished");
-    const {key: st, word} = taskStatus(t, tasks);
     const tag = has(t.mode) ? `<span class="mode m-${MODES[t.mode.trim().toLowerCase()] || "other"}">${esc(t.mode)}</span>` : "";
     const open = OPENTASKS.has(t.id) ? " open" : "";
     return `<li><details data-t="${esc(t.id)}"${open}><summary><span class="n">${esc(t.id)}</span>
-      <span class="tstat ${st}">${TICON[st]}${word}</span>${tag}<span class="t" dir="auto">${esc(t.task)}</span>
+      ${statusLabel(t, tasks)}${tag}<span class="t" dir="auto">${esc(t.task)}</span>
       ${live.length ? `<span class="on">${esc(live.map(a => a.name).join(", "))}</span>` : ""}</summary>
       <div class="body">${reqsOf(t).length ? `<ul class="req-list">${reqItems(t)}</ul>` : '<p class="empty">No requirement named.</p>'}
       ${has(t.check) ? `<p class="check">Check: <code>${esc(t.check)}</code></p>` : ""}
