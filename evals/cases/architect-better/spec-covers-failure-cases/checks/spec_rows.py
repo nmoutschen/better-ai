@@ -1,6 +1,5 @@
 """Pass when spec.jsonl in the change folder holds at least one `spec` record, each with a non-empty `statement` and a
-`source` that names a design section, a request sentence, a decision or a requirement. Its `gap` and `unlinked` records
-are other kinds and are not held to that."""
+`source` that names a design section, a request sentence, a decision or a requirement. A `gap` or `unlinked` record is another kind and is not held to that; a row with no type is."""
 
 import json
 import sys
@@ -22,7 +21,7 @@ for number, line in enumerate(SPEC.read_text().splitlines(), 1):
     if not isinstance(row, dict):
         problems.append(f"{name}: not a JSON object")
         continue
-    if row.get("type") != "spec":
+    if row.get("type") in ("gap", "unlinked"):
         continue
     rows.append(row)
     if not isinstance(row.get("statement"), str) or not row["statement"].strip():

@@ -44,6 +44,13 @@ Omit `in` for a part in both versions. Use `["before"]` for a removed part and `
 
 Refer to a node with `box:<id>`, a container edge with `edge:<id>`, or a flow step with `step:<flow id>/<step id>`. A key that names no part of `design.json`, and none a review once recorded, is an error. Join the two views of an exchange with `+`, for example `edge:e3+step:ask/s6`.
 
+## What checks what
+
+- `python3 scripts/schema.py check <file or folder>` checks every record against its schema: shapes, allowed values, the fields a status requires, pointers by id between the files, part keys, the references inside `design.json`, box kinds and the files `file` sources name. For a folder it also reports a file the others need and that is missing: `architect.json` and `design.json` are required by every file of the change folder except `spec.jsonl`.
+- `python3 scripts/architect.py check <folder>` runs the same checks, then reads the folder as the page does, so it prints the same errors the page shows in its band.
+- `python3 scripts/diagram.py check <design.json>` checks the shape of one design with the schema and what stops it from being drawn; `render` draws it. Any other failure of either is one line on stderr and exit 1.
+- `spec.schema.json` is shared with code-better, so it cannot require architect files: a folder that holds only `spec.jsonl` passes `schema.py check` and fails `architect.py check`, which wants `architect.json` and `design.json`.
+
 ## Review handoff
 
 **Approve…** sends an `approve` event with the applicable perspectives. Read the event with `wait`, use `status` to mark progress and use `reply --to` to report back in the thread.
