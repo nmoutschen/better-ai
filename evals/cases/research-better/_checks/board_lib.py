@@ -47,5 +47,5 @@ def entries(board: Path, kind: str) -> dict:
 
 
 def none(value) -> bool:
-    """True for a missing value, null, an empty string or an empty list."""
-    return value is None or value == "" or value == []
+    """True for a missing value, null, an empty string, the string "none" or an empty list."""
+    return value is None or value in ("", "none", [])

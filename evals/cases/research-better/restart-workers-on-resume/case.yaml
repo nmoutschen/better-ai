@@ -19,7 +19,7 @@ graders:
 - type: judge
   rubric: 'Rule: when a worker stops while questions remain, the coordinator starts a fresh worker sub-agent to replace it,
     and does not research the questions itself. Planted facts: in .research/checkout-drop/, Q-coordinator-8 (address autocomplete''s
-    effect on conversion) is in progress, owned by w3, whose log ends ''stopped: session ended''; wiki/experiments/address-autocomplete-ab-test.md
+    effect on conversion) is in progress, owned by w3, whose log ends with the JSONL record {"type": "stop", "text": "session ended"}; wiki/experiments/address-autocomplete-ab-test.md
     answers it. Sub-agent steps are marked "(sub-agent)" in the transcript, and the call that starts each sub-agent is a step
     of its own; its prompt is clipped. PASS only if all hold: (1) the agent started at least one worker sub-agent that took
     Q-coordinator-8 or the open questions including it, shown by the start call, its clipped prompt, or the sub-agent''s own
