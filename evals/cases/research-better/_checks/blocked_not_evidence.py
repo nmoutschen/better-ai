@@ -16,7 +16,7 @@ for sid in attachment:
 cited = [cid for cid, c in claims.items() if c.get("source") in attachment]
 if cited:
     fail(f"claims cite the missing attachment: {cited}")
-status = entry(board / "questions" / "Q-coordinator-8.md").get("status")
+status = entry(board / "questions" / "Q-coordinator-8.json").get("status")
 if status not in ("not found", "unclear") and not (status == "open" and attachment):
     fail(f"Q-coordinator-8 status is {status!r}")
 print("incident question closed without evidence from the attachment")

@@ -1,22 +1,8 @@
 reply: Added a challenge question.
 actions:
-- write: .research/checkout-drop/questions/Q-coordinator-7.md
-  content: 'id: Q-coordinator-7
-
-    question: Is the fall real?
-
-    title: Is the fall real
-
-    priority: high
-
-    status: open
-
-    owner: none
-
-    origin: Q-coordinator-2
-
-    kind: challenge
-
-    stakes: whether the fall is real
+- write: .research/checkout-drop/questions/Q-coordinator-7.json
+  content: '{"type": "question", "at": "2026-11-21T10:00:00Z", "by": "coordinator", "id": "Q-coordinator-7", "question": "Is
+    the fall real?", "title": "Is the fall real", "priority": "high", "status": "open", "origin": {"type": "question", "question":
+    "Q-coordinator-2"}, "kind": "challenge", "stakes": "whether the fall is real", "note": null}
 
     '

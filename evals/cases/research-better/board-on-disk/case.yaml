@@ -5,8 +5,8 @@ source:
 reads:
 - templates/board.md
 situation: 'A fresh research run on a planted wiki export (wiki/, eight pages on a checkout conversion drop after release
-  26.3). The agent keeps the research board on disk in .research/<slug>/ in the board.md format: a brief with the topic, goal,
-  stop level, collections and status, and questions that each say what evidence would answer them (done-when). It does not
+  26.3). The agent keeps the research board on disk in .research/<slug>/ in the JSON board format: a brief with the topic, goal,
+  stop level, collections and status, and questions that each say what evidence would answer them (done_when). It does not
   commit the board. A script checks the board''s files.'
 request: 'Research why checkout conversion dropped after our March 2026 release, so I can decide what to roll back first.
   The only place to search is our wiki export in wiki/: there is no web access, and no other system holds anything on this.
