@@ -394,6 +394,8 @@ KIND_BREAKS = [
     kind_break("tree", pop_in(["root"], "label"), "root.label"),
     kind_break("tree", set_in(["root", "children", 0], "value", "3"), "root.children[0].value"),
     kind_break("tree", pop_in(["root", "children", 1], "label"), "root.children[1].label"),
+    kind_break("tree", pop_in(["root", "children", 0], "value"), "root.children[0].value"),
+    kind_break("tree", set_in(["root", "children", 0], "value", None), "root.children[0].value"),
     kind_break("sets", pop_in([], "sets"), "sets"),
     kind_break("sets", set_in([], "regions", []), "regions"),
     kind_break("sets", pop_in(["regions", 0], "in"), "regions[0].in"),
@@ -970,6 +972,7 @@ NOT_NULLABLE = [
     ("slope", ["items", 0, "label"]),
     ("dots", ["groups", 0, "label"]),
     ("line", ["series", 0, "name"]),
+    ("tree", ["root", "children", 0, "value"]),
 ]
 
 
