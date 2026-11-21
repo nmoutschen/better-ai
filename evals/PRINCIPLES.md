@@ -73,7 +73,7 @@ A pull request that changes a skill or its cases REPORTS its eval results in thi
 
 OPEN with one or two sentences that give the result and what was tested, such as "Leaves correct work alone more often (+28 points). No other clear change. Tested on 28 cases with Sonnet 5.5." DO NOT list the harness version, judge agreement, run counts or error counts in the text.
 
-GROUP the rules into the skill's priority categories, in the order the maintainer set for that skill. A lower category may lose where a higher one gains, so DO NOT sum or weight categories into one score. A category holds several cases; a rule with one case is not a category.
+GROUP the cases into the skill's priority categories, in the order `cases/<skill>/priorities.md` lists them. WHEN a skill has no such file, ASK the maintainer for the order and WRITE the file before reporting. A lower category may lose where a higher one gains, so DO NOT sum or weight categories into one score. A category holds several cases; a rule with one case is not a category.
 
 SHOW two things:
 
