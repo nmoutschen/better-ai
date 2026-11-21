@@ -345,9 +345,14 @@ def _required_only(schema: Any) -> list[str] | None:
 
 
 class Validator:
-    def __init__(self, docs: dict[str, dict], context: Context | None = None):
+    """`hooks` says what `x-check` does: "on" runs the hooks with the other cross-record rules, "off" skips them, and
+    "only" runs nothing but them. `validate_instance` and `check_file` run "off", then "only" on a record that has no
+    shape errors, so a hook never sees a wrongly typed value."""
+
+    def __init__(self, docs: dict[str, dict], context: Context | None = None, hooks: str = "on"):
         self.docs = docs
         self.context = context
+        self.hooks = hooks
 
     def resolve(self, ref: str, doc: dict) -> tuple[Any, dict]:
         name, _, fragment = ref.partition("#")
@@ -491,19 +496,24 @@ class Validator:
         context = self.context
         at = _render(path)
         problems = []
-        if "x-points-to" in schema and isinstance(value, str):
-            problems += self._points_to(value, schema["x-points-to"], at)
-        if "x-mode-sets" in schema and isinstance(value, str):
-            problems += self._mode_sets(value, schema["x-mode-sets"], at)
-        if "x-differs-from" in schema and isinstance(parent, dict):
-            other = schema["x-differs-from"]
-            if other in parent and _equal(parent[other], value):
-                problems.append(Problem(at, f"must differ from {other} ({_show(value)})", "cross"))
-        if "x-check" in schema and isinstance(value, dict):
+        if self.hooks != "only":
+            if "x-points-to" in schema and isinstance(value, str):
+                problems += self._points_to(value, schema["x-points-to"], at)
+            if "x-mode-sets" in schema and isinstance(value, str):
+                problems += self._mode_sets(value, schema["x-mode-sets"], at)
+            if "x-differs-from" in schema and isinstance(parent, dict):
+                other = schema["x-differs-from"]
+                if other in parent and _equal(parent[other], value):
+                    problems.append(Problem(at, f"must differ from {other} ({_show(value)})", "cross"))
+        if "x-check" in schema and isinstance(value, dict) and self.hooks != "off":
             name = schema["x-check"]
             if name not in HOOKS:
                 raise SchemaError(f"x-check {name!r}: schema.py has no hook of that name")
-            for field, message in HOOKS[name](value, context):
+            try:
+                found = HOOKS[name](value, context)
+            except Exception:  # a hook is code: whatever it meets, the answer is an error, not a traceback
+                return [*problems, Problem(ROOT, f"check failed: {name}", "cross")]
+            for field, message in found:
                 problems.append(Problem(_render(_join(path, field)) if path else field, message, "cross"))
         return problems
 
@@ -544,8 +554,19 @@ class Validator:
 
 
 def validate_instance(value: Any, schema: dict, docs: dict[str, dict], context: Context | None = None) -> list[Problem]:
-    """The problems of one value against one schema; `docs` holds the schemas a $ref can name, by file name."""
-    return Validator(docs, context).validate(value, schema, (), schema)
+    """The problems of one value against one schema; `docs` holds the schemas a $ref can name, by file name. The hooks
+    run only when the value has no shape error."""
+    return validate_record(value, [schema], docs, context)
+
+
+def validate_record(value: Any, schemas: list[dict], docs: dict[str, dict], context: Context | None) -> list[Problem]:
+    """The problems of one record against each of its schemas: first everything but the hooks, then, if the record has
+    no shape error, the hooks, whose findings come last."""
+    first = [p for schema in schemas for p in Validator(docs, context, "off").validate(value, schema, (), schema)]
+    if context is None or any(p.kind != "cross" for p in first):
+        return first
+    hooked = [p for schema in schemas for p in Validator(docs, context, "only").validate(value, schema, (), schema)]
+    return first + [p for p in hooked if p.kind == "cross"]
 
 
 # ---------------------------------------------------------------- hooks
@@ -831,7 +852,6 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
     except (OSError, UnicodeDecodeError) as error:
         return [Error(where, 1, "(file)", f"cannot be read: {error}")]
     context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
-    validator = Validator(docs, context)
     errors: list[Error] = []
     seen: dict[str, int] = {}
     versioned = all(doc.get("x-versioned") for _, doc in found)
@@ -849,9 +869,8 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
         if not isinstance(record, dict):
             errors.append(Error(where, number, ROOT, f"expected object, got {_type_name(record)}"))
             continue
-        for _, schema in found:
-            for problem in validator.validate(record, schema, (), schema):
-                errors.append(Error(where, number, problem.field, problem.message))
+        for problem in validate_record(record, [schema for _, schema in found], docs, context):
+            errors.append(Error(where, number, problem.field, problem.message))
         identity = record.get("id")
         if isinstance(identity, str):
             if not versioned and identity in seen:
