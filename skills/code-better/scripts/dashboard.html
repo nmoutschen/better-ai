@@ -25,8 +25,6 @@
 .card.m-refactor { border-left-color:var(--umber); }
 .card.m-tests { border-left-color:var(--sand); }
 .card.m-other { border-left-color:var(--line); }
-/* A verifier checks a builder's work: its edge is a double line and its tag says verifier, in no mode's colour. */
-.card.r-verifier { border-left:5px double var(--heading); }
 .card h3 { margin:var(--space-tight) 0 var(--space-control); font:var(--font-heading); color:var(--heading); }
 .card ol { list-style:none; margin:0; padding:0; }
 .card ol li { margin:var(--space-tight) 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -75,7 +73,9 @@
 .tasks .tstat .w { overflow:hidden; text-overflow:ellipsis; }
 .tasks .tstat.verified, .tasks .tstat.merged, .tasks .tstat.done { color:var(--moss-dark); }
 .tasks .tstat.changes { color:var(--terracotta-dark); }
-.tasks .tstat.blocked { color:var(--error); }
+.tasks .tstat.blocked, .tasks .tstat.other { color:var(--error); }
+/* An unknown status is an error: its label takes the room it needs, so the status as written stays readable. */
+.tasks .tstat.other { width:auto; min-width:11.5em; }
 /* Past five rows the list scrolls, with a scroll bar that stays visible. macOS hides scroll bars until you scroll,
    and Firefox lets no page change that, so the page hides the browser's bar and draws its own track and thumb. */
 .tasks-box { display:flex; gap:var(--space-tight); }
@@ -147,18 +147,18 @@ const KINDS = ["start", "step", "asked", "blocked", "handed back"];
 const words = line => { const i = String(line).indexOf(":"), kind = i < 0 ? "" : line.slice(0, i).trim().toLowerCase(), rest = line.slice(i + 1).trim();
   return !KINDS.includes(kind) ? line : kind === "step" ? rest : `${kind[0].toUpperCase()}${kind.slice(1)}: ${rest}`; };
 // status:begin
-// What an agent does, as a tag and the card's edge: a builder shows the mode of its task, one colour per mode; a
-// verifier shows "verifier", so it never reads as a builder at work on the task again. No role counts as a builder.
+// What an agent does: the card's edge is the mode of its task, one colour per mode. A builder's tag is that mode; a
+// verifier's tag says "verifier", so it never reads as a builder at work on the task again. No role counts as a builder.
 const MODES = {feature: "feature", "bug fix": "bugfix", bugfix: "bugfix", refactor: "refactor", tests: "tests"};
 const modeOf = a => String(a.mode || "").trim().toLowerCase();
 const isVerifier = a => String(a.role || "").trim().toLowerCase() === "verifier";
 const modeClass = a => { const m = modeOf(a); return m && m !== "none" ? "m-" + (MODES[m] || "other") : "m-other"; };
-const agentClass = a => isVerifier(a) ? "r-verifier" : modeClass(a);
+const agentClass = modeClass;
 const agentTag = a => { const m = modeOf(a);
   return isVerifier(a) ? `<span class="mode r-verifier">verifier</span>` : m && m !== "none" ? `<span class="mode ${modeClass(a)}">${esc(m)}</span>` : ""; };
 // A task's status as tasks.md writes it (modes/coordinate.md), as an icon key and a word. A blocked task says what it
 // waits on from its Blocked by cell: a task of the list, the user, or the repair limit; anything else shows as written.
-// An unknown status shows as written too, never as another stage.
+// An unknown status is an error the coordinator made: it shows in red as written, never as another stage.
 const TASK_STATUS = {todo: ["todo", "to do"], building: ["building", "building"], built: ["built", "built"],
   verifying: ["verifying", "verifying"], "changes needed": ["changes", "changes needed"], verified: ["verified", "verified"],
   merged: ["merged", "merged"], done: ["done", "done"]};
@@ -170,7 +170,7 @@ function taskStatus(t, tasks) {
       : by.toLowerCase() === "repair limit" ? "repair limit" : tasks.some(x => x.id === by) ? `waiting on ${by}` : `blocked: ${by}`;
     return {key: "blocked", word};
   }
-  const [key, word] = TASK_STATUS[s] || ["other", s || "no status"];
+  const [key, word] = TASK_STATUS[s] || ["other", s ? `not a status: ${s}` : "no status"];
   return {key, word};
 }
 // The status word as HTML: it may carry a cell of tasks.md as written, so it is escaped; a long one is cut, in full on hover.
@@ -219,9 +219,12 @@ const TICON = {todo: svg('<circle cx="7" cy="7" r="5" fill="none" stroke="curren
   verifying: svg('<circle cx="6" cy="6" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.7 8.7L12.5 12.5" stroke="currentColor" stroke-width="2"/>'),
   changes: svg('<path d="M11.5 3v4.5H3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.5 4.3L3.2 7.5l3.3 3.2" fill="none" stroke="currentColor" stroke-width="1.8"/>'),
   verified: ICON.finished,
-  merged: svg('<circle cx="7" cy="7" r="6" fill="currentColor"/><path d="M4.3 7.2l1.9 1.9 3.6-4" fill="none" style="stroke:var(--cream)" stroke-width="1.8"/>'),
-  blocked: ICON.blocked, other: svg('<circle cx="7" cy="7" r="2" fill="currentColor"/>')};
-TICON.done = TICON.merged;  // done, in a single-agent list, is what merged is in a coordinated one: the task is finished
+  // merged: two branches joined
+  merged: svg('<circle cx="4" cy="2.8" r="1.7" fill="currentColor"/><circle cx="4" cy="11.2" r="1.7" fill="currentColor"/><circle cx="10.5" cy="7" r="1.7" fill="currentColor"/><path d="M4 4.5V9.5M4 4.5C4 7 6.5 7 8.8 7" fill="none" stroke="currentColor" stroke-width="1.6"/>'),
+  // done, in a single-agent list: finished, a filled tick
+  done: svg('<circle cx="7" cy="7" r="6" fill="currentColor"/><path d="M4.3 7.2l1.9 1.9 3.6-4" fill="none" style="stroke:var(--cream)" stroke-width="1.8"/>'),
+  blocked: ICON.blocked,
+  other: svg('<circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 5.6a1.8 1.8 0 1 1 2.5 1.6c-.5.3-.8.6-.8 1.2v.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="7" cy="10.4" r=".85" fill="currentColor"/>')};
 function drawTasks(d) {
   const tasks = d.tasks || [];
   $("tasks-sec").hidden = !tasks.length;

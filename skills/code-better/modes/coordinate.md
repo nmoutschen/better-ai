@@ -47,7 +47,7 @@ START a builder for each task that can run in parallel: READ [../agents/builder.
 | Role | What you write | What the dashboard shows |
 |---|---|---|
 | Builder | `{"role": "builder", "task": "T3", "mode": "bug fix", "branch": "fix/t3-reads"}` | the task's mode as a coloured tag and card edge |
-| Verifier | `{"role": "verifier", "task": "T3", "mode": "bug fix", "branch": "fix/t3-reads"}` | a `verifier` tag and a double card edge, in no mode's colour |
+| Verifier | `{"role": "verifier", "task": "T3", "mode": "bug fix", "branch": "fix/t3-reads"}` | a `verifier` tag, and the task's mode colour on the card edge |
 
 WRITE `role` as builder or verifier, `task` as the task's # exactly as `tasks.md` writes it, `mode` as the task's mode, one of feature, bug fix, refactor or tests, and `branch` as the branch the builder works on or the verifier reviews. IF the harness lets you choose a model, USE a cheaper model than yours for builders and the most capable model for verifiers.
 
