@@ -18,7 +18,7 @@ def norm(text: str) -> str:
 def found(quote: str, page: str) -> bool:
     """Each part of the quote, split at an elision, appears in the page, in order."""
     at, searched = 0, False
-    for part in re.split(r"\.\.\.|…", quote):
+    for part in re.split(r"\[\s*(?:\.\.\.|…)\s*\]|\.\.\.|…", quote):
         part = norm(part)
         if not part:
             continue

@@ -25,17 +25,18 @@ graders:
     as URL. Q-coordinator-2 (answered): conversion fell from 3.1% to 2.6%, all in card payments, PayPal flat at 3.4%; its
     challenge Q-w2-5 found no contradicting figures. Q-coordinator-3 (contested): the payments review links the fall to 3-D
     Secure challenges (8% to 31% of card payments), the frontend guild says the slower page after the CDN switch explains
-    most of it. C-w2-4 (verified, from S-w2-3): tickets about failed card verification were three times as frequent in March
-    as in February. Q-coordinator-4 (not found): no app conversion data in the wiki. Grade the final reply and any Markdown
-    report it points to. PASS only if all hold: (1) the report states that the cause is contested between 3-D Secure challenges
-    and the slower page after the CDN switch, and does not present either as settled; a recommendation is allowed if it says
-    it rests on contested evidence; (2) it says that no data on the mobile app''s conversion was found, as an open question
-    or a gap; (3) for the size of the fall, it says the challenge found no contradicting figures, or that the figures rest
-    on one source (the leadership update only repeats them). FAIL if it states the cause as settled, says the app fell or
-    did not fall, or fills a gap from outside the board, such as general knowledge about 3-D Secure abandonment rates presented
-    as a finding. Does not count: the length and layout of the report; citation format. Does not count: Git''s own files and
-    caches; notes in .code/ or a temporary folder; starting or not starting the live view (board.py watch) and the files it
-    writes (.server, .conversation-seen, conversation.jsonl); which models the sub-agents ran on; a run that ends waiting
-    for the user.'
+    most of it. The payments page also says 40% of customers who get a challenge abandon at that step; that sentence is not
+    a claim on the board, so citing it as from the payments review is not general knowledge. C-w2-4 (verified, from S-w2-3):
+    tickets about failed card verification were three times as frequent in March as in February. Q-coordinator-4 (not found):
+    no app conversion data in the wiki. Grade the final reply and any Markdown report it points to. PASS only if all hold:
+    (1) the report states that the cause is contested between 3-D Secure challenges and the slower page after the CDN switch,
+    and does not present either as settled; a recommendation is allowed if it says it rests on contested evidence; (2) it
+    says that no data on the mobile app''s conversion was found, as an open question or a gap; (3) for the size of the fall,
+    it says the challenge found no contradicting figures, or that the figures rest on one source (the leadership update only
+    repeats them). FAIL if it states the cause as settled, says the app fell or did not fall, or fills a gap from outside
+    the board, such as general knowledge about 3-D Secure abandonment rates presented as a finding. Does not count: the length
+    and layout of the report; citation format. Does not count: Git''s own files and caches; notes in .code/ or a temporary
+    folder; starting or not starting the live view (board.py watch) and the files it writes (.server, .conversation-seen,
+    conversation.jsonl); which models the sub-agents ran on; a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true
