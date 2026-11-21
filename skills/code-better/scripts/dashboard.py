@@ -88,7 +88,7 @@ def read_tasks(path: Path) -> tuple:
                 "mode": row.get("mode", ""),
                 "requirements": [r.strip() for r in row.get("requirements", "").split(",") if r.strip()],
                 "check": row.get("check that tells done from not done", row.get("check", "")),
-                "status": row.get("status", "").lower(),
+                "status": row.get("status", ""),  # as written: the page matches it without case
                 "blocked_by": row.get("blocked by", ""),  # a task's #, user or repair limit (modes/coordinate.md)
             }
         )

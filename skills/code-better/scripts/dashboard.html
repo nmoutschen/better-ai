@@ -75,7 +75,7 @@
 .tasks .tstat.changes { color:var(--terracotta-dark); }
 .tasks .tstat.blocked, .tasks .tstat.other { color:var(--error); }
 /* An unknown status is an error: its label takes the room it needs, so the status as written stays readable. */
-.tasks .tstat.other { width:auto; min-width:11.5em; }
+.tasks .tstat.other { width:auto; min-width:11.5em; max-width:50%; }
 /* Past five rows the list scrolls, with a scroll bar that stays visible. macOS hides scroll bars until you scroll,
    and Firefox lets no page change that, so the page hides the browser's bar and draws its own track and thumb. */
 .tasks-box { display:flex; gap:var(--space-tight); }
@@ -163,14 +163,15 @@ const TASK_STATUS = {todo: ["todo", "to do"], building: ["building", "building"]
   verifying: ["verifying", "verifying"], "changes needed": ["changes", "changes needed"], verified: ["verified", "verified"],
   merged: ["merged", "merged"], done: ["done", "done"]};
 const DONE = new Set(["done", "merged"]);
+const isDone = t => DONE.has(String(t.status || "").trim().toLowerCase());
 function taskStatus(t, tasks) {
-  const s = String(t.status || "").trim().toLowerCase(), by = String(t.blocked_by || "").trim();
+  const raw = String(t.status || "").trim(), s = raw.toLowerCase(), by = String(t.blocked_by || "").trim();
   if (s === "blocked") {
     const word = !by || by.toLowerCase() === "none" ? "blocked" : by.toLowerCase() === "user" ? "waiting on you"
       : by.toLowerCase() === "repair limit" ? "repair limit" : tasks.some(x => x.id === by) ? `waiting on ${by}` : `blocked: ${by}`;
     return {key: "blocked", word};
   }
-  const [key, word] = TASK_STATUS[s] || ["other", s ? `not a status: ${s}` : "no status"];
+  const [key, word] = TASK_STATUS[s] || ["other", raw ? `not a status: ${raw}` : "no status"];
   return {key, word};
 }
 // The status word as HTML: it may carry a cell of tasks.md as written, so it is escaped; a long one is cut, in full on hover.
@@ -229,7 +230,7 @@ function drawTasks(d) {
   const tasks = d.tasks || [];
   $("tasks-sec").hidden = !tasks.length;
   // The heading says how many tasks are done of how many, since past five rows the list scrolls and the rest are out of sight.
-  $("tasks-h").textContent = `Tasks: ${tasks.filter(t => DONE.has(t.status)).length} of ${tasks.length} done`;
+  $("tasks-h").textContent = `Tasks: ${tasks.filter(isDone).length} of ${tasks.length} done`;
   // The tasks keep their own order, the one tasks.md gives, each with the status tasks.md gives it.
   setHTML($("tasks"), tasks.map(t => {
     const live = d.agents.filter(a => a.task && a.task === t.id && a.state !== "finished");
@@ -416,7 +417,7 @@ document.addEventListener("keydown", ev => {
 function render(d) {
   D = d;
   $("title").textContent = d.name || "Change dashboard"; document.title = `${$("title").textContent} · Change dashboard`;
-  const tasks = d.tasks || [], done = tasks.filter(t => DONE.has(t.status)).length;
+  const tasks = d.tasks || [], done = tasks.filter(isDone).length;
   const working = d.agents.filter(a => a.state !== "finished").length;
   // A question the user answered in the page no longer waits for them, even before the coordinator applies the answer.
   // It waits again when the coordinator asked back about the answer.
