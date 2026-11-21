@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ("architect-better", "code-better", "research-better", "design-better", "show-better")
@@ -999,6 +1000,103 @@ class ArchitectFolder(Case):
         self.write("tasks.jsonl", jsonl(task(1)))
         errors = [e for e in self.messages("tasks.jsonl") if "repo root" in e]
         self.assertEqual(len(errors), 1)
+
+
+class SchemaAudit(Case):
+    """A schema is checked as a whole when it loads, not only where a record reaches it."""
+
+    def refused(self, node, text):
+        self.put_schema(
+            {"$id": "bad.schema.json", "x-files": ["bad.jsonl"], "type": "object", "properties": {"a": node}}
+        )
+        self.write("bad.jsonl", "{}\n")
+        with self.assertRaises(schema.SchemaError) as caught:
+            self.check("bad.jsonl")
+        self.assertIn(text, str(caught.exception))
+
+    def test_an_unsupported_keyword_under_an_optional_property_is_refused_on_load(self):
+        self.refused({"multipleOf": 2}, "multipleOf")
+
+    def test_an_unsupported_keyword_in_every_place_a_schema_nests(self):
+        for node in (
+            {"items": {"nope": 1}},
+            {"allOf": [{"nope": 1}]},
+            {"anyOf": [{"nope": 1}]},
+            {"not": {"nope": 1}},
+            {"if": {"nope": 1}, "then": {}},
+            {"if": {}, "then": {"nope": 1}},
+            {"if": {}, "else": {"nope": 1}},
+            {"additionalProperties": {"nope": 1}},
+            {"properties": {"b": {"nope": 1}}},
+            {"$defs": {"d": {"nope": 1}}},
+        ):
+            self.refused(node, "nope")
+
+    def test_a_type_that_is_not_a_type_name_is_refused(self):
+        self.refused({"type": True}, "type")
+        self.refused({"type": "x"}, "type")
+        self.refused({"type": ["string", "x"]}, "type")
+        self.refused({"type": ["string", 3]}, "type")
+
+    def test_valid_types_and_boolean_additional_properties_load(self):
+        self.put_schema(
+            {"$id": "ok.schema.json", "x-files": ["ok.jsonl"], "type": ["object"], "additionalProperties": False}
+        )
+        self.write("ok.jsonl", "{}\n")
+        self.assertEqual(self.messages("ok.jsonl"), [])
+
+
+class Retry(Case):
+    """A reader that caught a file mid-write reads it once more before it reports a parse error."""
+
+    def reads(self, *texts):
+        calls = []
+        real = schema.read_text
+
+        def fake(path):
+            if path.name == "tasks.jsonl":
+                calls.append(path)
+                return texts[min(len(calls), len(texts)) - 1]
+            return real(path)
+
+        return fake, calls
+
+    def test_a_second_read_that_parses_is_used(self):
+        fake, calls = self.reads('{"type": "tas', jsonl(task(1)))
+        self.write("tasks.jsonl", "")
+        with mock.patch.object(schema, "read_text", fake), mock.patch.object(schema, "PAUSE", 0):
+            self.assertEqual(self.messages("tasks.jsonl"), [])
+        self.assertEqual(len(calls), 2)
+
+    def test_a_parse_error_is_reported_only_if_the_second_read_fails_too(self):
+        fake, calls = self.reads('{"type": "tas')
+        self.write("tasks.jsonl", "")
+        with mock.patch.object(schema, "read_text", fake), mock.patch.object(schema, "PAUSE", 0):
+            errors = self.messages("tasks.jsonl")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("not valid JSON", errors[0])
+        self.assertEqual(len(calls), 2)
+
+    def test_a_clean_file_is_read_once(self):
+        fake, calls = self.reads(jsonl(task(1)))
+        self.write("tasks.jsonl", "")
+        with mock.patch.object(schema, "read_text", fake):
+            self.assertEqual(self.messages("tasks.jsonl"), [])
+        self.assertEqual(len(calls), 1)
+
+    def test_a_file_a_pointer_reads_is_retried_too(self):
+        real = schema.read_text
+        seen = []
+
+        def fake(path):
+            if path.name == "spec.jsonl":
+                seen.append(1)
+                return "{broken" if len(seen) == 1 else real(path)
+            return real(path)
+
+        self.write("tasks.jsonl", jsonl(task(1)))
+        with mock.patch.object(schema, "read_text", fake), mock.patch.object(schema, "PAUSE", 0):
+            self.assertEqual(self.messages("tasks.jsonl"), [])
 
 
 if __name__ == "__main__":
