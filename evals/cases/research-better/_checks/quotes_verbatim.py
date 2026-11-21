@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, os.environ["GRADE_FILES"])
-from board_lib import entries, fail, none, the_board, unquote  # noqa: E402
+from board_lib import entries, fail, none, the_board  # noqa: E402
 
 
 def norm(text: str) -> str:
@@ -46,7 +46,7 @@ for cid, c in claims.items():
     page = re.split(r"[#\s]|:\d", page, maxsplit=1)[0]
     if not Path(page).is_file():
         fail(f"{cid}: source url {url!r} is not a wiki page")
-    quote = unquote(c.get("quote", ""))
+    quote = c.get("quote", "")
     if none(quote) or not found(quote, norm(Path(page).read_text(encoding="utf-8"))):
         fail(f"{cid}: quote not found word for word in {page}: {quote[:80]!r}")
 print(f"{len(claims)} quotes found in their pages")

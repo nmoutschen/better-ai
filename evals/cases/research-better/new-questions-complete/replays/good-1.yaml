@@ -1,32 +1,10 @@
 reply: Added a challenge question for the size of the fall and answered it.
 actions:
-- write: .research/checkout-drop/questions/Q-coordinator-7.md
-  content: 'id: Q-coordinator-7
-
-    question: What evidence would contradict the size of the fall?
-
-    title: Challenge: size of the fall
-
-    priority: high
-
-    status: answered
-
-    owner: none
-
-    origin: Q-coordinator-2
-
-    kind: challenge
-
-    stakes: whether the fall is in card payments only
-
-    done-when: a source gives other figures for the same weeks, or none does after three searches
-
-    answer: none
-
-    summary: No page gives other figures.
-
-    gist: No contradicting figures.
-
-    note: none
+- write: .research/checkout-drop/questions/Q-coordinator-7.json
+  content: '{"type": "question", "at": "2026-11-21T10:00:00Z", "by": "coordinator", "id": "Q-coordinator-7", "question": "What
+    evidence would contradict the size of the fall?", "title": "Challenge: size of the fall", "priority": "high", "status":
+    "answered", "owner": "w1", "summary": "No page gives other figures.", "gist": "No contradicting figures.", "origin": {"type":
+    "question", "question": "Q-coordinator-2"}, "kind": "challenge", "stakes": "whether the fall is in card payments only",
+    "done_when": "a source gives other figures for the same weeks, or none does after three searches", "note": null}
 
     '

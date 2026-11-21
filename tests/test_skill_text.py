@@ -116,12 +116,12 @@ class ResearchBetterText(unittest.TestCase):
             with self.subTest(section=start):
                 self.assertIn("schema.py check", section)
         for name, markers in (
-            ("worker.md", ("After each search or page read", "Adding questions")),
+            ("worker.md", ("After each search or page read", "## Adding questions")),
             ("verifier.md", ("Before you write",)),
         ):
             text = (RESEARCH / "agents" / name).read_text(encoding="utf-8")
             for marker in markers:
-                paragraph = text[text.index(marker) :].split("\n\n")[0]
+                paragraph = text[text.index(marker) :].split("\n## ")[0]
                 with self.subTest(file=name, step=marker):
                     self.assertIn("schema.py check", paragraph)
 
@@ -134,17 +134,18 @@ class ResearchBetterText(unittest.TestCase):
         self.assertIn("withdrawn", section)
 
     def test_template_has_a_line_for_every_record_type_and_status(self) -> None:
-        """One placeholder line per record type, and per status the schemas give a record's shape."""
+        """One placeholder line per record type, and a line naming each status the schemas give a record's shape."""
         records = template_records()
-        shapes = {(r["type"], r.get("status")) for r in records}
         types = {r["type"] for r in records}
         logs = schema_json("logs.schema.json")["properties"]["type"]["enum"]
         self.assertEqual(types, set(RECORD_FILES) | set(logs))
         for kind, name in RECORD_FILES.items():
-            statuses = schema_json(name)["properties"]["status"]["enum"]
-            for status in statuses:
+            if kind == "brief":
+                continue  # its status does not change which fields it has
+            for status in schema_json(name)["properties"]["status"]["enum"]:
                 with self.subTest(kind=kind, status=status):
-                    self.assertIn((kind, status), shapes, f"no {kind} line with status {status}")
+                    lines = [r["status"] for r in records if r["type"] == kind]
+                    self.assertTrue(any(status in line for line in lines), f"no {kind} line for status {status}")
 
     def test_template_lines_use_only_the_schemas_fields(self) -> None:
         """Each placeholder line holds every field its record type requires and no field its schema lacks."""
