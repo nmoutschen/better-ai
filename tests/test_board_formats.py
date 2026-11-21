@@ -627,7 +627,7 @@ class MergeCycles(unittest.TestCase):
             )
             drawn = {q["id"]: q for q in data["questions"]}
             self.assertTrue(drawn["Q-w2-8"]["_errors"] and drawn["Q-w2-9"]["_errors"])
-            self.assertIn("C-w2-9", [c["id"] for c in data["claims"]])
+            self.assertEqual(sorted(c["id"] for c in data["claims"]), ["C-w2-7", "C-w2-8", "C-w2-9"])
             with contextlib.redirect_stdout(io.StringIO()) as out:
                 self.assertEqual(board.check(folder), 1)
             self.assertEqual(out.getvalue().count("merge loop"), 2)
@@ -651,6 +651,30 @@ class MergeCycles(unittest.TestCase):
                 "questions/Q-w2-3.json": "merge loop: Q-w2-3 → Q-w2-1 → Q-w2-2 → Q-w2-3",
             },
         )
+
+    def test_a_stray_file_with_a_question_id_does_not_hide_a_loop(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            for one, other in (("Q-w2-1", "Q-w2-2"), ("Q-w2-2", "Q-w2-1")):
+                write_entry(folder, seeded(one, status="merged", merged_into=other))
+            write_json(folder, "questions/zz.json", {"id": "Q-w2-2", "type": "question"})
+            board.SCANS.clear()
+            files = {e["file"] for e in board.load(folder)["errors"] if "merge loop" in e["message"]}
+        self.assertEqual(files, {"questions/Q-w2-1.json", "questions/Q-w2-2.json"})
+
+    def test_two_thousand_questions_merged_into_one_load_quickly(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            for n in range(100, 2100):
+                write_entry(folder, seeded(f"Q-w2-{n}", status="merged", merged_into="Q-w2-4"))
+            board.SCANS.clear()
+            started = time.monotonic()
+            errors = board.load(folder)["errors"]
+            took = time.monotonic() - started
+        self.assertEqual(errors, [])
+        self.assertLess(took, 10)
 
     def test_a_long_chain_that_ends_is_not_a_loop(self):
         with tempfile.TemporaryDirectory() as d:
