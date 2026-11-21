@@ -14,12 +14,14 @@ let D = null, LAYOUT = "", OPEN = null, REPLIES = -1, SCROLLED = false, CLOSED_P
 
 // ---------- Shape the board ----------
 function prepare(d) {
-  // A merged question is shown by the one it was merged into; a withdrawn claim is not shown.
-  const merged = Object.fromEntries(d.questions.filter(q => q.status === "merged" && q.merged_into).map(q => [q.id, q.merged_into]));
+  // A valid merged question is shown by the one it was merged into; a valid withdrawn claim and a valid question out
+  // of scope are not shown. An invalid one is shown, marked, so that nothing a broken file names vanishes.
+  const all = new Set(d.questions.map(q => q.id));
+  const merged = Object.fromEntries(d.questions.filter(q => q.status === "merged" && !q._errors && all.has(q.merged_into)).map(q => [q.id, q.merged_into]));
   const into = id => { for (let i = 0; merged[id] && i < 20; i++) id = merged[id]; return id; };
-  const qs = d.questions.filter(q => q.status !== "out of scope" && !merged[q.id]);
+  const qs = d.questions.filter(q => (q.status !== "out of scope" || q._errors) && !merged[q.id]);
   const ids = new Set(qs.map(q => q.id)), qOfSource = {};
-  d.claims = d.claims.filter(c => c.status !== "withdrawn");
+  d.claims = d.claims.filter(c => c.status !== "withdrawn" || c._errors);
   d.claims.forEach(c => { if (!qOfSource[c.source]) qOfSource[c.source] = c.question; });
   const searches = {};
   Object.values(d.logs || {}).forEach(l => (l.searches || []).forEach(r => { const id = into(r.question); searches[id] = (searches[id] || 0) + 1; }));
@@ -363,6 +365,7 @@ function render(d) {
   const b = d.brief || {}, qs = D.qs, now = d.now;
   $("title").textContent = has(b.title) ? b.title : b.topic || "Research board";
   $("title").title = b.topic || ""; document.title = `${$("title").textContent} · Research board`;
+  $("briefbad").textContent = notValid(b); $("briefbad").hidden = !notValid(b);
   $("goal").textContent = has(b.goal) ? b.goal : ""; $("goal").title = b.goal || "";
   const start = Math.min(now, ...[...d.questions, ...d.claims, ...d.sources].map(e => e._born));
   const answered = qs.filter(q => CLOSED.has(q.view)).length, workers = qs.filter(q => q.view === "in progress").length;
@@ -398,7 +401,7 @@ function render(d) {
 // A record the board still shows although it broke the schema says so, in the error colour, with its first message.
 const notValid = r => r && r._errors && r._errors.length ? `not valid: ${r._errors[0]}` : "";
 const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))}</span>` : "";
-const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> The records they name are left out of the page.</p><ul>`
+const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions, claims and sources they name are shown marked not valid; other records they name are left out of the page.</p><ul>`
   + errors.map(e => `<li><code>${esc(e.file)}:${esc(e.line)}</code> ${esc(e.field)}: ${esc(e.message)}${e.by ? ` <span class="by">(by ${esc(e.by)})</span>` : ""}</li>`).join("") + "</ul>";
 function showLoaded(d, els) {
   const errors = d.errors || [];

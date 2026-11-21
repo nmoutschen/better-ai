@@ -71,8 +71,8 @@ def board_files(board: Path) -> list:
 
 
 def scan(board: Path) -> dict:
-    """Every record of the board, each file read once and checked on its own. `brief`, `decisions` and `logs` (agent
-    -> records) hold the valid records. `questions`, `claims` and `sources` hold every record that parsed as JSON,
+    """Every record of the board, each file read once and checked on its own. `decisions` and `logs` (agent
+    -> records) hold the valid records. `brief`, `questions`, `claims` and `sources` hold every record that parsed as JSON,
     each invalid one with its messages in `_errors`, so the page shows it marked. `errors` lists every problem as
     {file, line, field, message, by}, `by` only where the record could be read."""
     data: dict = {"brief": {}, "decisions": [], "questions": [], "claims": [], "sources": [], "logs": {}, "errors": []}
@@ -90,13 +90,10 @@ def scan(board: Path) -> dict:
             data["errors"].append({"file": shown, "line": 1, "field": "(file)", "message": f"cannot be read: {error}"})
             continue
         # What is shown below is built from this text, the text that was checked.
-        known = bool(schema._match(path, docs))
-        found = schema.check_text(path, text, docs, cache) if known else []
-        if not known:
-            data["errors"].append(
-                {"file": shown, "line": 1, "field": "(file)", "message": "no schema describes this file"}
-            )
-            continue
+        found = schema.check_text(path, text, docs, cache)
+        if [(e.field, e.message) for e in found] == [("(file)", "no schema describes this file")]:
+            data["errors"].append({"file": shown, "line": 1, "field": "(file)", "message": found[0].message})
+            continue  # a file of another shape, such as an old Markdown one: listed, nothing to show from it
         pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
         if path.suffix != ".jsonl":
             pieces = [text]
@@ -122,7 +119,9 @@ def scan(board: Path) -> dict:
         valid = [r for n, r in kept.items() if n not in messages]
         parent = path.parent.name
         if path.name == "brief.json":
-            data["brief"] = valid[0] if valid else {}
+            data["brief"] = next(iter(kept.values()), {})  # an invalid brief is kept, marked like a question
+            if data["brief"] and 1 in messages:
+                data["brief"] = {**data["brief"], "_errors": messages[1]}
         elif path.name == "decisions.jsonl":
             data["decisions"] += valid
         elif parent in FOLDERS:
