@@ -467,6 +467,35 @@ class Keywords(unittest.TestCase):
         self.assertEqual(self.errors([], s), [("(record)", "must have at least 1 item")])
         self.assertEqual(self.errors(["a", 2], s), [("[1]", "expected string, got integer")])
 
+    def test_minimum_and_maximum(self):
+        s = {"type": "number", "minimum": 0, "maximum": 1}
+        self.assertEqual(self.errors(0, s), [])
+        self.assertEqual(self.errors(1, s), [])
+        self.assertEqual(self.errors(0.5, s), [])
+        self.assertEqual(self.errors(-0.1, s), [("(record)", "must be at least 0")])
+        self.assertEqual(self.errors(1.5, s), [("(record)", "must be at most 1")])
+        self.assertEqual(self.errors("2", {"minimum": 3}), [])  # they apply to numbers only
+        self.assertEqual(self.errors(True, {"minimum": 3}), [])  # a boolean is not a number
+
+    def test_max_items(self):
+        s = {"type": "array", "maxItems": 2}
+        self.assertEqual(self.errors(["a", "b"], s), [])
+        self.assertEqual(self.errors(["a", "b", "c"], s), [("(record)", "must have at most 2 items")])
+        self.assertEqual(self.errors([1], {"maxItems": 0}), [("(record)", "must have at most 0 items")])
+        self.assertEqual(self.errors([1], {"maxItems": 1}), [])
+
+    def test_prefix_items_checks_each_position_and_items_covers_the_rest(self):
+        s = {"type": "array", "minItems": 2, "prefixItems": [{}, {"type": "number"}]}
+        self.assertEqual(self.errors(["2020", 1], s), [])
+        self.assertEqual(self.errors([2020, 1, "more"], s), [])
+        self.assertEqual(self.errors(["2020", "x"], s), [("[1]", "expected number, got string")])
+        self.assertEqual(
+            self.errors(["2020"], {"prefixItems": [{"type": "number"}]}), [("[0]", "expected number, got string")]
+        )
+        both = {"prefixItems": [{"type": "string"}], "items": {"type": "integer"}}
+        self.assertEqual(self.errors(["a", 1, 2], both), [])
+        self.assertEqual(self.errors(["a", "b"], both), [("[1]", "expected integer, got string")])
+
     def test_properties_required_and_additional_properties(self):
         s = {
             "type": "object",
@@ -1017,6 +1046,25 @@ class SchemaAudit(Case):
 
     def test_an_unsupported_keyword_under_an_optional_property_is_refused_on_load(self):
         self.refused({"multipleOf": 2}, "multipleOf")
+
+    def test_the_numeric_keywords_need_numbers_and_prefix_items_a_list_of_schemas(self):
+        self.refused({"minimum": "0"}, "minimum")
+        self.refused({"maximum": True}, "maximum")
+        self.refused({"maxItems": -1}, "maxItems")
+        self.refused({"prefixItems": {"type": "string"}}, "prefixItems")
+        self.refused({"prefixItems": [{"nope": 1}]}, "nope")
+
+    def test_a_condition_on_a_missing_field_is_worded_as_absent(self):
+        s = {
+            "type": "object",
+            "if": {"not": {"required": ["mode"]}},
+            "then": {"required": ["kind"]},
+        }
+        self.assertEqual(
+            [(e.field, e.message) for e in schema.validate_instance({}, s, {})],
+            [("kind", "required when mode is absent")],
+        )
+        self.assertEqual(schema.validate_instance({"mode": "a"}, s, {}), [])
 
     def test_an_unsupported_keyword_in_every_place_a_schema_nests(self):
         for node in (

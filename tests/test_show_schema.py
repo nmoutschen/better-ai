@@ -39,7 +39,7 @@ HEAD = "The slide states one clear point."
 
 def shape_problems(spec):
     """(field, message) of each problem the spec schema finds."""
-    return schema.check_record(spec, ["spec.schema.json"], SCHEMAS)
+    return schema.check_record(spec, ["spec.schema.json"], SCHEMAS, cross=True)
 
 
 # One valid panel of each kind: the least the kind needs.
@@ -458,7 +458,7 @@ KIND_BREAKS = [
 
 class BrokenSpecs(unittest.TestCase):
     def test_each_broken_spec_is_refused_by_the_schema_with_its_field_named(self):
-        for name, spec, field in SHAPE_BREAKS + KIND_BREAKS:
+        for name, spec, field in BROKEN:
             with self.subTest(name):
                 fields = [f for f, _ in shape_problems(spec)]
                 self.assertTrue(
@@ -467,127 +467,194 @@ class BrokenSpecs(unittest.TestCase):
                 )
 
     def test_show_py_check_refuses_each_one_and_names_the_field(self):
-        for name, spec, field in SHAPE_BREAKS + KIND_BREAKS:
+        for name, spec, field in BROKEN:
             with self.subTest(name):
                 errors, _, _ = show.check(spec)
                 self.assertTrue(errors, "accepted")
                 self.assertTrue(any(field in e for e in errors), (field, errors))
 
 
-# Rules show.py keeps because they need the rendering's own knowledge: the schema accepts these specs.
-RENDERING_BREAKS = [
+def tree_of(*children, value=None):
+    return {"label": "All", **({"value": value} if value is not None else {}), "children": list(children)}
+
+
+def deep_tree():
+    node = {"label": "e", "value": 1}
+    for name in "dcba":
+        node = {"label": name, "children": [node]}
+    return {"label": "All", "children": [node]}
+
+
+def overview_panel():
+    return edited(visual("flow"), put("overview", True))
+
+
+# What refers to something else in the spec, and the limits a number must keep: refused by schema.py, with the field.
+CROSS_BREAKS = [
     (
         "an edge names a node that is not there",
         spec_of(edited(visual("concept"), lambda p: p["edges"][0].update({"to": "zzz"}))),
-        "edge",
+        "panels[0].edges[0].to",
+    ),
+    (
+        "an edge's source names a node that is not there",
+        spec_of(edited(visual("concept"), lambda p: p["edges"][0].update({"from": "zzz"}))),
+        "panels[0].edges[0].from",
+    ),
+    (
+        "an edge in a compare side names a node that is not there",
+        spec_of(
+            {
+                **OTHER_PANELS["compare"],
+                "a": {"label": "A", **edited(visual("concept"), lambda p: p["edges"][0].update({"to": "zzz"}))},
+            }
+        ),
+        "panels[0].a.edges[0].to",
     ),
     (
         "a region names a set that is not there",
         spec_of(edited(visual("sets"), lambda p: p["regions"][0].update({"in": ["Z"]}))),
-        "region",
+        "panels[0].regions[0].in",
     ),
     (
         "a lane step names another actor",
         spec_of(edited(visual("lanes"), lambda p: p["steps"][0].update({"actor": "Z"}))),
-        "actor",
+        "panels[0].steps[0].actor",
     ),
     (
         "a matrix row has too few cells",
         spec_of(edited(visual("matrix"), lambda p: p["rows"][0].update({"cells": [None]}))),
-        "cell",
+        "panels[0].rows[0].cells",
     ),
-    ("a table row has too few cells", spec_of(edited(visual("table"), lambda p: p["rows"][0].pop())), "row 1"),
-    ("a bar is negative", spec_of(edited(visual("bars"), lambda p: p["items"][0].update({"value": -1}))), "negative"),
+    (
+        "a table row has too few cells",
+        spec_of(edited(visual("table"), lambda p: p["rows"][1].pop())),
+        "panels[0].rows[1]",
+    ),
     (
         "a unit part counts zero",
         spec_of(edited(visual("units"), lambda p: p["parts"][0].update({"count": 0}))),
-        "count",
+        "panels[0].parts[0].count",
     ),
-    ("units above 100", spec_of(edited(visual("units"), lambda p: p["parts"][0].update({"count": 101}))), "units"),
     (
         "a quadrant position beyond 1",
         spec_of(edited(visual("quadrant"), lambda p: p["items"][0].update({"x": 1.5}))),
-        "between 0 and 1",
+        "panels[0].items[0].x",
     ),
-    ("a pair has three columns", spec_of(edited(visual("pairs"), lambda p: p["columns"].append("c"))), "two headings"),
+    (
+        "a quadrant position below 0",
+        spec_of(edited(visual("quadrant"), lambda p: p["items"][0].update({"y": -0.1}))),
+        "panels[0].items[0].y",
+    ),
+    (
+        "a pair has three columns",
+        spec_of(edited(visual("pairs"), lambda p: p["columns"].append("c"))),
+        "panels[0].columns",
+    ),
     (
         "a line point has a text y",
         spec_of(edited(visual("line"), lambda p: p["series"][0]["points"][0].__setitem__(1, "a"))),
-        "non-numeric",
-    ),
-    (
-        "a tree deeper than four levels",
-        spec_of(
-            edited(
-                visual("tree"),
-                lambda p: p["root"].update(
-                    {
-                        "children": [
-                            {
-                                "label": "a",
-                                "children": [
-                                    {
-                                        "label": "b",
-                                        "children": [
-                                            {
-                                                "label": "c",
-                                                "children": [{"label": "d", "children": [{"label": "e", "value": 1}]}],
-                                            }
-                                        ],
-                                    }
-                                ],
-                            }
-                        ]
-                    }
-                ),
-            )
-        ),
-        "levels",
+        "panels[0].series[0].points[0][1]",
     ),
     (
         "a tree whose children outweigh the parent",
         spec_of(edited(visual("tree"), lambda p: p["root"].update({"value": 1}))),
-        "sum",
+        "panels[0].root",
     ),
-    ("a map without sections", spec_of({"headline": HEAD, "source": "t", "kind": "map"}), "sections"),
-    ("an svg that is not one element", spec_of(edited(visual("svg"), lambda p: p.update({"svg": "<p>x</p>"}))), "svg"),
+    (
+        "a map without sections",
+        spec_of({"headline": HEAD, "source": "t", "kind": "map"}),
+        "panels[0].sections",
+    ),
+    (
+        "an action pointing past the last panel",
+        spec_of({**OTHER_PANELS["title"], "actions": [{"text": "go", "panel": 4}]}),
+        "panels[0].actions[0].panel",
+    ),
+    (
+        "an action pointing at panel 0",
+        spec_of({**OTHER_PANELS["title"], "actions": [{"text": "go", "panel": 0}]}),
+        "panels[0].actions[0].panel",
+    ),
+    (
+        "focus without an overview",
+        spec_of(visual("flow"), edited(visual("text"), put("focus", ["One"]))),
+        "panels[1].focus",
+    ),
+    (
+        "two overviews",
+        spec_of(overview_panel(), overview_panel()),
+        "panels[1].overview",
+    ),
+    (
+        "an overview that is not a flow, timeline, concept or groups",
+        spec_of(edited(visual("text"), put("overview", True))),
+        "panels[0].kind",
+    ),
+    (
+        "an overview that is not a visual panel",
+        spec_of({**OTHER_PANELS["statement"], "overview": True}),
+        "panels[0].template",
+    ),
+    (
+        "a focus label the overview lacks",
+        spec_of(overview_panel(), edited(visual("text"), put("focus", ["Nine"]))),
+        "panels[1].focus",
+    ),
+]
+BROKEN = SHAPE_BREAKS + KIND_BREAKS + CROSS_BREAKS
+
+# What stays in show.py, because the drawing cannot show it: the schema accepts these specs.
+RENDERING_BREAKS = [
+    (
+        "a bar is negative",
+        spec_of(edited(visual("bars"), lambda p: p["items"][0].update({"value": -1}))),
+        "negative",
+    ),
+    (
+        "units above 100",
+        spec_of(edited(visual("units"), lambda p: p["parts"][0].update({"count": 101}))),
+        "units",
+    ),
+    (
+        "a tree deeper than four levels",
+        spec_of(edited(visual("tree"), lambda p: p.update({"root": deep_tree()}))),
+        "levels",
+    ),
+    (
+        "an svg that is not one element",
+        spec_of(edited(visual("svg"), lambda p: p.update({"svg": "<p>x</p>"}))),
+        "svg",
+    ),
     (
         "an svg with a script",
         spec_of(edited(visual("svg"), lambda p: p.update({"svg": '<svg viewBox="0 0 8 8"><script>x</script></svg>'}))),
         "svg",
     ),
-    (
-        "an action pointing past the last panel",
-        spec_of({**OTHER_PANELS["title"], "actions": [{"text": "go", "panel": 4}]}),
-        "points to panel 4",
-    ),
-    ("focus without an overview", spec_of(visual("flow"), edited(visual("text"), put("focus", ["One"]))), "overview"),
-    (
-        "two overviews",
-        spec_of(edited(visual("flow"), put("overview", True)), edited(visual("flow"), put("overview", True))),
-        "overview",
-    ),
-    (
-        "an overview that is not a flow, timeline, concept or groups",
-        spec_of(edited(visual("text"), put("overview", True))),
-        "overview",
-    ),
-    (
-        "a focus label the overview lacks",
-        spec_of(edited(visual("flow"), put("overview", True)), edited(visual("text"), put("focus", ["Nine"]))),
-        "focus",
-    ),
 ]
 
 
 class RenderingChecks(unittest.TestCase):
-    def test_the_schema_accepts_them_and_show_py_check_refuses_them(self):
+    def test_what_the_drawing_cannot_show_is_accepted_by_the_schema_and_refused_by_show_py_check(self):
         for name, spec, word in RENDERING_BREAKS:
             with self.subTest(name):
                 self.assertEqual(shape_problems(spec), [])
                 errors, _, _ = show.check(spec)
                 self.assertTrue(errors, "accepted")
                 self.assertTrue(any(word in e for e in errors), (word, errors))
+
+    def test_a_note_or_read_on_a_panel_keeps_the_old_hint_to_move_it_into_source(self):
+        for old in ("note", "read"):
+            with self.subTest(old):
+                errors, _, _ = show.check(edited(BASE, lambda s, old=old: s["panels"][0].__setitem__(old, "x")))
+                self.assertEqual(len(errors), 1)
+                self.assertTrue(
+                    errors[0].startswith(f"panels[0].{old}: '{old}' is no longer used: move it into 'source'")
+                )
+
+    def test_a_missing_template_is_worded_as_absent(self):
+        spec = edited(BASE, lambda s: s["panels"][0].pop("kind"))
+        self.assertIn(("panels[0].kind", "required when template is absent"), shape_problems(spec))
 
     def test_a_shape_error_stops_the_rendering_checks_and_prints_no_digest(self):
         errors, _, digest = show.check(edited(BASE, drop("title")))
@@ -679,6 +746,31 @@ class SlideOnNotes(unittest.TestCase):
     def test_the_slide_page_sends_the_slide_with_each_note(self):
         source = (SHOW / "scripts" / "show.js").read_text(encoding="utf-8")
         self.assertRegex(source, r"noteParams:\s*function \(\) \{ return \{ on: \{ slide: cur \+ 1, part: [^}]*null")
+
+
+class DesignBetterFixtures(unittest.TestCase):
+    """The planted conversations of the design-better eval cases are typed events canvas.py reads."""
+
+    CASES = ("acceptance-walk", "design-before-build", "direction-review-before-build", "handback-three-things")
+
+    def folder(self, case):
+        return ROOT / "evals" / "cases" / "design-better" / case / "repo" / ".design" / "shift-swap"
+
+    def test_each_file_passes_the_schemas_and_pending_lists_the_planted_items(self):
+        for case in self.CASES:
+            with self.subTest(case):
+                log = self.folder(case) / "conversation.jsonl"
+                self.assertEqual(schema.check_paths([log], CANVAS / "schemas"), [])
+                with tempfile.TemporaryDirectory() as d:
+                    copy_to = Path(d) / "shift-swap"
+                    copy_to.mkdir()
+                    (copy_to / "conversation.jsonl").write_text(log.read_text())
+                    script = str(CANVAS / "scripts" / "canvas.py")
+                    done = subprocess.run(
+                        [sys.executable, "-I", script, "pending", str(copy_to)], capture_output=True, text=True
+                    )
+                self.assertIn("3 not done", done.stdout)
+                self.assertIn('"id": "d-1k9"', done.stdout)
 
 
 if __name__ == "__main__":
