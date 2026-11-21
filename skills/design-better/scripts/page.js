@@ -143,7 +143,7 @@ function pageCommentPosition(x, y, pop) {
 // o.readOnly     a copy of the page to read: no actions
 // o.stream       read the log from the server's /events (default true); otherwise the page calls setLog
 // o.afterSend()  called once the server saved an action
-// o.noteParams() what a message carries besides its words, such as the current slide
+// o.noteParams() what a message carries besides its words, such as the current slide; the page's events schema must allow it
 // o.sendMode()   a function to run instead of sending a message when the Send button is pressed, or null
 // o.busy()       the page has something open the user would lose on a reload
 // o.beforeReload()  keep the page's place before a new render loads

@@ -1,3 +1,0 @@
-{"action": "comment", "id": "c-1k2", "version": "A", "selector": "nav > a:nth-child(2)", "text": "Swap board", "verdict": "down", "words": "Nobody will open a second page between customers.", "at": "2026-12-03T14:02:11Z"}
-{"action": "comment", "id": "c-1k7", "version": "B", "selector": "li.shift > button", "text": "Offer this shift", "verdict": "up", "words": "Yes, right on the shift. Keep the note optional.", "at": "2026-12-03T14:03:40Z"}
-{"action": "decide", "id": "d-1k9", "option": "B", "label": "B", "carries": ["c-1k7"], "text": "B, with the note optional.", "at": "2026-12-03T14:05:02Z"}

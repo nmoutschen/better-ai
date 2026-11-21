@@ -101,7 +101,7 @@ class Reader:
         for number, piece in enumerate(lines_of(text, jsonl), 1):
             try:
                 value = json.loads(piece)
-            except ValueError:
+            except (ValueError, RecursionError):
                 continue
             parsed[number] = value if isinstance(value, dict) else None
         by_line: dict = {}

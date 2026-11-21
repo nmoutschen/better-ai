@@ -266,6 +266,7 @@
     served: served, name: 'page', apply: apply, reset: reset, byId: byId, reveal: reveal, edit: openEdit, remove: comments.remove,
     showLabel: function (n) { return 'Show comment ' + n + ' on its slide'; },
     crumb: crumb, commentBody: function (e) { return el('p', 'body', e.text); },
+    noteParams: function () { return { on: { slide: cur + 1, part: slides[cur].dataset.part || null } }; },
     busy: function () { return !pop.hidden; },
     beforeReload: function () { sessionStorage.setItem(KEY, commenting ? 'comment' : 'read'); },
     rendered: function (state) { comments.state(state); items.forEach(function (it) { placePin(it, false); }); }

@@ -16,8 +16,8 @@ Each skill carries an identical copy of this file in `scripts/`, with `schemas/b
 
 The schemas live in `--schemas DIR`, by default the `schemas/` folder next to `scripts/`. A schema describes one
 record: one line of a JSONL file, or one JSON file. These keywords of JSON Schema are supported, and any other keyword
-in a schema is an error, so a rule is never silently ignored: type, const, enum, pattern, minLength, minItems, required,
-properties, additionalProperties, items, allOf, anyOf, not, if/then/else and $ref (to `#/...` in the same schema, or to
+in a schema is an error, so a rule is never silently ignored: type, const, enum, pattern, minLength, minItems, maxItems, minimum, maximum, required,
+properties, additionalProperties, items, prefixItems, allOf, anyOf, not, if/then/else and $ref (to `#/...` in the same schema, or to
 `<name>.schema.json#/...` in the schemas folder, such as the shared `base.schema.json`). `title`, `description`,
 `$schema`, `$id`, `$comment`, `$defs`, `examples` and `default` are notes. The schemas are checked as a whole when
 they load: an unsupported keyword, a `type` that is not a type name, a `pattern` that is not a regular expression, a
@@ -62,6 +62,7 @@ import argparse
 import copy
 import fnmatch
 import json
+import math
 import os
 import re
 import sys
@@ -78,10 +79,14 @@ KEYWORDS = {
     "pattern",
     "minLength",
     "minItems",
+    "maxItems",
+    "minimum",
+    "maximum",
     "required",
     "properties",
     "additionalProperties",
     "items",
+    "prefixItems",
     "allOf",
     "anyOf",
     "not",
@@ -152,7 +157,7 @@ def _parses(text: str, lines: bool) -> bool:
         for piece in _lines(text) if lines else [text]:
             if piece.strip() or not lines:
                 json.loads(piece)
-    except ValueError:
+    except (ValueError, RecursionError):
         return False
     return True
 
@@ -213,7 +218,7 @@ class Context:
         if key not in self._cache:
             try:
                 self._cache[key] = json.loads(read_checked(path, False))
-            except (OSError, ValueError):
+            except (OSError, ValueError, RecursionError):
                 self._cache[key] = None
         return self._cache[key]
 
@@ -264,7 +269,7 @@ def _lines(text: str) -> list[str]:
 def _loads(text: str) -> Any:
     try:
         return json.loads(text)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
 
 
@@ -274,6 +279,8 @@ def _loads(text: str) -> Any:
 def _type_name(value: Any) -> str:
     if value is None:
         return "null"
+    if isinstance(value, float) and not math.isfinite(value):
+        return "non-finite number"  # NaN and Infinity are not JSON numbers
     if isinstance(value, bool):
         return "boolean"
     if isinstance(value, int):
@@ -331,6 +338,18 @@ def _condition(schema: dict) -> str:
             continue
         described.add(name)
     parts += [f"{name} is present" for name in schema.get("required", []) if name not in described]
+    excluded = schema.get("not")
+    if (
+        isinstance(excluded, dict)
+        and isinstance(excluded.get("required"), list)
+        and set(excluded) <= {"required", "properties"}
+    ):
+        for name in excluded["required"]:
+            empty = (
+                isinstance(excluded.get("properties", {}).get(name), dict)
+                and "minItems" in excluded["properties"][name]
+            )
+            parts.append(f"{name} is absent or empty" if empty else f"{name} is absent")
     return " and ".join(parts) or "its condition holds"
 
 
@@ -341,9 +360,14 @@ def _required_only(schema: Any) -> list[str] | None:
 
 
 class Validator:
-    def __init__(self, docs: dict[str, dict], context: Context | None = None):
+    """`hooks` says what `x-check` does: "on" runs the hooks with the other cross-record rules, "off" skips them, and
+    "only" runs nothing but them. `validate_instance` and `check_file` run "off", then "only" on a record that has no
+    shape errors, so a hook never sees a wrongly typed value."""
+
+    def __init__(self, docs: dict[str, dict], context: Context | None = None, hooks: str = "on"):
         self.docs = docs
         self.context = context
+        self.hooks = hooks
 
     def resolve(self, ref: str, doc: dict) -> tuple[Any, dict]:
         name, _, fragment = ref.partition("#")
@@ -390,9 +414,20 @@ class Validator:
             if "minItems" in schema and len(value) < schema["minItems"]:
                 n = schema["minItems"]
                 problems.append(Problem(at, f"must have at least {n} item{'' if n == 1 else 's'}"))
+            if "maxItems" in schema and len(value) > schema["maxItems"]:
+                n = schema["maxItems"]
+                problems.append(Problem(at, f"must have at most {n} item{'' if n == 1 else 's'}"))
+            prefix = schema.get("prefixItems", [])
+            for i, sub in enumerate(prefix[: len(value)]):
+                problems += self.validate(value[i], sub, _join(path, i), doc)
             if "items" in schema:
-                for i, item in enumerate(value):
-                    problems += self.validate(item, schema["items"], _join(path, i), doc)
+                for i in range(len(prefix), len(value)):
+                    problems += self.validate(value[i], schema["items"], _join(path, i), doc)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if "minimum" in schema and value < schema["minimum"]:
+                problems.append(Problem(at, f"must be at least {_show(schema['minimum'])}"))
+            if "maximum" in schema and value > schema["maximum"]:
+                problems.append(Problem(at, f"must be at most {_show(schema['maximum'])}"))
         if isinstance(value, dict):
             problems += self._object(value, schema, path, doc)
 
@@ -476,23 +511,28 @@ class Validator:
         context = self.context
         at = _render(path)
         problems = []
-        if "x-points-to" in schema and isinstance(value, str):
-            problems += self._points_to(value, schema["x-points-to"], at)
-        if (
-            "x-mode-sets" in schema
-            and isinstance(value, str)
-            and not ("enum" in schema and value not in schema["enum"])
-        ):
-            problems += self._mode_sets(value, schema["x-mode-sets"], at)
-        if "x-differs-from" in schema and isinstance(parent, dict):
-            other = schema["x-differs-from"]
-            if other in parent and _equal(parent[other], value):
-                problems.append(Problem(at, f"must differ from {other} ({_show(value)})", "cross"))
-        if "x-check" in schema and isinstance(value, dict):
+        if self.hooks != "only":
+            if "x-points-to" in schema and isinstance(value, str):
+                problems += self._points_to(value, schema["x-points-to"], at)
+            if (
+                "x-mode-sets" in schema
+                and isinstance(value, str)
+                and not ("enum" in schema and value not in schema["enum"])
+            ):
+                problems += self._mode_sets(value, schema["x-mode-sets"], at)
+            if "x-differs-from" in schema and isinstance(parent, dict):
+                other = schema["x-differs-from"]
+                if other in parent and _equal(parent[other], value):
+                    problems.append(Problem(at, f"must differ from {other} ({_show(value)})", "cross"))
+        if "x-check" in schema and isinstance(value, dict) and self.hooks != "off":
             name = schema["x-check"]
             if name not in HOOKS:
                 raise SchemaError(f"x-check {name!r}: schema.py has no hook of that name")
-            for field, message in HOOKS[name](value, context):
+            try:
+                found = HOOKS[name](value, context)
+            except Exception:  # a hook is code: whatever it meets, the answer is an error, not a traceback
+                return [*problems, Problem(ROOT, f"check failed: {name}", "cross")]
+            for field, message in found:
                 problems.append(Problem(_render(_join(path, field)) if path else field, message, "cross"))
         return problems
 
@@ -533,8 +573,26 @@ class Validator:
 
 
 def validate_instance(value: Any, schema: dict, docs: dict[str, dict], context: Context | None = None) -> list[Problem]:
-    """The problems of one value against one schema; `docs` holds the schemas a $ref can name, by file name."""
-    return Validator(docs, context).validate(value, schema, (), schema)
+    """The problems of one value against one schema; `docs` holds the schemas a $ref can name, by file name. The hooks
+    run only when the value has no shape error."""
+    return validate_record(value, [schema], docs, context)
+
+
+def validate_record(value: Any, schemas: list[dict], docs: dict[str, dict], context: Context | None) -> list[Problem]:
+    """The problems of one record against each of its schemas: first everything but the hooks, then, if the record has
+    no shape error, the hooks, whose findings come last."""
+    try:
+        first = [p for schema in schemas for p in Validator(docs, context, "off").validate(value, schema, (), schema)]
+        if context is None or any(p.kind != "cross" for p in first):
+            return first
+        hooked = [p for schema in schemas for p in Validator(docs, context, "only").validate(value, schema, (), schema)]
+    except SchemaError:
+        raise  # the schema is wrong, which is not a problem of the record
+    except RecursionError:
+        return [Problem(ROOT, "is nested too deeply to check")]
+    except Exception as error:  # whatever one record makes the validator raise is that record's error, not a traceback
+        return [Problem(ROOT, f"could not be checked: {type(error).__name__}")]
+    return first + [p for p in hooked if p.kind == "cross"]
 
 
 # ---------------------------------------------------------------- hooks
@@ -561,6 +619,141 @@ def _verified_needs_passing_verifier(record: dict, context: Context) -> list[tup
     if last.get("result") != "passes":
         return [("status", f"{need}; it handed back {_show(last.get('result'))}")]
     return []
+
+
+def _is_num(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _show_overview_labels(panel: dict) -> list:
+    """The labels a later panel's `focus` may name: those of the overview panel's steps, events, nodes or groups."""
+
+    def listed(key: str) -> list:
+        found = panel.get(key)
+        return found if isinstance(found, list) else []
+
+    def labels(key: str) -> list:
+        return [x.get("label") for x in listed(key) if isinstance(x, dict)]
+
+    kind = panel.get("kind")
+    if kind == "flow":
+        return labels("steps")
+    if kind == "timeline":
+        return labels("events")
+    if kind == "concept":
+        return labels("nodes")
+    found = []
+    for group in listed("groups"):
+        if isinstance(group, dict):
+            inside = group.get("items")
+            found += [group.get("label"), *map(str, inside if isinstance(inside, list) else [])]
+    return found
+
+
+def _show_visual(v: dict, where: str, document_sections: Any) -> list[tuple[str, str]]:
+    """What one visual refers to inside itself: the node an edge names, the set a region names, the cells of a row."""
+    problems: list[tuple[str, str]] = []
+    kind = v.get("kind")
+
+    def items(key: str) -> list:
+        found = v.get(key)
+        return found if isinstance(found, list) else []
+
+    if kind == "map" and not (v.get("sections") or document_sections):
+        problems.append((f"{where}.sections", "a map needs 'sections', or a top-level 'document' with 'sections'"))
+    if kind == "concept":
+        ids = {n["id"] for n in items("nodes") if isinstance(n, dict) and isinstance(n.get("id"), str)}
+        for j, edge in enumerate(items("edges")):
+            for end in ("from", "to"):
+                if isinstance(edge, dict) and isinstance(edge.get(end), str) and edge[end] not in ids:
+                    problems.append((f"{where}.edges[{j}].{end}", "names no node id of 'nodes'"))
+    if kind == "sets":
+        names = {n for n in items("sets") if isinstance(n, str)}
+        for j, region in enumerate(items("regions")):
+            ins = region.get("in") if isinstance(region, dict) else None
+            if isinstance(ins, list) and not all(n in names for n in ins if isinstance(n, str)):
+                problems.append((f"{where}.regions[{j}].in", "names a set that 'sets' does not list"))
+    if kind == "lanes":
+        actors = {a for a in items("actors") if isinstance(a, str)}
+        for j, step in enumerate(items("steps")):
+            if isinstance(step, dict) and isinstance(step.get("actor"), str) and step["actor"] not in actors:
+                problems.append((f"{where}.steps[{j}].actor", "is not one of 'actors'"))
+    if kind in ("matrix", "table"):
+        columns = items("columns")
+        for j, row in enumerate(items("rows")):
+            cells = row if kind == "table" else row.get("cells") if isinstance(row, dict) else None
+            if isinstance(cells, list) and len(cells) != len(columns):
+                field = f"{where}.rows[{j}]" + (".cells" if kind == "matrix" else "")
+                problems.append((field, f"has {len(cells)} cells for {len(columns)} columns"))
+    if kind == "tree" and isinstance(v.get("root"), dict):
+
+        def walk(node: dict, path: str) -> None:
+            children = node.get("children") if isinstance(node.get("children"), list) else []
+            kids = [k for k in children if isinstance(k, dict)]
+            if kids and _is_num(node.get("value")) and all(_is_num(k.get("value")) for k in kids):
+                total = sum(k["value"] for k in kids)
+                if abs(total - node["value"]) > 1e-9 * max(1, abs(node["value"])) and total > node["value"]:
+                    problems.append((path, f"its children sum to {total:g}, more than its value {node['value']:g}"))
+            for j, kid in enumerate(children):
+                if isinstance(kid, dict):
+                    walk(kid, f"{path}.children[{j}]")
+
+        walk(v["root"], f"{where}.root")
+    return problems
+
+
+@hook("show_spec")
+def _show_spec(record: dict, context: Context) -> list[tuple[str, str]]:
+    """What a show-better spec's panels say about each other and about themselves: a visual's references, an
+    action's target panel, one overview, and the focus labels it holds."""
+    panels = record.get("panels")
+    if not isinstance(panels, list):
+        return []
+    document = record.get("document")
+    sections = document.get("sections") if isinstance(document, dict) else None
+    problems: list[tuple[str, str]] = []
+    overview: tuple[int, list] | None = None  # the panel number and its labels, once a panel sets overview
+    for i, panel in enumerate(panels):
+        if not isinstance(panel, dict):
+            continue
+        at = f"panels[{i}]"
+        template = panel.get("template") or "visual"
+        if template == "visual":
+            problems += _show_visual(panel, at, sections)
+        elif template == "compare":
+            for side in ("a", "b"):
+                if isinstance(panel.get(side), dict):
+                    problems += _show_visual(panel[side], f"{at}.{side}", sections)
+        elif template == "title" and isinstance(panel.get("actions"), list):
+            for j, action in enumerate(panel["actions"]):
+                target = action.get("panel") if isinstance(action, dict) else None
+                if isinstance(target, int) and not isinstance(target, bool) and not 1 <= target <= len(panels):
+                    problems.append(
+                        (f"{at}.actions[{j}].panel", f"points to panel {target}; there are {len(panels)} panels")
+                    )
+        if panel.get("overview") is True:
+            if overview:
+                problems.append(
+                    (f"{at}.overview", f"only one panel may set 'overview'; panel {overview[0]} already does")
+                )
+            elif template == "visual" and panel.get("kind") in ("flow", "timeline", "concept", "groups"):
+                overview = (i + 1, _show_overview_labels(panel))
+        focus = panel.get("focus")
+        if focus is not None:
+            wanted = [focus] if isinstance(focus, str) else focus if isinstance(focus, list) else []
+            if overview is None:
+                problems.append((f"{at}.focus", 'needs an earlier panel with "overview": true'))
+            else:
+                for label in wanted:
+                    if label not in overview[1]:
+                        shown = ", ".join(map(str, overview[1]))
+                        problems.append(
+                            (
+                                f"{at}.focus",
+                                f"{_show(label)} is not a label in the overview (panel {overview[0]}): {shown}",
+                            )
+                        )
+    return problems
 
 
 # ---------------------------------------------------------------- checking files
@@ -607,6 +800,16 @@ def _audit(node: Any, where: str, boolean_ok: bool = False) -> None:
         isinstance(node["required"], list) and all(isinstance(n, str) for n in node["required"])
     ):
         raise SchemaError(f"{where}: required must be a list of field names")
+    for keyword in ("minimum", "maximum"):
+        if keyword in node and (not isinstance(node[keyword], (int, float)) or isinstance(node[keyword], bool)):
+            raise SchemaError(f"{where}: {keyword} must be a number")
+    for keyword in ("minItems", "maxItems", "minLength"):
+        if keyword in node and (
+            not isinstance(node[keyword], int) or isinstance(node[keyword], bool) or node[keyword] < 0
+        ):
+            raise SchemaError(f"{where}: {keyword} must be a whole number, 0 or more")
+    if "prefixItems" in node and not isinstance(node["prefixItems"], list):
+        raise SchemaError(f"{where}: prefixItems must be a list of schemas")
     _audit_extensions(node, where)
     for keyword in ("properties", "$defs"):
         if keyword in node and not isinstance(node[keyword], dict):
@@ -618,7 +821,7 @@ def _audit(node: Any, where: str, boolean_ok: bool = False) -> None:
         _audit(sub, f"{where}/properties/{name}")
     for name, sub in node.get("$defs", {}).items():
         _audit(sub, f"{where}/$defs/{name}")
-    for keyword in ("allOf", "anyOf"):
+    for keyword in ("allOf", "anyOf", "prefixItems"):
         for i, sub in enumerate(node.get(keyword, [])):
             _audit(sub, f"{where}/{keyword}/{i}")
     for keyword in ("items", "not", "if", "then", "else"):
@@ -684,7 +887,6 @@ def check_text(path: Path, text: str, docs: dict[str, dict], cache: dict[str, An
     if not found:
         return [Error(where, 1, "(file)", "no schema describes this file")]
     context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
-    validator = Validator(docs, context)
     errors: list[Error] = []
     seen: dict[str, int] = {}
     versioned = all(doc.get("x-versioned") for _, doc in found)
@@ -699,12 +901,14 @@ def check_text(path: Path, text: str, docs: dict[str, dict], cache: dict[str, An
         except ValueError as error:
             errors.append(Error(where, number, ROOT, f"not valid JSON: {error}"))
             continue
+        except RecursionError:
+            errors.append(Error(where, number, ROOT, "is nested too deeply to read"))
+            continue
         if not isinstance(record, dict):
             errors.append(Error(where, number, ROOT, f"expected object, got {_type_name(record)}"))
             continue
-        for _, schema in found:
-            for problem in validator.validate(record, schema, (), schema):
-                errors.append(Error(where, number, problem.field, problem.message))
+        for problem in validate_record(record, [schema for _, schema in found], docs, context):
+            errors.append(Error(where, number, problem.field, problem.message))
         identity = record.get("id")
         if isinstance(identity, str):
             if not versioned and identity in seen:
@@ -722,22 +926,29 @@ def strip_invalid(record: dict, errors: list[Error]) -> dict:
     errors name (`answer.event` and `requirements[0]` name `answer` and `requirements`), so what is left is well typed
     or missing. `errors` are the record's own; the copy lists them in `_errors` as `field: message`."""
     names = {re.match(r"[^.\[]*", error.field).group(0) for error in errors}
-    stripped = {key: copy.deepcopy(value) for key, value in record.items() if key not in names}
+    try:
+        stripped = {key: copy.deepcopy(value) for key, value in record.items() if key not in names}
+    except RecursionError:  # too deeply nested to copy: the page shows it marked, with its errors and a plain id
+        stripped = {"id": record["id"]} if isinstance(record.get("id"), str) else {}
     if errors:
         stripped["_errors"] = [f"{error.field}: {error.message}" for error in errors]
     return stripped
 
 
-def check_record(record: Any, names: list[str], schemas: Path | None = None) -> list[tuple[str, str]]:
+def check_record(
+    record: Any, names: list[str], schemas: Path | None = None, cross: bool = False
+) -> list[tuple[str, str]]:
     """The problems of one record against each named schema (file names in the schemas folder), as (field, message):
     the check a script makes before it writes a record. Pointers and other checks that need the files around the
-    record are not made: `check_paths` makes them on the file."""
+    record are not made: `check_paths` makes them on the file. With `cross`, the hooks (`x-check`) of the schemas
+    run too, for a record whose rules look only at the record itself, such as a presentation spec."""
     docs = load_schemas(schemas or Path(__file__).resolve().parent.parent / "schemas")
     problems: list[tuple[str, str]] = []
+    context = Context(Path.cwd(), "record", {}) if cross else None
     for name in names:
         if name not in docs:
             raise SchemaError(f"no schema named {name!r} in the schemas folder")
-        problems += [(p.field, p.message) for p in validate_instance(record, docs[name], docs)]
+        problems += [(p.field, p.message) for p in validate_instance(record, docs[name], docs, context)]
     return list(dict.fromkeys(problems))
 
 

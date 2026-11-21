@@ -5,7 +5,8 @@ Usage:
   python3 show.py render SPEC --out FILE      check, then write the page (--open to open it, --serve to serve it)
   python3 show.py wait DIR [--timeout S]
   python3 show.py reply DIR TEXT [--to ID]
-  python3 show.py status DIR seen|asked|working|done|accepted ID...
+  python3 show.py status DIR seen|asked|working|done ID...
+  python3 show.py status DIR accepted ID... --text "the user's words"
   python3 show.py pending DIR
 
 SPEC is a JSON file described in templates/spec.md. The page shows one 16:9 slide at a time, with a strip above that
@@ -45,6 +46,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent  # show.html, page.css, show.css, page.js and show.js sit next to this script
 sys.path.insert(0, str(HERE))  # page.py, the conversation every page that talks to the agent shares, sits here too
 import page  # noqa: E402
+import schema  # noqa: E402
+
+SCHEMAS = HERE.parent / "schemas"  # spec.schema.json, the shape of a spec
 
 KINDS = (
     "map",
@@ -401,17 +405,49 @@ def table_lines(header, rows, W, g, right=frozenset(), hl=frozenset()):
 # ---------- validation ----------
 
 
+def without_nulls(value):
+    """The value with each object field that holds null left out: an optional field set to null means the same as one
+    that is not there. A null inside a list, such as an empty cell, stays."""
+    if isinstance(value, dict):
+        return {k: without_nulls(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [without_nulls(v) for v in value]
+    return value
+
+
+def shape_errors(spec) -> list[str]:
+    """What schema.py finds wrong with the spec's shape, one line each, the field first."""
+    found = []
+    for field, message in schema.check_record(spec, ["spec.schema.json"], SCHEMAS, cross=True):
+        old = re.fullmatch(r"panels\[\d+\]\.(note|read)", field)
+        if old:  # a spec from before: say where the text goes now
+            message = (
+                f"'{old[1]}' is no longer used: move it into 'source', the one line at the foot of each slide "
+                "that says what the slide rests on and where to read it"
+            )
+        if field == "type" and message == "required":  # a spec from before `type` existed
+            message = 'add "type": "slides" at the top of the spec'
+        found.append(f"{field}: {message}")
+    return found
+
+
 def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
-    """Return (errors, warnings, digest lines)."""
-    errors, warnings, digest = [], [], []
-    if not isinstance(spec, dict):
-        return ["the spec must be a JSON object"], [], []
-    for key in ("title", "panels"):
-        if not spec.get(key):
-            errors.append(f"missing '{key}'")
-    panels = spec.get("panels") or []
-    if not isinstance(panels, list):
-        return errors + ["'panels' must be a list"], warnings, digest
+    """Return (errors, warnings, digest lines). The shape is schema.py's; the rest needs the rendering's knowledge.
+    Whatever the spec holds, the answer is errors, never a traceback."""
+    try:
+        return check_spec(spec)
+    except RecursionError:
+        return ["(record): is nested too deeply to check"], [], []
+    except Exception as error:
+        return [f"(record): could not be checked: {type(error).__name__}"], [], []
+
+
+def check_spec(spec: dict) -> tuple[list[str], list[str], list[str]]:
+    spec = without_nulls(spec)
+    errors, warnings, digest = shape_errors(spec), [], []
+    if errors:
+        return errors, warnings, digest
+    panels = spec["panels"]
     if len(panels) > LIMITS["panels"]:
         warnings.append(
             f"{len(panels)} panels: more than {LIMITS['panels']} is long for one introduction; split it or cut panels"
@@ -420,67 +456,35 @@ def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
         warnings.append("'kicker' is not shown: put the reader's question in 'question', the opening slide's kicker")
     if not spec.get("question"):
         warnings.append("no 'question': the opening slide asks the reader's question, and the title answers it")
-    digest.append(f"TITLE: {spec.get('title', '')}")
+    digest.append(f"TITLE: {spec['title']}")
     for key in ("question", "summary", "source"):
         if spec.get(key):
             digest.append(f"{key.upper()}: {spec[key]}")
     doc = spec.get("document")
-    if doc is not None:
-        if not isinstance(doc, dict) or not doc.get("title"):
-            errors.append("'document' needs a 'title', and may have an 'address' and 'sections'")
-        else:
-            address = doc.get("address")
-            if address is not None and not re.match(r"https?://\S+$", str(address)):
-                errors.append("document: 'address' must be the document's http(s) URL")
-            secs = doc.get("sections")
-            if secs is not None and (
-                not isinstance(secs, list)
-                or not secs
-                or not all(isinstance(x, dict) and x.get("id") is not None and x.get("label") for x in secs)
-            ):
-                errors.append("document: 'sections' needs a list of sections, each with an 'id' and a 'label'")
-                secs = None
-            digest.append(
-                f"DOCUMENT: {doc['title']}{(' <' + str(address) + '>') if address else ''}"
-                + (" — " + " · ".join(f"{x['id']} {x['label']}" for x in secs) if secs else "")
-            )
-            for x in secs or []:
-                if len(str(x.get("gist", ""))) > 50:
-                    warnings.append(
-                        f"document: the gist of '{x['label']}' is {len(x['gist'])} characters; keep it under 50, a few words"
-                    )
-    overview = None  # (panel number, its labels) once a panel sets overview
+    if doc:
+        address = doc.get("address")
+        secs = doc.get("sections")
+        digest.append(
+            f"DOCUMENT: {doc['title']}{(' <' + address + '>') if address else ''}"
+            + (" — " + " · ".join(f"{x['id']} {x['label']}" for x in secs) if secs else "")
+        )
+        for x in secs or []:
+            if len(str(x.get("gist", ""))) > 50:
+                warnings.append(
+                    f"document: the gist of '{x['label']}' is {len(x['gist'])} characters; keep it under 50, a few words"
+                )
     for i, p in enumerate(panels, 1):
         where = f"panel {i}"
-        if not isinstance(p, dict):
-            errors.append(f"{where}: must be an object")
-            continue
-        for old in ("note", "read"):
-            if old in p:
-                errors.append(
-                    f"{where}: '{old}' is no longer used: move it into 'source', the one line at the foot of each slide "
-                    "that says what the slide rests on and where to read it"
-                )
         template = p.get("template", "visual")
-        if template not in TEMPLATES:
-            errors.append(f"{where}: template must be one of {', '.join(TEMPLATES)}")
-            continue
-        head = str(p.get("headline", "")).strip()
-        if not head:
-            errors.append(f"{where}: missing 'headline' (a full sentence that states the panel's point)")
-        else:
-            if len(head.split()) < 4 or not re.search(r"[.!?]$", head):
-                warnings.append(
-                    f"{where}: headline '{head}' does not read as a full sentence; state the point, not the topic"
-                )
-            if len(head) > LIMITS["headline_chars"]:
-                warnings.append(
-                    f"{where}: headline is {len(head)} characters; keep it under {LIMITS['headline_chars']}"
-                )
+        head = p["headline"].strip()
+        if len(head.split()) < 4 or not re.search(r"[.!?]$", head):
+            warnings.append(
+                f"{where}: headline '{head}' does not read as a full sentence; state the point, not the topic"
+            )
+        if len(head) > LIMITS["headline_chars"]:
+            warnings.append(f"{where}: headline is {len(head)} characters; keep it under {LIMITS['headline_chars']}")
         part = p.get("part")
-        if part is not None and not isinstance(part, str):
-            errors.append(f"{where}: 'part' must be a short question, such as 'Does it arrive?'")
-        elif part and len(part) > LIMITS["part_chars"]:
+        if part and len(part) > LIMITS["part_chars"]:
             warnings.append(
                 f"{where}: part '{part}' is {len(part)} characters; keep it under {LIMITS['part_chars']}, two to five words"
             )
@@ -494,58 +498,22 @@ def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
             elif template == "compare":
                 check_compare(p, where, spec, errors, warnings, digest)
             elif template == "statement":
-                check_statement(p, where, errors, warnings, digest)
+                check_statement(p, where, warnings, digest)
             else:
-                check_title(p, where, len(panels), errors, digest)
+                check_title(p, where, errors, digest)
         except (TypeError, ValueError, KeyError, AttributeError) as exc:
             errors.append(f"{where}: malformed {template} data ({exc})")
-        check_source(p, where, spec, errors, warnings, digest)
-        check_details(p, where, errors, digest)
+        check_source(p, where, spec, warnings, digest)
+        check_details(p, digest)
         if p.get("overview"):
-            if overview:
-                errors.append(f"{where}: only one panel may set 'overview'; panel {overview[0]} already does")
-            elif template != "visual" or p.get("kind") not in OVERVIEW_KINDS:
-                errors.append(f"{where}: the overview must be a visual panel of kind {', '.join(OVERVIEW_KINDS)}")
-            else:
-                try:
-                    overview = (i, overview_labels(p))
-                    digest.append("    overview: later panels may mark their place in it with 'focus'")
-                except (TypeError, KeyError, AttributeError):
-                    pass  # the kind's own check has reported the malformed data
+            digest.append("    overview: later panels may mark their place in it with 'focus'")
         if p.get("focus") is not None:
-            focus = _as_list(p["focus"])
-            if overview is None:
-                errors.append(f"{where}: 'focus' needs an earlier panel with \"overview\": true")
-            else:
-                for lab in focus:
-                    if lab not in overview[1]:
-                        errors.append(
-                            f"{where}: focus '{lab}' is not a label in the overview (panel {overview[0]}): "
-                            + ", ".join(overview[1])
-                        )
-                digest.append(f"    where we are: {', '.join(map(str, focus))}")
-    check_style(spec, errors, digest)
+            digest.append(f"    where we are: {', '.join(map(str, _as_list(p['focus'])))}")
+    if spec.get("style"):
+        digest.append("STYLE: " + ", ".join(f"{k}={v}" for k, v in spec["style"].items()))
     if not errors:
         check_cuts(spec, warnings)
     return errors, warnings, digest
-
-
-def check_style(spec, errors, digest):
-    style = spec.get("style")
-    if style is None:
-        return
-    if not isinstance(style, dict):
-        errors.append('\'style\' must be an object, such as {"point": "#0055AA", "serif": "Georgia, serif"}')
-        return
-    for k, v in style.items():
-        if k not in STYLE_KEYS:
-            errors.append(f"style: '{k}' is not a slide variable; use {', '.join(STYLE_KEYS)}")
-        elif k in ("serif", "sans"):
-            if not (isinstance(v, str) and FONT_STACK.fullmatch(v)):
-                errors.append(f"style: '{k}' must be a font stack, such as \"'Inter', sans-serif\"")
-        elif not (isinstance(v, str) and COLOUR.fullmatch(v.strip())):
-            errors.append(f"style: '{k}' must be a CSS colour, such as #1C1A17 or rgb(28, 26, 23)")
-    digest.append("STYLE: " + ", ".join(f"{k}={v}" for k, v in style.items()))
 
 
 def check_cuts(spec, warnings):
@@ -566,11 +534,8 @@ def check_cuts(spec, warnings):
 
 
 def check_kind(p, where, spec, errors, warnings, digest):
-    """Check a visual's kind and its data: a visual panel, or one side of a compare."""
-    kind = p.get("kind")
-    if kind not in KINDS:
-        errors.append(f"{where}: kind must be one of {', '.join(KINDS)}")
-        return
+    """Check a visual's data against what its drawing needs: a visual panel, or one side of a compare."""
+    kind = p["kind"]
     if kind == "map":
         check_map(p, where, errors, warnings, digest, spec)
     else:
@@ -580,60 +545,39 @@ def check_kind(p, where, spec, errors, warnings, digest):
 def check_compare(p, where, spec, errors, warnings, digest):
     sides = []
     for side in ("a", "b"):
-        s = p.get(side)
-        if not isinstance(s, dict) or not s.get("label"):
-            errors.append(f"{where}: '{side}' needs a 'label' and a 'kind' with that kind's fields")
-            continue
-        digest.append(f"    {side.upper()}: {s['label']} ({s.get('kind')})")
+        s = p[side]
+        digest.append(f"    {side.upper()}: {s['label']} ({s['kind']})")
         check_kind(s, f"{where}, side {side}", spec, errors, warnings, digest)
-        sides.append(s.get("kind"))
-    if len(sides) == 2 and sides[0] == sides[1] and sides[0] in SHARED_SCALE:
+        sides.append(s["kind"])
+    if sides[0] == sides[1] and sides[0] in SHARED_SCALE:
         digest.append("    both sides drawn on one scale")
 
 
-def check_statement(p, where, errors, warnings, digest):
-    for key in ("figure", "sentence"):
-        if not p.get(key):
-            errors.append(f"{where}: a statement needs '{key}'")
-    if len(str(p.get("figure", ""))) > 14:
-        warnings.append(f"{where}: figure '{p.get('figure')}' is long; a statement shows one short figure")
+def check_statement(p, where, warnings, digest):
+    if len(str(p["figure"])) > 14:
+        warnings.append(f"{where}: figure '{p['figure']}' is long; a statement shows one short figure")
     if not p.get("compare"):
         warnings.append(
             f"{where}: no 'compare': a figure alone does not say whether it is large; give what it is compared to, "
             "such as 'against 89% before', or use another template"
         )
-    digest.append(f"    {p.get('figure')} {p.get('sentence')}" + (f" ({p['compare']})" if p.get("compare") else ""))
+    digest.append(f"    {p['figure']} {p['sentence']}" + (f" ({p['compare']})" if p.get("compare") else ""))
 
 
-def check_title(p, where, n_panels, errors, digest):
-    if p.get("body") is not None and not isinstance(p["body"], str):
-        errors.append(f"{where}: 'body' must be a string")
+def check_title(p, where, errors, digest):
     if p.get("body"):
         digest.append(f"    {p['body']}")
-    actions = p.get("actions") or []
-    if not isinstance(actions, list):
-        errors.append(f"{where}: 'actions' must be a list")
-        return
-    for k, a in enumerate(actions, 1):
-        target = a.get("panel") if isinstance(a, dict) else None
-        if not isinstance(a, dict) or not a.get("text") or not isinstance(target, int) or isinstance(target, bool):
-            errors.append(f"{where}: each action needs 'text' and 'panel', the number of the panel it points to")
-            continue
-        if not 1 <= target <= n_panels:
-            errors.append(f"{where}: action '{a['text']}' points to panel {target}; there are {n_panels} panels")
-            continue
+    for k, a in enumerate(p.get("actions") or [], 1):
+        target = a["panel"]
         digest.append(f"    {k}. {a['text']} → panel {target} (slide {target + 1})")
 
 
-def check_source(p, where, spec, errors, warnings, digest):
+def check_source(p, where, spec, warnings, digest):
     src = p.get("source")
     if not src:
         warnings.append(f"{where}: no 'source': say what the slide's claim rests on, and where to read it")
         return
     if isinstance(src, dict):
-        if not src.get("text") and not src.get("section"):
-            errors.append(f"{where}: 'source' needs 'text', and may have 'section'")
-            return
         if src.get("section") and not (spec.get("document") or {}).get("address"):
             warnings.append(
                 f"{where}: source section '{src['section']}' is shown without a link: the 'document' has no 'address'"
@@ -641,21 +585,16 @@ def check_source(p, where, spec, errors, warnings, digest):
         digest.append(
             f"    source: {src.get('text', '')}" + (f" [read: {src['section']}]" if src.get("section") else "")
         )
-    elif isinstance(src, str):
-        digest.append(f"    source: {src}")
     else:
-        errors.append(f"{where}: 'source' must be a string or an object with 'text' and 'section'")
+        digest.append(f"    source: {src}")
 
 
-def check_details(p, where, errors, digest):
+def check_details(p, digest):
     for lab, d in collect_details(p):
-        if not isinstance(d, dict) or not d.get("text"):
-            errors.append(f"{where}: the detail of '{lab}' needs 'text', and may have 'source' and 'evidence'")
-            continue
-        if d.get("evidence") is not None and d["evidence"] not in EVIDENCE:
-            errors.append(f"{where}: the evidence of '{lab}' must be one of {', '.join(EVIDENCE)}")
+        if not isinstance(d, dict):
+            continue  # a detail where no kind has one is not drawn
         digest.append(
-            f"    detail, {lab}: {d['text']}"
+            f"    detail, {lab}: {d.get('text')}"
             + (f" ({d['source']})" if d.get("source") else "")
             + (f" [{d['evidence']}]" if d.get("evidence") else "")
         )
@@ -745,12 +684,10 @@ def overview_labels(p):
     return [x for g in p["groups"] for x in [g["label"], *map(str, g.get("items") or [])]]
 
 
-def need_list(p, key, where, errors, limit=None, warnings=None, what="items"):
-    items = p.get(key)
-    if not isinstance(items, list) or not items:
-        errors.append(f"{where}: '{key}' must be a non-empty list")
-        return []
-    if limit and len(items) > limit and warnings is not None:
+def listed(p, key, where, warnings, limit=None, what="items"):
+    """The list the schema guarantees, with a warning when it is longer than one panel can show."""
+    items = p[key]
+    if limit and len(items) > limit:
         warnings.append(f"{where}: {len(items)} {what}; more than {limit} is hard to read in one panel")
     return items
 
@@ -767,22 +704,16 @@ def count_highlights(items, where, warnings):
 
 
 def check_map(p, where, errors, warnings, digest, spec=None):
-    secs = p.get("sections") or (spec or {}).get("document", {}).get("sections")
-    if not isinstance(secs, list) or not secs:
-        errors.append(f"{where}: a map needs 'sections', or a top-level 'document' with 'sections'")
-        return
+    secs = p.get("sections") or ((spec or {}).get("document") or {}).get("sections")
     if len(secs) > 9:
         warnings.append(f"{where}: {len(secs)} sections; group them into at most 9 parts")
     if p.get("sections"):
         for sec in secs:
-            if isinstance(sec, dict) and len(str(sec.get("gist", ""))) > 50:
+            if len(str(sec.get("gist", ""))) > 50:
                 warnings.append(
                     f"{where}: the gist of '{sec.get('label')}' is {len(sec['gist'])} characters; keep it under 50, a few words"
                 )
     for s in secs:
-        if not isinstance(s, dict) or not s.get("label"):
-            errors.append(f"{where}: each section needs a 'label'")
-            continue
         digest.append(
             f"    {s.get('id', '')} {s['label']}{(' — ' + s['gist']) if s.get('gist') else ''}"
             f"{'  [highlight]' if s.get('highlight') or s.get('id') in _as_list(p.get('highlight')) else ''}"
@@ -903,23 +834,10 @@ def _layers(nodes, edges):
 
 
 def check_concept(p, where, errors, warnings, digest):
-    nodes = need_list(p, "nodes", where, errors, 12, warnings, "concepts")
-    edges = need_list(p, "edges", where, errors)
-    ids = {n.get("id") for n in nodes if isinstance(n, dict)}
-    for n in nodes:
-        if not isinstance(n, dict) or not n.get("id") or not n.get("label"):
-            errors.append(f"{where}: each node needs an 'id' and a 'label'")
+    nodes = listed(p, "nodes", where, warnings, 12, "concepts")
     count_highlights(nodes, where, warnings)
-    labels = {n.get("id"): n.get("label") for n in nodes if isinstance(n, dict)}
-    for e in edges:
-        if not isinstance(e, dict) or e.get("from") not in ids or e.get("to") not in ids:
-            errors.append(f"{where}: each edge needs 'from' and 'to' that name node ids")
-            continue
-        if not e.get("label"):
-            errors.append(
-                f"{where}: edge {e['from']} → {e['to']} needs a 'label' that says how they relate, such as 'causes' or 'is part of'"
-            )
-            continue
+    labels = {n["id"]: n["label"] for n in nodes}
+    for e in p["edges"]:
         if len(e["label"]) > 40:
             warnings.append(
                 f"{where}: relation '{e['label']}' is {len(e['label'])} characters; keep relations to a few words and put conditions in the note"
@@ -1071,15 +989,11 @@ def flow_boxes(labels, notes, hls, W, g, arrow_word):
 
 
 def check_flow(p, where, errors, warnings, digest):
-    steps = need_list(p, "steps", where, errors, LIMITS["flow"], warnings, "steps")
+    steps = listed(p, "steps", where, warnings, LIMITS["flow"], "steps")
     count_highlights(steps, where, warnings)
-    if not p.get("arrow"):
-        errors.append(f"{where}: missing 'arrow': state what every arrow means, such as 'then' or 'sends data to'")
     for s in steps:
-        if not s.get("label"):
-            errors.append(f"{where}: every step needs a 'label'")
         digest.append(
-            f"    → {s.get('label')}{'  [highlight]' if s.get('highlight') else ''}"
+            f"    → {s['label']}{'  [highlight]' if s.get('highlight') else ''}"
             + (f" ({s['note']})" if s.get("note") else "")
         )
 
@@ -1154,7 +1068,7 @@ def t_flow(p, W, g):
 
 
 def check_groups(p, where, errors, warnings, digest):
-    groups = need_list(p, "groups", where, errors, LIMITS["groups"], warnings, "groups")
+    groups = listed(p, "groups", where, warnings, LIMITS["groups"], "groups")
     count_highlights(groups, where, warnings)
     total = 0
     for g in groups:
@@ -1226,10 +1140,6 @@ def t_groups(p, W, g):
 
 
 def check_tree(p, where, errors, warnings, digest):
-    root = p.get("root")
-    if not isinstance(root, dict) or not root.get("label"):
-        errors.append(f"{where}: a tree needs 'root' with a 'label' and optional 'children'")
-        return
     count = [0]
     hl = [0]
 
@@ -1237,30 +1147,19 @@ def check_tree(p, where, errors, warnings, digest):
         count[0] += 1
         hl[0] += 1 if n.get("highlight") else 0
         if depth > 3:
-            errors.append(f"{where}: '{n.get('label')}' is deeper than 4 levels; cut the tree or split it")
+            errors.append(f"{where}: '{n['label']}' is deeper than 4 levels; cut the tree or split it")
             return
         kids = n.get("children") or []
-        if "value" in n and not _is_num(n["value"]):
-            errors.append(f"{where}: '{n.get('label')}' has a non-numeric 'value'")
-        if kids and "value" in n and all(_is_num(k.get("value")) for k in kids):
-            total = sum(k["value"] for k in kids)
-            if abs(total - n["value"]) > 1e-9 * max(1, abs(n["value"])) and total > n["value"]:
-                errors.append(
-                    f"{where}: the children of '{n['label']}' sum to {num(total)}, more than its value {num(n['value'])}"
-                )
         digest.append(
             "    "
             + "  " * depth
-            + f"{n.get('label')}{(' = ' + num(n['value'])) if _is_num(n.get('value')) else ''}"
+            + f"{n['label']}{(' = ' + num(n['value'])) if 'value' in n else ''}"
             + ("  [highlight]" if n.get("highlight") else "")
         )
         for k in kids:
-            if not isinstance(k, dict) or not k.get("label"):
-                errors.append(f"{where}: every node needs a 'label'")
-                continue
             walk(k, depth + 1)
 
-    walk(root, 0)
+    walk(p["root"], 0)
     if count[0] > 30:
         warnings.append(f"{where}: {count[0]} nodes; more than about 30 cannot be labelled")
     if hl[0] > LIMITS["highlights"]:
@@ -1363,16 +1262,10 @@ def _region_order(sets, regions):
 
 
 def check_sets(p, where, errors, warnings, digest):
-    sets = need_list(p, "sets", where, errors, 6, warnings, "sets")
-    regions = need_list(p, "regions", where, errors, 12, warnings, "regions")
-    names = set(map(str, sets))
+    listed(p, "sets", where, warnings, 6, "sets")
+    regions = listed(p, "regions", where, warnings, 12, "regions")
     for r in regions:
-        ins = r.get("in") if isinstance(r, dict) else None
-        if not isinstance(ins, list) or not ins or not all(str(s) in names for s in ins):
-            errors.append(f"{where}: each region needs 'in', a list of set names from 'sets'")
-            continue
-        if not r.get("label") and "count" not in r:
-            errors.append(f"{where}: region {ins} needs a 'label' or a 'count'")
+        ins = r["in"]
         digest.append(
             f"    in {' & '.join(ins)}: {r.get('label', '')} {('(' + num(r['count']) + ')') if 'count' in r else ''}".rstrip()
             + ("  [highlight]" if r.get("highlight") else "")
@@ -1486,19 +1379,14 @@ def mark_svg(mark, hl):
 
 
 def check_matrix(p, where, errors, warnings, digest):
-    cols = need_list(p, "columns", where, errors, LIMITS["matrix_cols"], warnings, "columns")
-    rows = need_list(p, "rows", where, errors, LIMITS["matrix_rows"], warnings, "rows")
+    cols = listed(p, "columns", where, warnings, LIMITS["matrix_cols"], "columns")
+    rows = listed(p, "rows", where, warnings, LIMITS["matrix_rows"], "rows")
     n_hl = 0
     for r in rows:
-        cells = r.get("cells") if isinstance(r, dict) else None
-        if not isinstance(cells, list) or len(cells) != len(cols) or not r.get("label"):
-            errors.append(f"{where}: each row needs a 'label' and one cell per column ({len(cols)})")
-            continue
+        cells = r["cells"]
         out = []
         for c in cells:
             mark = _mark(c)
-            if mark is not None and mark not in MARKS:
-                errors.append(f"{where}: row '{r['label']}' has mark '{mark}'; use one of {', '.join(MARKS)}, or null")
             n_hl += 1 if isinstance(c, dict) and c.get("highlight") else 0
             out.append(mark or "–")
         n_hl += 1 if r.get("highlight") else 0
@@ -1516,7 +1404,7 @@ def check_matrix(p, where, errors, warnings, digest):
         )
     measured = {}
     for r in rows:
-        if isinstance(r, dict) and isinstance(r.get("cells"), list):
+        if isinstance(r.get("cells"), list):
             key = r.get("group") or r.get("label")
             measured.setdefault(key, set()).update(k for k, c in enumerate(r["cells"]) if _mark(c))
     keys = [k for k in measured if measured[k]]
@@ -1721,18 +1609,15 @@ def effect_legend(used, g=None):
 
 
 def check_effects(p, where, errors, warnings, digest):
-    rows = need_list(p, "rows", where, errors, 12, warnings, "findings")
+    rows = listed(p, "rows", where, warnings, 12, "findings")
     count_highlights(rows, where, warnings)
     for r in rows:
-        if not isinstance(r, dict) or not r.get("label") or r.get("effect") not in EFFECTS:
-            errors.append(f"{where}: each row needs a 'label' and an 'effect' of {', '.join(EFFECTS)}")
-            continue
         g = f"{r['group']} / " if r.get("group") else ""
         digest.append(
             f"    {g}{r['label']}{(' on ' + r['outcome']) if r.get('outcome') else ''}: {EFFECT_WORDS[r['effect']]}"
             + ("  [highlight]" if r.get("highlight") else "")
         )
-    if rows and not any(isinstance(r, dict) and r.get("outcome") for r in rows):
+    if not any(r.get("outcome") for r in rows):
         warnings.append(
             f"{where}: no row names its 'outcome'; when every finding has the same outcome and each item comes in a good and a bad form, use 'pairs'"
         )
@@ -1815,32 +1700,17 @@ def t_effects(p, W, g):
 
 
 def check_pairs(p, where, errors, warnings, digest):
-    heads = p.get("columns")
-    if not (isinstance(heads, list) and len(heads) == 2):
-        errors.append(f'{where}: \'columns\' needs two headings, such as ["Helps when", "Hurts or no gain when"]')
-    else:
-        digest.append(f"    columns: {heads[0]} | {heads[1]}")
-    rows = need_list(p, "rows", where, errors, 7, warnings, "items")
+    heads = p["columns"]
+    digest.append(f"    columns: {heads[0]} | {heads[1]}")
+    rows = listed(p, "rows", where, warnings, 7, "items")
     count_highlights(rows, where, warnings)
     for r in rows:
-        if not isinstance(r, dict) or not r.get("label"):
-            errors.append(f"{where}: each row needs a 'label'")
-            continue
-        for side in ("left", "right"):
-            for c in r.get(side) or []:
-                if not isinstance(c, dict) or not c.get("label") or c.get("effect") not in EFFECTS + (None,):
-                    errors.append(
-                        f"{where}: '{r['label']}': each entry in '{side}' needs a 'label', and an optional 'effect' of {', '.join(EFFECTS)}"
-                    )
-        if not (r.get("left") or r.get("right")):
-            errors.append(f"{where}: '{r['label']}' has nothing in 'left' or 'right'")
         digest.append(
             f"    {r['label']}: "
             + " | ".join(
                 ", ".join(
-                    f"{c.get('label')}{(' [' + EFFECT_WORDS.get(c.get('effect'), '') + ']') if c.get('effect') else ''}"
+                    f"{c['label']}{(' [' + EFFECT_WORDS.get(c.get('effect'), '') + ']') if c.get('effect') else ''}"
                     for c in r.get(side) or []
-                    if isinstance(c, dict)
                 )
                 or "–"
                 for side in ("left", "right")
@@ -1933,26 +1803,13 @@ def t_pairs(p, W, g):
 
 
 def check_quadrant(p, where, errors, warnings, digest):
-    items = need_list(p, "items", where, errors, 10, warnings, "items")
+    items = listed(p, "items", where, warnings, 10, "items")
     count_highlights(items, where, warnings)
-    for ax in ("x", "y"):
-        a = p.get(ax)
-        if not isinstance(a, dict) or not a.get("label") or not a.get("low") or not a.get("high"):
-            errors.append(
-                f'{where}: \'{ax}\' needs \'label\', \'low\' and \'high\', such as {{"label": "Effort", "low": "small", "high": "large"}}'
-            )
-    if not p.get("basis"):
-        errors.append(
-            f"{where}: a quadrant needs 'basis': where the positions come from (measured values, or the document's own judgment)"
-        )
     for it in items:
-        if not (_is_num(it.get("x")) and _is_num(it.get("y")) and 0 <= it["x"] <= 1 and 0 <= it["y"] <= 1):
-            errors.append(f"{where}: '{it.get('label')}' needs 'x' and 'y' between 0 and 1")
-            continue
         digest.append(
             f"    {it.get('label')}: x={it['x']}, y={it['y']}{'  [highlight]' if it.get('highlight') else ''}"
         )
-    digest.append(f"    basis: {p.get('basis')}")
+    digest.append(f"    basis: {p['basis']}")
 
 
 def v_quadrant(p):
@@ -2049,11 +1906,7 @@ def t_quadrant(p, W, g):
 
 
 def check_numbers(p, where, errors, warnings, digest):
-    items = need_list(p, "figures", where, errors, LIMITS["numbers"], warnings, "figures")
-    for it in items:
-        if "value" not in it or "label" not in it:
-            errors.append(f"{where}: each figure needs 'value' and 'label'")
-            continue
+    for it in listed(p, "figures", where, warnings, LIMITS["numbers"], "figures"):
         digest.append(f"    {it['value']} — {it['label']}")
 
 
@@ -2079,14 +1932,11 @@ def t_numbers(p, W, g):
 
 
 def check_units(p, where, errors, warnings, digest):
-    parts = need_list(p, "parts", where, errors, LIMITS["unit_parts"], warnings, "parts")
+    parts = listed(p, "parts", where, warnings, LIMITS["unit_parts"], "parts")
     count_highlights(parts, where, warnings)
     total = 0
     for it in parts:
-        n = it.get("count") if isinstance(it, dict) else None
-        if not isinstance(n, int) or isinstance(n, bool) or n < 1 or not it.get("label"):
-            errors.append(f"{where}: each part needs a 'label' and a whole-number 'count' of at least 1")
-            continue
+        n = it["count"]
         total += n
         digest.append(f"    {n} {it['label']}{'  [highlight]' if it.get('highlight') else ''}")
     if total > LIMITS["units"]:
@@ -2196,18 +2046,11 @@ def t_units(p, W, g):
 
 
 def check_bars(p, where, errors, warnings, digest):
-    items = need_list(p, "items", where, errors, LIMITS["bars"], warnings, "bars")
+    items = listed(p, "items", where, warnings, LIMITS["bars"], "bars")
     count_highlights(items, where, warnings)
     unit = p.get("unit", "")
     for it in items:
-        v = it.get("value")
-        if not isinstance(v, (int, float)) or isinstance(v, bool):
-            errors.append(f"{where}: bar '{it.get('label')}' needs a numeric 'value'")
-            continue
-        if v < 0:
-            errors.append(
-                f"{where}: bar '{it.get('label')}' is negative; bars start at zero, so use a table or an 'svg' panel"
-            )
+        v = it["value"]
         digest.append(
             f"    {it.get('label')}: {num(v)}{(' ' + unit) if unit else ''}{'  [highlight]' if it.get('highlight') else ''}"
         )
@@ -2282,24 +2125,14 @@ def t_bars(p, W, g):
 
 
 def check_slope(p, where, errors, warnings, digest):
-    items = need_list(p, "items", where, errors, 10, warnings, "lines")
+    items = listed(p, "items", where, warnings, 10, "lines")
     count_highlights(items, where, warnings)
-    for k in ("from", "to"):
-        if not p.get(k):
-            errors.append(
-                f"{where}: a slope needs '{k}', the label of the {'first' if k == 'from' else 'second'} state, such as '2020'"
-            )
     unit = p.get("unit", "")
     for it in items:
-        if not _is_num(it.get("before")) or not _is_num(it.get("after")):
-            errors.append(f"{where}: '{it.get('label')}' needs numeric 'before' and 'after'")
-            continue
         digest.append(
             f"    {it.get('label')}: {num(it['before'])} → {num(it['after'])} {unit}".rstrip()
             + ("  [highlight]" if it.get("highlight") else "")
         )
-    if p.get("y_from_zero") is False and not p.get("y_note"):
-        errors.append(f"{where}: 'y_from_zero' is false, so add 'y_note' stating where the scale starts and why")
     if not unit:
         warnings.append(f"{where}: no 'unit'; say what the values measure")
 
@@ -2400,15 +2233,10 @@ def t_slope(p, W, g):
 
 
 def check_dots(p, where, errors, warnings, digest):
-    groups = need_list(p, "groups", where, errors, 6, warnings, "groups")
+    groups = listed(p, "groups", where, warnings, 6, "groups")
     count_highlights(groups, where, warnings)
     for g in groups:
-        vals = g.get("values") if isinstance(g, dict) else None
-        if not isinstance(vals, list) or not vals or not all(_is_num(v) for v in vals):
-            errors.append(
-                f"{where}: group '{g.get('label') if isinstance(g, dict) else g}' needs a non-empty list of numeric 'values'"
-            )
-            continue
+        vals = g["values"]
         s = sorted(vals)
         med = s[len(s) // 2] if len(s) % 2 else (s[len(s) // 2 - 1] + s[len(s) // 2]) / 2
         digest.append(
@@ -2529,18 +2357,12 @@ def t_dots(p, W, g):
 
 
 def check_scatter(p, where, errors, warnings, digest):
-    pts = need_list(p, "points", where, errors, 200, warnings, "points")
-    for k in ("x_label", "y_label"):
-        if not p.get(k):
-            errors.append(f"{where}: a scatter needs '{k}' naming what the axis measures")
-    bad = [pt for pt in pts if not (isinstance(pt, dict) and _is_num(pt.get("x")) and _is_num(pt.get("y")))]
-    if bad:
-        errors.append(f"{where}: {len(bad)} point(s) lack numeric 'x' and 'y'")
-    labelled = [pt for pt in pts if isinstance(pt, dict) and pt.get("label")]
+    pts = listed(p, "points", where, warnings, 200, "points")
+    labelled = [pt for pt in pts if pt.get("label")]
     if len(labelled) > 8:
         warnings.append(f"{where}: {len(labelled)} labelled points; label only the few the headline is about")
     count_highlights(pts, where, warnings)
-    digest.append(f"    {len(pts)} points; x = {p.get('x_label')}, y = {p.get('y_label')}")
+    digest.append(f"    {len(pts)} points; x = {p['x_label']}, y = {p['y_label']}")
     for pt in labelled:
         digest.append(
             f"    {pt['label']}: x={num(pt['x'])}, y={num(pt['y'])}{'  [highlight]' if pt.get('highlight') else ''}"
@@ -2634,20 +2456,11 @@ def spark(values, g, lo=None, hi=None):
 
 
 def check_line(p, where, errors, warnings, digest):
-    series = need_list(p, "series", where, errors, LIMITS["series"], warnings, "series")
+    series = listed(p, "series", where, warnings, LIMITS["series"], "series")
     count_highlights(series, where, warnings)
     for s in series:
-        pts = s.get("points")
-        if not isinstance(pts, list) or len(pts) < 2:
-            errors.append(f"{where}: series '{s.get('name')}' needs at least 2 points as [x, y] pairs")
-            continue
-        ys = [pt[1] for pt in pts]
-        if not all(isinstance(y, (int, float)) and not isinstance(y, bool) for y in ys):
-            errors.append(f"{where}: series '{s.get('name')}' has non-numeric y values")
-            continue
+        pts = s["points"]
         digest.append(f"    {s.get('name')}: " + ", ".join(f"{x}={num(y)}" for x, y in pts))
-    if p.get("y_from_zero") is False and not p.get("y_note"):
-        errors.append(f"{where}: 'y_from_zero' is false, so add 'y_note' stating where the axis starts and why")
     if not p.get("unit"):
         warnings.append(f"{where}: no 'unit'; say what the values measure")
 
@@ -2783,12 +2596,10 @@ def t_line(p, W, g):
 
 
 def check_timeline(p, where, errors, warnings, digest):
-    events = need_list(p, "events", where, errors, LIMITS["timeline"], warnings, "events")
+    events = listed(p, "events", where, warnings, LIMITS["timeline"], "events")
     count_highlights(events, where, warnings)
     for e in events:
-        if not e.get("date") or not e.get("label"):
-            errors.append(f"{where}: every event needs 'date' and 'label'")
-        digest.append(f"    {e.get('date')}: {e.get('label')}{'  [highlight]' if e.get('highlight') else ''}")
+        digest.append(f"    {e['date']}: {e['label']}{'  [highlight]' if e.get('highlight') else ''}")
 
 
 def v_timeline(p):
@@ -2841,14 +2652,8 @@ def t_timeline(p, W, g):
 
 
 def check_table(p, where, errors, warnings, digest):
-    cols = need_list(p, "columns", where, errors)
-    rows = need_list(p, "rows", where, errors, LIMITS["rows"], warnings, "rows")
-    for r, row in enumerate(rows):
-        if not isinstance(row, list) or len(row) != len(cols):
-            errors.append(
-                f"{where}: row {r + 1} has {len(row) if isinstance(row, list) else '?'} cells for {len(cols)} columns"
-            )
-            continue
+    rows = listed(p, "rows", where, warnings, LIMITS["rows"], "rows")
+    for row in rows:
         digest.append("    " + " | ".join(str(c) for c in row))
 
 
@@ -2878,12 +2683,9 @@ def t_table(p, W, g):
 
 
 def check_text(p, where, errors, warnings, digest):
-    body = p.get("body")
+    body = p["body"]
     if isinstance(body, str):
         body = [body]
-    if not body:
-        errors.append(f"{where}: 'body' must be a string or a list of paragraphs")
-        return
     words = sum(len(str(b).split()) for b in body)
     if words > 120:
         warnings.append(f"{where}: {words} words; a panel read alone works best with a short text")
@@ -2970,7 +2772,7 @@ class _SvgCheck(HTMLParser):
 
 
 def check_svg(p, where, errors, warnings, digest):
-    svg = str(p.get("svg", "")).strip()
+    svg = p["svg"].strip()
     if not svg.startswith("<svg") or not svg.endswith("</svg>"):
         errors.append(f"{where}: 'svg' must be one <svg>…</svg> element")
     if "viewBox" not in svg:
@@ -2980,9 +2782,7 @@ def check_svg(p, where, errors, warnings, digest):
     parser.close()
     for problem in dict.fromkeys(parser.problems):  # each problem once, in order
         errors.append(f"{where}: the svg must not contain {problem}")
-    if not p.get("alt"):
-        errors.append(f"{where}: an 'svg' panel needs 'alt': a description of its essential information")
-    digest.append(f"    custom svg; alt: {p.get('alt', '')}")
+    digest.append(f"    custom svg; alt: {p['alt']}")
 
 
 def v_svg(p):
@@ -2998,18 +2798,14 @@ def t_svg(p, W, g):
 
 
 def check_lanes(p, where, errors, warnings, digest):
-    actors = need_list(p, "actors", where, errors, LIMITS["lanes_actors"], warnings, "actors")
-    steps = need_list(p, "steps", where, errors, LIMITS["lanes_steps"], warnings, "steps")
+    listed(p, "actors", where, warnings, LIMITS["lanes_actors"], "actors")
+    steps = listed(p, "steps", where, warnings, LIMITS["lanes_steps"], "steps")
     count_highlights(steps, where, warnings)
-    names = set(map(str, actors))
     prev = None
     for s in steps:
-        if not isinstance(s, dict) or not s.get("label") or str(s.get("actor")) not in names:
-            errors.append(f"{where}: each step needs a 'label' and an 'actor' from 'actors'")
-            continue
-        hand = f"  (hand-off from {prev})" if prev is not None and prev != str(s["actor"]) else ""
+        hand = f"  (hand-off from {prev})" if prev is not None and prev != s["actor"] else ""
         digest.append(f"    {s['actor']}: {s['label']}{hand}{'  [highlight]' if s.get('highlight') else ''}")
-        prev = str(s["actor"])
+        prev = s["actor"]
 
 
 def v_lanes(p):
@@ -3082,18 +2878,10 @@ def t_lanes(p, W, g):
 
 
 def check_fork(p, where, errors, warnings, digest):
-    for key in ("input", "decider"):
-        if not p.get(key):
-            errors.append(f"{where}: a fork needs '{key}'")
-    branches = need_list(p, "branches", where, errors, LIMITS["fork_branches"], warnings, "branches")
-    if len(branches) < 2:
-        errors.append(f"{where}: a fork needs two to four branches")
+    branches = listed(p, "branches", where, warnings, LIMITS["fork_branches"], "branches")
     count_highlights(branches, where, warnings)
-    digest.append(f"    {p.get('input')} → {p.get('decider')}")
+    digest.append(f"    {p['input']} → {p['decider']}")
     for b in branches:
-        if not isinstance(b, dict) or not b.get("label") or b.get("outcome") not in OUTCOMES:
-            errors.append(f"{where}: each branch needs a 'label' and an 'outcome' of {', '.join(OUTCOMES)}")
-            continue
         digest.append(
             f"      {b['label']}: {b['outcome']}{(' (' + b['note'] + ')') if b.get('note') else ''}"
             + ("  [highlight]" if b.get("highlight") else "")
@@ -3312,8 +3100,6 @@ STYLE_KEYS = {
     "serif": "--s-serif",
     "sans": "--s-sans",
 }
-COLOUR = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\([0-9.,%\s/]+\)")
-FONT_STACK = re.compile(r"[A-Za-z0-9 ,'\"-]+")
 START_TAG = re.compile(r"<([a-zA-Z][\w:-]*)((?:\s+[^\s=>/]+(?:=\"[^\"]*\")?)*)\s*(/?)>")
 PAINT = re.compile(r'\s(fill|stroke|stop-color|font-family)="([^"]*)"')
 
@@ -4004,7 +3790,11 @@ def render_command(args) -> None:
         spec = json.loads(Path(args.spec).expanduser().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         sys.exit(f"error: cannot read {args.spec}: {exc}")
+    except RecursionError:
+        sys.exit(f"error: cannot read {args.spec}: is nested too deeply to read")
     errors, warnings, digest = check(spec)
+    if not errors:
+        spec = without_nulls(spec)
     for w in warnings:
         print(f"warning: {w}", file=sys.stderr)
     for e in errors:
