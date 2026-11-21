@@ -329,6 +329,8 @@ def _condition(schema: dict) -> str:
             continue
         described.add(name)
     parts += [f"{name} is present" for name in schema.get("required", []) if name not in described]
+    absent = _required_only(schema["not"]) if isinstance(schema.get("not"), dict) else None
+    parts += [f"{name} is absent" for name in absent or []]
     return " and ".join(parts) or "its condition holds"
 
 

@@ -30,6 +30,10 @@
       }
     },
     {
+      "if": {"required": ["type"], "properties": {"type": {"const": "note"}}},
+      "then": {"not": {"required": ["on"]}}
+    },
+    {
       "if": {"required": ["type"], "properties": {"type": {"const": "verdict"}}},
       "then": {"$ref": "#/$defs/verdict"}
     },

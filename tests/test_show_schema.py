@@ -651,7 +651,8 @@ class SlideOnNotes(unittest.TestCase):
     ON = {"slide": 2, "part": "Does it arrive?"}
 
     def test_a_show_note_needs_the_slide_it_was_written_on(self):
-        self.assertIn(("on", "required"), note_problems("show-better", "show-events.schema.json", note()))
+        problems = note_problems("show-better", "show-events.schema.json", note())
+        self.assertEqual([(f, m.split(" ")[0]) for f, m in problems], [("on", "required")])
 
     def test_a_show_note_with_its_slide_is_accepted(self):
         self.assertEqual(note_problems("show-better", "show-events.schema.json", note(on=self.ON)), [])

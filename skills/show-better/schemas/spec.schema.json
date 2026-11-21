@@ -1,0 +1,892 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "spec.schema.json",
+  "title": "a show-better presentation spec: .show/<slug>/spec.json",
+  "$comment": "The shape of the spec: types, required fields, allowed values. show.py keeps the checks that need the rendering's own knowledge (whether a node an edge names exists, a row's cell count, the overview and focus, an svg's elements), the readability warnings and the digest. A spec is a document a renderer draws, so it has `type` and may have `at` and `by`, not an `id`.",
+  "x-files": ["spec.json"],
+  "type": "object",
+  "required": ["type", "title", "panels"],
+  "properties": {
+    "type": {"const": "slides"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "title": {"$ref": "#/$defs/text"},
+    "question": {"type": "string"},
+    "summary": {"type": "string"},
+    "source": {"type": "string"},
+    "lang": {"type": "string"},
+    "document": {"$ref": "#/$defs/document"},
+    "style": {"$ref": "#/$defs/style"},
+    "panels": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/panel"}}
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "detail": {
+      "description": "what opens under a visual when its label or mark is clicked",
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": {"$ref": "#/$defs/text"},
+        "source": {"type": "string"},
+        "evidence": {"enum": ["strong", "moderate", "weak", "stated", null]}
+      }
+    },
+    "source": {
+      "description": "what the slide's claim rests on: a sentence, or a sentence with the section of the document to read",
+      "anyOf": [
+        {"type": "string"},
+        {
+          "type": "object",
+          "anyOf": [
+            {"required": ["text"], "properties": {"text": {"$ref": "#/$defs/text"}}},
+            {"required": ["section"], "properties": {"section": {"$ref": "#/$defs/text"}}}
+          ]
+        }
+      ]
+    },
+    "document": {
+      "type": ["object", "null"],
+      "description": "the document the slides introduce",
+      "required": ["title"],
+      "properties": {
+        "title": {"$ref": "#/$defs/text"},
+        "address": {"type": "string", "pattern": "^https?://\\S+$"},
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": {"type": ["string", "number"], "minLength": 1},
+              "label": {"$ref": "#/$defs/text"},
+              "gist": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "style": {
+      "description": "the project's look for the slides and their drawings: CSS colours and font stacks",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "background": {
+          "type": "string",
+          "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
+        },
+        "tint": {
+          "type": "string",
+          "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
+        },
+        "ink": {
+          "type": "string",
+          "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
+        },
+        "heading": {
+          "type": "string",
+          "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
+        },
+        "muted": {
+          "type": "string",
+          "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
+        },
+        "line": {
+          "type": "string",
+          "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
+        },
+        "point": {
+          "type": "string",
+          "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
+        },
+        "serif": {"type": "string", "pattern": "^[A-Za-z0-9 ,'\\\"-]+$"},
+        "sans": {"type": "string", "pattern": "^[A-Za-z0-9 ,'\\\"-]+$"}
+      }
+    },
+    "visual": {
+      "description": "one visual: a kind and that kind's fields",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "map",
+            "concept",
+            "flow",
+            "groups",
+            "tree",
+            "sets",
+            "matrix",
+            "effects",
+            "pairs",
+            "quadrant",
+            "numbers",
+            "units",
+            "bars",
+            "slope",
+            "dots",
+            "scatter",
+            "line",
+            "timeline",
+            "table",
+            "text",
+            "svg",
+            "lanes",
+            "fork"
+          ]
+        }
+      },
+      "allOf": [
+        {"if": {"required": ["kind"], "properties": {"kind": {"const": "map"}}}, "then": {"$ref": "#/$defs/kind_map"}},
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "concept"}}},
+          "then": {"$ref": "#/$defs/kind_concept"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "flow"}}},
+          "then": {"$ref": "#/$defs/kind_flow"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "groups"}}},
+          "then": {"$ref": "#/$defs/kind_groups"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "tree"}}},
+          "then": {"$ref": "#/$defs/kind_tree"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "sets"}}},
+          "then": {"$ref": "#/$defs/kind_sets"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "matrix"}}},
+          "then": {"$ref": "#/$defs/kind_matrix"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "effects"}}},
+          "then": {"$ref": "#/$defs/kind_effects"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "pairs"}}},
+          "then": {"$ref": "#/$defs/kind_pairs"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "quadrant"}}},
+          "then": {"$ref": "#/$defs/kind_quadrant"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "numbers"}}},
+          "then": {"$ref": "#/$defs/kind_numbers"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "units"}}},
+          "then": {"$ref": "#/$defs/kind_units"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "bars"}}},
+          "then": {"$ref": "#/$defs/kind_bars"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "slope"}}},
+          "then": {"$ref": "#/$defs/kind_slope"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "dots"}}},
+          "then": {"$ref": "#/$defs/kind_dots"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "scatter"}}},
+          "then": {"$ref": "#/$defs/kind_scatter"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "line"}}},
+          "then": {"$ref": "#/$defs/kind_line"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "timeline"}}},
+          "then": {"$ref": "#/$defs/kind_timeline"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "table"}}},
+          "then": {"$ref": "#/$defs/kind_table"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "text"}}},
+          "then": {"$ref": "#/$defs/kind_text"}
+        },
+        {"if": {"required": ["kind"], "properties": {"kind": {"const": "svg"}}}, "then": {"$ref": "#/$defs/kind_svg"}},
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "lanes"}}},
+          "then": {"$ref": "#/$defs/kind_lanes"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "fork"}}},
+          "then": {"$ref": "#/$defs/kind_fork"}
+        }
+      ]
+    },
+    "side": {
+      "description": "one side of a compare panel: a label, and a visual",
+      "type": "object",
+      "required": ["label", "kind"],
+      "properties": {
+        "label": {"$ref": "#/$defs/text"},
+        "kind": {
+          "enum": [
+            "map",
+            "concept",
+            "flow",
+            "groups",
+            "tree",
+            "sets",
+            "matrix",
+            "effects",
+            "pairs",
+            "quadrant",
+            "numbers",
+            "units",
+            "bars",
+            "slope",
+            "dots",
+            "scatter",
+            "line",
+            "timeline",
+            "table",
+            "text",
+            "svg",
+            "lanes",
+            "fork"
+          ]
+        },
+        "detail": {"$ref": "#/$defs/detail"}
+      },
+      "allOf": [
+        {"if": {"required": ["kind"], "properties": {"kind": {"const": "map"}}}, "then": {"$ref": "#/$defs/kind_map"}},
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "concept"}}},
+          "then": {"$ref": "#/$defs/kind_concept"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "flow"}}},
+          "then": {"$ref": "#/$defs/kind_flow"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "groups"}}},
+          "then": {"$ref": "#/$defs/kind_groups"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "tree"}}},
+          "then": {"$ref": "#/$defs/kind_tree"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "sets"}}},
+          "then": {"$ref": "#/$defs/kind_sets"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "matrix"}}},
+          "then": {"$ref": "#/$defs/kind_matrix"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "effects"}}},
+          "then": {"$ref": "#/$defs/kind_effects"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "pairs"}}},
+          "then": {"$ref": "#/$defs/kind_pairs"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "quadrant"}}},
+          "then": {"$ref": "#/$defs/kind_quadrant"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "numbers"}}},
+          "then": {"$ref": "#/$defs/kind_numbers"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "units"}}},
+          "then": {"$ref": "#/$defs/kind_units"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "bars"}}},
+          "then": {"$ref": "#/$defs/kind_bars"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "slope"}}},
+          "then": {"$ref": "#/$defs/kind_slope"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "dots"}}},
+          "then": {"$ref": "#/$defs/kind_dots"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "scatter"}}},
+          "then": {"$ref": "#/$defs/kind_scatter"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "line"}}},
+          "then": {"$ref": "#/$defs/kind_line"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "timeline"}}},
+          "then": {"$ref": "#/$defs/kind_timeline"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "table"}}},
+          "then": {"$ref": "#/$defs/kind_table"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "text"}}},
+          "then": {"$ref": "#/$defs/kind_text"}
+        },
+        {"if": {"required": ["kind"], "properties": {"kind": {"const": "svg"}}}, "then": {"$ref": "#/$defs/kind_svg"}},
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "lanes"}}},
+          "then": {"$ref": "#/$defs/kind_lanes"}
+        },
+        {
+          "if": {"required": ["kind"], "properties": {"kind": {"const": "fork"}}},
+          "then": {"$ref": "#/$defs/kind_fork"}
+        }
+      ]
+    },
+    "compare": {
+      "type": "object",
+      "required": ["a", "b"],
+      "properties": {"a": {"$ref": "#/$defs/side"}, "b": {"$ref": "#/$defs/side"}}
+    },
+    "statement": {
+      "type": "object",
+      "required": ["figure", "sentence"],
+      "properties": {"figure": {"$ref": "#/$defs/text"}, "sentence": {"$ref": "#/$defs/text"}, "compare": {"type": "string"}}
+    },
+    "title": {
+      "type": "object",
+      "properties": {
+        "body": {"type": "string"},
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["text", "panel"],
+            "properties": {"text": {"$ref": "#/$defs/text"}, "panel": {"type": "integer"}}
+          }
+        }
+      }
+    },
+    "panel": {
+      "type": "object",
+      "required": ["headline"],
+      "properties": {
+        "template": {"enum": ["visual", "compare", "statement", "title"]},
+        "part": {"type": ["string", "null"]},
+        "headline": {"type": "string", "pattern": "\\S"},
+        "source": {"$ref": "#/$defs/source"},
+        "overview": {"type": "boolean"},
+        "focus": {"type": ["string", "array"], "items": {"type": "string"}}
+      },
+      "not": {"anyOf": [{"required": ["note"]}, {"required": ["read"]}]},
+      "allOf": [
+        {
+          "if": {"required": ["template"], "properties": {"template": {"const": "compare"}}},
+          "then": {"$ref": "#/$defs/compare"}
+        },
+        {
+          "if": {"required": ["template"], "properties": {"template": {"const": "statement"}}},
+          "then": {"$ref": "#/$defs/statement"}
+        },
+        {
+          "if": {"required": ["template"], "properties": {"template": {"const": "title"}}},
+          "then": {"$ref": "#/$defs/title"}
+        },
+        {"if": {"not": {"required": ["template"]}}, "then": {"$ref": "#/$defs/visual"}},
+        {
+          "if": {"required": ["template"], "properties": {"template": {"const": "visual"}}},
+          "then": {"$ref": "#/$defs/visual"}
+        }
+      ]
+    },
+    "treenode": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "label": {"$ref": "#/$defs/text"},
+        "value": {"type": "number"},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/treenode"}},
+        "detail": {"$ref": "#/$defs/detail"}
+      }
+    },
+    "kind_map": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label"],
+            "properties": {
+              "id": {"type": ["string", "number"], "minLength": 1},
+              "label": {"$ref": "#/$defs/text"},
+              "gist": {"type": "string"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        },
+        "highlight": {"type": ["array", "string"]}
+      }
+    },
+    "kind_concept": {
+      "type": "object",
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {"id": {"$ref": "#/$defs/text"}, "label": {"$ref": "#/$defs/text"}, "detail": {"$ref": "#/$defs/detail"}}
+          }
+        },
+        "edges": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "label"],
+            "properties": {
+              "from": {"$ref": "#/$defs/text"},
+              "to": {"$ref": "#/$defs/text"},
+              "label": {"$ref": "#/$defs/text"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    },
+    "kind_flow": {
+      "type": "object",
+      "required": ["arrow", "steps"],
+      "properties": {
+        "arrow": {"$ref": "#/$defs/text"},
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["label"],
+            "properties": {"label": {"$ref": "#/$defs/text"}, "note": {"type": "string"}, "detail": {"$ref": "#/$defs/detail"}}
+          }
+        }
+      }
+    },
+    "kind_groups": {
+      "type": "object",
+      "required": ["groups"],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {"label": {"type": "string"}, "items": {"type": "array"}, "detail": {"$ref": "#/$defs/detail"}}
+          }
+        }
+      }
+    },
+    "kind_tree": {
+      "type": "object",
+      "required": ["root"],
+      "properties": {"unit": {"type": "string"}, "root": {"$ref": "#/$defs/treenode"}}
+    },
+    "kind_sets": {
+      "type": "object",
+      "required": ["sets", "regions"],
+      "properties": {
+        "sets": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "regions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["in"],
+            "properties": {
+              "in": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+              "label": {"type": "string"},
+              "count": {"type": "number"},
+              "detail": {"$ref": "#/$defs/detail"}
+            },
+            "anyOf": [{"required": ["label"], "properties": {"label": {"$ref": "#/$defs/text"}}}, {"required": ["count"]}]
+          }
+        }
+      }
+    },
+    "kind_matrix": {
+      "type": "object",
+      "required": ["columns", "rows"],
+      "properties": {
+        "columns": {"type": "array", "minItems": 1, "items": {"type": ["string", "object"]}},
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["label", "cells"],
+            "properties": {
+              "label": {"$ref": "#/$defs/text"},
+              "group": {"type": "string"},
+              "cells": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {"type": "null"},
+                    {"enum": ["yes", "no", "up", "down", "same"]},
+                    {"type": "object", "properties": {"mark": {"enum": ["yes", "no", "up", "down", "same", null]}}}
+                  ]
+                }
+              },
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    },
+    "kind_effects": {
+      "type": "object",
+      "required": ["rows"],
+      "properties": {
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["label", "effect"],
+            "properties": {
+              "label": {"$ref": "#/$defs/text"},
+              "effect": {"enum": ["up", "down", "same"]},
+              "group": {"type": "string"},
+              "outcome": {"type": "string"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    },
+    "kind_pairs": {
+      "type": "object",
+      "required": ["columns", "rows"],
+      "properties": {
+        "columns": {"type": "array", "minItems": 2, "items": {"type": "string"}},
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["label"],
+            "properties": {
+              "label": {"$ref": "#/$defs/text"},
+              "left": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": "object",
+                  "required": ["label"],
+                  "properties": {
+                    "label": {"$ref": "#/$defs/text"},
+                    "effect": {"enum": ["up", "down", "same", null]},
+                    "detail": {"$ref": "#/$defs/detail"}
+                  }
+                }
+              },
+              "right": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": "object",
+                  "required": ["label"],
+                  "properties": {
+                    "label": {"$ref": "#/$defs/text"},
+                    "effect": {"enum": ["up", "down", "same", null]},
+                    "detail": {"$ref": "#/$defs/detail"}
+                  }
+                }
+              },
+              "detail": {"$ref": "#/$defs/detail"}
+            },
+            "anyOf": [
+              {"required": ["left"], "properties": {"left": {"minItems": 1}}},
+              {"required": ["right"], "properties": {"right": {"minItems": 1}}}
+            ]
+          }
+        }
+      }
+    },
+    "kind_quadrant": {
+      "type": "object",
+      "required": ["basis", "x", "y", "items"],
+      "properties": {
+        "basis": {"$ref": "#/$defs/text"},
+        "x": {
+          "type": "object",
+          "required": ["label", "low", "high"],
+          "properties": {"label": {"$ref": "#/$defs/text"}, "low": {"$ref": "#/$defs/text"}, "high": {"$ref": "#/$defs/text"}}
+        },
+        "y": {
+          "type": "object",
+          "required": ["label", "low", "high"],
+          "properties": {"label": {"$ref": "#/$defs/text"}, "low": {"$ref": "#/$defs/text"}, "high": {"$ref": "#/$defs/text"}}
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["x", "y"],
+            "properties": {
+              "x": {"type": "number"},
+              "y": {"type": "number"},
+              "label": {"type": "string"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    },
+    "kind_numbers": {
+      "type": "object",
+      "required": ["figures"],
+      "properties": {
+        "figures": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["value", "label"],
+            "properties": {
+              "value": {"type": ["string", "number"]},
+              "label": {"type": "string"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    },
+    "kind_units": {
+      "type": "object",
+      "required": ["parts"],
+      "properties": {
+        "unit": {"type": "string"},
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["label", "count"],
+            "properties": {"label": {"$ref": "#/$defs/text"}, "count": {"type": "integer"}, "detail": {"$ref": "#/$defs/detail"}}
+          }
+        }
+      }
+    },
+    "kind_bars": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "unit": {"type": "string"},
+        "max": {"type": "number"},
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["value"],
+            "properties": {"value": {"type": "number"}, "label": {"type": "string"}, "detail": {"$ref": "#/$defs/detail"}}
+          }
+        }
+      }
+    },
+    "kind_slope": {
+      "type": "object",
+      "required": ["from", "to", "items"],
+      "properties": {
+        "from": {"type": ["string", "number"], "minLength": 1},
+        "to": {"type": ["string", "number"], "minLength": 1},
+        "unit": {"type": "string"},
+        "y_from_zero": {"type": "boolean"},
+        "y_note": {"type": "string"},
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["before", "after"],
+            "properties": {
+              "before": {"type": "number"},
+              "after": {"type": "number"},
+              "label": {"type": "string"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"required": ["y_from_zero"], "properties": {"y_from_zero": {"const": false}}},
+          "then": {"required": ["y_note"], "properties": {"y_note": {"$ref": "#/$defs/text"}}}
+        }
+      ]
+    },
+    "kind_dots": {
+      "type": "object",
+      "required": ["groups"],
+      "properties": {
+        "unit": {"type": "string"},
+        "groups": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["values"],
+            "properties": {
+              "label": {"type": "string"},
+              "values": {"type": "array", "minItems": 1, "items": {"type": "number"}},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    },
+    "kind_scatter": {
+      "type": "object",
+      "required": ["x_label", "y_label", "points"],
+      "properties": {
+        "x_label": {"$ref": "#/$defs/text"},
+        "y_label": {"$ref": "#/$defs/text"},
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["x", "y"],
+            "properties": {
+              "x": {"type": "number"},
+              "y": {"type": "number"},
+              "label": {"type": "string"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    },
+    "kind_line": {
+      "type": "object",
+      "required": ["series"],
+      "properties": {
+        "unit": {"type": "string"},
+        "x_label": {"type": "string"},
+        "y_from_zero": {"type": "boolean"},
+        "y_note": {"type": "string"},
+        "series": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["points"],
+            "properties": {
+              "name": {"type": "string"},
+              "points": {"type": "array", "minItems": 2, "items": {"type": "array", "minItems": 2}},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"required": ["y_from_zero"], "properties": {"y_from_zero": {"const": false}}},
+          "then": {"required": ["y_note"], "properties": {"y_note": {"$ref": "#/$defs/text"}}}
+        }
+      ]
+    },
+    "kind_timeline": {
+      "type": "object",
+      "required": ["events"],
+      "properties": {
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["date", "label"],
+            "properties": {
+              "date": {"type": ["string", "number"], "minLength": 1},
+              "label": {"$ref": "#/$defs/text"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    },
+    "kind_table": {
+      "type": "object",
+      "required": ["columns", "rows"],
+      "properties": {
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "anyOf": [
+              {"$ref": "#/$defs/text"},
+              {"type": "object", "required": ["label"], "properties": {"label": {"$ref": "#/$defs/text"}}}
+            ]
+          }
+        },
+        "rows": {"type": "array", "minItems": 1, "items": {"type": "array"}},
+        "highlight_rows": {"type": "array", "items": {"type": "integer"}}
+      }
+    },
+    "kind_text": {
+      "type": "object",
+      "required": ["body"],
+      "properties": {"body": {"type": ["string", "array"], "minItems": 1, "items": {"type": "string"}}}
+    },
+    "kind_svg": {
+      "type": "object",
+      "required": ["alt", "svg"],
+      "properties": {"alt": {"$ref": "#/$defs/text"}, "svg": {"type": "string"}}
+    },
+    "kind_lanes": {
+      "type": "object",
+      "required": ["actors", "steps"],
+      "properties": {
+        "actors": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["label", "actor"],
+            "properties": {"label": {"$ref": "#/$defs/text"}, "actor": {"type": "string"}, "detail": {"$ref": "#/$defs/detail"}}
+          }
+        }
+      }
+    },
+    "kind_fork": {
+      "type": "object",
+      "required": ["input", "decider", "branches"],
+      "properties": {
+        "input": {"$ref": "#/$defs/text"},
+        "decider": {"$ref": "#/$defs/text"},
+        "branches": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["label", "outcome"],
+            "properties": {
+              "label": {"$ref": "#/$defs/text"},
+              "outcome": {"enum": ["helps", "hurts", "never", "neutral"]},
+              "note": {"type": "string"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
