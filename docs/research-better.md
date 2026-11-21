@@ -77,3 +77,13 @@ When the board's server stops, a strip says the board is closed; ask the agent t
 | Background commands and a browser that can reach the machine | It tells you how to start the live view yourself, or posts progress in the chat. |
 | Writing files | It keeps the board in its working notes and restates it every few results. |
 | Asking through a tool | It asks in plain text and waits for your answer. |
+
+## How it is tested
+
+Tested on 18 situations with Sonnet 5.5 (2026-11-21), each searching a planted wiki with no web access.
+
+| What it does | Passed |
+| --- | ---: |
+| Keeps the board on disk in its format, copies quotes and source details from the page, and marks repeats and blocked sources | 61% |
+| Asks before the research runs when a collection is missing, records a decision instead of waiting once it runs, and reports only what the board holds | 72% |
+| Leaves the research to workers, has claims checked by verifiers that did not record them, and keeps the board's questions in order | 89% |

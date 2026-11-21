@@ -1,0 +1,14 @@
+# One sentence per source of skills/research-better: the core instruction of that SKILL.md section or skill file
+# (reviewed by the user, 2026-11-21, with the second set of cases). Keys are the sources that cases name in `source`. The
+# one-sentence condition appends the sentence for a case's first source to its request; cases whose first source has
+# no entry are not run in that condition. The short-skill condition installs every sentence as the body of a short
+# SKILL.md.
+"SKILL.md#2": "Keep the research board on disk in .research/<topic-slug>/ in the board file format, with a brief and questions that each say what evidence would answer them, and don't commit it; once the research runs, don't stop to wait for me: record a decision with a default and a deadline, and carry on."
+"SKILL.md#5.2": "After each search or page read, record the query, each new source with its author, date and title copied from the page itself, how you read it and whether it repeats another source, and each claim with a verbatim quote."
+"SKILL.md#6.1": "When you have sub-agents, coordinate: start worker sub-agents with the filled-in worker instructions to research the questions, start a fresh one when a worker stops while questions remain, start separate verifier sub-agents to check claims, and don't research questions yourself."
+"SKILL.md#6.2": "Each time you review the board, open or merge the questions workers proposed, add a question for each pair of claims that contradict each other, and add a challenge question for every answered high-priority question that lacks one."
+"SKILL.md#7": "Present findings that state where sources disagree, what each main claim's challenge found and which questions remain open, with APA citations and a reference list built only from the board's sources, with missing fields copied from the source itself, never from memory."
+"SKILL.md#tools-and-collections": "If a collection the topic needs cannot be searched, tell me which one before the research runs and ask whether to wait, continue without it, or get the sources from me."
+"agents/worker.md": "When you research a question from the board, copy each claim's quote word for word from the page you read."
+"SKILL.md#5.3": "Give every question you add a title of at most six words, its origin, kind, stakes, a done-when line and a priority from its own stakes."
+"SKILL.md#know-what-your-retrieval-tools-return": "If you cannot read a source, mark it blocked and do not use it as evidence."

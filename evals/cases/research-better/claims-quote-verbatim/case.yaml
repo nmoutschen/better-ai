@@ -1,0 +1,20 @@
+id: claims-quote-verbatim
+rule: quote-verbatim
+source:
+- agents/worker.md
+- SKILL.md#5.2
+reads:
+- agents/worker.md
+- templates/board.md
+situation: A fresh research run on the planted wiki export. Every claim on the board carries a quote copied word for word
+  from the wiki page its source points to, and every source records how it was read. A script finds each quote in its page,
+  ignoring whitespace and Markdown emphasis.
+request: 'Research why checkout conversion dropped after our March 2026 release, so I can decide what to roll back first.
+  The only place to search is our wiki export in wiki/: there is no web access, and no other system holds anything on this.
+  Run on your own until you have an answer; I won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/quotes_verbatim.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    quotes_verbatim.py: ../_checks/quotes_verbatim.py

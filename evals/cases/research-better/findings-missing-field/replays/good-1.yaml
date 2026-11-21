@@ -1,0 +1,27 @@
+reply: Findings with references; the frontend guild's page is dated 2026-03-18 from the page.
+actions:
+- read: wiki/frontend/checkout-page-speed.md
+- write: .research/checkout-drop/sources/S-w2-2.md
+  content: 'id: S-w2-2
+
+    author: Frontend guild
+
+    date: 2026-03-18
+
+    title: Checkout page speed after the CDN switch
+
+    publisher: Tallow wiki
+
+    url: wiki/frontend/checkout-page-speed.md
+
+    type: other
+
+    read: raw
+
+    trust: medium
+
+    trust-reason: internal team page with its own data
+
+    repeats: none
+
+    '

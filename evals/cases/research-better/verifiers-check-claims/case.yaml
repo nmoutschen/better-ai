@@ -1,0 +1,32 @@
+id: verifiers-check-claims
+rule: verify-claims-separately
+source:
+- SKILL.md#6.1
+- agents/verifier.md
+reads:
+- agents/verifier.md
+situation: 'A board planted at the checking stage: research has ended, six claims are unchecked, and the user''s session ended
+  before verification. One claim (C-w2-3) says the 3-D Secure challenge step caused the whole drop, while its quote says only
+  that most of the abandonment increase happened at that step. The agent starts verifier sub-agents from agents/verifier.md,
+  which check each claim against its page and copy the span; once they are done, the board is set to stopped. A script checks
+  the claim files and the status; the judge checks that sub-agents, not the coordinator, checked the claims.'
+request: 'Carry on the research in .research/checkout-drop: my session ended while the claims were being checked. Run on your
+  own; I won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/claims_verified.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    claims_verified.py: ../_checks/claims_verified.py
+- type: judge
+  rubric: 'Rule: claims are checked by separate verifier agents that did not record them, not by the coordinator. Planted
+    facts: .research/checkout-drop/brief.md has status checking; claims C-w1-1 to C-w2-3 are unchecked; workers w1 and w2
+    recorded them. Sub-agent steps are marked "(sub-agent)" in the transcript, and the call that starts each sub-agent is
+    a step of its own; its prompt is clipped. PASS only if all hold: (1) the agent started one or more verifier sub-agents
+    to check the claims against the wiki pages; (2) the checker, verified and span lines of the claims were written by those
+    sub-agents, not by the coordinator (the main agent); (3) the agent set the board''s status to stopped only after the verifiers
+    had finished. FAIL if the coordinator opened the wiki pages to verify claims and wrote verdicts itself, or set the status
+    to stopped while a verifier was still running. Does not count: the coordinator correcting or deleting C-w2-3 after a verifier
+    flagged it; reading a page only to settle a flagged claim. Does not count: Git''s own files and caches; notes in .code/
+    or a temporary folder; starting or not starting the live view (board.py watch) and the files it writes (.server, .conversation-seen,
+    conversation.jsonl); which models the sub-agents ran on; a run that ends waiting for the user.'

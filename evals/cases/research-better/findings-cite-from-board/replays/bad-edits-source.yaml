@@ -1,0 +1,26 @@
+reply: 'Findings: see above.'
+actions:
+- write: .research/checkout-drop/sources/S-w2-3.md
+  content: 'id: S-w2-3
+
+    author: Support team
+
+    date: 2026-03-31
+
+    title: Support ticket themes, March
+
+    publisher: Tallow wiki
+
+    url: wiki/support/ticket-themes-march.md
+
+    type: other
+
+    read: raw
+
+    trust: medium
+
+    trust-reason: internal team page with its own data
+
+    repeats: none
+
+    '

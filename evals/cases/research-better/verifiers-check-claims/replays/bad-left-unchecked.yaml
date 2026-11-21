@@ -1,0 +1,185 @@
+reply: Verified the claims. Board stopped.
+actions:
+- write: .research/checkout-drop/claims/C-w1-2.md
+  content: 'id: C-w1-2
+
+    claim: Checkout conversion fell from 3.1% to 2.6% between the weeks of 23 February and 9 March 2026.
+
+    question: Q-coordinator-2
+
+    source: S-w1-2
+
+    quote: "Checkout conversion fell from 3.1% in the week of 2026-02-23 to 2.6% in the week of 2026-03-09."
+
+    verified: verified
+
+    checker: v1
+
+    span: "Checkout conversion fell from 3.1% in the week of 2026-02-23 to 2.6% in the week of 2026-03-09."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w1-3.md
+  content: 'id: C-w1-3
+
+    claim: The fall is in card payments, while PayPal orders stayed at 3.4%.
+
+    question: Q-coordinator-2
+
+    source: S-w1-2
+
+    quote: "The fall is concentrated in card payments: conversion for orders paid by card fell from 3.0% to 2.3%, while orders
+    paid with PayPal stayed at 3.4%."
+
+    verified: verified
+
+    checker: v1
+
+    span: "The fall is concentrated in card payments: conversion for orders paid by card fell from 3.0% to 2.3%, while orders
+    paid with PayPal stayed at 3.4%."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w2-1.md
+  content: 'id: C-w2-1
+
+    claim: The share of card payments with a 3-D Secure challenge rose from 8% to 31% after release 26.3.
+
+    question: Q-coordinator-3
+
+    source: S-w2-1
+
+    quote: "Since release 26.3, the share of card payments that get a 3-D Secure challenge rose from 8% to 31%."
+
+    verified: verified
+
+    checker: v1
+
+    span: "Since release 26.3, the share of card payments that get a 3-D Secure challenge rose from 8% to 31%."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w2-2.md
+  content: 'id: C-w2-2
+
+    claim: The checkout page''s largest contentful paint at the 75th percentile went from 1.9 s to 3.4 s after the CDN switch.
+
+    question: Q-coordinator-3
+
+    source: S-w2-2
+
+    quote: "After the switch to the new image CDN, the largest contentful paint on the checkout page went from 1.9 s to 3.4
+    s at the 75th percentile."
+
+    verified: verified
+
+    checker: v1
+
+    span: "After the switch to the new image CDN, the largest contentful paint on the checkout page went from 1.9 s to 3.4
+    s at the 75th percentile."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w2-4.md
+  content: 'id: C-w2-4
+
+    claim: Tickets about failed card verification were three times as frequent in March as in February.
+
+    question: Q-coordinator-3
+
+    source: S-w2-3
+
+    quote: "Tickets with the theme "card verification failed" were three times as frequent in March as in February."
+
+    verified: verified
+
+    checker: v1
+
+    span: "Tickets with the theme "card verification failed" were three times as frequent in March as in February."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w2-3.md
+  content: 'id: C-w2-3
+
+    claim: The 3-D Secure challenge step caused the whole drop in checkout conversion.
+
+    question: Q-coordinator-3
+
+    source: S-w2-1
+
+    quote: "Most of the abandonment increase happened at the challenge step."
+
+    verified: unverified
+
+    checker: v2
+
+    span: "Most of the abandonment increase happened at the challenge step."
+
+    hard: none
+
+    reason: the span says most of the abandonment increase, not the whole drop in conversion
+
+    '
+- write: .research/checkout-drop/claims/C-w1-1.md
+  content: 'id: C-w1-1
+
+    claim: Release 26.3 moved card payments to the 3-D Secure 2 flow.
+
+    question: Q-coordinator-1
+
+    source: S-w1-1
+
+    quote: "Card payments now use the new 3-D Secure 2 flow from our payment provider."
+
+    verified: unchecked
+
+    checker: none
+
+    span: none
+
+    hard: none
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/brief.md
+  content: 'topic: Why did checkout conversion drop after the March 2026 release, and what should we roll back first?
+
+    title: Checkout conversion drop after release 26.3
+
+    short: Checkout drop
+
+    meaning: The fall in the web shop''s checkout conversion after release 26.3 (2026-03-04), and which of its changes caused
+    it
+
+    goal: Decide which change of release 26.3 to roll back first
+
+    limit: none
+
+    stop-at: high
+
+    collections: the wiki export in wiki/
+
+    missing: none
+
+    changes: none
+
+    status: stopped
+
+    '

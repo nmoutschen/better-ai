@@ -30,7 +30,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent  # board.html, the page template, sits next to this script
+HERE = Path(__file__).resolve().parent  # board.html, the page template, and its CSS and JS sit next to this script
 sys.path.insert(0, str(HERE))  # page.py, the conversation every page that talks to the agent shares, sits here too
 import page  # noqa: E402
 
@@ -90,12 +90,21 @@ def load(board: Path) -> dict:
 
 
 def board_page(snapshot: dict | None) -> str:
-    """The page, read on each request, so a fix to board.html or page.css shows on reload without restarting the viewer."""
+    """The page as one file, read on each request, so a fix to the page's files shows on reload without restarting the
+    viewer. board.html is the template; page.css and page.js are shared with the other pages that talk to the agent;
+    board.css and board.js are what only the board has."""
     embedded = "null" if snapshot is None else json.dumps(snapshot).replace("</", "<\\/")
-    shared = (HERE / "page.css").read_text(encoding="utf-8")  # the look shared with design-better's canvas
-    script = (HERE / "page.js").read_text(encoding="utf-8")  # the conversation shared with the canvas and the slides
-    html = (HERE / "board.html").read_text(encoding="utf-8").replace("/*__PAGE_CSS__*/", shared)
-    html = html.replace("/*__PAGE_JS__*/", script)
+    html = (HERE / "board.html").read_text(encoding="utf-8")
+    for marker, name in (
+        ("/*__PAGE_CSS__*/", "page.css"),
+        ("/*__BOARD_CSS__*/", "board.css"),
+        ("/*__PAGE_JS__*/", "page.js"),
+        ("/*__BOARD_JS__*/", "board.js"),
+    ):
+        text = (HERE / name).read_text(encoding="utf-8")
+        if name.startswith("board."):  # the template ends the line after this marker
+            text = text.removesuffix("\n")
+        html = html.replace(marker, text, 1)
     return html.replace("__SNAPSHOT__", embedded)
 
 

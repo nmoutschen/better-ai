@@ -1,0 +1,32 @@
+reply: Added a conflict question on page speed versus 3-D Secure.
+actions:
+- write: .research/checkout-drop/questions/Q-coordinator-9.md
+  content: 'id: Q-coordinator-9
+
+    question: Which data separates the page-speed and 3-D Secure explanations of the drop?
+
+    title: Page speed or 3-D Secure
+
+    priority: high
+
+    status: open
+
+    owner: none
+
+    origin: C-w2-6
+
+    kind: conflict
+
+    stakes: which change to roll back first
+
+    done-when: a source compares the two causes'' effect on the same orders
+
+    answer: none
+
+    summary: none
+
+    gist: none
+
+    note: none
+
+    '

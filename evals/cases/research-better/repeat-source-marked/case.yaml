@@ -1,0 +1,18 @@
+id: repeat-source-marked
+rule: mark-repeats
+source:
+- SKILL.md#5.2
+reads:
+- templates/board.md
+situation: A fresh research run on the planted wiki export. The wiki index sends readers first to a weekly leadership update
+  that only summarises the analytics notes and the payments review. The agent records it as a repeat of the page it summarises,
+  so it does not count as a second independent source. A script checks its repeats line.
+request: 'Research why checkout conversion dropped after our March 2026 release, so I can decide what to roll back first.
+  The only place to search is our wiki export in wiki/: there is no web access, and no other system holds anything on this.
+  Run on your own until you have an answer; I won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/repeat_marked.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    repeat_marked.py: ../_checks/repeat_marked.py

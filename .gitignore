@@ -1,5 +1,7 @@
 __pycache__/
 .research
+# Eval cases plant a research board in the project's own .research/ folder as part of the case.
+!evals/cases/*/*/repo/.research
 .show
 .teach
 .design

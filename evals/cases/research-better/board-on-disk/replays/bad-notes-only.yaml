@@ -1,0 +1,10 @@
+reply: 'Most of the fall is in card payments, and the 3-D Secure 2 challenge step is the likeliest cause; the frontend guild
+  disputes this. Roll back nothing yet: tune the 3-D Secure threshold first. Board: .research/checkout-drop.'
+actions:
+- write: research-notes.md
+  content: '# Notes
+
+
+    3DS is the likely cause.
+
+    '

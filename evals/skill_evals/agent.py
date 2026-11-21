@@ -45,6 +45,27 @@ SKILL_TOOL = "Skill"
 # With a history planted in .history/, each step folder, in name order, adds its files/ to the tree and commits them
 # with its message.txt, as the author and date its optional commit.env sets. The planted repository then replaces the
 # tree as a last commit, only when it differs from the last step.
+# `claude -p` stays open while a shell it started in the background still runs, such as a skill's live page server,
+# even after it printed its final `result` event. End it once that event is out, so such a run ends when the agent's
+# turn ends, not at the timeout. The quotes inside a JSON string are escaped, so only the top-level event matches.
+# The run ends only while that event is still the last line 10 seconds later: a background task that finishes may
+# start another turn, which prints more events and a new result.
+END_AFTER_RESULT = """{run} &
+pid=$!
+while kill -0 $pid 2>/dev/null; do
+    if tail -n 1 {out} 2>/dev/null | grep -q '"type":"result"'; then
+        sleep 10
+        if tail -n 1 {out} | grep -q '"type":"result"'; then
+            kill -TERM $pid 2>/dev/null || true
+            sleep 5
+            kill -KILL $pid 2>/dev/null || true
+            break
+        fi
+    fi
+    sleep 2
+done
+wait $pid
+"""
 START_SCRIPT = """
 commit() {
     git add -f -A
@@ -152,7 +173,10 @@ async def claude_cli(
             sandbox_env, ["sh", "-c", 'umask 077 && cat > "$HOME/.eval-token"'], input=token, user=user, env=env
         )
     # Without input, close stdin: `claude -p` otherwise waits for piped data.
-    script = f'run-claude "$@" > {out}.out 2> {out}.err' + ("" if stdin is not None else " < /dev/null")
+    # A command sent to the background reads /dev/null, so a run with input (the judge) stays in the foreground.
+    script = f'run-claude "$@" > {out}.out 2> {out}.err'
+    if stdin is None:
+        script = END_AFTER_RESULT.format(run=script + " < /dev/null", out=f"{out}.out")
     timed_out = False
     try:
         await sandbox_env.exec(

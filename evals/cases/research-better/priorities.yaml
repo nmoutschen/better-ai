@@ -1,0 +1,34 @@
+# research-better's priority categories, highest first. Eval results are grouped by them: a change may lose
+# in a lower category where it gains in a higher one. See evals/PRINCIPLES.md, sections 10 and 11.
+# `does` is the category as the docs show it; `rules` is documentation; `cases` decides the grouping.
+categories:
+  - name: Keeps the evidence on the board
+    does: Keeps the board on disk in its format, copies quotes and source details from the page, and marks repeats and blocked sources
+    rules: [keep-board-on-disk, quote-verbatim, mark-repeats, blocked-not-evidence, record-new-questions-fully, copy-source-fields]
+    cases:
+      - board-on-disk
+      - claims-quote-verbatim
+      - repeat-source-marked
+      - blocked-source-not-evidence
+      - new-questions-complete
+      - source-fields-from-page
+  - name: Fails closed and reports honestly
+    does: Asks before the research runs when a collection is missing, records a decision instead of waiting once it runs, and reports only what the board holds
+    rules: [fail-closed-missing-collection, record-decision-not-wait, cite-from-board, fill-fields-from-source, report-what-is-open]
+    cases:
+      - missing-collection-asks
+      - empty-collection-asks
+      - decision-recorded-mid-run
+      - findings-cite-from-board
+      - findings-missing-field
+      - findings-report-gaps
+  - name: Splits the work between agents
+    does: Leaves the research to workers, has claims checked by verifiers that did not record them, and keeps the board's questions in order
+    rules: [coordinator-delegates-research, verify-claims-separately, challenge-high-priority-answers, replace-stopped-workers, admit-proposed-questions, add-conflict-questions]
+    cases:
+      - coordinator-starts-workers
+      - verifiers-check-claims
+      - challenge-for-answered-high
+      - restart-workers-on-resume
+      - admit-proposed-questions
+      - conflict-question-added

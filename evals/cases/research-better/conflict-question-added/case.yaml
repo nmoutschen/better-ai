@@ -1,0 +1,16 @@
+id: conflict-question-added
+rule: add-conflict-questions
+source:
+- SKILL.md#6.2
+situation: 'A board planted mid-run. Two verified claims under Q-coordinator-3 name different main causes: C-w2-6, from the
+  frontend guild, says the slower page explains most of the drop; C-w2-7, from the payments review, says the 3-D Secure challenge
+  step does. The question is marked answered. When the coordinator reviews the board, it adds a question of kind conflict
+  that targets the disagreement. A script checks the board for one.'
+request: 'Carry on the research in .research/checkout-drop: the workers stopped when my session ended. Run on your own; I
+  won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/conflict_added.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    conflict_added.py: ../_checks/conflict_added.py

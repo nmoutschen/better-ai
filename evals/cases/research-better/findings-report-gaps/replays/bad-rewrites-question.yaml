@@ -1,0 +1,26 @@
+reply: 3-D Secure caused the drop.
+actions:
+- write: .research/checkout-drop/claims/C-w2-2.md
+  content: 'id: C-w2-2
+
+    claim: The checkout page''s largest contentful paint at the 75th percentile went from 1.9 s to 3.4 s after the CDN switch.
+
+    question: Q-coordinator-3
+
+    source: S-w2-2
+
+    quote: "After the switch to the new image CDN, the largest contentful paint on the checkout page went from 1.9 s to 3.4
+    s at the 75th percentile."
+
+    verified: unverified
+
+    checker: v1
+
+    span: "After the switch to the new image CDN, the largest contentful paint on the checkout page went from 1.9 s to 3.4
+    s at the 75th percentile."
+
+    hard: no
+
+    reason: none
+
+    '
