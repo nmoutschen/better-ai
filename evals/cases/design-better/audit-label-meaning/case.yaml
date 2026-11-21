@@ -1,0 +1,44 @@
+id: audit-label-meaning
+rule: check-meaning-not-presence
+source:
+- agents/reviewer.md
+reads:
+- modes/audit.md
+- agents/reviewer.md
+situation: >-
+  A café's menu page passes an automated accessibility checker (reports/axe-menu.json: 0 violations), because
+  every image has alt text, every button has an accessible name and the headings are in order. But the names say
+  nothing: images are "image", "icon", "photo1" to "photo7"; the seven add-to-basket buttons and the basket link
+  are all named "button"; the section headings are "Section 1", "Section 2", "Section 3"; a link says "Click
+  here". The agent does not call the page accessible on the checker's result and reports that the names, alt text
+  and headings do not say what they are.
+request: Our accessibility checker passes on the menu page. Is it accessible?
+graders:
+- type: planted_unchanged
+- type: judge
+  rubric: >-
+    Rule: a review checks what names, labels, alt text and headings say, not only that they exist; an automated
+    checker's pass does not show that an interface is accessible.
+    Planted facts in menu.html: images have alt="image" (logo), alt="icon" (basket) and alt="photo1" to "photo7"
+    (the drinks and food); the seven "+" buttons that add an item to the basket and the basket link all have
+    aria-label="button", so a screen reader announces "button" seven times without saying which item each adds;
+    the three menu sections are headed "Section 1", "Section 2", "Section 3" (drinks, pastries, lunch); the
+    allergens link says "Click here". reports/axe-menu.json shows 0 violations, with image-alt, button-name and
+    link-name passing.
+    PASS only if all hold:
+    (1) the agent does not conclude that the page is accessible because the checker passes; it says the checker
+    tests that names exist, not what they say, or an equivalent point;
+    (2) it reports that the add buttons are all named "button" and do not say which item they add (or that a
+    screen reader user cannot tell them apart);
+    (3) it reports at least one more of: the meaningless alt text ("image", "icon", "photo1"...), the "Section
+    1/2/3" headings, the "Click here" link;
+    (4) for the problems it reports it says what a person meets, such as a screen reader user hearing "button" with
+    no item, or navigating by headings without knowing which section holds drinks.
+    FAIL if the agent answers that the page is accessible, or largely accessible, on the strength of the
+    checker; if it reports only problems a checker would also flag and misses the meaningless names; or if it
+    edits any planted file.
+    Does not count: also running a checker itself; proposing replacement names and alt texts; recommending a test
+    with screen reader users; Git's own files under .git/ and caches; notes, scripts or screenshots under
+    .design/, .code/ or a temporary folder; serving the folder with a local web server.
+validation:
+  do_nothing_fails_only_by_judge: true

@@ -1,0 +1,54 @@
+reply: >-
+  I walked the booking on a phone-sized screen in Chromium, with the keyboard and with the mouse. Two problems
+  stop people. (1) Keyboard users cannot book: after the nav links, Tab goes Guests, Date, Time, Name, Mobile
+  number, Anything we should know?, then back to the top; Continue is never focused, and Enter in a field does nothing. It is a
+  div with a click handler; it should be a submit button. (2) With the phone number left empty, pressing Continue
+  shows "Invalid input" in a red banner at the top of the page, which on a phone is scrolled out of view, about 400 px
+  above the top of the screen: nothing near the phone field changes, so it looks as if Continue did nothing. The message
+  should go under the phone field and say what to enter. Smaller: the date field has no label once you type in
+  it, and the photo's alt text is "image". Details in .design/booking-review/findings.md.
+actions:
+- read: booking.html
+- read: booking.js
+- bash: |
+    python3 - <<'PY'
+    import os
+    from playwright.sync_api import sync_playwright
+
+    url = "file://" + os.path.abspath("booking.html")
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+        page.goto(url)
+        stops = []
+        for _ in range(12):
+            page.keyboard.press("Tab")
+            stops.append(page.evaluate(
+                "() => { const e = document.activeElement; return e.id || e.textContent.trim().slice(0, 30) || e.tagName; }"))
+        print("Tab stops:", stops)
+        page.fill("#date", "12/12/2026")
+        page.fill("#name", "Sofie Claes")
+        page.focus("#notes")
+        page.keyboard.press("Tab")
+        page.keyboard.press("Enter")
+        print("after Tab+Enter from notes, banner hidden:", page.locator("#banner").is_hidden())
+        page.click("text=Continue")
+        print("banner text:", page.locator("#banner").inner_text())
+        print("banner in view:", page.evaluate(
+            "() => { const r = document.getElementById('banner').getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }"))
+        print("banner top:", page.locator("#banner").bounding_box()["y"], "phone top:", page.locator("#phone").bounding_box()["y"])
+        browser.close()
+    PY
+- write: .design/booking-review/findings.md
+  content: |
+    # Booking page review (operated in Chromium, 390 x 844)
+
+    Scenario: a guest books a table on their phone.
+
+    1. Pressing Continue by keyboard: after the nav links, Tab stops are Guests, Date, Time, Name, Mobile number, notes, then out of
+       the page. Continue is never focused; Enter in a field does nothing. A keyboard or screen reader user cannot
+       book. Fix: a `<button type="submit">` and the form's submit event.
+    2. Continue with the phone empty: "Invalid input" appears in the banner at the top, out of view; nothing
+       changes near the field. Fix: the message under the phone field, saying what to enter; focus the field.
+    3. The date field has no label, only a placeholder.
+    4. The photo's alt text is "image".

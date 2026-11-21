@@ -46,7 +46,7 @@ Run `/interview-me` first, then work as usual. See [Getting started](docs/gettin
 | [`/architect-better`](docs/architect-better.md) | Designs and audits software systems, with before and after diagrams you can comment on. |
 | [`/code-better`](docs/code-better.md) | Writes, checks, reviews and audits code so it builds what you need. |
 | [`/decide-better`](docs/decide-better.md) | Helps you make a decision yourself: asks which way you lean, checks the options against what matters to you, and gives its view with the main drawback. |
-| [`/design-better`](docs/design-better.md) | Designs, builds and checks an interface or page, and shows you versions side by side on a live page. |
+| [`/design-better`](docs/design-better.md) | Designs and audits an interface or page and its design language, shows you versions side by side on a live page, and has `/code-better` build the design. |
 | [`/do-better`](docs/do-better.md) | Corrects work that doesn't meet your intent. |
 | [`/improve-better`](docs/improve-better.md) | Improves the agent's memory, instructions and skills and proposes changes for you to approve, each with its test result. |
 | [`/research-better`](docs/research-better.md) | Researches a topic from sources on a shared board, with verified claims, and writes a report. |

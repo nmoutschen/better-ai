@@ -1,0 +1,5 @@
+reply: 'Open .design/ticket-header/A.html and .design/ticket-header/B.html in your browser, at phone width (375) and at desktop width (1280), to compare them.'
+actions:
+- read: .design/ticket-header/brief.md
+- read: .design/ticket-header/A.html
+- read: .design/ticket-header/B.html

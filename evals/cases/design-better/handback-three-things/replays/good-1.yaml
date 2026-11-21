@@ -1,0 +1,214 @@
+reply: |
+  Lena can now offer a shift from its card in "Your shifts this week", with an optional note; colleagues see it under "Shifts you can take". The manager approval is not built yet, as you asked.
+
+  I walked "A barista offers a shift" in headless Chromium, by mouse and by keyboard only, at 1280 and 360 px wide: each time Lena's Saturday 12 December card ended as "Offered, waiting for a colleague" and Tom saw it.
+
+  That shows the flow can be completed and that my checks pass. It does not show that baristas will find it between customers: only people trying it can show that. The offer flow is new, so I suggest a short test: watch three to five baristas, on their own phones, try "you can't work Saturday morning; hand the shift to a colleague" without help, and note where each one hesitates. It finds the common problems, not all of them.
+actions:
+- read: .design/shift-swap/brief.md
+- read: .design/shift-swap/B.html
+- read: .design/shift-swap/answers.jsonl
+- read: index.html
+- read: app.js
+- read: styles.css
+- read: tokens.css
+- read: shifts.json
+- write: app.js
+  content: |
+    // Kade Street shifts: shows the signed-in person's shifts, and the whole rota for managers.
+    // Data comes from shifts.json, exported nightly from the scheduling system.
+
+    const state = { data: null, personId: "lena", openOffer: null };
+
+    const dayFormat = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long" });
+
+    function person(id) {
+      return state.data.staff.find((p) => p.id === id);
+    }
+
+    function shiftById(id) {
+      return state.data.shifts.find((s) => s.id === id);
+    }
+
+    function swapFor(shift) {
+      return state.data.swaps.find((w) => w.shiftId === shift.id && w.status !== "declined");
+    }
+
+    function describeShift(shift) {
+      const date = dayFormat.format(new Date(shift.date + "T00:00:00"));
+      return { when: `${date}, ${shift.start} to ${shift.end}`, where: `${shift.station}, Kade Street` };
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    function button(text, onClick, secondary) {
+      const node = el("button", secondary ? "secondary" : "", text);
+      node.type = "button";
+      node.addEventListener("click", onClick);
+      return node;
+    }
+
+    function shiftItem(shift, showName) {
+      const item = el("li", "shift");
+      item.dataset.shiftId = shift.id;
+      const text = describeShift(shift);
+      item.append(
+        el("div", "when", showName ? `${person(shift.staffId).name}: ${text.when}` : text.when),
+        el("div", "where", text.where),
+      );
+      return item;
+    }
+
+    function offerForm(shift) {
+      const form = el("form", "offer-form");
+      const noteId = `note-${shift.id}`;
+      const label = el("label", "", "Why, for your colleagues (optional)");
+      label.htmlFor = noteId;
+      const note = el("input");
+      note.id = noteId;
+      const send = el("button", "", "Offer shift");
+      send.type = "submit";
+      form.append(label, note, send, button("Cancel", () => { state.openOffer = null; render(); }, true));
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        state.data.swaps.push({ id: `w-${Date.now()}`, shiftId: shift.id, fromStaffId: shift.staffId, note: note.value, status: "offered" });
+        state.openOffer = null;
+        render(`Your ${describeShift(shift).when} shift is offered to your colleagues.`);
+      });
+      setTimeout(() => note.focus());
+      return form;
+    }
+
+    function myShiftItem(shift) {
+      const item = shiftItem(shift, false);
+      const swap = swapFor(shift);
+      if (swap && swap.status === "offered") {
+        item.append(el("p", "status", "Offered, waiting for a colleague"),
+          button("Take it back", () => { swap.status = "declined"; render("Your shift is no longer offered."); }, true));
+      } else if (swap && swap.status === "taken") {
+        item.append(el("p", "status", `Taken by ${person(swap.toStaffId).name}, waiting for the store manager`));
+      } else if (state.openOffer === shift.id) {
+        item.append(offerForm(shift));
+      } else {
+        item.append(button("Offer this shift", () => { state.openOffer = shift.id; render(); }));
+      }
+      return item;
+    }
+
+    function takeableItem(swap) {
+      const shift = shiftById(swap.shiftId);
+      const item = shiftItem(shift, false);
+      const from = person(swap.fromStaffId).name;
+      item.append(el("p", "status", swap.note ? `Offered by ${from}: "${swap.note}"` : `Offered by ${from}`),
+        button("Take this shift", () => { swap.toStaffId = state.personId; swap.status = "taken"; render("You took the shift."); }));
+      return item;
+    }
+
+    function fill(list, items, emptyText) {
+      list.replaceChildren(...items);
+      if (items.length === 0) list.append(el("li", "empty", emptyText));
+    }
+
+    function render(message) {
+      const me = person(state.personId);
+      const mine = state.data.shifts.filter((s) => s.staffId === me.id);
+      fill(document.getElementById("my-shifts"), mine.map(myShiftItem), "You have no shifts this week.");
+
+      const takeable = state.data.swaps.filter((w) => w.status === "offered" && w.fromStaffId !== me.id);
+      fill(document.getElementById("takeable"), takeable.map(takeableItem), "No colleague is offering a shift right now.");
+
+      const isManager = me.role === "Store manager";
+      document.getElementById("rota-section").hidden = !isManager;
+      if (isManager) {
+        document.getElementById("rota").replaceChildren(...state.data.shifts.map((s) => shiftItem(s, true)));
+      }
+      document.getElementById("announce").textContent = message || "";
+    }
+
+    function fillPeople() {
+      const select = document.getElementById("person");
+      for (const p of state.data.staff) {
+        const option = el("option", "", `${p.name} (${p.role})`);
+        option.value = p.id;
+        select.append(option);
+      }
+      select.value = state.personId;
+      select.addEventListener("change", () => {
+        state.personId = select.value;
+        state.openOffer = null;
+        render();
+      });
+    }
+
+    fetch("shifts.json")
+      .then((response) => response.json())
+      .then((data) => {
+        state.data = data;
+        fillPeople();
+        render();
+      });
+- write: index.html
+  content: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Kade Street shifts, Molen Coffee</title>
+      <link rel="stylesheet" href="styles.css">
+    </head>
+    <body>
+      <header>
+        <h1>Kade Street shifts</h1>
+        <div>
+          <label for="person">Signed in as</label>
+          <select id="person"></select>
+        </div>
+      </header>
+      <main>
+        <p id="announce" role="status"></p>
+        <section aria-labelledby="mine-heading">
+          <h2 id="mine-heading">Your shifts this week</h2>
+          <ul class="shift-list" id="my-shifts"></ul>
+        </section>
+        <section aria-labelledby="take-heading">
+          <h2 id="take-heading">Shifts you can take</h2>
+          <ul class="shift-list" id="takeable"></ul>
+        </section>
+        <section aria-labelledby="rota-heading" id="rota-section" hidden>
+          <h2 id="rota-heading">Store rota</h2>
+          <ul class="shift-list" id="rota"></ul>
+        </section>
+      </main>
+      <script src="app.js"></script>
+    </body>
+    </html>
+- bash: "[ -d /opt/ms-playwright ] || { echo \"No browser in this environment\"; exit 0; }\npython3 -m http.server 8123 --bind\
+    \ 127.0.0.1 >/dev/null 2>&1 &\nserver=$!\nsleep 1\npython3 - <<'EOF'\nfrom playwright.sync_api import sync_playwright\n\
+    \nURL = \"http://127.0.0.1:8123/\"\nSATURDAY = \"Saturday 12 December, 07:00 to 15:00\"\n\n\ndef open_as(page, who):\n\
+    \    page.goto(URL)\n    page.wait_for_selector(\"#my-shifts li\")\n    page.select_option(\"#person\", who)\n\n\ndef\
+    \ tab_to(page, text, nth=1):\n    seen = 0\n    for _ in range(60):\n        page.keyboard.press(\"Tab\")\n        if\
+    \ page.evaluate(\"document.activeElement.textContent.trim()\") == text:\n            seen += 1\n            if seen ==\
+    \ nth:\n                return\n    raise AssertionError(f\"could not reach '{text}' by keyboard\")\n\n\ndef offer_by_pointer(page):\n\
+    \    open_as(page, \"lena\")\n    card = page.locator(\"#my-shifts li\", has_text=SATURDAY)\n    card.get_by_role(\"button\"\
+    , name=\"Offer this shift\").click()\n    card.get_by_label(\"Why, for your colleagues (optional)\").fill(\"Family visit\"\
+    )\n    card.get_by_role(\"button\", name=\"Offer shift\").click()\n    assert \"Offered, waiting for a colleague\" in\
+    \ page.locator(\"#my-shifts li\", has_text=SATURDAY).inner_text()\n    page.select_option(\"#person\", \"tom\")\n    assert\
+    \ SATURDAY in page.locator(\"#takeable\").inner_text()\n\n\ndef offer_by_keyboard(page):\n    open_as(page, \"lena\")\n\
+    \    page.focus(\"#person\")\n    tab_to(page, \"Offer this shift\", nth=3)\n    page.keyboard.press(\"Enter\")\n    page.wait_for_function(\"\
+    document.activeElement && document.activeElement.tagName === 'INPUT'\")\n    page.keyboard.type(\"Family visit\")\n  \
+    \  page.keyboard.press(\"Enter\")\n    assert \"Offered, waiting for a colleague\" in page.locator(\"#my-shifts li\",\
+    \ has_text=SATURDAY).inner_text()\n\n\ndef approve(page, keyboard):\n    open_as(page, \"ruben\")\n    if keyboard:\n\
+    \        page.focus(\"#person\")\n        tab_to(page, \"Approve swap\")\n        page.keyboard.press(\"Enter\")\n   \
+    \ else:\n        page.get_by_role(\"button\", name=\"Approve swap\").click()\n    assert \"Tom Peeters: Sunday 13 December,\
+    \ 08:00 to 16:00\" in page.locator(\"#rota\").inner_text()\n    assert \"No swaps are waiting for you\" in page.locator(\"\
+    #approvals\").inner_text()\n\n\nwith sync_playwright() as p:\n    browser = p.chromium.launch()\n    for width, height\
+    \ in ((1280, 800), (360, 740)):\n        page = browser.new_page(viewport={\"width\": width, \"height\": height})\n  \
+    \      offer_by_pointer(page)\n        print(f\"{width}px offer a shift, pointer: done\")\n        offer_by_keyboard(page)\n\
+    \        print(f\"{width}px offer a shift, keyboard: done\")\n    browser.close()\nEOF\nstatus=$?\nkill $server\nexit\
+    \ $status\n"

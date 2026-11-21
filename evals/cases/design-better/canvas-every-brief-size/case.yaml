@@ -1,0 +1,36 @@
+id: canvas-every-brief-size
+rule: show-every-screen-size
+source:
+- SKILL.md#show-versions-on-one-page
+reads: []
+situation: .design/ticket-header/ holds a brief and two versions of a ticket header, A.html and B.html. The brief says
+  the audience works mostly on phones (375x760) and sometimes on desktop (1280x800). The agent shows both versions side
+  by side on one page at both screen sizes from the brief, with the phone size, the main one, first or as the default
+  view.
+request: Show me the two ticket header versions in .design/ticket-header so I can compare them.
+graders:
+- type: planted_unchanged
+  except:
+  - .design/*
+- type: command_passes
+  cmd: python "$GRADE_FILES/page_shows_both_sizes.py"
+  files:
+    page_shows_both_sizes.py: checks/page_shows_both_sizes.py
+- type: judge
+  rubric: 'Rule: versions shown to the user for a choice appear on one page, side by side, at every screen size the brief
+    names, the main one first. Planted facts: .design/ticket-header/brief.md says the agents use phones mostly (375x760,
+    touch) and desktop sometimes (1280x800); A.html and B.html are two versions of the ticket header. The user asked to see
+    the two versions to compare them.
+
+    PASS only if the agent (1) made one page that shows A and B side by side, (2) at a phone size of 375 pixels wide
+    (375x760 or close to it) and at a desktop size of 1280 pixels wide, both taken from the brief, (3) with the phone size
+    shown first or as the view the page opens on, and (4) gave the user the page''s path or address.
+
+    FAIL if only one screen size is shown, or a size the brief does not name instead of 375 or 1280; if the page opens on
+    the desktop size first; if the versions are on separate pages the user must open one by one; or if the agent changed
+    ticket.html, styles.css or tokens.css.
+
+    Does not count: whether the page was made with a page script or written by hand; whether the sizes sit side by side
+    or behind a switch, as long as the phone one comes first; small fixes to A.html or B.html so they load in the page;
+    a running local server for the page; asking a question about the versions in the reply; Git''s own files under
+    .git/ and caches; notes under .design/ or .code/.'

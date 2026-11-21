@@ -1,0 +1,41 @@
+id: audit-structure-first
+rule: structure-before-defects
+source:
+- modes/audit.md
+- SKILL.md#2
+reads:
+- modes/audit.md
+situation: >-
+  A restaurant booking site has three pages in its nav: Book a table, My bookings, and "Booking history by API
+  version". The last repeats the bookings of My bookings, grouped by which booking API recorded them, which no
+  guest needs. The booking page also has in-page defects (a div used as the Continue button, an "Invalid input"
+  banner far from the field, an unlabelled date field, alt="image"). An audit checks the structure first and
+  reports the history page as a page to merge or remove, ahead of the defects inside pages.
+request: Audit the booking site.
+graders:
+- type: planted_unchanged
+- type: judge
+  rubric: >-
+    Rule: an audit checks the site's structure (which pages and parts exist, against what the audience comes to
+    do) before defects inside pages, and reports a page that should merge or go ahead of any in-page defect.
+    Planted facts: the nav of every page links Book a table (booking.html), My bookings (account.html) and
+    "Booking history by API version" (history.html). history.html lists the same four bookings as account.html,
+    grouped by "API v2" and "API v1" with the endpoint that recorded each; no guest task (booking a table, seeing
+    or changing one's bookings) needs that grouping. In-page defects also exist: Continue is a div with onclick
+    (keyboard cannot book), errors show "Invalid input" in a top banner, the date input has no label, the photo has
+    alt="image".
+    PASS only if all hold:
+    (1) the agent reports history.html as a page to remove, or to merge into My bookings, or to take out of the
+    guests' navigation, and says why: it repeats account.html, or no guest task needs bookings grouped by API
+    version;
+    (2) this structure finding comes before the in-page defects in the report the agent hands back (the reply, or
+    the Markdown report the reply points to): it is listed first, or in a section on structure placed ahead of
+    the defects, or the reply explicitly ranks it ahead of them.
+    FAIL if the agent does not mention history.html as a page to remove or merge; if it treats history.html only
+    as a page to polish (for example only its wording, labels or styling); if the structure finding comes after
+    in-page defects with no statement that it ranks ahead of them; or if it deletes or edits any planted file.
+    Does not count: Git's own files under .git/ and caches; notes, a brief, scripts or screenshots under .design/,
+    .code/ or a temporary folder; serving the folder with a local web server; how many in-page defects it finds
+    and how it orders them among themselves; saying that only a test with guests would confirm the structure.
+validation:
+  do_nothing_fails_only_by_judge: true

@@ -1,0 +1,22 @@
+reply: 'Two directions side by side in .design/next-ticket/index.html: a compact list and a card layout. Which do you prefer?'
+actions:
+- write: .design/next-ticket/A.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>A: list</title></head>
+    <body><table>
+    <tr><td>Ticket 1</td><td>Customer cannot log in</td><td>High</td></tr>
+    <tr><td>Ticket 2</td><td>Billing question</td><td>Normal</td></tr>
+    <tr><td>Ticket 3</td><td>Feature request</td><td>Low</td></tr>
+    </table></body></html>
+- write: .design/next-ticket/B.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>B: cards</title></head>
+    <body><div class="card">Ticket 1: Customer cannot log in</div><div class="card">Ticket 2: Billing question</div>
+    <div class="card">Ticket 3: Feature request</div></body></html>
+- write: .design/next-ticket/index.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>Directions</title></head>
+    <body><div style="display:flex"><iframe src="A.html"></iframe><iframe src="B.html"></iframe></div></body></html>

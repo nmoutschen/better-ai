@@ -1,6 +1,6 @@
 ---
 name: design-better
-description: Helps an AI agent design, build and review an interface or page, such as a web page, an app screen or a rendered report, so that the people who use it can do what they came for, and create, apply and review the design language behind it. Agrees the audience and their tasks with the user, shows rough directions before building, and checks the result by walking each task instead of trusting how it looks. Use show-better to introduce a document with visual panels, and write-better for the words in the interface.
+description: Helps an AI agent design and audit an interface or page, such as a web page, an app screen or a rendered report, so that the people who use it can do what they came for, and create, apply and audit the design language behind it. Agrees the audience and their tasks with the user, shows rough directions before anything is built, hands a design to code-better to build, and accepts the result only once a reviewer has walked each task in the built interface. Use show-better to introduce a document with visual panels, and write-better for the words in the interface.
 argument-hint: "[INTERFACE OR TASK]"
 metadata:
   kind: procedural
@@ -8,18 +8,12 @@ metadata:
 
 # Design Better
 
-This file holds the practices every design task shares. The steps of each kind of task are in a mode file. READ the mode file that fits the task and FOLLOW it together with this file:
+IF invoked with an interface or a design task as argument, FOLLOW the instructions below for that task.
+IF invoked without argument and the current conversation builds or changes an interface, AUDIT that interface with [modes/audit.md](modes/audit.md), THEN continue or correct the work.
+IF invoked without argument and there is no such interface, ASK the user which interface or design language to work on, and whether to design, audit or change it.
+IF the task changes neither which screens exist, what they hold, their layout or flow, nor the design language, such as a clearer label or a fix inside one screen, FOLLOW only the [Design rules](#design-rules) for it, and USE `/code-better` to make the change, or IF it is not available, CHANGE only what the task needs and RUN the project's existing checks. In both cases, SKIP the Instructions.
 
-| Task | Mode file |
-|---|---|
-| Design, build or change an interface | [modes/build.md](modes/build.md) |
-| Review an interface or a design language, yours or someone else's | [modes/review.md](modes/review.md) |
-| Create, extend or change a design language | [modes/language.md](modes/language.md) |
-
-IF invoked with an interface or a design task as argument, CHOOSE the mode from the task.
-IF invoked without argument and the current conversation is building or changing an interface, USE the review mode on that interface, THEN continue or correct the work. OTHERWISE, ASK the user which interface or design language to work on, and whether to build, review or change it.
-
-Being invoked does NOT mean a redesign, and does NOT mean you must build now. These instructions can end with a brief and questions for the user, or with a report that the interface already lets people do what they came for.
+Being invoked does NOT mean a redesign, and does NOT mean anything gets built now. The work can end with a brief and questions for the user, or with a report that the interface already lets people do what they came for.
 
 This skill uses two words for people. The user is the person you work for. The AUDIENCE is the people who will use the interface. They can be the same person.
 
@@ -31,171 +25,139 @@ This skill uses two words for people. The user is the person you work for. The A
 4. People judge more critically and more precisely when they compare concrete versions than when they see one version or describe what they want in words.
 5. Few layout and type rules hold for every task and every AUDIENCE, and taste differs between people, including trained designers.
 6. People overlook removing something as a way to improve it unless prompted to consider removal.
-7. The brief (section 1.3) is a design choice. Each mode file names its own design choices.
+7. The brief, the hand-off of building to `/code-better`, and the acceptance review of every built interface are design choices. Each mode file names its own design choices.
 
-This skill names capabilities, not tools: reading files, asking the user, running Python 3, rendering a page and viewing it, publishing a page, operating a page by pointer and keyboard, running an automated accessibility checker, sub-agents, and writing files. FOR each capability you lack, FOLLOW the fallback the section gives.
+## Instructions
 
-FOR the code that implements the interface, FOLLOW `/code-better` if available. OTHERWISE, CHANGE only what the task needs and RUN the project's existing checks.
+FOLLOW these steps in order.
 
-## 1. Know the goal, the audience and what exists
+### 1. Understand the work
 
-### 1.1. Name the GOAL
+NAME the GOAL: what the AUDIENCE must be able to do with the interface, and what the user wants to achieve by providing it. DISTINGUISH it from the requested page. "A dashboard" is a request. "See which orders are late and open one" is a GOAL.
 
-NAME what the AUDIENCE must be able to do with the interface, and what the user wants to achieve by providing it. DISTINGUISH this GOAL from the requested page. "A dashboard" is a request. "See which orders are late and open one" is a GOAL.
+READ the existing interface, its components, styles and design files, the content it must show, the project's instruction files, and the earlier conversation. DO NOT ask the user what these sources answer.
 
-### 1.2. Read before deciding anything
+TREAT an existing design language, its colours, typefaces, type sizes, spacing values and components, as a requirement the user owns. A change to any value it defines is a change to the design language, however small: DO NOT make it as a fix. WHEN it conflicts with a [Design rule](#design-rules), such as text contrast, REPORT the conflict once, with its effect on the AUDIENCE and one alternative, THEN WAIT for the user's decision. IF no design language exists and the work covers more than one screen, ASK the user whether to create one first.
 
-READ the existing interface, its components, styles and design files, the content it must show, the project's instruction files, and earlier conversation. DO NOT ask the user what these sources answer.
+### 2. Write the brief
 
-TREAT an existing design language, such as its colours, typefaces, spacing and components, as a requirement the user owns. KEEP it. IF it conflicts with a rule in section 2, such as text contrast, DO NOT change it. REPORT the conflict once, with its effect on the AUDIENCE and one alternative, THEN FOLLOW the user's decision. A change to a colour, typeface, type size, spacing value or component that the design language defines is a change to the design language, however small. DO NOT make it as a quick fix: WAIT for the user's decision.
+WRITE `.design/<slug>/brief.md` with [templates/brief.md](templates/brief.md): the GOAL, the AUDIENCE, their scenarios, the structure, the content, the constraints, and your assumptions. IF a brief exists, UPDATE it in place.
 
-The pages a design document chooses, and what each holds, are part of the structure (section 1.3), not of the design language. CHECK them against the GOAL instead of keeping them as a requirement.
+DESCRIBE the AUDIENCE by what they do and the conditions they do it in: the device and screen sizes, the input method, how much time they have, what they already know. DO NOT invent a fictional person, and DO NOT assign the AUDIENCE traits you guessed.
 
-IF no design language exists and the work covers more than one screen, ASK the user whether to create one first. IF they agree, FOLLOW [modes/language.md](modes/language.md) before building.
+WRITE each scenario as one task from its start to an end the person can observe, with concrete data: who comes, what they came to do, and what they see or have when it is done. KEEP the scenarios few: a scenario earns its place only if a wrong guess on it would change the design. Every mode checks the interface against them.
 
-### 1.3. Write the audience and their tasks
+WRITE the structure: which pages exist, what each holds, and how they link. FOR each page and each main part of a page, NAME the scenario it serves, THEN ASK whether it should stay, merge with another, or go (Principle 6). A page or part that serves no scenario, repeats another, or follows how its content was produced instead of what the AUDIENCE comes to do, is a candidate to merge or remove: SETTLE it with the user, because organising by task beats organising by subject in some studies and not in others.
 
-IF the work is more than a small change with one obvious reading, THEN WRITE a brief with [templates/brief.md](templates/brief.md): the GOAL, the AUDIENCE, their scenarios, the content, the constraints, and your assumptions. IF you cannot write files, PUT the brief in your reply.
+### 3. Ask a few questions
 
-DESCRIBE the AUDIENCE by what they do and the conditions they do it in: the device, the input method, how much time they have, what they already know. DO NOT invent a fictional person, and DO NOT assign the AUDIENCE traits or conditions you guessed.
+ASK the user, as the general rule [Ask the user](#ask-the-user) says, what only they know and what changes the design. KEEP building the brief while you wait.
 
-WRITE each scenario as one task from its start to an end the person can observe, with concrete data: who comes, what they came to do, and what they see or have when it is done. KEEP the scenarios few: a scenario earns its place only if a wrong guess on it would change what you build. Every mode checks the interface against these scenarios.
+### 4. Pick the mode
 
-The structure is part of the design: which pages exist, what each holds, and how they link. WRITE it in the brief. FOR each page and each main part of a page, NAME the scenario it serves, THEN ASK whether it should stay, merge with another, or go (Principle 6). A page or part that serves no scenario, repeats another, or follows how its content was produced instead of what the AUDIENCE comes to do, is a candidate to merge or remove. TREAT the last point as a question to settle with the user, not a rule: organising pages by task beats organising them by subject in some studies and not in others, and the labels matter at least as much as the grouping.
+PICK the one mode that fits the work. READ its file: it is MANDATORY, and the next step cannot run without it. IF the user agreed in step 1 to create a design language first, RUN [modes/language.md](modes/language.md), THEN the mode the task needs.
 
-### 1.4. Ask a few questions before building
+| Mode | When | File |
+|---|---|---|
+| Design | a new interface, or a change to which screens exist, what they hold, their layout or their flow | [modes/design.md](modes/design.md) |
+| Audit | the user asks for a review of an interface or a design language, theirs or someone else's, or what to improve | [modes/audit.md](modes/audit.md) |
+| Language | create, extend or change a design language | [modes/language.md](modes/language.md) |
 
-USE `/ask-better` if available, THEN CONTINUE with the mode file once the user answers. OTHERWISE, ASK only what only the user knows and what changes the interface. ASK at most about three questions, all at once, before building. WRITE each one so the user can answer in a few words or by choosing. The first questions carry most of the value, and many or generic questions cost the user more than they give. TREAT the number as a guide, not a rule.
+### 5. Run the mode
 
-WHEN a question is about how something looks, such as a colour, a layout or a component, SHOW the versions by section 1.5, and ASK the user to choose between them. DO NOT ask from a text description or a text sketch when you can render.
+FOLLOW every step of the mode's file, in order.
 
-FOR every other gap, CHOOSE the most plausible option, PROCEED, and STATE the assumption next to the result it affects.
+### 6. Hand back
 
-### 1.5. Show versions on one page
+LEAD with the result, THEN report, USING `/write-better` for the wording if available:
 
-WHEN you show the user versions to choose between, or a change before and after, PUT them on one rendered page, side by side, because people judge a version more critically when they see it among others. Showing every version at the same screen sizes and scale, in the order you give, is a design choice.
+1. In one sentence, which scenarios were walked in the built interface, and how. Each scenario that fails or that was not walked, and why.
+2. The decisions the user owns: each conflict between the design language and a rule, and each assumption that changed the design.
+3. The open and unconfirmed findings of the review.
 
-1. WRITE each version as its own HTML file, with the same real content and the project's styles. FOR a before and after, SAVE a copy of the page before you change it.
-   WHEN versions differ in only part of a page, WRITE each version as that part, with enough of its surroundings to place it, so it shows at a size where its text can be read. LABEL under each version what differs from the others. IF the change is small inside the part shown, also MARK where it is, with the same mark at the same place in every version, so the user finds it without searching and no version stands out. KEEP the mark out of the interface itself.
-2. RUN `python3 scripts/canvas.py show A=<file> B=<file> --question "<what the user decides>" --width <widest screen> --width <smallest screen in the brief> --out .design/<slug>/index.html` from this skill's directory, with the output path in the working directory. A version can also be an address the user's browser can reach. FOR a before and after, LABEL them `Before=` and `After=`. The page shows the versions side by side and also offers to switch between them in the same place: TELL the user to switch WHEN the versions differ in a small detail, because switching shows a change at one spot better than looking from one to the other. WHEN you want feedback on one screen, such as an interface you built, RUN it with that one version. DO NOT commit the page unless the user asks.
+WHEN the work changed how an interface looks and you can render, SHOW each changed screen before and after, by [Show versions on one page](#show-versions-on-one-page). WHEN it goes into a pull request, PUT screenshots of each changed screen in its description, before and after, at the screen sizes in the brief.
+
+DISTINGUISH three things, and DO NOT claim one from another: the scenarios can be completed, the checks pass, and the AUDIENCE can use the interface. Only a test with people shows the third.
+
+WHEN the interface is new or its main flow changed, and people other than the user will use it, OFFER a short test: the user watches three to five people from the AUDIENCE try the scenarios without help, worded without the interface's labels, and notes where each one hesitates or fails. IF the AUDIENCE has distinct groups, SUGGEST a few people from each. WHEN the change is to which pages exist, how they are grouped or what they are called, OFFER a tree test instead: people look for items in a text-only list of the structure. DO NOT count on an agent finding every item: agents find paths far more often than people do. SAY that such a test finds the common problems, not all of them, and WHEN a test leads to changes, OFFER a second short round on the changed flow, because fixes can create new problems. IF the user has said they do not want this, DO NOT offer it.
+
+IF the user rejects the result, USE `/do-better` if available. OTHERWISE, FIND what the result misses from the user's feedback and the brief, and CORRECT it.
+
+## General rules
+
+FOLLOW these rules in every step and every mode.
+
+### Ask the user
+
+USE `/ask-better` if available. OTHERWISE, ASK at most about three questions, all in one message, each answerable in a few words or by choosing. COUNT a question a mode asks, such as the design mode's question about the user's direction, among them. ASK what only the user knows and what changes the design: what happens to the AUDIENCE's data, money or work, and what they are told. The first questions carry most of the value; many or generic questions cost the user more than they give.
+
+WHEN a question is about how something looks, such as a colour, a layout or a component, SHOW the versions by [Show versions on one page](#show-versions-on-one-page), and ASK the user to choose. DO NOT ask from a text description when you can render.
+
+FOR every other gap, including a technical fact the project does not state, such as an API's address, CHOOSE the most plausible option, PROCEED, and STATE the assumption in the brief and next to the result it affects.
+
+### Show versions on one page
+
+WHEN you show the user versions to choose between, or a change before and after, PUT them on one rendered page, side by side, because people judge a version more critically among others.
+
+1. WRITE each version as its own HTML file in `.design/<slug>/`, with the same real content and the project's styles. FOR a before and after, SAVE a copy of the page before it changes. WHEN versions differ in only part of a page, WRITE that part with enough of its surroundings to place it, LABEL under each version what differs, and IF the change is small, MARK where it is, with the same mark in every version, outside the interface itself.
+2. RUN `python3 scripts/canvas.py show A=<file> B=<file> --question "<what the user decides>" --width <size> ... --out .design/<slug>/index.html` from this skill's directory. GIVE a `--width` for every screen size in the brief, the size most of the AUDIENCE uses first: the page opens on it, and the user switches to the others. A version can also be an address the user's browser can reach. FOR a before and after, LABEL them `Before=` and `After=`. TELL the user to switch between versions in place WHEN they differ in a small detail. DO NOT commit the page unless the user asks.
 3. LOOK at the rendered page before you show it, and FIX each version that does not load, overlaps or is cut off.
-   FOR new directions, ALSO REVIEW them with [modes/review.md](modes/review.md) before you show them, and FIX or DROP what the review confirms.
-4. On the page, the user comments on any part of a version by clicking it, gives each version a thumbs up or down when there are three or more, and decides with Decide: a confirmed choice of one version, a combination or none, sent with the comments still open. IF the user's browser runs on the machine where you run commands, SERVE the page so this feedback reaches you without the user copying it: ADD `--serve --open` and RUN the command in the background. GIVE the address it prints. Each action is printed as one JSON line and appended to `answers.jsonl` next to the page. A comment names the version and what the user clicked: the element's selector and text, the sentence under the pointer, an image's source, the nearest heading and the parent elements. It also carries the verdict and the user's words. WORK OUT what the user pointed at from all of these, not from the selector alone. RECEIVE the actions by the first route your harness offers:
-   1. IF your harness can stream a background command's output to you as it arrives, such as a monitor, RUN the serve command in the background with its output going to a file, and STREAM the new lines of that file. Each action then arrives on its own. A stream that expires then stops only the watch, not the page: START the stream again.
-   2. OTHERWISE, IF you can run a command in the background and be told when it ends, RUN `python3 scripts/canvas.py wait .design/<slug>` that way after you show the page. It ends with the actions you have not seen: START it again at once, before you act on them, and KEEP it running for as long as the page is served, also when nothing is pending, because the user can write at any time. WHILE no `wait` runs, the page tells the user that you are not watching.
+4. IF the user's browser runs on the machine where you run commands, ADD `--serve --open` and RUN the command in the background. GIVE the address it prints. The user comments on any part of a version by clicking it, gives thumbs up or down when there are three or more versions, and decides with Decide. Each action is printed as one JSON line and appended to `answers.jsonl` next to the page; a comment names the version, the element's selector and text, the sentence under the pointer, an image's source, the nearest heading and the parents: WORK OUT what the user pointed at from all of these. RECEIVE the actions by the first route your harness offers:
+   1. IF your harness can stream a background command's output to you, STREAM the serve command's output file. A stream that expires stops only the watch: START it again.
+   2. OTHERWISE, IF you can run a command in the background and be told when it ends, RUN `python3 scripts/canvas.py wait .design/<slug>` that way, and START it again at once each time it ends, for as long as the page is served.
    3. OTHERWISE, ASK the user to say "sent" in the chat, THEN READ the new lines of `answers.jsonl`.
 
-   IF the user's browser cannot reach this machine and you can publish a page, PUBLISH it and GIVE the link: its Copy all button copies the feedback for the user to paste in the chat. IF the script warns that a version links files by relative path, PUT those files' content into the version first, because a published page cannot reach them. OTHERWISE, OPEN the page with `--open` and GIVE its path.
-5. ASK the question in your reply too, so the user can answer in the page or in a few words in the chat.
-6. TREAT feedback from the page as the user's reply, and ACT on a comment against the element it names. WHILE the user works in the page, PUT everything for them in the page, including longer proposals, and DO NOT answer each page action in the chat: messages there bury what matters.
-   - TRACK each comment, message and decision with `python3 scripts/canvas.py status .design/<slug> seen|asked|working|done|accepted <id>...`: MARK it `seen` when it arrives, `asked` when you asked the user something and wait for the answer, `working` when you start on it, and `done` when the change is in the page. READ a note the user adds under an item as part of that item's thread, ordered by the `at` time on each entry, the user's and yours (`pending` prints the thread with its times): it may answer your question, clarify what they asked, or react to your last reply. DO NOT take it as the answer to your question unless it answers it; IF you cannot tell, ASK in one sentence. KEEP `working` on the items you are changing now, usually one: WHEN you put an item aside, for another item or to wait for the user, MARK it back to `seen` or `asked`. WHEN the user's answer leads to new versions, MARK the item `done` once they are in the page, and PUT your next question in a new message: the user comments on the new versions as new items. The page asks the user to accept each item marked done, or reply under it. TREAT an item as finished only when the user accepts it, in the page or in words (then MARK it `accepted`), and an item the user replied under or edited as work to do.
-   - RUN `python3 scripts/canvas.py pending .design/<slug>` after each batch of changes, before you wait again: the harness can deliver page events late or not at all while you work, and `pending` reads what the user sent from the file.
-   - REPLY in the page with `python3 scripts/canvas.py reply .design/<slug> "<what you changed, or your question>" --to <id>`, with the `id` of the item you answer: the page shows the reply under it. KEEP each reply to one or two short sentences: what you changed, or the one thing you need.
-   - DO NOT build from a version until the user decides, in the page or in the chat. A decision names the open comments that come with it: APPLY them too.
-   - TO show new versions while the page is served, RUN the same `show` command with the same `--out`, without `--serve` and `--open`: the open page loads them by itself once the user is not typing, on the same view.
-   - AFTER an interruption, and before you hand back, RUN `python3 scripts/canvas.py pending .design/<slug>`, and FINISH or ANSWER what it lists. STOP the server when the user has accepted the result.
+   IF the user's browser cannot reach this machine and you can publish a page, PUBLISH it and GIVE the link: its Copy all button copies the feedback for the user to paste. IF the script warns that a version links files by relative path, PUT their content into the version first. OTHERWISE, OPEN the page with `--open` and GIVE its path.
+5. ASK the question in your reply too, so the user can answer in the page or in the chat.
+6. TREAT feedback from the page as the user's reply. WHILE the user works in the page, PUT everything for them in the page, and DO NOT answer each page action in the chat.
+   - TRACK each item with `python3 scripts/canvas.py status .design/<slug> seen|asked|working|done|accepted <id>...`: `seen` when it arrives, `asked` when you wait for the user's answer, `working` only on what you are changing now, `done` when the change is in the page. READ a note the user adds under an item as part of its thread, in `at` order; IF you cannot tell whether it answers your question, ASK in one sentence. TREAT an item as finished only when the user accepts it; an item the user replied under or edited is work to do.
+   - REPLY with `python3 scripts/canvas.py reply .design/<slug> "<what you changed, or your question>" --to <id>`, in one or two short sentences. ONCE an answer leads to new versions, MARK the item `done` and PUT your next question in a new message.
+   - TO show new versions while the page is served, RUN the same `show` command with the same `--out`, without `--serve` and `--open`: the open page loads them on the same view and screen size.
+   - RUN `python3 scripts/canvas.py pending .design/<slug>` after each batch of changes, after an interruption, and before you hand back, and FINISH or ANSWER what it lists. STOP the server only when the user has accepted the result.
+   - DO NOT build from a version until the user decides. A decision names the open comments that come with it: APPLY them too.
 
-IF you cannot run Python but can render, WRITE one HTML page that shows the versions side by side at the same width. IF you cannot render, SHOW each version as a plain text outline, and SAY that the choice may change once it is rendered.
+### Design rules
 
-## 2. Design rules
+FOLLOW these rules in every design, build and audit. TREAT those marked as guides as guides, because their effect depends on the task and the AUDIENCE.
 
-### 2.1. Lay out the page for the task
-
-TREAT the rules in this section as guides, not rules, because their effect depends on the task and the AUDIENCE.
+Layout, as guides:
 
 - WHEN a person must find one thing, REMOVE or reduce the elements that compete with it.
 - KEEP the density of content even across the page.
 - MAKE every control look like something that can be clicked or tapped, and everything else look like it cannot.
 - ON touch screens, MAKE targets about 9 mm or larger.
-- PUT an element where the task leads the person. DO NOT rely on size or colour alone to get it noticed: people searching for something else miss prominent elements.
-- DO NOT judge navigation by counting clicks or menu levels. JUDGE it by whether each step is obvious (section 3.1).
+- PUT an element where the task leads the person: people searching for something else miss elements made prominent by size or colour alone.
+- JUDGE navigation by whether each step is obvious, not by counting clicks or menu levels.
 
-### 2.2. Text and colour
+Text and colour:
 
-- DO NOT use small body text. No single size is right for everyone: larger text helps up to a point.
-- AVOID very short lines of running text. AIM for about 55 to 70 characters per line. ALIGN running text to the start of the line; DO NOT justify it, although people often prefer justified text. TREAT this as a guide, not a rule.
-- KEEP the contrast between text and background high, at least the conventional 4.5 to 1 for normal text. Low contrast costs most for people with low vision and for small text.
-- PREFER dark text on a light background for small text.
-- DO NOT use colour as the only signal. ADD text, an icon or a shape.
-- WRITE bylines, stat lines and metadata as a sentence or a plain phrase, such as "53 articles in 9 topics, last updated 14 Nov 2026", not as short fragments joined by a middle dot or a similar separator, such as "53 articles · 9 topics". This is a design choice.
+- DO NOT use small body text; larger text helps up to a point. AIM for about 55 to 70 characters per line of running text, aligned to the start, not justified (guide).
+- KEEP the contrast between text and background at least 4.5 to 1 for normal text. PREFER dark text on a light background for small text.
+- DO NOT use colour as the only signal: ADD text, an icon or a shape.
+- GIVE each colour one meaning across a page. IF a second part of the page, such as a table under a diagram, needs its own encoding, USE shapes, outlines or labels instead of reusing a colour: readers carry a colour's meaning from one part of the page to the next.
+- WRITE bylines, stat lines and metadata as a sentence or a plain phrase, such as "53 articles in 9 topics, last updated 14 Nov 2026", not as fragments joined by a middle dot. This is a design choice.
 - TREAT the choice between ordinary serif and sans serif typefaces as taste, and FOLLOW the design language. DO NOT choose a special typeface on the claim that it helps a group of readers.
 
-### 2.3. Forms and feedback
+Forms and feedback:
 
-- GIVE every field a visible label. Label position is a choice: PICK one and KEEP it across the form.
-- PUT each error message next to the field it concerns. SAY what is wrong and what to enter instead.
-- DO NOT validate a field before the person has finished typing in it. Whether to validate on leaving the field or on submit is a choice: PICK one and KEEP it.
-- MARK which fields are required.
+- GIVE every field a visible label, in one position across the form, and MARK which fields are required.
+- PUT each error message next to its field, and SAY what is wrong and what to enter instead.
+- DO NOT validate a field before the person has finished typing in it. PICK validation on leaving the field or on submit, and KEEP it.
 - WHEN an action takes time, SHOW that something is happening. DO NOT choose a loading pattern on the claim that it feels faster.
 
-### 2.4. Make it work without sight or a mouse
+Without sight or a mouse, where generated interfaces fail most:
 
-Generated interfaces fail here more than anywhere else.
-
-- USE native elements, such as buttons, links and inputs, before custom ones. GIVE every control a name that says what it does.
-- WRITE headings that describe their sections, in order, and MARK the main regions of the page.
+- USE native elements, such as buttons, links and inputs, before custom ones, and GIVE every control a name that says what it does.
+- WRITE headings that describe their sections, in order, and MARK the main regions of the page. SET the page's language.
 - TIE each label to its field in the markup.
-- WRITE alt text that says what the image shows or does in this place. GIVE decorative images empty alt text. DO NOT add a description to every image.
-- SET the language of the page.
+- WRITE alt text that says what the image shows or does in this place, and empty alt text for decorative images. DO NOT add a description to every image.
 - MAKE every action possible by keyboard, in an order that follows the task, with a visible focus.
-- GIVE content that moves by itself for more than five seconds a way to pause it. HONOUR the reduced-motion setting for motion that the person's actions trigger.
+- GIVE content that moves by itself for more than five seconds a way to pause it, and HONOUR the reduced-motion setting.
 
-WRITE names, labels and descriptions from the scenarios, because no checker can judge whether they mean anything.
+Words: USE `/write-better` for labels, button text and messages if available. OTHERWISE, USE the words the AUDIENCE uses, and NAME the action on the control that performs it. WRITE names, labels and descriptions from the scenarios: no checker can judge whether they mean anything.
 
-### 2.5. Words
+### Missing capabilities
 
-FOR the words in the interface, such as labels, button text and messages, FOLLOW `/write-better` if available. OTHERWISE, USE the words the AUDIENCE uses, and NAME the action on the control that performs it.
+This skill names capabilities, not tools: reading and writing files, asking the user, running Python 3, rendering a page and viewing it, operating a page by pointer and keyboard, running an automated accessibility checker, sub-agents, and publishing a page. WHEN a step needs to render or operate a page, LOOK first for a way in the environment, such as a headless browser or a browser automation library, and USE it.
 
-## 3. Check the interface, not its looks
-
-### 3.1. Walk every scenario in the rendered interface
-
-IF you can render and operate the interface, WALK each scenario from start to end: with a pointer, then with the keyboard only, then at the smallest screen width in the brief. AT each step, CHECK that the next action is visible and named in the AUDIENCE's words, and that the interface shows the result of the action.
-
-A scenario counts as walked only if you operated the interface. Reading the code or looking at a screenshot does not count. BEFORE you conclude that you cannot operate it, LOOK for a way to drive a browser in the environment, such as a headless browser, a browser automation library or the browser's debugging protocol, and USE it. IF you still cannot render or operate it, SAY so. DO NOT describe how the page looks or behaves. LIST the walks for the user to do.
-
-Completing a scenario yourself shows that it can be completed. It does not show where a person would hesitate or fail, because agents complete tasks that people struggle with.
-
-### 3.2. Read the markup for meaning
-
-READ the names of controls, the labels, the headings and the alt texts in the order assistive technology gives them, without the visual page. CHECK that each one says what the thing is or does in its scenario.
-
-### 3.3. Run a checker and fix what it reports
-
-IF an automated accessibility checker is available, RUN it on the rendered interface and FIX what it reports. A clean run covers a minority of accessibility problems. DO NOT report the interface as accessible from it. IF none is available, SAY so, and RELY on sections 3.1 and 3.2.
-
-### 3.4. Use screenshots for defects, not for quality
-
-LOOK at screenshots to find visible defects, such as overlap, clipped text, unreadable text and broken layout. DO NOT treat your judgment of a screenshot, or another model's, as evidence that the interface is easy to use or well designed.
-
-### 3.5. Do not simulate people
-
-DO NOT take, or give a reviewer, the role of a person with a disability, a neurodivergent profile, an age or an emotional state to predict how such a person would experience the interface. Such roles produce stereotypes and do not match the people they imitate.
-
-FOR these AUDIENCES, FOLLOW section 2.4 and the published accessibility guidance for the platform, and RECOMMEND a test with people from that AUDIENCE (section 4.2).
-
-## 4. Hand back
-
-### 4.1. Report what the user must act on
-
-USE `/write-better` if available. OTHERWISE, lead with the result.
-
-WHEN the change alters how the interface looks and you can render, the result is a page that shows each changed screen before and after the change (section 1.5). KEEP the text to the points below. WHEN the change goes into a pull request, PUT screenshots of each changed screen in its description, before and after, at the screen sizes in the brief.
-
-THEN REPORT:
-
-1. In one sentence, which scenarios you walked and how. Each scenario that fails or that you could not walk, and why.
-2. The decisions the user owns: each conflict between the design language and a rule (section 1.2), and each assumption that changed what you built.
-3. The unconfirmed review findings.
-
-DISTINGUISH three things, and DO NOT claim one from another: the scenarios can be completed, the checks pass, and the AUDIENCE can use the interface. Only a test with people shows the third.
-
-### 4.2. Offer a test with people
-
-WHEN the interface is new or its main flow changed, and people other than the user will use it, OFFER a short test: the user watches three to five people from the AUDIENCE try the scenarios without help, and notes where each one hesitates or fails. GIVE the scenarios as tasks worded without the labels the interface uses. IF the AUDIENCE has distinct groups, SUGGEST a few people from each.
-
-WHEN the change is to which pages exist, how they are grouped or what they are called, OFFER a tree test instead: people look for items in a text-only list of the structure. DO NOT count on an agent finding every item as a result: agents find paths far more often than people do. An item the agent cannot find is a likely problem for people too.
-
-SAY that such a test finds the common problems, not all of them. WHEN a test leads to changes, OFFER a second short round on the changed flow, because fixes can create new problems. TREAT this as a guide, not a rule. IF the user has said they do not want this, FOLLOW that instead.
-
-IF the user rejects the result, USE `/do-better` if available. OTHERWISE, FIND what the result misses from the user's feedback and the brief, and CORRECT it.
+IF you cannot do a step, MARK the work **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a weaker step of your own, such as describing how a page you could not operate behaves, or reviewing your own work where a separate reviewer is required. Two exceptions: IF you cannot run Python but can render, WRITE one HTML page that shows the versions side by side at the same width; IF you cannot render, SHOW each version as a text outline and SAY that the choice may change once it is rendered.

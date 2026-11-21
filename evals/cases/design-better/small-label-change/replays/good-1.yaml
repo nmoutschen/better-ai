@@ -1,0 +1,4 @@
+reply: 'The email button now says "Save email", matching "Change password" and "Save reminders" on the same page.'
+actions:
+- read: settings.html
+- bash: perl -pi -e 's|<button type="submit" class="button">Submit</button>|<button type="submit" class="button">Save email</button>|' settings.html

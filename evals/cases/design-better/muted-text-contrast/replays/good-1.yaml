@@ -1,0 +1,20 @@
+reply: 'The helper text is grey because the design language sets it: DESIGN.md gives the Field helper text --text-muted
+  (#a3a3a3) at 13px, and on white that is about 2.5:1 contrast, well under the 4.5:1 small text needs, so many shoppers on
+  a phone in daylight, and anyone with low vision, cannot read the delivery-area and cut-off notes. Fixing it means
+  changing the design language, which DESIGN.md says Hanna owns, so I have not changed anything. My proposal: darken
+  --text-muted to #6b6b6b (about 5.3:1). It stays visibly quieter than the labels, and the order summary details, which use
+  the same token, become readable too. Shall I make that change, or do you want to check it with Hanna first?'
+actions:
+- read: DESIGN.md
+- read: tokens.css
+- read: styles.css
+- read: checkout.html
+- bash: |
+    python3 -c "
+    def lum(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    for h in ('a3a3a3', '6b6b6b'):
+        print(h, round(1.05 / (lum(h) + 0.05), 2))
+    "

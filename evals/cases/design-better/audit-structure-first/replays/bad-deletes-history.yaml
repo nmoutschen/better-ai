@@ -1,0 +1,4 @@
+reply: Removed the duplicate history page.
+actions:
+- read: history.html
+- bash: rm history.html

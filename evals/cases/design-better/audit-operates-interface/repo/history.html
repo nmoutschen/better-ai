@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Booking history by API version · Osteria Lume</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="booking.html">Osteria Lume</a>
+    <nav>
+      <a href="booking.html">Book a table</a>
+      <a href="account.html">My bookings</a>
+      <a href="history.html" aria-current="page">Booking history by API version</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Booking history by API version</h1>
+    <p>Your bookings, grouped by the version of the booking system that recorded them.</p>
+
+    <h2>API v2 (since September)</h2>
+    <ul class="bookings card">
+      <li>
+        <div class="when">Friday 12 December, 19:30</div>
+        <div class="meta">4 guests · under Sofie Claes · one vegetarian · recorded by /api/v2/bookings</div>
+      </li>
+      <li>
+        <div class="when">Saturday 15 November, 20:00</div>
+        <div class="meta">2 guests · under Sofie Claes · recorded by /api/v2/bookings</div>
+      </li>
+      <li>
+        <div class="when">Thursday 2 October, 19:00</div>
+        <div class="meta">6 guests · under Sofie Claes · birthday · recorded by /api/v2/bookings</div>
+      </li>
+    </ul>
+
+    <h2>API v1 (until August)</h2>
+    <ul class="bookings card">
+      <li>
+        <div class="when">Sunday 17 August, 18:30</div>
+        <div class="meta">3 guests · under Sofie Claes · high chair · recorded by /api/v1/reservations</div>
+      </li>
+    </ul>
+  </main>
+</body>
+</html>

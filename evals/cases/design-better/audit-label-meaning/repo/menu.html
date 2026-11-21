@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Menu · Tram 7 Coffee</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="index.html"><img src="img/logo.svg" alt="image" width="40" height="40"> Tram 7 Coffee</a>
+    <a class="basket" href="order.html" aria-label="button"><img src="img/basket.svg" alt="icon" width="24" height="24"> <span id="basket-count">0</span></a>
+  </header>
+
+  <main>
+    <h1>Menu</h1>
+    <p>Order at the counter or here for pick-up at Lange Lozanastraat 7. Open 7:30 to 17:00, closed Mondays.</p>
+
+    <section>
+      <h2>Section 1</h2>
+      <ul class="menu">
+        <li>
+          <img src="img/flat-white.svg" alt="photo1" width="96" height="96">
+          <div><h3>Flat white</h3><p>Double ristretto, steamed whole milk. Oat milk +€0.50.</p></div>
+          <span class="price">€3.80</span>
+          <button class="add" aria-label="button" data-item="flat-white">+</button>
+        </li>
+        <li>
+          <img src="img/filter.svg" alt="photo2" width="96" height="96">
+          <div><h3>Batch filter</h3><p>This week: Kayon Mountain, Ethiopia. Peach and black tea.</p></div>
+          <span class="price">€3.20</span>
+          <button class="add" aria-label="button" data-item="filter">+</button>
+        </li>
+        <li>
+          <img src="img/chai.svg" alt="photo3" width="96" height="96">
+          <div><h3>Chai latte</h3><p>House chai syrup with cardamom and ginger, steamed milk.</p></div>
+          <span class="price">€4.10</span>
+          <button class="add" aria-label="button" data-item="chai">+</button>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Section 2</h2>
+      <ul class="menu">
+        <li>
+          <img src="img/cardamom-bun.svg" alt="photo4" width="96" height="96">
+          <div><h3>Cardamom bun</h3><p>Baked here every morning. Contains gluten, milk and egg.</p></div>
+          <span class="price">€3.50</span>
+          <button class="add" aria-label="button" data-item="cardamom-bun">+</button>
+        </li>
+        <li>
+          <img src="img/banana-bread.svg" alt="photo5" width="96" height="96">
+          <div><h3>Banana bread</h3><p>Vegan, with walnuts. Contains gluten and nuts.</p></div>
+          <span class="price">€3.30</span>
+          <button class="add" aria-label="button" data-item="banana-bread">+</button>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Section 3</h2>
+      <ul class="menu">
+        <li>
+          <img src="img/toastie.svg" alt="photo6" width="96" height="96">
+          <div><h3>Cheese toastie</h3><p>Old Brugge cheese, leek and mustard on sourdough. From 11:30.</p></div>
+          <span class="price">€7.50</span>
+          <button class="add" aria-label="button" data-item="toastie">+</button>
+        </li>
+        <li>
+          <img src="img/soup.svg" alt="photo7" width="96" height="96">
+          <div><h3>Soup of the day</h3><p>Ask at the counter. With bread. Vegan most days.</p></div>
+          <span class="price">€6.00</span>
+          <button class="add" aria-label="button" data-item="soup">+</button>
+        </li>
+      </ul>
+    </section>
+
+    <p class="small">Allergies? <a href="allergens.html">Click here</a>.</p>
+  </main>
+
+  <script src="menu.js"></script>
+</body>
+</html>

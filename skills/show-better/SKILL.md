@@ -122,6 +122,8 @@ The renderer draws the marks; KEEP their meanings in custom `svg` visuals and in
 - Nodes are small marks with their labels on the drawing, joined by thin lines; only data is filled.
 - Solid lines are stated in the document; dashed sand lines are indirect or the deck's own reading.
 
+GIVE each colour one meaning across the slides, in custom `svg` visuals too. IF a second visual needs its own encoding, such as a table after a diagram, USE shapes, outlines or labels instead of reusing a colour: readers carry a colour's meaning from one visual to the next.
+
 DO NOT add images, icons or effects that carry no information.
 
 WHEN the user or the project has a style, such as brand colours and fonts, SET the spec's `style` to them: the slides and their drawings take those colours and fonts, and the page around the slides keeps its look. MAP each colour to the role it plays in the vocabulary, such as the brand's accent to `point`. OTHERWISE, LEAVE `style` out: the slides use n14n's Journal style.

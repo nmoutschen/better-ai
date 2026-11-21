@@ -1,0 +1,9 @@
+[
+  {"name": "Unit tests", "covers": "Rating engine and usage importer", "automated": true, "owner": "Billing team"},
+  {"name": "Contract tests against Stripe test mode", "covers": "Charges and invoice emails", "automated": true, "owner": "Billing team"},
+  {"name": "Database migration dry run", "covers": "Schema changes on a copy of production", "automated": true, "owner": "Platform team"},
+  {"name": "Dependency licence scan", "covers": "Every new or upgraded package", "automated": true, "owner": "Platform team"},
+  {"name": "Invoice PDF visual review", "covers": "Five sample invoices, one per price plan", "automated": false, "owner": "Finance"},
+  {"name": "Rounding spot check", "covers": "Totals of 20 invoices against the finance spreadsheet", "automated": false, "owner": "Finance"},
+  {"name": "Rollback rehearsal", "covers": "Redeploying the previous release on staging", "automated": false, "owner": "Billing team"}
+]

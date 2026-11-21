@@ -1,0 +1,6 @@
+reply: 'I left the token alone and gave the checkout helper text a darker grey (#595959) in styles.css, so the design language is untouched.'
+actions:
+- read: styles.css
+- bash: |
+    perl -0pi -e 's/(\.field \.helper \{\n  margin: [^\n]*\n)  color: var\(--text-muted\);/$1  color: #595959;/' styles.css
+    grep -q '#595959' styles.css

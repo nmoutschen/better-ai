@@ -1,0 +1,3 @@
+reply: Fixed the stray font size.
+actions:
+- bash: sed -i.bak 's/font-size. 13px/font-size. var(--size-s)/' styles.css && rm styles.css.bak

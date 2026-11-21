@@ -1,0 +1,61 @@
+reply: 'Three rough directions, side by side in .design/next-ticket/index.html (open it in a browser):
+
+  A. Queue by deadline: one table of unassigned tickets sorted by first-reply target, overdue on top.
+
+  B. One next ticket: the ticket to take now, large, with a Take button; the rest as a short list below.
+
+  C. Lanes by priority: Urgent, High, Normal and Low side by side, oldest first in each.
+
+  Which one fits how your agents pick, and what is wrong with each?'
+actions:
+- read: README.md
+- read: DESIGN.md
+- read: tickets.json
+- write: .design/next-ticket/A.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>A: queue by deadline</title>
+    <link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../../styles.css"></head>
+    <body><main><h1>Unassigned, by first-reply target</h1><table>
+    <tr><th>Due</th><th>Subject</th><th>Customer</th><th>Priority</th></tr>
+    <tr><td>08:25</td><td>Cannot log in after password reset</td><td>Amara Okoye</td><td>Urgent</td></tr>
+    <tr><td>08:56</td><td>Webhook deliveries failing since 06:00</td><td>Parcelbird</td><td>Urgent</td></tr>
+    <tr><td>09:42</td><td>Invoice shows VAT twice for March</td><td>Lindqvist Bakeries</td><td>High</td></tr>
+    <tr><td>10:11</td><td>Card declined when upgrading to Business</td><td>Studio Halvorsen</td><td>High</td></tr>
+    <tr><td>10:15</td><td>SSO login loops back to the start page</td><td>Hollis and Pike Legal</td><td>High</td></tr>
+    </table></main></body></html>
+- write: .design/next-ticket/B.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>B: one next ticket</title>
+    <link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../../styles.css"></head>
+    <body><main>
+    <section><p>Take next</p><h1>#4813 Cannot log in after password reset</h1>
+    <p>Amara Okoye · Starter · chat · Urgent · reply due 08:25</p><button class="button">Take ticket</button></section>
+    <h2>Then</h2><ol>
+    <li>Webhook deliveries failing since 06:00 · Parcelbird</li>
+    <li>Invoice shows VAT twice for March · Lindqvist Bakeries</li>
+    <li>Card declined when upgrading to Business · Studio Halvorsen</li>
+    </ol></main></body></html>
+- write: .design/next-ticket/C.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>C: lanes by priority</title>
+    <link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../../styles.css"></head>
+    <body><main style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+    <section><h2>Urgent</h2><p>Cannot log in after password reset</p><p>Webhook deliveries failing since 06:00</p></section>
+    <section><h2>High</h2><p>Invoice shows VAT twice for March</p><p>Card declined when upgrading to Business</p></section>
+    <section><h2>Normal</h2><p>Team member did not get the invite email</p><p>Scheduled report arrived empty this morning</p></section>
+    <section><h2>Low</h2><p>Request to add a second admin</p><p>How do I change the invoice address</p></section>
+    </main></body></html>
+- write: .design/next-ticket/index.html
+  content: |
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><title>Pick the next ticket: three directions</title>
+    <style>.row{display:flex;gap:16px}.row figure{flex:1;margin:0}.row iframe{width:100%;height:720px;border:1px solid #ccc}</style></head>
+    <body><h1>Which direction fits how agents pick their next ticket?</h1>
+    <div class="row">
+    <figure><iframe src="A.html" title="A"></iframe><figcaption>A. Queue by deadline</figcaption></figure>
+    <figure><iframe src="B.html" title="B"></iframe><figcaption>B. One next ticket</figcaption></figure>
+    <figure><iframe src="C.html" title="C"></iframe><figcaption>C. Lanes by priority</figcaption></figure>
+    </div></body></html>

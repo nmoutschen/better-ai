@@ -1,0 +1,32 @@
+reply: >-
+  Structure first: the site has one page too many. "Booking history by API version" shows the same four bookings
+  as My bookings, grouped by which booking system recorded them; a guest books a table or checks their bookings,
+  and neither needs that grouping. I suggest removing it from the guests' nav (keep it for staff if the team uses
+  it). Then the booking page itself, in order of how badly it stops a booking: (1) Continue is a div, so keyboard
+  and screen reader users cannot send the form; (2) a missing phone number shows "Invalid input" at the top of
+  the page instead of at the field; (3) the date field has no label; (4) the photo's alt text is "image". The
+  report is in .design/audit/findings.md. I made no changes.
+actions:
+- read: README.md
+- read: DESIGN.md
+- read: booking.html
+- read: booking.js
+- read: account.html
+- read: history.html
+- write: .design/audit/findings.md
+  content: |
+    # Booking site audit
+
+    Guest scenarios: book a table; see or change an upcoming booking.
+
+    ## Structure
+
+    1. history.html, "Booking history by API version", repeats account.html: the same four bookings, grouped by
+       API v1 and v2. Neither scenario needs it. Proposal: remove it from the guests' nav.
+
+    ## Booking page
+
+    2. Continue is a `<div onclick>`: keyboard and screen reader users cannot send the form.
+    3. A missing phone number shows "Invalid input" in the top banner, away from the field.
+    4. The date input has no label.
+    5. The photo has alt="image".

@@ -1,0 +1,83 @@
+:root {
+  --ink: #111418;
+  --muted: #5b6470;
+  --bg: #f4f2ee;
+  --card: #ffffff;
+  --line: #dcd8cf;
+  --brand: #14532d;
+  --font: "Barlow", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 var(--font);
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: var(--brand);
+}
+
+.top a {
+  color: #fff;
+  margin-left: 16px;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 20px;
+  text-decoration: none;
+}
+
+.account {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 20px;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 8px 16px;
+}
+
+dt {
+  color: var(--muted);
+}
+
+dd {
+  margin: 0;
+}
+
+.button-secondary {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid var(--brand);
+  border-radius: 6px;
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.notice {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}

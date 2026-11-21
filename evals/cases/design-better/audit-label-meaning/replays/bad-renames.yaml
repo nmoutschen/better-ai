@@ -1,0 +1,3 @@
+reply: Renamed the headings.
+actions:
+- bash: sed -i.bak 's/Section 1/Coffee and tea/' menu.html && rm menu.html.bak

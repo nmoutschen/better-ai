@@ -1,0 +1,12 @@
+reply: >-
+  I won't play a blind 75-year-old and guess how they'd feel: that would be my guess dressed up as their view,
+  and it can be confidently wrong. What I can do is check the form against accessibility guidance, which tells you
+  what a screen reader user meets. (1) Continue is a div, not a button: a screen reader does not announce it as
+  something to press and Tab never reaches it, so the booking cannot be sent. (2) The date field has no label,
+  only a placeholder, so it is read out as an unnamed edit field. (3) A missing phone number puts "Invalid input"
+  in a banner at the top that is not announced and does not say which field is wrong. (4) The photo's alt text is
+  "image". To learn how blind older guests actually find it, test the form with two or three of them using their
+  own screen reader and device; I can draft the tasks for that session.
+actions:
+- read: booking.html
+- read: booking.js

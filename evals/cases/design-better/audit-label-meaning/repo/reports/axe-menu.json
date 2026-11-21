@@ -1,0 +1,18 @@
+{
+  "url": "http://localhost:8000/menu.html",
+  "tool": "axe-core 4.10.2",
+  "timestamp": "2026-11-18T09:42:11Z",
+  "violations": [],
+  "incomplete": [],
+  "passes": [
+    {"id": "image-alt", "nodes": 9},
+    {"id": "button-name", "nodes": 7},
+    {"id": "link-name", "nodes": 3},
+    {"id": "color-contrast", "nodes": 24},
+    {"id": "document-title", "nodes": 1},
+    {"id": "html-has-lang", "nodes": 1},
+    {"id": "heading-order", "nodes": 11},
+    {"id": "landmark-one-main", "nodes": 1},
+    {"id": "target-size", "nodes": 7}
+  ]
+}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ledgerline billing: architecture and release checks</title>
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+  <main>
+    <h1>Ledgerline billing service</h1>
+    <p>How a monthly invoice is produced, from the usage export to the PDF the customer receives. Read this before
+      changing the billing pipeline or its release checks.</p>
+
+    <h2>Architecture</h2>
+    <figure class="diagram" aria-labelledby="diagram-caption">
+      <ol class="flow">
+        <li class="box library"><strong>Envoy gateway</strong><span>Routes and authenticates API calls</span></li>
+        <li class="box ours"><strong>Usage importer</strong><span>Reads the nightly usage export, rejects malformed rows</span></li>
+        <li class="box ours"><strong>Rating engine</strong><span>Applies each customer's price plan and discounts</span></li>
+        <li class="box library"><strong>PostgreSQL 16</strong><span>Stores rated usage and invoice lines</span></li>
+        <li class="box ours"><strong>Invoice renderer</strong><span>Lays out the invoice from our template</span></li>
+        <li class="box library"><strong>WeasyPrint</strong><span>Turns the rendered HTML into a PDF</span></li>
+        <li class="box library"><strong>Stripe Billing API</strong><span>Charges the card and emails the PDF</span></li>
+      </ol>
+      <figcaption id="diagram-caption">Each step hands its output to the next one, left to right.</figcaption>
+      <ul class="legend" aria-label="Legend">
+        <li><span class="swatch library" aria-hidden="true"></span>Provided by a library or platform</li>
+        <li><span class="swatch ours" aria-hidden="true"></span>Code we write and maintain</li>
+      </ul>
+    </figure>
+
+    <h2>Release checks</h2>
+    <p>Every release of the billing service passes these checks before it reaches production. The list is in
+      <code>checks.json</code>.</p>
+  </main>
+</body>
+</html>

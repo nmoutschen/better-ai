@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book a table · Osteria Lume</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="booking.html">Osteria Lume</a>
+    <nav>
+      <a href="booking.html" aria-current="page">Book a table</a>
+      <a href="account.html">My bookings</a>
+      <a href="history.html">Booking history by API version</a>
+    </nav>
+  </header>
+
+  <main>
+    <div id="banner" class="banner" hidden></div>
+
+    <img class="hero" src="img/dining-room.svg" alt="image" width="1200" height="600">
+
+    <h1>Book a table</h1>
+    <p>Dinner Tuesday to Sunday, 18:00 to 22:30. For groups of nine or more, call us on 09 223 41 87.</p>
+
+    <section id="booking-step" class="card">
+      <form id="booking" onsubmit="return false">
+        <div class="row">
+          <div class="field">
+            <label for="guests">Guests</label>
+            <select id="guests" name="guests">
+              <option>1</option>
+              <option selected>2</option>
+              <option>3</option>
+              <option>4</option>
+              <option>5</option>
+              <option>6</option>
+              <option>7</option>
+              <option>8</option>
+            </select>
+          </div>
+          <div class="field">
+            <input id="date" name="date" type="text" placeholder="Date (dd/mm/yyyy)" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="time">Time</label>
+            <select id="time" name="time">
+              <option>18:00</option>
+              <option>18:30</option>
+              <option>19:00</option>
+              <option selected>19:30</option>
+              <option>20:00</option>
+              <option>20:30</option>
+              <option>21:00</option>
+              <option>21:30</option>
+              <option>22:00</option>
+              <option>22:30</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="name">Name</label>
+          <input id="name" name="name" type="text" autocomplete="name">
+        </div>
+
+        <div class="field">
+          <label for="phone">Mobile number</label>
+          <input id="phone" name="phone" type="tel" autocomplete="tel">
+          <p class="hint">We text you to confirm and if we are running late.</p>
+        </div>
+
+        <div class="field">
+          <label for="notes">Anything we should know?</label>
+          <textarea id="notes" name="notes" rows="3"></textarea>
+          <p class="hint">Allergies, a high chair, a birthday.</p>
+        </div>
+
+        <div class="button" onclick="submitBooking()">Continue</div>
+      </form>
+    </section>
+
+    <section id="confirmation-step" class="card confirmation" hidden>
+      <h2>Your table is held</h2>
+      <p id="confirmation-text"></p>
+      <p class="small-print">We hold tables for 15 minutes. To cancel, reply CANCEL to our text.</p>
+    </section>
+  </main>
+
+  <script src="booking.js"></script>
+</body>
+</html>

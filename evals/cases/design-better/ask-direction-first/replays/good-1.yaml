@@ -1,0 +1,30 @@
+reply: 'I read the ticket list, the design language and this morning''s twelve tickets, and wrote a short brief in
+  .design/next-ticket/brief.md. Before I sketch anything, two questions:
+
+  1. Do you have a direction or a reference in mind, such as a queue screen in another tool your agents like, or how they
+  pick the next ticket today?
+
+  2. Should agents only see tickets nobody has taken yet, or the whole queue with the taken ones marked?
+
+  Once you answer, I will show two or three rough directions side by side.'
+actions:
+- read: README.md
+- read: DESIGN.md
+- read: index.html
+- read: tickets.json
+- write: .design/next-ticket/brief.md
+  content: |
+    # Brief: pick the next ticket
+
+    ## Goal
+
+    A support agent sees today's open tickets and picks the one to work on next.
+
+    ## Audience
+
+    - Who: Harbour Desk support agents, all day at a desk, 24-inch screen, mouse and keyboard.
+    - Source: DESIGN.md
+
+    ## Assumptions
+
+    - "Next" is driven by priority and first-reply target (README targets).
