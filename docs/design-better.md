@@ -19,6 +19,16 @@ For example, to get late orders found first:
 /design-better the orders page
 ```
 
+## How it is tested
+
+Tested on 18 situations with Sonnet 5.5 (2026-11-21).
+
+| What it does | Passed |
+| --- | ---: |
+| Checks the interface by operating it for the people it serves, reports what stops them, and does not claim that people can use it | 72% |
+| Puts the user's direction, design language and decisions first, and asks few questions, each costly to get wrong | 89% |
+| Follows the skill's design rules in the design, the directions and the build | 89% |
+
 ## Reference
 
 <details>
