@@ -31,4 +31,4 @@ graders:
     if the research went on meanwhile; how the gap is worded in the brief; whether Q-coordinator-8 ends not found or open
     with a note. Does not count: Git''s own files and caches; notes in .code/ or a temporary folder; starting or not starting
     the live view (board.py watch) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models
-    the sub-agents ran on; a run that ends waiting for the user.'
+    the sub-agents ran on.'

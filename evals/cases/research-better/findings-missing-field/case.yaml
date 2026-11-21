@@ -19,6 +19,7 @@ graders:
   - .research/checkout-drop/brief.md
   - .research/checkout-drop/logs/*
   - .research/checkout-drop/questions/*
+  - .research/checkout-drop/claims/*
   - .research/checkout-drop/sources/S-w2-2.md
 - type: judge
   rubric: 'Rule: when a board source entry lacks a field the reference list needs, the agent has the field copied from the

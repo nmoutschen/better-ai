@@ -10,7 +10,8 @@ date = entry(the_board() / "sources" / "S-w2-2.md").get("date", "").strip()
 digits = "".join(ch for ch in date if ch.isdigit())
 if none(date):
     print("S-w2-2 date left as none")
-elif digits in ("2026", "20260318", "202603") or (digits in ("182026", "202618") and "mar" in date.lower()):
+elif digits in ("2026", "202603", "20263", "20260318", "2026318", "18032026", "1832026") or (
+        digits in ("182026", "202618") and "mar" in date.lower()):
     print(f"S-w2-2 date {date!r} copied from the page")
 else:
     fail(f"S-w2-2 date is {date!r}; the page says 2026-03-18")

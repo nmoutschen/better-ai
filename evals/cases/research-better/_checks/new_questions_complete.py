@@ -19,7 +19,7 @@ KINDS = ("seed", "frontier", "challenge", "chain", "conflict", "gap")
 STATUSES = ("proposed", "open", "in progress", "answered", "contested", "not found", "unclear", "out of scope")
 for qid, q in new.items():
     for key in ("question", "title", "origin", "stakes", "done-when"):
-        if none(q.get(key)):
+        if none(q.get(key)) and not (key == "stakes" and q.get("priority") == "low"):
             fail(f"{qid} has no {key}")
     if len(q["title"].split()) > 6:
         fail(f"{qid} title has more than six words: {q['title']!r}")

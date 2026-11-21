@@ -19,10 +19,13 @@ def parts(text: str) -> tuple:
     year = re.search(r"\b(19|20)\d\d\b", text)
     if not year:
         return None
-    iso = re.search(r"(\d{4})-(\d{1,2})(?:-(\d{1,2}))?", text)
+    iso = re.search(r"(\d{4})[-/](\d{1,2})(?:[-/](\d{1,2}))?", text)
     if iso:
         return int(iso.group(1)), int(iso.group(2)), int(iso.group(3)) if iso.group(3) else None
-    month = next((n for name, n in MONTHS.items() if name in text or name[:3] + " " in text + " "), None)
+    dmy = re.search(r"(\d{1,2})[./](\d{1,2})[./](\d{4})", text)
+    if dmy:
+        return int(dmy.group(3)), int(dmy.group(2)), int(dmy.group(1))
+    month = next((n for name, n in MONTHS.items() if re.search(rf"\b{name[:3]}", text)), None)
     rest = re.sub(r"\b(19|20)\d\d\b", "", text)
     day = re.search(r"\b(\d{1,2})\b", rest)
     return int(year.group(0)), month, int(day.group(1)) if day and month else None

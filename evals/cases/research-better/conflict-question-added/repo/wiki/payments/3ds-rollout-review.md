@@ -9,6 +9,8 @@ Since release 26.3, the share of card payments that get a 3-D Secure challenge r
 
 Most of the abandonment increase happened at the challenge step.
 
+In our view, the challenge step explains most of the drop in checkout conversion.
+
 The provider's default risk threshold was left in place; their documentation recommends tuning it for each merchant.
 
 We recommend lowering the challenge rate by tuning the threshold, not switching 3-D Secure 2 off, because the card schemes require it from 2026-06-01.
