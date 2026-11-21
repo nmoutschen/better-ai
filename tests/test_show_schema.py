@@ -1259,7 +1259,12 @@ class FilesThatAreNotSpecs(unittest.TestCase):
 
     def contents(self):
         # Built as text: json.dumps of a tree this deep raises RecursionError on Python 3.10.
-        deep_node = '{"label":"n","children":[' * 1200 + '{"label":"leaf","value":1}' + "]}" * 1200
+        def deep_tree(depth):
+            node = '{"label":"n","children":[' * depth + '{"label":"leaf","value":1}' + "]}" * depth
+            return (
+                '{"type":"slides","title":"T","panels":[{"headline":"A deep tree.","kind":"tree","root":' + node + "}]}"
+            )
+
         text = {"headline": "x", "kind": "text", "body": [[[[[[[[[[["x"]]]]]]]]]]]}
         bars = '{"type":"slides","title":"t","panels":[{"headline":"Bars show a clear point.","kind":"bars","items":[{"label":"a","value":%s}]}]}'
         return {
@@ -1267,9 +1272,10 @@ class FilesThatAreNotSpecs(unittest.TestCase):
             "a number": "5",
             "null": "null",
             "panels that is text": '{"type":"slides","title":"t","panels":"x"}',
-            "a tree 1200 deep": '{"type":"slides","title":"T","panels":[{"headline":"A deep tree.","kind":"tree","root":'
-            + deep_node
-            + "}]}",
+            # 1200 levels is past what Python 3.10's json reads (that case ends in "nested too deeply to read" before
+            # show.py's own check runs); 300 is one both read, so it reaches the check on every version.
+            "a tree 1200 deep": deep_tree(1200),
+            "a tree 300 deep": deep_tree(300),
             "a body nested 11 deep": json.dumps({"type": "slides", "title": "T", "panels": [text]}),
             "a bar value NaN": bars % "NaN",
             "a bar value Infinity": bars % "Infinity",
