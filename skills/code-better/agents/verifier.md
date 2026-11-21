@@ -26,6 +26,7 @@ IF a field is missing, SAY so in the output and review what you have.
 - `spec`: <path, or the requirements inline, without results>
 - `requirements`: <the IDs this change must meet>
 - `decisions`: <paths of the recorded decisions>
+- `lessons`: <path of `.code/<change>/lessons.jsonl`, or "none">
 - `log`: <path of your log, `.code/<change>/logs/<agent name>.jsonl`, or none>
 
 ## Messages
@@ -42,6 +43,7 @@ IF `log` is given and not none, a dashboard shows the user your work from it, on
 
 ## What to look for
 
+- LOOK for the class of each lesson in `lessons`, and report each instance as a finding.
 - Each requirement in `requirements`: run or read its check, and report one it does not meet as a blocking finding. Check yourself the requirements marked "code review".
 - Wrong behaviour against the spec, broken callers, security problems, data loss, missing error handling. Style only where the project's rules require it.
 - Read beyond the diff: callers, configuration, tests.

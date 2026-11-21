@@ -7,7 +7,7 @@
 - Most costly to miss first. No reasons in `statement`: `source` carries them. A MUST NOT in positive form where one exists, and every MUST NOT with a check. KEEP a requirement only if its absence would change what is built or checked.
 - GIVE each requirement its `source`, THEN CHECK the other direction: every decision and stated behaviour in the design has a requirement; WRITE each one that has none as an `unlinked` record.
 - One `gap` record per gap, with `if_wrong`: what the user would see. A `gap` that is asked points to its decision in `decisions.jsonl`, and holds `answered` instead of `asked` once the user answered; an assumed one holds `choice`.
-- WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `decisions.jsonl`: RECORD the question there, and once the user has answered, WRITE the requirement with source `request` holding the user's words.
+- WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file, and once the user has answered, WRITE the requirement with source `request` holding the user's words.
 - CHANGE a requirement only as the general rule Ask the user of SKILL.md says, and REVISE its line in place.>
 
 Conventions and fields: `schemas/*.schema.json` of this skill.

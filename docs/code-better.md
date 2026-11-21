@@ -100,7 +100,8 @@ The dashboard reads the change's folder, `.code/<change>/`, and keeps running un
   - **Change and requirements**: `code.json` holds your goal, the design and the mode. `spec.jsonl` holds the requirements, each with its source and its check, the gaps with what you were asked about each, and the design items with no requirement.
   - **Plan**: `tasks.jsonl` holds the tasks with a check for each, `progress.jsonl` the progress and open problems, and `instructions.jsonl` what you told it about how to work.
   - **Next steps**: `next-steps.jsonl` holds the work outside the change.
-  - When it coordinates agents: each agent's card and log in `logs/`, each decision and question in `decisions.jsonl`, and your conversation with the coordinator (`conversation.jsonl`).
+  - **Decisions**: `decisions.jsonl` holds each decision it took and each question it asked you.
+  - When it coordinates agents: each agent's card and log in `logs/`, `lessons.jsonl` with the bug classes its verifiers found and the rule for each (every builder and verifier gets it), and your conversation with the coordinator (`conversation.jsonl`).
 - For structural changes, the design and spec from `/architect-better` that the build follows.
 - A report:
   - what changed and why, in terms of the requirements

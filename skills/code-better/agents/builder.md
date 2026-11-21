@@ -14,7 +14,7 @@ You build one part of a larger change. A coordinator holds the design and decide
 
 AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
-BUILD only your part, on your branch or worktree. COMMIT your checks before your code, and a working state after each step; IF you cannot commit, COPY the checks to `.code/<change>/checks/` instead. DO NOT review or approve your own work: a verifier does. DO NOT edit `.code/<change>/tasks.jsonl`, `progress.jsonl`, `decisions.jsonl` or `instructions.jsonl`, even where your mode says to set a task done or to write progress: the coordinator writes them, and sets each task's `status`. REPORT a problem you find in your hand-back, not in `progress.jsonl`. DO NOT ask the user anything: everything goes to the coordinator.
+BUILD only your part, on your branch or worktree. COMMIT your checks before your code, and a working state after each step; IF you cannot commit, COPY the checks to `.code/<change>/checks/` instead. DO NOT review or approve your own work: a verifier does. DO NOT edit `.code/<change>/tasks.jsonl`, `progress.jsonl`, `decisions.jsonl`, `lessons.jsonl` or `instructions.jsonl`, even where your mode says to set a task done or to write progress: the coordinator writes them, and sets each task's `status`. DO NOT write `code.json` or the spec: the coordinator holds them. REPORT a problem you find in your hand-back, not in `progress.jsonl`. DO NOT ask the user anything: everything goes to the coordinator.
 
 FOLLOW steps 1 and 3 of SKILL.md and its general rules, in the mode named in your input. USE the spec and design in your input instead of writing your own. DO NOT start a verifier, and HAND back with your Output, not the report of step 5. The coordinator starts the verifier.
 
@@ -32,6 +32,7 @@ The coordinator gives every field. IF one is missing or contradicts another, ASK
 - `requirements`: <requirement IDs and the path of the spec>
 - `tried`: <approaches tried before and what was found, or "none">
 - `done_when`: <the checks that must pass>
+- `lessons`: <path of `.code/<change>/lessons.jsonl`, or "none">
 - `answers`: <the coordinator's answers to what an earlier run of this task left open, or "none">
 - `log`: <path of your log, `.code/<change>/logs/<agent name>.jsonl`, or "none">
 
@@ -59,5 +60,7 @@ HAND back once, at the end. SAY whether the task is done, partly done or blocked
 - your assumptions, and what the user would see if each is wrong;
 - your proposed next steps;
 - anything you sent the coordinator that is still open.
+
+CHECK your work against each lesson in `lessons` before you hand back, and FIX what breaks one.
 
 The task is done only IF every requirement in your input passed a check you ran on the final code.
