@@ -39,7 +39,8 @@ ASSETS = {
     "/page.js": ("page.js", "text/javascript"),
     "/architect.js": ("architect.js", "text/javascript"),
 }
-ITEMS = ("comment", "note", "approve", "confirm")
+ITEMS = ("comment", "note", "approve", "confirm")  # what the agent tracks with status
+METHODS = (*ITEMS, "delete", "accept")  # what the page may send
 TABS = ("requirements", "containers", "flows", "perspectives", "decisions", "spec")
 
 
@@ -456,6 +457,8 @@ def conversation(folder: Path) -> page.Conversation:
         ITEMS,
         "architect",
         "architect.py serve CHANGE --no-browser",
+        schemas=HERE.parent / "schemas",
+        events="architect-events.schema.json",
     )
 
 
@@ -473,7 +476,7 @@ def serve(folder: Path, port: int, open_browser: bool) -> None:
 
     class Handler(page.Handler):
         conversation = conv
-        methods = (*ITEMS, "delete", "accept")
+        methods = METHODS
 
         def do_GET(self):
             if self.conversation_get():
@@ -549,6 +552,7 @@ def main(argv=None):
     commands["reply"].add_argument("--to", metavar="ID")
     commands["status"].add_argument("state", choices=page.STATES)
     commands["status"].add_argument("ids", nargs="+")
+    commands["status"].add_argument("--text", help="the user's words, for accepted")
     args = parser.parse_args(argv)
     folder = args.change.expanduser().resolve()
     if not folder.is_dir():
@@ -569,7 +573,7 @@ def main(argv=None):
         elif args.command == "reply":
             conv.reply(args.text, args.to)
         elif args.command == "status":
-            conv.set_status(args.state, args.ids)
+            conv.set_status(args.state, args.ids, args.text)
         else:
             conv.pending()
     except (ValueError, OSError, KeyError, TypeError) as exc:

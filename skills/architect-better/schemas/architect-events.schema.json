@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "architect-events.schema.json",
+  "title": "what the architecture page adds to conversation.jsonl: its own events, and what a comment's `on` holds",
+  "$comment": "A line must meet this schema and conversation.schema.json. `type` lists every event this page's log may hold; the page's own events are described here in full.",
+  "x-files": ["conversation.jsonl"],
+  "x-versioned": true,
+  "type": "object",
+  "properties": {
+    "type": {"enum": ["comment", "note", "approve", "confirm", "delete", "accept", "reply", "status", "accepted"]}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["type"], "properties": {"type": {"const": "comment"}}},
+      "then": {
+        "required": ["on"],
+        "properties": {
+          "on": {"$ref": "#/$defs/on"},
+          "text": {"type": "string", "minLength": 1}
+        },
+        "not": {"required": ["verdict"]}
+      }
+    },
+    {
+      "if": {"required": ["type"], "properties": {"type": {"const": "approve"}}},
+      "then": {"$ref": "#/$defs/approve"}
+    },
+    {
+      "if": {"required": ["type"], "properties": {"type": {"const": "confirm"}}},
+      "then": {"$ref": "#/$defs/confirm"}
+    }
+  ],
+  "$defs": {
+    "on": {
+      "description": "the part of the design a comment is on, or the section a change request is for",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string"},
+        "key": {"type": "string"},
+        "selector": {"type": "string"}
+      }
+    },
+    "approve": {
+      "description": "the user asked for the design to be approved, or reviewed again",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "again", "perspectives", "changes", "text"],
+      "properties": {
+        "type": {"const": "approve"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "again": {"type": "boolean"},
+        "perspectives": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "changes": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "text": {"type": "string", "minLength": 1}
+      }
+    },
+    "confirm": {
+      "description": "the user confirmed a requirement in the wording shown",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "requirement", "wording", "text"],
+      "properties": {
+        "type": {"const": "confirm"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "requirement": {"type": "string", "minLength": 1},
+        "wording": {"type": "string", "minLength": 1},
+        "text": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

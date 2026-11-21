@@ -14,7 +14,7 @@ a label or a mark to see its detail. Export downloads the slides alone as one pr
 
 `render --serve` serves the page on 127.0.0.1 and keeps running. The page then shows a conversation with the agent:
 the user comments on any part of a slide in Comment mode or writes a message. Each action is a JSON-RPC call from the
-page (comment, delete, note, accept, reopen); the script appends it to answers.jsonl next to the page and prints it to
+page (comment, delete, note, accept, reopen); the script appends it to conversation.jsonl next to the page and prints it to
 stdout as one JSON line. Running `render` again with the same --out, without --serve, updates the served page: the open
 page loads the new slides once the user is not typing. `wait` blocks until the page receives actions the agent has not
 seen, prints them and exits. `reply` shows the agent's reply in the page, `status` marks each item seen, asked, working,
@@ -3932,15 +3932,25 @@ def render_screen_reader(spec, width=72):
     return "\n".join(line.rstrip() for line in out) + "\n"
 
 
-# ---------- The conversation: answers.jsonl, one JSON event per line, next to the page ----------
+# ---------- The conversation: conversation.jsonl, one JSON event per line, next to the page ----------
 
-LOG, SEEN, ADDRESS = "answers.jsonl", ".answers-seen", ".server"
+LOG, SEEN, ADDRESS = "conversation.jsonl", ".conversation-seen", ".server"
 METHODS = ("comment", "delete", "note", "accept", "reopen")  # what the page may send
 ITEMS = ("comment", "note")  # what the agent tracks with status
 
 
 def conversation(folder: Path) -> page.Conversation:
-    return page.Conversation(folder, LOG, SEEN, ADDRESS, ITEMS, "agent", "render SPEC --out FILE --serve")
+    return page.Conversation(
+        folder,
+        LOG,
+        SEEN,
+        ADDRESS,
+        ITEMS,
+        "agent",
+        "render SPEC --out FILE --serve",
+        schemas=HERE.parent / "schemas",
+        events="show-events.schema.json",
+    )
 
 
 # ---------- render --serve ----------
@@ -4074,6 +4084,7 @@ def main() -> None:
     t.add_argument("dir")
     t.add_argument("state", choices=page.STATES)
     t.add_argument("ids", nargs="+", metavar="ID")
+    t.add_argument("--text", help="the user's words, for accepted")
     pd = sub.add_parser("pending", help="list the items that are not done or accepted")
     pd.add_argument("dir")
     args = parser.parse_args()
@@ -4086,7 +4097,7 @@ def main() -> None:
     elif args.command == "reply":
         conversation(folder).reply(args.text, args.to)
     elif args.command == "status":
-        conversation(folder).set_status(args.state, args.ids)
+        conversation(folder).set_status(args.state, args.ids, args.text)
     else:
         conversation(folder).pending()
 

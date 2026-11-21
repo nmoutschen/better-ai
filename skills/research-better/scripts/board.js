@@ -170,28 +170,28 @@ addEventListener("pointerup", () => { drag = null; wrapEl.classList.remove("drag
 // is in the order things happened, so what an event answers is already timed when the event is read.
 function events(d) {
   const at = e => Date.parse(e.at) / 1000 || 0;
-  const decisions = (d.decisions || []).map(x => ({action: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || x._born}));
+  const decisions = (d.decisions || []).map(x => ({type: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || x._born}));
   const when = Object.fromEntries(decisions.map(e => [e.id, e._t]));
   return (d.conversation || []).map(e => {
-    const _t = Math.max(at(e), when[e.action === "answer" ? e.decision : e.to] || 0);
+    const _t = Math.max(at(e), when[e.type === "answer" ? e.decision : e.to] || 0);
     if (e.id) when[e.id] = _t;
     return {...e, _t}; })
-    .concat(decisions).sort((a, z) => a._t - z._t || (z.action === "decision") - (a.action === "decision"));
+    .concat(decisions).sort((a, z) => a._t - z._t || (z.type === "decision") - (a.type === "decision"));
 }
 const decisionStatus = x => String(x.status || "pending").trim().toLowerCase();
-const answerOf = c => c.replies.filter(r => r.action === "answer").pop();
-const clock = at => String(at || "").slice(11, 16);
+const answerOf = c => c.replies.filter(r => r.type === "answer").pop();
+const clock = at => pageTime(at);
 const headHTML = (who, at, extra) => `<div class="head"><span class="who">${who}</span><span class="when">${esc(extra || clock(at))}</span></div>`;
 function li(cls, html) { const x = document.createElement("li"); x.className = cls; x.innerHTML = html; return x; }
 // A worker's message when it closes a question. The title and the count of new questions are read from the board now,
-// so a later rewrite or a question added after the close shows; the answer is the gist as the worker wrote it.
+// so a later rewrite or a question added after the close shows; the answer is the question's gist as the worker wrote it.
 const CLOSEWORD = {answered: "Answered", contested: "Contested", "not found": "Not found", unclear: "Unclear"};
 function closedItem(c) {
-  const e = c.e, q = D.byId[e.q], n = D.qs.filter(x => x.parent === e.q).length;
-  const title = q ? `<button type="button" class="qlink" data-open="question:${esc(e.q)}">${esc(q.label)}</button>` : esc(e.q);
+  const e = c.e, q = D.byId[e.question], n = D.qs.filter(x => x.parent === e.question).length;
+  const title = q ? `<button type="button" class="qlink" data-open="question:${esc(e.question)}">${esc(q.label)}</button>` : esc(e.question);
   const more = n ? `<p class="added">Raised ${plural(n, "new question")}.</p>` : "";
   return li("msg worker", `${headHTML(esc(e.by || "A worker"), e.at)}
-    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p>${md(e.text)}${more}`);
+    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p>${q && has(q.gist) ? md(q.gist) : ""}${more}`);
 }
 // A decision waiting for the user: Use the default (the check) or Answer; once answered or decided, Reply.
 function decisionItem(c, state, actions) {
@@ -342,7 +342,7 @@ document.addEventListener("click", ev => {
   const ud = t.closest("[data-default]"); if (ud) { ud.disabled = true;  // the run applies its default now instead of at the deadline
     return conv.send("answer", {id: uid("a"), decision: ud.dataset.default, text: "Use the default.", default: true}, "Answer", null, () => { ud.disabled = false; }); }
   const ch = t.closest(".thread .change"); if (ch) { const d = ch.closest("li").dataset.d;  // hidden, not removed, so the state row does not move
-    return conv.box(ch.closest("li"), d, "What should the run do?", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text}, "Answer", done)); }
+    return conv.box(ch.closest("li"), d, "What should the run do?", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text, default: false}, "Answer", done)); }
   if ($("pop") && !t.closest("form, .why")) closePop();
 });
 document.addEventListener("keydown", ev => {
@@ -364,7 +364,7 @@ function render(d) {
   const rate = answered / Math.max(1, now - start), eta = answered >= 3 && left ? ` ${left / rate < 90 ? "Under 2 min" : "About " + Math.round(left / rate / 60) + " min"} left at this pace.` : "";
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   const leftText = left / rate < 90 ? "<2 min" : `~${Math.round(left / rate / 60)} min`;
-  const answeredIds = new Set((d.conversation || []).filter(e => e.action === "answer").map(e => e.decision));
+  const answeredIds = new Set((d.conversation || []).filter(e => e.type === "answer").map(e => e.decision));
   const waitingN = (d.decisions || []).filter(x => String(x.status || "pending").trim().toLowerCase() === "pending" && !answeredIds.has(x.id)).length;
   const phase = CLOSED_PAGE ? stat("Closed", `since ${new Date(now * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`)
     : b.status === "stopped" ? stat("Stopped", `after ${mins(now - start)}`, "done")
@@ -376,7 +376,7 @@ function render(d) {
     + (waitingN && !CLOSED_PAGE ? `<button type="button" class="stat" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "decision waiting for you" : "decisions waiting for you"}</button>` : "") + phase);
   const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, OPEN && OPEN.id === q.id]).concat([b.short]));
   if (key !== LAYOUT) { LAYOUT = key; drawMap(D); if (FITTED) fit(); }
-  const replies = (d.conversation || []).filter(e => e.action === "reply");
+  const replies = (d.conversation || []).filter(e => e.type === "reply");
   if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + pageMarkdownText(replies[replies.length - 1].text).slice(0, 120), "ok");
   REPLIES = replies.length;
   drawAgents(D);

@@ -220,8 +220,8 @@ const fakeEl = () => ({ className: '', dataset: {}, html: '', classList: { add(c
   append(n) { this.html += n.html; }, insertAdjacentHTML(_w, v) { this.html += v; } });
 const fakeDoc = { createElement: fakeEl };
 const fakeConv = { progress: s => ({ html: `<span class="progress">${s}</span>` }) };
-const { decisionStep, decisionItem } = new Function('document', 'conv', 'esc', 'has', 'md',
-  stepCode + '; return {decisionStep, decisionItem};')(fakeDoc, fakeConv, s => String(s), v => v && v !== 'none', s => String(s));
+const { decisionStep, decisionItem } = new Function('document', 'conv', 'esc', 'has', 'md', 'pageTime',
+  stepCode + '; return {decisionStep, decisionItem};')(fakeDoc, fakeConv, s => String(s), v => v && v !== 'none', s => String(s), context.pageTime);
 const STEP_NAME = ['Waiting for you', 'You answered', 'Applied'];
 const shows = (status, answer, st) => STEP_NAME[decisionStep(status, answer, st)];
 
@@ -463,6 +463,9 @@ function conversationOn(answer, extra) {
     '.notes .send .btn': stubElement(), '.thread': stubElement(), '.notes .empty': stubElement() };
   const sent = [];
   context.document = { querySelector: s => els[s] || stubElement(), querySelectorAll: () => [], contains: () => true };
+  context.clearTimeout = clearTimeout;
+  context.setTimeout = setTimeout;
+  context.requestAnimationFrame = f => f();
   context.fetch = (url, init) => { sent.push(JSON.parse(init.body)); return answer(); };
   const applied = [], resets = [];
   const conv = context.pageConversation(Object.assign({
@@ -525,7 +528,7 @@ test('a saved message clears the box and is not undone', async () => {
 });
 
 test('a comment box stays open with its text until the server has saved the comment', () => {
-  const els = { textarea: stubElement({ value: 'my comment' }), '.ok': stubElement(), '.remove': stubElement(), '.cancel': stubElement(), '.target': stubElement() };
+  const els = { textarea: stubElement(), '.ok': stubElement(), '.remove': stubElement(), '.cancel': stubElement(), '.target': stubElement() };
   const pop = stubElement({ querySelector: s => els[s] || stubElement(), offsetWidth: 10, offsetHeight: 10 });
   context.document = { contains: () => true };
   const calls = [];
@@ -534,6 +537,7 @@ test('a comment box stays open with its text until the server has saved the comm
     send: (method, params, what, done, fail) => calls.push({ method, params, done, fail }),
   });
   layer.open({}, null, null, () => ({ x: 0, y: 0 }));
+  els.textarea.value = 'my comment';
   els['.ok'].listeners.click();
   assert.equal(calls.length, 1);
   assert.equal(calls[0].method, 'comment');

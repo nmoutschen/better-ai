@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "board-events.schema.json",
+  "title": "what the research board adds to conversation.jsonl: its own events, and what a comment's `on` holds",
+  "$comment": "A line must meet this schema and conversation.schema.json. `type` lists every event this page's log may hold; the page's own events are described here in full.",
+  "x-files": ["conversation.jsonl"],
+  "x-versioned": true,
+  "type": "object",
+  "properties": {
+    "type": {"enum": ["comment", "note", "answer", "reply", "status", "accepted", "closed"]}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["type"], "properties": {"type": {"const": "comment"}}},
+      "then": {
+        "required": ["on"],
+        "properties": {
+          "on": {"$ref": "#/$defs/on"},
+          "text": {"type": "string", "minLength": 1}
+        },
+        "not": {"required": ["verdict"]}
+      }
+    },
+    {
+      "if": {"required": ["type"], "properties": {"type": {"const": "answer"}}},
+      "then": {"$ref": "#/$defs/answer"}
+    },
+    {
+      "if": {"required": ["type"], "properties": {"type": {"const": "closed"}}},
+      "then": {"$ref": "#/$defs/closed"}
+    }
+  ],
+  "$defs": {
+    "on": {
+      "description": "what a comment is on: a kind of thing on the page, its id and its title",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "title"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string"}
+      }
+    },
+    "answer": {
+      "description": "the user's answer to a decision; default when they took the proposed one",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "decision", "text", "default"],
+      "properties": {
+        "type": {"const": "answer"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "decision": {"type": "string", "minLength": 1},
+        "text": {"type": "string", "minLength": 1},
+        "default": {"type": "boolean"}
+      }
+    },
+    "closed": {
+      "description": "a worker closed a question; board.py writes the line, `by` is the worker, and the page reads the gist from the question",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "question", "status"],
+      "properties": {
+        "type": {"const": "closed"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"type": "string", "minLength": 1, "not": {"const": "user"}},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "question": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

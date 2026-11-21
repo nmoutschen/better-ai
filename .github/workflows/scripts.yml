@@ -77,9 +77,9 @@ jobs:
             test -f "skills/architect-better/scripts/$name" || exit 1
             for f in "$@"; do cmp "$1" "$f"; done
           done
-          # schema.py, the validator of every agent file, and the base schema its schemas build on, are in all five
-          # page skills and identical.
-          for name in scripts/schema.py schemas/base.schema.json; do
+          # schema.py, the validator of every agent file, the base schema its schemas build on, and the conversation
+          # schema every page's log shares, are in all five page skills and identical.
+          for name in scripts/schema.py schemas/base.schema.json schemas/conversation.schema.json; do
             for skill in architect-better code-better research-better design-better show-better; do
               cmp "skills/architect-better/$name" "skills/$skill/$name" || exit 1
             done

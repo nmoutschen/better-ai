@@ -314,7 +314,7 @@ class CommandLine(Case):
 
 class CopiesAndCi(unittest.TestCase):
     def test_r1_every_page_skill_carries_identical_copies_of_the_script_and_the_base_schema(self):
-        for relative in ("scripts/schema.py", "schemas/base.schema.json"):
+        for relative in ("scripts/schema.py", "schemas/base.schema.json", "schemas/conversation.schema.json"):
             texts = {s: (ROOT / "skills" / s / relative).read_text(encoding="utf-8") for s in SKILLS}
             self.assertEqual(len(set(texts.values())), 1, f"{relative} differs between skills")
 
@@ -322,6 +322,7 @@ class CopiesAndCi(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "scripts.yml").read_text(encoding="utf-8")
         self.assertIn("schema.py", workflow)
         self.assertIn("base.schema.json", workflow)
+        self.assertIn("conversation.schema.json", workflow)
         for skill in SKILLS:
             # the loop names no skill but the one it requires and compares the rest by glob
             self.assertTrue(skill in workflow or "skills/*/" in workflow)

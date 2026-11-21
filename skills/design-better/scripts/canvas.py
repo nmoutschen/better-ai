@@ -20,7 +20,7 @@ one to the other; with four or more, it opens that way, since side by side they 
 On the page, the user clicks any part of a version to comment on it, gives each version a thumbs up or down when
 there are three or more, writes to the agent, and decides with Decide. `show --serve` serves the page on 127.0.0.1
 and keeps running. Each action is a JSON-RPC call from the page (comment, delete, note, verdict, decide, accept,
-reopen); the script appends it to answers.jsonl next to the page and prints it to stdout as one JSON line, so a
+reopen); the script appends it to conversation.jsonl next to the page and prints it to stdout as one JSON line, so a
 harness that streams a command's output delivers it to the agent as it arrives. Running `show` again with the same
 --out, without --serve and --open, updates the served page: the open page loads the new versions once the user is not typing.
 
@@ -65,7 +65,7 @@ HEAD = re.compile(r"<head[^>]*>", re.I)
 # The file:// base given to a version with relative links, as it appears inside the escaped srcdoc of the page.
 FILE_BASE = re.compile(r'(base href=&quot;)(file://[^&"]+?)/(&quot;)')
 
-LOG, SEEN, ADDRESS = "answers.jsonl", ".answers-seen", ".server"
+LOG, SEEN, ADDRESS = "conversation.jsonl", ".conversation-seen", ".server"
 METHODS = ("comment", "delete", "note", "verdict", "decide", "accept", "reopen")  # what the page may send
 ITEMS = ("comment", "note", "decide")  # what the agent tracks with status
 
@@ -229,11 +229,21 @@ def render(versions: list, sizes: list, title: str, question: str) -> tuple:
     return markup, warnings
 
 
-# ---------- The conversation: answers.jsonl, one JSON event per line, next to the page ----------
+# ---------- The conversation: conversation.jsonl, one JSON event per line, next to the page ----------
 
 
 def conversation(folder: Path) -> page.Conversation:
-    return page.Conversation(folder, LOG, SEEN, ADDRESS, ITEMS, "agent", "show VERSION... --out FILE --serve")
+    return page.Conversation(
+        folder,
+        LOG,
+        SEEN,
+        ADDRESS,
+        ITEMS,
+        "agent",
+        "show VERSION... --out FILE --serve",
+        schemas=HERE.parent / "schemas",
+        events="canvas-events.schema.json",
+    )
 
 
 # ---------- show --serve ----------
@@ -367,6 +377,7 @@ def main() -> None:
     t.add_argument("dir")
     t.add_argument("state", choices=page.STATES)
     t.add_argument("ids", nargs="+", metavar="ID")
+    t.add_argument("--text", help="the user's words, for accepted")
     p = sub.add_parser("pending", help="list the items that are not done or accepted")
     p.add_argument("dir")
     args = parser.parse_args()
@@ -379,7 +390,7 @@ def main() -> None:
     elif args.command == "reply":
         conversation(folder).reply(args.text, args.to)
     elif args.command == "status":
-        conversation(folder).set_status(args.state, args.ids)
+        conversation(folder).set_status(args.state, args.ids, args.text)
     else:
         conversation(folder).pending()
 

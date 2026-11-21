@@ -173,7 +173,17 @@ def dashboard_page() -> str:
 
 
 def conversation(change: Path) -> page.Conversation:
-    return page.Conversation(change, LOG, SEEN, ADDRESS, ITEMS, "coordinator", "watch CHANGE")
+    return page.Conversation(
+        change,
+        LOG,
+        SEEN,
+        ADDRESS,
+        ITEMS,
+        "coordinator",
+        "watch CHANGE",
+        schemas=HERE.parent / "schemas",
+        events="dashboard-events.schema.json",
+    )
 
 
 # ---------- watch ----------
@@ -246,6 +256,7 @@ def main() -> None:
     st.add_argument("change")
     st.add_argument("state", choices=page.STATES)
     st.add_argument("ids", nargs="+")
+    st.add_argument("--text", help="the user's words, for accepted")
     p = sub.add_parser("pending", help="list the user's items that are not done or accepted")
     p.add_argument("change")
     args = parser.parse_args()
@@ -259,7 +270,7 @@ def main() -> None:
     elif args.command == "reply":
         conversation(change).reply(args.text, args.to)
     elif args.command == "status":
-        conversation(change).set_status(args.state, args.ids)
+        conversation(change).set_status(args.state, args.ids, args.text)
     else:
         conversation(change).pending()
 

@@ -167,18 +167,24 @@
   // keeps its own model of comments, for the pins in each version, and of the verdicts, for the thumbs.
   var served = location.protocol === 'http:', seq = 0, items = [], verdicts = {};
   function apply(e, fresh) {
-    if (e.action === 'comment') {
-      var it = byId(e.id);
+    if (e.type === 'comment') {
+      var it = byId(e.id), on = e.on || {};
       if (!it) {
-        it = { id: e.id, n: e.n || seq + 1, version: e.version, screen: e.screen, target: e.target || {}, spot: e.spot || { fx: 0.5, fy: 0.5 } };
+        it = { id: e.id, n: e.n || seq + 1, version: on.version, screen: on.screen, target: on.target || {}, spot: on.spot || { fx: 0.5, fy: 0.5 } };
         seq = Math.max(seq, it.n); items.push(it);
         document.querySelectorAll('iframe[data-i="' + labels.indexOf(it.version) + '"]').forEach(function (f) { placePin(f, it, fresh); });
       }
-      it.verdict = e.verdict || null; it.comment = e.comment || null;
-    } else if (e.action === 'delete') {
-      items = items.filter(function (x) { return x.id !== e.id; });
-      document.querySelectorAll('iframe').forEach(function (f) { try { comments.removePin(f.contentDocument.body, e.id); } catch (x) {} });
-    } else if (e.action === 'verdict') { verdicts[e.version] = e.verdict || null; syncVersionButtons(); }
+      it.verdict = e.verdict || null; it.text = e.text || null;
+    } else if (e.type === 'delete') {
+      items = items.filter(function (x) { return x.id !== e.to; });
+      document.querySelectorAll('iframe').forEach(function (f) { try { comments.removePin(f.contentDocument.body, e.to); } catch (x) {} });
+    } else if (e.type === 'verdict') { verdicts[e.version] = e.verdict || null; syncVersionButtons(); }
+  }
+  // Empty the model, its pins and the thumbs, for the conversation to refill them from the log when the server refused an event.
+  function reset() {
+    items = []; seq = 0; verdicts = {};
+    document.querySelectorAll('iframe').forEach(function (f) { try { f.contentDocument.querySelectorAll('.db-pin').forEach(function (p) { p.remove(); }); } catch (x) {} });
+    syncVersionButtons();
   }
   function byId(id) { return items.filter(function (x) { return x.id === id; })[0]; }
   function syncVersionButtons() {
@@ -207,8 +213,9 @@
     allowEmpty: function (data) { return data.verdict; },
     params: function (data, text) {
       var anchor = data.item || data;
-      return { version: anchor.version, screen: anchor.screen, target: anchor.target, spot: anchor.spot,
-               verdict: data.verdict, comment: text || null };
+      var params = { on: { version: anchor.version, screen: anchor.screen, target: anchor.target, spot: anchor.spot }, text: text || null };
+      if (data.verdict) params.verdict = data.verdict;  // the schema allows a verdict only when there is one
+      return params;
     }
   });
   function setMode(on) {
@@ -400,14 +407,15 @@
   }
   // ---------- The conversation: page.js, shared with the other pages; the canvas adds verdicts and Decide ----------
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
-  function time(at) { return (at || '').slice(11, 16); }
+  function time(at) { return pageTime(at); }
   // Show a comment where it was made: its screen size, its version, scrolled to its pin, which flashes.
   function reveal(e) {
+    var on = e.on || e;
     var sec = Array.prototype.filter.call(document.querySelectorAll('main > section'), function (x) {
-      var f = x.querySelector('iframe'); return f && f.getAttribute('width') + 'x' + f.getAttribute('height') === e.screen;
+      var f = x.querySelector('iframe'); return f && f.getAttribute('width') + 'x' + f.getAttribute('height') === on.screen;
     })[0];
     if (sec && sec.hidden) { var sb = document.querySelector('button[data-size="' + sec.dataset.size + '"]'); if (sb) sb.click(); }
-    var i = labels.indexOf(e.version); if (i < 0) return;
+    var i = labels.indexOf(on.version); if (i < 0) return;
     if (main.classList.contains('switch')) show(i);
     var frame = (sec || main).querySelector('iframe[data-i="' + i + '"]'); if (!frame) return;
     var doc; try { doc = frame.contentDocument; } catch (x) { return; }
@@ -430,7 +438,7 @@
   function commentBody(e) {
     var body = el('p', 'body');
     if (e.verdict) body.append(el('span', 'verdict ' + e.verdict, e.verdict === 'up' ? 'Good' : 'Not good'));
-    if (e.comment) body.append(e.comment);
+    if (e.text) body.append(e.text);
     return body;
   }
   function decisionItem(c) {
@@ -438,7 +446,7 @@
     head.append(el('span', 'who', 'You decided'), el('span', 'when', time(e.at)));
     var d = el('p', 'body'); d.append(el('strong', '', e.label || e.option));
     if (e.carries && e.carries.length) d.append(el('span', 'with', ' with comments ' + e.carries.map(function (id) { var x = conv.log().filter(function (y) { return y.id === id; })[0]; return x && x.n ? x.n : '?'; }).join(', ')));
-    li.append(head, d); if (e.note) li.append(el('p', 'body', e.note));
+    li.append(head, d); if (e.text) li.append(el('p', 'body', e.text));
     return li;
   }
   function verdictItem(c) {
@@ -448,10 +456,10 @@
   // New versions from the agent load on the same view and version; the screen size is kept by SIZE_KEY above.
   var KEY = 'canvas-view:' + location.pathname, deciding = false;
   var conv = pageConversation({
-    served: served, name: 'canvas', unsent: 'Use Copy all to paste it in the chat.', apply: apply, byId: byId,
+    served: served, name: 'canvas', unsent: 'Use Copy all to paste it in the chat.', apply: apply, reset: reset, byId: byId,
     reveal: reveal, edit: openEdit, remove: comments.remove,
     showLabel: function (n) { return 'Show where comment ' + n + ' is'; },
-    crumb: function (e) { return crumb(e.version, e.target || {}); }, commentBody: commentBody,
+    crumb: function (e) { var on = e.on || e; return crumb(on.version, on.target || {}); }, commentBody: commentBody,
     kinds: { decide: decisionItem, verdict: verdictItem }, itemKinds: ['comment', 'note', 'decide'],
     sendMode: function () { return deciding ? sendDecision : null; },
     busy: function () { return !pop.hidden; },
@@ -460,20 +468,20 @@
     },
     rendered: function (state) { comments.state(state); syncPins(); }
   });
-  function send(method, params, what, done) { conv.send(method, params, what, done); }
+  function send(method, params, what, done, fail) { conv.send(method, params, what, done, fail); }
   var say = conv.say, noteBox = conv.noteBox, noteBtn = conv.noteBtn;
   function asText() {
     var lines = [], log = conv.log();
-    var dec = log.filter(function (x) { return x.action === 'decide'; }).pop();
+    var dec = log.filter(function (x) { return x.type === 'decide'; }).pop();
     if (dec) lines.push('I decide: ' + (dec.label || dec.option) + (dec.carries && dec.carries.length ? ', with comments ' +
-      dec.carries.map(function (id) { var x = byId(id); return x ? x.n : '?'; }).join(', ') : '') + '.' + (dec.note ? ' ' + dec.note : ''));
+      dec.carries.map(function (id) { var x = byId(id); return x ? x.n : '?'; }).join(', ') : '') + '.' + (dec.text ? ' ' + dec.text : ''));
     labels.forEach(function (v) { if (verdicts[v]) lines.push(v + ': ' + (verdicts[v] === 'up' ? 'good' : 'not good') + '.'); });
     items.forEach(function (it) {
       var t = it.target || {};
       lines.push(it.n + '. ' + it.version + ', ' + (t.words || t.text ? '"' + (t.words || t.text).slice(0, 60) + '"' : t.selector) + ': ' +
-                 (it.verdict ? (it.verdict === 'up' ? 'good' : 'not good') + (it.comment ? ', ' : '') : '') + (it.comment || ''));
+                 (it.verdict ? (it.verdict === 'up' ? 'good' : 'not good') + (it.text ? ', ' : '') : '') + (it.text || ''));
     });
-    log.forEach(function (e) { if (e.action === 'note') lines.push(e.note); });
+    log.forEach(function (e) { if (e.type === 'note') lines.push(e.text); });
     return lines.join('\n');
   }
   var copyBtn = document.querySelector('.notes .copy');
@@ -506,7 +514,7 @@
     var open = openItems(), carry = panel.querySelector('.carry'); carry.replaceChildren();
     if (open.length) {
       carry.append(el('p', 'menu-h', 'Comes with your open comments'));
-      open.forEach(function (it) { carry.append(el('p', 'carried', it.n + '. ' + (it.comment || (it.verdict === 'up' ? 'Good' : 'Not good')))); });
+      open.forEach(function (it) { carry.append(el('p', 'carried', it.n + '. ' + (it.text || (it.verdict === 'up' ? 'Good' : 'Not good')))); });
     }
     noteBox.focus();
   }
@@ -516,7 +524,7 @@
     if ((pick.value === 'combine' || pick.value === 'none') && !note) { say('Say how to combine them, or why none fits, in the message.', true); return noteBox.focus(); }
     var label = pick.parentElement.textContent.trim();
     send('decide', { id: 'd-' + Date.now().toString(36), option: pick.value, label: label,
-                     carries: openItems().map(function (it) { return it.id; }), note: note || null },
+                     carries: openItems().map(function (it) { return it.id; }), text: note || null },
          'Decision', function () { noteBox.value = ''; setDeciding(false); });
   }
   conv.start();

@@ -369,7 +369,6 @@ VALID = {
             "id": "c1-x",
             "n": 1,
             "text": "too small",
-            "verdict": None,
             "on": {"version": "A", "screen": "390x844", "target": {"selector": "#pay"}, "spot": {"fx": 0.5, "fy": 0.5}},
         },
         "note": {"id": "m-x", "text": "hi", "to": None},
@@ -451,7 +450,9 @@ class Pages(unittest.TestCase):
     def test_every_method_of_every_page_has_a_valid_event_and_it_is_accepted(self):
         for name, module in self.modules().items():
             with self.subTest(page=name), tempfile.TemporaryDirectory() as d:
-                self.assertEqual(set(module.METHODS), set(VALID[name]), "a method without a check, or a check without one")
+                self.assertEqual(
+                    set(module.METHODS), set(VALID[name]), "a method without a check, or a check without one"
+                )
                 conv, base = self.serve(module, Path(d))
                 for method, params in VALID[name].items():
                     answer = self.send(base, method, params)
@@ -518,6 +519,17 @@ class Pages(unittest.TestCase):
                 shown = [json.loads(line) for line in lines[:-1]]
                 self.assertEqual([(e["id"], e["text"]) for e in shown], [(first["id"], "edited")])
 
+    def test_a_verdict_only_comment_is_the_canvas_only_comment_without_text(self):
+        with tempfile.TemporaryDirectory() as d:
+            conv, base = self.serve(load("design-better", "canvas.py"), Path(d))
+            thumbs = {**VALID["canvas"]["comment"], "id": "c2-x", "text": None, "verdict": "up"}
+            self.assertEqual(self.send(base, "comment", thumbs).get("result"), "saved")
+        for name in ("show", "board"):
+            with tempfile.TemporaryDirectory() as d:
+                conv, base = self.serve(self.modules()[name], Path(d))
+                thumbs = {**VALID[name]["comment"], "text": None, "verdict": "up"}
+                self.assertEqual(self.send(base, "comment", thumbs)["error"]["code"], -32602)
+
     def test_the_researchers_closing_message_carries_its_question(self):
         module = self.modules()["board"]
         with tempfile.TemporaryDirectory() as d:
@@ -527,7 +539,7 @@ class Pages(unittest.TestCase):
                 {k: conv.events()[0][k] for k in ("type", "by", "id", "question", "status")},
                 {"type": "closed", "by": "w2", "id": "c-1", "question": "Q-w2-4", "status": "answered"},
             )
-            with self.assertRaises(page.EventError):
+            with self.assertRaises(module.page.EventError):
                 conv.append({"type": "closed", "by": "w2", "id": "c-2", "q": "Q-w2-4", "status": "answered"})
 
 
@@ -573,7 +585,9 @@ class Scripts(unittest.TestCase):
                 [*agent, "status", str(folder), "accepted", "m1", "--text", "good"], capture_output=True, text=True
             )
             self.assertEqual(out.returncode, 0, out.stderr)
-            self.assertEqual(json.loads((folder / "conversation.jsonl").read_text().splitlines()[-1])["type"], "accepted")
+            self.assertEqual(
+                json.loads((folder / "conversation.jsonl").read_text().splitlines()[-1])["type"], "accepted"
+            )
         finally:
             server.send_signal(signal.SIGTERM)  # as a harness ends a command: the script still removes .server
             server.communicate(timeout=10)

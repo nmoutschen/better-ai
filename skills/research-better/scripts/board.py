@@ -7,7 +7,8 @@ Usage:
   python3 board.py snapshot BOARD --out FILE               write a static page
   python3 board.py wait BOARD [--timeout S]                wait for the user's next actions on the served page
   python3 board.py reply BOARD TEXT [--to ID]              show the coordinator's reply in the page
-  python3 board.py status BOARD seen|asked|working|done|accepted ID...
+  python3 board.py status BOARD seen|asked|working|done ID...
+  python3 board.py status BOARD accepted ID... --text "the user's words"
   python3 board.py pending BOARD                           list the user's items that are not done or accepted
 
 BOARD is the board directory described in templates/board.md. The page shows one column per direction of the
@@ -125,8 +126,8 @@ def announce_closes(conv: page.Conversation, initial: bool) -> None:
     On a board's first viewer, questions already closed get no message, so an old board does not flood the
     conversation; a resumed viewer posts the closes it missed while it was away."""
     events = conv.events()
-    ANNOUNCED.update((e.get("q"), e.get("by"), e.get("status")) for e in events if e.get("action") == "closed")
-    first = initial and not any(e.get("action") == "closed" for e in events)
+    ANNOUNCED.update((e.get("question"), e.get("by"), e.get("status")) for e in events if e.get("type") == "closed")
+    first = initial and not any(e.get("type") == "closed" for e in events)
     for path in md_files(conv.folder / "questions"):
         q = read_entry(path)
         status, gist = q.get("status", "").lower(), q.get("gist", "")
@@ -135,16 +136,18 @@ def announce_closes(conv: page.Conversation, initial: bool) -> None:
             continue
         ANNOUNCED.add(key)
         if not first:
-            conv.append(
-                {
-                    "action": "closed",
-                    "id": "c-" + str(time.time_ns()),
-                    "by": key[1],
-                    "q": key[0],
-                    "status": status,
-                    "text": gist[:500],
-                },
-            )
+            try:
+                conv.append(
+                    {
+                        "type": "closed",
+                        "by": key[1],
+                        "id": "c-" + str(time.time_ns()),
+                        "question": key[0],
+                        "status": status,
+                    },
+                )
+            except page.EventError as error:  # the line is not written; the viewer goes on
+                print(f"error: closing message for {key[0]} not written: {error}", file=sys.stderr, flush=True)
 
 
 def board_stopped(board: Path) -> bool:
@@ -156,7 +159,17 @@ def board_stopped(board: Path) -> bool:
 
 
 def conversation(board: Path) -> page.Conversation:
-    return page.Conversation(board, LOG, SEEN, ADDRESS, ITEMS, "coordinator", "watch BOARD")
+    return page.Conversation(
+        board,
+        LOG,
+        SEEN,
+        ADDRESS,
+        ITEMS,
+        "coordinator",
+        "watch BOARD",
+        schemas=HERE.parent / "schemas",
+        events="board-events.schema.json",
+    )
 
 
 # ---------- watch ----------
@@ -246,6 +259,7 @@ def main() -> None:
     st.add_argument("board")
     st.add_argument("state", choices=page.STATES)
     st.add_argument("ids", nargs="+")
+    st.add_argument("--text", help="the user's words, for accepted")
     p = sub.add_parser("pending", help="list the user's items that are not done or accepted")
     p.add_argument("board")
     args = parser.parse_args()
@@ -262,7 +276,7 @@ def main() -> None:
     elif args.command == "reply":
         conversation(board).reply(args.text, args.to)
     elif args.command == "status":
-        conversation(board).set_status(args.state, args.ids)
+        conversation(board).set_status(args.state, args.ids, args.text)
     else:
         conversation(board).pending()
 

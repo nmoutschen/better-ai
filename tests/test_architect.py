@@ -268,9 +268,9 @@ class Architect(unittest.TestCase):
         self.assertIn("Coordinator agent to dashboard.py: wait ends with the answer (Flows, step 2d)", html)
 
     def test_thread_comment_lookup_works_before_any_rendered_hook(self):
-        event = {"id": "C1", "action": "comment", "on": {"id": "target"}, "comment": "Original"}
-        edited = {**event, "comment": "Edited"}
-        deleted = {"id": "C1", "action": "delete"}
+        event = {"id": "C1", "type": "comment", "on": {"id": "target"}, "text": "Original"}
+        edited = {**event, "text": "Edited"}
+        deleted = {"type": "delete", "to": "C1"}
         result = self.render_javascript(
             {"events": [event, edited, deleted]},
             """JSON.stringify([
@@ -356,7 +356,17 @@ class Architect(unittest.TestCase):
 
     def test_pending_and_status_follow_review_requests(self):
         conv = architect.conversation(self.folder)
-        conv.append({"action": "approve", "id": "A1", "perspectives": ["security"]})
+        conv.append(
+            {
+                "type": "approve",
+                "by": "user",
+                "id": "A1",
+                "again": False,
+                "perspectives": ["security"],
+                "changes": [],
+                "text": "Design approved",
+            }
+        )
         self.assertIn('"id": "A1"', self.command("pending"))
         self.assertIn("Marked working: A1", self.command("status", "working", "A1"))
         self.command("reply", "Checking the server.", "--to", "A1")

@@ -156,7 +156,7 @@
     reopen: function (id) { conv.reopen(id); },
     nextNumber: function () { return seq + 1; },
     params: function (data, text) {
-      return { slide: data.slide, part: data.part, headline: data.headline, target: data.target, spot: data.spot, comment: text };
+      return { on: { slide: data.slide, part: data.part, headline: data.headline, target: data.target, spot: data.spot }, text: text };
     }
   });
   function choose(attr, value) {
@@ -209,8 +209,8 @@
     };
   }
   // Two lines: where the comment is, small and muted, then what was clicked.
-  function crumb(c) {
-    var box = el('span', 'crumb'), t = c.target || {}, said = t.item || t.text || c.headline || '';
+  function crumb(event) {
+    var c = event.on || event, box = el('span', 'crumb'), t = c.target || {}, said = t.item || t.text || c.headline || '';
     box.append(el('span', 'path', 'Slide ' + c.slide + (c.part ? ' › ' + c.part : '')),
                el('span', 'el', said ? '“' + said.slice(0, 90) + (said.length > 90 ? '…' : '') + '”' : 'the slide'));
     return box;
@@ -231,15 +231,20 @@
   var seq = 0, items = [];
   function byId(id) { return items.filter(function (x) { return x.id === id; })[0]; }
   function apply(e, fresh) {
-    if (e.action === 'comment') {
-      var it = byId(e.id);
+    if (e.type === 'comment') {
+      var it = byId(e.id), on = e.on || {};
       if (!it) { it = { id: e.id, n: e.n || seq + 1 }; seq = Math.max(seq, it.n); items.push(it); }
-      Object.assign(it, { slide: e.slide, part: e.part, headline: e.headline, target: e.target || {}, spot: e.spot || { fx: 0.5, fy: 0.5 }, comment: e.comment || '' });
+      Object.assign(it, { slide: on.slide, part: on.part, headline: on.headline, target: on.target || {}, spot: on.spot || { fx: 0.5, fy: 0.5 }, text: e.text || '' });
       placePin(it, fresh);
-    } else if (e.action === 'delete') {
-      items = items.filter(function (x) { return x.id !== e.id; });
-      slides.forEach(function (slide) { comments.removePin(slide, e.id); });
+    } else if (e.type === 'delete') {
+      items = items.filter(function (x) { return x.id !== e.to; });
+      slides.forEach(function (slide) { comments.removePin(slide, e.to); });
     }
+  }
+  // Empty the model and its pins, for the conversation to refill it from the log when the server refused an event.
+  function reset() {
+    items = []; seq = 0;
+    slides.forEach(function (slide) { slide.querySelectorAll('.pin').forEach(function (p) { p.remove(); }); });
   }
   function placePin(it, fresh) {
     var slide = slides[(it.slide || 1) - 1]; if (!slide) return;
@@ -251,22 +256,21 @@
   }
   // Show a comment where it was made: its slide, with its pin flashing.
   function reveal(e) {
-    go((e.slide || 1) - 1);
+    go(((e.on || e).slide || 1) - 1);
     var pin = comments.findPin(slides[cur], e.id); if (!pin) return;
     comments.flashPin(pin, 'flash');
     pin.scrollIntoView({ block: 'nearest' });
   }
   var KEY = 'show-mode:' + location.pathname;
   var conv = pageConversation({
-    served: served, name: 'page', apply: apply, byId: byId, reveal: reveal, edit: openEdit, remove: comments.remove,
+    served: served, name: 'page', apply: apply, reset: reset, byId: byId, reveal: reveal, edit: openEdit, remove: comments.remove,
     showLabel: function (n) { return 'Show comment ' + n + ' on its slide'; },
-    crumb: crumb, commentBody: function (e) { return el('p', 'body', e.comment); },
-    noteParams: function () { return { slide: cur + 1, part: slides[cur].dataset.part || '' }; },
+    crumb: crumb, commentBody: function (e) { return el('p', 'body', e.text); },
     busy: function () { return !pop.hidden; },
     beforeReload: function () { sessionStorage.setItem(KEY, commenting ? 'comment' : 'read'); },
     rendered: function (state) { comments.state(state); items.forEach(function (it) { placePin(it, false); }); }
   });
-  function send(method, params, what, done) { conv.send(method, params, what, done); }
+  function send(method, params, what, done, fail) { conv.send(method, params, what, done, fail); }
   function flash(text, kind) { conv.flash(text, kind); }
 
   try { if (sessionStorage.getItem(KEY) === 'comment' && served) setMode(true); sessionStorage.removeItem(KEY); } catch (e) {}

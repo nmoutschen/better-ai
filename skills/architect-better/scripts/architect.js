@@ -119,8 +119,8 @@ function reviewSummary(changed, names, removed = []) {
 }
 
 function threadComment(log, id) {
-  const event = log.findLast(event => event.id === id && (event.action === 'comment' || event.action === 'delete'));
-  return event?.action === 'comment' && byId(event.on?.id) ? event : undefined;
+  const event = log.findLast(event => (event.type === 'comment' && event.id === id) || (event.type === 'delete' && event.to === id));
+  return event?.type === 'comment' && byId(event.on?.id) ? event : undefined;
 }
 
 function start(data) {
@@ -137,7 +137,7 @@ function start(data) {
   const reviewNames = data.rerun;
   const items = ['comment', 'note', 'approve', 'confirm'];
   const waiting = (entry, states) => states[entry.e.id] === 'asked' ||
-    (entry.kind === 'reply' && !entry.e.to && entry.e.id && !entry.replies.some(reply => reply.action === 'note'));
+    (entry.kind === 'reply' && !entry.e.to && entry.e.id && !entry.replies.some(reply => reply.type === 'note'));
   const revKey = 'architecture-page';
   const saved = JSON.parse(sessionStorage.getItem(revKey) || '{}');
   sessionStorage.removeItem(revKey);
@@ -291,7 +291,7 @@ function start(data) {
     who.textContent = 'You';
     const when = document.createElement('span');
     when.className = 'when';
-    when.textContent = (entry.e.at || '').slice(11, 16);
+    when.textContent = pageTime(entry.e.at);
     head.append(who, when);
     li.append(head, pageMarkdown(entry.e.text));
     return li;
@@ -299,7 +299,7 @@ function start(data) {
 
   const conversation = pageConversation({
     served: true, name: 'design page', agent: 'Architect', itemKinds: items, latestLast: true, waiting,
-    kinds: {approve: logItem, confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.comment),
+    kinds: {approve: logItem, confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.text),
     byId: id => threadComment(conversation.log(), id),
     reveal, edit: editComment, remove: event => commentLayer.remove(event), showLabel: n => 'Show comment ' + n,
     busy: () => !pop.hidden || !reviewMenu.hidden || !!$('.edit:not([hidden])'),
@@ -327,14 +327,14 @@ function start(data) {
         status.innerHTML = count ? chip(count + (count === 1 ? ' comment' : ' comments'), 'open') : chip('Draft');
       }
       for (const event of log) {
-        if (event.action !== 'confirm' || event.wording !== requirementWording.get(event.requirement)) continue;
+        if (event.type !== 'confirm' || event.wording !== requirementWording.get(event.requirement)) continue;
         const record = byId('req-' + event.requirement);
         if (!record || !$('[data-confirm]', record)) continue;
         const link = document.createElement('a');
         link.className = 'src';
         link.href = '#thread';
         link.dataset.confirmation = event.id;
-        link.append('You, on this page', document.createElement('br'), event.at.slice(11, 16));
+        link.append('You, on this page', document.createElement('br'), pageTime(event.at));
         $('.req-source', record).replaceChildren(link);
         $('[data-confirm]', record).remove();
       }
@@ -344,7 +344,7 @@ function start(data) {
   });
   const commentLayer = pageElementComments({
     pop, pinClass: 'pin', commenting: () => true, crumb,
-    params: (draft, comment) => ({on: draft.on, comment}),
+    params: (draft, text) => ({on: draft.on, text}),
     nextNumber: () => 1 + Math.max(0, ...conversation.log().map(event => event.n || 0)),
     send: conversation.send, byId: id => commentsById.get(id), reopen: conversation.reopen
   });
@@ -412,7 +412,7 @@ function start(data) {
     const record = form.closest('[data-record]');
     const button = $('button', form);
     button.disabled = true;
-    conversation.send('comment', {id: 'change-' + Date.now().toString(36), comment: message,
+    conversation.send('comment', {id: 'change-' + Date.now().toString(36), text: message,
       on: {id: record.id, title: 'Change ' + record.dataset.record}}, 'Change request', () => {
       form.hidden = true;
       button.disabled = false;

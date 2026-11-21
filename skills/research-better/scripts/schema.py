@@ -7,7 +7,8 @@ A path is a file, or a folder whose files are all checked. Each error is one lin
 and the exit code is 1 if there is any error and 0 if there is none. A JSONL file
 is checked line by line, a JSON file as one record; `<line>` is 1 for a JSON file. The page's own scripts call
 `check_paths` instead of keeping checks of their own; a script keeps only checks that need its own knowledge, such as
-whether a slide can be drawn.
+whether a slide can be drawn. A script that writes one record at a time, as page.py does for an event, calls
+`check_record` with the names of the schemas the record must meet before it writes the record.
 
 Each skill carries an identical copy of this file in `scripts/`, with `schemas/base.schema.json` next to it in
 `schemas/`, as it does page.py; the Scripts workflow fails if the copies differ. Standard library only.
@@ -18,7 +19,9 @@ in a schema is an error, so a rule is never silently ignored: type, const, enum,
 properties, additionalProperties, items, allOf, anyOf, not, if/then/else and $ref (to `#/...` in the same schema, or to
 `<name>.schema.json#/...` in the schemas folder, such as the shared `base.schema.json`). `title`, `description`,
 `$schema`, `$id`, `$comment`, `$defs`, `examples` and `default` are notes. The schemas are checked as a whole when
-they load: an unsupported keyword or a `type` that is not a type name is an error even where no record reaches it.
+they load: an unsupported keyword, a `type` that is not a type name, a `pattern` that is not a regular expression, a
+`required` that is not a list of names, an extension without what it needs, or an `x-check` no hook answers to is an
+error even where no record reaches it.
 A file that does not parse is read once more before the parse error is reported, in case it was caught mid-write.
 
 An error under if/then/else names the rule: `reason: required when status is "blocked"`.
@@ -26,7 +29,9 @@ An error under if/then/else names the rule: `reason: required when status is "bl
 Extensions, which other JSON Schema tools ignore:
 
 - `x-files` (schema root): the files the schema describes, as paths from the end of the file's path, with `*` as in a
-  shell: `["tasks.jsonl"]`, `["logs/*.jsonl"]`, `["questions/*.json"]`. The most specific pattern wins.
+  shell: `["tasks.jsonl"]`, `["logs/*.jsonl"]`, `["questions/*.json"]`. The most specific pattern wins. When several
+  schemas share the most specific pattern, a record must meet each of them: a page's `conversation.jsonl` is checked
+  against the shared `conversation.schema.json` and the page's own `<page>-events.schema.json`.
 - `x-versioned` (schema root): true when a line may reuse an `id`, as in a page conversation, where the latest line is
   the item's current version. Otherwise an `id` repeated in a file is an error.
 - `x-id-from-filename` (schema root): true when the file is one entry of a folder, named `<id>.json`.
@@ -153,8 +158,11 @@ def _parses(text: str, lines: bool) -> bool:
 def read_checked(path: Path, lines: bool) -> str:
     """The text of a JSON or JSONL file. If it does not parse, the file may have been caught mid-write: read it once
     more and use that read, so a parse error is reported only if the second read fails too."""
-    text = read_text(path)
-    if not _parses(text, lines):
+    try:
+        text: str | None = read_text(path)
+    except UnicodeDecodeError:  # a multi-byte character cut by the write in progress
+        text = None
+    if text is None or not _parses(text, lines):
         time.sleep(PAUSE)
         text = read_text(path)
     return text
@@ -213,7 +221,7 @@ class Context:
         if key not in self._cache:
             try:
                 text = read_checked(path, True)
-            except OSError:
+            except (OSError, UnicodeDecodeError):
                 self._cache[key] = None
             else:
                 self._cache[key] = [_loads(line) for line in _lines(text) if line.strip()]
@@ -552,6 +560,25 @@ def _verified_needs_passing_verifier(record: dict, context: Context) -> list[tup
 # ---------------------------------------------------------------- checking files
 
 
+def _audit_extensions(node: dict, where: str) -> None:
+    """Refuse an extension that lacks what it needs, so a mistake in a schema is an error where it is written."""
+    if "x-points-to" in node:
+        rule = node["x-points-to"]
+        wanted = rule.get("type") if isinstance(rule, dict) else None
+        types_ok = isinstance(wanted, str) or (
+            isinstance(wanted, list) and bool(wanted) and all(isinstance(t, str) for t in wanted)
+        )
+        file_ok = isinstance(rule, dict) and isinstance(rule.get("file"), (str, dict)) and bool(rule.get("file"))
+        if not (file_ok and types_ok):
+            raise SchemaError(f'{where}: x-points-to needs a "file" and a "type" (a name or a list of names)')
+    if "x-mode-sets" in node:
+        rule = node["x-mode-sets"]
+        if not (isinstance(rule, dict) and isinstance(rule.get("file"), str) and isinstance(rule.get("field"), str)):
+            raise SchemaError(f'{where}: x-mode-sets needs a "file" and a "field"')
+    if "x-check" in node and (not isinstance(node["x-check"], str) or node["x-check"] not in HOOKS):
+        raise SchemaError(f"{where}: x-check {_show(node['x-check'])}: schema.py has no hook of that name")
+
+
 def _audit(node: Any, where: str, boolean_ok: bool = False) -> None:
     """Refuse an unsupported keyword or a bad `type` anywhere in a schema, whether or not a record reaches it."""
     if boolean_ok and isinstance(node, bool):
@@ -565,6 +592,16 @@ def _audit(node: Any, where: str, boolean_ok: bool = False) -> None:
         names = node["type"] if isinstance(node["type"], list) else [node["type"]]
         if not names or any(not isinstance(n, str) or n not in TYPE_NAMES for n in names):
             raise SchemaError(f"{where}: type must be one of {', '.join(sorted(TYPE_NAMES))} or a list of them")
+    if "pattern" in node:
+        try:
+            re.compile(node["pattern"])
+        except (re.error, TypeError):
+            raise SchemaError(f"{where}: pattern {_show(node['pattern'])} is not a regular expression") from None
+    if "required" in node and not (
+        isinstance(node["required"], list) and all(isinstance(n, str) for n in node["required"])
+    ):
+        raise SchemaError(f"{where}: required must be a list of field names")
+    _audit_extensions(node, where)
     for keyword in ("properties", "$defs"):
         if keyword in node and not isinstance(node[keyword], dict):
             raise SchemaError(f"{where}: {keyword} must be an object")
@@ -595,12 +632,17 @@ def load_schemas(directory: Path) -> dict[str, dict]:
         except ValueError as error:
             raise SchemaError(f"{path}: not valid JSON: {error}") from None
         _audit(docs[path.name], path.name)
+        files = docs[path.name].get("x-files", []) if isinstance(docs[path.name], dict) else []
+        if not isinstance(files, list) or not all(isinstance(f, str) for f in files):
+            raise SchemaError(f"{path.name}: x-files must be a list of file patterns")
     return docs
 
 
-def _match(path: Path, docs: dict[str, dict]) -> tuple[str, dict] | None:
+def _match(path: Path, docs: dict[str, dict]) -> list[tuple[str, dict]]:
+    """The schemas that describe a file: those with the most specific pattern that matches it (several may tie)."""
     path = path.resolve()
-    best, best_rank = None, (0, 0)
+    best: list[tuple[str, dict]] = []
+    best_rank = (0, 0)
     for name, doc in docs.items():
         patterns = doc.get("x-files", []) if isinstance(doc, dict) else []
         for pattern in patterns:
@@ -610,7 +652,9 @@ def _match(path: Path, docs: dict[str, dict]) -> tuple[str, dict] | None:
             ):
                 rank = (len(parts), len(pattern.replace("*", "")))
                 if rank > best_rank:
-                    best, best_rank = (name, doc), rank
+                    best, best_rank = [(name, doc)], rank
+                elif rank == best_rank and (name, doc) not in best:
+                    best.append((name, doc))
     return best
 
 
@@ -618,9 +662,8 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
     """The errors of one file, in line order. The file's schema is found from the `x-files` of the schemas."""
     found = _match(path, docs)
     where = str(path)
-    if found is None:
+    if not found:
         return [Error(where, 1, "(file)", "no schema describes this file")]
-    _, schema = found
     try:
         text = read_checked(path, path.suffix == ".jsonl")
     except (OSError, UnicodeDecodeError) as error:
@@ -629,6 +672,7 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
     validator = Validator(docs, context)
     errors: list[Error] = []
     seen: dict[str, int] = {}
+    versioned = all(doc.get("x-versioned") for _, doc in found)
     lines = _lines(text) if path.suffix == ".jsonl" else [text]
     records = list(enumerate(lines, 1))
     for number, line in records:
@@ -643,18 +687,32 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
         if not isinstance(record, dict):
             errors.append(Error(where, number, ROOT, f"expected object, got {_type_name(record)}"))
             continue
-        for problem in validator.validate(record, schema, (), schema):
-            errors.append(Error(where, number, problem.field, problem.message))
+        for _, schema in found:
+            for problem in validator.validate(record, schema, (), schema):
+                errors.append(Error(where, number, problem.field, problem.message))
         identity = record.get("id")
         if isinstance(identity, str):
-            if not schema.get("x-versioned") and identity in seen:
+            if not versioned and identity in seen:
                 errors.append(Error(where, number, "id", f"duplicate of line {seen[identity]}"))
             seen.setdefault(identity, number)
-            if schema.get("x-id-from-filename") and identity != path.name.removesuffix(".json"):
+            if any(doc.get("x-id-from-filename") for _, doc in found) and identity != path.name.removesuffix(".json"):
                 errors.append(
                     Error(where, number, "id", f'must equal the file name "{path.name.removesuffix(".json")}"')
                 )
     return errors
+
+
+def check_record(record: Any, names: list[str], schemas: Path | None = None) -> list[tuple[str, str]]:
+    """The problems of one record against each named schema (file names in the schemas folder), as (field, message):
+    the check a script makes before it writes a record. Pointers and other checks that need the files around the
+    record are not made: `check_paths` makes them on the file."""
+    docs = load_schemas(schemas or Path(__file__).resolve().parent.parent / "schemas")
+    problems: list[tuple[str, str]] = []
+    for name in names:
+        if name not in docs:
+            raise SchemaError(f"no schema named {name!r} in the schemas folder")
+        problems += [(p.field, p.message) for p in validate_instance(record, docs[name], docs)]
+    return list(dict.fromkeys(problems))
 
 
 def check_paths(paths: list[Path], schemas: Path | None = None) -> list[Error]:
@@ -669,7 +727,7 @@ def check_paths(paths: list[Path], schemas: Path | None = None) -> list[Error]:
                 names[:] = sorted(n for n in names if n not in SKIPPED_FOLDERS and not n.startswith("."))
                 for name in sorted(files):
                     file = Path(folder) / name
-                    if _match(file, docs) is not None:
+                    if _match(file, docs):
                         matched = True
                         errors += check_file(file, docs, cache)
             if not matched:
