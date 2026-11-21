@@ -1258,9 +1258,8 @@ class FilesThatAreNotSpecs(unittest.TestCase):
     the show-better schema change)."""
 
     def contents(self):
-        deep_node = {"label": "leaf", "value": 1}
-        for _ in range(1200):
-            deep_node = {"label": "n", "children": [deep_node]}
+        # Built as text: json.dumps of a tree this deep raises RecursionError on Python 3.10.
+        deep_node = '{"label":"n","children":[' * 1200 + '{"label":"leaf","value":1}' + "]}" * 1200
         text = {"headline": "x", "kind": "text", "body": [[[[[[[[[[["x"]]]]]]]]]]]}
         bars = '{"type":"slides","title":"t","panels":[{"headline":"Bars show a clear point.","kind":"bars","items":[{"label":"a","value":%s}]}]}'
         return {
@@ -1268,9 +1267,9 @@ class FilesThatAreNotSpecs(unittest.TestCase):
             "a number": "5",
             "null": "null",
             "panels that is text": '{"type":"slides","title":"t","panels":"x"}',
-            "a tree 1200 deep": json.dumps(
-                {"type": "slides", "title": "T", "panels": [{"headline": "A deep tree.", "kind": "tree", "root": deep_node}]}
-            ),
+            "a tree 1200 deep": '{"type":"slides","title":"T","panels":[{"headline":"A deep tree.","kind":"tree","root":'
+            + deep_node
+            + "}]}",
             "a body nested 11 deep": json.dumps({"type": "slides", "title": "T", "panels": [text]}),
             "a bar value NaN": bars % "NaN",
             "a bar value Infinity": bars % "Infinity",

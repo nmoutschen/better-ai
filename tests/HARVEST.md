@@ -71,6 +71,7 @@ probes of T5c and T7 are kept by those tests.
 
 ### T7, the architect folder (branch `feat/aff-t7-architect`)
 - `t7/fuzz.py`, `t7/nulls.py`, `t7/edge.py`, `t7/edge2.py`, `t7/specs.py`, `t7/survey.py`, `t7c/accnull.py`, `t7c/deep_arch.py`, `t7c/missing.py`, `t7c/only.py`, `t7c/gen.py`, `t7d/never.py`, `t7b-*.py`, `t7b-*.sh`, `t7b-*.json`, `t7b-rerun.py`, `t7b-fixtures.py`: covered by `tests/test_architect_formats.py` on that branch: `WrongTypes::test_no_wrong_type_breaks_check_load_or_the_page`, `RawLines`, `EveryAcceptedExampleRenders`, `NullIsAbsent` (every optional field null, through `diagram.py`), `DiagramCli::test_a_design_nested_very_deep_is_an_error_not_a_traceback`, `DiagramCli::test_whatever_raises_while_checking_or_rendering_is_one_line_and_exit_1`, `RequiredFiles`, `SpecsNeedRecords`, `GeneratedSpecs`, `LoadNeverRaises` (the source file that goes away), `MovedChecks::test_schema_check_alone_rejects_each_broken_design_and_architect_check_agrees`. Not on this base.
+- `t7d/surr.py` (a lone surrogate, JSON escape `\ud800`, in a field schema.py accepts, which then breaks `architect.py`): no test yet. Open finding on T7: schema.py passes it and architect.py fails, so the two disagree. It is in code under test, and in a branch not on this base.
 - `t7/convert_replays.py`, `t7/convert.py`, `t7/gen_schemas.py`, `t7/fix_old_tests.py`, `t7/new_head.py`, `t7/new_rest.py`, `t7/old_head.py`, `t7/old_rest.py`, `t7/rest_view.txt`, `t7/specs.py`, `t7/o.txt`, `t7/*.json`, `t7/out-*`, `t7/*-v.txt`, `t7b-*` data and outputs, `t7c/` JSON and outputs, `t7d/` outputs, `out-*.txt`, `t7b-base-diagram.py` (the old diagram.py): converters, generators and outputs. Not probes.
 
 ### T8, show-better
@@ -81,6 +82,7 @@ probes of T5c and T7 are kept by those tests.
 - `fz3/depth.py`, `fz3/tree.py`, `fz3/tree2.py`: covered by `Nesting` (tree 5 to 50,000 deep, command line) and `ChildrenAndRenderCrashes` (`test_a_leaf_with_an_empty_children_list_and_a_value_renders`, `test_a_node_without_a_non_empty_children_list_needs_a_value`).
 - `fz3/edge.py`: new (`FilesThatAreNotSpecs`).
 - `fz4/deep.py`: new (`test_deep_input.py::DeepInput`: 950 and 50,000 levels, list and object, in a show spec, a show conversation, the dashboard, the board, through every command that reads them).
+- `v3b/repro.js` (a task with `requirements` as text or `mode` as a number throws in the dashboard page): covered by `test_dashboard_formats.py::WrongTypes::test_no_wrong_type_breaks_check_load_or_the_page`, which draws every payload through `render-payloads.js` (`drawTasks`, `drawAgents`), and by `::test_an_invalid_record_shows_without_the_fields_that_failed` on the Python side.
 - `fz3/e/`, `fz3/d/`, `fz4/w/`, `fz3/out*.txt`: inputs and outputs written by those scripts. Not probes.
 - `t8/n.txt`, `t8/o.txt`, `t8/old/`, `t8/r/`, `t8tree/`: outputs and a copy of the tree. Not probes.
 
@@ -95,7 +97,13 @@ probes of T5c and T7 are kept by those tests.
 
 Briefs and notes: `builder-t1.md` to `builder-t11b.md`, `builder-t10.md`, `verifier-t*.md` (copies of the logs read here), `final-pass-notes.md`, `audit/`, `spec*.txt`, `specpage.txt`, `spec-page.txt`. Spec-page generators and editors (the formats page and its schemas): `formats/`, `archjson.py`, `atomic.py`, `conform.py`, `examples.py`, `flatten.py`, `purpose.py`, `request.py`, `spec.py`, `status_ast.py`, `extract.js`, `extract-t3.js`, `gen_schema.py`, `gen-schemas-t3.py`, `new_funcs.py`, `apply.py`, `cmp.py`, `post_audit*.py`. Copies of the validator and its tests at one commit: `base-schema.py`, `schema_t3.py`, `t3schema.py`, `t5schema.py`, `t_a.py`, `t_b.py`, `base-v.txt`, `new-v.txt`, `prof`, `p.prof`, `p0.json`, `bd/`, `board-copy/`, `lint/`, `__pycache__/`. Outputs: `t4b-checks.txt`, `t4c-checks.txt`, `t7b-unit.txt`, `t7d-checks.txt`, `out-*.txt`.
 
+## Python versions
+
+Run on 3.15 (`python3`) and 3.10 (`uv run --python 3.10`, CI's oldest). The deep-input tests (`test_deep_input.py::DeepInput`, `test_show_schema.py::Nesting`, `FilesThatAreNotSpecs`, the 50,000-deep cases in `test_schema.py`) only bite on Python 3.13 and older: 3.15's `json` parses 50,000 levels without recursing, so there they pass whatever the code does.
+
 ## Found while harvesting
+
+- `show.py pending` raises RecursionError on a `conversation.jsonl` line nested 50,000 deep, on Python 3.10: `page.py` `events()` calls `json.loads` and does not catch it. `test_deep_input.py::DeepInput::test_no_command_prints_a_traceback_for_a_deeply_nested_file` fails on 3.10 for the two 50,000-deep cases (list and object) because of it, and is left as it is until the code is fixed in another task.
 
 - `schema.py` compares a list or object `const` and `enum` with Python equality, so `{"const": [true]}` accepts `[1]` (`probe/p1.py`: `validate_instance([1], {"const": [True]}, {})` gives no error). A scalar `true` against `1` is refused (tested). No schema uses a list `const`, so no input is affected today. Code under test, so unchanged here.
 - A rewrite of a file that keeps its size and mtime (`probe/probe1.py` C) is not seen by the board's scan cache. Not asserted by any test, and not known to happen in use (it needs a rewrite of the same length within one mtime tick). Code under test, so unchanged here.
