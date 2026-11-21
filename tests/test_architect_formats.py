@@ -1182,6 +1182,35 @@ class DiagramCli(unittest.TestCase):
                     self.assertIn("design: expected an object", run.stderr)
                     self.assertNotIn("Traceback", run.stderr)
 
+    def test_a_design_nested_very_deep_is_an_error_not_a_traceback(self):
+        for depth in (2000, 50000):
+            text = '{"a": ' * depth + "1" + "}" * depth
+            for command in ("check", "render"):
+                with self.subTest(depth=depth, command=command), tempfile.TemporaryDirectory() as tmp:
+                    run = self.run_cli(command, text, tmp)
+                    self.assertEqual(run.returncode, 1)
+                    self.assertEqual(run.stderr.strip(), "design: nested too deeply")
+                    self.assertFalse((Path(tmp) / "out").exists())
+
+    def test_whatever_raises_while_checking_or_rendering_is_one_line_and_exit_1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "design.json"
+            path.write_text(json.dumps(design()))
+            for command, name, error, line in (
+                ("check", "validate", ZeroDivisionError("x"), "design: could not be checked: ZeroDivisionError"),
+                ("render", "layout", KeyError("k"), "design: could not be checked: KeyError"),
+                ("render", "svg_containers", RuntimeError("r"), "design: could not be checked: RuntimeError"),
+                ("check", "validate", RecursionError(), "design: nested too deeply"),
+                ("render", "layout", RecursionError(), "design: nested too deeply"),
+            ):
+                with self.subTest(command=command, raised=type(error).__name__, name=name):
+                    argv = [command, str(path)] + (["--out", str(Path(tmp) / "out")] if command == "render" else [])
+                    err = io.StringIO()
+                    with mock.patch.object(diagram, name, side_effect=error), redirect_stderr(err):
+                        code = diagram.main(argv)
+                    self.assertEqual(code, 1)
+                    self.assertEqual(err.getvalue().strip(), line)
+
     def test_an_answered_gap_is_written_as_answered(self):
         records = [
             base("spec", id="S1", statement="s", source={"type": "design", "section": "x"}, checked_by="c"),
@@ -1236,6 +1265,34 @@ class RequiredFiles(unittest.TestCase):
                 schema.load_schemas(copy)
 
 
+class SpecRowsCheck(unittest.TestCase):
+    """The eval check for spec.jsonl skips gap and unlinked rows only: a row with no type is held to the rules."""
+
+    CHECK = ROOT / "evals" / "cases" / "architect-better" / "spec-covers-failure-cases" / "checks" / "spec_rows.py"
+
+    def run_check(self, rows):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "docs" / "designs" / "2026-11-order-export"
+            folder.mkdir(parents=True)
+            (folder / "spec.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+            return subprocess.run([sys.executable, str(self.CHECK)], cwd=tmp, capture_output=True, text=True)
+
+    GOOD = base("spec", id="S1", statement="s", source={"type": "design", "section": "x"}, checked_by="c")
+
+    def test_a_row_with_no_type_is_checked(self):
+        run = self.run_check([self.GOOD, {"id": "S2"}])
+        self.assertEqual(run.returncode, 1)
+        self.assertIn("S2: statement is empty or missing", run.stderr)
+
+    def test_gap_and_unlinked_rows_are_skipped_and_a_spec_row_is_required(self):
+        gap = base("gap", id="G1", text="t", status="assumed", choice="c", if_wrong="w")
+        unlinked = base("unlinked", item="i", why="w")
+        self.assertEqual(self.run_check([self.GOOD, gap, unlinked]).returncode, 0)
+        run = self.run_check([gap, unlinked])
+        self.assertEqual(run.returncode, 1)
+        self.assertIn("holds no spec requirement", run.stderr)
+
+
 class ModeText(unittest.TestCase):
     """The mode files, the example and the templates name the new files, and say once where to check every write."""
 
@@ -1265,6 +1322,10 @@ class ModeText(unittest.TestCase):
             self.assertNotIn(word, readme)
         for name in ("architect.json", "findings.jsonl", "conversation.jsonl", "specs.md"):
             self.assertIn(name, readme)
+        self.assertIn("## What checks what", readme)
+        self.assertIn(
+            "a folder that holds only `spec.jsonl` passes `schema.py check` and fails `architect.py check`", readme
+        )
 
 
 class Serving(unittest.TestCase):
