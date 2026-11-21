@@ -351,7 +351,7 @@ class Dashboard(unittest.TestCase):
             (error["file"], error["line"], error["field"], error["by"]), ("tasks.jsonl", 2, "status", "coordinator")
         )
         self.assertIn("must be one of", error["message"])
-        self.assertEqual(data["tasks"][1]["_errors"], [error["message"]])
+        self.assertEqual(data["tasks"][1]["_errors"], [f"{error['field']}: {error['message']}"])
 
     def test_an_unparsed_line_is_an_error_without_an_author(self):
         with tempfile.TemporaryDirectory() as d:

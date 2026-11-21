@@ -457,6 +457,38 @@ test('a verifier shows as a verifier, a builder by its mode', () => {
   assert.match(agentTag({ role: ' Verifier ' }), />verifier</);
 });
 
+// A kept invalid record can hold any type in any field: the page draws what it can and never throws.
+test('a task with a wrongly typed requirements or mode still draws the task list', () => {
+  const rows = html.split("// A task's requirements with their text")[1].split('const taskLabel')[0];
+  const drawCode = html.split('const svg = body =>')[1].split("// The task list's own scroll bar")[0];
+  const el = { hidden: true, textContent: '', html: '' };
+  const OPENTASKS = new Set();
+  const setHTML = (e, h) => { e.html = h; };
+  const { drawTasks } = new Function('esc', 'has', 'D', '$', 'setHTML', 'OPENTASKS', 'MODES', 'ICON',
+    statusCode + ';const reqsOf' + rows.split('const reqsOf')[1] + ';const svg = body =>' + drawCode + '; return {drawTasks};')(
+    realEsc, v => v && v !== 'none', { requirements: { R1: 'text' }, tasks: [], agents: [] }, () => el, setHTML, OPENTASKS,
+    { feature: 'feature' }, { working: '', finished: '', blocked: '' });
+  const bad = { id: 'T2', task: 'x', mode: 5, requirements: 'R1', check: 7, status: 'built', _errors: ['requirements: expected array'] };
+  drawTasks({ tasks: [{ id: 'T1', task: 'ok', mode: 'feature', requirements: ['R1'], status: 'todo' }, bad], agents: [] });
+  assert.match(el.html, /T1/);
+  assert.match(el.html, /T2/);
+  assert.match(el.html, /not valid: requirements: expected array/);
+});
+
+test('a decision that did not validate says so, with its first message', () => {
+  const card = x => ({ e: { x: { id: 'd1', status: 'waiting', asked: 'Which?', at: '2026-11-20T10:00:00Z', ...x } }, replies: [] });
+  const [item] = decisionItem(card({ _errors: ['about.task: dangling: "T9"'] }), {}, true);
+  assert.match(item.html, /class="what invalid">not valid: about\.task: dangling/);
+  const [clean] = decisionItem(card({ _errors: [] }), {}, true);
+  assert.doesNotMatch(clean.html, /not valid/);
+  const [odd] = decisionItem(card({ asked: 5, from: {}, task: [], _errors: ['asked: expected string'] }), {}, true);
+  assert.match(odd.html, /not valid/);
+});
+
+test('an invalid task marked done or merged does not count toward the done total', () => {
+  assert.equal([{ status: 'done' }, { status: 'merged', _errors: ['x'] }, { status: 'merged', _errors: [] }].filter(isDone).length, 2);
+});
+
 // ---------- The errors band: records that did not validate are listed, and the page stays live ----------
 const errorsCode = html.split('// errors:begin')[1].split('// errors:end')[0];
 const realEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
