@@ -11,7 +11,7 @@ metadata:
 IF invoked with a topic as argument, RESEARCH that topic.
 IF invoked without argument, LOOK for an existing research board (step 2) and RESUME from it. IF there is none, USE these instructions to restart the previous research.
 
-Being invoked does NOT mean a full research run is needed. A simple factual question ends after a few searches (step 1), and the research can end with questions it could not answer.
+Being invoked does NOT mean a full research run is needed. A simple factual question ends after a few searches (step 1), and the research can end with questions it could not answer. Every other topic runs every step.
 
 ## Principles
 
@@ -38,6 +38,8 @@ IF the topic still has several possible meanings with this context, EXPLAIN them
 ```
 
 IF the topic is a simple factual question, such as a date, a definition or a current value, USE at most two searches, counting the first ones. WRITE the queries from the question, not from an answer you expect. READ a source page, and ANSWER in one or two sentences from what it says, naming that source. DO NOT add background, notes on precision, or a list of sources. SKIP the remaining steps. IF the sources disagree or do not answer it, it is not a simple question: CONTINUE with the remaining steps.
+
+FOR every topic that is not a simple factual question, FOLLOW every remaining step, however few sources the COLLECTIONs hold. A COLLECTION you could read in a few minutes is not a reason to skip the board, the workers, the verifiers or the check for a missing COLLECTION.
 
 IDENTIFY the user's GOAL: what they must understand, learn, decide, or do with the findings. CHOOSE the stop level from the GOAL: `high` for a quick decision, `medium` by default, `low` for an exhaustive review. The stop level and the stop rules (step 5.5) decide how much research to do. DO NOT ask the user for a budget, a number of searches, or a research size. USE a limit only when the user states one.
 
