@@ -276,25 +276,26 @@ function fillPop() {
     const failed = q.claimsList.filter(c => /^unverified$/i.test(String(c.verified || "").trim())).length;
     const parent = q.parent ? D.byId[q.parent] : null, srcs = new Set(q.claimsList.map(c => c.source)).size;
     const gist = has(q.gist) ? q.gist : has(q.summary) ? q.summary : "";
-    // Three text styles only: the small label line, the title, and body text.
-    html = `<p class="meta"><span class="chip ${cls}">${word}${q.view === "in progress" && has(q.owner) ? " · " + esc(q.owner) : ""}</span>${q.prio ? ` · ${q.prio} priority` : ""} · ${plural(n, "claim")} from ${plural(srcs, "source")}${n ? `, ${ver} verified${failed ? `, ${failed} failed` : ""}` : ""}</p>
-      <h3 dir="auto">${esc(q.label)}</h3>
-      ${gist ? `<p dir="auto">${esc(gist)}</p>` : ""}${parent ? `<p class="muted" dir="auto">Raised by: ${esc(parent.label)}</p>` : ""}
-      <details><summary>Full question and claims</summary><p class="muted" dir="auto">${esc(q.question || "")}</p>
-      ${has(q.summary) && has(q.gist) ? `<p dir="auto">${esc(q.summary)}</p>` : ""}
-      ${q.claimsList.length ? `<ul>${q.claimsList.map(c => { const s = (D.sources.find(x => x.id === c.source) || {});
+    const checked = !n ? "" : ver === n ? ", all verified" : ver || failed ? `, ${ver} verified${failed ? `, ${failed} failed` : ""}` : ", none checked yet";
+    // The header says what it is, its title and the full question; the answer, the claims and the conversation follow.
+    html = `<div class="hd"><p class="kind">Question, <span class="chip ${cls}">${word}</span>${q.view === "in progress" && has(q.owner) ? " by " + esc(q.owner) : ""}${q.prio ? `, ${q.prio} priority` : ""}</p>
+      <h3 dir="auto">${esc(q.label)}</h3>${has(q.question) ? `<p class="full" dir="auto">${esc(q.question)}</p>` : ""}</div>
+      <div class="bd">${has(q.summary) ? `<p dir="auto">${esc(q.summary)}</p>` : gist ? `<p dir="auto">${esc(gist)}</p>` : ""}
+      ${parent ? `<p class="muted" dir="auto">Raised by: ${esc(parent.label)}</p>` : ""}
+      <div class="sec"><h4 class="section-h">${n ? `${plural(n, "claim")} from ${plural(srcs, "source")}${checked}` : "No claims yet"}</h4>
+      ${n ? `<ul class="claims">${q.claimsList.map(c => { const s = (D.sources.find(x => x.id === c.source) || {});
         const v = String(c.verified || "").trim().toLowerCase(), mark = v === "verified" ? "✓" : v === "unverified" ? "✗" : "○";
-        return `<li dir="auto"><span aria-label="${v === "verified" ? "verified" : v === "unverified" ? "failed" : "not checked yet"}">${mark}</span> ${esc(c.claim)} <span class="muted">${esc(s.author || s.publisher || c.source)}${has(s.date) ? ` (${esc(s.date)})` : ""}</span></li>`; }).join("")}</ul>` : ""}</details>
-      <ul class="thread"></ul>`;
+        return `<li dir="auto"><span aria-label="${v === "verified" ? "verified" : v === "unverified" ? "failed" : "not checked yet"}">${mark}</span> ${esc(c.claim)} <span class="muted">${esc(s.author || s.publisher || c.source)}${has(s.date) ? ` (${esc(s.date)})` : ""}</span></li>`; }).join("")}</ul>` : ""}</div>
+      <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>`;
     match = e => e.on && e.on.kind === "question" && e.on.id === id;
   } else if (D.claims.some(c => c.checker === id)) {
     const mine = D.claims.filter(c => c.checker === id), v = x => String(x.verified || "").trim().toLowerCase();
     const holding = mine.filter(c => !["verified", "unverified"].includes(v(c))), failed = mine.filter(c => v(c) === "unverified");
-    html = `<p class="meta"><span class="chip now">checking</span></p><h3>${esc(id)}, verifier</h3>
-      <p>Checked ${plural(mine.length - holding.length, "claim")}: ${mine.filter(c => v(c) === "verified").length} verified, ${failed.length} failed.</p>
-      ${holding.length ? `<h2>Checking now</h2><ul class="searches">${holding.map(c => `<li dir="auto">${esc(c.claim)}</li>`).join("")}</ul>` : ""}
-      ${failed.length ? `<h2>Failed</h2><ul class="searches">${failed.map(c => `<li dir="auto">${esc(c.claim)} <span class="muted">${esc(has(c.reason) ? c.reason : "")}</span></li>`).join("")}</ul>` : ""}
-      <ul class="thread"></ul>`;
+    html = `<div class="hd"><p class="kind">Verifier, <span class="chip now">checking</span></p><h3>${esc(id)}</h3></div>
+      <div class="bd"><p>Checked ${plural(mine.length - holding.length, "claim")}: ${mine.filter(c => v(c) === "verified").length} verified, ${failed.length} failed.</p>
+      ${holding.length ? `<div class="sec"><h4 class="section-h">Checking now</h4><ul>${holding.map(c => `<li dir="auto">${esc(c.claim)}</li>`).join("")}</ul></div>` : ""}
+      ${failed.length ? `<div class="sec"><h4 class="section-h">Failed</h4><ul>${failed.map(c => `<li dir="auto">${esc(c.claim)} <span class="muted">${esc(has(c.reason) ? c.reason : "")}</span></li>`).join("")}</ul></div>` : ""}
+      <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>`;
     match = e => e.on && e.on.kind === "agent" && e.on.id === id;
   } else {
     const log = (D.logs || {})[id] || {}, q = D.byId[(D.qs.find(x => x.view === "in progress" && x.owner === id) || {}).id];
@@ -302,21 +303,20 @@ function fillPop() {
     const counts = new Map();
     (log.searches || []).slice().reverse().forEach(l => { const q = (l.match(/^search "([^"]+)"/) || [])[1]; if (q) counts.set(q, (counts.get(q) || 0) + 1); });
     const s = [...counts].slice(0, 5).map(([q, n]) => n > 1 ? `${q} (${n} times)` : q);
-    html = `<p class="meta"><span class="chip now">working</span></p><h3>${esc(id)}${q ? " on " + esc(q.label) : ""}</h3><h2>Latest searches</h2>
-      <ul class="searches">${s.map(x => `<li dir="auto">${esc(x)}</li>`).join("") || "<li>None logged yet.</li>"}</ul>
-      <ul class="thread"></ul>`;
+    html = `<div class="hd"><p class="kind">Agent, <span class="chip now">working</span></p><h3>${esc(id)}${q ? " on " + esc(q.label) : ""}</h3></div>
+      <div class="bd"><div class="sec"><h4 class="section-h">Latest searches</h4>
+      <ul>${s.map(x => `<li dir="auto">${esc(x)}</li>`).join("") || "<li>None logged yet.</li>"}</ul></div>
+      <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>`;
     match = e => e.on && e.on.kind === "agent" && e.on.id === id;
   }
   const label = kind === "question" ? "Ask or comment on this question" : `Message about ${id}'s work`;
   html = `<button type="button" class="x" aria-label="Close">×</button>` + html + (SNAPSHOT ? "" :
-    `<form class="ask popask"><textarea aria-label="${esc(label)}" placeholder="${esc(label)}"></textarea><button type="submit" class="btn">Send</button></form>`);
+    `<form class="ask popask"><textarea aria-label="${esc(label)}" placeholder="${esc(label)}"></textarea><button type="submit" class="btn">Send</button></form>`) + "</div></div>";
   const mine = conv.nodes(match), key = html + mine.map(n => n.outerHTML).join("");
   if (el._html === key) return;
-  const wasOpen = el.querySelector("details")?.open;
   el.innerHTML = html; el._html = key;
   el.querySelector("ul.thread").append(...mine);
   const h3 = el.querySelector("h3"); if (h3) { h3.id = "pop-title"; h3.setAttribute("tabindex", "-1"); }
-  if (wasOpen) el.querySelector("details")?.setAttribute("open", "");
   const t = el.querySelector("textarea"); if (t) { t.value = typed; if (focused) t.focus({preventScroll: true}); }
   placePop(OPEN && OPEN.anchor);
 }

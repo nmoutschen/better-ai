@@ -85,8 +85,7 @@
 
 /* The pop-up for an agent */
 .qpop { width:min(36rem, calc(100vw - 24px)); }
-.qpop .meta { padding-right:var(--space-group); }
-.qpop .steps { padding-left:var(--space-edge); margin:var(--space-control) 0; }
+.qpop .sec > ul.req-list { padding-left:0; }
 .qpop .steps li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
 
 /* The conversation: the coordinator's decisions and questions */
@@ -202,7 +201,7 @@ function drawTasks(d) {
     return `<li><details data-t="${esc(t.id)}"${open}><summary><span class="n">${esc(t.id)}</span>
       <span class="tstat ${st}">${TICON[st]}${word}</span>${tag}<span class="t" dir="auto">${esc(t.task)}</span>
       ${live.length ? `<span class="on">${esc(live.map(a => a.name).join(", "))}</span>` : ""}</summary>
-      <div class="body">${reqsOf(t).length ? `<ul class="req-list">${reqItems(t)}</ul>` : '<p class="empty">No requirement named.</p>'}
+      <div class="body">${reqsOf(t).length ? `<ul class="req-list">${reqItems(task)}</ul>` : '<p class="empty">No requirement named.</p>'}
       ${has(t.check) ? `<p class="check">Check: <code>${esc(t.check)}</code></p>` : ""}
       ${live.length ? `<p class="agents">${live.map(a => `<button type="button" data-a="${esc(a.name)}">${esc(a.name)}</button>`).join("")}</p>` : ""}</div></details></li>`;
   }).join(""));
@@ -328,14 +327,16 @@ function fillPop() {
   // An agent that handed back leaves the page, its pop-up too.
   const a = D.agents.find(x => x.name === OPEN.id && x.state !== "finished"); if (!a) return closePop();
   const label = `Message about ${a.name}'s work`;
+  const task = taskOf(a), reqs = reqsOf(task).length, check = task && has(task.check);
+  // The header says who and what; then what the agent must make true, its steps, and the conversation about its work.
   const html = `<button type="button" class="x" aria-label="Close">×</button>
-    <p class="meta">${modeTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>
-    <h3 dir="auto">${esc(taskLabel(a))}</h3>
-    ${reqsOf(taskOf(a)).length ? `<ul class="req-list">${reqItems(taskOf(a))}</ul>` : ""}
-    ${taskOf(a) && has(taskOf(a).check) ? `<p class="check">Check: <code>${esc(taskOf(a).check)}</code></p>` : ""}
-    <ol class="steps">${a.lines.map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
-    <ul class="thread"></ul>
-    <form class="ask popask"><textarea aria-label="${esc(label)}" placeholder="${esc(label)}"></textarea><button type="submit" class="btn">Send</button></form>`;
+    <div class="hd"><p class="kind">${modeTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>
+    <h3 dir="auto">${esc(taskLabel(a))}</h3></div>
+    <div class="bd">${reqs || check ? `<div class="sec"><h4 class="section-h">Must make true</h4>${reqs ? `<ul class="req-list">${reqItems(task)}</ul>` : ""}
+    ${check ? `<p class="check">Check: <code>${esc(task.check)}</code></p>` : ""}</div>` : ""}
+    <div class="sec"><h4 class="section-h">Steps so far</h4><ol class="steps">${a.lines.map(l => `<li dir="auto">${esc(words(l))}</li>`).join("") || "<li>None logged yet.</li>"}</ol></div>
+    <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>
+    <form class="ask popask"><textarea aria-label="${esc(label)}" placeholder="${esc(label)}"></textarea><button type="submit" class="btn">Send</button></form></div></div>`;
   const mine = conv.nodes(e => e.on && e.on.kind === "agent" && e.on.id === a.name), key = html + mine.map(n => n.outerHTML).join("");
   if (el._html === key) return;
   el.innerHTML = html; el._html = key;

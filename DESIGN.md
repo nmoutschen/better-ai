@@ -245,7 +245,9 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ### Pop-up
 
-- Use for: details of a question or an agent (`.qpop`, 34rem wide), or a comment box (`.pop`, 22rem, with `.target`, a textarea and a `.row2` of buttons). Cream, a 2px ink border, `--shadow`, square corners.
+- Use for: details of a question or an agent (`.qpop`, 34rem wide), or a comment box (`.pop`, 22rem, with `.target`, a textarea and a `.row2` of buttons). Cream under the n14n band (umber with the saya pattern, 6px), no outline, `--shadow`, square corners.
+- A details pop-up has a header (`.hd`): what it is and its state as a phrase (`.kind`), the title, and the full question (`.full`) when there is one. A hairline separates it from the body (`.bd`): the answer or summary, then sections (`.sec`), each under a section label, the last one the conversation with its message box. Tags keep their own colours in the header, such as a task's mode.
+- The comment box's `.target`, where the comment points, is its header, above a hairline.
 - Name and role: `role="dialog"` with a name (its heading, or `aria-label`); Escape closes it; the close button is `.x`.
 
 ### Decision in the conversation
@@ -292,3 +294,4 @@ None. A conflict between a rule above and a page is listed here until the user d
 - 2026-11-20: spacing and type sizes became tokens (`--space-*`, `--text-*`) in every board. Off-scale values moved to the nearest step: 3px to 4, 5 to 6, 7 to 8, 14 to 16, 18 to 20, 28 to 24, 48 to 40. Type sizes merged: 13px into 14 (`--text-message`), 16 and 18 into 17 (`--text-heading`), 22 into 20 (`--text-title`). On linen, muted text and the progress words use ink, and research-better's "contested" uses `--terracotta-dark`.
 - 2026-11-20: spacing tokens named by role, in seven steps instead of eleven (the user's choice): 2px became 4, 6 became 8, 10 became 12, and 32 became 40.
 - 2026-11-20: type styles became tokens (`--font-*`): each sets weight, size, line height and typeface, and replaces the full shorthand written in each rule. Line heights of the same style were made equal (1.4, 1.45 and 1.5 became the style's one value), and weight 600, which the page never loaded, became 700.
+- 2026-11-21: pop-ups lost the 2px ink border for the n14n band (the user's decision): the outline read heavy against the Journal style. Details pop-ups now open with a header (what, title, full question) and labelled sections; the research board shows a question's claims open, not folded, and states its status as a phrase instead of a dot-joined line.
