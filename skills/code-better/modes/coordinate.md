@@ -60,7 +60,7 @@ ANSWER what builders send you, in plain language, and SAY whether an answer came
 - A gap the design, the spec or the repo answers: ANSWER it yourself.
 - A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed (WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file, and once the user has answered, WRITE the requirement with source `request` holding the user's words.), and RECORD it in `.code/<change>/decisions.jsonl`: READ [../templates/decision.md](../templates/decision.md) and WRITE it in its format.
 - Anything that would change what the user agreed, or that only the user can answer: ASK the user, with everything the builder gave.
-- A blocked task: GIVE what is missing, SPLIT the task, or ASK the user. DO NOT build the task yourself.
+- A blocked task: GIVE what is missing, SPLIT the task (a split task gets a new `T<n>`, never `T5b`), or ASK the user. DO NOT build the task yourself.
 
 EACH time this mode says ASK the user, ALSO RECORD the question in `.code/<change>/decisions.jsonl` with the status `waiting`, so the dashboard shows it. ASK it in the chat too, because the user may not be watching the page. The user answers in either: APPLY the first answer, THEN SET the status to `answered` and SET `answer` to the page's answer event, or to the user's words from the chat.
 
@@ -76,7 +76,7 @@ WHEN a builder hands back:
 - KEEP its assumptions for your hand-back, and ASK the user about any costly one. WRITE each problem it reports as a `problem` in `progress.jsonl`. ADD its proposed next steps to `.code/<change>/next-steps.jsonl`, in the format of [../templates/next-steps.md](../templates/next-steps.md): ADMIT those that stay inside the design, and ASK the user about the rest.
 - WRITE each instruction the user gives on how to work to `.code/<change>/instructions.jsonl`, in the format of [../templates/instructions.md](../templates/instructions.md), with their words.
 
-AFTER each verifier report, WRITE a lesson for each finding that could recur in another task, in `.code/<change>/lessons.jsonl`: READ [../templates/lessons.md](../templates/lessons.md) and WRITE it in its format. WHEN a lesson of that class exists, EXTEND its `found_in` with the task instead of writing a second lesson.
+AFTER each verifier report, WRITE a lesson for each finding that could recur in another task, in `.code/<change>/lessons.jsonl`: READ [../templates/lessons.md](../templates/lessons.md) and WRITE it in its format. WHEN a later finding is of a class a lesson already names, REWRITE that lesson's line in place, keeping `at` and `by`, with the task added to `found_in`; WRITE no second lesson.
 
 WHEN a verifier fails a task, SET it `changes needed`. IF it failed the same task twice for the same finding, SET it `blocked` by `repair limit` and ASK the user; OTHERWISE START the task again with the findings in `tried`. WHEN it passes with unconfirmed blocking findings or parts it could not review, SET the task `blocked` by `user` and ASK the user about them before you merge.
 

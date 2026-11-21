@@ -15,7 +15,7 @@ Usage:
 CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it, in the formats of
 schemas/: code.json (the goal, the design and the mode), spec.jsonl (or the one in the architect folder code.json names),
 tasks.jsonl, decisions.jsonl, and in logs/ one <agent>.card.json with the agent's role, task and branch and the agent's
-log, <agent>.jsonl. progress.jsonl, next-steps.jsonl and instructions.jsonl are checked too, and not shown.
+log, <agent>.jsonl. progress.jsonl, next-steps.jsonl, instructions.jsonl and lessons.jsonl are checked too, and not shown.
 The page shows the agents at work and their latest steps, the tasks with the requirements of the spec, and a
 conversation with the coordinator in which its decisions and its questions to the user appear. The user writes to the
 coordinator, asks about an agent, answers a question or replies to a decision. Each action is a JSON-RPC call from the
@@ -52,7 +52,12 @@ ITEMS = ("comment", "note", "answer")  # what the coordinator tracks with status
 STATES = {"start": "working", "step": "working", "asked": "waiting", "blocked": "blocked", "handed_back": "finished"}
 # Where the spec is: next to the other files, or in the architect folder code.json names.
 SPEC = {"from": "code.json", "field": "design.folder", "name": "spec.jsonl", "else": "spec.jsonl"}
-CHECKED_ONLY = ("progress.jsonl", "next-steps.jsonl", "instructions.jsonl")  # the page does not show them
+CHECKED_ONLY = (
+    "progress.jsonl",
+    "next-steps.jsonl",
+    "instructions.jsonl",
+    "lessons.jsonl",
+)  # the page does not show them
 
 
 def lines_of(text: str, jsonl: bool) -> list:
