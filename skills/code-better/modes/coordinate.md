@@ -58,7 +58,7 @@ WRITE `role` as `builder` or `verifier`, `task` as the task's ID exactly as `tas
 ANSWER what builders send you, in plain language, and SAY whether an answer came from you or from the user:
 
 - A gap the design, the spec or the repo answers: ANSWER it yourself.
-- A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed, and RECORD it in `.code/<change>/decisions.jsonl`: READ [../templates/decision.md](../templates/decision.md) and WRITE it in its format.
+- A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed (WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `decisions.jsonl`: RECORD the question there, and once the user has answered, WRITE the requirement with source `request` holding the user's words.), and RECORD it in `.code/<change>/decisions.jsonl`: READ [../templates/decision.md](../templates/decision.md) and WRITE it in its format.
 - Anything that would change what the user agreed, or that only the user can answer: ASK the user, with everything the builder gave.
 - A blocked task: GIVE what is missing, SPLIT the task, or ASK the user. DO NOT build the task yourself.
 

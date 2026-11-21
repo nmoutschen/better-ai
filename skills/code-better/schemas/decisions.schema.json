@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "decisions.schema.json",
   "title": "one line of decisions.jsonl: a decision or a question to the user, with its state",
-  "$comment": "Only the coordinator writes it. The user's answer from the page is pointed to, not copied.",
+  "$comment": "In coordinate mode only the coordinator writes it; otherwise the agent does. The user's answer from the page is pointed to, not copied.",
   "x-files": [
     "decisions.jsonl"
   ],
