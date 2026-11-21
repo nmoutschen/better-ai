@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, suppress
 from pathlib import Path
 from unittest import mock
 
@@ -635,11 +635,9 @@ class WrongTypes(unittest.TestCase):
                         with (
                             mock.patch.object(sys, "argv", ["dashboard.py", "check", str(folder)]),
                             redirect_stdout(out),
+                            suppress(SystemExit),
                         ):
-                            try:
-                                dashboard.main()
-                            except SystemExit:
-                                pass
+                            dashboard.main()
                         payloads.append({"label": name, "data": data})
                 write(folder, relative, records, as_json)
             self.assertGreater(len(payloads), 300)

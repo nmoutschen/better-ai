@@ -206,7 +206,7 @@ const taskOf = a => a.task ? (D.tasks || []).find(t => t.id === a.task) : undefi
 // A task's requirements with their text from the spec; an ID the spec does not hold shows as missing, not hidden.
 const reqsOf = t => { const r = (t || {}).requirements; return (Array.isArray(r) ? r : []).map(id => [String(id), (D.requirements || {})[id]]); };
 const reqItems = t => reqsOf(t).map(([id, text]) => `<li dir="auto"><b>${esc(id)}</b>${text ? esc(text) : '<span class="missing">not in the spec</span>'}</li>`).join("");
-const taskLabel = a => { const t = taskOf(a); return t ? `${t.id}: ${t.task}` : a.task ? `Task ${a.task}` : "No task named"; };
+const taskLabel = a => { const t = taskOf(a); return t ? `${t.id}: ${t.task ?? ""}` : a.task ? `Task ${a.task}` : "No task named"; };
 
 // errors:begin
 // The records that did not validate, as a band above the work: where each is, its field, why, and who wrote it. A file

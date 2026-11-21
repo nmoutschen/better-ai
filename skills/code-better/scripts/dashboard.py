@@ -104,18 +104,25 @@ class Reader:
             except ValueError:
                 continue
             parsed[number] = value if isinstance(value, dict) else None
-        messages: dict = {}
+        by_line: dict = {}
         for error in found:
             record = parsed.get(error.line)
             by = record.get("by") if record else None
             entry = {"file": name, "line": error.line, "field": error.field, "message": error.message}
             self.errors.append({**entry, "by": by} if isinstance(by, str) and by else entry)
-            messages.setdefault(error.line, []).append(f"{error.field}: {error.message}")
+            by_line.setdefault(error.line, []).append(error)
         kept = []
         for number, record in parsed.items():
-            if record is None or (number in messages and not keep_invalid):
+            if record is None or (number in by_line and not keep_invalid):
                 continue
-            kept.append({**record, "_errors": messages[number]} if number in messages else record)
+            if number in by_line:
+                status = record.get("status")
+                record = schema.strip_invalid(record, by_line[number])
+                if isinstance(status, str):
+                    record["status"] = status  # only text on the page, so a status that failed shows as written
+                if not isinstance(record.get("id"), str) or not record["id"]:
+                    record["id"] = f"(line {number})"
+            kept.append(record)
         return kept
 
     def spec_records(self) -> list:

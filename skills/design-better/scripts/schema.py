@@ -8,7 +8,8 @@ and the exit code is 1 if there is any error and 0 if there is none. A JSONL fil
 is checked line by line, a JSON file as one record; `<line>` is 1 for a JSON file. The page's own scripts call
 `check_paths` instead of keeping checks of their own; a script keeps only checks that need its own knowledge, such as
 whether a slide can be drawn. A script that writes one record at a time, as page.py does for an event, calls
-`check_record` with the names of the schemas the record must meet before it writes the record.
+`check_record` with the names of the schemas the record must meet before it writes the record. A page that still shows a
+record that failed its checks calls `strip_invalid`, which drops the fields the errors name.
 
 Each skill carries an identical copy of this file in `scripts/`, with `schemas/base.schema.json` next to it in
 `schemas/`, as it does page.py; the Scripts workflow fails if the copies differ. Standard library only.
@@ -58,6 +59,7 @@ a name no hook has is an error in the schema.
 from __future__ import annotations
 
 import argparse
+import copy
 import fnmatch
 import json
 import os
@@ -713,6 +715,17 @@ def check_text(path: Path, text: str, docs: dict[str, dict], cache: dict[str, An
                     Error(where, number, "id", f'must equal the file name "{path.name.removesuffix(".json")}"')
                 )
     return errors
+
+
+def strip_invalid(record: dict, errors: list[Error]) -> dict:
+    """A copy of a record that failed its checks, for a page that still shows it: without each top-level field the
+    errors name (`answer.event` and `requirements[0]` name `answer` and `requirements`), so what is left is well typed
+    or missing. `errors` are the record's own; the copy lists them in `_errors` as `field: message`."""
+    names = {re.match(r"[^.\[]*", error.field).group(0) for error in errors}
+    stripped = {key: copy.deepcopy(value) for key, value in record.items() if key not in names}
+    if errors:
+        stripped["_errors"] = [f"{error.field}: {error.message}" for error in errors]
+    return stripped
 
 
 def check_record(record: Any, names: list[str], schemas: Path | None = None) -> list[tuple[str, str]]:
