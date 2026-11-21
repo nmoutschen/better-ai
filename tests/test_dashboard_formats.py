@@ -360,6 +360,21 @@ class Dashboard(unittest.TestCase):
         self.assertIn("must be one of", error["message"])
         self.assertEqual(data["tasks"][1]["_errors"], [f"{error['field']}: {error['message']}"])
 
+    def test_an_invalid_lessons_file_is_listed_by_load_and_by_check(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            write(folder, "lessons.jsonl", [{"type": "lesson", "at": AT, "by": "coordinator", "id": "L1"}])
+            errors = dashboard.load(folder)["errors"]
+            self.assertTrue(errors)
+            self.assertEqual({e["file"] for e in errors}, {"lessons.jsonl"})
+            done = subprocess.run(
+                [sys.executable, "-I", str(SCRIPTS / "dashboard.py"), "check", str(folder)],
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("lessons.jsonl", done.stdout)
+
     def test_an_unparsed_line_is_an_error_without_an_author(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
