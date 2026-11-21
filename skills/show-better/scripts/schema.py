@@ -338,8 +338,18 @@ def _condition(schema: dict) -> str:
             continue
         described.add(name)
     parts += [f"{name} is present" for name in schema.get("required", []) if name not in described]
-    absent = _required_only(schema["not"]) if isinstance(schema.get("not"), dict) else None
-    parts += [f"{name} is absent" for name in absent or []]
+    excluded = schema.get("not")
+    if (
+        isinstance(excluded, dict)
+        and isinstance(excluded.get("required"), list)
+        and set(excluded) <= {"required", "properties"}
+    ):
+        for name in excluded["required"]:
+            empty = (
+                isinstance(excluded.get("properties", {}).get(name), dict)
+                and "minItems" in excluded["properties"][name]
+            )
+            parts.append(f"{name} is absent or empty" if empty else f"{name} is absent")
     return " and ".join(parts) or "its condition holds"
 
 
@@ -916,7 +926,10 @@ def strip_invalid(record: dict, errors: list[Error]) -> dict:
     errors name (`answer.event` and `requirements[0]` name `answer` and `requirements`), so what is left is well typed
     or missing. `errors` are the record's own; the copy lists them in `_errors` as `field: message`."""
     names = {re.match(r"[^.\[]*", error.field).group(0) for error in errors}
-    stripped = {key: copy.deepcopy(value) for key, value in record.items() if key not in names}
+    try:
+        stripped = {key: copy.deepcopy(value) for key, value in record.items() if key not in names}
+    except RecursionError:  # too deeply nested to copy: the page shows it marked, with its errors and a plain id
+        stripped = {"id": record["id"]} if isinstance(record.get("id"), str) else {}
     if errors:
         stripped["_errors"] = [f"{error.field}: {error.message}" for error in errors]
     return stripped
