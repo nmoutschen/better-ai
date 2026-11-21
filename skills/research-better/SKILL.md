@@ -181,7 +181,7 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
    - IF the claim and the span disagree, or the claim is marked `hard`, CHECK that the span states each number and condition in the claim. OPEN the page only if the span is not enough to decide.
    - CORRECT source fields that a verifier found differ from the page.
 3. **Resolve conflicts**: FIND claims that contradict each other. ADD a question that targets the disagreement, such as which method, population, or date explains it, kind `conflict`.
-4. **Merge duplicates**: MERGE duplicate claims and sources, and DELETE the copies. MERGE duplicate questions as in step 1.
+4. **Merge duplicates**: MERGE duplicate claims and sources, and DELETE the copies. MERGE duplicate questions as in item 1.
 5. **Close obsolete questions**: CLOSE open questions that new findings made irrelevant, as out of scope, and RECORD why.
 6. **Rewrite unclear questions**: REWRITE questions with the status unclear, and REOPEN them.
 7. **Reprioritize** as findings change what matters for the GOAL.
