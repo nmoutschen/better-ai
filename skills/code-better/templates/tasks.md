@@ -12,9 +12,9 @@
 Design: <path or link>
 Spec: <path or link>
 
-| # | Task | Mode | Requirements | Check that tells done from not done | Status |
-|---|---|---|---|---|---|
-| <n> | <one task> | <feature / bug fix / refactor / tests> | <requirement IDs from the spec, separated by commas, nothing else> | <test or command specific to this task: fails before, passes after> | <todo / done / blocked> |
+| # | Task | Mode | Requirements | Check that tells done from not done | Status | Blocked by |
+|---|---|---|---|---|---|---|
+| <n> | <one task> | <feature / bug fix / refactor / tests> | <requirement IDs from the spec, separated by commas, nothing else> | <test or command specific to this task: fails before, passes after> | <todo / done / blocked; in coordinate mode, a status from modes/coordinate.md> | <when blocked: the # of the task it waits on, `user`, or `repair limit`; otherwise empty> |
 
 ## Progress notes
 
