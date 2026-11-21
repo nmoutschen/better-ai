@@ -386,12 +386,15 @@ test('element selectors use the nearest document-unique id in a page or slide', 
   assert.deepEqual(escaped, ['name', 'anchor']);
 });
 
-// The dashboard's task status and agent tag: read out of dashboard.html between `// status:begin` and `// status:end`.
+// The dashboard's task status and agent tag, on the JSON the dashboard now reads: read out of dashboard.html between `// status:begin` and `// status:end`.
 const statusCode = html.split('// status:begin')[1].split('// status:end')[0];
 const { taskStatus, agentTag, agentClass, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, agentTag, agentClass, DONE, isDone};')(s => String(s));
-const shown = (status, blocked_by, tasks) => { const s = taskStatus({ status, blocked_by }, tasks || [{ id: 'T2' }]); return [s.key, s.word]; };
+// A task record is tasks.jsonl's: a blocked task names `reason` (task, user or repair limit) and, for task, `waits_on`.
+const blockedFields = by => by === undefined || by === '' ? {} : by === 'user' || by === 'repair limit' ? { reason: by }
+  : /^T\d+$/.test(by) ? { reason: 'task', waits_on: by } : { reason: by };
+const shown = (status, blocked_by, tasks) => { const s = taskStatus({ status, ...blockedFields(blocked_by) }, tasks || [{ id: 'T2' }]); return [s.key, s.word]; };
 
-test("a task shows the status tasks.md gives it, each of the coordinate mode's stages with its own icon", () => {
+test("a task shows the status tasks.jsonl gives it, each of the coordinate mode's stages with its own icon", () => {
   assert.deepEqual(shown('todo'), ['todo', 'to do']);
   assert.deepEqual(shown('building'), ['building', 'building']);
   assert.deepEqual(shown('built'), ['built', 'built']);
@@ -405,7 +408,7 @@ test("a task shows the status tasks.md gives it, each of the coordinate mode's s
   assert.equal(new Set(keys).size, keys.length);
 });
 
-test('a blocked task says what it waits on, from the Blocked by column only', () => {
+test('a blocked task says what it waits on, from its reason and waits_on only', () => {
   assert.deepEqual(shown('blocked', 'T2'), ['blocked', 'waiting on T2']);
   assert.deepEqual(shown('blocked', 'user'), ['blocked', 'waiting on you']);
   assert.deepEqual(shown('blocked', 'repair limit'), ['blocked', 'repair limit']);
@@ -419,7 +422,7 @@ test('a blocked task says what it waits on, from the Blocked by column only', ()
 test('a status or a blocked reason with markup shows as text, never as HTML', () => {
   const realEsc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const { statusLabel } = new Function('esc', statusCode + '; return {statusLabel};')(realEsc);
-  assert.doesNotMatch(statusLabel({ status: 'blocked', blocked_by: '<img src=x onerror=alert(1)>' }, []), /<img/);
+  assert.doesNotMatch(statusLabel({ status: 'blocked', reason: '<img src=x onerror=alert(1)>' }, []), /<img/);
   assert.match(statusLabel({ status: '<b>x</b>' }, []), /&lt;b&gt;x&lt;\/b&gt;/);
 });
 
@@ -444,6 +447,63 @@ test('a verifier shows as a verifier, a builder by its mode', () => {
   assert.equal(agentClass(b), 'm-bugfix');
   assert.equal(agentClass(n), 'm-feature');  // no role: shown as a builder
   assert.match(agentTag({ role: ' Verifier ' }), />verifier</);
+});
+
+// ---------- The errors band: records that did not validate are listed, and the page stays live ----------
+const errorsCode = html.split('// errors:begin')[1].split('// errors:end')[0];
+const realEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const { errorsHTML } = new Function('esc', errorsCode + '; return {errorsHTML};')(realEsc);
+const badRecords = [
+  { file: 'tasks.jsonl', line: 2, field: 'status', message: 'must be one of "todo", "building"', by: 'coordinator' },
+  { file: 'logs/b1.jsonl', line: 7, field: 'result', message: 'required when type is "handed_back"' },
+];
+
+test('the errors band lists each invalid record with its file and line, its field, the reason and who wrote it', () => {
+  const band = errorsHTML(badRecords);
+  assert.match(band, /2 records are not valid/);
+  assert.match(band, /tasks\.jsonl:2/);
+  assert.match(band, /status/);
+  assert.match(band, /must be one of &quot;todo&quot;, &quot;building&quot;/);
+  assert.match(band, /coordinator/);
+  assert.match(band, /logs\/b1\.jsonl:7/);
+  assert.match(errorsHTML([badRecords[0]]), /1 record is not valid/);
+  assert.equal(errorsHTML([]), '');
+  assert.equal(errorsHTML(undefined), '');
+});
+
+test('markup in an invalid record shows as text in the errors band', () => {
+  const band = errorsHTML([{ file: '<b>f</b>', line: 1, field: '<img src=x>', message: '<script>x</script>', by: '<i>' }]);
+  assert.doesNotMatch(band, /<b>|<img|<script|<i>/);
+});
+
+// tick() is read out of dashboard.html between `// load:begin` and `// load:end`, with stubs for what a page has.
+const loadCode = html.split('// load:begin')[1].split('// load:end')[0];
+function pageWith(answer) {
+  const els = {};
+  const el = id => els[id] || (els[id] = { hidden: true, textContent: '', id });
+  const drawn = [];
+  const body = new Function('fetch', '$', 'render', 'unwatched', loadCode + '; return {tick, state: () => ({ fails, CLOSED_PAGE })};')(
+    () => answer(), el, d => drawn.push(d), () => {});
+  return { ...body, el, drawn };
+}
+const served = data => () => Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
+
+test('a folder with invalid records is not a closed dashboard: the page renders what is valid and the closed notice stays hidden', async () => {
+  const page = pageWith(served({ tasks: [{ id: 'T1' }], agents: [], errors: badRecords, now: 1 }));
+  await page.tick();
+  await page.tick();
+  assert.equal(page.el('offline').hidden, true);
+  assert.equal(page.state().CLOSED_PAGE, false);
+  assert.equal(page.drawn.length, 2);
+  assert.equal(page.drawn[0].errors.length, 2);
+});
+
+test('the closed notice shows when the server cannot be reached', async () => {
+  const page = pageWith(() => Promise.reject(new Error('down')));
+  await page.tick();
+  assert.equal(page.el('offline').hidden, true);  // once is a blip
+  await page.tick();
+  assert.equal(page.el('offline').hidden, false);
 });
 
 // ---------- Sending: what the user sees when the server refuses an event, as against when it cannot be reached ----------
