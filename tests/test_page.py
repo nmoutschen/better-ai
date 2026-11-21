@@ -445,7 +445,7 @@ class Dashboard(unittest.TestCase):
             path.write_text(
                 "# Tasks: Late orders\n\n"
                 "| # | Task | Mode | Requirements | Check | Status | Blocked by |\n|---|---|---|---|---|---|---|\n"
-                "| T1 | Order query | feature | R1 | t1 | changes needed | |\n"
+                "| T1 | Order query | feature | R1 | t1 | Changes needed | |\n"
                 "| T2 | Orders page | feature | R2 | t2 | blocked | T1 |\n"
                 "| T3 | Export | feature | R3 | t3 | blocked | repair limit |\n"
             )
@@ -454,7 +454,7 @@ class Dashboard(unittest.TestCase):
             old = dashboard.read_tasks(path)[1]
         self.assertEqual(
             [(t["id"], t["status"], t["blocked_by"]) for t in tasks],
-            [("T1", "changes needed", ""), ("T2", "blocked", "T1"), ("T3", "blocked", "repair limit")],
+            [("T1", "Changes needed", ""), ("T2", "blocked", "T1"), ("T3", "blocked", "repair limit")],
         )
         self.assertEqual((old[0]["status"], old[0]["blocked_by"]), ("blocked", ""))
 

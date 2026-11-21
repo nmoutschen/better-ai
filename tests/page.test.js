@@ -430,6 +430,8 @@ test('a status or a blocked reason with markup shows as text, never as HTML', ()
 
 test('an unknown status shows as an error, with the status as written', () => {
   assert.deepEqual(shown('in review'), ['other', 'not a status: in review']);
+  assert.deepEqual(shown('In Review'), ['other', 'not a status: In Review']);  // as written, casing kept
+  assert.deepEqual(shown('Merged'), ['merged', 'merged']);
   assert.deepEqual(shown(''), ['other', 'no status']);
 });
 
