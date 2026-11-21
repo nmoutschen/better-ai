@@ -581,8 +581,12 @@ def _is_num(value: Any) -> bool:
 def _show_overview_labels(panel: dict) -> list:
     """The labels a later panel's `focus` may name: those of the overview panel's steps, events, nodes or groups."""
 
+    def listed(key: str) -> list:
+        found = panel.get(key)
+        return found if isinstance(found, list) else []
+
     def labels(key: str) -> list:
-        return [x.get("label") for x in panel.get(key) or [] if isinstance(x, dict)]
+        return [x.get("label") for x in listed(key) if isinstance(x, dict)]
 
     kind = panel.get("kind")
     if kind == "flow":
@@ -592,9 +596,10 @@ def _show_overview_labels(panel: dict) -> list:
     if kind == "concept":
         return labels("nodes")
     found = []
-    for group in panel.get("groups") or []:
+    for group in listed("groups"):
         if isinstance(group, dict):
-            found += [group.get("label"), *map(str, group.get("items") or [])]
+            inside = group.get("items")
+            found += [group.get("label"), *map(str, inside if isinstance(inside, list) else [])]
     return found
 
 
@@ -610,16 +615,16 @@ def _show_visual(v: dict, where: str, document_sections: Any) -> list[tuple[str,
     if kind == "map" and not (v.get("sections") or document_sections):
         problems.append((f"{where}.sections", "a map needs 'sections', or a top-level 'document' with 'sections'"))
     if kind == "concept":
-        ids = {n.get("id") for n in items("nodes") if isinstance(n, dict)}
+        ids = {n["id"] for n in items("nodes") if isinstance(n, dict) and isinstance(n.get("id"), str)}
         for j, edge in enumerate(items("edges")):
             for end in ("from", "to"):
-                if isinstance(edge, dict) and edge.get(end) not in ids:
+                if isinstance(edge, dict) and isinstance(edge.get(end), str) and edge[end] not in ids:
                     problems.append((f"{where}.edges[{j}].{end}", "names no node id of 'nodes'"))
     if kind == "sets":
         names = {n for n in items("sets") if isinstance(n, str)}
         for j, region in enumerate(items("regions")):
             ins = region.get("in") if isinstance(region, dict) else None
-            if isinstance(ins, list) and not all(n in names for n in ins):
+            if isinstance(ins, list) and not all(n in names for n in ins if isinstance(n, str)):
                 problems.append((f"{where}.regions[{j}].in", "names a set that 'sets' does not list"))
     if kind == "lanes":
         actors = {a for a in items("actors") if isinstance(a, str)}
@@ -636,12 +641,13 @@ def _show_visual(v: dict, where: str, document_sections: Any) -> list[tuple[str,
     if kind == "tree" and isinstance(v.get("root"), dict):
 
         def walk(node: dict, path: str) -> None:
-            kids = [k for k in node.get("children") or [] if isinstance(k, dict)]
+            children = node.get("children") if isinstance(node.get("children"), list) else []
+            kids = [k for k in children if isinstance(k, dict)]
             if kids and _is_num(node.get("value")) and all(_is_num(k.get("value")) for k in kids):
                 total = sum(k["value"] for k in kids)
                 if abs(total - node["value"]) > 1e-9 * max(1, abs(node["value"])) and total > node["value"]:
                     problems.append((path, f"its children sum to {total:g}, more than its value {node['value']:g}"))
-            for j, kid in enumerate(node.get("children") or []):
+            for j, kid in enumerate(children):
                 if isinstance(kid, dict):
                     walk(kid, f"{path}.children[{j}]")
 
@@ -664,7 +670,7 @@ def _show_spec(record: dict, context: Context) -> list[tuple[str, str]]:
         if not isinstance(panel, dict):
             continue
         at = f"panels[{i}]"
-        template = panel.get("template", "visual")
+        template = panel.get("template") or "visual"
         if template == "visual":
             problems += _show_visual(panel, at, sections)
         elif template == "compare":

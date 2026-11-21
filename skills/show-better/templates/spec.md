@@ -37,7 +37,7 @@ The page shows the opening slide, then one slide per panel. Slide N is panel N â
 }
 ```
 
-`type` is always `"slides"`. `at` and `by`, when the agent writes them, are the time in UTC with Z and the agent's name; they are optional.
+A field that is optional may be `null`, which means the same as leaving it out. `type` is always `"slides"`. `at` and `by`, when the agent writes them, are the time in UTC with Z and the agent's name; they are optional.
 
 `style` is optional: the project's look for the slides and their drawings. Its keys are `background`, `tint` (fills, detail boxes), `ink` (lines, text), `heading`, `muted`, `line` (rules), `point` (the highlight), `serif` (headlines) and `sans` (labels). Colours are CSS colours, such as `#1C1A17` or `rgb(28, 26, 23)`; fonts are font stacks, such as `"'Inter', sans-serif"`. The page around the slides keeps its own look.
 

@@ -405,6 +405,16 @@ def table_lines(header, rows, W, g, right=frozenset(), hl=frozenset()):
 # ---------- validation ----------
 
 
+def without_nulls(value):
+    """The value with each object field that holds null left out: an optional field set to null means the same as one
+    that is not there. A null inside a list, such as an empty cell, stays."""
+    if isinstance(value, dict):
+        return {k: without_nulls(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [without_nulls(v) for v in value]
+    return value
+
+
 def shape_errors(spec) -> list[str]:
     """What schema.py finds wrong with the spec's shape, one line each, the field first."""
     found = []
@@ -415,12 +425,15 @@ def shape_errors(spec) -> list[str]:
                 f"'{old[1]}' is no longer used: move it into 'source', the one line at the foot of each slide "
                 "that says what the slide rests on and where to read it"
             )
+        if field == "type" and message == "required":  # a spec from before `type` existed
+            message = 'add "type": "slides" at the top of the spec'
         found.append(f"{field}: {message}")
     return found
 
 
 def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
     """Return (errors, warnings, digest lines). The shape is schema.py's; the rest needs the rendering's knowledge."""
+    spec = without_nulls(spec)
     errors, warnings, digest = shape_errors(spec), [], []
     if errors:
         return errors, warnings, digest
@@ -2028,10 +2041,6 @@ def check_bars(p, where, errors, warnings, digest):
     unit = p.get("unit", "")
     for it in items:
         v = it["value"]
-        if v < 0:
-            errors.append(
-                f"{where}: bar '{it.get('label')}' is negative; bars start at zero, so use a table or an 'svg' panel"
-            )
         digest.append(
             f"    {it.get('label')}: {num(v)}{(' ' + unit) if unit else ''}{'  [highlight]' if it.get('highlight') else ''}"
         )
@@ -3771,6 +3780,7 @@ def render_command(args) -> None:
         spec = json.loads(Path(args.spec).expanduser().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         sys.exit(f"error: cannot read {args.spec}: {exc}")
+    spec = without_nulls(spec)
     errors, warnings, digest = check(spec)
     for w in warnings:
         print(f"warning: {w}", file=sys.stderr)

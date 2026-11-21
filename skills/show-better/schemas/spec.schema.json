@@ -9,13 +9,13 @@
   "required": ["type", "title", "panels"],
   "properties": {
     "type": {"const": "slides"},
-    "at": {"$ref": "base.schema.json#/$defs/at"},
-    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "at": {"anyOf": [{"$ref": "base.schema.json#/$defs/at"}, {"type": "null"}]},
+    "by": {"anyOf": [{"$ref": "base.schema.json#/$defs/by"}, {"type": "null"}]},
     "title": {"$ref": "#/$defs/text"},
-    "question": {"type": "string"},
-    "summary": {"type": "string"},
-    "source": {"type": "string"},
-    "lang": {"type": "string"},
+    "question": {"type": ["string", "null"]},
+    "summary": {"type": ["string", "null"]},
+    "source": {"type": ["string", "null"]},
+    "lang": {"type": ["string", "null"]},
     "document": {"$ref": "#/$defs/document"},
     "style": {"$ref": "#/$defs/style"},
     "panels": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/panel"}}
@@ -24,11 +24,11 @@
     "text": {"type": "string", "minLength": 1},
     "detail": {
       "description": "what opens under a visual when its label or mark is clicked",
-      "type": "object",
+      "type": ["object", "null"],
       "required": ["text"],
       "properties": {
         "text": {"$ref": "#/$defs/text"},
-        "source": {"type": "string"},
+        "source": {"type": ["string", "null"]},
         "evidence": {"enum": ["strong", "moderate", "weak", "stated", null]}
       }
     },
@@ -36,6 +36,7 @@
       "description": "what the slide's claim rests on: a sentence, or a sentence with the section of the document to read",
       "anyOf": [
         {"type": "string"},
+        {"type": "null"},
         {
           "type": "object",
           "anyOf": [
@@ -51,9 +52,9 @@
       "required": ["title"],
       "properties": {
         "title": {"$ref": "#/$defs/text"},
-        "address": {"type": "string", "pattern": "^https?://\\S+$"},
+        "address": {"type": ["string", "null"], "pattern": "^https?://\\S+$"},
         "sections": {
-          "type": "array",
+          "type": ["array", "null"],
           "minItems": 1,
           "items": {
             "type": "object",
@@ -61,7 +62,7 @@
             "properties": {
               "id": {"type": ["string", "number"], "minLength": 1},
               "label": {"$ref": "#/$defs/text"},
-              "gist": {"type": "string"}
+              "gist": {"type": ["string", "null"]}
             }
           }
         }
@@ -73,35 +74,35 @@
       "additionalProperties": false,
       "properties": {
         "background": {
-          "type": "string",
+          "type": ["string", "null"],
           "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
         },
         "tint": {
-          "type": "string",
+          "type": ["string", "null"],
           "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
         },
         "ink": {
-          "type": "string",
+          "type": ["string", "null"],
           "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
         },
         "heading": {
-          "type": "string",
+          "type": ["string", "null"],
           "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
         },
         "muted": {
-          "type": "string",
+          "type": ["string", "null"],
           "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
         },
         "line": {
-          "type": "string",
+          "type": ["string", "null"],
           "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
         },
         "point": {
-          "type": "string",
+          "type": ["string", "null"],
           "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|rgba|hsl|hsla)\\([0-9.,%\\s/]+\\))\\s*$"
         },
-        "serif": {"type": "string", "pattern": "^[A-Za-z0-9 ,'\\\"-]+$"},
-        "sans": {"type": "string", "pattern": "^[A-Za-z0-9 ,'\\\"-]+$"}
+        "serif": {"type": ["string", "null"], "pattern": "^[A-Za-z0-9 ,'\\\"-]+$"},
+        "sans": {"type": ["string", "null"], "pattern": "^[A-Za-z0-9 ,'\\\"-]+$"}
       }
     },
     "visual": {
@@ -358,14 +359,18 @@
     "statement": {
       "type": "object",
       "required": ["figure", "sentence"],
-      "properties": {"figure": {"$ref": "#/$defs/text"}, "sentence": {"$ref": "#/$defs/text"}, "compare": {"type": "string"}}
+      "properties": {
+        "figure": {"$ref": "#/$defs/text"},
+        "sentence": {"$ref": "#/$defs/text"},
+        "compare": {"type": ["string", "null"]}
+      }
     },
     "title": {
       "type": "object",
       "properties": {
-        "body": {"type": "string"},
+        "body": {"type": ["string", "null"]},
         "actions": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "type": "object",
             "required": ["text", "panel"],
@@ -378,12 +383,12 @@
       "type": "object",
       "required": ["headline"],
       "properties": {
-        "template": {"enum": ["visual", "compare", "statement", "title"]},
+        "template": {"enum": ["visual", "compare", "statement", "title", null]},
         "part": {"type": ["string", "null"]},
         "headline": {"type": "string", "pattern": "\\S"},
         "source": {"$ref": "#/$defs/source"},
-        "overview": {"type": "boolean"},
-        "focus": {"type": ["string", "array"], "items": {"type": "string"}}
+        "overview": {"type": ["boolean", "null"]},
+        "focus": {"type": ["string", "array", "null"], "items": {"type": "string"}}
       },
       "not": {"anyOf": [{"required": ["note"]}, {"required": ["read"]}]},
       "allOf": [
@@ -401,6 +406,10 @@
         },
         {"if": {"not": {"required": ["template"]}}, "then": {"$ref": "#/$defs/visual"}},
         {
+          "if": {"required": ["template"], "properties": {"template": {"const": null}}},
+          "then": {"$ref": "#/$defs/visual"}
+        },
+        {
           "if": {"required": ["template"], "properties": {"template": {"const": "visual"}}},
           "then": {"$ref": "#/$defs/visual"}
         },
@@ -413,13 +422,19 @@
         }
       ]
     },
+    "childnode": {
+      "description": "a part of the tree: a leaf has its value, a node with children may take the sum of them",
+      "allOf": [{"$ref": "#/$defs/treenode"}],
+      "if": {"not": {"required": ["children"]}},
+      "then": {"required": ["value"], "properties": {"value": {"type": "number"}}}
+    },
     "treenode": {
       "type": "object",
       "required": ["label"],
       "properties": {
         "label": {"$ref": "#/$defs/text"},
-        "value": {"type": "number"},
-        "children": {"type": "array", "items": {"$ref": "#/$defs/treenode"}},
+        "value": {"type": ["number", "null"]},
+        "children": {"type": ["array", "null"], "items": {"$ref": "#/$defs/childnode"}},
         "detail": {"$ref": "#/$defs/detail"}
       }
     },
@@ -427,19 +442,19 @@
       "type": "object",
       "properties": {
         "sections": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "type": "object",
             "required": ["label"],
             "properties": {
-              "id": {"type": ["string", "number"], "minLength": 1},
+              "id": {"type": ["string", "number", "null"], "minLength": 1},
               "label": {"$ref": "#/$defs/text"},
-              "gist": {"type": "string"},
+              "gist": {"type": ["string", "null"]},
               "detail": {"$ref": "#/$defs/detail"}
             }
           }
         },
-        "highlight": {"type": ["array", "string"]}
+        "highlight": {"type": ["array", "string", "null"]}
       }
     },
     "kind_concept": {
@@ -482,7 +497,11 @@
           "items": {
             "type": "object",
             "required": ["label"],
-            "properties": {"label": {"$ref": "#/$defs/text"}, "note": {"type": "string"}, "detail": {"$ref": "#/$defs/detail"}}
+            "properties": {
+              "label": {"$ref": "#/$defs/text"},
+              "note": {"type": ["string", "null"]},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
           }
         }
       }
@@ -496,7 +515,8 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "properties": {"label": {"type": "string"}, "items": {"type": "array"}, "detail": {"$ref": "#/$defs/detail"}}
+            "required": ["label"],
+            "properties": {"label": {"type": "string"}, "items": {"type": ["array", "null"]}, "detail": {"$ref": "#/$defs/detail"}}
           }
         }
       }
@@ -504,7 +524,7 @@
     "kind_tree": {
       "type": "object",
       "required": ["root"],
-      "properties": {"unit": {"type": "string"}, "root": {"$ref": "#/$defs/treenode"}}
+      "properties": {"unit": {"type": ["string", "null"]}, "root": {"$ref": "#/$defs/treenode"}}
     },
     "kind_sets": {
       "type": "object",
@@ -519,11 +539,14 @@
             "required": ["in"],
             "properties": {
               "in": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-              "label": {"type": "string"},
-              "count": {"type": "number"},
+              "label": {"type": ["string", "null"]},
+              "count": {"type": ["number", "null"]},
               "detail": {"$ref": "#/$defs/detail"}
             },
-            "anyOf": [{"required": ["label"], "properties": {"label": {"$ref": "#/$defs/text"}}}, {"required": ["count"]}]
+            "anyOf": [
+              {"required": ["label"], "properties": {"label": {"$ref": "#/$defs/text"}}},
+              {"required": ["count"], "properties": {"count": {"type": "number"}}}
+            ]
           }
         }
       }
@@ -541,7 +564,7 @@
             "required": ["label", "cells"],
             "properties": {
               "label": {"$ref": "#/$defs/text"},
-              "group": {"type": "string"},
+              "group": {"type": ["string", "null"]},
               "cells": {
                 "type": "array",
                 "items": {
@@ -571,8 +594,8 @@
             "properties": {
               "label": {"$ref": "#/$defs/text"},
               "effect": {"enum": ["up", "down", "same"]},
-              "group": {"type": "string"},
-              "outcome": {"type": "string"},
+              "group": {"type": ["string", "null"]},
+              "outcome": {"type": ["string", "null"]},
               "detail": {"$ref": "#/$defs/detail"}
             }
           }
@@ -619,8 +642,8 @@
               "detail": {"$ref": "#/$defs/detail"}
             },
             "anyOf": [
-              {"required": ["left"], "properties": {"left": {"minItems": 1}}},
-              {"required": ["right"], "properties": {"right": {"minItems": 1}}}
+              {"required": ["left"], "properties": {"left": {"type": "array", "minItems": 1}}},
+              {"required": ["right"], "properties": {"right": {"type": "array", "minItems": 1}}}
             ]
           }
         }
@@ -646,7 +669,7 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["x", "y"],
+            "required": ["label", "x", "y"],
             "properties": {
               "x": {"type": "number", "minimum": 0, "maximum": 1},
               "y": {"type": "number", "minimum": 0, "maximum": 1},
@@ -680,7 +703,7 @@
       "type": "object",
       "required": ["parts"],
       "properties": {
-        "unit": {"type": "string"},
+        "unit": {"type": ["string", "null"]},
         "parts": {
           "type": "array",
           "minItems": 1,
@@ -700,15 +723,19 @@
       "type": "object",
       "required": ["items"],
       "properties": {
-        "unit": {"type": "string"},
-        "max": {"type": "number"},
+        "unit": {"type": ["string", "null"]},
+        "max": {"type": ["number", "null"]},
         "items": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["value"],
-            "properties": {"value": {"type": "number"}, "label": {"type": "string"}, "detail": {"$ref": "#/$defs/detail"}}
+            "required": ["label", "value"],
+            "properties": {
+              "value": {"type": "number", "minimum": 0},
+              "label": {"type": "string"},
+              "detail": {"$ref": "#/$defs/detail"}
+            }
           }
         }
       }
@@ -719,15 +746,15 @@
       "properties": {
         "from": {"type": ["string", "number"], "minLength": 1},
         "to": {"type": ["string", "number"], "minLength": 1},
-        "unit": {"type": "string"},
-        "y_from_zero": {"type": "boolean"},
-        "y_note": {"type": "string"},
+        "unit": {"type": ["string", "null"]},
+        "y_from_zero": {"type": ["boolean", "null"]},
+        "y_note": {"type": ["string", "null"]},
         "items": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["before", "after"],
+            "required": ["label", "before", "after"],
             "properties": {
               "before": {"type": "number"},
               "after": {"type": "number"},
@@ -748,13 +775,13 @@
       "type": "object",
       "required": ["groups"],
       "properties": {
-        "unit": {"type": "string"},
+        "unit": {"type": ["string", "null"]},
         "groups": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["values"],
+            "required": ["label", "values"],
             "properties": {
               "label": {"type": "string"},
               "values": {"type": "array", "minItems": 1, "items": {"type": "number"}},
@@ -779,7 +806,7 @@
             "properties": {
               "x": {"type": "number"},
               "y": {"type": "number"},
-              "label": {"type": "string"},
+              "label": {"type": ["string", "null"]},
               "detail": {"$ref": "#/$defs/detail"}
             }
           }
@@ -790,16 +817,16 @@
       "type": "object",
       "required": ["series"],
       "properties": {
-        "unit": {"type": "string"},
-        "x_label": {"type": "string"},
-        "y_from_zero": {"type": "boolean"},
-        "y_note": {"type": "string"},
+        "unit": {"type": ["string", "null"]},
+        "x_label": {"type": ["string", "null"]},
+        "y_from_zero": {"type": ["boolean", "null"]},
+        "y_note": {"type": ["string", "null"]},
         "series": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["points"],
+            "required": ["name", "points"],
             "properties": {
               "name": {"type": "string"},
               "points": {
@@ -853,7 +880,7 @@
           }
         },
         "rows": {"type": "array", "minItems": 1, "items": {"type": "array"}},
-        "highlight_rows": {"type": "array", "items": {"type": "integer"}}
+        "highlight_rows": {"type": ["array", "null"], "items": {"type": "integer"}}
       }
     },
     "kind_text": {
@@ -897,7 +924,7 @@
             "properties": {
               "label": {"$ref": "#/$defs/text"},
               "outcome": {"enum": ["helps", "hurts", "never", "neutral"]},
-              "note": {"type": "string"},
+              "note": {"type": ["string", "null"]},
               "detail": {"$ref": "#/$defs/detail"}
             }
           }
