@@ -81,7 +81,7 @@ When the work splits into several tasks that each need their own review, such as
 
 When it coordinates several agents, it opens a dashboard in your browser, if it can run a command in the background. The dashboard updates as the agents work:
 
-![The live dashboard: figures for tasks done, agents at work and open questions; one card per agent with its task's mode, a state icon, its task's requirements and its latest steps, stuck agents first; the task list pinned under the agents; and a conversation with the coordinator on the right](img/code-better-dashboard.png)
+![The live dashboard: figures for tasks done, agents at work and open questions; one card per agent, a builder with its task's mode and a verifier marked verifier, a state icon, its task's requirements and its latest steps, stuck agents first; the task list with each task's stage pinned under the agents; and a conversation with the coordinator on the right](img/code-better-dashboard.png)
 
 - **The figures** at the top: tasks done (merged into the coordinator's branch), agents at work, and open questions. Click the open questions to jump to the first one.
 - **The agents** at work, one card each: a builder with its task's mode as a coloured tag and edge, a verifier with a `verifier` tag and a double edge; each with an icon for its state (working, waiting on the coordinator, blocked, or quiet for 15 minutes), the requirements of its task, and its latest steps. Blocked and quiet agents come first, then the rest in the order of the task list. Click a card for the agent's recent log, its task's requirements and check, and to ask about its work. Agents that handed back leave the page.
