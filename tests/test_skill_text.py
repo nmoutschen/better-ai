@@ -569,15 +569,18 @@ class CodeBetterTextTest(unittest.TestCase):
         """The coordinator writes lessons after each verifier report and gives the file to every agent, which uses it."""
         coordinate = (CODE_BETTER / "modes" / "coordinate.md").read_text()
         self.assertIn("lessons.jsonl", coordinate)
-        self.assertIn("extend", coordinate)
+        self.assertIn("EXTEND its `found_in`", coordinate)
         self.assertIn("found_in", coordinate)
-        self.assertIn("`lessons.jsonl` in every builder's and verifier's `lessons` input", coordinate)
-        self.assertIn("only you write `tasks.jsonl`, `progress.jsonl`, `instructions.jsonl`, `decisions.jsonl` and `lessons.jsonl`", coordinate)
+        self.assertIn("`.code/<change>/lessons.jsonl` in every builder's and verifier's `lessons` input", coordinate)
+        self.assertIn(
+            "only you write `tasks.jsonl`, `progress.jsonl`, `instructions.jsonl`, `decisions.jsonl` and `lessons.jsonl`",
+            coordinate,
+        )
         builder = (CODE_BETTER / "agents" / "builder.md").read_text()
-        self.assertIn("- `lessons`: <path of `.code/<change>/lessons.jsonl`, or \"none\">", builder)
+        self.assertIn('- `lessons`: <path of `.code/<change>/lessons.jsonl`, or "none">', builder)
         self.assertIn("CHECK your work against each lesson in `lessons` before you hand back", builder)
         verifier = (CODE_BETTER / "agents" / "verifier.md").read_text()
-        self.assertIn("- `lessons`: <path of `.code/<change>/lessons.jsonl`, or \"none\">", verifier)
+        self.assertIn('- `lessons`: <path of `.code/<change>/lessons.jsonl`, or "none">', verifier)
         self.assertIn("LOOK for the class of each lesson in `lessons`", verifier)
 
     def test_code_better_lessons_template_and_docs(self):
@@ -592,16 +595,18 @@ class CodeBetterTextTest(unittest.TestCase):
     def test_code_better_t4_text_fixes(self):
         """Decisions are named by their file, the builder does not write code.json or the spec, docs list decisions solo."""
         phrase = "a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file"
-        for path in (CODE_BETTER / "SKILL.md", CODE_BETTER / "modes" / "coordinate.md", CODE_BETTER / "templates" / "spec.md"):
+        for path in (
+            CODE_BETTER / "SKILL.md",
+            CODE_BETTER / "modes" / "coordinate.md",
+            CODE_BETTER / "templates" / "spec.md",
+        ):
             text = path.read_text()
             self.assertIn(phrase, text, path.name)
             self.assertNotIn("a decision of `decisions.jsonl`", text, path.name)
         builder = (CODE_BETTER / "agents" / "builder.md").read_text()
         self.assertIn("DO NOT write `code.json` or the spec: the coordinator holds them.", builder)
         docs = (ROOT / "docs" / "code-better.md").read_text()
-        solo = [line for line in docs.splitlines() if "decisions.jsonl" in line]
-        self.assertTrue(solo)
-        self.assertFalse(any(line.strip().startswith("- When it coordinates agents") and "decisions.jsonl" in line for line in solo))
+        self.assertIn("- **Decisions**: `decisions.jsonl` holds", docs)
 
     def test_code_better_case_files_name_no_old_file(self):
         """The case files name the templates and files of the new format."""

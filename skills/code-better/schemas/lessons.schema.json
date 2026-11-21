@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lessons.schema.json",
+  "title": "one line of lessons.jsonl: a bug class a verifier found, and the rule that prevents it",
+  "$comment": "Only the coordinator writes it. Every builder and verifier gets the file in its input.",
+  "x-files": [
+    "lessons.jsonl"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "id",
+    "class",
+    "rule",
+    "found_in"
+  ],
+  "properties": {
+    "type": {
+      "const": "lesson"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "id": {
+      "$ref": "base.schema.json#/$defs/id",
+      "pattern": "^L\\d+$"
+    },
+    "class": {
+      "description": "a short name for the bug class",
+      "type": "string",
+      "minLength": 1
+    },
+    "rule": {
+      "description": "what to do, in one sentence",
+      "type": "string",
+      "minLength": 1
+    },
+    "found_in": {
+      "description": "the tasks whose verifier found it, each with a short label of the finding",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task",
+          "finding"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "pattern": "^T\\d+$",
+            "x-points-to": {
+              "file": "tasks.jsonl",
+              "type": "task"
+            }
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

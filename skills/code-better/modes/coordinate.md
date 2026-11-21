@@ -15,7 +15,7 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFT
 
 WRITE `.code/<change>/code.json` with the goal, the design and the mode `coordinate`. READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format, always, with the requirements of the whole change: from the existing spec when one covers it. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files from it. WHEN `code.json` names an architect folder as the design, its `spec.jsonl` is the spec: UPDATE it there and WRITE no copy.
 
-IN coordinate mode only you write `tasks.jsonl`, `progress.jsonl`, `instructions.jsonl` and `decisions.jsonl`. Builders and verifiers write only their own log.
+IN coordinate mode only you write `tasks.jsonl`, `progress.jsonl`, `instructions.jsonl`, `decisions.jsonl` and `lessons.jsonl`. Builders and verifiers write only their own log.
 
 SPLIT the work into tasks by part, such as one module or one flow per task, never by role. EACH task fits in one context, and names its mode and its requirements. WRITE them in `.code/<change>/tasks.jsonl`: READ [../templates/tasks.md](../templates/tasks.md) and WRITE the list in its format, with the statuses of [Task status](#task-status) instead of the template's. WRITE each requirement before the task that names it.
 
@@ -44,7 +44,7 @@ IF the harness can run a shell command in the background, and the user's browser
 
 IF your harness tells you when a background command ends, ALSO RUN `python3 scripts/dashboard.py wait <change folder>` in the background while the dashboard runs: it ends with the user's new actions in the page. START it again at once each time it ends, before you act on what it printed.
 
-START a builder for each task that can run in parallel: READ [../agents/builder.md](../agents/builder.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt. GIVE each builder and verifier its own log, `.code/<change>/logs/<agent name>.jsonl`, in its `log` input, with a name no other agent of the change uses, and the path of this skill's folder in `skill_dir`. BEFORE you start each builder or verifier, WRITE `.code/<change>/logs/<agent name>.card.json` in the format of [../templates/log.md](../templates/log.md). The dashboard reads what the agent works on from this file, and the mode from the task's in `tasks.jsonl`:
+START a builder for each task that can run in parallel: READ [../agents/builder.md](../agents/builder.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt. GIVE each builder and verifier its own log, `.code/<change>/logs/<agent name>.jsonl`, in its `log` input, with a name no other agent of the change uses, and the path of this skill's folder in `skill_dir`. GIVE `.code/<change>/lessons.jsonl` in every builder's and verifier's `lessons` input, or "none" while it does not exist. BEFORE you start each builder or verifier, WRITE `.code/<change>/logs/<agent name>.card.json` in the format of [../templates/log.md](../templates/log.md). The dashboard reads what the agent works on from this file, and the mode from the task's in `tasks.jsonl`:
 
 | Role | What the dashboard shows |
 |---|---|
@@ -58,7 +58,7 @@ WRITE `role` as `builder` or `verifier`, `task` as the task's ID exactly as `tas
 ANSWER what builders send you, in plain language, and SAY whether an answer came from you or from the user:
 
 - A gap the design, the spec or the repo answers: ANSWER it yourself.
-- A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed (WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `decisions.jsonl`: RECORD the question there, and once the user has answered, WRITE the requirement with source `request` holding the user's words.), and RECORD it in `.code/<change>/decisions.jsonl`: READ [../templates/decision.md](../templates/decision.md) and WRITE it in its format.
+- A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed (WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file, and once the user has answered, WRITE the requirement with source `request` holding the user's words.), and RECORD it in `.code/<change>/decisions.jsonl`: READ [../templates/decision.md](../templates/decision.md) and WRITE it in its format.
 - Anything that would change what the user agreed, or that only the user can answer: ASK the user, with everything the builder gave.
 - A blocked task: GIVE what is missing, SPLIT the task, or ASK the user. DO NOT build the task yourself.
 
@@ -75,6 +75,8 @@ WHEN a builder hands back:
 - Partly done or blocked: ANSWER what is open, THEN START the task again with the answers in `answers`. WHILE it waits on the user or on another task, SET it `blocked`.
 - KEEP its assumptions for your hand-back, and ASK the user about any costly one. WRITE each problem it reports as a `problem` in `progress.jsonl`. ADD its proposed next steps to `.code/<change>/next-steps.jsonl`, in the format of [../templates/next-steps.md](../templates/next-steps.md): ADMIT those that stay inside the design, and ASK the user about the rest.
 - WRITE each instruction the user gives on how to work to `.code/<change>/instructions.jsonl`, in the format of [../templates/instructions.md](../templates/instructions.md), with their words.
+
+AFTER each verifier report, WRITE a lesson for each finding that could recur in another task, in `.code/<change>/lessons.jsonl`: READ [../templates/lessons.md](../templates/lessons.md) and WRITE it in its format. WHEN a lesson of that class exists, EXTEND its `found_in` with the task instead of writing a second lesson.
 
 WHEN a verifier fails a task, SET it `changes needed`. IF it failed the same task twice for the same finding, SET it `blocked` by `repair limit` and ASK the user; OTHERWISE START the task again with the findings in `tried`. WHEN it passes with unconfirmed blocking findings or parts it could not review, SET the task `blocked` by `user` and ASK the user about them before you merge.
 
