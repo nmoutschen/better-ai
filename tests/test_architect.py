@@ -236,7 +236,9 @@ class Architect(unittest.TestCase):
         design["containers"]["edges"][0]["to"] = "nowhere"
         path.write_text(json.dumps(design))
         data = architect.load(self.folder)
-        self.assertIn("design.json:1: (diagram): Edge 'e1': to references missing 'nowhere'", self.errors(data))
+        self.assertIn(
+            "design.json:1: containers.edges[0].to: Edge 'e1': to references missing 'nowhere'", self.errors(data)
+        )
         self.assertEqual(data["flows"], [])
         self.assertEqual(data["containers"], {"before": "", "after": ""})
 

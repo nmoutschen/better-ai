@@ -19,6 +19,9 @@ from string import Template
 from urllib.parse import quote
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))  # schema.py, which checks a design's references, is next to this script
+import schema  # noqa: E402
+
 KINDS = {kind["name"]: kind for kind in json.loads((HERE / "kinds.json").read_text(encoding="utf-8"))}
 ICONS = json.loads((HERE / "icons.json").read_text(encoding="utf-8"))
 
@@ -39,67 +42,21 @@ ARROWS = {
 
 
 def validate(design: dict) -> list[str]:
-    """Report invalid kinds, IDs and references before laying out a design."""
-    errors = []
-
-    def index(items, scope):
-        ids = set()
-        for item in items:
-            ident = item["id"]
-            if not isinstance(ident, str) or not ident:
-                errors.append(f"{scope}: expected a nonempty string id, got {ident!r}")
-            if ident in ids:
-                errors.append(f"{scope}: Duplicate id {ident!r}")
-            ids.add(ident)
-        return ids
-
-    def reference(item, field, ids, scope):
-        if item[field] not in ids:
-            errors.append(f"{scope} {item['id']!r}: {field} references missing {item[field]!r}")
-
-    containers = design["containers"]
-    nodes = containers["nodes"]
-    edges = containers.get("edges", [])
-    groups = containers.get("groups", [])
-    node_ids = index(nodes, "Container nodes")
-    edge_ids = index(edges, "Container edges")
-    index(groups, "Container groups")
-    for node in nodes:
-        if node["kind"] not in KINDS:
-            errors.append(f"Box {node['id']!r}: unknown kind {node['kind']!r}")
-    for edge in edges:
-        for field in ("from", "to"):
-            reference(edge, field, node_ids, "Edge")
-    members = set()
-    for group in groups:
-        for member in group["members"]:
-            if member not in node_ids:
-                errors.append(f"Group {group['id']!r}: missing member {member!r}")
-            if member in members:
-                errors.append(f"Box {member!r} belongs to more than one group or is listed twice")
-            members.add(member)
+    """Report what stops a design from being laid out. The references inside it, and the box kinds, are schema.py's to
+    check (`design_problems`); this keeps the one check that needs the layout: a finding that names no part of it."""
+    try:
+        errors = [message for _, message in schema.design_problems(design)]
+    except (AttributeError, KeyError, TypeError) as exc:
+        return [f"The design is not the shape design.schema.json describes: {exc!r}"]
     if "flow" in design:
         errors.append("Use a flows list instead of flow")
-    targets = node_ids | {f"edge:{ident}" for ident in edge_ids}
+    targets = {node["id"] for node in design["containers"]["nodes"]}
+    targets |= {f"edge:{edge['id']}" for edge in design["containers"].get("edges", [])}
     step_counts = Counter()
     for i, flow in enumerate(design.get("flows", []), 1):
-        participants = []
-        for participant in flow["participants"]:
-            if isinstance(participant, dict):
-                participants.append(participant)
-            else:
-                errors.append(f"Flow {i} participant {participant!r}: expected an object with id and box")
-        participant_ids = index(participants, f"Flow {i} participants")
-        step_ids = index(flow["steps"], f"Flow {i} steps")
+        step_ids = [step["id"] for step in flow["steps"]]
         step_counts.update(step_ids)
         targets.update(f"flow{i}:step:{ident}" for ident in step_ids)
-        for participant in participants:
-            reference(participant, "box", node_ids, f"Flow {i} participant")
-        for step in flow["steps"]:
-            for field in ("from", "to"):
-                reference(step, field, participant_ids, f"Flow {i} step")
-            if step.get("kind", "request") not in ARROWS:
-                errors.append(f"Flow {i} step {step['id']!r}: unknown kind {step['kind']!r}")
     targets.update(f"step:{ident}" for ident, count in step_counts.items() if count == 1)
     for target in design.get("findings", {}):
         if target not in targets:

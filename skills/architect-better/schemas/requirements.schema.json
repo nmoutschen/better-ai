@@ -118,7 +118,8 @@
                 "type": "string",
                 "minLength": 1
               }
-            }
+            },
+            "x-check": "source-file-exists"
           }
         },
         {

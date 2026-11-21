@@ -198,11 +198,6 @@ def read_design(reader: Reader):
     if not isinstance(usable["containers"], dict):
         return None, {}, {}
     try:
-        problems = diagram.validate(usable)
-        for problem in problems:
-            reader.error("design.json", 1, "(diagram)", problem)
-        if problems:
-            return None, {}, {}
         parts, hashes = diagram_parts(usable)
         return usable, parts, hashes
     except (AttributeError, IndexError, KeyError, TypeError, ValueError) as exc:
@@ -229,13 +224,10 @@ def read_folder(folder: Path) -> dict:
     request = architect.get("request") if isinstance(architect.get("request"), dict) else {}
     if isinstance(request.get("text"), str):
         data["sources"]["request"] = request["text"]
-    for number, record in enumerate(data["requirements"], 1):
+    for record in data["requirements"]:
         source = record.get("source")
         if isinstance(source, dict) and source.get("type") == "file" and not record.get("_errors"):
-            try:
-                data["sources"][source["file"]] = source_file(folder, source["file"])
-            except ValueError as exc:
-                reader.error("requirements.jsonl", number, "source.file", str(exc))
+            data["sources"][source["file"]] = source_file(folder, source["file"])  # schema.py has checked it exists
     for name in CHECKED_ONLY:
         reader.records(name)
     return data

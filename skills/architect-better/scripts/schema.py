@@ -725,6 +725,104 @@ def _request_sentence(record: dict, context: Context) -> list[tuple[str, str]]:
     return [] if sentence in text else [("sentence", "is not in the request of architect.json")]
 
 
+def _box_kinds() -> set[str] | None:
+    """The names of the box kinds of architect-better's register (kinds.json next to the scripts); None in a skill
+    that has no register."""
+    try:
+        data = json.loads((Path(__file__).resolve().parent / "kinds.json").read_text(encoding="utf-8"))
+        return {kind["name"] for kind in data}
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def design_problems(design: dict) -> list[tuple[str, str]]:
+    """What is wrong with the references inside a design that has the right shape: an id used twice, a box kind that is
+    not in the register, an edge, a group, a participant or a step that names what does not exist, a box in two groups.
+    The messages are the ones diagram.py has always given."""
+    problems: list[tuple[str, str]] = []
+
+    def index(items, scope, field):
+        ids: set = set()
+        for number, item in enumerate(items):
+            ident = item["id"]
+            if ident in ids:
+                problems.append((f"{field}[{number}].id", f"{scope}: Duplicate id {ident!r}"))
+            ids.add(ident)
+        return ids
+
+    def reference(item, key, ids, scope, field):
+        if item[key] not in ids:
+            problems.append((f"{field}.{key}", f"{scope} {item['id']!r}: {key} references missing {item[key]!r}"))
+
+    containers = design["containers"]
+    nodes, edges, groups = containers["nodes"], containers.get("edges", []), containers.get("groups", [])
+    node_ids = index(nodes, "Container nodes", "containers.nodes")
+    index(edges, "Container edges", "containers.edges")
+    index(groups, "Container groups", "containers.groups")
+    kinds = _box_kinds()
+    for number, node in enumerate(nodes):
+        if kinds is not None and node["kind"] not in kinds:
+            problems.append((f"containers.nodes[{number}].kind", f"Box {node['id']!r}: unknown kind {node['kind']!r}"))
+    for number, edge in enumerate(edges):
+        for key in ("from", "to"):
+            reference(edge, key, node_ids, "Edge", f"containers.edges[{number}]")
+    members: set = set()
+    for number, group in enumerate(groups):
+        for member in group["members"]:
+            if member not in node_ids:
+                problems.append(
+                    (f"containers.groups[{number}].members", f"Group {group['id']!r}: missing member {member!r}")
+                )
+            if member in members:
+                problems.append(
+                    (
+                        f"containers.groups[{number}].members",
+                        f"Box {member!r} belongs to more than one group or is listed twice",
+                    )
+                )
+            members.add(member)
+    for number, flow in enumerate(design.get("flows", [])):
+        where = f"Flow {number + 1}"
+        participants = []
+        for at, participant in enumerate(flow["participants"]):
+            if isinstance(participant, dict):
+                participants.append(participant)
+            else:  # the schema refuses it; diagram.py may be given a design that never met the schema
+                message = f"{where} participant {participant!r}: expected an object with id and box"
+                problems.append((f"flows[{number}].participants[{at}]", message))
+        participant_ids = index(participants, f"{where} participants", f"flows[{number}].participants")
+        index(flow["steps"], f"{where} steps", f"flows[{number}].steps")
+        for at, participant in enumerate(participants):
+            reference(participant, "box", node_ids, f"{where} participant", f"flows[{number}].participants[{at}]")
+        for at, step in enumerate(flow["steps"]):
+            for key in ("from", "to"):
+                reference(step, key, participant_ids, f"{where} step", f"flows[{number}].steps[{at}]")
+    return problems
+
+
+@hook("design-references")
+def _design_references(record: dict, context: Context) -> list[tuple[str, str]]:
+    """The references inside design.json resolve: see design_problems."""
+    return design_problems(record)
+
+
+@hook("source-file-exists")
+def _source_file_exists(record: dict, context: Context) -> list[tuple[str, str]]:
+    """A `file` source of a requirement names a file of the repository the change folder is in (the nearest folder up
+    with a .git; the change folder itself if there is none), reached without leaving it, and never inside .git."""
+    path = record.get("file")
+    if not isinstance(path, str) or not path:
+        return []
+    name = Path(path)
+    if name.is_absolute() or {"..", ".git"} & set(name.parts):
+        return [("file", f"invalid source path {path!r}")]
+    root = (context.repo_root() or context.directory).resolve()
+    target = (root / name).resolve()
+    if not (target.is_relative_to(root) and target.is_file()):
+        return [("file", f"missing or out-of-scope source {path!r}")]
+    return []
+
+
 @hook("design-flow-ids")
 def _design_flow_ids(record: dict, context: Context) -> list[tuple[str, str]]:
     """A flow id is used once, so a part key names one flow."""
