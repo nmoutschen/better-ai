@@ -421,6 +421,13 @@ test('a blocked task says what it waits on, from the Blocked by column only', ()
   assert.deepEqual(shown('blocked', 'needs a key'), ['blocked', 'blocked: needs a key']);
 });
 
+test('a status or a blocked reason with markup shows as text, never as HTML', () => {
+  const realEsc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  const { statusLabel } = new Function('esc', statusCode + '; return {statusLabel};')(realEsc);
+  assert.doesNotMatch(statusLabel({ status: 'blocked', blocked_by: '<img src=x onerror=alert(1)>' }, []), /<img/);
+  assert.match(statusLabel({ status: '<b>x</b>' }, []), /&lt;b&gt;x&lt;\/b&gt;/);
+});
+
 test('an unknown status shows as written', () => {
   assert.deepEqual(shown('in review'), ['other', 'in review']);
   assert.deepEqual(shown(''), ['other', 'no status']);
