@@ -73,7 +73,7 @@ A pull request that changes a skill or its cases REPORTS its eval results in thi
 
 OPEN with one or two sentences that give the result and what was tested, such as "Leaves correct work alone more often (+28 points). No other clear change. Tested on 28 cases with Sonnet 5.5." DO NOT list the harness version, judge agreement, run counts or error counts in the text.
 
-GROUP the rules into the skill's priority categories, in the order the maintainer set for that skill. A lower category may lose where a higher one gains, so DO NOT sum or weight categories into one score. A category holds several cases; a rule with one case is not a category.
+GROUP the cases into the skill's priority categories, in the order `cases/<skill>/priorities.yaml` lists them. WHEN a skill has no such file, ASK the maintainer for the order and WRITE the file before reporting. EVERY case of the skill is in exactly one category. A lower category may lose where a higher one gains, so DO NOT sum or weight categories into one score. A category holds several cases; a rule with one case is not a category.
 
 SHOW two things:
 
@@ -85,4 +85,15 @@ SHOW two things:
 | 1 Owns the error | 6 | 5% | 60% | 82% | 73% | = |
 | 4 Leaves correct work alone | 5 | 40% | 74% | **31%** | **59%** | ▲ +28 |
 
-COPY `.github/PULL_REQUEST_TEMPLATE/eval-results.md` into the pull request description. RUN every condition in the table on the same cases with the same number of runs. BOLD the numbers that carry the opening sentence. LEAVE OUT per-rule and per-case rows, cost and p-values.
+COPY `.github/PULL_REQUEST_TEMPLATE/eval-results.md` into the pull request description. PRINT the table with `uv run python -m tools.report <logs> --latest --pr --chart chart.svg`, adding `--before <logs of the skill before the change>` for a change to an existing skill, and HOST the chart on the `pr-screenshots` branch. RUN every condition in the table on the same cases with the same number of runs. BOLD the numbers that carry the opening sentence. LEAVE OUT per-rule and per-case rows, cost and p-values.
+
+## 11. Report results in a skill's docs by what it does
+
+A skill's docs page REPORTS its eval results as a short "How it is tested" section: one sentence on what was tested, such as "Tested on 28 situations with Sonnet 5.5 (2026-11-21).", then one row per priority category, in order, with what the skill does and how often it passed. DESCRIBE what the skill does for the reader: DO NOT compare with no skill, and DO NOT add a chart.
+
+| What it does | Passed |
+| --- | ---: |
+| Says plainly that it made the error | 73% |
+| Fixes what the evidence supports, checks the fix, and asks only when blocked | 80% |
+
+TAKE the row text from each category's `does` in `priorities.yaml`, and PRINT the table with `uv run python -m tools.report <logs> --latest --docs`.

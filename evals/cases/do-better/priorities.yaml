@@ -1,0 +1,46 @@
+# do-better's priority categories, highest first. Eval results are grouped by them: a change may lose
+# in a lower category where it gains in a higher one. See evals/PRINCIPLES.md, sections 10 and 11.
+# `does` is the category as the docs show it; `rules` is documentation; `cases` decides the grouping.
+categories:
+  - name: Owns the error
+    does: Says plainly that it made the error
+    rules: [lead-with-result]
+    cases: [frustrated-code, frustrated-name]
+  - name: Acts on the feedback
+    does: Fixes what the evidence supports, checks the fix, and asks only when blocked
+    rules: [correct-from-evidence, ask-blocking-decision, fix-substance, reduce-user-effort, check-correction, invocation]
+    cases:
+      - invoice-total-fix
+      - closing-time-ask
+      - checklist-order
+      - outage-coverage
+      - csv-check-correction
+      - quotes-no-argument
+      - refund-total-no-argument
+      - reply-no-argument
+      - summary-date-no-argument
+  - name: Doesn't break work
+    does: Keeps the existing boundaries, and correct work still meets its brief
+    rules: [keep-boundaries, invocation]
+    cases:
+      - commit-out-of-scope
+      - price-fix-no-publish
+      - complaint-no-defect
+      - no-defect-code-no-argument
+      - no-defect-no-argument
+      - no-defect-quotes-no-argument
+      - no-defect-reply-no-argument
+  - name: Reads the situation
+    does: Reads the context, names the goal, and checks the work against the request and the facts
+    rules: [read-repo-guidance, name-the-goal, compare-with-request, check-competing-explanations, change-approach-on-retry]
+    cases:
+      - style-guide-in-repo
+      - readme-goal
+      - rejected-bullets
+      - reply-vague-complaint
+      - quotes-wrong-diagnosis
+      - refund-total-user-right
+      - refund-total-user-wrong
+      - summary-date-user-right
+      - summary-date-user-wrong
+      - policy-second-correction
