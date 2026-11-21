@@ -13,7 +13,7 @@ better-ai's pages share one look: the live pages the skills serve (boards) and t
 |---|---|---|
 | Tokens and shared components | `skills/*/scripts/page.css` | Identical in every skill that serves a board. Change it in one skill, then copy it to the others: the Scripts workflow fails if the copies differ. |
 | The conversation column | `skills/*/scripts/page.js`, `page.py` | Identical copies, as page.css. |
-| What only one board shows | `board.html`, `dashboard.html`, `canvas.css`, `show.css`, `architect.css` | Uses only the tokens and components below. |
+| What only one board shows | `board.css`, `dashboard.html`, `canvas.css`, `show.css`, `architect.css` | Uses only the tokens and components below. |
 | This document | `DESIGN.md`, `DESIGN.html` | The names here are the names in page.css. DESIGN.html holds copies of page.css and page.js, so it works as a single file: after changing either, paste it again into DESIGN.html (the test says which). |
 
 `tests/test_design.py` fails when a page uses a colour that is not in the colour table below, a raw px value for a space or a type size, a `font` shorthand that is not a `--font-*` token, or when this document and page.css disagree.

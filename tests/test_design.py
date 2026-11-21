@@ -50,7 +50,11 @@ def board_css():
     page_css = PAGE_CSS.read_text(encoding="utf-8")
     start = page_css[: page_css.index("\n}\n")].count("\n") + 2
     yield from ((PAGE_CSS, n, line) for n, line in enumerate(page_css.splitlines(), 1) if n >= start)
-    for name in ("research-better/scripts/board.html", "code-better/scripts/dashboard.html"):
+    board = scripts / "research-better/scripts/board.css"
+    for n, line in enumerate(board.read_text(encoding="utf-8").splitlines(), 1):
+        if ".map" not in line:
+            yield board, n, line
+    for name in ("code-better/scripts/dashboard.html",):
         text = (scripts / name).read_text(encoding="utf-8")
         first = text[: text.index("/*__PAGE_CSS__*/")].count("\n") + 1
         last = text[: text.index("</style>")].count("\n") + 1
