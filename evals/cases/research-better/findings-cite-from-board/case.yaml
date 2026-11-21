@@ -23,8 +23,9 @@ graders:
     wiki and a wiki/ path as URL. Q-coordinator-2 (answered): conversion fell from 3.1% to 2.6%, all in card payments, PayPal
     flat at 3.4%; its challenge Q-w2-5 found no contradicting figures. Q-coordinator-3 (contested): the payments review links
     the fall to 3-D Secure challenges (8% to 31% of card payments), the frontend guild says the slower page after the CDN
-    switch explains most of it. Q-coordinator-4 (not found): no app conversion data in the wiki. Grade the final reply and
-    any Markdown report it points to. PASS only if all hold: (1) each main claim in the findings has an author-date citation
+    switch explains most of it. C-w2-4 (verified, from S-w2-3): tickets about failed card verification were three times as
+    frequent in March as in February. Q-coordinator-4 (not found): no app conversion data in the wiki. Grade the final reply
+    and any Markdown report it points to. PASS only if all hold: (1) each main claim in the findings has an author-date citation
     in the text, such as (Weber, 2026) or (Raman, 2026); (2) the report ends with a reference list whose entries give author,
     date, title, publisher or site, and URL or path; (3) every author, date and title in the reference list matches a board
     source entry, and the support ticket page, if listed, is dated n.d.; (4) no reference is to a source that is not on the
