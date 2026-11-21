@@ -393,7 +393,7 @@ test('element selectors use the nearest document-unique id in a page or slide', 
 
 // The dashboard's task status and agent tag: read out of dashboard.html between `// status:begin` and `// status:end`.
 const statusCode = html.split('// status:begin')[1].split('// status:end')[0];
-const { taskStatus, agentTag, agentClass, DONE } = new Function('esc', statusCode + '; return {taskStatus, agentTag, agentClass, DONE};')(s => String(s));
+const { taskStatus, agentTag, agentClass, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, agentTag, agentClass, DONE, isDone};')(s => String(s));
 const shown = (status, blocked_by, tasks) => { const s = taskStatus({ status, blocked_by }, tasks || [{ id: 'T2' }]); return [s.key, s.word]; };
 
 test("a task shows the status tasks.md gives it, each of the coordinate mode's stages with its own icon", () => {
@@ -435,8 +435,9 @@ test('an unknown status shows as an error, with the status as written', () => {
   assert.deepEqual(shown(''), ['other', 'no status']);
 });
 
-test('only merged and done tasks count as done', () => {
+test('only merged and done tasks count as done, in any casing', () => {
   assert.deepEqual([...DONE].sort(), ['done', 'merged']);
+  assert.equal([{ status: 'Merged' }, { status: ' DONE ' }, { status: 'verified' }, { status: '' }, {}].filter(isDone).length, 2);
 });
 
 test('a verifier shows as a verifier, a builder by its mode', () => {
