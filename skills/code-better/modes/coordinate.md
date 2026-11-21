@@ -19,7 +19,7 @@ SPLIT the work into tasks by part, such as one module or one flow per task, neve
 
 ### Task status
 
-SET a task's status in `tasks.md` at each event below, in an edit of its own, as soon as the event happens. WRITE the status word exactly as this table writes it. The dashboard shows each status as written.
+SET a task's status in `tasks.md` at each event below, in an edit of its own, as soon as the event happens. WRITE the status word as this table writes it, without the backticks. The dashboard shows each status as written.
 
 | Event | Status |
 |---|---|
@@ -32,7 +32,7 @@ SET a task's status in `tasks.md` at each event below, in an edit of its own, as
 | You merge it into your main branch | `merged` |
 | It cannot go on until something else happens | `blocked` |
 
-WHEN a task is `blocked`, WRITE in its Blocked by column exactly one of: the # of the task it waits on, as `tasks.md` writes it; `user`, when it waits on the user's answer; or `repair limit`, when its verifier failed it twice for the same finding. LEAVE the column empty for every other status, and EMPTY it when the task moves on. WRITE the details under Open problems.
+WHEN a task is `blocked`, WRITE in its Blocked by column exactly one of, without backticks: the # of the task it waits on, as `tasks.md` writes it; `user`, when it waits on the user's answer; or `repair limit`, when its verifier failed it twice for the same finding. LEAVE the column empty for every other status, and EMPTY it when the task moves on. WRITE the details under Open problems.
 
 ## 2. Start the builders
 
@@ -73,7 +73,7 @@ WHEN a builder hands back:
 - Partly done or blocked: ANSWER what is open, THEN START the task again with the answers in `answers`. WHILE it waits on the user or on another task, SET it `blocked`.
 - KEEP its assumptions for your hand-back, and ASK the user about any costly one. ADD its proposed next steps to `.code/<change>/next-steps.md`, in the format of [../templates/next-steps.md](../templates/next-steps.md): ADMIT those that stay inside the design, and ASK the user about the rest.
 
-WHEN a verifier fails a task, START the task again with its findings in `tried`. IF it fails the same task twice for the same finding, SET the task `blocked` by `repair limit` and ASK the user. WHEN it passes with unconfirmed blocking findings or parts it could not review, SET the task `blocked` by `user` and ASK the user about them before you merge.
+WHEN a verifier fails a task, SET it `changes needed`. IF it failed the same task twice for the same finding, SET it `blocked` by `repair limit` and ASK the user; OTHERWISE START the task again with the findings in `tried`. WHEN it passes with unconfirmed blocking findings or parts it could not review, SET the task `blocked` by `user` and ASK the user about them before you merge.
 
 ## 4. Merge and test the whole change
 

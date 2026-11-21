@@ -423,7 +423,7 @@ test('a blocked task says what it waits on, from the Blocked by column only', ()
 
 test('a status or a blocked reason with markup shows as text, never as HTML', () => {
   const realEsc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-  const { statusLabel } = new Function('esc', 'TICON', statusCode + '; return {statusLabel};')(realEsc, {});
+  const { statusLabel } = new Function('esc', statusCode + '; return {statusLabel};')(realEsc);
   assert.doesNotMatch(statusLabel({ status: 'blocked', blocked_by: '<img src=x onerror=alert(1)>' }, []), /<img/);
   assert.match(statusLabel({ status: '<b>x</b>' }, []), /&lt;b&gt;x&lt;\/b&gt;/);
 });
