@@ -674,7 +674,6 @@ test('delete, accept and reopen point at their item with to, and reopen carries 
 // The research board's page: its errors band and how it shapes the new record fields. Both are read out of board.js,
 // between marker comments and between `const has =` and the map's layout, so the test runs the shipped code.
 const boardJs = fs.readFileSync(path.join(__dirname, '..', 'skills', 'research-better', 'scripts', 'board.js'), 'utf8');
-const realEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const { showLoaded, notValid } = new Function('esc', 'plural', boardJs.split('// errors:begin')[1].split('// errors:end')[0] + '; return {showLoaded, notValid};')(realEsc, plural);
 const { prepare } = new Function('const has =' + boardJs.split('const has =')[1].split('// ---------- Slices')[0] + '; return {prepare};')();
