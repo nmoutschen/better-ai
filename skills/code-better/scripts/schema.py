@@ -598,6 +598,27 @@ def validate_record(value: Any, schemas: list[dict], docs: dict[str, dict], cont
 # ---------------------------------------------------------------- hooks
 
 
+@hook("merge-loop")
+def _merge_loop(record: dict, context: Context) -> list[tuple[str, str]]:
+    """A question merged into another that is merged into it, directly or through others, is in a loop: each member
+    is an error on `merged_into`. A question merged into itself is left to `x-differs-from`."""
+    questions = {}
+    for path in sorted(context.path(".").glob("*.json")):
+        found = context.read_json(path.name)
+        if isinstance(found, dict) and isinstance(found.get("id"), str):
+            questions[found["id"]] = found
+    start = record.get("id")
+    chain = [start]
+    at = record.get("merged_into")
+    while isinstance(at, str) and at != start and at not in chain and len(chain) <= len(questions):
+        chain.append(at)
+        step = questions.get(at, {})
+        at = step.get("merged_into") if step.get("status") == "merged" else None
+    if at == start and len(chain) > 1:
+        return [("merged_into", f"merge loop: {' → '.join([*chain, start])}")]
+    return []
+
+
 @hook("verified-needs-passing-verifier")
 def _verified_needs_passing_verifier(record: dict, context: Context) -> list[tuple[str, str]]:
     """A task is `verified` only when its latest verifier (a `logs/<agent>.card.json` with role verifier and this

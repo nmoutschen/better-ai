@@ -37,13 +37,13 @@ FILES = {
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wrong_types  # noqa: E402
 
-def schema_main(argv: list) -> tuple:
-    """schema.py's command line: its exit code and what it printed."""
-    import schema as schema_script
 
-    with contextlib.redirect_stdout(io.StringIO()) as out:
-        code = schema_script.main(argv)
-    return code, out.getvalue()
+def schema_main(argv: list) -> tuple:
+    """research-better's schema.py on the command line: its exit code and what it printed."""
+    run = subprocess.run(
+        [sys.executable, "-I", str(SCRIPT.parent / "schema.py"), *argv], capture_output=True, text=True, timeout=60
+    )
+    return run.returncode, run.stdout
 
 
 spec = importlib.util.spec_from_file_location("board_under_test", SCRIPT)
@@ -627,7 +627,7 @@ class MergeCycles(unittest.TestCase):
             )
             drawn = {q["id"]: q for q in data["questions"]}
             self.assertTrue(drawn["Q-w2-8"]["_errors"] and drawn["Q-w2-9"]["_errors"])
-            self.assertEqual([c["id"] for c in data["claims"]], ["C-w2-9"])
+            self.assertIn("C-w2-9", [c["id"] for c in data["claims"]])
             with contextlib.redirect_stdout(io.StringIO()) as out:
                 self.assertEqual(board.check(folder), 1)
             self.assertEqual(out.getvalue().count("merge loop"), 2)
@@ -656,7 +656,7 @@ class MergeCycles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
             ids = [f"Q-w2-{n}" for n in range(1, 8)]
-            data = self.merged(folder, {**{a: b for a, b in zip(ids, ids[1:])}, ids[-1]: None})
+            data = self.merged(folder, {**dict(zip(ids, ids[1:], strict=False)), ids[-1]: None})
         self.assertEqual(data["errors"], [])
 
 

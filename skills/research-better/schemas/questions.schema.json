@@ -65,7 +65,7 @@
     },
     {
       "if": {"required": ["status"], "properties": {"status": {"const": "merged"}}},
-      "then": {"required": ["merged_into"]},
+      "then": {"required": ["merged_into"], "x-check": "merge-loop"},
       "else": {"not": {"required": ["merged_into"]}}
     },
     {

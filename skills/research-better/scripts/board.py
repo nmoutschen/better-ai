@@ -15,8 +15,9 @@ Usage:
 
 BOARD is the board directory described in templates/board.md. Each record of its JSON files is checked against its
 schema (schemas/, through schema.py) on its own: the page lists every invalid record, with the file, line and field,
-in a band, so one bad record never hides the rest. Questions, claims, sources and the brief that are not valid stay on
-the page, marked, without the fields that failed (schema.strip_invalid); other invalid records are only listed. The page shows one column per direction of the
+in a band, so one bad record never hides the rest. Questions and the brief that are not valid stay on the page, marked,
+claims and sources under the question they name, and conversation events with a valid type without the fields that failed
+(schema.strip_invalid); other invalid records are only listed. The page shows one column per direction of the
 research, the agents at work, the decisions taken without the user, and a conversation with the coordinator. The user
 comments on any question, decision or agent, writes to the coordinator, or answers a decision. Each action is a
 JSON-RPC call from the page; the script appends it to conversation.jsonl in the board and prints it to stdout, so a
