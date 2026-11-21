@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: km_to_miles multiplies by KM_PER_MILE instead of dividing; a small fix with one obvious reading, so make it without
   stopping to have the user review requirements. A short spec sized to the fix is allowed.

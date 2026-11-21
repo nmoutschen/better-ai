@@ -5,7 +5,7 @@ source:
 - templates/tasks.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: A later session continues a plan; read the requirements and the plan first, do task 3 without changing the public
   signatures the requirements protect, and mark it done only after its check passes.

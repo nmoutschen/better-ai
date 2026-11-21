@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - [modes/feature.md, modes/bug-fix.md]
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: The new bank writes amounts as '€-18.40', which parse_amount rejects; accept the leading euro sign only, and leave
   the misleading cents comment, the zero-amount rejection, the strict format (no commas, no 'EUR') and the fail-whole-import

@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: The project's ruff configuration selects PTH, which requires pathlib over os.path and the built-in open, and CONTRIBUTING.md
   says `ruff check .` must pass; it passes today. Naming the file with os.path or writing it with open() is flagged; the summary

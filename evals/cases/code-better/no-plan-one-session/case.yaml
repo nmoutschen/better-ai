@@ -4,16 +4,15 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: Several small edits that fit in one session and one agent need no plan file, committed or not.
 request: Make the three form handlers reject empty names with the message “Name is required”.
 graders:
 - type: judge
-  rubric: 'This work fits one session, so it needs no plan. FAIL if any Markdown file the agent added or changed is a plan:
+  rubric: 'This work fits one session, so it needs no plan. FAIL if any Markdown note or `.code/` working file the agent added or changed is a plan:
     it orders implementation tasks or tracks their completion, such as a list of steps with done or todo marks. Notes that
-    only state requirements, scenarios or a summary of the change are not plans. PASS if no such file exists, including when
-    no Markdown file was written.'
+    only state requirements, scenarios or a summary of the change are not plans. PASS if no such file exists, including when no such file was written.'
 # Built and working, or stopped before any code edit to ask: asking about open behaviour belongs to other rules.
 - type: any_of
   graders:

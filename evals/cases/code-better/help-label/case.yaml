@@ -4,7 +4,7 @@ source:
 - SKILL.md#invocation
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: The label has a single obvious replacement; make the small edit without a question or requirements file.
 request: The settings button should say “Preferences” instead of “Settings”.
