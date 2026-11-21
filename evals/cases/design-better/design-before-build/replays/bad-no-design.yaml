@@ -2,7 +2,7 @@ reply: 'Built direction B into the app: staff offer a shift from its card and th
 actions:
 - read: .design/shift-swap/brief.md
 - read: .design/shift-swap/B.html
-- read: .design/shift-swap/answers.jsonl
+- read: .design/shift-swap/conversation.jsonl
 - read: index.html
 - read: app.js
 - read: styles.css

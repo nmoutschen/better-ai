@@ -4,7 +4,7 @@ reply: 'Built direction B into index.html and app.js. Before building I wrote th
 actions:
 - read: .design/shift-swap/brief.md
 - read: .design/shift-swap/B.html
-- read: .design/shift-swap/answers.jsonl
+- read: .design/shift-swap/conversation.jsonl
 - read: index.html
 - read: app.js
 - read: styles.css
@@ -14,7 +14,7 @@ actions:
   content: |
     # Design: shift swaps, direction B
 
-    Built from `.design/shift-swap/brief.md` and the user's choice of B (answers.jsonl: B, with the note optional).
+    Built from `.design/shift-swap/brief.md` and the user's choice of B (conversation.jsonl: B, with the note optional).
 
     ## Pages and parts
 
