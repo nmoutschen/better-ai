@@ -695,6 +695,194 @@ class WrongTypes(unittest.TestCase):
         self.assertNotIn("status", data["tasks"][1])
 
 
+class BaseFieldsOfEveryKind(unittest.TestCase):
+    """Every kind of file starts with type, at and by, `at` is UTC with a Z, and `id` is there exactly where the spec
+    page puts one (verifier of the file-format scripts: R8 held for the kinds first tried, not for all)."""
+
+    def kinds(self):
+        for kind, (name, _) in KINDS.items():
+            for title, record in examples(kind):
+                yield f"{kind}: {title}", name, record
+        yield "audit header", AUDIT[0], audit_header()
+
+    def problems(self, name, record):
+        return schema.check_record(record, [name], SCHEMAS)
+
+    def test_a_record_without_type_at_or_by_is_refused(self):
+        for label, name, record in self.kinds():
+            for field in ("type", "at", "by"):
+                with self.subTest(label, missing=field):
+                    changed = {k: v for k, v in record.items() if k != field}
+                    self.assertTrue(self.problems(name, changed))
+
+    def test_at_must_be_utc_with_a_z(self):
+        for label, name, record in self.kinds():
+            for at in ("2026-11-21T10:00:00", "2026-11-21T10:00:00+01:00", "yesterday", 5):
+                with self.subTest(label, at=at):
+                    self.assertTrue(self.problems(name, {**record, "at": at}))
+
+    def test_id_is_required_where_the_page_marks_one_and_refused_where_it_does_not(self):
+        for label, name, record in self.kinds():
+            with self.subTest(label):
+                if "id" in record:
+                    self.assertTrue(self.problems(name, {k: v for k, v in record.items() if k != "id"}))
+                else:
+                    self.assertTrue(self.problems(name, {**record, "id": "X1"}))
+
+
+class OneBadRecordKeepsTheRest(unittest.TestCase):
+    """What the verifiers found by loading a folder with one bad record in it (each used to hide something)."""
+
+    def test_a_pretty_printed_card_with_a_bad_role_is_listed_and_the_other_agents_stay(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d), tasks=[task("T1", status="building")])
+            write(folder, "logs/b2.card.json", [card("builder", "T1")], as_json=True)
+            (folder / "logs" / "b1.card.json").write_text(
+                json.dumps({**card("builder", "T1"), "role": "boss"}, indent=2), encoding="utf-8"
+            )
+            data = dashboard.load(folder)
+        self.assertIn(("logs/b1.card.json", "role"), [(e["file"], e["field"]) for e in data["errors"]])
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
+        self.assertIn("b2", [a["name"] for a in data["agents"]])
+
+    def test_a_code_json_with_an_unknown_mode_does_not_hide_the_tasks(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d), tasks=[task("T1", status="building")])
+            write(folder, "code.json", [{**code(), "mode": "weird"}], as_json=True)
+            data = dashboard.load(folder)
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
+        self.assertIn("mode", [e["field"] for e in data["errors"] if e["file"] == "code.json"])
+
+    def test_every_status_of_a_task_with_a_requirement_nobody_wrote_still_lists_the_task(self):
+        with tempfile.TemporaryDirectory() as d:
+            tasks = [
+                task("T1", status="merged"),
+                task("T2", status="in review"),
+                task("T3", status="verified"),
+                task("T4", status="blocked", reason="task", waits_on="T2"),
+                task("T5", requirements=["S9"]),
+            ]
+            data = dashboard.load(change(Path(d), tasks=tasks))
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T2", "T3", "T4", "T5"])
+        self.assertTrue(data["errors"])
+
+
+GOOD_LESSON = {
+    "type": "lesson",
+    "at": AT,
+    "by": "coordinator",
+    "id": "L1",
+    "class": "c",
+    "rule": "r",
+    "found_in": [{"task": "T1", "finding": "f"}],
+}
+
+
+class LessonsWrongTypes(unittest.TestCase):
+    """Every field of lessons.jsonl given each wrong value, raw lines, NaN, 50,000-deep nesting and bad UTF-8: `load`
+    lists the file's errors and nothing else, `check` exits 1 without a traceback, and the page draws the payload."""
+
+    def run_all(self, text):
+        """(load result, exit code of check) for a lessons.jsonl holding `text`, a str or bytes."""
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            path = folder / "lessons.jsonl"
+            path.write_bytes(text if isinstance(text, bytes) else text.encode("utf-8"))
+            data = dashboard.load(folder)
+            json.dumps(data, allow_nan=False)
+            out = io.StringIO()
+            argv = mock.patch.object(sys, "argv", ["dashboard.py", "check", str(folder)])
+            with argv, redirect_stdout(out), self.assertRaises(SystemExit) as raised:
+                dashboard.main()
+            lessons = [(e["line"], e["field"]) for e in data["errors"] if e["file"] == "lessons.jsonl"]
+            self.assertEqual([e for e in data["errors"] if e["file"] != "lessons.jsonl"], [])
+            return data, lessons, raised.exception.code, out.getvalue()
+
+    def test_a_valid_lesson_is_clean(self):
+        _, lessons, code_, out = self.run_all(json.dumps(GOOD_LESSON) + "\n")
+        self.assertEqual((lessons, code_, out), ([], 0, ""))
+
+    def test_each_text_field_with_a_value_that_is_not_text_is_one_error_on_that_field(self):
+        for field in ("type", "at", "by", "id", "class", "rule"):
+            for bad in (None, 0, 1.5, True, [], {}, [None], {"a": 1}):
+                with self.subTest(field=field, bad=bad):
+                    _, lessons, code_, out = self.run_all(json.dumps({**GOOD_LESSON, field: bad}) + "\n")
+                    self.assertIn(field, [f.split(".")[0] for _, f in lessons])
+                    self.assertEqual(code_, 1)
+                    self.assertIn("lessons.jsonl:1", out)
+
+    def test_found_in_with_a_wrong_item_or_a_wrong_task_is_an_error(self):
+        for found in ([None], [0], [[]], [{}], [{"task": None, "finding": "f"}], [{"task": 1, "finding": 2}], "x", 5):
+            with self.subTest(found=found):
+                _, lessons, code_, _ = self.run_all(json.dumps({**GOOD_LESSON, "found_in": found}) + "\n")
+                self.assertTrue(lessons)
+                self.assertEqual(code_, 1)
+
+    def test_a_task_that_is_not_in_tasks_jsonl_and_an_extra_field_are_errors(self):
+        for record in (
+            {**GOOD_LESSON, "found_in": [{"task": "T99", "finding": "f"}]},
+            {**GOOD_LESSON, "extra": 1},
+            {**GOOD_LESSON, "found_in": [{"task": "T1", "finding": "f", "x": {"y": [1]}}]},
+        ):
+            with self.subTest(record=record):
+                _, lessons, code_, _ = self.run_all(json.dumps(record) + "\n")
+                self.assertTrue(lessons)
+                self.assertEqual(code_, 1)
+
+    def test_a_field_left_out_is_an_error(self):
+        for field in GOOD_LESSON:
+            with self.subTest(field):
+                record = {k: v for k, v in GOOD_LESSON.items() if k != field}
+                self.assertTrue(self.run_all(json.dumps(record) + "\n")[1])
+
+    def test_the_same_id_twice_is_an_error_on_the_second_line(self):
+        _, lessons, _, _ = self.run_all((json.dumps(GOOD_LESSON) + "\n") * 2)
+        self.assertEqual([line for line, _ in lessons], [2])
+
+    def test_lines_that_are_not_records_and_values_that_are_not_json_are_errors(self):
+        deep_list = "[" * 50000 + "]" * 50000
+        deep_object = '{"a":' * 50000 + "1" + "}" * 50000
+        deep_field = json.dumps({**GOOD_LESSON, "class": 1})[:-1] + ',"x":' + deep_list + "}"
+        raw = [
+            *RAW_LINES[:-1],
+            "[1,2]",
+            "true",
+            "not json at all",
+            deep_list,
+            deep_object,
+            deep_field,
+            '{"type":"lesson","at":NaN,"by":Infinity,"id":"L1","class":-Infinity,"rule":"r","found_in":[{"task":NaN,"finding":"f"}]}',
+        ]
+        for line in raw:
+            with self.subTest(line=line[:30]):
+                _, lessons, code_, out = self.run_all(line + "\n")
+                self.assertTrue(lessons)
+                self.assertEqual(code_, 1)
+                self.assertIn("lessons.jsonl", out)
+
+    def test_bytes_that_are_not_utf8_are_an_error_not_a_traceback(self):
+        _, lessons, code_, _ = self.run_all(b'{"type":"lesson","by":"\xff\xfe"}\n')
+        self.assertTrue(lessons)
+        self.assertEqual(code_, 1)
+
+    def test_every_payload_is_drawn_by_the_page(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node is not installed")
+        payloads = []
+        for label, changed in wrong_types.variants([GOOD_LESSON]):
+            data, *_ = self.run_all(json.dumps(changed[0]) + "\n")
+            payloads.append({"label": label, "data": data})
+        self.assertGreater(len(payloads), 100)
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "payloads.json"
+            path.write_text(json.dumps(payloads))
+            run = subprocess.run(
+                [node, str(ROOT / "tests" / "render-payloads.js"), str(path)], capture_output=True, text=True
+            )
+        self.assertEqual(run.returncode, 0, run.stderr[:3000])
+
+
 class Check(unittest.TestCase):
     def run_check(self, folder):
         cmd = [sys.executable, "-I", str(SCRIPTS / "dashboard.py"), "check", str(folder)]

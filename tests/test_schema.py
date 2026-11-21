@@ -469,6 +469,15 @@ class Keywords(unittest.TestCase):
         self.assertEqual(self.errors("b", {"enum": ["a", "b"]}), [])
         self.assertEqual(self.errors("c", {"enum": ["a", "b"]}), [("(record)", 'must be one of "a", "b"')])
 
+    def test_a_boolean_is_not_the_number_it_equals_in_python(self):
+        """True == 1 and False == 0 in Python, not in JSON (from the verifier's probe of the validator)."""
+        self.assertEqual(len(self.errors(True, {"const": 1})), 1)
+        self.assertEqual(len(self.errors(1, {"const": True})), 1)
+        self.assertEqual(len(self.errors(1, {"enum": [True]})), 1)
+        self.assertEqual(len(self.errors(0, {"enum": [False]})), 1)
+        self.assertEqual(self.errors(True, {"const": True}), [])
+        self.assertEqual(len(self.errors(True, {"type": "number"})), 1)
+
     def test_pattern_and_min_length(self):
         self.assertEqual(self.errors("T1", {"pattern": r"^T\d+$"}), [])
         self.assertEqual(self.errors("x", {"pattern": r"^T\d+$"}), [("(record)", r"must match ^T\d+$")])
