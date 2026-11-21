@@ -1,0 +1,11 @@
+reply: |
+  One conflict before I design this. docs/adr/0003 says only shop/store.py and shop/outbox.py run SQL on shop.db, and
+  a new job adds a function to shop/store.py; your request has the job run its own SQL.
+  I propose: add sales_report(conn, day) to shop/store.py and have the job call it. It costs about one more function,
+  and a schema change then shows up in store.py's tests instead of breaking the report silently.
+  The other way is to supersede ADR 0003 with a new record that allows read-only report jobs their own SQL.
+  Which do you want?
+actions:
+- read: docs/adr/0003-sql-only-in-shop-modules.md
+- read: shop/store.py
+- read: jobs/send_emails.py

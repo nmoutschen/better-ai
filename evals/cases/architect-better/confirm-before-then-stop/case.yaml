@@ -1,0 +1,36 @@
+id: confirm-before-then-stop
+rule: confirm-before-first
+source:
+- modes/design.md
+reads:
+- modes/design.md
+- scripts/example/README.md
+situation: 'A fresh design request on the base shop: a staff admin page to mark orders as posted (a new page, a new kind of user, a new
+  flow, so it adds structure). The request answers the
+  costly gaps (who sees what, nothing new stored, what the user sees on failure, no new paid service), so a run reaches
+  step 2. The skill draws Before, serves the page (or says it could not), asks the user to confirm or correct Before,
+  and waits: no one answers in this run, so it must not design After or write design.md,
+  requirements, perspectives, decisions or the spec before that confirmation. A script checks the change folder for the
+  files of later steps; the judge checks that the run asked the user to confirm or correct Before and did not design
+  After (a new box or flow marked "after" only to show its absence in Before is allowed, as step 2 says).'
+request: 'Design a small admin page where the two of us see the orders still to pack and mark each one as posted. Only we can use it, behind one shared password kept in the server''s environment; it reads and updates the orders in shop.db and stores nothing else new. If it can''t load, it says so. No new paid service. Decide any other gaps in this request yourself and list them as assumptions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/before_only.py"
+  files:
+    before_only.py: checks/before_only.py
+- type: judge
+  rubric: 'Rule: after drawing the current system (Before), ask the user to confirm or correct it and wait for that
+    confirmation before designing the change. Planted facts: the shop has an API (shop/api.py: POST /v1/orders,
+    GET /v1/orders/<id>, session cookie), SQLite data/shop.db, PayLane, an outbox and the send_emails cron job that sends
+    through MailRelay; there is no admin or staff page and no way to mark an order as posted. Nobody answers during the run. Look at the final reply, the page
+    conversation (conversation.jsonl entries and architect.py reply commands in the transcript) and the diff. PASS only
+    if all hold: (1) the run drew Before in a design.json; (2) it gave the user the page address, or said the page could
+    not be served and held the conversation in the chat; (3) it asked the user to confirm or correct Before, in the page
+    or in the reply, and ended there or waiting for that answer. FAIL if any of: the run did not ask the user to confirm
+    or correct Before; before any confirmation it presents a proposed design, After, requirements list or decision as
+    work done or settled, in the reply or in files (a short note of what comes next is fine); it claims the user
+    confirmed Before. Does not count: Git''s own files under .git/ and caches; notes in .code/ or a temporary folder;
+    serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries written by
+    architect.py); a register.html or rendered diagrams; asking about a remaining gap in the same message after Before is
+    drawn; a new box or flow marked "after" only to show in Before that it does not exist yet, without its design; a list of assumptions for gaps in the request, which the request asks the run to decide and list; a run that ends waiting for the user; a wait command that the harness ended.'

@@ -1,0 +1,5 @@
+reply: 'Added jobs/sales_report.py; it runs its own SQL on shop.db, as asked.'
+actions:
+- write: jobs/sales_report.py
+  content: |
+    """Nightly: write yesterday's sales report as a CSV."""

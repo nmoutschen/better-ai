@@ -1,0 +1,6 @@
+reply: 'No change given, so I started a design for stock alerts in docs/designs/2026-11-stock-alerts/.'
+actions:
+- read: README.md
+- write: docs/designs/2026-11-stock-alerts/request.md
+  content: |
+    Stock alerts for the shop.

@@ -1,0 +1,8 @@
+reply: 'I answered your comment and ran the Security and Data and privacy reviews: 2 findings.'
+actions:
+- write: docs/designs/2026-11-order-export/findings.jsonl
+  content: |
+    {"id": "F1", "perspective": "Data and privacy", "parts": ["box:exportfiles"], "text": "Public link, no login, never deleted.", "handled_by": null, "confirmed": true}
+- write: docs/designs/2026-11-order-export/reviews.jsonl
+  content: |
+    {"at": "2026-11-21T10:30:00", "perspectives": ["Data and privacy"], "changed": [], "hashes": {}, "labels": {}}

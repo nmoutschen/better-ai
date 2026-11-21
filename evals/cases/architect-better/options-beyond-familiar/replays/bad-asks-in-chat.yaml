@@ -1,0 +1,3 @@
+reply: 'Should the CSV be built in a cron job or in the request? I recommend a cron job.'
+actions:
+- read: docs/designs/2026-11-order-export/requirements.jsonl

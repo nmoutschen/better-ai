@@ -1,0 +1,5 @@
+reply: 'Added a Kafka producer in the API and a consumer job.'
+actions:
+- write: shop/events.py
+  content: |
+    """Publish order events to Kafka."""

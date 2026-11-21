@@ -1,0 +1,46 @@
+id: spec-covers-failure-cases
+rule: spec-states-failure-cases-in-ears
+source:
+- modes/design.md
+- templates/specs.md
+reads:
+- modes/design.md
+- templates/specs.md
+situation: >-
+  The change folder docs/designs/2026-11-order-export/ holds a design whose review is settled; the user's last note
+  (n5) says "record the decisions and write the spec". The design and requirements state failure and edge cases: an
+  export of another customer gets 404 (RQ2, API standard rule 3), an export older than 7 days is deleted and can no longer be downloaded
+  (D2), more than 10 export requests a minute get 429 (RQ5, rule 4), and a failed export emails the customer within
+  10 minutes (RQ6), which the design does not yet meet (finding F2 open). The agent writes the spec as EARS
+  statements with concrete values and sources, covering those cases. A script checks that spec.jsonl has records with
+  a requirement and a source; the judge checks the form and the coverage.
+request: I answered in the page. Carry on with docs/designs/2026-11-order-export.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/spec_rows.py"
+  files:
+    spec_rows.py: checks/spec_rows.py
+- type: judge
+  rubric: >-
+    Rule: the spec states every MUST of the design and its decisions, including the failure and edge cases they state
+    or leave open, as EARS statements with concrete values, each linked to its source. Planted facts in
+    docs/designs/2026-11-order-export/: RQ2 (from docs/standards/api.md rule 3) says an export is only the requesting
+    customer's, behind their session cookie, 404 for anyone else's; revised D2 serves an export through GET
+    /v1/account/export/<token> to its owner for 7 days and the job deletes older files; RQ5 (rule 4) says more than 10
+    export requests in a minute get 429 and build none of the extra exports; RQ6 (confirmed by the user) says when an
+    export cannot be built the customer gets an email within 10 minutes and the owners see the failure in the job's
+    log; finding F2 is open: the job's failures before it writes the outbox row are silent, so the design does not yet
+    meet RQ6. Read spec.jsonl, and specs.md if written. PASS only if all hold: (1) the requirements are EARS
+    statements ("When …, the <system> shall …", "If …, then the <system> shall …", "While …", "Where …" or "The
+    <system> shall …") with concrete values; (2) the spec has a requirement for each of: (a) another customer's export
+    gets 404 (API standard rule 3); a request with no valid session gets an error such as the 401 shop/api.py already
+    answers, or 404; (b) an export older than 7 days is deleted and can no longer be downloaded, with a concrete response (no source states which status code: 404, 410 or another stated code are all fine); (c) more than 10 export
+    requests in a minute get 429 with no export built for the extra ones; (d) when an export cannot be built, the
+    customer gets an email within 10 minutes; it may also note that F2 leaves the design short of (d); (3) each
+    requirement names its source: a design section, a decision ID, a requirement ID or a request sentence. FAIL if
+    any of: one of (a) to (d) is missing, or is only under Gaps or in the reply and not a requirement; a value a source
+    states differs from it, such as 403 for another customer's export, 30 days or 5 requests; a requirement has no concrete trigger or response, such as
+    "errors are handled". Does not count: other requirements and their order; the "Checked by" column; where specs.md
+    is saved; the spec checker; the decision records; Git's own files under .git/ and caches; notes in .code/ or a
+    temporary folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl
+    entries written by architect.py); asking the user to confirm in the page; a run that ends waiting for the user.

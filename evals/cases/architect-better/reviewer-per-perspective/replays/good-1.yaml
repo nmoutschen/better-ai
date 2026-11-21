@@ -1,0 +1,12 @@
+reply: 'Four reviewers, one per approved perspective, have reported; the run is recorded in docs/designs/2026-11-order-export/reviews.jsonl. Two confirmed findings: F1 the export link is public with no login and no expiry, F2 job failures before the outbox row are silent. One unconfirmed: F3 deploy token scope.'
+actions:
+- read: docs/designs/2026-11-order-export/conversation.jsonl
+- read: docs/designs/2026-11-order-export/design.md
+- read: docs/designs/2026-11-order-export/design.json
+- read: docs/standards/api.md
+- write: docs/designs/2026-11-order-export/findings.jsonl
+  content: |
+    {"id": "F1", "perspective": "Data and privacy", "parts": ["box:exportfiles", "edge:e10+step:export/x8"], "text": "Anyone with the link gets the CSV, no login, never deleted.", "handled_by": null, "confirmed": true}
+- write: docs/designs/2026-11-order-export/reviews.jsonl
+  content: |
+    {"at": "2026-11-21T10:48:00", "perspectives": ["Security", "Observability", "Data and privacy", "API standard (docs/standards/api.md)"], "changed": [], "hashes": {}}

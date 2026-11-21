@@ -40,7 +40,7 @@ RUN `python3 scripts/diagram.py check <folder>/design.json` and `python3 scripts
 
 RUN `python3 scripts/architect.py serve <folder>` to start the page and GIVE the user its address.
 
-ASK the user to confirm or correct Before in the page. IF the change introduces a system or flow, SHOW its absence in Before. WAIT for the user's confirmation or correction and APPLY any corrections.
+ASK the user to confirm or correct Before in the page. IF the change introduces a system or flow, NAME it in your question as not existing yet, and DO NOT add it to `design.json` before step 4. WAIT for the user's confirmation or correction and APPLY any corrections. DO NOT start step 3 before the user confirms or corrects Before: HANDLE other actions and START `wait` again; IF `wait` times out before they answer, END your turn with the question, in the chat as well as the page.
 
 ## 3. Agree the requirements
 
@@ -61,7 +61,7 @@ USE Attribute-Driven Design (ADD 3.0). IN each iteration, PICK the requirements 
 
 UPDATE `design.json` with the proposed containers, relationships and flows. USE the same boxes as flow participants. PRESERVE part identities across Before and After. SET `in` on every added or removed part. CHECK and render the updated JSON as in step 2.
 
-READ and FOLLOW [../templates/design.md](../templates/design.md) for the conventional design document structure. WRITE `design.md` in the change folder, linking the JSON. RECORD each decision in `design.md` as an output of its iteration, with the recommendation, trade-offs, rejected alternatives and reasons. CHECK the evidence for vendor claims, because vendors often make claims without supporting evidence. FLAG options that rely on unsupported claims.
+READ and FOLLOW [../templates/design.md](../templates/design.md) for the conventional design document structure. WRITE `design.md` in the change folder, linking the JSON. RECORD each decision in `design.md` as an output of its iteration, with the recommendation, its drivers, each rejected alternative with its reason, and the main drawback of the chosen option. A reason to reject an alternative is not a drawback. TREAT a choice that changes behaviour, cost, risk or how the system is maintained as a decision, and COMPARE its options. LIST other choices in the hand-back as assumptions you made. CHECK the evidence for vendor claims, because vendors often make claims without supporting evidence. FLAG options that rely on unsupported claims.
 
 PICK the perspectives that apply, from what the change touches and the applicable repo standards:
 
@@ -93,7 +93,7 @@ DEBATE findings in the page and UPDATE the design where needed. WHEN the user di
 
 ## 7. Record decisions and extract the spec
 
-WHEN the approved design and its review are settled, WRITE each decision of `design.md` worth recording as a record of `decisions.jsonl`. READ and FOLLOW [../templates/decision.md](../templates/decision.md), and WRITE each of these decisions as `<id>.md` in the decision record location.
+WHEN the approved design and its review are settled, WRITE each decision of `design.md` worth recording as a record of `decisions.jsonl`. WRITE each of these decisions in the decision record location, in the repo's decision record format when it has one: NAME the file as the repo names its records, KEEP its sections and PUT the drivers, rejected alternatives and main drawback within them. OTHERWISE, READ and FOLLOW [../templates/decision.md](../templates/decision.md) and NAME the file `<id>.md`.
 
 READ and FOLLOW [../templates/specs.md](../templates/specs.md) to extract the spec from the design and decisions. WRITE each requirement as a record of `spec.jsonl`, with its source. WRITE the same spec as `specs.md` in the spec location, or in the repo's spec format when it has one.
 

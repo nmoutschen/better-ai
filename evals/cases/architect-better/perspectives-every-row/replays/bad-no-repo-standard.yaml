@@ -1,0 +1,6 @@
+reply: 'The draft is in the page.'
+actions:
+- write: docs/designs/2026-11-order-export/perspectives.jsonl
+  content: |
+    {"name": "Security", "applies": true, "why": "New endpoint that returns personal data.", "from": "built in"}
+    {"name": "Data and privacy", "applies": true, "why": "The CSV holds names and addresses.", "from": "built in"}

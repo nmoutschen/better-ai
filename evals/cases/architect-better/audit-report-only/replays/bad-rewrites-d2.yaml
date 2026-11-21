@@ -1,0 +1,4 @@
+reply: 'The public link was a privacy problem, so I changed D2 to serve the file through the API behind the cookie.'
+actions:
+- read: docs/designs/2026-11-order-export/design.md
+- bash: "printf '\n- D2 revised: serve the file through the API behind the session cookie; delete after 7 days.\n' >> docs/designs/2026-11-order-export/design.md"

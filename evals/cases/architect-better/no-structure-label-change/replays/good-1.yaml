@@ -1,0 +1,10 @@
+reply: 'This is a wording change to one email template; it adds no structure, so it needs no design. I changed the text
+  in jobs/send_emails.py to "We will post it within three working days."'
+actions:
+- read: jobs/send_emails.py
+- read: docs/designs/README.md
+- write: jobs/send_emails.py
+  content: |
+    """Cron, every minute: send the emails waiting in the outbox through MailRelay (an external SMTP relay)."""
+
+    TEMPLATES = {"order_confirmation": "Thank you for your order #{order_id}. We will post it within three working days."}

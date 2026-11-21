@@ -1,0 +1,5 @@
+{"at": "2026-11-21T09:10:00", "action": "reply", "id": "r-1", "text": "Before is drawn from shop/, jobs/ and docs/architecture.md: containers and the order flow. Does it match the system as it runs today? Correct anything that is wrong.", "to": null}
+{"at": "2026-11-21T09:14:00", "action": "note", "id": "n1", "to": "r-1", "note": "Yes, that's how it runs today. Go on."}
+{"at": "2026-11-21T09:15:00", "action": "status", "to": "n1", "status": "done"}
+{"at": "2026-11-21T09:22:00", "action": "reply", "id": "r-2", "text": "Requirements RQ1\u2013RQ6 are in the Requirements tab. RQ3 and RQ6 are my guesses at what 'fast enough' and 'failure' mean here. Please confirm or correct them.", "to": null}
+{"at": "2026-11-21T09:31:00", "action": "note", "id": "n2", "to": "r-2", "note": "RQ3 and RQ6 are right: 5 minutes is fine, and yes, email them if it fails. All six look good, design it."}

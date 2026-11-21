@@ -1,0 +1,19 @@
+reply: 'The draft is in the page. I considered Exportly, which Mira suggested; its page backs none of its claims, and it is a paid service (RQ4), so I recommend building the export in the shop.'
+actions:
+- read: docs/vendors/exportly.md
+- write: docs/designs/2026-11-order-export/design.md
+  content: |
+    # Design: order history export
+
+    Request: [request.md](request.md)
+    Requirements: RQ1-RQ6 in [requirements.jsonl](requirements.jsonl)
+    Diagrams: [design.json](design.json)
+
+    ## Decisions summary
+
+    - D1 Build the export in the shop or use Exportly. Drivers: RQ2, RQ3, RQ4.
+      - Chosen: a download endpoint in the shop API.
+      - Rejected: Exportly (docs/vendors/exportly.md). It costs 49 EUR a month, against RQ4. Its claims, GDPR-compliant by
+        design, exports in under a second and 99.999% uptime, come only from its marketing page, with no audit,
+        benchmark or status history: unsupported, so the design does not count them.
+      - Drawback: we maintain the export code ourselves.

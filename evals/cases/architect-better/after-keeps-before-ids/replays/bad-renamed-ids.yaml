@@ -1,0 +1,12 @@
+reply: 'After is in the page.'
+actions:
+- bash: |
+    python3 - <<'PY'
+    import json
+    path = "docs/designs/2026-11-order-export/design.json"
+    design = json.load(open(path))
+    for node in design["containers"]["nodes"]:
+        node["id"] = node["id"] + "-after"
+    design["containers"]["nodes"].append({"id": "exportjob", "label": "build_exports", "kind": "job", "in": ["after"]})
+    json.dump(design, open(path, "w"), indent=2)
+    PY

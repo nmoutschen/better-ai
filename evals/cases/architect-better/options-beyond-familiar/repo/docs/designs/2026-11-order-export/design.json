@@ -1,0 +1,172 @@
+{
+  "title": "Order history export",
+  "summary": "Customers download their own order history as CSV from their account page.",
+  "scope": "shop API, jobs, SQLite data, outbox emails",
+  "containers": {
+    "nodes": [
+      {
+        "id": "customer",
+        "label": "Customer",
+        "kind": "person",
+        "detail": "logged in on the website"
+      },
+      {
+        "id": "website",
+        "label": "Website",
+        "kind": "page",
+        "detail": "static, on Netlify"
+      },
+      {
+        "id": "api",
+        "label": "shop API",
+        "kind": "service",
+        "detail": "shop/api.py"
+      },
+      {
+        "id": "db",
+        "label": "shop.db",
+        "kind": "store",
+        "detail": "SQLite: customers, orders, order_lines, outbox"
+      },
+      {
+        "id": "paylane",
+        "label": "PayLane",
+        "kind": "external",
+        "detail": "card payments"
+      },
+      {
+        "id": "mailjob",
+        "label": "send_emails",
+        "kind": "job",
+        "detail": "cron, every minute"
+      },
+      {
+        "id": "mailrelay",
+        "label": "MailRelay",
+        "kind": "external",
+        "detail": "SMTP relay"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "from": "customer",
+        "to": "website",
+        "label": "orders books"
+      },
+      {
+        "id": "e2",
+        "from": "website",
+        "to": "api",
+        "label": "HTTPS, session cookie"
+      },
+      {
+        "id": "e3",
+        "from": "api",
+        "to": "db",
+        "label": "orders, outbox rows"
+      },
+      {
+        "id": "e4",
+        "from": "api",
+        "to": "paylane",
+        "label": "charges card"
+      },
+      {
+        "id": "e5",
+        "from": "mailjob",
+        "to": "db",
+        "label": "reads unsent outbox"
+      },
+      {
+        "id": "e6",
+        "from": "mailjob",
+        "to": "mailrelay",
+        "label": "SMTP"
+      }
+    ],
+    "groups": [
+      {
+        "id": "vps",
+        "label": "VPS",
+        "members": [
+          "api",
+          "db",
+          "mailjob"
+        ]
+      }
+    ]
+  },
+  "flows": [
+    {
+      "id": "order",
+      "name": "Place an order",
+      "participants": [
+        {
+          "id": "website",
+          "box": "website"
+        },
+        {
+          "id": "api",
+          "box": "api"
+        },
+        {
+          "id": "paylane",
+          "box": "paylane"
+        },
+        {
+          "id": "db",
+          "box": "db"
+        },
+        {
+          "id": "mailjob",
+          "box": "mailjob"
+        }
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "from": "website",
+          "to": "api",
+          "label": "POST /v1/orders"
+        },
+        {
+          "id": "s2",
+          "from": "api",
+          "to": "paylane",
+          "label": "charge card"
+        },
+        {
+          "id": "s3",
+          "from": "paylane",
+          "to": "api",
+          "label": "charge id",
+          "kind": "response"
+        },
+        {
+          "id": "s4",
+          "from": "api",
+          "to": "db",
+          "label": "save order + outbox row, one transaction"
+        },
+        {
+          "id": "s5",
+          "from": "api",
+          "to": "website",
+          "label": "201 order id",
+          "kind": "response"
+        },
+        {
+          "id": "s6",
+          "from": "mailjob",
+          "to": "db",
+          "label": "read unsent outbox rows",
+          "kind": "async"
+        }
+      ]
+    }
+  ],
+  "accepted": [
+    "requirements"
+  ]
+}

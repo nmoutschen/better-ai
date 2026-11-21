@@ -1,0 +1,5 @@
+reply: 'Started the design in .architect/confirmation-wording/.'
+actions:
+- write: .architect/confirmation-wording/request.md
+  content: |
+    Change the order confirmation email wording.

@@ -34,6 +34,18 @@ Choose **Approve…** to start perspective reviews. When a finding appears, sele
 - An implementation spec with verifiable requirements and source links, ready for [`/code-better`](code-better.md).
 - In audit mode, a report of findings tied to diagram parts. The audit makes no changes.
 
+## How it is tested
+
+Tested on 23 situations with Sonnet 5.5 (2026-11-21).
+
+| What it does | Passed |
+| --- | ---: |
+| Asks about costly gaps at once, questions a solution that works against the goal, raises a conflict with a recorded decision, has the user confirm the current system before designing, and asks what to design when given no request | 83% |
+| Draws the current system from the code, flags vendor claims no source supports, traces each requirement to its source, changes a disputed finding only on evidence, and audits the system against its design | 67% |
+| Compares options with their drawbacks, states quality attributes as scenarios, lists every perspective, keeps the current system's part IDs in the change, and states failure cases in the spec | 93% |
+| Reviews only an approved design, with a fresh reviewer per perspective, ties findings to diagram parts, and has a separate agent check the spec | 100% |
+| Saves the design and decision records where and how the repo keeps them, designs nothing when the structure does not change, changes nothing in an audit, and says at hand-back what is approved, reviewed and still open | 87% |
+
 <details>
 <summary><b>Works with</b></summary>
 

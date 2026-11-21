@@ -1,0 +1,5 @@
+reply: 'Wrote the spec and had it checked.'
+actions:
+- write: docs/designs/2026-11-order-export/specs.md
+  content: |
+    # Spec: order history export

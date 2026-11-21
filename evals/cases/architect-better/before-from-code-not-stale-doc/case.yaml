@@ -1,0 +1,42 @@
+id: before-from-code-not-stale-doc
+rule: draw-before-from-code
+source:
+- modes/design.md
+reads:
+- modes/design.md
+- scripts/example/README.md
+situation: 'docs/architecture.md is out of date: it says the shop API sends the order confirmation email straight to
+  MailRelay before it answers, with no outbox and no email job. The code says otherwise: shop/api.py calls
+  outbox.enqueue in the order transaction, shop/outbox.py writes an outbox row, jobs/send_emails.py (cron, every minute)
+  reads unsent outbox rows and sends them through MailRelay, and docs/adr/0002-outbox-for-emails.md records that
+  decision. The user asks for a shipping email and the request already answers the costly gaps, so a run reaches step
+  2. The agent draws Before in design.json from the code: the send_emails job reads the outbox in shop.db and sends
+  through MailRelay; the API does not call MailRelay. It marks what it could not check against the code. A script checks
+  that a design.json with boxes exists; the judge reads its relations.'
+request: 'Customers keep emailing us to ask whether their books have left. When we post a parcel we set the order''s status to ''posted'' by hand in shop.db, and we''ll keep doing that. Design a shipping email for it. Once an order''s status is ''posted'', the customer who placed it gets one email saying it''s on its way, without a tracking number. Store only what is needed to send it once. If it cannot be sent, we see that in the job''s log and the customer simply doesn''t get it. No new paid service. Decide anything else yourself and list it as an assumption.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/before_drawn.py"
+  files:
+    before_drawn.py: checks/before_drawn.py
+- type: judge
+  rubric: 'Rule: draw the current system (Before) from the code, checking each box, relationship and flow step against
+    the code, and mark what could not be verified; a stale document does not override the code. Planted facts:
+    docs/architecture.md (out of date) says the shop API sends the confirmation email straight to MailRelay, with no
+    outbox and no email job. The code: shop/api.py saves the order and calls outbox.enqueue in the same transaction and
+    never contacts MailRelay; shop/outbox.py inserts a row into the outbox table of SQLite data/shop.db;
+    jobs/send_emails.py (its docstring says cron, every minute) reads unsent outbox rows and sends them through
+    MailRelay (smtp.mailrelay.example); docs/adr/0002-outbox-for-emails.md records this outbox decision. No crontab or
+    deployment file is in the repository. Look at the new design.json in the diff; Before is every part whose `in` is
+    missing or holds "before" (parts with `"in": ["after"]` are the proposal and do not count). PASS only if all hold:
+    (1) Before has a box for the email job (send_emails or a cron job by another name) with a relationship or flow step
+    from it to the database or outbox, and one from it to MailRelay; (2) Before has no relationship or flow step from
+    the shop API to MailRelay; (3) the run marks at least one thing it could not check against the code, in design.json
+    (such as a detail or label), the page conversation or the reply, such as the cron schedule, the Netlify hosting, the
+    NAS backup, or that docs/architecture.md disagrees with the code about how emails are sent. FAIL if any of: Before
+    shows the API sending email to MailRelay directly (in Before), or leaves out the email job or the outbox path to
+    MailRelay; no design.json was written. Does not count: Git''s own files under .git/ and caches; notes in .code/ or a
+    temporary folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl
+    entries written by architect.py); asking the user to confirm Before in the page; asking about a remaining gap after
+    Before is drawn; a run that ends waiting for the user; a register.html or rendered diagrams; extra boxes that match
+    the code, such as PayLane or the website.'

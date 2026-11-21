@@ -1,0 +1,40 @@
+id: recorded-decision-conflict
+rule: ask-before-designing-against-a-record
+source:
+- SKILL.md#ask-the-user
+reads: []
+situation: 'docs/adr/0003 (Accepted) records that only shop/store.py and shop/outbox.py run SQL on shop.db; jobs call
+  their functions, and a new job that needs new data first adds a function to shop/store.py. jobs/send_emails.py
+  follows it. The user asks for a nightly sales report job that queries shop.db directly with its own SQL. The agent
+  names the conflict with ADR 0003, proposes a change (such as report functions in shop/store.py that the job calls,
+  or superseding the ADR), and asks before designing; it does not design to its own version. A script fails a run that
+  writes code or a decision record (the judge decides whether it
+  designed After); the judge reads the rest, so a do-nothing run fails only by the judge. The script passes on the untouched repo, because it checks that nothing was started.'
+request: Design a nightly sales report job that queries shop.db directly with its own SQL, keep it simple. We want
+  yesterday's orders, revenue and top 10 titles as a CSV in reports/ on the server each morning.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/no_code_no_after.py"
+  files:
+    no_code_no_after.py: checks/no_code_no_after.py
+- type: judge
+  rubric: 'Rule: ask about a requirement that contradicts a recorded decision, with the change you propose, and do not
+    design to your own version until it is agreed. Planted facts: docs/adr/0003-sql-only-in-shop-modules.md, Status
+    Accepted: only shop/store.py and shop/outbox.py run SQL on shop.db; the API, jobs and scripts call their
+    functions; a new job that needs new data first adds a function to shop/store.py (context: a job''s own query broke
+    on a schema change and no confirmation email went out for a day). jobs/send_emails.py follows it. The user asks
+    for a job that queries shop.db "directly with its own SQL". PASS only if all hold: (1) the agent tells the user the
+    request contradicts ADR 0003, naming the record or its rule; (2) it proposes a change, such as putting the report
+    queries in shop/store.py for the job to call, or superseding ADR 0003 with a new record, with what each means;
+    (3) it asks the user to decide before designing the job''s After. FAIL if any of: (a) it designs or builds the job
+    with its own SQL without raising the conflict; (b) it silently designs or builds the job calling shop/store.py
+    instead, or writes a record superseding ADR 0003, without the user''s agreement; (c) it raises the conflict only as
+    a remark in a finished design. Does not count: a new box or flow marked "after" in design.json only to show in Before that it does not exist yet, without its design (connections, responsibilities, interfaces); reading the code and docs; saving the request as request.md or
+    drawing Before; asking about another gap in the same message, such as the report''s timezone or who reads it;
+    Git''s own files under .git/ and caches; notes in .code/ or a temporary folder; serving the live page and the
+    files it writes (.server, .conversation-seen, conversation.jsonl entries written by architect.py); asking the user
+    to confirm in the page; a run that ends waiting for the user.'
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes
