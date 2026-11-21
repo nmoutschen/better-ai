@@ -495,6 +495,29 @@ class Keywords(unittest.TestCase):
             self.errors(1, {"not": {"type": "integer"}}), [("(record)", "must not match the excluded shape")]
         )
 
+    def test_a_rejection_in_then_names_the_rule(self):
+        s = {"if": {"properties": {"status": {"const": "done"}}}, "then": {"not": {"required": ["reason"]}}}
+        self.assertEqual(
+            self.errors({"status": "done", "reason": "x"}, s), [("reason", 'not allowed when status is "done"')]
+        )
+
+    def test_a_nested_rule_keeps_its_own_name(self):
+        inner = {
+            "if": {"properties": {"reason": {"const": "task"}}, "required": ["reason"]},
+            "then": {"required": ["waits_on"]},
+        }
+        s = {
+            "if": {"properties": {"status": {"const": "blocked"}}},
+            "then": {"required": ["reason"], "allOf": [inner]},
+        }
+        self.assertEqual(
+            self.errors({"status": "blocked", "reason": "task"}, s), [("waits_on", 'required when reason is "task"')]
+        )
+
+    def test_not_with_a_non_object_schema_is_a_schema_error_not_a_traceback(self):
+        with self.assertRaises(schema.SchemaError):
+            self.errors({"a": 1}, {"not": True})
+
     def test_if_then_else(self):
         s = {
             "if": {"properties": {"k": {"const": 1}}, "required": ["k"]},
@@ -857,6 +880,125 @@ class Schemas(Case):
             "logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"})
         )
         self.assertEqual(self.messages("logs/b.card.json"), [])
+
+
+class Paths(Case):
+    def test_a_relative_path_from_inside_the_folder_finds_its_schema(self):
+        self.write(
+            "logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"})
+        )
+        self.write("logs/b.jsonl", jsonl({"type": "start", "at": AT, "by": "b", "text": "x", "id": "L1"}))
+        result = subprocess.run(
+            [sys.executable, "-I", str(SCRIPT), "check", "--schemas", str(self.schemas), "b.jsonl"],
+            capture_output=True,
+            text=True,
+            cwd=self.change / "logs",
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("id: not allowed", result.stdout)
+        self.assertNotIn("no schema", result.stdout)
+
+    def test_dot_checks_the_current_folder(self):
+        self.write("tasks.jsonl", jsonl(task(1, status="blocked")))
+        result = subprocess.run(
+            [sys.executable, "-I", str(SCRIPT), "check", "--schemas", str(self.schemas), "."],
+            capture_output=True,
+            text=True,
+            cwd=self.change,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('reason: required when status is "blocked"', result.stdout)
+
+    def test_a_folder_with_no_file_that_has_a_schema_is_an_error(self):
+        empty = self.root / "empty"
+        empty.mkdir()
+        (empty / "notes.md").write_text("x", encoding="utf-8")
+        errors = schema.check_paths([empty], self.schemas)
+        self.assertEqual([(e.field, e.message) for e in errors], [("(folder)", "no file here has a schema")])
+
+
+class Lines(Case):
+    def test_a_unicode_line_separator_inside_a_string_does_not_split_a_record(self):
+        for char in ("\u2028", "\u2029", "\u0085", "\x1c", "\x1d", "\x1e"):
+            self.write("spec.jsonl", jsonl_raw(spec_line(1, statement=f"a{char}b"), spec_line(2)))
+            self.write("tasks.jsonl", jsonl(task(1, requirements=["S1", "S2"])))
+            self.assertEqual(self.messages("spec.jsonl"), [], repr(char))
+            self.assertEqual(self.messages("tasks.jsonl"), [], repr(char))
+
+    def test_crlf_line_ends_are_fine_and_a_blank_line_is_still_found(self):
+        self.write("spec.jsonl", "\r\n".join(json.dumps(r) for r in (spec_line(1), spec_line(2))) + "\r\n")
+        self.assertEqual(self.messages("spec.jsonl"), [])
+        self.write("spec.jsonl", jsonl(spec_line(1)) + "\n" + jsonl(spec_line(2)))
+        self.assertEqual(self.messages("spec.jsonl"), ["2: (record): empty line"])
+
+
+def jsonl_raw(*records):
+    return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records)
+
+
+class ArchitectFolder(Case):
+    """Decided 21: code.json `design` can point to an architect folder that holds the spec and the decisions."""
+
+    POINTER = {"from": "code.json", "field": "design.folder", "name": "spec.jsonl", "else": "spec.jsonl"}
+
+    def setUp(self):
+        super().setUp()
+        s = copy.deepcopy(TASKS)
+        s["properties"]["requirements"]["items"]["x-points-to"] = {"file": self.POINTER, "type": "spec"}
+        self.put_schema(s)
+        code = copy.deepcopy(CODE)
+        code["properties"]["design"] = {
+            "type": "object",
+            "properties": {"type": {"enum": ["architect", "file"]}, "folder": {"type": "string"}},
+        }
+        self.put_schema(code)
+        (self.root / ".git").mkdir()
+        arch = self.root / "docs" / "designs" / "up"
+        arch.mkdir(parents=True)
+        (arch / "spec.jsonl").write_text(jsonl(spec_line(1), spec_line(7)), encoding="utf-8")
+
+    def code_json(self, design):
+        record = {"type": "code", "at": AT, "by": "x", "goal": "g", "mode": "coordinate"}
+        if design is not None:
+            record["design"] = design
+        self.write("code.json", json.dumps(record))
+
+    def test_requirements_resolve_in_the_architect_folder(self):
+        self.code_json({"type": "architect", "folder": "docs/designs/up"})
+        self.write("tasks.jsonl", jsonl(task(1, requirements=["S7"])))
+        self.assertEqual(self.messages("tasks.jsonl"), [])
+
+    def test_a_requirement_only_in_the_local_spec_is_dangling_then_and_names_the_folder_file(self):
+        self.code_json({"type": "architect", "folder": "docs/designs/up"})
+        self.write("tasks.jsonl", jsonl(task(1, requirements=["S2"])))
+        errors = self.messages("tasks.jsonl")
+        self.assertEqual(len(errors), 1)
+        self.assertIn('dangling: "S2" is not a spec record in docs/designs/up/spec.jsonl', errors[0])
+
+    def test_another_design_falls_back_to_the_local_file(self):
+        for design in (None, {"type": "file", "path": "p.md"}):
+            self.code_json(design)
+            self.write("tasks.jsonl", jsonl(task(1, requirements=["S2"]), task(2, requirements=["S7"])))
+            errors = self.messages("tasks.jsonl")
+            self.assertEqual(len(errors), 1, errors)
+            self.assertIn('2: requirements[0]: dangling: "S7"', errors[0])
+
+    def test_a_missing_code_json_falls_back_to_the_local_file(self):
+        (self.change / "code.json").unlink()
+        self.write("tasks.jsonl", jsonl(task(1, requirements=["S2"])))
+        self.assertEqual([e for e in self.messages("tasks.jsonl") if "dangling" in e], [])
+
+    def test_a_missing_architect_folder_is_dangling(self):
+        self.code_json({"type": "architect", "folder": "docs/designs/none"})
+        self.write("tasks.jsonl", jsonl(task(1)))
+        self.assertIn("docs/designs/none/spec.jsonl does not exist", self.messages("tasks.jsonl")[0])
+
+    def test_no_repo_root_is_an_error_not_a_pass(self):
+        (self.root / ".git").rmdir()
+        self.code_json({"type": "architect", "folder": "docs/designs/up"})
+        self.write("tasks.jsonl", jsonl(task(1)))
+        errors = [e for e in self.messages("tasks.jsonl") if "repo root" in e]
+        self.assertEqual(len(errors), 1)
 
 
 if __name__ == "__main__":
