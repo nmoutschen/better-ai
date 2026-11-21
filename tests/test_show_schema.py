@@ -442,7 +442,6 @@ KIND_BREAKS = [
     kind_break("table", set_in([], "highlight_rows", "1"), "highlight_rows"),
     kind_break("text", pop_in([], "body"), "body"),
     kind_break("text", set_in([], "body", []), "body"),
-    kind_break("text", set_in([], "body", ""), "body"),
     kind_break("svg", pop_in([], "alt"), "alt"),
     kind_break("svg", pop_in([], "svg"), "svg"),
     kind_break("lanes", set_in([], "actors", []), "actors"),
