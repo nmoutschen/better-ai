@@ -1053,9 +1053,9 @@ class NullIsAbsent(unittest.TestCase):
 
     def test_a_status_driven_field_is_still_refused_as_null(self):
         finding = {**examples("findings.jsonl")[0][1], "status": "open", "handled_by": None}
-        self.assertEqual(
-            {p[0] for p in schema.check_record(finding, ["findings.schema.json"], SCHEMAS)}, {"handled_by"}
-        )
+        problems = schema.check_record(finding, ["findings.schema.json"], SCHEMAS)
+        self.assertEqual([p[0] for p in problems], ["handled_by"])
+        self.assertIn("status", problems[0][1])
 
     def test_a_folder_with_nulls_loads_draws_and_hashes_like_one_without(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1099,6 +1099,99 @@ class NullIsAbsent(unittest.TestCase):
             diagram.svg_containers(diagram.layout(nulls), "after"),
             diagram.svg_containers(diagram.layout(plain), "after"),
         )
+
+
+class DiagramCli(unittest.TestCase):
+    """`diagram.py check` and `render` agree on every design the schema accepts, and never show a traceback."""
+
+    def run_cli(self, command, text, tmp):
+        path = Path(tmp) / "design.json"
+        path.write_text(text)
+        argv = [sys.executable, "-I", str(SCRIPTS / "diagram.py"), command, str(path)]
+        if command == "render":
+            argv += ["--out", str(Path(tmp) / "out")]
+        return subprocess.run(argv, capture_output=True, text=True)
+
+    def full_design(self):
+        made = design()
+        made["containers"]["groups"] = [{"id": "g", "label": "G", "members": ["user"], "in": ["after"]}]
+        made["containers"]["nodes"][0].update(detail="d", **{"in": ["after"]})
+        made["containers"]["edges"][0].update(**{"in": ["after"]})
+        made["flows"][0].update(**{"in": ["after"]})
+        made["flows"][0]["participants"][0].update(**{"in": ["after"]})
+        made["flows"][0]["steps"][0].update(**{"in": ["after"]})
+        return made
+
+    def optional_paths(self, value, prefix=()):
+        """Every optional field of a design, as a path: those a schema marks null-able and the design holds."""
+        required = {
+            "type",
+            "at",
+            "by",
+            "id",
+            "label",
+            "kind",
+            "from",
+            "to",
+            "members",
+            "name",
+            "box",
+            "nodes",
+            "flows",
+            "containers",
+            "participants",
+            "steps",
+        }
+        if isinstance(value, dict):
+            for key, inner in value.items():
+                here = (*prefix, key)
+                optional = key not in required or (
+                    key in ("label", "kind") and (prefix[-2:-1] == ("steps",) or prefix[-2:-1] == ("edges",))
+                )
+                if optional and key not in ("type", "at", "by"):
+                    yield here
+                yield from self.optional_paths(inner, here)
+        elif isinstance(value, list):
+            for index, inner in enumerate(value):
+                yield from self.optional_paths(inner, (*prefix, index))
+
+    def test_every_optional_field_set_to_null_checks_and_renders(self):
+        paths = sorted(set(self.optional_paths(self.full_design())), key=str)
+        names = {p[-1] for p in paths}
+        for needed in ("detail", "in", "label", "kind", "edges", "groups"):
+            self.assertIn(needed, names)
+        for path in paths:
+            with self.subTest(path=path), tempfile.TemporaryDirectory() as tmp:
+                made = self.full_design()
+                target = made
+                for part in path[:-1]:
+                    target = target[part]
+                target[path[-1]] = None
+                self.assertEqual(schema.check_record(made, ["design.schema.json"], SCHEMAS), [])
+                check = self.run_cli("check", json.dumps(made), tmp)
+                self.assertEqual((check.returncode, check.stderr), (0, ""))
+                render = self.run_cli("render", json.dumps(made), tmp)
+                self.assertEqual((render.returncode, render.stderr), (0, ""))
+
+    def test_a_design_that_is_not_an_object_is_an_error_not_a_traceback(self):
+        for text in ("[]", "5", "null", '"x"', "true"):
+            for command in ("check", "render"):
+                with self.subTest(text=text, command=command), tempfile.TemporaryDirectory() as tmp:
+                    run = self.run_cli(command, text, tmp)
+                    self.assertEqual(run.returncode, 1)
+                    self.assertIn("design: expected an object", run.stderr)
+                    self.assertNotIn("Traceback", run.stderr)
+
+    def test_an_answered_gap_is_written_as_answered(self):
+        records = [
+            base("spec", id="S1", statement="s", source={"type": "design", "section": "x"}, checked_by="c"),
+            base("gap", id="G1", text="t", status="answered", decision="D2", if_wrong="w"),
+            base("gap", id="G2", text="t", status="asked", decision="D3", if_wrong="w"),
+        ]
+        text = architect.specs_md(records, {"title": "T"})
+        self.assertIn("answered (D2)", text)
+        self.assertNotIn("asked (D2)", text)
+        self.assertIn("asked (D3)", text)
 
 
 class RequiredFiles(unittest.TestCase):
