@@ -22,7 +22,8 @@ evals/
   tools/
     validate_cases.py     replays good and bad runs through the result checks
     check_coverage.py     skill sections and files the cases point to
-    report.py             pass rate per rule and condition, tokens, cost, time, judge agreement
+    report.py             pass rate per rule and condition, tokens, cost, time, judge agreement;
+                          --pr and --docs print the tables of PRINCIPLES.md, sections 10 and 11
   cases/<skill>/...       the cases
   judge_labels/           hand labels for judge validation
   tests/

@@ -1,6 +1,6 @@
 # Eval principles
 
-Use these principles to write or change the eval cases and graders of a skill. They are the author's choices for how skills are measured. `README.md` says how the harness works; this file says what each grader is for.
+Use these principles to write or change the eval cases and graders of a skill, and to report their results. They are the author's choices for how skills are measured. `README.md` says how the harness works; this file says what each grader is for.
 
 ## 1. Grade with a script what a script can decide
 
@@ -66,3 +66,34 @@ FIX the grader, the case or the adapter WHEN that is the cause, and VALIDATE the
 ## 9. Test a skill change on a pilot before a full run
 
 STATE each skill change as a hypothesis: the behaviour it should change, the evidence for it, and the cases that show it. RUN those cases, and a fixed set of about ten cases that covers the skill's main steps, a few times each, and COMPARE them with the same cases before the change. CHANGE one thing at a time where you can. RUN the full eval only once the pilots reach a satisfactory rate, and KEEP the pilot logs to compare against.
+
+## 10. Report results in a pull request by the skill's priorities
+
+A pull request that changes a skill or its cases REPORTS its eval results in this form. Its readers are the public: STATE the results, and DO NOT address the maintainer, such as with a verdict or "your call". DO NOT link private pages or research.
+
+OPEN with one or two sentences that give the result and what was tested, such as "Leaves correct work alone more often (+28 points). No other clear change. Tested on 28 cases with Sonnet 5.5." DO NOT list the harness version, judge agreement, run counts or error counts in the text.
+
+GROUP the cases into the skill's priority categories, in the order `cases/<skill>/priorities.yaml` lists them. WHEN a skill has no such file, ASK the maintainer for the order and WRITE the file before reporting. EVERY case of the skill is in exactly one category. A lower category may lose where a higher one gains, so DO NOT sum or weight categories into one score. A category holds several cases; a rule with one case is not a category.
+
+SHOW two things:
+
+- a chart of the change in each category, new minus old (or skill minus no skill for a new skill), as a dot with its 95% interval over cases, with one note: "A 95% interval crossing zero means no clear change". The case is the unit: AVERAGE a case's runs first;
+- a table with the category, its number of cases, the pass rate in percent in each condition, and a centred Change column that holds only a mark and the number: ▲ +28, ▼ −12, or a bare = when the interval crosses zero.
+
+| Category | Cases | No skill | Short skill | Before | After | Change |
+| --- | ---: | ---: | ---: | ---: | ---: | :---: |
+| 1 Owns the error | 6 | 5% | 60% | 82% | 73% | = |
+| 4 Leaves correct work alone | 5 | 40% | 74% | **31%** | **59%** | ▲ +28 |
+
+COPY `.github/PULL_REQUEST_TEMPLATE/eval-results.md` into the pull request description. PRINT the table with `uv run python -m tools.report <logs> --latest --pr --chart chart.svg`, adding `--before <logs of the skill before the change>` for a change to an existing skill, and HOST the chart on the `pr-screenshots` branch. RUN every condition in the table on the same cases with the same number of runs. BOLD the numbers that carry the opening sentence. LEAVE OUT per-rule and per-case rows, cost and p-values.
+
+## 11. Report results in a skill's docs by what it does
+
+A skill's docs page REPORTS its eval results as a short "How it is tested" section: one sentence on what was tested, such as "Tested on 28 situations with Sonnet 5.5 (2026-11-21).", then one row per priority category, in order, with what the skill does and how often it passed. DESCRIBE what the skill does for the reader: DO NOT compare with no skill, and DO NOT add a chart.
+
+| What it does | Passed |
+| --- | ---: |
+| Says plainly that it made the error | 73% |
+| Fixes what the evidence supports, checks the fix, and asks only when blocked | 80% |
+
+TAKE the row text from each category's `does` in `priorities.yaml`, and PRINT the table with `uv run python -m tools.report <logs> --latest --docs`.
