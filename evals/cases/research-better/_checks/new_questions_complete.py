@@ -1,4 +1,4 @@
-"""Every question added during the run has a short title, an origin, a kind, stakes, a done-when line, a priority and
+"""Every question added during the run has a short title, an origin, a kind, stakes, a done_when, a priority and
 a status from the board format."""
 
 import os
