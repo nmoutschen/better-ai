@@ -14,9 +14,14 @@ and condition of a group keeps only the runs of the most recently started log th
 replace the runs they fix.
 
     uv run python -m tools.report logs/<dir>/*.eval [...] [--latest] [--labels judge_labels/code-better.yaml]
+
+With `--pr` or `--docs`, it prints instead the pull request or docs table of PRINCIPLES.md, sections 10 and 11: one
+row per priority category of `cases/<skill>/priorities.yaml`. `--before` takes the logs of the skill before a change,
+and `--chart` writes the pull request's chart of the change per category to an SVG file.
 """
 
 import argparse
+import html
 import math
 import random
 import statistics
@@ -505,19 +510,240 @@ def agreement(results: list[SampleResult], labels: list[dict[str, Any]]) -> list
     return lines
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Print the report for the given logs."""
+# ---------- PR and docs format (evals/PRINCIPLES.md, sections 10 and 11) ----------
+
+CASES_DIR = Path(__file__).resolve().parents[1] / "cases"
+PRIORITIES_FILE = "priorities.yaml"
+# Two-sided 95% quantiles of Student's t for 1 to 30 degrees of freedom; 1.96 beyond.
+T95 = (
+    12.706,
+    4.303,
+    3.182,
+    2.776,
+    2.571,
+    2.447,
+    2.365,
+    2.306,
+    2.262,
+    2.228,
+    2.201,
+    2.179,
+    2.160,
+    2.145,
+    2.131,
+    2.120,
+    2.110,
+    2.101,
+    2.093,
+    2.086,
+    2.080,
+    2.074,
+    2.069,
+    2.064,
+    2.060,
+    2.056,
+    2.052,
+    2.048,
+    2.045,
+    2.042,
+)
+BEFORE, AFTER = "before", "after"
+COLUMN_NAMES = {NO_SKILL: "No skill", SHORT_SKILL: "Short skill", WITH_SKILL: "Skill", BEFORE: "Before", AFTER: "After"}
+
+
+@dataclass
+class CategoryRow:
+    """One priority category: its pass rate per column and the change between the compared columns."""
+
+    name: str
+    does: str
+    cases: int
+    rates: dict[str, float]
+    change: float | None
+    low: float | None
+    high: float | None
+
+    def mark(self) -> str:
+        """▲ or ▼ with the change in points when its interval excludes zero, otherwise =."""
+        if self.change is None or self.low is None or self.high is None or self.low <= 0 <= self.high:
+            return "="
+        points = round(self.change * 100)
+        return "=" if points == 0 else f"▲ +{points}" if points > 0 else f"▼ −{-points}"
+
+
+def load_priorities(skill: str, cases_dir: Path = CASES_DIR) -> list[dict[str, Any]]:
+    """Read `cases/<skill>/priorities.yaml` and check that each category names existing cases, each case once."""
+    path = cases_dir / skill / PRIORITIES_FILE
+    if not path.exists():
+        raise SystemExit(f"{path} is missing: ask the maintainer for {skill}'s priority order and write it there")
+    categories = (yaml.safe_load(path.read_text()) or {}).get("categories") or []
+    seen: dict[str, str] = {}
+    for category in categories:
+        if not category.get("name") or not category.get("does") or not category.get("cases"):
+            raise SystemExit(f"{path}: every category needs a name, does and cases")
+        for case in category["cases"]:
+            if not (cases_dir / skill / case / "case.yaml").exists():
+                raise SystemExit(f"{path}: {category['name']} lists {case}, which is not a case of {skill}")
+            if case in seen:
+                raise SystemExit(f"{path}: {case} is in both {seen[case]} and {category['name']}")
+            seen[case] = category["name"]
+    return categories
+
+
+def mean_interval(differences: list[float]) -> tuple[float, float | None, float | None]:
+    """Return the mean of per-case differences and its 95% t-interval; no interval with fewer than two cases."""
+    mean = sum(differences) / len(differences)
+    if len(differences) < 2:
+        return mean, None, None
+    freedom = len(differences) - 1
+    quantile = T95[freedom - 1] if freedom <= len(T95) else 1.96
+    half = quantile * statistics.stdev(differences) / math.sqrt(len(differences))
+    return mean, mean - half, mean + half
+
+
+def category_rows(
+    results: list[SampleResult], categories: list[dict[str, Any]], before: list[SampleResult] | None = None
+) -> tuple[list[str], list[CategoryRow]]:
+    """Pass rate per category and column, and the change: after − before, or skill − no skill without `before`.
+
+    A category's rate is the mean of its cases' rates, so each case counts once; the change is paired by case.
+    """
+    means = case_means(results)
+    if before is not None:
+        means[BEFORE] = case_means(before).get(WITH_SKILL, {})
+        means[AFTER] = means.pop(WITH_SKILL, {})
+        compared, columns = (BEFORE, AFTER), [NO_SKILL, SHORT_SKILL, BEFORE, AFTER]
+    else:
+        compared, columns = (NO_SKILL, WITH_SKILL), [NO_SKILL, SHORT_SKILL, WITH_SKILL]
+    columns = [column for column in columns if means.get(column)]
+    ran = {case for column in columns for case in means[column]}
+    missing = [f"{case} ({COLUMN_NAMES[c]})" for c in columns for case in sorted(ran - set(means[c]))]
+    if missing:
+        raise SystemExit(f"every column needs scored runs of the same cases; none for: {', '.join(missing)}")
+    listed = {case for category in categories for case in category["cases"]}
+    if ran - listed:
+        raise SystemExit(f"cases in no priority category: {', '.join(sorted(ran - listed))}")
+    rows = []
+    for category in categories:
+        cases = [case for case in category["cases"] if case in ran]
+        rates = {}
+        for column in columns:
+            values = [means[column][case] for case in cases if case in means[column]]
+            if values:
+                rates[column] = sum(values) / len(values)
+        old, new = means.get(compared[0], {}), means.get(compared[1], {})
+        differences = [new[case] - old[case] for case in cases if case in old and case in new]
+        change, low, high = mean_interval(differences) if differences else (None, None, None)
+        rows.append(CategoryRow(category["name"], category["does"], len(cases), rates, change, low, high))
+    return columns, rows
+
+
+def tested_on(results: list[SampleResult]) -> tuple[int, str, str]:
+    """Return how many cases have scored runs, on which agent model, and the date of the newest log."""
+    scored = {r.case for r in results if r.error is None and not math.isnan(r.passed)}
+    return len(scored), results[0].agent_model, max(r.started for r in results)[:10]
+
+
+def pr_lines(columns: list[str], rows: list[CategoryRow], results: list[SampleResult]) -> list[str]:
+    """The table for a pull request: rate per column in percent and the change, the compared cells bold if clear."""
+    count, model, _ = tested_on(results)
+    compared = columns[-2:] if AFTER in columns else [NO_SKILL, WITH_SKILL]
+    lines = [
+        f"Tested on {count} cases with {model}.",
+        "",
+        "| Category | Cases | " + " | ".join(COLUMN_NAMES[c] for c in columns) + " | Change |",
+        "| --- | ---: | " + " | ".join("---:" for _ in columns) + " | :---: |",
+    ]
+    for number, row in enumerate(rows, 1):
+        clear = row.mark() != "="
+        cells = []
+        for column in columns:
+            text = f"{row.rates[column]:.0%}" if column in row.rates else "–"
+            cells.append(f"**{text}**" if clear and column in compared and column in row.rates else text)
+        lines.append(f"| {number} {row.name} | {row.cases} | " + " | ".join(cells) + f" | {row.mark()} |")
+    return lines
+
+
+def docs_lines(columns: list[str], rows: list[CategoryRow], results: list[SampleResult]) -> list[str]:
+    """The table for a skill's docs page: what the skill does and its pass rate, with no comparison."""
+    count, model, date = tested_on(results)
+    column = AFTER if AFTER in columns else WITH_SKILL
+    lines = [f"Tested on {count} situations with {model} ({date}).", "", "| What it does | Passed |", "| --- | ---: |"]
+    lines += [f"| {row.does} | {row.rates[column]:.0%} |" for row in rows if column in row.rates]
+    return lines
+
+
+def chart_svg(rows: list[CategoryRow]) -> str:
+    """Draw the change per category as a dot with its 95% interval, in percentage points, around a zero line."""
+    ends = [abs(v) for row in rows for v in (row.change, row.low, row.high) if v is not None]
+    reach = max(10, math.ceil(max(ends, default=0) * 10) * 10)
+    width, label, value, top, step = 680, 240, 130, 16, 34
+    plot = width - label - value - 20
+
+    def x(points: float) -> float:
+        return label + (points + reach) / (2 * reach) * plot
+
+    height = top + step * len(rows) + 24
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        'font-family="-apple-system, Segoe UI, sans-serif" font-size="13">',
+        f'<rect width="{width}" height="{height}" fill="#FFFCF7"/>',
+        f'<line x1="{x(0):.1f}" y1="{top - 8}" x2="{x(0):.1f}" y2="{height - 22}" stroke="#33302B"/>',
+    ]
+    for tick in (-reach, 0, reach):
+        parts.append(
+            f'<text x="{x(tick):.1f}" y="{height - 6}" text-anchor="middle" fill="#78736B">'
+            f"{'+' if tick > 0 else '−' if tick < 0 else ''}{abs(tick)}</text>"
+        )
+    for index, row in enumerate(rows):
+        y = top + step * index + step / 2
+        parts.append(f'<text x="12" y="{y + 4:.1f}" fill="#33302B">{index + 1} {html.escape(row.name)}</text>')
+        if row.change is None:
+            continue
+        if row.low is not None and row.high is not None:
+            parts.append(
+                f'<line x1="{x(row.low * 100):.1f}" y1="{y:.1f}" x2="{x(row.high * 100):.1f}" y2="{y:.1f}" '
+                'stroke="#33302B" stroke-width="3" stroke-linecap="round"/>'
+            )
+        parts.append(
+            f'<circle cx="{x(row.change * 100):.1f}" cy="{y:.1f}" r="6" fill="#FFFCF7" stroke="#1C1A17" '
+            'stroke-width="2"/>'
+        )
+        colour = "#66795A" if row.mark().startswith("▲") else "#33302B"
+        parts.append(f'<text x="{width - value + 10}" y="{y + 4:.1f}" fill="{colour}">{row.mark()}</text>')
+    parts.append("</svg>")
+    return "\n".join(parts)
+
+
+def parse_args(argv: list[str] | None) -> argparse.Namespace:
+    """Read the command line."""
     parser = argparse.ArgumentParser(description="Pass rates per rule and condition, cost, time and judge agreement.")
     parser.add_argument("logs", nargs="+", type=Path)
     parser.add_argument("--labels", type=Path, help="hand labels, such as judge_labels/code-better.yaml")
     parser.add_argument(
         "--latest", action="store_true", help="keep each case and condition's runs from the newest log that has it"
     )
-    args = parser.parse_args(argv)
+    parser.add_argument("--pr", action="store_true", help="print the pull request table (evals/PRINCIPLES.md, 10)")
+    parser.add_argument("--docs", action="store_true", help="print the docs table (evals/PRINCIPLES.md, 11)")
+    parser.add_argument("--before", nargs="+", type=Path, help="logs of the skill before the change, for --pr")
+    parser.add_argument("--chart", type=Path, help="with --pr, write the change chart to this SVG file")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Print the report for the given logs."""
+    args = parse_args(argv)
     results = read_results(args.logs)
     if args.latest:
         results = latest(results)
-    labels = load_labels(args.labels) if args.labels else None
+    if args.pr or args.docs:
+        return print_formatted(results, args)
+    return print_report(results, args.labels)
+
+
+def print_report(results: list[SampleResult], labels_path: Path | None) -> int:
+    """Print the full report of each skill and agent model, with judge agreement when hand labels are given."""
+    labels = load_labels(labels_path) if labels_path else None
     if labels is not None:
         try:
             resolve_labels(results, labels)
@@ -547,6 +773,25 @@ def main(argv: list[str] | None = None) -> int:
         unmatched = unmatched_labels(results, labels)
         if unmatched:
             print("\n## Labels without a verdict\n" + "\n".join(unmatched))
+    return 0
+
+
+def print_formatted(results: list[SampleResult], args: argparse.Namespace) -> int:
+    """Print the pull request or docs table of each skill and agent model, grouped by the skill's priorities."""
+    before = read_results(args.before) if args.before else None
+    if before is not None and args.latest:
+        before = latest(before)
+    groups = group_results(results)
+    if args.chart and len(groups) > 1:
+        raise SystemExit("--chart writes one chart: give the logs of one skill and agent model")
+    for (skill, model), group in groups.items():
+        old = [r for r in before if r.skill == skill and r.agent_model == model] if before is not None else None
+        if old == []:
+            raise SystemExit(f"--before has no runs of {skill} on {model}")
+        columns, rows = category_rows(group, load_priorities(skill), old)
+        print("\n".join(pr_lines(columns, rows, group) if args.pr else docs_lines(columns, rows, group)))
+        if args.pr and args.chart:
+            args.chart.write_text(chart_svg(rows))
     return 0
 
 

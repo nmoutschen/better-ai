@@ -1,6 +1,6 @@
 ## Eval results
 
-<!-- Follow evals/PRINCIPLES.md, section 10.
+<!-- Follow evals/PRINCIPLES.md, section 10. `uv run python -m tools.report <logs> --latest --pr --chart chart.svg [--before <old logs>]` prints the table and draws the chart.
 - Open with the result and what was tested, such as "Leaves correct work alone more often (+28 points). No other clear change. Tested on 28 cases with Sonnet 5.5."
 - One row per priority category of the skill, in the skill's order. Every condition ran on the same cases with the same number of runs.
 - For a new skill, replace Before and After with one Skill column; Change is skill minus no skill.
