@@ -206,14 +206,15 @@ CHOOSE the container by who edits it:
 
 GIVE every kind of file a JSON Schema, `schemas/<name>.schema.json` in its skill, that lists every field and its type, the allowed values, and the fields that depend on a status. A missing required field is an error, and so is a field the schema does not list: agents invent fields otherwise. RUN `python3 scripts/schema.py check <path>` after each write, and CALL `schema.py` from the script that serves a page. KEEP in a script only the checks that need its own knowledge, such as whether a slide can be drawn.
 
-START every record with `type`, `at` (ISO 8601 UTC with Z, when it was first written, never changed), `by` (the agent's name, or `user` for what a page sends for the user) and, only on a kind another record points to, `id`. A kind that nothing points to has no `id`.
+START every record with `type`, `at` (ISO 8601 UTC with Z, when it was first written, never changed), `by` (the agent's name, or `user` for what a page sends for the user; the creator, never changed) and, only on a kind another record points to, `id`. A kind that nothing points to has no `id`.
 
 FOLLOW these conventions in every kind:
 
 - WRITE a missing value as `null`, and a list as an array. WRITE allowed values as exact lowercase strings and field names in `snake_case`.
-- LET a status drive the record's shape. Keep `status` a flat string, and put a field that exists only in some states at the top level: required in those states and rejected in the others.
+- LET a status drive the record's shape. Keep `status` a flat string, and put a field that exists only in some states at the top level: required in those states and rejected in the others. NEVER make a field null only because of the status.
 - WRITE a field that takes different shapes, and is not a status, as an object tagged by `type`, never as a string that mixes an ID with fixed words.
 - WRITE each fact once, and store a link on one side only. A pointer names the other record's `id` in a field of its own, never in free text.
 - WRITE the record a pointer names before the pointer, and CHECK that every pointer resolves. NEVER delete a record that others point to: give it a final status, such as withdrawn, with a pointer to what replaces it.
 - WRITE one record per line, as ASCII JSON, and rewrite a record edited in place as a whole line. In a page conversation, a line that reuses an item's `id` is a new version of that item.
-- SHOW a record that fails its schema, with its file and line, and the records that pass; one bad record never hides the rest.
+- CREATE a folder entry exclusively: never overwrite an existing `<id>.json`, and continue the counter from the highest existing ID.
+- SHOW a record that fails its schema, with its file and line, and the records that pass; one bad record never hides the rest. A reader RETRIES once before it reports a parse error, in case it read a file mid-write. A page event the script rejects KEEPS the user's text on the page and SHOWS the reason, never "closed".

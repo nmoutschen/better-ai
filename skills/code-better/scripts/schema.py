@@ -31,6 +31,9 @@ Extensions, which other JSON Schema tools ignore:
 - `x-points-to` (a string field): `{"file": "spec.jsonl", "type": "spec"}`. The value must be the `id` of a record
   of that type in that file. `file` is relative to the folder of the file being checked and may use `..`; a name that
   ends in `/` is a folder of `<id>.json` files; `type` may be a list. Otherwise the error says it is dangling.
+  `file` may also be `{"from": "code.json", "field": "design.folder", "name": "spec.jsonl", "else": "spec.jsonl"}`:
+  `name` in the repo-relative folder (the repo root is the nearest folder up with `.git`) that `field`, a dotted path
+  into the JSON file `from`, holds, as when `code.json` points to an architect folder; `else` when it holds none.
 - `x-mode-sets` (a string field): `{"file": "code.json", "field": "mode", "coordinate": [...], "other": [...]}`. The
   value must be in the set named by the `field` of the JSON file `file`: the key that equals that value, or `other`.
   `{stem}` in `file` stands for the checked file's name without its extension: `{stem}.card.json`.
@@ -105,11 +108,13 @@ class Error(NamedTuple):
 
 
 class Problem(NamedTuple):
-    """One problem in a record. `kind` is "required", "not allowed" or "cross" (it needs another file) or "" (a shape)."""
+    """One problem in a record. `kind` is "required", "not allowed" or "cross" (it needs another file) or "" (a shape).
+    `named` is true once an if/then/else has put its rule in the message, so an outer rule leaves it alone."""
 
     field: str
     message: str
     kind: str = ""
+    named: bool = False
 
 
 HOOKS: dict[str, Callable[[Any, Context], list[tuple[str, str]]]] = {}
@@ -137,6 +142,32 @@ class Context:
     def path(self, relative: str) -> Path:
         return Path(os.path.normpath(self.directory / relative.replace("{stem}", self.stem)))
 
+    def repo_root(self) -> Path | None:
+        for folder in (self.directory, *self.directory.parents):
+            if (folder / ".git").exists():
+                return folder
+        return None
+
+    def target(self, file: Any) -> tuple[str | None, str]:
+        """The file a pointer looks in, and how to show it. A name is used as it is; an object
+        `{"from": "code.json", "field": "design.folder", "name": "spec.jsonl", "else": "spec.jsonl"}` names `name`
+        in the repo-relative folder that `field` of the JSON file `from` holds, or `else` if it holds none."""
+        if isinstance(file, str):
+            return file, file
+        missing = {"from", "field", "name", "else"} - set(file)
+        if missing:
+            raise SchemaError(f"x-points-to file {file!r} lacks {', '.join(sorted(missing))}")
+        value: Any = self.read_json(file["from"])
+        for part in file["field"].split("."):
+            value = value.get(part) if isinstance(value, dict) else None
+        if not isinstance(value, str) or not value:
+            return file["else"], file["else"]
+        shown = f"{value.rstrip('/')}/{file['name']}"
+        root = self.repo_root()
+        if root is None:
+            return None, f"cannot find the repo root (a folder with .git) to find {shown}"
+        return str(root / shown), shown
+
     def read_json(self, relative: str) -> Any:
         path = self.path(relative)
         key = f"json:{path}"
@@ -156,7 +187,7 @@ class Context:
             except OSError:
                 self._cache[key] = None
             else:
-                self._cache[key] = [_loads(line) for line in text.splitlines() if line.strip()]
+                self._cache[key] = [_loads(line) for line in _lines(text) if line.strip()]
         return self._cache[key]
 
     def ids(self, relative: str) -> dict[str, set[str]] | None:
@@ -180,6 +211,15 @@ class Context:
                         found.setdefault(record["id"], set()).add(str(record.get("type")))
             self._cache[key] = found
         return self._cache[key]
+
+
+def _lines(text: str) -> list[str]:
+    """The lines of a JSONL file: split on \\n only (U+2028 and the like may sit inside a string), without a final \\r
+    and without the empty piece after the last newline."""
+    pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
+    if pieces and pieces[-1] == "":
+        pieces.pop()
+    return pieces
 
 
 def _loads(text: str) -> Any:
@@ -359,6 +399,8 @@ class Validator:
         return [Problem(_render(path), f"matches none of the allowed shapes ({reasons})")]
 
     def _not(self, value: Any, sub: Any, path: tuple, doc: dict, parent: Any) -> list[Problem]:
+        if not isinstance(sub, dict):
+            raise SchemaError(f"a schema must be an object, got {_show(sub)}")
         if isinstance(value, dict):
             shapes = [sub] if "required" in sub else sub.get("anyOf") if set(sub) == {"anyOf"} else None
             names = [_required_only(s) for s in shapes] if shapes else [None]
@@ -379,15 +421,16 @@ class Validator:
             return []
         problems = []
         for problem in self.validate(value, branch, path, doc, parent):
+            if problem.named or problem.kind == "cross":
+                problems.append(problem)
+                continue
             if problem.kind == "required":
                 message = f"required {word} {condition}"
-            elif problem.kind == "not allowed":
-                message = f"not allowed unless {condition}" if word == "unless" else problem.message
-            elif problem.kind == "cross":
-                message = problem.message
+            elif problem.kind == "not allowed" and problem.message == "not allowed":
+                message = f"not allowed {word} {condition}"
             else:
                 message = f"{problem.message} ({word} {condition})"
-            problems.append(Problem(problem.field, message, problem.kind))
+            problems.append(Problem(problem.field, message, problem.kind, True))
         return problems
 
     def _cross(self, value: Any, schema: dict, path: tuple, parent: Any) -> list[Problem]:
@@ -411,14 +454,16 @@ class Validator:
         return problems
 
     def _points_to(self, value: str, rule: dict, at: str) -> list[Problem]:
-        relative = rule["file"]
+        relative, shown = self.context.target(rule["file"])
         wanted = rule["type"] if isinstance(rule["type"], list) else [rule["type"]]
+        if relative is None:
+            return [Problem(at, shown, "cross")]
         known = self.context.ids(relative)
         if known is None:
-            return [Problem(at, f"dangling: {relative} does not exist", "cross")]
+            return [Problem(at, f"dangling: {shown} does not exist", "cross")]
         if not known.get(value, set()) & set(wanted):
             kinds = " or ".join(wanted)
-            return [Problem(at, f"dangling: {_show(value)} is not a {kinds} record in {relative}", "cross")]
+            return [Problem(at, f"dangling: {_show(value)} is not a {kinds} record in {shown}", "cross")]
         return []
 
     def _mode_sets(self, value: str, rule: dict, at: str) -> list[Problem]:
@@ -491,6 +536,7 @@ def load_schemas(directory: Path) -> dict[str, dict]:
 
 
 def _match(path: Path, docs: dict[str, dict]) -> tuple[str, dict] | None:
+    path = path.resolve()
     best, best_rank = None, (0, 0)
     for name, doc in docs.items():
         patterns = doc.get("x-files", []) if isinstance(doc, dict) else []
@@ -516,11 +562,11 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as error:
         return [Error(where, 1, "(file)", f"cannot be read: {error}")]
-    context = Context(path.parent, path.name, {} if cache is None else cache)
+    context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
     validator = Validator(docs, context)
     errors: list[Error] = []
     seen: dict[str, int] = {}
-    lines = text.splitlines() if path.suffix == ".jsonl" else [text]
+    lines = _lines(text) if path.suffix == ".jsonl" else [text]
     records = list(enumerate(lines, 1))
     for number, line in records:
         if path.suffix == ".jsonl" and not line.strip():
@@ -555,12 +601,16 @@ def check_paths(paths: list[Path], schemas: Path | None = None) -> list[Error]:
     errors: list[Error] = []
     for path in paths:
         if path.is_dir():
+            matched = False
             for folder, names, files in os.walk(path):
                 names[:] = sorted(n for n in names if n not in SKIPPED_FOLDERS and not n.startswith("."))
                 for name in sorted(files):
                     file = Path(folder) / name
                     if _match(file, docs) is not None:
+                        matched = True
                         errors += check_file(file, docs, cache)
+            if not matched:
+                errors.append(Error(str(path), 1, "(folder)", "no file here has a schema"))
         elif path.exists():
             errors += check_file(path, docs, cache)
         else:
