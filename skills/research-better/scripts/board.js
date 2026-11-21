@@ -18,7 +18,12 @@ function prepare(d) {
   // of scope are not shown. An invalid one is shown, marked, so that nothing a broken file names vanishes.
   const all = new Set(d.questions.map(q => q.id));
   const merged = Object.fromEntries(d.questions.filter(q => q.status === "merged" && !q._errors && all.has(q.merged_into)).map(q => [q.id, q.merged_into]));
-  const into = id => { for (let i = 0; merged[id] && i < 20; i++) id = merged[id]; return id; };
+  // A merge counts only when following it ends on a question that is not merged: questions merged into themselves or
+  // into each other stay on the board, with their claims.
+  const steps = Object.keys(merged).length;
+  Object.keys(merged).filter(id => { let at = merged[id]; for (let i = 0; i < steps && at !== id && at in merged; i++) at = merged[at]; return at === id; })
+    .forEach(id => delete merged[id]);
+  const into = id => { for (let i = 0; merged[id] && i <= steps; i++) id = merged[id]; return id; };
   const qs = d.questions.filter(q => (q.status !== "out of scope" || q._errors) && !merged[q.id]);
   const ids = new Set(qs.map(q => q.id)), qOfSource = {};
   d.claims = d.claims.filter(c => c.status !== "withdrawn" || c._errors);
@@ -401,7 +406,7 @@ function render(d) {
 // A record the board still shows although it broke the schema says so, in the error colour, with its first message.
 const notValid = r => r && r._errors && r._errors.length ? `not valid: ${r._errors[0]}` : "";
 const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))}</span>` : "";
-const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions, claims and sources they name are shown marked not valid; other records they name are left out of the page.</p><ul>`
+const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions are shown marked not valid, and claims and sources under the question they name; other records are only listed here.</p><ul>`
   + errors.map(e => `<li><code>${esc(e.file)}:${esc(e.line)}</code> ${esc(e.field)}: ${esc(e.message)}${e.by ? ` <span class="by">(by ${esc(e.by)})</span>` : ""}</li>`).join("") + "</ul>";
 function showLoaded(d, els) {
   const errors = d.errors || [];

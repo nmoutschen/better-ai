@@ -14,8 +14,9 @@ Usage:
   python3 board.py pending BOARD                           list the user's items that are not done or accepted
 
 BOARD is the board directory described in templates/board.md. Each record of its JSON files is checked against its
-schema (schemas/, through schema.py) on its own: the page shows every valid record and lists the invalid ones, with
-the file, line and field, in a band, so one bad record never hides the rest. The page shows one column per direction of the
+schema (schemas/, through schema.py) on its own: the page lists every invalid record, with the file, line and field,
+in a band, so one bad record never hides the rest. Questions, claims, sources and the brief that are not valid stay on
+the page, marked, without the fields that failed (schema.strip_invalid); other invalid records are only listed. The page shows one column per direction of the
 research, the agents at work, the decisions taken without the user, and a conversation with the coordinator. The user
 comments on any question, decision or agent, writes to the coordinator, or answers a decision. Each action is a
 JSON-RPC call from the page; the script appends it to conversation.jsonl in the board and prints it to stdout, so a
@@ -71,11 +72,21 @@ def board_files(board: Path) -> list:
 
 
 def scan(board: Path) -> dict:
-    """Every record of the board, each file read once and checked on its own. `decisions` and `logs` (agent
-    -> records) hold the valid records. `brief`, `questions`, `claims` and `sources` hold every record that parsed as JSON,
-    each invalid one with its messages in `_errors`, so the page shows it marked. `errors` lists every problem as
-    {file, line, field, message, by}, `by` only where the record could be read."""
-    data: dict = {"brief": {}, "decisions": [], "questions": [], "claims": [], "sources": [], "logs": {}, "errors": []}
+    """Every record of the board, each file read once and checked on its own. `decisions` and `logs` (agent ->
+    records) hold the valid records. `brief`, `questions`, `claims`, `sources` and `conversation` hold every record
+    that parsed as an object, each invalid one without the fields that failed and with its messages in `_errors`
+    (schema.strip_invalid), so the page shows it marked and meets only well-typed fields. `errors` lists every problem
+    as {file, line, field, message, by}, `by` only where the record could be read."""
+    data: dict = {
+        "brief": {},
+        "decisions": [],
+        "conversation": [],
+        "questions": [],
+        "claims": [],
+        "sources": [],
+        "logs": {},
+        "errors": [],
+    }
     try:
         docs = schema.load_schemas(SCHEMAS)
     except schema.SchemaError as error:
@@ -103,7 +114,7 @@ def scan(board: Path) -> dict:
         for number, piece in enumerate(pieces, 1):
             with contextlib.suppress(ValueError, RecursionError):
                 records[number] = json.loads(piece)
-        messages: dict = {}
+        messages: dict = {}  # line -> its errors, the first of each field
         reported: set = set()
         for error in found:
             if (error.line, error.field) in reported:  # one error per field of a line, the first
@@ -114,23 +125,29 @@ def scan(board: Path) -> dict:
             if isinstance(record, dict) and isinstance(record.get("by"), str):
                 entry["by"] = record["by"]
             data["errors"].append(entry)
-            messages.setdefault(error.line, []).append(f"{error.field}: {error.message}")
+            messages.setdefault(error.line, []).append(error)
         kept = {n: r for n, r in records.items() if isinstance(r, dict)}
         valid = [r for n, r in kept.items() if n not in messages]
         parent = path.parent.name
         if path.name == "brief.json":
             data["brief"] = next(iter(kept.values()), {})  # an invalid brief is kept, marked like a question
             if data["brief"] and 1 in messages:
-                data["brief"] = {**data["brief"], "_errors": messages[1]}
+                data["brief"] = schema.strip_invalid(data["brief"], messages[1])
         elif path.name == "decisions.jsonl":
             data["decisions"] += valid
+        elif path.name == LOG:
+            # An invalid event still shows, without the fields that failed. Without a valid `type` no branch of the
+            # schema checked its other fields, so it is only listed.
+            stripped = [schema.strip_invalid(r, messages[n]) if n in messages else r for n, r in kept.items()]
+            data["conversation"] += [r for r in stripped if "_errors" not in r or isinstance(r.get("type"), str)]
         elif parent in FOLDERS:
             for number, record in kept.items():
-                record = {**record, "_born": at_time(record)}
+                born = at_time(record)
+                if number in messages:
+                    record = schema.strip_invalid(record, messages[number])
+                record["_born"] = born
                 if not isinstance(record.get("id"), str):
                     record["id"] = path.stem  # the file is named for its id
-                if number in messages:
-                    record["_errors"] = messages[number]
                 data[parent].append(record)
         elif parent == "logs":
             data["logs"][path.stem] = valid
@@ -162,7 +179,7 @@ def load(board: Path) -> dict:
             # The page counts searches per question from these, so it gets every search line, not only the last 60.
             "searches": [r for r in records if r["type"] == "search"],
         }
-    return {**data, "logs": logs, "now": time.time(), "conversation": conversation(board).events()}
+    return {**data, "logs": logs, "now": time.time()}
 
 
 def board_page(snapshot: dict | None) -> str:
