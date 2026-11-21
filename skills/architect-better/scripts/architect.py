@@ -68,6 +68,36 @@ def lines_of(text: str, jsonl: bool) -> list:
     return pieces[:-1] if pieces and pieces[-1] == "" else pieces
 
 
+MAX_DEPTH = 50  # no record of these files nests deeper than a design.json step
+
+
+def parse(piece: str):
+    """One JSON value as the page can show it: no NaN or Infinity (the browser cannot read them), and nothing nested
+    so deep that Python gives up."""
+
+    def refuse(word):
+        raise ValueError(f"{word} is not a JSON value")
+
+    def finite(word):
+        value = float(word)
+        if value in (float("inf"), float("-inf")):
+            raise ValueError(f"{word} is too large")
+        return value
+
+    try:
+        value = json.loads(piece, parse_constant=refuse, parse_float=finite)
+    except RecursionError:
+        raise ValueError("nested too deeply") from None
+    pending = [(value, 1)]
+    while pending:  # no recursion: a line may be as deep as it likes
+        item, depth = pending.pop()
+        if isinstance(item, (dict, list)):
+            if depth > MAX_DEPTH:
+                raise ValueError(f"nested more than {MAX_DEPTH} levels deep")
+            pending.extend((inner, depth + 1) for inner in (item.values() if isinstance(item, dict) else item))
+    return value
+
+
 class Reader:
     """Reads the files of one change folder record by record through schema.py: the records come back, and each
     invalid one goes to `errors` with its file, line, field, reason and, if it parsed, its `by`."""
@@ -94,12 +124,19 @@ class Reader:
         except (OSError, UnicodeDecodeError) as exc:
             self.error(name, 1, "(file)", f"cannot be read: {exc}")
             return []
-        found = schema.check_text(path, text, self.docs, self.cache)
+        try:
+            found = schema.check_text(path, text, self.docs, self.cache)
+        except (RecursionError, ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
+            self.error(name, 1, "(file)", f"cannot be checked: {exc}")
+            return []
+        flagged = {problem.line for problem in found}
         parsed = {}
         for number, piece in enumerate(lines_of(text, jsonl), 1):
             try:
-                value = json.loads(piece)
-            except ValueError:
+                value = parse(piece)
+            except ValueError as exc:
+                if number not in flagged:  # valid for the schema, but not for the page
+                    self.error(name, number, "(record)", f"not valid JSON: {exc}")
                 continue
             parsed[number] = value if isinstance(value, dict) else None
         by_line: dict = {}

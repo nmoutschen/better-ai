@@ -181,7 +181,8 @@ class Examples(unittest.TestCase):
         for folder in folders:
             with self.subTest(folder=str(folder.relative_to(ROOT))):
                 self.assertEqual([str(e) for e in schema.check_paths([folder], SCHEMAS)], [])
-                self.assertEqual(run_check(folder)[0], 0)
+                if folder == SCRIPTS / "example":  # the other repos' sources are in their own repos, not this one
+                    self.assertEqual(run_check(folder)[0], 0)
                 self.assertFalse((folder / "request.md").exists())
 
 
@@ -586,6 +587,107 @@ class WrongTypes(unittest.TestCase):
         self.assertEqual({e["field"] for e in data["errors"]}, {"kind", "text"})
         self.assertEqual(data["requirements"][1]["id"], "F3")
         self.assertNotIn("_errors", data["requirements"][1])
+
+
+class RawLines(unittest.TestCase):
+    """Whatever a line holds, `check` and `load` do not raise and the payload is JSON the browser can read."""
+
+    LINES = [
+        "[1]",
+        "5",
+        "null",
+        '"x"',
+        "",
+        "{",
+        '{"a": NaN}',
+        '{"type": "requirement", "id": Infinity}',
+        '{"n": 1e999}',
+        "[" * 50000 + "]" * 50000,
+        '{"a": ' * 50000 + "1" + "}" * 50000,
+    ]
+
+    def test_no_line_breaks_check_load_or_the_payload(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = make_folder(Path(d))
+            write(
+                folder,
+                "conversation.jsonl",
+                [{"type": "note", "at": AT, "by": "user", "id": "n1", "text": "hi", "to": None}],
+            )
+            for name in (*KINDS, "conversation.jsonl"):
+                original = (folder / name).read_text()
+                for line in self.LINES:
+                    with self.subTest(name=name, line=line[:30]):
+                        if name in JSON_FILES:
+                            (folder / name).write_text(line + "\n")
+                        else:
+                            (folder / name).write_text(original + line + "\n")
+                        data = architect.load(folder)
+                        json.dumps(data, allow_nan=False)
+                        with redirect_stdout(io.StringIO()):
+                            self.assertIn(architect.main(["check", str(folder)]), (0, 1))
+                (folder / name).write_text(original)
+
+    def test_a_value_the_schema_accepts_but_the_page_cannot_read_is_an_error_on_its_line(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = make_folder(Path(d))
+            records = read(folder, "requirements.jsonl")
+            text = "".join(json.dumps(r) + "\n" for r in records[:1])
+            (folder / "requirements.jsonl").write_text(text.rstrip("\n").removesuffix("}") + ', "n": NaN}\n')
+            data = architect.load(folder)
+            self.assertEqual([(e["file"], e["line"]) for e in data["errors"]][:1], [("requirements.jsonl", 1)])
+            json.dumps(data, allow_nan=False)
+
+
+class EveryAcceptedExampleRenders(unittest.TestCase):
+    """A schema that accepts a value the page cannot draw is a bug in the schema: what the schemas accept is drawn."""
+
+    def odd_ids(self, folder):
+        made = read(folder, "design.json")
+        for node in made["containers"]["nodes"]:
+            node["id"] = node["id"] + "\"<b>&'"
+        for edge in made["containers"]["edges"]:
+            edge["from"] += "\"<b>&'"
+            edge["to"] += "\"<b>&'"
+        flow = made["flows"][0]
+        flow["id"] = "a\"<i>&'"
+        for p in flow["participants"]:
+            p["box"] += "\"<b>&'"
+        write(folder, "design.json", [made])
+        findings = read(folder, "findings.jsonl")
+        for finding in findings:
+            finding["parts"] = [part.replace("step:ask/", "step:a\"<i>&'/") for part in finding["parts"]]
+        write(folder, "findings.jsonl", findings)
+
+    def test_the_example_the_planted_folders_and_odd_ids_render(self):
+        node = shutil.which("node")
+        payloads = []
+        folders = [
+            SCRIPTS / "example",
+            *sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*/architect.json")),
+        ]
+        for folder in [f.parent if f.name == "architect.json" else f for f in folders]:
+            data = architect.load(folder)
+            json.dumps(data, allow_nan=False)
+            payloads.append({"label": str(folder.relative_to(ROOT)), "data": data})
+        with tempfile.TemporaryDirectory() as d:
+            folder = make_folder(Path(d))
+            self.assertEqual(check(folder), [])
+            self.odd_ids(folder)
+            self.assertEqual([str(e) for e in check(folder)], [])
+            data = architect.load(folder)
+            self.assertEqual(data["errors"], [])
+            self.assertIn("&lt;b&gt;", data["containers"]["after"])
+            payloads.append({"label": "odd ids", "data": data})
+            if node:
+                path = Path(d) / "payloads.json"
+                path.write_text(json.dumps(payloads))
+                run = subprocess.run(
+                    [node, str(ROOT / "tests" / "render-architect-payloads.js"), str(path)],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(run.returncode, 0, run.stderr[:3000])
 
 
 class Serving(unittest.TestCase):
