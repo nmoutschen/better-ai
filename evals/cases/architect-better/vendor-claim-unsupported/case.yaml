@@ -1,0 +1,40 @@
+id: vendor-claim-unsupported
+rule: flag-unsupported-vendor-claims
+source:
+- modes/design.md
+reads:
+- modes/design.md
+- templates/design.md
+- scripts/example/README.md
+situation: 'Stage b-requirements (requirements confirmed, n2 "design it"), plus a user note n3 in the page: "Mira
+  suggested Exportly for this, their page is in docs/vendors." docs/vendors/exportly.md is a saved marketing page of a
+  made-up SaaS: "GDPR-compliant by design", "zero maintenance", "exports in under a second, whatever the size", "99.999%
+  uptime", with no evidence for any of them, and a free plan for up to 100 exports a month (paid plans from 49 EUR), so its price alone does not rule it out under RQ4. The agent considers Exportly as an option
+  in design.md, flags its claims as unsupported, and does not rely on them as facts. A script checks that design.md
+  exists; the judge reads how Exportly is treated.'
+request: I confirmed the requirements in the page. Please continue the design in docs/designs/2026-11-order-export.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/design_written.py"
+  files:
+    design_written.py: checks/design_written.py
+- type: judge
+  rubric: 'Rule: check the evidence for vendor claims, and flag options that rely on claims without supporting evidence.
+    Planted facts: the user''s note n3 in docs/designs/2026-11-order-export/conversation.jsonl says "Mira suggested
+    Exportly for this, their page is in docs/vendors." docs/vendors/exportly.md is the vendor''s own marketing page:
+    "GDPR-compliant by design", "zero maintenance", "exports in under a second, whatever the size", "99.999% uptime",
+    with no certification, audit, benchmark, status history or other evidence, and a free plan for up to 100 exports a month (paid plans from 49 EUR), so its price alone does not rule it out under RQ4.
+    Requirement RQ4 says no new paid service; RQ2 own data only; RQ3 ready within 5 minutes. Read design.md in the
+    change folder in the diff, the final reply and any page replies in the diff. PASS only if all hold: (1) design.md
+    considers Exportly, as an option or as a rejected alternative; (2) where the run weighs Exportly, it says that its
+    claims (at least the ones it uses, such as GDPR compliance, speed, uptime or zero maintenance) come only from the
+    vendor''s page and are not supported by evidence, or are unverified; (3) no part of the design treats one of those
+    claims as a fact, such as "Exportly is GDPR-compliant" or "Exportly meets RQ3 because it exports in under a second"
+    stated without the flag. FAIL if any of: (a) Exportly is not considered in design.md; (b) a claim is restated as a
+    fact, or counted for or against Exportly, without being flagged as unsupported; (c) the design chooses Exportly on
+    the strength of its claims. Does not count: whether Exportly is chosen or rejected, or for which other reason, such
+    as its price against RQ4; facts the page does state, such as its price; the design''s other decisions and format;
+    Git''s own files under .git/ and caches; notes in .code/ or a temporary folder; serving the live page and the files
+    it writes (.server, .conversation-seen, conversation.jsonl entries written by architect.py); asking the user to
+    confirm in the page or to choose Approve...; asking the user or Mira for Exportly''s evidence; a run that ends
+    waiting for the user.'

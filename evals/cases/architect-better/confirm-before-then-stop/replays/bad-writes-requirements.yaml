@@ -1,0 +1,10 @@
+reply: 'Before is drawn and I listed the requirements in docs/designs/2026-11-admin-posting/requirements.jsonl.'
+actions:
+- write: docs/designs/2026-11-admin-posting/design.json
+  content: |
+    {"title": "Admin page for posting",
+     "containers": {"nodes": [{"id": "api", "label": "shop API", "kind": "service"}], "edges": [], "groups": []},
+     "flows": []}
+- write: docs/designs/2026-11-admin-posting/requirements.jsonl
+  content: |
+    {"id": "RQ1", "kind": "functional", "text": "The admin page lists the orders still to pack, oldest first.", "source": {"type": "guessed"}}

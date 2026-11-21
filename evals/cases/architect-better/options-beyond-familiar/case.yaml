@@ -1,0 +1,47 @@
+id: options-beyond-familiar
+rule: compare-options-before-choosing
+source:
+- modes/design.md
+- templates/design.md
+reads:
+- modes/design.md
+- templates/design.md
+- scripts/example/README.md
+situation: 'The change folder docs/designs/2026-11-order-export/ holds the confirmed Before and requirements RQ1-RQ6
+  (stage b-requirements); the user''s last note in the page, n2, says "All six look good, design it." The repo''s
+  familiar patterns are a cron job reading the SQLite file (jobs/send_emails.py) and the outbox for emails (ADR 0002).
+  The agent designs the export and writes design.md, recording each decision with the options it compared against the
+  driving requirements, at least one of them not the familiar choice, the chosen one, the rejected alternatives with
+  reasons, and the main drawback. A script checks that design.md exists; the judge reads it.'
+request: I confirmed the requirements in the page. Please continue the design in docs/designs/2026-11-order-export.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/design_written.py"
+  files:
+    design_written.py: checks/design_written.py
+- type: judge
+  rubric: 'Rule: before choosing an approach, list the options, including at least one that is not the familiar choice,
+    compare them against the requirements that drive the decision, and record each decision in design.md with the
+    chosen option, the rejected alternatives with reasons, and the main drawback. Planted facts: the change folder
+    docs/designs/2026-11-order-export/ has confirmed requirements RQ1-RQ6 in requirements.jsonl (RQ1 CSV of all the
+    customer''s orders from the account page, RQ2 own data only behind the session cookie, RQ3 ready within 5 minutes
+    for 500 orders, RQ4 existing VPS, SQLite and outbox, no new paid service, RQ5 429 beyond 10 exports a minute, RQ6
+    failure email within 10 minutes and visible in the job log). The repo''s familiar patterns are a cron job over the
+    SQLite file (jobs/send_emails.py), the outbox for emails (ADR 0002), and the stdlib API in shop/api.py. Read
+    design.md in the change folder, in the diff. "Not the familiar choice" means an option that departs from what the
+    repo already does for a similar need or from the obvious first answer, such as streaming the CSV from the request,
+    building it in the browser from an existing JSON endpoint, or a file served through the API when a job is the
+    familiar choice; a variant of the same approach with another name does not count. PASS only if all hold: (1)
+    design.md records at least one design decision, such as where the CSV is built or how the file reaches the
+    customer; (2) each recorded decision names the requirements or constraints that drive it (IDs or their content)
+    and compares at least two options against them; (3) each recorded decision includes at least one option that is
+    not the familiar choice, compared on the drivers rather than only named; (4) each recorded decision states the
+    chosen option, each rejected alternative with its reason, and the main drawback or trade-off of the chosen one.
+    FAIL if any of: (a) design.md is missing or records no decision; (b) a decision states only the chosen approach,
+    or lists alternatives without reasons for rejecting them; (c) every option of a decision is a variant of the
+    familiar choice; (d) no decision states the chosen option''s drawback or trade-off. Does not count: small
+    implementation choices the design does not present as decisions, such as a table or column name; whether the chosen
+    option is the best one; the design''s other content or format; Git''s own files under .git/ and caches; notes in
+    .code/ or a temporary folder; serving the live page and the files it writes (.server, .conversation-seen,
+    conversation.jsonl entries written by architect.py); asking the user to confirm in the page or to choose
+    Approve...; a run that ends waiting for the user.'

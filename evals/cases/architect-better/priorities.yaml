@@ -1,0 +1,72 @@
+# architect-better's priority categories, highest first. Eval results are grouped by them: a change may lose
+# in a lower category where it gains in a higher one. See evals/PRINCIPLES.md, sections 10 and 11.
+# `does` is the category as the docs show it; `rules` is documentation; `cases` decides the grouping.
+categories:
+  - name: Asks before deciding for you
+    does: Asks about costly gaps at once, questions a solution that works against the goal, raises a conflict with a recorded decision, has the user confirm the current system before designing, and asks what to design when given no request
+    rules:
+      - ask-costly-gaps-in-one-message
+      - challenge-solution-against-goal
+      - ask-before-designing-against-a-record
+      - confirm-before-first
+      - ask-what-to-design-without-argument
+    cases:
+      - ask-costly-gaps-at-once
+      - solution-against-goal
+      - recorded-decision-conflict
+      - confirm-before-then-stop
+      - no-argument-asks
+  - name: Grounds claims in evidence
+    does: Draws the current system from the code, flags vendor claims no source supports, traces each requirement to its source, changes a disputed finding only on evidence, and audits the system against its design
+    rules:
+      - draw-before-from-code
+      - flag-unsupported-vendor-claims
+      - trace-each-requirement
+      - change-finding-only-on-evidence
+      - check-system-against-design
+    cases:
+      - before-from-code-not-stale-doc
+      - vendor-claim-unsupported
+      - requirements-traced-to-source
+      - disputed-finding-needs-evidence
+      - audit-system-against-design
+  - name: Designs thoroughly
+    does: Compares options with their drawbacks, states quality attributes as scenarios, lists every perspective, keeps the current system's part IDs in the change, and states failure cases in the spec
+    rules:
+      - compare-options-before-choosing
+      - quality-attributes-as-scenarios
+      - list-every-perspective
+      - preserve-part-identity
+      - spec-states-failure-cases-in-ears
+    cases:
+      - options-beyond-familiar
+      - quality-as-scenarios
+      - perspectives-every-row
+      - after-keeps-before-ids
+      - spec-covers-failure-cases
+  - name: Reviews independently
+    does: Reviews only an approved design, with a fresh reviewer per perspective, ties findings to diagram parts, and has a separate agent check the spec
+    rules:
+      - review-only-after-approval
+      - fresh-reviewer-per-perspective
+      - attach-findings-to-parts
+      - check-spec-with-separate-agent
+    cases:
+      - no-review-before-approval
+      - reviewer-per-perspective
+      - findings-on-diagram-parts
+      - spec-checked-by-separate-agent
+  - name: Fits the repo and its process
+    does: Saves the design and decision records where and how the repo keeps them, designs nothing when the structure does not change, changes nothing in an audit, and says at hand-back what is approved, reviewed and still open
+    rules:
+      - keep-design-in-repo-location
+      - record-decisions-where-the-repo-keeps-them
+      - no-design-without-structure
+      - audit-changes-nothing
+      - distinguish-approval-review-and-requirements
+    cases:
+      - design-location-convention
+      - decision-records-repo-format
+      - no-structure-label-change
+      - audit-report-only
+      - handback-open-finding

@@ -1,0 +1,44 @@
+id: quality-as-scenarios
+rule: quality-attributes-as-scenarios
+source:
+- modes/design.md
+reads:
+- modes/design.md
+- scripts/example/README.md
+situation: 'The order-export change folder docs/designs/2026-11-order-export/ is planted at the a-before stage, with the
+  user''s note n1 confirming Before, but its request.md ends with a vague quality wish: "It has to be quick, and safe,
+  because it''s personal data." The user repeats it when asking to continue, so the run is at step 3. The agent drafts
+  the quality attributes in requirements.jsonl as observable scenarios (trigger, conditions, observable response, a
+  measure where it matters), not as "fast" or "secure"; measures nobody stated are marked guessed; it asks the user to
+  confirm. A script checks that a quality record exists; the judge reads the scenarios.'
+request: I confirmed Before in the page, continue the order export design in docs/designs/2026-11-order-export. Like I
+  said, it has to be quick, and safe, because it's personal data.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/quality_records.py"
+  files:
+    quality_records.py: checks/quality_records.py
+- type: judge
+  rubric: 'Rule: draft quality attributes as observable scenarios, each naming a trigger, the conditions and the
+    observable response, with a measure where it matters, instead of a wish such as "fast" or "secure"; mark measures
+    nobody stated as guessed; have the user confirm or correct them. Planted facts: request.md says "Customers should be
+    able to download their order history from their account page, as a CSV file. We get a few GDPR access requests a
+    month and answer them by hand today, which takes an hour each. It has to be quick, and safe, because it''s personal
+    data." The user''s only other words are note n1 confirming Before, and the request repeating "quick" and "safe". No
+    file states a time limit or a security measure for exports; docs/standards/api.md rule 3 says an endpoint that
+    returns a customer''s data requires their session cookie and returns only their own data (404 for someone else''s),
+    and rule 4 limits endpoints that send email or cost money to 10 requests per customer per minute (429). README.md:
+    about 40 orders a day. Look at the records of kind quality in requirements.jsonl in the diff, the page conversation
+    and the reply. PASS only if all hold: (1) "quick" becomes at least one scenario with a trigger (such as a customer
+    asking for an export), a condition (such as how many orders they have or the load) and an observable response with
+    a measure (such as the CSV downloadable within a stated time); (2) "safe" becomes at least one scenario with a
+    trigger (such as someone other than the logged-in customer asking for an export, or a link reaching someone else)
+    and an observable response (such as a 404 and no data returned), with a measure where it matters; (3) every measure
+    the request, the files and the user do not state is marked guessed: the record''s source is `guessed`, or the record
+    or the run''s message to the user says the measure is a guess; (4) the run asks the user to confirm or correct
+    these scenarios, in the page or the reply. FAIL if any of: a quality record says only "fast", "quick", "secure",
+    "safe" or similar without a trigger and an observable response; an invented measure is presented as the user''s or
+    the request''s; the run does not ask the user to confirm. Does not count: Git''s own files under .git/ and caches;
+    notes in .code/ or a temporary folder; serving the live page and the files it writes (.server, .conversation-seen,
+    conversation.jsonl entries written by architect.py); status commands on n1; asking the user to confirm in the page;
+    a run that ends waiting for the user; functional requirements and constraints, and their sources.'

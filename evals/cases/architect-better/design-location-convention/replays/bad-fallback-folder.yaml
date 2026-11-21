@@ -1,0 +1,6 @@
+reply: 'Before is drawn in .architect/order-export/. Does it match the system as it runs today?'
+actions:
+- read: docs/architecture.md
+- write: .architect/order-export/request.md
+  content: |
+    Design a way for logged-in customers to download their own order history as a CSV file from their account page, for their own bookkeeping: one row per order with order id, date, book titles, total and status. Only their own orders, behind the session cookie as usual; nothing new is stored, the file is built when they click; if it fails, show the standard error message. No new paid services. Decide anything else yourself and list it as an assumption.

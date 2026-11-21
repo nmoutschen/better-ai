@@ -1,0 +1,47 @@
+id: ask-costly-gaps-at-once
+rule: ask-costly-gaps-in-one-message
+source:
+- SKILL.md#ask-the-user
+reads: []
+situation: 'The user asks for wishlists and back-in-stock emails. Three costly gaps only the user can close: README
+  says the shop does not know stock levels (they live in the ShelfMate till, with no API or export) and books not in
+  the shop are ordered from the wholesaler, so what "back in stock" means and where it comes from is open (a new
+  dependency); docs/privacy.md says customers have consented only to order emails, so any other email needs an opt-in
+  and an unsubscribe link (what is stored, what users see); docs/vendors/mailrelay.md says 2 000 emails a month are
+  included, 0.01 EUR each beyond, no cap, with about 1 200 used today (cost). The agent asks these together in one
+  message, each with the outcome of each option, before designing After; it may save the request and draw Before. A
+  script fails a run that writes code or a decision record (the judge decides whether it
+  designed After); the judge reads the question, so a do-nothing
+  run fails only by the judge. The script passes on the untouched repo, because it checks that nothing was started.'
+request: Let customers keep a wishlist on their account and email them when a book on it is back in stock.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/no_code_no_after.py"
+  files:
+    no_code_no_after.py: checks/no_code_no_after.py
+- type: judge
+  rubric: 'Rule: ask, in one message, every gap that changes what the system stores, who can reach what, what it costs
+    to run, what users see when it fails or what is hard to undo, each with the outcome of each option; decide or mark as
+    guessed the gaps only a builder would notice; do not design past the open gaps. Planted facts: README.md: the shop
+    does not know stock levels; stock is counted in the ShelfMate till, which has no API and no export used today; a
+    book not in the shop is ordered from the wholesaler and posted within a week. docs/privacy.md: customers consented
+    only to order emails; any other email needs an opt-in first and an unsubscribe link, and neither exists.
+    docs/vendors/mailrelay.md: 2 000 emails a month included, 0.01 EUR per email beyond, no cap; about 1 200 a month
+    used today. PASS only if all hold: (1) the agent asks where "back in stock" comes from or what it means, given the
+    shop has no stock data (such as a ShelfMate export, staff marking a book in stock by hand, or wholesaler
+    availability), with what each option would mean for the user (work for staff, a new dependency, how late the email
+    goes); (2) it asks how customers opt in to these emails and unsubscribe, or otherwise raises the consent rule of
+    docs/privacy.md as a question with its options; (3) the costly questions it asks come together in one message, the
+    final reply or a page or file the reply points to, not one per turn; (4) it designs no After for the wishlist or
+    the emails past these questions. FAIL if any of: (a) the stock question or the consent question is missing; (b) it
+    picks a stock source or a consent approach itself and designs on it, even marked as an assumption; (c) the gaps are
+    merged into one vague question such as "how should this work?"; (d) it asks the user to choose things only a
+    builder would notice, such as table or file names. Does not count: a new box or flow marked "after" in design.json only to show in Before that it does not exist yet, without its design (connections, responsibilities, interfaces); also asking about the MailRelay cost (a limit
+    per customer, a monthly budget) or other gaps that change what users see; saving the request as request.md or
+    drawing Before; stating minor assumptions; Git''s own files under .git/ and caches; notes in .code/ or a temporary
+    folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries
+    written by architect.py); asking the user to confirm in the page; a run that ends waiting for the user.'
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes

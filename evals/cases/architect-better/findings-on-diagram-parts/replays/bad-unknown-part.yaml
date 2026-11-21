@@ -1,0 +1,5 @@
+reply: 'F1: the public export link exposes customer data.'
+actions:
+- write: docs/designs/2026-11-order-export/findings.jsonl
+  content: |
+    {"id": "F1", "perspective": "Data and privacy", "parts": ["box:netlify", "step:export/download"], "text": "Public link, no login.", "handled_by": null, "confirmed": true}

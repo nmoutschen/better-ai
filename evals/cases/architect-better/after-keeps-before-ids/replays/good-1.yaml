@@ -1,0 +1,17 @@
+reply: 'After is in the page: a build_exports job and an export request edge; the order flow is unchanged.'
+actions:
+- read: docs/designs/2026-11-order-export/design.json
+- bash: |
+    python3 - <<'PY'
+    import json
+    path = "docs/designs/2026-11-order-export/design.json"
+    design = json.load(open(path))
+    design["containers"]["nodes"].append({"id": "exportjob", "label": "build_exports", "kind": "job", "in": ["after"]})
+    design["containers"]["edges"].append({"id": "e7", "from": "exportjob", "to": "db", "label": "reads orders", "in": ["after"]})
+    design["containers"]["edges"][3]["in"] = ["before"]
+    design["flows"].append({"id": "export", "name": "Export", "in": ["after"],
+        "participants": [{"id": "api", "box": "api"}, {"id": "db", "box": "db"}],
+        "steps": [{"id": "x1", "from": "api", "to": "db", "label": "export row"}]})
+    design["flows"][0]["steps"].append({"id": "s7", "from": "api", "to": "db", "label": "audit row", "in": ["after"]})
+    json.dump(design, open(path, "w"), indent=2)
+    PY

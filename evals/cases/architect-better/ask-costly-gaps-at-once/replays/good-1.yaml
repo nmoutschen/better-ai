@@ -1,0 +1,15 @@
+reply: |
+  Three questions before I design this; each changes what we build:
+  1. Where does "back in stock" come from? The shop has no stock data; it lives in ShelfMate, with no API or export.
+     a) Staff mark a book "in stock" in a small admin page: no new dependency, but someone must remember to.
+     b) A nightly ShelfMate export, if it can make one: automatic, emails up to a day late, a new dependency.
+     c) Wholesaler availability: almost every book is always orderable, so the emails would mean little.
+  2. Consent: docs/privacy.md says customers agreed only to order emails. Should adding a book to the wishlist ask them
+     to opt in to its alert (a checkbox), with an unsubscribe link in each email? Without it we cannot send these.
+  3. Cost: MailRelay includes 2 000 emails a month and we use about 1 200; beyond that each email costs 0.01 EUR, with
+     no cap. Should I cap alerts per customer, such as one digest a day?
+actions:
+- read: README.md
+- read: docs/privacy.md
+- read: docs/vendors/mailrelay.md
+- read: shop/store.py

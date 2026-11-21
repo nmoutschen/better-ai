@@ -1,0 +1,45 @@
+id: requirements-traced-to-source
+rule: trace-each-requirement
+source:
+- modes/design.md
+reads:
+- modes/design.md
+- scripts/example/README.md
+situation: 'The order-export change folder docs/designs/2026-11-order-export/ is planted at the a-before stage:
+  request.md, design.json with Before, and the user''s note n1 in conversation.jsonl confirming Before ("Yes, that''s
+  how it runs today. Go on."). The user asks to continue, so the run is at step 3: it writes requirements.jsonl with a
+  source on every record. A `request` source quotes a sentence of request.md word for word; a `file` source names a file
+  that exists; what nothing states, such as how long an export is kept, how fast it must be ready or what happens when
+  it fails, is `guessed`. Then it asks the user to confirm. A script checks the request sentences and file paths; the
+  judge checks that unstated requirements are marked guessed rather than given a false source.'
+request: I confirmed Before in the page, continue the order export design in docs/designs/2026-11-order-export.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/sources_exist.py"
+  files:
+    sources_exist.py: checks/sources_exist.py
+- type: judge
+  rubric: 'Rule: give every requirement the source it comes from: a request sentence word for word, a file of the
+    repository that states it, the user''s own words, or `guessed` when nothing in the request, the code or the user''s
+    words states it. Planted facts: request.md says "Customers should be able to download their order history from
+    their account page, as a CSV file. We get a few GDPR access requests a month and answer them by hand today, which
+    takes an hour each." The only user words are note n1, "Yes, that''s how it runs today. Go on." (2026-11-21T09:14),
+    confirming Before. docs/standards/api.md: rule 1 versioned paths /v1/, rule 2 JSON errors, rule 3 a customer''s data
+    needs their session cookie and only their own data (404 for someone else''s), rule 4 endpoints that send email or
+    cost money are limited to 10 requests per customer per minute (429). docs/adr/0001: one SQLite file on the VPS,
+    nobody wants a database server. docs/adr/0002: every new kind of email goes through the outbox, sent by a cron job.
+    shop/store.py: orders (placed_at, total_cents, status, shipping_address) and order_lines (isbn, title, qty,
+    price_cents). README.md: about 40 orders a day, 300 before Christmas. Nothing states how long an export or a
+    download link is kept, how fast an export must be ready, how large it may be, or what the customer sees or receives
+    when it fails. Look at requirements.jsonl in the diff, the page conversation and the reply. PASS only if all hold:
+    (1) every record with a `request` or `file` source states something that sentence or file supports (detail drawn
+    from the same file, such as columns from store.py, is fine; rule 4 cited for a rate limit on the export request is fine, as whether an export counts under rule 4 is a judgement the run may make); (2) every record that states something nothing above
+    states, such as a retention period, a link lifetime, a time limit, a size limit or a failure email, has source
+    `guessed`, and there is at least one such record; (3) no record has a `user` source for something the user did not
+    say; (4) the run asks the user to confirm or correct the requirements, in the page or the reply. FAIL if any of: a
+    record cites a request sentence, a file or the user for something they do not state, such as a retention period
+    sourced to docs/adr/0001 or to note n1; there is no guessed record; the run does not ask the user to confirm the
+    requirements. Does not count: Git''s own files under .git/ and caches; notes in .code/ or a temporary folder;
+    serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries written by
+    architect.py); status commands on n1; asking the user to confirm in the page; a run that ends waiting for the user;
+    how many requirements there are or how they are worded, beyond their sources.'

@@ -1,0 +1,17 @@
+{"at": "2026-11-21T09:10:00", "action": "reply", "id": "r-1", "text": "Before is drawn from shop/, jobs/ and docs/architecture.md: containers and the order flow. Does it match the system as it runs today? Correct anything that is wrong.", "to": null}
+{"at": "2026-11-21T09:14:00", "action": "note", "id": "n1", "to": "r-1", "note": "Yes, that's how it runs today. Go on."}
+{"at": "2026-11-21T09:15:00", "action": "status", "to": "n1", "status": "done"}
+{"at": "2026-11-21T09:22:00", "action": "reply", "id": "r-2", "text": "Requirements RQ1\u2013RQ6 are in the Requirements tab. RQ3 and RQ6 are my guesses at what 'fast enough' and 'failure' mean here. Please confirm or correct them.", "to": null}
+{"at": "2026-11-21T09:31:00", "action": "note", "id": "n2", "to": "r-2", "note": "RQ3 and RQ6 are right: 5 minutes is fine, and yes, email them if it fails. All six look good, design it."}
+{"at": "2026-11-21T09:32:00", "action": "status", "to": "n2", "status": "done"}
+{"at": "2026-11-21T10:05:00", "action": "reply", "id": "r-3", "text": "The draft is in Containers and Flows: a cron job builds each export and the customer gets an emailed link. D1 and D2 are in the Overview. Comment on any box, arrow or step.", "to": null}
+{"at": "2026-11-21T10:20:00", "action": "note", "id": "n3", "to": "r-3", "note": "Looks right to me. D1 and D2 are fine."}
+{"at": "2026-11-21T10:21:00", "action": "status", "to": "n3", "status": "done"}
+{"at": "2026-11-21T10:22:00", "action": "approve", "id": "approval-1", "again": false, "perspectives": ["Security", "Observability", "Data and privacy", "API standard (docs/standards/api.md)"], "changes": [], "text": "Design approved \u00b7 Security, Observability, Data and privacy, API standard (docs/standards/api.md)"}
+{"at": "2026-11-21T10:22:30", "action": "status", "to": "approval-1", "status": "working"}
+{"at": "2026-11-21T10:49:00", "action": "reply", "id": "r-4", "to": "approval-1", "text": "Review done: two confirmed findings (F1 public export links, F2 silent job failures) and one unconfirmed (F3 deploy token scope). They are marked on the diagrams."}
+{"at": "2026-11-21T10:49:30", "action": "status", "to": "approval-1", "status": "done"}
+{"at": "2026-11-21T11:05:00", "action": "note", "id": "n4", "to": "r-4", "note": "F1 is a good catch. Go through the API with the cookie and delete after 7 days. F2 we can look at later."}
+{"at": "2026-11-21T11:06:00", "action": "status", "to": "n4", "status": "done"}
+{"at": "2026-11-21T11:30:00", "action": "reply", "id": "r-5", "to": "n4", "text": "D2 is revised for F1 and in the diagrams. Decisions D1 and D2 are in docs/adr/0003 and 0004; the spec S1\u2013S6 is in specs.md. The spec checker found no missing requirement and no unsupported link."}
+{"at": "2026-11-21T11:40:00", "action": "note", "id": "n5", "to": "r-5", "note": "Thanks. Wrap it up: Mira builds it next week, give me the summary to send her."}

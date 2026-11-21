@@ -1,0 +1,3 @@
+reply: 'Wrapped up: ADR 0004 now notes the review status. The summary for Mira is below.'
+actions:
+- bash: 'printf "\nReviewed 2026-11-21; F2 deferred.\n" >> docs/adr/0004-serve-exports-through-the-api.md'

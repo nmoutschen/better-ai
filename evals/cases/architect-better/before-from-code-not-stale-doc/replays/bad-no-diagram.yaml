@@ -1,0 +1,9 @@
+reply: 'Today the API sends the confirmation email straight to MailRelay, as docs/architecture.md says. I wrote the
+  current system up in docs/designs/2026-11-shipping-email/before.md.'
+actions:
+- read: docs/architecture.md
+- write: docs/designs/2026-11-shipping-email/before.md
+  content: |
+    # Before
+
+    The shop API saves the order and sends the confirmation email to MailRelay before it answers.

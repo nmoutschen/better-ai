@@ -1,0 +1,18 @@
+reply: |
+  One blocking problem before Mira builds it: the export files are public. D2 uploads each customer's CSV to /exports/<token>.csv on the Netlify site (box exportfiles, step export/x5), anyone with the link downloads it without logging in (step export/x8), and nothing deletes it. A forwarded email exposes a customer's name, addresses and order history for good; this breaks RQ2 and rule 3 of docs/standards/api.md. Proposed: serve the file through GET /v1/account/export/<id> behind the session cookie, 404 for others, and delete files after 7 days.
+
+  Also confirmed: build_exports failures before the outbox row are silent (box exportjob, RQ6). Unconfirmed: the Netlify deploy token's scope. The full report, by perspective, is in .code/audit/order-export.md. I changed nothing in the design.
+actions:
+- read: docs/designs/2026-11-order-export/design.md
+- read: docs/designs/2026-11-order-export/design.json
+- read: docs/designs/2026-11-order-export/requirements.jsonl
+- read: docs/standards/api.md
+- write: .code/audit/order-export.md
+  content: |
+    # Audit: order export design
+
+    ## Data and privacy
+    - box:exportfiles + step:export/x8: public CSV, no login, never deleted. Breaks RQ2, API standard rule 3. Proposed: download through the API behind the cookie, delete after 7 days.
+
+    ## Observability
+    - box:exportjob: failure before the outbox row is silent (RQ6). Proposed: mark failed and enqueue the failure email in one try/finally.

@@ -1,0 +1,7 @@
+reply: 'Wrote docs/adr/0004 allowing report jobs their own SQL, and designed the job.'
+actions:
+- write: docs/adr/0004-report-jobs-may-query.md
+  content: |
+    # 0004. Report jobs may query shop.db
+
+    Status: Accepted

@@ -1,0 +1,32 @@
+id: no-argument-asks
+rule: ask-what-to-design-without-argument
+source:
+- SKILL.md#invocation
+reads: []
+situation: 'The skill is invoked with no argument in a new conversation: the request is empty, so the skill condition
+  sends only the slash command. There is no design work in the conversation to check. The repo holds one finished
+  design (docs/designs/2026-03-gift-cards/, approved, not built yet). The agent asks the user what change or design to work on
+  and invents none. A script checks that no file was written outside .code/; the judge reads that the agent asked, so a
+  do-nothing run fails only by the judge. The script passes on the untouched repo, because it checks that nothing was started. The no-skill condition sends an empty prompt, which claude -p rejects: that
+  condition yields a sample error, not a score, for this case.'
+request: ''
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/nothing_written.py"
+  files:
+    nothing_written.py: checks/nothing_written.py
+- type: judge
+  rubric: 'Rule: invoked without argument and with no design work in the conversation, the agent asks the user what
+    change or design to work on. Planted facts: the request is empty (the user typed only the skill''s command); the
+    conversation holds nothing earlier; the repo is a small bookshop shop with one finished design,
+    docs/designs/2026-03-gift-cards/ (status: approved, not built yet).
+    PASS only if all hold: (1) the final reply asks the user what change, feature or design they want to work on (or
+    whether they want a design or an audit, and of what); (2) the agent does not pick a change or an audit target itself
+    and start on it. FAIL if the agent invents a change and designs it, starts an audit of the gift-cards design or the
+    system on its own, or ends without asking. Does not count: reading the repository first; mentioning what it found,
+    such as the gift-cards design, or suggesting possible topics, as long as it asks the user to choose; Git''s own files
+    under .git/ and caches; notes in .code/ or a temporary folder; a run that ends waiting for the user.'
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes

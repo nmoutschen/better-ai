@@ -1,0 +1,6 @@
+reply: 'Reviewed the design for security and privacy; one finding, F1.'
+actions:
+- read: docs/designs/2026-11-order-export/design.md
+- write: docs/designs/2026-11-order-export/reviews.jsonl
+  content: |
+    {"at": "2026-11-21T10:48:00", "perspectives": ["Security", "Data and privacy"], "changed": [], "hashes": {}}

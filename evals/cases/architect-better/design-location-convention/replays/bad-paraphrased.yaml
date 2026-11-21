@@ -1,0 +1,5 @@
+reply: 'Started the design in docs/designs/2026-11-order-export/.'
+actions:
+- write: docs/designs/2026-11-order-export/request.md
+  content: |
+    Customers want to export their order history as CSV (GDPR requests).

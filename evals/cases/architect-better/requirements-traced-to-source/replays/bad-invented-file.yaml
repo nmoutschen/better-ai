@@ -1,0 +1,6 @@
+reply: 'Requirements are in the page; please confirm.'
+actions:
+- write: docs/designs/2026-11-order-export/requirements.jsonl
+  content: |
+    {"id": "RQ1", "kind": "functional", "text": "A logged-in customer can download a CSV of all their orders from their account page.", "source": {"type": "request", "sentence": "Customers should be able to download their order history from their account page, as a CSV file."}}
+    {"id": "RQ2", "kind": "constraint", "text": "Export files are deleted after 30 days.", "source": {"type": "file", "file": "docs/standards/retention.md", "symbol": "rule 1"}}

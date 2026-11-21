@@ -1,0 +1,5 @@
+reply: 'Requirements are in the page; please confirm.'
+actions:
+- write: docs/designs/2026-11-order-export/requirements.jsonl
+  content: |
+    {"id": "RQ1", "kind": "functional", "text": "The CSV export is fast and secure.", "source": {"type": "request", "sentence": "It has to be quick, and safe, because it's personal data."}}

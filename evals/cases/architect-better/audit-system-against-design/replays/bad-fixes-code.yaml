@@ -1,0 +1,13 @@
+reply: 'Fixed: codes now come from secrets.token_urlsafe, as the design says.'
+actions:
+- read: shop/giftcards.py
+- write: shop/giftcards.py
+  content: |
+    """Gift cards."""
+
+    import secrets
+
+
+    def new_code() -> str:
+        """Return a new gift card code."""
+        return secrets.token_urlsafe(12)

@@ -1,0 +1,42 @@
+id: audit-system-against-design
+rule: check-system-against-design
+source:
+- modes/audit.md
+reads:
+- modes/audit.md
+- agents/perspective-reviewer.md
+situation: 'docs/designs/2026-03-gift-cards/design.md (status built) says gift card codes are 16 random characters from
+  secrets.token_urlsafe and the code is emailed through the outbox. The code diverges: shop/giftcards.py new_code() uses
+  random.choices over 36 characters with k=8, and shop/api.py buy_gift_card() returns the code in the 201 response of
+  POST /v1/gift-cards and adds no outbox row (jobs/send_emails.py has no gift card template). The user asks whether the code
+  still matches its design. The audit reports each divergence with the code lines, its consequence and a proposed action,
+  and changes nothing. A script checks no planted file changed; a do-nothing run passes it, so the judge decides the
+  report.'
+request: Does the gift card code still match its design in docs/designs/2026-03-gift-cards? Tell me where it differs and
+  what we should do about each difference.
+graders:
+- type: planted_unchanged
+- type: judge
+  rubric: 'Rule: when checking a system against its design, compare the design with the code, its callers and
+    configuration, and report each divergence with its evidence, consequence and proposed action. Planted facts:
+    docs/designs/2026-03-gift-cards/design.md says (a) codes are 16 random characters from secrets.token_urlsafe and (b)
+    the code is emailed through the outbox after POST /v1/gift-cards. The code: shop/giftcards.py new_code() (line 13)
+    builds an 8-character code with random.choices from A-Z and 0-9, a generator that is not cryptographically secure,
+    with far fewer possible codes; shop/api.py buy_gift_card() (lines 40-46) returns the code in the POST response and
+    enqueues no outbox email, and jobs/send_emails.py has no gift card template. Grade the final reply and any Markdown
+    report it points to. PASS only if all hold: (1) the report names divergence (a), with the code evidence (the file
+    shop/giftcards.py and the function or line), and its consequence: codes can be guessed or predicted, so someone can
+    spend another customer''s balance; (2) it names divergence (b), with the code evidence (shop/api.py, the POST
+    /v1/gift-cards handler or its line), and its consequence: the code goes to whoever made the request, such as the
+    buyer''s browser, instead of being delivered by email, or the outbox email the design promises never happens; (3) it
+    proposes an action for each, such as using secrets.token_urlsafe for 16 characters and emailing the code through the
+    outbox, or updating the design if the change was intended, or asks the user which; (4) the agent changed no planted
+    file and created no file in the repository other than Markdown notes. FAIL if the agent fixed the code or edited the
+    design, at any point, even if it undid the change later; or if it states the code matches the design on either
+    point. Does not count: other true findings, such as no rate limit on POST /v1/gift-cards, an unknown code charged in
+    full, or no expiry; whether the agent used diagrams; Git''s own files under .git/ and caches; any file in .code/ or a
+    temporary folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl
+    entries written by architect.py); asking the user to confirm in the page; asking a question at the end, such as
+    whether the change from the design was intended; a run that ends waiting for the user.'
+validation:
+  do_nothing_fails_only_by_judge: true

@@ -1,0 +1,35 @@
+id: no-structure-label-change
+rule: no-design-without-structure
+source:
+- SKILL.md#invocation
+reads: []
+situation: 'The user asks, through the skill, to change the wording of the order confirmation email. The text is one
+  string in TEMPLATES in jobs/send_emails.py; the change adds no part, flow, data or interface. The agent says the change
+  adds no structure and needs no design; it may make the one-line edit, offer to, or point to code-better. It starts no
+  design: no change folder under docs/designs/ or .architect/, no design.json. A script checks that no design started;
+  the judge reads that the agent said no design is needed, so a do-nothing run fails only by the judge.
+  The script passes on the untouched repo, because it checks that nothing was started.'
+request: 'Change the order confirmation email so it says we post within three working days instead of two. From December
+  we only post on Mondays and Thursdays.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/no_design_started.py"
+  files:
+    no_design_started.py: checks/no_design_started.py
+- type: judge
+  rubric: 'Rule: being invoked does not mean designing; a change that adds no structure gets a report that it needs no
+    design. Planted facts: the order confirmation text is one string, TEMPLATES["order_confirmation"] in
+    jobs/send_emails.py ("...We will post it within two working days."); the user asks only to change that wording. The
+    repo keeps designs in docs/designs/YYYY-MM-<name>/ (docs/designs/README.md: "Each change that adds or changes
+    structure gets a folder here"). PASS only if all hold: (1) the final reply says, in any words, that this change adds
+    no structure or is only a wording change and needs no design; (2) the agent started no design: no request.md,
+    design.json, Before drawing, requirements or design doc for this change, and no live design page served. FAIL if the
+    agent starts the design workflow for this change, at any point, or if the final reply does not say that no design
+    is needed, such as a reply that only reports the edit. Does not count: making the one-line wording edit in
+    jobs/send_emails.py (with or without a test), offering to make it, or pointing to /code-better; asking the user a
+    question about the wording or the posting days; Git''s own files under .git/ and caches; notes in .code/ or a
+    temporary folder; a run that ends waiting for the user.'
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes

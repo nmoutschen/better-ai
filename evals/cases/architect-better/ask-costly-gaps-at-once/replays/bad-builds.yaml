@@ -1,0 +1,5 @@
+reply: 'Added a wishlist table and a back-in-stock job.'
+actions:
+- write: jobs/stock_alerts.py
+  content: |
+    """Email customers when a wishlisted book is back in stock."""

@@ -1,0 +1,41 @@
+id: no-review-before-approval
+rule: review-only-after-approval
+source:
+- modes/design.md
+reads:
+- modes/design.md
+situation: 'Stage c-drafted: the draft is in the page (design.json with After, design.md with D1 cron job and D2 export
+  files on the public Netlify site behind an unguessable link, perspectives.jsonl). The user has left comment c1 on the
+  Export files box: "Why put the files on Netlify and not behind the API?" There is no approve event: the user has not
+  chosen Approve.... The agent answers the comment with the options and a recommendation, and may revise the design,
+  but starts no perspective reviewers and writes no findings.jsonl or reviews.jsonl; it may ask the user to choose
+  Approve... when ready. The script check passes on the untouched repo because a run that does nothing also starts no
+  review; the judge fails that run for not answering the comment.'
+request: I left a comment on the export design in the page, have a look.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/no_review_started.py"
+  files:
+    no_review_started.py: checks/no_review_started.py
+- type: judge
+  rubric: 'Rule: start the perspective reviewers only when the user chooses Approve... in the page; before that, debate
+    the design and answer comments. Planted facts: docs/designs/2026-11-order-export/ holds a drafted design: D2 serves
+    the CSV from the public Netlify site under an unguessable link instead of a download endpoint in the API.
+    conversation.jsonl has the user''s comment c1 on the Export files box (box:exportfiles): "Why put the files on
+    Netlify and not behind the API?", and no approve event. Read the final reply, the page replies in the diff
+    (conversation.jsonl entries) and the transcript. PASS only if all hold: (1) the agent answers c1, in the page or in
+    the reply, with at least two options for where the file is served (such as the Netlify link and a download
+    endpoint in the API) and a recommendation with its reason; (2) it starts no reviewer sub-agent for any perspective
+    (Security, Observability, Data and privacy, API standard or other) and does not record a review, such as running
+    architect.py review or writing findings.jsonl or reviews.jsonl. FAIL if any of: (a) c1 is not answered, or answered
+    without options or without a recommendation; (b) a reviewer sub-agent is started, or the agent reviews the design
+    by perspective itself and records findings, before the user chooses Approve.... Does not count: revising D2,
+    design.json or design.md in answer to the comment; asking the user which option they prefer; asking the user to
+    choose Approve... when ready; reading agents/perspective-reviewer.md; a sub-agent started for another purpose, such
+    as exploring the code; Git''s own files under .git/ and caches; notes in .code/ or a temporary folder; serving the
+    live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries written by architect.py);
+    a run that ends waiting for the user.'
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes

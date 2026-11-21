@@ -1,0 +1,5 @@
+reply: 'F1 is accepted as a risk, as you asked.'
+actions:
+- bash: |
+    sed -i.bak 's/"handled_by": null, "confirmed": true}$/"handled_by": "accepted by the user", "confirmed": true}/' docs/designs/2026-11-order-export/findings.jsonl
+    rm docs/designs/2026-11-order-export/findings.jsonl.bak
