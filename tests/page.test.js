@@ -787,7 +787,7 @@ test('a kept invalid claim with a list for its question does not stop the board 
 test('the errors band says which records are shown marked and which are only listed', () => {
   const els = band();
   showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] }, els);
-  assert.match(els.errors.innerHTML, /Questions are shown marked not valid, and claims and sources under the question they name; other records are only listed here\./);
+  assert.match(els.errors.innerHTML, /Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here\./);
 });
 
 test('the board marks an invalid brief like any other record', () => {
