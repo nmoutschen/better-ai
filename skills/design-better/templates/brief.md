@@ -42,7 +42,7 @@
 
 <The direction the user chose, and what they said is wrong with the others. Leave empty until the user chooses a direction.>
 
-Review of the direction: <not yet | settled: the user's decision on each confirmed finding>
+Review of the direction: <not yet | settled for <direction>: no confirmed finding, or the user's decision on each confirmed finding>
 
 ## Out of scope
 
