@@ -38,6 +38,7 @@ def load(name: str, path: Path):
 
 
 schema = load("schema", SCRIPTS / "schema.py")
+diagram = load("architect_formats_diagram", SCRIPTS / "diagram.py")
 architect = load("architect_formats_architect", SCRIPTS / "architect.py")
 
 # The spec page's file kinds, and the schema each is checked against.
@@ -811,6 +812,333 @@ class MovedChecks(unittest.TestCase):
         self.assertNotIn("belongs to more than one group", text)
         self.assertNotIn("references missing", text)
         self.assertIn("Finding target", text)
+
+
+class Templates(unittest.TestCase):
+    """Each line of a template, with its placeholders filled, is a record its schema accepts, and the templates state
+    the conventions and show every shape of a record that depends on a status or a tagged source."""
+
+    SCHEMA_OF = {
+        "architect": "architect.schema.json",
+        "design": "design.schema.json",
+        "requirement": "requirements.schema.json",
+        "perspective": "perspectives.schema.json",
+        "finding": "findings.schema.json",
+        "decision": "decisions.schema.json",
+        "review": "reviews.schema.json",
+        "spec": "spec.schema.json",
+        "gap": "spec.schema.json",
+        "unlinked": "spec.schema.json",
+    }
+
+    def lines(self):
+        found = []
+        for path in sorted((SKILL / "templates").glob("*.md")):
+            for number, line in enumerate(path.read_text().splitlines(), 1):
+                if line.startswith("{") and line.endswith("}"):
+                    found.append((path.name, number, line))
+        return found
+
+    @staticmethod
+    def fill(line):
+        line = line.replace("<UTC time>", AT).replace("<agent>", "architect").replace("<n>", "1")
+        line = re.sub(r"<SHA-256[^>]*>", DIGEST, line)
+        return re.sub(r"<[^<>\"]+>", "text", line)
+
+    def test_every_template_line_is_a_valid_record_once_filled(self):
+        found = self.lines()
+        self.assertGreater(len(found), 20)
+        for name, number, line in found:
+            with self.subTest(template=name, line=number):
+                record = json.loads(self.fill(line))
+                self.assertEqual(
+                    schema.check_record(record, [self.SCHEMA_OF[record["type"]]], SCHEMAS), [], self.fill(line)
+                )
+
+    def test_each_shape_has_a_line(self):
+        records = [json.loads(self.fill(line)) for _, _, line in self.lines()]
+        shapes = {
+            ("gap", "asked"),
+            ("gap", "assumed"),
+            ("gap", "answered"),
+            ("finding", "open"),
+            ("finding", "handled"),
+            *(("requirement", t) for t in ("request", "file", "user", "guessed")),
+            *(("spec", t) for t in ("design", "request", "decision", "requirement")),
+            *(("perspective", t) for t in ("built_in", "standard")),
+            *(("architect", t) for t in ("chat", "issue", "file")),
+            ("unlinked", None),
+            ("decision", None),
+            ("review", None),
+            ("design", None),
+        }
+        seen = set()
+        for r in records:
+            kind = r["type"]
+            if kind in ("gap", "finding"):
+                seen.add((kind, r["status"]))
+            elif kind in ("requirement", "spec"):
+                seen.add((kind, r["source"]["type"]))
+            elif kind == "perspective":
+                seen.add((kind, r["from"]["type"]))
+            elif kind == "architect":
+                seen.add((kind, r["request"]["from"]["type"]))
+            else:
+                seen.add((kind, None))
+        self.assertEqual(shapes - seen, set())
+
+    def test_the_templates_state_the_conventions(self):
+        text = "\n".join(p.read_text() for p in (SKILL / "templates").glob("*.md") if "{" in p.read_text())
+        for convention in (
+            "`type`, `at` (UTC, ending in Z) and `by`",
+            "`null`",
+            "JSON array",
+            "the record a pointer names before the pointer",
+            "A field the schema does not name is an error",
+            "schema.py check",
+        ):
+            self.assertIn(convention, text)
+
+    def test_a_template_holds_placeholders_only(self):
+        for name, number, line in self.lines():
+            with self.subTest(template=name, line=number):
+                values = re.findall(r'": "([^"]*)"', line)
+                for value in values:
+                    self.assertTrue(
+                        "<" in value
+                        or value in ("architect", "chat", "asked", "assumed", "answered", "open", "handled")
+                        or value in KINDWORDS,
+                        value,
+                    )
+
+
+KINDWORDS = {
+    "design", "request", "decision", "requirement", "file", "user", "guessed", "issue", "built_in", "standard",
+    "functional", "quality", "constraint", "spec", "gap", "unlinked", "perspective", "finding", "review", "architect",
+    "service", "person", "box", "step", "async", "response", "dashboard", "after", "before",
+}  # fmt: skip
+
+
+class DiagramShapeFirst(unittest.TestCase):
+    """diagram.py checks the shape with the schema first, and the references only of a design that has the shape."""
+
+    def plain(self):
+        d = design()
+        return {"containers": d["containers"], "flows": d["flows"]}
+
+    def test_a_step_kind_the_renderer_cannot_draw_is_refused_by_check(self):
+        made = self.plain()
+        made["flows"][0]["steps"][0]["kind"] = "foo"
+        errors = diagram.validate(made)
+        self.assertTrue(any("kind" in e and "foo" in e or "kind" in e for e in errors), errors)
+        with self.assertRaises(ValueError):
+            diagram.layout(made)
+
+    def test_a_node_id_that_is_not_text_gives_the_shape_error_and_no_reference_errors(self):
+        made = self.plain()
+        made["containers"]["nodes"][0]["id"] = 5
+        errors = diagram.validate(made)
+        self.assertTrue(errors)
+        self.assertFalse([e for e in errors if "references missing" in e], errors)
+        self.assertTrue(any("containers.nodes[0].id" in e for e in errors), errors)
+
+    def test_a_well_shaped_design_still_gets_the_reference_checks(self):
+        made = self.plain()
+        made["containers"]["edges"][0]["to"] = "nowhere"
+        self.assertTrue(any("references missing 'nowhere'" in e for e in diagram.validate(made)))
+
+    def test_the_findings_the_page_adds_are_not_a_shape_error(self):
+        made = self.plain()
+        made["findings"] = {"user": [["V1", "t", "security"]]}
+        self.assertEqual(diagram.validate(made), [])
+
+    def test_check_and_render_agree_on_a_good_and_a_bad_design(self):
+        for change, ok in (({}, True), ({"kind": "foo"}, False)):
+            made = self.plain()
+            made["flows"][0]["steps"][0].update(change)
+            try:
+                diagram.layout(made)
+                rendered = True
+            except ValueError:
+                rendered = False
+            self.assertEqual((diagram.validate(made) == []), ok)
+            self.assertEqual(rendered, ok)
+
+
+class LoadNeverRaises(unittest.TestCase):
+    def test_a_source_file_that_goes_away_between_check_and_read_is_an_error_entry(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = make_folder(Path(d))
+            (Path(d) / "docs").mkdir()
+            (Path(d) / "docs" / "there.md").write_text("x\n")
+            requirements = read(folder, "requirements.jsonl")
+            requirements[0]["source"] = {"type": "file", "file": "docs/there.md", "symbol": "s"}
+            write(folder, "requirements.jsonl", requirements)
+            self.assertEqual(architect.load(folder)["errors"], [])
+            with mock.patch.object(architect, "source_file", side_effect=ValueError("missing or out-of-scope source")):
+                data = architect.load(folder)
+                json.dumps(data, allow_nan=False)
+                self.assertEqual(
+                    [(e["file"], e["line"], e["field"]) for e in data["errors"]],
+                    [("requirements.jsonl", 1, "source.file")],
+                )
+                code, out, _ = run_check(folder)
+            self.assertEqual(code, 1)
+            self.assertIn("requirements.jsonl:1: source.file:", out)
+
+
+class SpecsNeedRecords(unittest.TestCase):
+    def test_no_spec_records_writes_nothing_and_says_so(self):
+        for records in (None, []):
+            with self.subTest(records=records), tempfile.TemporaryDirectory() as d:
+                folder = make_folder(Path(d), **{"spec.jsonl": records})
+                out = Path(d) / "specs.md"
+                err = io.StringIO()
+                with redirect_stdout(io.StringIO()), redirect_stderr(err), self.assertRaises(SystemExit):
+                    architect.main(["specs", str(folder), "--out", str(out)])
+                self.assertIn("spec.jsonl has no records: write the spec first", err.getvalue())
+                self.assertFalse(out.exists())
+
+    def test_gaps_alone_are_not_a_spec(self):
+        with tempfile.TemporaryDirectory() as d:
+            gap = base("gap", id="G1", text="t", status="assumed", choice="c", if_wrong="w")
+            folder = make_folder(Path(d), **{"spec.jsonl": [gap]})
+            out = Path(d) / "specs.md"
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                architect.main(["specs", str(folder), "--out", str(out)])
+            self.assertFalse(out.exists())
+
+
+class NullIsAbsent(unittest.TestCase):
+    """An optional field may be null, which means the same as leaving it out; a field a status drives may not."""
+
+    OPTIONAL = {
+        "design.schema.json": [
+            ("containers.nodes[0].detail", None),
+            ("containers.nodes[0].in", None),
+            ("containers.edges[0].label", None),
+            ("containers.edges[0].in", None),
+            ("containers.edges", None),
+            ("containers.groups", None),
+            ("flows[0].in", None),
+            ("flows[0].participants[0].in", None),
+            ("flows[0].steps[0].kind", None),
+            ("flows[0].steps[0].label", None),
+            ("flows[0].steps[0].in", None),
+        ],
+    }
+
+    @staticmethod
+    def put(record, path, value):
+        parts = re.findall(r"[^.\[\]]+|\[\d+\]", path)
+        target = record
+        for part in parts[:-1]:
+            target = target[int(part[1:-1])] if part.startswith("[") else target[part]
+        last = parts[-1]
+        target[last] = value
+
+    def test_the_schemas_accept_null_for_an_optional_field(self):
+        for name, cases in self.OPTIONAL.items():
+            for path, value in cases:
+                with self.subTest(path):
+                    record = design()
+                    self.put(record, path, value)
+                    self.assertEqual(schema.check_record(record, [name], SCHEMAS), [])
+        record = examples("perspectives.jsonl")[0][1]
+        record["from"] = {"type": "built_in", "method": None}
+        self.assertEqual(schema.check_record(record, ["perspectives.schema.json"], SCHEMAS), [])
+        record = examples("reviews.jsonl")[0][1]
+        record["labels"] = None
+        self.assertEqual(schema.check_record(record, ["reviews.schema.json"], SCHEMAS), [])
+
+    def test_a_status_driven_field_is_still_refused_as_null(self):
+        finding = {**examples("findings.jsonl")[0][1], "status": "open", "handled_by": None}
+        self.assertEqual(
+            [p[0] for p in schema.check_record(finding, ["findings.schema.json"], SCHEMAS)], ["handled_by"]
+        )
+
+    def test_a_folder_with_nulls_loads_draws_and_hashes_like_one_without(self):
+        with tempfile.TemporaryDirectory() as d:
+            plain = make_folder(Path(d) / "a")
+            nulls = make_folder(Path(d) / "b")
+            made = read(nulls, "design.json")
+            made["containers"]["nodes"][0]["detail"] = None
+            made["containers"]["edges"][0]["in"] = None
+            made["containers"]["groups"] = None
+            made["flows"][0]["steps"][0]["kind"] = None
+            made["flows"][0]["in"] = None
+            write(nulls, "design.json", [made])
+            perspectives = read(nulls, "perspectives.jsonl")
+            perspectives[0]["from"] = {"type": "built_in", "method": None}
+            write(nulls, "perspectives.jsonl", perspectives)
+            reviews = read(nulls, "reviews.jsonl")
+            reviews[0]["labels"] = None
+            write(nulls, "reviews.jsonl", reviews)
+            self.assertEqual([str(e) for e in check(nulls)], [])
+            a, b = architect.load(plain), architect.load(nulls)
+            self.assertEqual(b["errors"], [])
+            json.dumps(b, allow_nan=False)
+            self.assertEqual(a["containers"], b["containers"])
+            self.assertEqual(a["flows"], b["flows"])
+            self.assertEqual(
+                {k: v["label"] for k, v in a["parts"].items()}, {k: v["label"] for k, v in b["parts"].items()}
+            )
+            self.assertEqual(architect.read_folder(plain)["hashes"], architect.read_folder(nulls)["hashes"])
+
+    def test_diagram_py_treats_null_like_absent(self):
+        plain = DiagramShapeFirst().plain()
+        nulls = DiagramShapeFirst().plain()
+        nulls["containers"]["nodes"][0]["detail"] = None
+        nulls["containers"]["edges"][0]["in"] = None
+        nulls["containers"]["groups"] = None
+        nulls["flows"][0]["steps"][0]["kind"] = None
+        self.assertEqual(diagram.validate(nulls), [])
+        self.assertEqual(
+            diagram.svg_containers(diagram.layout(nulls), "after"),
+            diagram.svg_containers(diagram.layout(plain), "after"),
+        )
+
+
+class RequiredFiles(unittest.TestCase):
+    """A folder missing a file its other files need fails `schema.py check <folder>` too, not only architect.py check."""
+
+    def test_a_folder_missing_design_json_or_architect_json_fails_both_checks(self):
+        for missing in ("design.json", "architect.json"):
+            with self.subTest(missing), tempfile.TemporaryDirectory() as d:
+                folder = make_folder(Path(d), **{missing: None})
+                errors = check(folder)
+                self.assertEqual([(Path(e.file).name, e.line, e.field) for e in errors], [(missing, 1, "(file)")])
+                code, out, _ = run_check(folder)
+                self.assertEqual(code, 1)
+                self.assertIn(f"{missing}:1: (file): missing file", out)
+                self.assertTrue(errors[0].file.endswith(missing))
+                self.assertIn(f"{missing}:1: (file): {errors[0].message}", out)
+
+    def test_a_good_folder_and_a_folder_with_no_architect_files_pass(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(check(make_folder(Path(d))), [])
+            other = Path(d) / "elsewhere"
+            write(
+                other,
+                "conversation.jsonl",
+                [{"type": "note", "at": AT, "by": "user", "id": "n1", "text": "hi", "to": None}],
+            )
+            self.assertEqual([str(e) for e in check(other)], [])
+
+    def test_the_requirement_is_declared_in_the_schemas_not_in_architect_py(self):
+        for name in ("architect", "design", "requirements", "perspectives", "findings", "decisions", "reviews"):
+            doc = json.loads((SCHEMAS / f"{name}.schema.json").read_text())
+            self.assertEqual(doc["x-required-files"], ["architect.json", "design.json"], name)
+
+    def test_a_schema_with_a_malformed_required_files_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            copy = Path(d) / "schemas"
+            shutil.copytree(SCHEMAS, copy)
+            doc = json.loads((copy / "design.schema.json").read_text())
+            doc["x-required-files"] = "design.json"
+            (copy / "design.schema.json").write_text(json.dumps(doc))
+            with self.assertRaises(schema.SchemaError):
+                schema.load_schemas(copy)
 
 
 class ModeText(unittest.TestCase):
