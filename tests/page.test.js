@@ -464,10 +464,10 @@ test('a task with a wrongly typed requirements or mode still draws the task list
   const el = { hidden: true, textContent: '', html: '' };
   const OPENTASKS = new Set();
   const setHTML = (e, h) => { e.html = h; };
-  const { drawTasks } = new Function('esc', 'has', 'D', '$', 'setHTML', 'OPENTASKS', 'MODES', 'ICON',
+  const { drawTasks } = new Function('esc', 'has', 'D', '$', 'setHTML', 'OPENTASKS', 'ICON',
     statusCode + ';const reqsOf' + rows.split('const reqsOf')[1] + ';const svg = body =>' + drawCode + '; return {drawTasks};')(
     realEsc, v => v && v !== 'none', { requirements: { R1: 'text' }, tasks: [], agents: [] }, () => el, setHTML, OPENTASKS,
-    { feature: 'feature' }, { working: '', finished: '', blocked: '' });
+    { working: '', finished: '', blocked: '' });
   const bad = { id: 'T2', task: 'x', mode: 5, requirements: 'R1', check: 7, status: 'built', _errors: ['requirements: expected array'] };
   drawTasks({ tasks: [{ id: 'T1', task: 'ok', mode: 'feature', requirements: ['R1'], status: 'todo' }, bad], agents: [] });
   assert.match(el.html, /T1/);

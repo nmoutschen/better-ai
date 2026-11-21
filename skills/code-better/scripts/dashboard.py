@@ -110,7 +110,7 @@ class Reader:
             by = record.get("by") if record else None
             entry = {"file": name, "line": error.line, "field": error.field, "message": error.message}
             self.errors.append({**entry, "by": by} if isinstance(by, str) and by else entry)
-            messages.setdefault(error.line, []).append(error.message)
+            messages.setdefault(error.line, []).append(f"{error.field}: {error.message}")
         kept = []
         for number, record in parsed.items():
             if record is None or (number in messages and not keep_invalid):

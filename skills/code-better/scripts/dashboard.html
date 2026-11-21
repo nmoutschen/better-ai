@@ -101,6 +101,7 @@
 .errors li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
 .errors code { font:var(--font-code); }
 .errors .by { color:var(--muted); }
+.what.invalid { color:var(--error); }
 </style></head><body>
 <div class="band"></div>
 <header class="bar--stats"><div><h1 id="title" dir="auto">Change dashboard</h1></div>
@@ -171,7 +172,7 @@ const TASK_STATUS = {todo: ["todo", "to do"], building: ["building", "building"]
   verifying: ["verifying", "verifying"], "changes needed": ["changes", "changes needed"], verified: ["verified", "verified"],
   merged: ["merged", "merged"], done: ["done", "done"]};
 const DONE = new Set(["done", "merged"]);
-const isDone = t => DONE.has(String(t.status || "").trim().toLowerCase());
+const isDone = t => !(t._errors && t._errors.length) && DONE.has(String(t.status || "").trim().toLowerCase());
 function taskStatus(t, tasks) {
   const raw = String(t.status || "").trim(), s = raw.toLowerCase();
   // A record that did not validate says so, in the error style, with its first message; an unknown status still shows as written.
@@ -203,7 +204,7 @@ const stateIcon = (a, now) => { const s = stateOf(a, now), w = word(a, now);
 const who = a => esc(a.name);
 const taskOf = a => a.task ? (D.tasks || []).find(t => t.id === a.task) : undefined;
 // A task's requirements with their text from the spec; an ID the spec does not hold shows as missing, not hidden.
-const reqsOf = t => ((t || {}).requirements || []).map(id => [id, (D.requirements || {})[id]]);
+const reqsOf = t => { const r = (t || {}).requirements; return (Array.isArray(r) ? r : []).map(id => [String(id), (D.requirements || {})[id]]); };
 const reqItems = t => reqsOf(t).map(([id, text]) => `<li dir="auto"><b>${esc(id)}</b>${text ? esc(text) : '<span class="missing">not in the spec</span>'}</li>`).join("");
 const taskLabel = a => { const t = taskOf(a); return t ? `${t.id}: ${t.task}` : a.task ? `Task ${a.task}` : "No task named"; };
 
@@ -253,7 +254,7 @@ function drawTasks(d) {
   // The tasks keep their own order, the one tasks.jsonl gives, each with the status tasks.jsonl gives it.
   setHTML($("tasks"), tasks.map(t => {
     const live = d.agents.filter(a => a.task && a.task === t.id && a.state !== "finished");
-    const tag = has(t.mode) ? `<span class="mode m-${MODES[t.mode.trim().toLowerCase()] || "other"}">${esc(t.mode)}</span>` : "";
+    const tag = typeof t.mode === "string" && has(t.mode) ? `<span class="mode m-${MODES[t.mode.trim().toLowerCase()] || "other"}">${esc(t.mode)}</span>` : "";
     const open = OPENTASKS.has(t.id) ? " open" : "";
     return `<li><details data-t="${esc(t.id)}"${open}><summary><span class="n">${esc(t.id)}</span>
       ${statusLabel(t, tasks, TICON)}${tag}<span class="t" dir="auto">${esc(t.task)}</span>
@@ -328,8 +329,8 @@ function decisionItem(c, state, actions) {
   // The answer the coordinator copied shows only when the user gave it in the chat: an answer from the page is in the thread.
   const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer:\n\n${x.answer}`)
     : status === "decided" && has(x.decision) ? md(`Decided:\n\n${x.decision}`) : "";
-  const item = li(`msg decision ${status}`, `${headHTML("Coordinator", x.at, label)}${from ? `<p class="what">From ${esc(from)}</p>` : ""}
-    ${md(x.asked || "")}${after}`);
+  const item = li(`msg decision ${status}`, `${headHTML("Coordinator", x.at, label)}${from ? `<p class="what">From ${esc(from)}</p>` : ""}${x._errors && x._errors.length ? `<p class="what invalid">not valid: ${esc(x._errors[0])}</p>` : ""}
+    ${md(String(x.asked || ""))}${after}`);
   item.dataset.d = x.id;
   if (step === 0) item.classList.add("open-q");  // the top bar's figure takes the user to the first one
   item.dataset.state = STEP ? STEP[0] : "";
