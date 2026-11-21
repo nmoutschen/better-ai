@@ -1,5 +1,5 @@
 # One sentence per source of skills/research-better: the core instruction of that SKILL.md section or skill file
-# (draft, 2026-11-21, not yet reviewed by the user). Keys are the sources that cases name in `source`. The
+# (reviewed by the user, 2026-11-21). Keys are the sources that cases name in `source`. The
 # one-sentence condition appends the sentence for a case's first source to its request; cases whose first source has
 # no entry are not run in that condition. The short-skill condition installs every sentence as the body of a short
 # SKILL.md.
