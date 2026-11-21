@@ -249,6 +249,7 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .pop[hidden] { display:none; }
 /* The comment box: where the comment points as its header, the words, then Send, Cancel and Delete. */
 .pop { width:min(22rem, calc(100vw - 24px)); font-size:var(--text-body); padding:0 var(--space-item) var(--space-item); }
+.pop::before { margin:0 calc(-1 * var(--space-item)); }
 .pop .target { margin:0 calc(-1 * var(--space-item)) var(--space-item); padding:var(--space-control) var(--space-item); border-bottom:1px solid var(--line);
   font:var(--font-message); color:var(--ink); overflow-wrap:anywhere; }
 .pop textarea { width:100%; min-height:4.5em; font:var(--font-body); color:var(--ink); background:var(--white);
