@@ -690,6 +690,37 @@ class EveryAcceptedExampleRenders(unittest.TestCase):
                 self.assertEqual(run.returncode, 0, run.stderr[:3000])
 
 
+class ModeText(unittest.TestCase):
+    """The mode files, the example and the templates name the new files, and say once where to check every write."""
+
+    SENTENCE = (
+        "After every write to a file in the change folder, run `python3 <skill dir>/scripts/schema.py check <file>` "
+        "and fix every error before your next step."
+    )
+
+    def test_each_mode_says_to_check_every_write_with_the_skill_dir_form(self):
+        for name in ("design.md", "audit.md"):
+            with self.subTest(name):
+                text = (SKILL / "modes" / name).read_text()
+                self.assertEqual(text.count(self.SENTENCE), 1)
+                self.assertLess(text.index(self.SENTENCE), text.index("\n## "))
+
+    def test_no_skill_text_names_the_old_files(self):
+        self.assertNotIn("request.md", (SKILL / "SKILL.md").read_text())
+        for path in [
+            *(SKILL / "modes").glob("*.md"),
+            *(SKILL / "agents").glob("*.md"),
+            *(SKILL / "templates").glob("*.md"),
+        ]:
+            with self.subTest(path.name):
+                self.assertNotIn("request.md", path.read_text())
+        readme = (SCRIPTS / "example" / "README.md").read_text()
+        for word in ("request.md", "aliases", "flow<N>"):
+            self.assertNotIn(word, readme)
+        for name in ("architect.json", "findings.jsonl", "conversation.jsonl", "specs.md"):
+            self.assertIn(name, readme)
+
+
 class Serving(unittest.TestCase):
     def test_the_page_payload_carries_errors_and_is_not_an_offline_notice(self):
         with tempfile.TemporaryDirectory() as d:
