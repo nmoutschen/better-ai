@@ -2,8 +2,8 @@
 # in a lower category where it gains in a higher one. See evals/PRINCIPLES.md, sections 10 and 11.
 # `does` is the category as the docs show it; `rules` is documentation; `cases` decides the grouping.
 categories:
-  - name: People can use it
-    does: Checks the interface by operating it for the people it serves, reports what stops them, and does not claim that people can use it
+  - name: Checks it as people meet it
+    does: "Checks the interface the way its users meet it: does their tasks in it, reads what its labels and pages say, and reports what stops them. Claims only what it checked, and suggests a test with real people for the rest"
     rules:
       - walk-every-scenario-after-build
       - findings-from-operating
