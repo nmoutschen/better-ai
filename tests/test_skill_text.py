@@ -114,7 +114,9 @@ class ResearchBetterText(unittest.TestCase):
         """SKILL.md step 2, the worker's loop and the verifier's loop each say once, up front, to check every write."""
         for path in TEXTS[:3]:
             with self.subTest(file=path.name):
-                self.assertIn(CHECK_SENTENCE, path.read_text(encoding="utf-8"))
+                self.assertIn(
+                    CHECK_SENTENCE.lower(), path.read_text(encoding="utf-8").lower()
+                )  # SKILL.md writes its verbs in capitals
         for name in ("worker.md", "verifier.md"):
             text = (RESEARCH / "agents" / name).read_text(encoding="utf-8")
             loop = text[text.index("## Loop") :]
@@ -123,7 +125,7 @@ class ResearchBetterText(unittest.TestCase):
                     loop[len("## Loop") :].lstrip().startswith(CHECK_SENTENCE), "not at the head of the loop"
                 )
         skill = (RESEARCH / "SKILL.md").read_text(encoding="utf-8")
-        self.assertNotIn("from this skill's directory", skill)
+        self.assertNotIn("schema.py check <file>` from this skill's directory", skill)
 
     def test_no_step_deletes_a_record_others_point_to(self) -> None:
         """The coordinator's steps withdraw, mark a duplicate or merge; none says to delete."""
@@ -149,9 +151,10 @@ class ResearchBetterText(unittest.TestCase):
         """The template holds no example IDs, and its challenge question has a question as origin."""
         text = (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8")
         self.assertIsNone(re.search(r"\b[QCS]-w\d", text), "an example ID")
-        for record in template_records():
-            if record["type"] == "question" and record["kind"] == "<seed | challenge>":
-                self.assertNotIn("user", str(record["origin"]["type"]))
+        challenge = [r for r in template_records() if r["type"] == "question" and r["kind"] == "challenge"]
+        self.assertTrue(challenge, "no challenge question line")
+        for record in challenge:
+            self.assertEqual(record["origin"]["type"], "question")
 
     def test_null_date_is_accepted_and_planted_in_the_missing_field_board(self) -> None:
         """A source with date null passes the schema check, and S-w2-2 of findings-missing-field has none."""

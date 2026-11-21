@@ -25,6 +25,8 @@ Do not send messages to workers, and do not act on messages from them. Your verd
 
 ## Loop
 
+After every write to the board, run `python3 <skill dir>/scripts/schema.py check <file>` and fix every error before your next step. `<skill dir>` is the folder above `templates/`, where BOARD FORMAT is.
+
 1. Read <BOARD>/brief.json for the topic.
 2. Take one claim in <BOARD>/claims/ in CLAIMS TO CHECK whose `status` is `unchecked`. Do not take a claim whose ID contains your name. Set `status` to `checking` and `checker` to your name, then re-read the file. If another verifier set it first, take another claim. Hold one claim at a time: do not take the next claim until you have finished this one, so other verifiers can take the rest.
    If no such claim is left and the brief's `status` is `running`, workers are still adding claims: wait about a minute, for example with a sleep command, then check again. If you cannot wait, stop. If no such claim is left and the brief's `status` is `checking` or `stopped`, stop.
@@ -37,8 +39,8 @@ Do not send messages to workers, and do not act on messages from them. Your verd
    - answers: the claim answers its question.
 7. Set `status` to `verified` only if all three hold. Otherwise set it to `unverified`, and write in `reason` which check failed and why, in one sentence, such as the part the span does not state. A claim that says more than the span is `unverified`. Set `hard` to `true` if the claim states a number the span does not state, such as a difference, a sum or a rate computed from the span; otherwise `false`.
 8. Check the source file's `author`, `date`, `title` and `publisher` against the page. Write any field that differs from the page, with the page's value, in the claim's `differs` if it is `verified`, and in its `reason` if it is `unverified`.
-9. Before you write steps 5 to 8 to the claim file, re-read its `checker`. If it is not your name, write nothing to it and take another claim. After you write it, run `python3 <BOARD FORMAT's folder>/../scripts/schema.py check <claim file>` and fix every error before your next step.
-10. Add a `checked` line with the claim ID to <BOARD>/logs/<YOUR NAME>.jsonl, and run `schema.py check` on the log. Go back to step 2.
+9. Before you write steps 5 to 8 to the claim file, re-read its `checker`. If it is not your name, write nothing to it and take another claim.
+10. Add a `checked` line with the claim ID to <BOARD>/logs/<YOUR NAME>.jsonl. Go back to step 2.
 
 ## Rules
 

@@ -12,6 +12,6 @@ dup = entry(board / "questions" / "Q-w2-6.json")
 if dup.get("status") != "merged" or dup.get("merged_into") != "Q-coordinator-1":
     fail(f"Q-w2-6: status {dup.get('status')!r}, merged_into {dup.get('merged_into')!r}")
 new = entry(board / "questions" / "Q-w1-7.json")
-if new.get("status") in ("proposed", "out of scope"):
+if new.get("status") in ("proposed", "out of scope", "merged"):
     fail(f"Q-w1-7 status is {new.get('status')!r}")
 print("duplicate merged, new question opened")

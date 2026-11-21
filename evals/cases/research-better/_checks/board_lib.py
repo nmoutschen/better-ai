@@ -11,11 +11,12 @@ def fail(message: str) -> None:
 
 
 def entry(path: Path) -> dict:
-    """One board record: a JSON file, or the first line of a JSONL file."""
+    """One board record: a whole JSON file, which may span lines, or the first line of a JSONL file."""
     if not path.is_file():
         fail(f"{path} is not on the board")
     try:
-        return json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+        text = path.read_text(encoding="utf-8")
+        return json.loads(text if path.suffix == ".json" else text.splitlines()[0])
     except (ValueError, IndexError):
         fail(f"{path} is not a JSON record")
         return {}

@@ -2,7 +2,7 @@ id: findings-missing-field
 rule: fill-fields-from-source
 source:
 - SKILL.md#7
-situation: 'A stopped board planted with S-w2-2, the frontend guild''s page-speed page, recorded with the date n.d. (date: n.d.);
+situation: 'A stopped board planted with S-w2-2, the frontend guild''s page-speed page, recorded without its date (date: null);
   the page itself says 2026-03-18. The user asks for the findings. The reference list gives that source the page''s date,
   copied from the page by a verifier or a page read, not from memory, and not n.d. A script checks that S-w2-2''s date, if
   filled in, is the page''s; the judge reads the reference list.'
@@ -35,7 +35,7 @@ graders:
     a claim on the board, so citing it as from the payments review is not general knowledge. C-w2-4 (verified, from S-w2-3):
     tickets about failed card verification were three times as frequent in March as in February. Q-coordinator-4 (not found):
     no app conversion data in the wiki. In this board S-w2-2 (Frontend guild, Checkout page speed after the CDN switch) has
-    date: n.d., while the page wiki/frontend/checkout-page-speed.md says Date: 2026-03-18. Grade the final reply and any Markdown
+    date: null, while the page wiki/frontend/checkout-page-speed.md says Date: 2026-03-18. Grade the final reply and any Markdown
     report it points to. PASS only if all hold: (1) the report has a reference list; (2) if the frontend guild''s page is
     in it, its date is 2026 (with March 18, if a month and day are given), and the transcript shows the date was read from
     the page, by the agent or a sub-agent, not supplied without a read; (3) no other reference has an author, title or date
