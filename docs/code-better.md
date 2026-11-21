@@ -64,15 +64,15 @@ Running it does not mean code gets written right away. It can stop at requiremen
 1. **It names your goal.** If your request names a solution, such as "add a cache", it names the need behind it. If that solution works against the need, it says so once, with one alternative, then follows your decision.
 2. **It reads first.** It reads the code the change touches, its callers and tests, and the project's instruction and contribution files. It does not ask you what those files answer.
 3. **It writes requirements as scenarios.** For anything beyond a small fix with one obvious reading, it writes scenarios with concrete inputs and expected results, such as Given/When/Then. You can check them without reading code.
-4. **It asks about gaps only you can fill.** These are behaviours you would notice, such as errors, limits or what happens to existing data. It asks them all at once, before building, by showing the scenarios they affect. It decides internal design itself and states its other assumptions next to the result.
-5. **It shows the design when the change adds structure.** This applies to a new module, data model, dependency or migration. If you will maintain the code, it shows you the decisions that change behaviour, cost or risk before building.
+4. **It asks about gaps only you can fill.** These are behaviours you would notice, such as errors, limits or what happens to existing data. It asks them all at once, before building, by showing the scenarios they affect. It decides implementation details within the agreed design and states its other assumptions next to the result.
+5. **It points you to `/architect-better` for structural changes without a design.** This applies to a new module, data model, dependency or migration. It builds from the resulting design and spec once both exist.
 6. **It writes a plan only for long or shared work.** This means work over several sessions or agents.
 7. **It writes the code.** It changes only what the task needs, and lists other things worth changing instead of changing them.
 8. **It checks the code.** It runs the affected tests, a check per scenario, a smoke check, and the project's existing static checks. It stops after about three rounds of fixes, or when the same check fails twice for the same reason, and reports what fails. It never edits or skips tests to make them pass. When you add or change a requirement, it re-runs the checks of every earlier scenario.
 9. **It gets a separate review.** The reviewer sees only the diff, the requirements and the code, not the agent's reasoning.
 10. **It reports back** and offers to explain how the change works.
 
-When the work splits into several tasks that each need their own review, such as an epic of several tickets, it coordinates instead of building: builder agents write each task on its own branch, verifier agents check each one, and the coordinating agent keeps the requirements, the design and the task list correct.
+When the work splits into several tasks that each need their own review, such as an epic of several tickets, it coordinates instead of building: builder agents write each task on its own branch, verifier agents check each one, and the coordinating agent keeps the spec and task list correct. For structural changes that need a design, the coordinator points you to `/architect-better` and coordinates the build from its design and spec.
 
 </details>
 
@@ -98,9 +98,9 @@ The dashboard reads the change's folder, `.code/<change>/`, and keeps running un
 - The code change, kept to one purpose.
 - When the change needs them, these files, from the skill's templates:
   - **Requirements**: the need, what changes for you, scenarios, constraints, out of scope, assumptions.
-  - **Design**: the approach, diagrams of only the parts the change touches, main flows, data changes, decisions.
   - **Plan**: tasks with a check for each, progress notes, open questions.
   - When it coordinates agents: each agent's log, each decision and question, and your conversation with the coordinator (`conversation.jsonl`).
+- For structural changes, the design and spec from `/architect-better` that the build follows.
 - A report:
   - what changed and why, in terms of the requirements
   - the design decisions and assumptions
@@ -121,7 +121,7 @@ It calls:
 
 - [`/ask-better`](ask-better.md) when it checks requirements with you.
 - [`/review-better`](review-better.md) to run the review and the audit, with `/code-better`'s list of what to look for in code.
-- [`/decide-better`](decide-better.md) when it shows you design decisions before building.
+- [`/decide-better`](decide-better.md) when it asks you about implementation decisions.
 - [`/write-better`](write-better.md) for the final report and for explanations.
 - [`/do-better`](do-better.md) when you reject the result.
 

@@ -39,6 +39,7 @@ The method is the same for all work. The skill for the kind of work adds what to
 |---|---|
 | Code, a diff or a pull request | [`/code-better`](code-better.md) |
 | An interface or a design language | [`/design-better`](design-better.md) |
+| A software design, or a system against its design | [`/architect-better`](architect-better.md) |
 | Text you read | [`/write-better`](write-better.md) |
 
 For a plan, a specification or a research report, it writes three to six kinds of problem from the work's goal and requirements.
@@ -95,7 +96,7 @@ It ends with what it did not read, run or check. It adds no praise to soften fin
 
 It calls:
 
-- [`/code-better`](code-better.md), [`/design-better`](design-better.md) or [`/write-better`](write-better.md) for what to look for, by kind of work.
+- [`/code-better`](code-better.md), [`/design-better`](design-better.md), [`/architect-better`](architect-better.md) or [`/write-better`](write-better.md) for what to look for, by kind of work.
 - Your `review-for-<name>` guide, if you have one from [`/interview-me`](interview-me.md). Its criteria are added, and its blocking criteria become blocking findings.
 - [`/decide-better`](decide-better.md) and [`/ask-better`](ask-better.md) when you must choose between fixes.
 - [`/write-better`](write-better.md) for the report.
@@ -105,6 +106,7 @@ It is called by:
 
 - [`/code-better`](code-better.md) for its review step.
 - [`/design-better`](design-better.md)'s audit mode and its review of each built interface.
+- [`/architect-better`](architect-better.md)'s design and audit modes, to confirm the perspective reviewers' findings.
 - [`/write-better`](write-better.md) when you ask for a review of a text without a rewrite.
 
 </details>

@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>better-ai design language</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- A copy of skills/*/scripts/page.css, so this page shows what the boards show and works as a single file.
+     tests/test_design.py fails when it differs; paste page.css again between the style tags after changing it. -->
+<style id="page-css">
+/* The shared look of the skills' live pages (boards): research-better's board, code-better's dashboard,
+   design-better's canvas, show-better's slides and architect-better's design page. Every skill carries an identical
+   copy of this file (the Scripts workflow checks it); each page adds its own file for what only it shows.
+   DESIGN.md at the repository root names every token and component here; DESIGN.html shows them. */
+/* The n14n "Journal" tokens. Pages use these names only: tests/test_design.py fails on a colour not named here. */
+:root {
+  --cream:#FFFCF7; --linen:#F2EDE5; --sand:#C4B69C; --terracotta:#E8725C; --umber:#5C4033; --moss-dark:#66795A;
+  --ink:#33302B; --heading:#1C1A17; --muted:#78736B; --line:#DDD6CA; --error:#9A3B2A;
+  /* moss is a fill only, for marks that mean done; terracotta-dark is terracotta as text (5.2:1 on cream, 4.5:1 on linen). */
+  --moss:#6B7F5E; --terracotta-dark:#AA5141;
+  --white:#FFFFFF; --shadow:0 8px 24px rgba(28,26,23,.25);
+  /* Behind the versions: untinted, because a tinted surround shifts what looks neutral. Near-white as in design
+     tools, or #1E1E1E for dark (the Display menu). A mid-grey would favour mid-tones. */
+  --surround:#F5F5F5; --surround-dark:#1E1E1E; --frame:#BDBDBD; --frame-dark:#5A5A5A;
+  --serif:'Libre Baskerville', Georgia, serif; --sans:'Space Grotesk', -apple-system, sans-serif;
+  /* Type sizes of the boards. Slides and drawings, such as the research map, keep their own. */
+  --text-label:11px; --text-small:12px; --text-message:14px; --text-body:15px; --text-heading:17px; --text-title:20px;
+  /* Type styles: weight, size, line height and typeface together. Write font:var(--font-message), and override only
+     the line height when a box needs it, such as a pin's number. */
+  --font-label:700 var(--text-label)/1.3 var(--sans); --font-small:400 var(--text-small)/1.4 var(--sans);
+  --font-small-strong:700 var(--text-small)/1.3 var(--sans); --font-message:400 var(--text-message)/1.45 var(--sans);
+  --font-message-strong:700 var(--text-message)/1.4 var(--sans); --font-body:400 var(--text-body)/1.55 var(--sans);
+  --font-body-strong:700 var(--text-body)/1.3 var(--sans); --font-subtitle:400 var(--text-body)/1.4 var(--serif);
+  --font-heading:700 var(--text-heading)/1.3 var(--serif); --font-title:700 var(--text-title)/1.2 var(--serif);
+  --font-figure:700 var(--text-title)/1.1 var(--sans); --font-code:400 .9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Type sizes of an article page (the website, a document a skill writes), as n14n.dev. */
+  --text-site:1.5rem; --text-article-title:2.75rem; --text-lead:1.25rem; --text-prose:17px;
+  --font-site:700 var(--text-site)/1.2 var(--sans); --font-article-title:700 var(--text-article-title)/1.15 var(--serif);
+  --font-lead:400 var(--text-lead)/1.55 var(--serif); --font-prose:400 var(--text-prose)/1.75 var(--serif);
+  /* Spacing, named by role. Only these; 1px is a hairline, not a space. */
+  --space-tight:4px; --space-control:8px; --space-item:12px; --space-section:16px; --space-edge:20px; --space-group:24px;
+  --space-wide:40px;
+  --saya:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='75' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath fill='%23FFFCF7' fill-opacity='0.22' d='m0-1 4 4 1-1-1-1 1-1 1 1 1-1 1 1-7 7-1-1 1-1-1-1 1-1 1 1 1-1-4-4m0 8 3 3h-3m11 0-4-4-1 1 1 1-1 1-1-1-1 1-1-1 7-7 1 1-1 1 1 1-1 1-1-1-1 1 4 4m0-8-3-3h3'/%3E%3C/svg%3E");
+}
+@media (max-width:700px) { :root { --text-article-title:2rem; } }
+* { box-sizing:border-box; }
+:focus-visible { outline:2px solid var(--umber); outline-offset:2px; }
+
+/* ---------- Layout: one window, no page scroll; each version scrolls inside its own frame ---------- */
+html { height:100%; }
+body { margin:0; height:100%; display:flex; flex-direction:column; overflow:hidden; background:var(--cream); color:var(--ink);
+  font:var(--font-body); -webkit-font-smoothing:antialiased; }
+.band { height:6px; background:var(--umber) var(--saya); background-size:13px 7.5px; }
+.work { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0, 1fr) minmax(20rem, 24rem); }
+@media (max-width:900px) {
+  body { height:auto; overflow:auto; }
+  .work { grid-template-columns:1fr; }
+  main { height:85vh; }
+  .notes { border-left:0; border-top:2px solid var(--ink); }
+}
+
+/* ---------- Top bar: the n14n umber block, with the question and the controls ---------- */
+header { flex:none; display:flex; flex-wrap:wrap; gap:var(--space-item) var(--space-wide); align-items:center; justify-content:space-between;
+  padding:var(--space-item) var(--space-edge); background:var(--umber); color:var(--cream); }
+h1 { font:var(--font-title); color:var(--cream); margin:0; }
+
+/* The stats header: the page's title on the left, its figures on the right. It never wraps; the title cuts off. */
+header.bar--stats { flex-wrap:nowrap; align-items:flex-end; }
+header.bar--stats > div { min-width:0; }
+header.bar--stats h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stats { flex:none; display:flex; gap:var(--space-group); align-items:flex-end; margin:0; font-size:var(--text-small); }
+.stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
+.stat b { font:var(--font-figure); }
+.stat .of { font-size:var(--text-message); opacity:.8; }
+/* A figure that takes the user somewhere is a button, underlined like a link; a plain figure is not. */
+button.stat { border:0; background:none; padding:0; color:inherit; font:inherit; cursor:pointer; }
+button.stat b { text-decoration:underline; text-underline-offset:3px; }
+button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px; }
+/* Progress under a figure: a cream outline that fills. */
+.meter { width:140px; height:8px; border:1px solid var(--cream); margin-top:var(--space-tight); display:flex; }
+.meter i { display:block; height:100%; background:var(--cream); }
+
+/* A section label: small uppercase sans, as "Agents" and "Conversation". */
+.section-h, .notes h2 { margin:0; font:var(--font-small-strong); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+
+/* A legend: one mark and a plain word per state. */
+ul.legend { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-section); font-size:var(--text-small); color:var(--ink); }
+ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control); }
+
+/* The question header: the title with the question under it, and the page's controls on the right. A two-option
+   setting is one button that shows the current option: both options share one cell, so it keeps the longer one's width;
+   the first option shows cream and the second umber, so the colour also tells which is on. */
+.question { font:var(--font-subtitle); margin:var(--space-tight) 0 0; max-width:65ch; }
+.controls { display:flex; flex-wrap:wrap; gap:var(--space-control) var(--space-item); align-items:center; color:var(--cream); }
+.controls > .seg.cycle { display:inline-grid; }
+.controls > .seg.cycle button { grid-area:1 / 1; justify-content:center; border:0; }
+.controls > .seg.cycle button[aria-pressed="false"] { visibility:hidden; }
+.controls > .seg.cycle button:first-child[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
+.controls > .seg.cycle button:last-child[aria-pressed="true"] { background:transparent; color:var(--cream); }
+
+/* Segmented controls: one of several options, the chosen one filled. */
+.seg { display:inline-flex; border:1px solid var(--cream); }
+.seg[hidden] { display:none; }
+.seg button { border:0; background:transparent; color:var(--cream); padding:var(--space-control) var(--space-section); cursor:pointer;
+  font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; }
+.seg button + button { border-left:1px solid var(--cream); }
+.seg button[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
+
+
+.seg--light { border-color:var(--ink); }
+.seg--light button { color:var(--ink); padding:var(--space-tight) var(--space-item); font-size:var(--text-label); }
+.seg--light button + button { border-left-color:var(--ink); }
+.seg--light button[aria-pressed="true"] { background:var(--ink); color:var(--cream); }
+
+/* Tabs: a tablist of buttons, with optional count or check badges. */
+.tabs { position:sticky; top:0; z-index:2; display:flex; gap:0; background:var(--cream); border-bottom:2px solid var(--ink);
+  margin:0 0 var(--space-group); padding-top:var(--space-section); }
+.tabs button[role="tab"] { font:var(--font-message-strong); color:var(--ink); background:none; border:0; border-bottom:3px solid transparent;
+  padding:var(--space-control) var(--space-section); margin-bottom:calc(-1 * var(--space-tight)); cursor:pointer; display:flex; align-items:center; gap:var(--space-control); }
+.tabs button[aria-selected="true"] { border-bottom-color:var(--terracotta); color:var(--heading); }
+.tabs .count { flex:none; white-space:nowrap;
+  font:var(--font-label); font-variant-numeric:tabular-nums; background:var(--umber); color:var(--cream); padding:1px var(--space-control); }
+.tabs .count.ok { background:var(--moss-dark); }
+
+.scroll-setting { display:grid; gap:var(--space-tight); }
+.scroll-setting[hidden] { display:none; }
+
+
+/* ---------- Conversation ---------- */
+.notes { min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:var(--space-section) 0 0;
+  border-left:2px solid var(--ink); background:var(--cream); color:var(--ink); }
+.notes-top { display:flex; justify-content:space-between; align-items:center; gap:var(--space-item); min-height:24px; padding:0 var(--space-edge); margin-bottom:var(--space-item); }
+.thread { flex:1; min-height:0; overflow:auto; list-style:none; margin:0; padding:0 var(--space-edge) var(--space-item); }
+.thread > li { display:block; margin:0 0 var(--space-item); }
+
+/* An item: the user's comment, message or decision, with the replies under it and its state at the end. */
+.thread > li.msg { padding:var(--space-item) var(--space-item); background:var(--white); border:1px solid var(--line); }
+.thread > li.msg.agent { background:var(--linen); border-color:var(--sand); border-left:4px solid var(--moss-dark); }
+.msg .head { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:center; margin-bottom:var(--space-tight); font-size:var(--text-small); color:var(--muted); }
+.msg .who { font-weight:700; color:var(--heading); }
+.msg.agent .who { color:var(--umber); }
+/* On linen, muted and moss-dark text fall under 4.5:1: muted text uses ink there, and so do the progress words, whose
+   bars keep their colour. */
+.msg.agent, .thread .reply:not(.mine) { --muted:var(--ink); }
+.msg.agent .progress, .thread .reply:not(.mine) .progress { color:var(--ink); }
+.msg .re { font-style:italic; }
+.msg .body { margin:var(--space-tight) 0 0; white-space:pre-wrap; font-size:var(--text-message); line-height:1.45; }
+/* A message in Markdown: its blocks keep a small gap, and wide code or tables scroll inside the message. */
+.body.md { white-space:normal; overflow-wrap:anywhere; }
+.body.md > * { margin:0; }
+.body.md > * + *, .body.md li > * + * { margin-top:var(--space-control); }
+.body.md ul, .body.md ol { padding-left:var(--space-edge); }
+/* Inside the thread's own list, a list would start at the nested bullet: set the usual ones. */
+.body.md ul { list-style:disc; }
+.body.md ul ul { list-style:circle; }
+.body.md ol { list-style:decimal; }
+.body.md li + li { margin-top:var(--space-tight); }
+.body.md .md-h { margin-top:var(--space-item); color:var(--heading); }
+.body.md .md-h:first-child { margin-top:0; }
+.body.md blockquote { padding-left:var(--space-item); border-left:2px solid var(--sand); color:var(--muted); }
+.body.md code { font:var(--font-code); background:var(--linen); padding:1px var(--space-tight); }
+.body.md pre { overflow-x:auto; padding:var(--space-control) var(--space-item); background:var(--linen); border:1px solid var(--line); white-space:pre; overflow-wrap:normal; }
+.body.md pre code { padding:0; background:none !important; }
+.body.md table { display:block; overflow-x:auto; border-collapse:collapse; font-size:var(--text-message); overflow-wrap:normal; }
+.body.md th, .body.md td { padding:var(--space-tight) var(--space-control); border:1px solid var(--line); text-align:left; vertical-align:top; }
+.body.md th { background:var(--linen); color:var(--heading); }
+.body.md hr { border:0; border-top:1px solid var(--line); }
+.body.md a { color:var(--umber); }
+/* On linen, the agent's code and table heads take cream, so they still stand out. */
+.msg.agent .body.md :is(code, pre, th), .thread .reply:not(.mine) .body.md :is(code, pre, th) { background:var(--cream); }
+.msg .link { margin-left:auto; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
+.msg .head .link + .link { margin-left:var(--space-control); }
+.msg .answered { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
+/* The item's left edge carries its state, so it reads at a glance in a long thread. */
+.thread > li.msg[data-state] { border-left-width:4px; }
+.thread > li.msg[data-state="seen"], .thread > li.msg[data-state="replied"], .thread > li.msg[data-state="followup"] { border-left-color:var(--sand); }
+.thread > li.msg[data-state="asked"] { border-left-color:var(--umber); }
+.thread > li.msg[data-state="working"] { border-left-color:var(--terracotta); }
+.thread > li.msg[data-state="done"], .thread > li.msg[data-state="accepted"] { border-left-color:var(--moss-dark); }
+.thread > li.msg[data-state="reopened"] { border-left-color:var(--error); }
+/* Where a comment points: a small quote above the user's words, so every message reads alike. */
+.crumb { display:block; }
+.crumb .path { display:block; font:var(--font-small); color:var(--muted); }
+/* One typeface for the whole label: the path muted, then what the element is, muted, and what it says. */
+.crumb .el { display:block; font:var(--font-body); color:var(--heading); margin-top:var(--space-tight); }
+.crumb .role { color:var(--muted); }
+.thread .crumb { margin:var(--space-tight) 0 0; padding-left:var(--space-control); border-left:2px solid var(--line); }
+.thread .crumb .path { font-size:var(--text-label); }
+.thread .crumb .el { font:var(--font-message); color:var(--muted); margin-top:0; }
+
+/* Replies sit under the item, edge to edge. The item's own left edge already marks it, so a reply shows by its
+   background and label, not a second bar. */
+.thread .reply { margin:var(--space-item) calc(-1 * var(--space-item)) calc(-1 * var(--space-item)); padding:var(--space-control) var(--space-item) var(--space-item); background:var(--linen); border-top:1px solid var(--line); }
+.thread .reply .who { color:var(--umber); }
+.thread .reply .body { margin:var(--space-tight) 0 0; }
+.thread .reply.mine { background:var(--white); }
+.thread .reply.mine .who { color:var(--heading); }
+/* The agent's own message is its first reply block, flush with the item so its text lines up with every other item. */
+.thread > li.msg.agent > .reply:first-child { margin:calc(-1 * var(--space-item)) calc(-1 * var(--space-item)) 0; padding:var(--space-item) var(--space-item) 0; border:0; background:none; }
+/* The state row closes the item, aligned with its text. A reply pulls its bottom edge 10px down; 16px leaves the same
+   6px gap as without one. */
+.thread .foot { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:center; margin:var(--space-control) 0 0; font-size:var(--text-small); color:var(--muted); }
+.thread .reply + .foot { margin-top:var(--space-section); }
+.thread .reply:has(+ .foot) { padding-bottom:var(--space-tight); }
+.thread .foot .answer { margin-left:auto; }
+.thread .foot .answer + .answer { margin-left:0; }
+.thread .foot .mini:first-of-type { margin-left:auto; }
+.mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer;
+  font:var(--font-small-strong); line-height:18px; }
+.mini:hover { border-color:var(--ink); }
+/* Progress: three short bars fill as the agent sees an item, works on it and finishes it. */
+.progress { white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-control); font:var(--font-label); letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted); }
+.progress .bars { display:inline-flex; gap:var(--space-tight); }
+.progress .bars i { width:10px; height:4px; background:var(--line); }
+.progress.seen .bars i.on, .progress.replied .bars i.on, .progress.followup .bars i.on { background:var(--sand); }
+.progress.asked, .progress.working { color:var(--umber); }
+.progress.asked .bars i.on { background:var(--umber); }
+.progress.working .bars i.on { background:var(--terracotta); }
+.progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
+.progress.done, .progress.accepted { color:var(--moss-dark); }
+.progress.done .bars i.on, .progress.accepted .bars i.on { background:var(--moss-dark); }
+.progress.accepted::after { content:"\2713"; font-size:var(--text-small); }
+.progress.reopened { color:var(--error); }
+.progress.reopened .bars i { background:var(--terracotta); opacity:.5; }
+@keyframes pulse-bar { 50% { opacity:.35; } }
+@media (prefers-reduced-motion: reduce) { .progress .bars i { animation:none !important; } }
+/* The box for a reason to reopen, or for an answer. A reply above pulls its bottom edge down by the item's padding;
+   20px gives that space back. */
+.why { margin-top:var(--space-item); }
+.thread .reply + .why { margin-top:var(--space-edge); }
+
+/* The message box, with the decision panel above it. */
+.composer { border-top:1px solid var(--line); padding:var(--space-item) var(--space-edge) var(--space-section); background:var(--cream); }
+.notes label { display:block; font-size:var(--text-message); margin:var(--space-control) 0 var(--space-tight); }
+
+/* ---------- Buttons, fields, the comment box and the toast ---------- */
+.btn { border:1px solid var(--umber); background:var(--umber); color:var(--cream); padding:var(--space-control) var(--space-section); cursor:pointer;
+  font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; }
+.btn--quiet { background:transparent; color:var(--ink); border:1px solid var(--ink); }
+.btn--sm { padding:var(--space-tight) var(--space-item); font-size:var(--text-label); }
+.notes textarea { width:100%; min-height:4.5em; font:var(--font-body); color:var(--ink); background:var(--white);
+  border:1px solid var(--muted); padding:var(--space-control) var(--space-item); resize:vertical; }
+.composer textarea { min-height:3.2em; }
+.why textarea { min-height:3em; font:var(--font-message); padding:var(--space-control) var(--space-control); }
+/* Pop-ups: a question, an agent or a comment box, over the page. Each page sets the width. */
+.qpop, .pop { position:fixed; z-index:5; width:min(34rem, calc(100vw - 24px)); max-height:calc(100vh - 20px); overflow:auto;
+  background:var(--cream); color:var(--ink); border:2px solid var(--ink); box-shadow:var(--shadow); padding:var(--space-item); font-size:var(--text-message); }
+.pop[hidden] { display:none; }
+/* The comment box: where the comment points, the words, then Send, Cancel and Delete. */
+.pop { width:min(22rem, calc(100vw - 24px)); font-size:var(--text-body); }
+.pop .target { margin:0 0 var(--space-control); font-size:var(--text-message); color:var(--muted); overflow-wrap:anywhere; }
+.pop textarea { width:100%; min-height:4.5em; font:var(--font-body); color:var(--ink); background:var(--white);
+  border:1px solid var(--muted); padding:var(--space-control) var(--space-item); resize:vertical; }
+.pop .row2 { display:flex; gap:var(--space-control); align-items:center; margin-top:var(--space-control); }
+.pop .remove { margin-left:auto; }
+.pop .remove[hidden] { display:none; }
+.qpop h3 { font:var(--font-heading); color:var(--heading); margin:var(--space-control) 0 var(--space-control); }
+.qpop p, .qpop li, .qpop textarea, .qpop .thread .body { font:var(--font-message); }
+.qpop .x { position:absolute; top:8px; right:8px; border:0; background:none; font:var(--font-body-strong); font-size:var(--text-heading); color:var(--muted); cursor:pointer; }
+.qpop .crumb { display:none; }
+.qpop .thread { flex:none; overflow:visible; padding:0; margin:var(--space-item) 0 0; }
+/* A question box with its button beside it. */
+.ask { display:flex; gap:var(--space-control); align-items:stretch; margin-top:var(--space-item); }
+.ask textarea { flex:1; min-height:3em; font:var(--font-message); color:var(--ink); background:var(--white); border:1px solid var(--muted); padding:var(--space-control) var(--space-control); resize:vertical; }
+
+/* An agent's decision in the conversation, and the line that says what it is about. */
+.thread .crumb button { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; }
+.thread > li.msg.decision { border-left:4px solid var(--umber); }
+.thread > li.msg.decision > .head .who { color:var(--umber); }
+.thread > li.msg.decision > .head .when { color:var(--umber); font-weight:700; }
+.msg .what { margin:var(--space-tight) 0 0; font:var(--font-small-strong); color:var(--ink); }
+
+/* Above the message box when no agent is watching, so a note sent then is not lost in silence. */
+.unwatched { margin:0 0 var(--space-item); padding:var(--space-control) var(--space-item); background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:var(--font-message); }
+.unwatched[hidden] { display:none; }
+
+.toast { position:fixed; z-index:6; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(36rem, calc(100vw - 32px));
+  background:var(--umber); color:var(--cream); padding:var(--space-item) var(--space-edge); font:var(--font-body-strong);
+  box-shadow:var(--shadow); }
+.toast.ok { background:var(--moss-dark); }
+.toast.error { background:var(--error); }
+.toast[hidden] { display:none; }
+
+.notes .empty { margin:0 0 var(--space-section); padding:0 var(--space-edge); }
+.why .row2 { display:flex; gap:var(--space-control); margin-top:var(--space-control); }
+.notes .send { display:flex; flex-wrap:wrap; gap:var(--space-item) var(--space-edge); align-items:center; margin-top:var(--space-item); }
+.sys { padding:var(--space-item) 0; border-top:1px solid var(--line); font-size:var(--text-small); color:var(--muted); text-align:center; }
+/* Under the bar when the agent's server stops answering, so a quiet page is not mistaken for a quiet agent. */
+.offline { flex:none; margin:0; padding:var(--space-control) var(--space-edge); background:var(--error); color:var(--cream); font:var(--font-message-strong); }
+.offline[hidden] { display:none; }
+</style>
+<style>
+/* Only the layout of this reference page; every colour, type size and component comes from page.css. */
+main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
+.ref section { max-width:64rem; padding-top:24px; }
+.ref h2.big { font:var(--font-title); color:var(--heading); margin:0 0 var(--space-tight); }
+.ref section > h3 { font:var(--font-body-strong); color:var(--heading); margin:var(--space-group) 0 var(--space-control); }
+.ref p.lead { color:var(--muted); margin:0 0 16px; max-width:65ch; }
+.ref .row { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; margin:0 0 8px; }
+.swatches { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(15rem, 1fr)); gap:12px; }
+.swatches li { border:1px solid var(--line); background:var(--cream); }
+.swatches .chip { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:var(--space-control); padding:0 var(--space-item); font:var(--font-body-strong); }
+.swatches .info { padding:8px 12px 10px; font-size:13px; line-height:1.4; }
+.swatches code { font:var(--font-code); }
+.swatches b { color:var(--heading); }
+.swatches .role { color:var(--ink); margin-top:2px; }
+.type { width:100%; border-collapse:collapse; }
+.type td, .type th { text-align:left; vertical-align:baseline; padding:10px 12px 10px 0; border-bottom:1px solid var(--line); }
+.type th { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.type td:first-child { width:9rem; font-size:12px; color:var(--muted); }
+.specimen { border:1px solid var(--line); background:var(--cream); padding:16px; }
+.ref .qpop.demo { position:relative; max-width:34rem; }
+.ref .tabs { position:static; }
+.ref .link { color:var(--umber); }
+.ref .flush { margin:0; }
+.ref .gap { margin-bottom:8px; }
+.ref .narrow { max-width:34rem; }
+.ref .spaced { margin:12px 0 0; }
+.ref .on-umber { background:var(--umber); padding:12px; }
+.ref svg.fig { max-width:100%; height:auto; }
+.ref td.stat { display:table-cell; }
+.t-title { font:var(--font-title); color:var(--heading); }
+.t-card { font:var(--font-heading); color:var(--heading); }
+.t-body { font:var(--font-body); }
+.t-message { font:var(--font-message); }
+.t-small { font:var(--font-small); color:var(--muted); }
+.t-label { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
+.spaces { list-style:none; margin:0; padding:0; display:grid; gap:var(--space-tight); }
+.spaces li { display:grid; grid-template-columns:8rem 3rem 1fr; align-items:center; gap:var(--space-control); font-size:var(--text-message); }
+.spaces i { display:block; height:var(--space-control); background:var(--sand); }
+.t-prose { font:var(--font-prose); max-width:42rem; }
+.ref .offline.demo { max-width:34rem; }
+/* Wireframes of the board layouts: square cream boxes with thin sand borders, the header in umber. */
+.wires { display:grid; grid-template-columns:repeat(auto-fill, minmax(26rem, 1fr)); gap:24px; margin:0; }
+.wires figure { margin:0; }
+.wires figcaption { margin-top:8px; font-size:14px; line-height:1.45; }
+.wires figcaption b { color:var(--heading); }
+.wire { display:grid; grid-template-rows:4px auto 1fr; height:300px; border:1px solid var(--sand); background:var(--cream); font:400 11px/1.3 var(--sans); color:var(--ink); }
+.wire.tall { height:420px; }
+.wire > .b { background:var(--umber) var(--saya); background-size:13px 7.5px; }
+.wire > .h { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; padding:6px 10px; background:var(--umber); color:var(--cream); }
+.wire > .h .t { font:700 13px/1.2 var(--serif); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wire > .h .t small { display:block; font:400 11px/1.3 var(--serif); opacity:.85; }
+.wire > .h .r { display:flex; gap:10px; white-space:nowrap; }
+.wire > .h .r span { border:1px solid var(--cream); padding:1px 5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.wire > .h .r b { display:block; font-size:12px; text-align:right; }
+.wire > .w { display:grid; grid-template-columns:1fr 34%; min-height:0; }
+.wire.stack > .w { grid-template-columns:1fr; grid-template-rows:1fr auto; }
+.wire .v { display:flex; flex-direction:column; gap:6px; padding:8px; min-height:0; }
+.wire .v.grey { background:var(--surround); }
+.wire .n { display:flex; flex-direction:column; gap:6px; padding:8px; border-left:2px solid var(--ink); min-height:0; }
+.wire.stack .n { border-left:0; border-top:2px solid var(--ink); }
+.wire .x { border:1px solid var(--sand); background:var(--cream); padding:4px 6px; }
+.wire .x.shade { background:var(--linen); }
+.wire .x.grow { flex:1; min-height:0; }
+.wire .wrow > .x.fixed { flex:none; }
+.wire .wrow.fill { flex:1; min-height:0; }
+.wire .v:not(.grey) .wrow.fill { align-items:flex-start; }
+.wire .x.bare { background:none; border:0; }
+.wire .v.flush { padding:0; }
+.wire .x.route { border:0; border-bottom:1px solid var(--line); }
+.wire .x.slide { margin:auto; width:80%; aspect-ratio:16 / 9; }
+.wire .x.sel { outline:2px solid var(--terracotta); outline-offset:-2px; }
+.wire .wrow { display:flex; gap:6px; margin:0; }
+.wire .wrow > .x { flex:1; }
+.wire .lbl { font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.wire .s { color:var(--muted); }
+.wire .s::before { content:"\2195\00a0"; }
+.wire .tabsw { display:flex; gap:10px; border-bottom:2px solid var(--ink); padding:2px 0 3px; font-weight:700; }
+.wire .tabsw span:first-child { border-bottom:2px solid var(--terracotta); margin-bottom:-5px; }
+.article { border:1px solid var(--line); background:var(--cream); padding:var(--space-group); }
+.article .site { font:var(--font-site); color:var(--heading); margin:0 0 var(--space-section); }
+.article .site span { color:var(--muted); font-weight:400; }
+.article .atitle { font:var(--font-article-title); color:var(--heading); margin:var(--space-section) 0 0; }
+.article .terra { height:10px; margin:var(--space-group) 0; background:var(--terracotta) var(--saya); background-size:13px 7.5px; max-width:42rem; }
+.article .alead { font:var(--font-lead); color:var(--ink); margin:0 0 var(--space-section); max-width:42rem; }
+.article .prose { font:var(--font-prose); color:var(--ink); margin:0; max-width:42rem; }
+.article .band { height:10px; }
+</style></head>
+<body>
+<div class="band"></div>
+<header class="bar--stats">
+  <div><h1>better-ai design language</h1></div>
+  <div class="stats">
+    <span class="stat"><b id="n-done"></b>messages answered<span class="meter" aria-hidden="true"><i id="meter-done"></i></span></span>
+    <span class="stat"><b id="n-colours"></b>colours</span>
+    <button type="button" class="stat" id="to-waiting"><b>1</b>question for you</button>
+  </div>
+</header>
+<div class="work">
+<main class="ref">
+
+  <section aria-labelledby="h-colour">
+    <h2 class="big" id="h-colour">Colour</h2>
+    <p class="lead">Every colour a page uses. Each card shows the text colours allowed on it, and its contrast. The rules are in <a href="https://github.com/nmoutschen/better-ai/blob/main/DESIGN.md" class="link">DESIGN.md</a>.</p>
+    <ul class="swatches" id="swatches"></ul>
+  </section>
+
+  <section aria-labelledby="h-type">
+    <h2 class="big" id="h-type">Type</h2>
+    <p class="lead">Libre Baskerville for titles and prose to read; Space Grotesk for the interface.</p>
+    <table class="type">
+      <thead><tr><th scope="col">Style</th><th scope="col">Sample</th></tr></thead>
+      <tbody>
+        <tr><td><code>--font-title</code></td><td class="t-title">Export invoices as CSV</td></tr>
+        <tr><td><code>--font-heading</code></td><td class="t-card">3: Fix rounding of VAT totals</td></tr>
+        <tr><td><code>--font-body</code></td><td class="t-body">Round VAT per line or on the invoice total? The ticket says both.</td></tr>
+        <tr><td><code>--font-message</code></td><td class="t-message">Applied the default: treating it as unsupported and recording the issue as a gap.</td></tr>
+        <tr><td><code>--font-small</code></td><td class="t-small">Updated just now</td></tr>
+        <tr><td><code>--font-label</code></td><td class="t-label">Waiting for you</td></tr>
+        <tr><td><code>--font-prose</code></td><td class="t-prose">A board shows what the agent is doing and what waits for you, in one window.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="h-space">
+    <h2 class="big" id="h-space">Spacing</h2>
+    <p class="lead">Every padding, margin and gap on a board is one of these, named by what the space does.</p>
+    <ul class="spaces" id="spaces"></ul>
+  </section>
+
+  <section aria-labelledby="h-comp">
+    <h2 class="big" id="h-comp">Components</h2>
+    <p class="lead">Rendered from page.css. The conversation on the right runs on page.js, as on every board: write a message, then try Reply.</p>
+
+    <h3>Stats header</h3>
+    <p class="lead flush">The bar at the top of this page: a figure with a meter, a plain figure, and a figure that is a button (it takes you to the question in the conversation).</p>
+
+    <h3>Section label and legend</h3>
+    <div class="specimen">
+      <h4 class="section-h gap">Agents</h4>
+      <ul class="legend">
+        <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="#6B7F5E" stroke="#33302B" stroke-width=".75"/></svg>answered</li>
+        <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="#C4B69C" stroke="#33302B" stroke-width=".75"/></svg>to do</li>
+        <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="#9A3B2A" stroke-width="2"/></svg>not found</li>
+      </ul>
+    </div>
+
+    <h3>Tabs</h3>
+    <div class="tabs" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" aria-selected="true">Overview</button>
+      <button type="button" role="tab" aria-selected="false">Requirements <span class="count ok">✓</span></button>
+      <button type="button" role="tab" aria-selected="false">Flows <span class="count">1</span></button>
+    </div>
+
+    <h3>Buttons and segmented controls</h3>
+    <div class="row">
+      <button type="button" class="btn">Send</button>
+      <button type="button" class="btn btn--quiet">Decide…</button>
+      <button type="button" class="btn btn--sm">✓</button>
+      <button type="button" class="btn btn--quiet btn--sm">Reply</button>
+      <button type="button" class="mini" aria-label="Good">+</button>
+      <div class="seg seg--light" role="group" aria-label="Show">
+        <button type="button" aria-pressed="false">All</button><button type="button" aria-pressed="true">Open (4)</button>
+      </div>
+    </div>
+    <div class="row on-umber">
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" aria-pressed="true">Side by side</button><button type="button" aria-pressed="false">Switch</button>
+      </div>
+    </div>
+
+    <h3>Progress</h3>
+    <div class="row" id="progress-demo"></div>
+
+    <h3>Pop-up</h3>
+    <div class="qpop demo" role="dialog" aria-label="Example pop-up">
+      <button type="button" class="x" aria-label="Close">×</button>
+      <h3>How do coding agents test their apps?</h3>
+      <p>Answered by w1 from 4 sources. Ask the coordinator about it below.</p>
+      <form class="ask" onsubmit="return false"><textarea aria-label="Question about it"></textarea><button type="submit" class="btn">Ask</button></form>
+    </div>
+
+    <h3>Notices</h3>
+    <p class="unwatched narrow">The agent is not watching this page right now. What you send is saved, but it reads it only when it next looks: tell it in the chat.</p>
+    <p class="offline demo">The page's server stopped answering. Ask the agent to restart it.</p>
+    <p class="spaced"><button type="button" class="btn btn--quiet" id="toast-ok">Show a toast</button></p>
+
+    <h3>Diagram boxes</h3>
+    <svg viewBox="0 0 640 120" width="640" class="fig" role="img" aria-label="Three boxes: a plain box, a dashed group, and the selected box outlined in terracotta">
+      <rect x="1" y="20" width="180" height="70" fill="#FFFCF7" stroke="#C4B69C"/>
+      <text x="16" y="50" font-family="Space Grotesk" font-size="15" fill="#33302B">Coordinator agent</text>
+      <text x="16" y="70" font-family="Space Grotesk" font-size="12" fill="#78736B">plans, answers, merges</text>
+      <rect x="220" y="10" width="190" height="96" fill="#F2EDE5" stroke="#C4B69C" stroke-dasharray="4 3"/>
+      <text x="234" y="30" font-family="Space Grotesk" font-size="12" fill="#78736B">Agent team</text>
+      <rect x="234" y="40" width="162" height="50" fill="#FFFCF7" stroke="#C4B69C"/>
+      <text x="248" y="70" font-family="Space Grotesk" font-size="15" fill="#33302B">Builder agents</text>
+      <rect x="450" y="20" width="180" height="70" fill="#FFFCF7" stroke="#E8725C" stroke-width="2"/>
+      <text x="466" y="50" font-family="Space Grotesk" font-size="15" fill="#33302B">Dashboard page</text>
+      <text x="466" y="70" font-family="Space Grotesk" font-size="12" fill="#78736B">selected</text>
+    </svg>
+  </section>
+
+  <section aria-labelledby="h-layout">
+    <h2 class="big" id="h-layout">Board layout</h2>
+    <p class="lead">Every board has the same areas: band, header, view, side column. The page never scrolls; the parts marked ↕ scroll inside themselves. A new board picks one header and one view pattern.</p>
+    <div class="wires">
+      <figure>
+        <div class="wire" role="img" aria-label="Research board: stats header; a tool row with the legend and zoom buttons over a map; a side column with the agents at work, then the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Agent-made local apps<small>Choose an approach for building agent apps</small></div><div class="r"><b>19 / 21 closed</b><b>1 for you</b></div></div>
+          <div class="w">
+            <div class="v"><div class="wrow"><div class="x">answered, to do, contested</div><div class="x fixed">+ &minus; Fit</div></div><div class="x grow"><span class="s">pans and zooms</span><br>Map of the research questions</div></div>
+            <div class="n"><div class="lbl">Agents</div><div class="x"><span class="s">up to 20</span><br>w1 WebGen references</div><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Tool row and canvas</b>, research-better. Stats header. Up to twenty agents scroll in the side column, so the map keeps its height.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Code dashboard: stats header; agent cards that scroll, a task list fixed at the bottom; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Export invoices as CSV</div><div class="r"><b>1 / 7 done</b><b>1 question</b></div></div>
+          <div class="w">
+            <div class="v"><div class="lbl">Agents</div><div class="wrow fill"><div class="x"><span class="s">cards</span><br>3: Fix rounding of VAT totals</div><div class="x">2: Export endpoint</div></div><div class="lbl">Tasks: 1 of 7 done</div><div class="x"><span class="s">five rows</span><br>1 Done, CSV writer</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Cards and fixed list</b>, code-better. Stats header. The list stays in view under the cards.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Architect design page: stats header; tabs fixed at the top of the view over one section; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Design: Live dashboard</div><div class="r"><b>2 / 6 accepted</b><b>2 questions</b></div></div>
+          <div class="w">
+            <div class="v"><div class="tabsw"><span>Overview</span><span>Requirements</span><span>Flows</span></div><div class="x grow"><span class="s">the view</span><br>Containers: one diagram, its findings beside it</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the architect<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Tabs and sections</b>, architect-better. Stats header. The tabs stay at the top while the section scrolls.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Design canvas: question header with view controls; two versions side by side on a grey surround; the conversation with Decide.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Orders<small>Which layout shows late orders first?</small></div><div class="r"><span>Desktop</span><span>Comment</span></div></div>
+          <div class="w">
+            <div class="v grey"><div class="wrow"><div class="x bare">A, one list</div><div class="x bare">B, late first</div></div><div class="wrow fill"><div class="x"><span class="s">each</span><br>version A</div><div class="x sel"><span class="s">each</span><br>version B</div></div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>Comments on the versions</div><div class="x">Message to the agent<br><b>SEND</b>&nbsp; DECIDE&hellip;</div></div>
+          </div>
+        </div>
+        <figcaption><b>Versions side by side</b>, design-better. Question header. Each version scrolls inside its own frame.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire" role="img" aria-label="Show-better slides: question header; a route with Previous, the slide strip and Next; one slide centred; the conversation.">
+          <div class="b"></div>
+          <div class="h"><div class="t">A page can send your click back<small>Can a page your agent built reach it?</small></div><div class="r"><span>Comment</span></div></div>
+          <div class="w">
+            <div class="v grey flush"><div class="x shade route">PREVIOUS &nbsp;[1][2][3][4] &nbsp;1 of 8 &nbsp;NEXT</div><div class="x slide">One slide, 16:9, centred on the surround</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x grow shade"><span class="s">thread</span><br>The question waiting for you comes last.</div><div class="x">Message to the agent<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Strip and stage</b>, show-better. Question header. Opened as a file, the side column is hidden.</figcaption>
+      </figure>
+      <figure>
+        <div class="wire stack tall" role="img" aria-label="A board under 900px wide: the view first, the side column under it, and the page scrolls.">
+          <div class="b"></div>
+          <div class="h"><div class="t">Export invoices as CSV</div><div class="r"><b>1 / 7 done</b></div></div>
+          <div class="w">
+            <div class="v"><div class="x grow">The view, 85% of the window height</div></div>
+            <div class="n"><div class="lbl">Conversation</div><div class="x shade">thread</div><div class="x">Message to the coordinator<br><b>SEND</b></div></div>
+          </div>
+        </div>
+        <figcaption><b>Under 900px</b>, every board. The side column moves under the view, and the page scrolls.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-article">
+    <h2 class="big" id="h-article">Article page</h2>
+    <p class="lead">For the website and for documents a skill writes: a page to read, which scrolls.</p>
+    <div class="article">
+      <p class="site">better-ai <span>skills for AI agents</span></p>
+      <div class="band"></div>
+      <h3 class="atitle">Research a topic from sources</h3>
+      <div class="terra"></div>
+      <p class="alead">research-better splits a question into smaller ones, sends worker agents after each, and shows the run on a live board.</p>
+      <p class="prose">You see which questions are answered, which are contested, and which decisions wait for you. Each finding cites its source, so you can check the claims that matter to you.</p>
+    </div>
+  </section>
+</main>
+
+<aside class="notes" aria-labelledby="notes-h">
+  <div class="notes-top">
+    <h2 id="notes-h">Conversation</h2>
+    <div class="seg seg--light" role="group" aria-label="Show">
+      <button type="button" data-filter="all" aria-pressed="false">All</button>
+      <button type="button" data-filter="open" aria-pressed="true">Open</button>
+    </div>
+  </div>
+  <p class="empty">Nothing yet.</p>
+  <ol class="thread"></ol>
+  <div class="composer">
+    <label for="note">Message to the agent</label>
+    <textarea id="note"></textarea>
+    <div class="send">
+      <button type="button" class="btn">Send</button>
+      <p class="status" role="status"></p>
+    </div>
+  </div>
+</aside>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+<!-- A copy of skills/*/scripts/page.js, kept identical by tests/test_design.py, as page.css above. -->
+<script id="page-js">
+// The element-comment layer. A page supplies its target metadata, pin coordinates and navigation;
+// this owns the editor, the numbered pins and their actions.
+function pageElementComments(o) {
+  var pop = o.pop, draft = null, opener = null, state = {};
+  var input = pop.querySelector('textarea'), ok = pop.querySelector('.ok'), del = pop.querySelector('.remove');
+
+  function open(data, item, from, position) {
+    draft = data;
+    pop.querySelector('.target').replaceChildren(o.crumb(data));
+    input.value = item ? item.comment || '' : '';
+    if (o.prepare) o.prepare(data);
+    del.hidden = !item;
+    ok.textContent = item ? 'Update' : 'Send';
+    pop.hidden = false;
+    opener = from;
+    var point = position(pop);
+    pop.style.left = point.x + 'px';
+    pop.style.top = point.y + 'px';
+    input.focus();
+  }
+  function close() {
+    pop.hidden = true;
+    draft = null;
+    if (opener && document.contains(opener)) opener.focus();
+    opener = null;
+  }
+  function remove(it) { o.send('delete', { id: it.id, n: it.n }, 'Deletion of comment ' + it.n); }
+  function submit() {
+    var text = input.value.trim();
+    if (!draft || (!text && !(o.allowEmpty && o.allowEmpty(draft)))) { input.focus(); return; }
+    var it = draft.item, n = it ? it.n : o.nextNumber();
+    var id = it ? it.id : 'c' + n + '-' + Date.now().toString(36);
+    var params = Object.assign({ id: id, n: n }, o.params(draft, text));
+    close();
+    // An update reuses the comment's id, so the agent replaces the earlier version.
+    o.send('comment', params, 'Comment ' + n + (it ? ' (updated)' : ''));
+  }
+  pop.querySelector('.cancel').addEventListener('click', close);
+  del.addEventListener('click', function () { var it = draft && draft.item; close(); if (it) remove(it); });
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
+  ok.addEventListener('click', submit);
+
+  function findPin(root, id) { return root && root.querySelector('.' + o.pinClass + '[data-id="' + CSS.escape(id) + '"]'); }
+  function updatePin(pin, it) {
+    pin.textContent = it.n;
+    pin.dataset.state = state[it.id] || 'new';
+  }
+  function placePin(root, it) {
+    var pin = findPin(root, it.id);
+    if (!pin) {
+      pin = root.ownerDocument.createElement('span');
+      pin.className = o.pinClass;
+      pin.dataset.id = it.id;
+      root.appendChild(pin);
+    }
+    updatePin(pin, it);
+    return pin;
+  }
+  function removePin(root, id) { var pin = findPin(root, id); if (pin) pin.remove(); }
+  function flashPin(pin, cls) { pin.classList.remove(cls); void pin.offsetWidth; pin.classList.add(cls); }
+  function click(e, start, edit) {
+    var pin = e.target.closest && e.target.closest('.' + o.pinClass);
+    if (pin) {
+      e.preventDefault();
+      if (o.stopPinPropagation) e.stopPropagation();
+      var it = o.byId(pin.dataset.id), st = state[pin.dataset.id];
+      if (it && (st === 'done' || st === 'accepted')) o.reopen(it.id);
+      else if (it) edit(it, pin);
+      return true;
+    }
+    if (!o.commenting()) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!pop.hidden) close();
+    else start();
+    return true;
+  }
+
+  return {
+    open: open, close: close, remove: remove, click: click,
+    draft: function () { return draft; },
+    findPin: findPin, placePin: placePin, updatePin: updatePin, removePin: removePin, flashPin: flashPin,
+    state: function (next) { if (next) state = next; return state; }
+  };
+}
+
+// Anchor at the nearest ID that is unique across the document. Otherwise use a positional path
+// from body, or a path relative to the supplied root for a page with multiple commentable regions.
+function pageElementSelector(node, root) {
+  var doc = node.ownerDocument, counts = pageIdCounts(doc), parts = [];
+  while (node && node.nodeType === 1 && node !== root && node !== doc.body && node !== doc.documentElement) {
+    if (node.id && counts[node.id] === 1) return ['#' + CSS.escape(node.id)].concat(parts).join(' > ');
+    var tag = node.tagName.toLowerCase(), n = 1, sib = node;
+    while ((sib = sib.previousElementSibling)) if (sib.tagName === node.tagName) n++;
+    parts.unshift(tag + ':nth-of-type(' + n + ')');
+    node = node.parentElement;
+  }
+  return (root ? parts : ['body'].concat(parts)).join(' > ');
+}
+function pageIdCounts(doc) {
+  var counts = Object.create(null);
+  doc.querySelectorAll('[id]').forEach(function (el) { counts[el.id] = (counts[el.id] || 0) + 1; });
+  return counts;
+}
+function pageElementDescription(node, root, text, limit) {
+  return { tag: node.tagName.toLowerCase(), text: (text || '').replace(/\s+/g, ' ').trim().slice(0, limit),
+           selector: pageElementSelector(node, root) };
+}
+
+function pageCommentPosition(x, y, pop) {
+  return { x: Math.max(12, Math.min(x + 12, innerWidth - pop.offsetWidth - 12)),
+           y: Math.max(12, Math.min(y + 12, innerHeight - pop.offsetHeight - 12)) };
+}
+
+// The conversation between a served page and the agent: sending, the thread with its items, states and replies, the
+// message box, and the live updates. Each skill whose page talks to the agent carries an identical copy of this file,
+// as it does page.css and page.py, and the Scripts workflow fails if the copies differ: change it in one skill, then
+// copy it to the others. The page's own script calls pageConversation with what only that page has, such as its pins.
+//
+// Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the agent's
+// replies. The page streams that log, or feeds it with setLog, and rebuilds the conversation from it, so a reload or a
+// new render loses nothing. State changes are also applied at once, and applying the same event twice changes nothing.
+//
+// o.served       the page is served over http; otherwise actions stay on the page (o.unsent says what to do with them)
+// o.name         what the page is called in errors, such as 'canvas'; o.agent what the agent is called (default Agent)
+// o.apply(e, fresh)  apply one event to the page's own model, such as its pins; fresh when the user just sent it
+// o.byId(id)     the page's own model of a comment, which offers Show, Edit and Delete; nothing when it offers none
+// o.crumb(e)     where a comment was made; o.commentBody(e) what it says
+// o.reveal(e), o.edit(it, button), o.remove(it), o.showLabel(n)   the comment's Show, Edit and Delete
+// o.kinds        renderers for the page's own kinds of event: function (c, state) returning the item, or [item, foot]
+// o.itemKinds    the user's actions the agent tracks with a state (default comment and note)
+// o.agentKinds   the agent's messages the user can reply to (default reply)
+// o.steps, o.labels, o.shown(state)   the progress steps the page has, their words, and the step a state shows as
+// o.accept       a done item offers Accept (default true); without it, a done item is finished
+// o.filter       the thread has Open and All (default true); without it, one list in time order
+// o.waiting(c, state)  an entry that waits for the user, shown last (default: the agent's own unanswered question)
+// o.latestLast   order the items by their newest message, replies included, so the newest is at the bottom, waiting ones last (default: by first message)
+// o.readOnly     a copy of the page to read: no actions
+// o.stream       read the log from the server's /events (default true); otherwise the page calls setLog
+// o.afterSend()  called once the server saved an action
+// o.noteParams() what a message carries besides its words, such as the current slide
+// o.sendMode()   a function to run instead of sending a message when the Send button is pressed, or null
+// o.busy()       the page has something open the user would lose on a reload
+// o.beforeReload()  keep the page's place before a new render loads
+// o.rendered(state)  called after each redraw with every item's state, to sync the pins
+function pageConversation(o) {
+  var rpcId = 0, log = [], state = {}, fed = null, itemKinds = o.itemKinds || ['comment', 'note'], kinds = o.kinds || {};
+  var agentKinds = o.agentKinds || ['reply'], agent = o.agent || 'Agent', accept = o.accept !== false, filtering = o.filter !== false;
+  function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
+  function time(at) { return (at || '').slice(11, 16); }
+  var status = document.querySelector('.notes .status');
+  function say(text, error) { if (!status) return; status.textContent = text; status.classList.toggle('error', !!error); }
+  // Every action shows a toast at the bottom of the window: sending, then sent or failed.
+  var toast = document.querySelector('.toast'), toastTimer = null;
+  function flash(text, kind) {
+    clearTimeout(toastTimer);
+    toast.textContent = text; toast.className = 'toast ' + (kind || ''); toast.hidden = false;
+    if (kind !== 'error' && kind !== 'busy') toastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
+  }
+  // DONE runs once the server saved the action; FAIL when it could not, such as to enable a button again.
+  function send(method, params, what, done, fail) {
+    if (o.readOnly) return;
+    var event = Object.assign({ action: method, at: new Date().toISOString().slice(0, 19) }, params);
+    if (o.apply) o.apply(event, true);
+    if (!o.served) { log.push(event); renderThread(); flash(what + ' saved on this page. ' + (o.unsent || ''), 'ok'); if (done) done(); return; }
+    flash('Sending ' + what.toLowerCase() + '…', 'busy');
+    fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
+      .then(function (r) { return r.json(); })
+      .then(function (r) { if (r.error) throw new Error(r.error.message);
+        flash('✓ ' + what + ' sent to the ' + agent.toLowerCase(), 'ok'); say(''); if (done) done(); if (o.afterSend) o.afterSend(); })
+      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The ' + o.name + ' is closed.', 'error');
+        say('Not sent: the ' + o.name + ' is closed. Ask the agent to restart it.', true); if (fail) fail(); });
+  }
+
+  // ---------- The thread: everything sent and every reply, in order; a comment shows once, in its latest state ----------
+  var thread = o.thread || document.querySelector('.thread');
+  function body(text) { return pageMarkdown(text); }
+  function head(who, at) { var h = el('div', 'head'); h.append(el('span', 'who', who), el('span', 'when', time(at))); return h; }
+  // A reply that names the message it answers is shown under that message, so the user sees what was answered.
+  function replyBlock(e) {
+    var mine = e.action !== 'reply', r = el('div', mine ? 'reply mine' : 'reply'), h = head(mine ? 'You' : agent, e.at);
+    if (e.action === 'reopen') h.append(el('span', 'progress reopened', 'Reopened'));
+    r.append(h, body(e.action === 'reopen' ? e.reason : pageWords(e)));
+    return r;
+  }
+  var filter = filtering ? 'open' : 'all', scrolledOnce = false;
+  document.querySelectorAll('[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      filter = b.dataset.filter;
+      document.querySelectorAll('[data-filter]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      renderThread();
+    });
+  });
+  var STEPS = o.steps || ['seen', 'working', 'done', 'accepted'],
+      LABEL = Object.assign({ seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' }, o.labels || {});
+  // The box for an answer or a reply, under the item. The button that opened it hides in place while it is open, and
+  // the box goes only once the message is sent. By default it sends a note under the item; onSend(text, done) sends
+  // something else, such as the answer to a decision.
+  function reasonBox(li, id, label, from, onSend) {
+    if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
+    var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'),
+        ok = el('button', 'btn btn--sm', 'Send'), no = el('button', 'btn btn--quiet btn--sm cancel', 'Cancel');
+    ta.setAttribute('aria-label', label); ta.placeholder = label;
+    ok.type = no.type = 'button';
+    if (from) from.style.visibility = 'hidden';
+    // A redraw moves the box into a new item, whose own buttons it hid: show those again, not only the first one.
+    function close() {
+      var host = box.parentNode; box.remove(); if (from) from.style.visibility = '';
+      var again = host ? host.querySelectorAll('.foot .answer, .foot .change') : [];
+      again.forEach(function (b) { b.style.visibility = ''; });
+      // Focus goes back to the button that opened the box, so a keyboard user who cancels stays at the item. After a
+      // redraw that button is gone: its copy in the redrawn item takes the focus instead.
+      if (from) { var back = document.contains(from) ? from : again[again.length - 1]; if (back) back.focus({ preventScroll: true }); }
+    }
+    function sendIt() {
+      var r = ta.value.trim(); if (!r) return ta.focus();
+      var done = function () { close(); li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); };
+      if (onSend) return onSend(r, done);
+      send('note', { id: 'm-' + Date.now().toString(36), to: id, note: r }, label === 'Your answer' ? 'Answer' : 'Reply', done);
+    }
+    ok.addEventListener('click', sendIt); no.addEventListener('click', close);
+    ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); sendIt(); } if (k.key === 'Escape') close(); });
+    row.append(ok, no); box.append(ta, row); li.append(box); box.scrollIntoView({ block: 'nearest' }); ta.focus();
+  }
+  // The progress mark: a short bar per step fills as the agent sees an item, works on it, finishes it and the user
+  // accepts it. Before the agent sets a state, the bars are empty and the word is Sent.
+  function progressChip(st) {
+    if (st && o.shown) st = o.shown(st);
+    var k = !st ? -1 : st === 'asked' || st === 'replied' || st === 'followup' ? 0 : STEPS.indexOf(st), chip = el('span', 'progress' + (st ? ' ' + st : '')), bars = el('span', 'bars');
+    bars.setAttribute('aria-hidden', 'true');
+    for (var j = 0; j < STEPS.length; j++) bars.append(el('i', j <= k ? 'on' : ''));
+    chip.append(bars, el('span', '', st ? LABEL[st] || st : 'Sent'));
+    return chip;
+  }
+  // One entry of the thread; without actions, as in a copy to read or a list elsewhere on the page.
+  function entryNode(c, actions) {
+    var e = c.e, li, foot;
+    if (c.kind === 'comment') {
+      li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
+      var h = el('div', 'head');
+      if (e.n) h.append(el('span', 'n', e.n));
+      h.append(el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
+      var it = actions && o.byId && o.byId(e.id);
+      if (it && !c.deleted && state[e.id] !== 'done' && state[e.id] !== 'accepted') {
+        var where = el('button', 'link', 'Show'), edit = el('button', 'link', 'Edit'), del = el('button', 'link', 'Delete');
+        where.type = edit.type = del.type = 'button';
+        where.setAttribute('aria-label', o.showLabel(e.n)); edit.setAttribute('aria-label', 'Edit comment ' + e.n); del.setAttribute('aria-label', 'Delete comment ' + e.n);
+        where.addEventListener('click', function () { o.reveal(e); });
+        edit.addEventListener('click', function () { o.reveal(e); o.edit(it, edit); });
+        del.addEventListener('click', function () { o.remove(it); });
+        h.append(where, edit, del);
+      }
+      li.append(h, o.crumb(e), c.deleted ? el('p', 'body', 'Deleted') : o.commentBody(e));
+    } else if (c.kind === 'note') {
+      li = el('li', 'msg me'); li.append(head('You', e.at), body(pageWords(e)));
+    } else if (c.kind === 'reply') {
+      li = el('li', 'msg agent'); li.append(replyBlock(e));
+    } else if (kinds[c.kind]) {
+      var made = kinds[c.kind](c, state, actions);
+      if (Array.isArray(made)) { li = made[0]; foot = made[1]; } else li = made;
+    } else return null;
+    c.replies.forEach(function (r) { li.append(replyBlock(r)); });
+    if (foot) li.append(foot);
+    if (agentKinds.indexOf(c.kind) >= 0 && e.id && actions) {  // the agent's own messages can be answered too; the state row closes them
+      var rf = el('div', 'foot'), mine = c.replies.filter(function (r) { return r.action === 'note'; }), last = mine[mine.length - 1];
+      if (last) rf.append(progressChip(state[last.id]));
+      var rb = el('button', 'btn btn--quiet btn--sm answer', 'Reply'); rb.type = 'button';
+      rb.addEventListener('click', function () { reasonBox(li, e.id, 'Your reply', rb); });
+      rf.append(rb); li.append(rf);
+    }
+    // The state and what the user can do with it close the item, after the latest reply, where the eye ends.
+    if (itemKinds.indexOf(c.kind) >= 0) {
+      var f = el('div', 'foot');
+      f.append(progressChip(state[e.id]));
+      // A done item is accepted with the brown check next to Reply; replying instead puts it back with the agent.
+      if (actions && accept && state[e.id] === 'done') {
+        var ok = el('button', 'btn btn--sm answer', '✓'); ok.type = 'button'; ok.title = 'Accept'; ok.setAttribute('aria-label', 'Accept');
+        ok.addEventListener('click', function () { send('accept', { to: e.id }, 'Acceptance', function () { li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); }); });
+        f.append(ok);
+      }
+      // Every message can be answered: Answer when the agent asked something, Reply otherwise.
+      if (actions) {
+        var asked = state[e.id] === 'asked', ans = el('button', 'btn btn--sm answer' + (asked ? '' : ' btn--quiet'), asked ? 'Answer' : 'Reply');
+        ans.type = 'button';
+        ans.addEventListener('click', function () { reasonBox(li, e.id, asked ? 'Your answer' : 'Your reply', ans); });
+        f.append(ans);
+      }
+      li.append(f);
+      if (state[e.id]) li.dataset.state = state[e.id];
+    }
+    if (e.id) li.dataset.id = e.id;
+    return li;
+  }
+  function renderThread() {
+    var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
+    var model = pageThread(log, itemKinds, o.waiting, o.latestLast), entries = model.entries, open = model.open;
+    state = model.state;
+    // A box the user is typing in survives the redraw, with its text and cursor, and keeps its item on the page until
+    // it is sent or cancelled, even when the item has left Open meanwhile.
+    var kept = {};
+    thread.querySelectorAll('li[data-id] > .why').forEach(function (box) {
+      var ta = box.querySelector('textarea');
+      kept[box.parentNode.dataset.id] = { box: box, focus: document.activeElement === ta, start: ta.selectionStart, end: ta.selectionEnd };
+    });
+    if (filtering) document.querySelector('[data-filter="open"]').textContent = 'Open (' + open.length + ')';
+    if (filter === 'open') entries = entries.filter(function (c) { return open.indexOf(c) >= 0 || (c.e.id && kept[c.e.id]); });
+    thread.replaceChildren();
+    // Before anything is sent, both views say how to start; after, Open says when nothing is left.
+    var started = log.some(function (x) { return x.action && x.action !== 'status'; });
+    document.querySelector('.notes .empty').hidden = started;
+    entries.forEach(function (c) {
+      var li = entryNode(c, !o.readOnly); if (!li) return;
+      var k = c.e.id && kept[c.e.id];
+      if (k) { li.append(k.box); li.querySelectorAll('.foot .answer, .foot .change').forEach(function (b) { b.style.visibility = 'hidden'; }); }
+      thread.appendChild(li);
+    });
+    // Focus only once the box is back in the page: a detached element cannot take it.
+    Object.keys(kept).forEach(function (id) {
+      var k = kept[id], ta = k.box.querySelector('textarea');
+      if (k.focus && document.contains(ta)) { ta.focus({ preventScroll: true }); ta.setSelectionRange(k.start, k.end); }
+    });
+    if (filter === 'open' && started && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
+    // The conversation opens on its latest message, and follows new ones while the user is at the bottom. The scroll
+    // repeats on the next frame and once fonts load, which can make the thread taller after this render.
+    if (stick || !scrolledOnce) {
+      var bottom = function () { thread.scrollTop = thread.scrollHeight; };
+      bottom(); requestAnimationFrame(bottom); if (document.fonts) document.fonts.ready.then(bottom);
+      if (log.length) scrolledOnce = true;
+    }
+    if (o.rendered) o.rendered(state);
+  }
+  // Reply under a finished item from elsewhere on the page, such as its pin: the item comes into view with the box open.
+  function reopen(id) {
+    if (filter === 'open' && state[id] === 'accepted') document.querySelector('[data-filter="all"]').click();
+    var li = thread.querySelector('li[data-id="' + id + '"]'); if (!li) return;
+    li.scrollIntoView({ block: 'nearest' }); reasonBox(li, id, 'Your reply');
+  }
+  // The page's whole log, when the page reads it itself; KEY is anything else the entries show, such as a deadline.
+  // The thread is redrawn only when either changed, so focus and selection stay put between polls.
+  function setLog(events, key) {
+    var next = JSON.stringify([events, key]);
+    if (next === fed) return;
+    fed = next; log = events.slice(); renderThread();
+  }
+  // The user's items that match, without actions, such as the comments on one question.
+  function nodes(match) {
+    return pageThread(log, itemKinds, o.waiting, o.latestLast).entries
+      .filter(function (c) { return itemKinds.indexOf(c.kind) >= 0 && match(c.e); })
+      .map(function (c) { return entryNode(c, false); });
+  }
+
+  // ---------- The message box ----------
+  var noteBox = document.querySelector('#note'), noteBtn = document.querySelector('.notes .send .btn');
+  function sendNote() {
+    var note = noteBox.value.trim();
+    if (!note) { noteBox.focus(); return; }
+    send('note', Object.assign({ id: 'm-' + Date.now().toString(36), note: note }, o.noteParams ? o.noteParams() : {}), 'Message', function () { noteBox.value = ''; });
+  }
+  function mode() { return o.sendMode ? o.sendMode() : null; }
+  if (noteBox && !o.readOnly) {
+    noteBtn.addEventListener('click', function (e) { e.preventDefault(); (mode() || sendNote)(); });
+    noteBox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !mode()) { e.preventDefault(); sendNote(); } });
+  }
+
+  // ---------- Live updates ----------
+  function busy() {
+    return !!noteBox.value.trim() || (o.busy && o.busy()) ||
+      Array.prototype.some.call(document.querySelectorAll('.why textarea'), function (t) { return !!t.value.trim(); });
+  }
+  function start() {
+    renderThread();
+    if (!o.served || o.stream === false) return;
+    // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
+    var offline = document.querySelector('.offline'), misses = 0;
+    function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
+    (function stream(after) {
+      fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
+        connected(true);
+        r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
+        // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
+        if (after > 0) r.events.forEach(function (e) { if (e.action === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
+        if (r.events.length) renderThread();
+        stream(r.total);
+      }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
+    })(0);
+    // A new render from the agent loads by itself, as soon as the user is not typing: a comment, a message or an answer
+    // in progress would be lost. The page keeps its place through o.beforeReload.
+    var rev = null;
+    (function poll() {
+      fetch('/rev').then(function (r) { return r.text(); }).then(function (t) {
+        if (rev === null) rev = t;
+        else if (t !== rev && !busy()) {
+          try { if (o.beforeReload) o.beforeReload(); } catch (e) {}
+          location.reload();
+        }
+      }).catch(function () {}).then(function () { setTimeout(poll, 2000); });
+    })();
+    // Once the agent has used `wait`, a note above the message box says when no `wait` is connected: what the user
+    // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more.
+    var unwatched = document.querySelector('.unwatched');
+    (function watch() {
+      fetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
+        unwatched.hidden = on !== false;
+      }).catch(function () { unwatched.hidden = true; }).then(function () { setTimeout(watch, 2000); });
+    })();
+  }
+
+  return {
+    send: send, say: say, flash: flash, reopen: reopen, render: renderThread, start: start, setLog: setLog, nodes: nodes,
+    box: reasonBox, progress: progressChip, noteBox: noteBox, noteBtn: noteBtn,
+    log: function () { return log; }, state: function () { return state; }
+  };
+}
+
+// A message's words: the canvas and the slides send them as "note", the research board as "text" before it shared this.
+function pageWords(e) { return e.note != null ? e.note : e.text; }
+
+// The thread as the log makes it, without the page: each item's state, the entries in the order they show, with the
+// replies under them, and the entries Open lists. Kept apart from the drawing so it can be tested without a browser.
+// WAITING(c, state) says which entries wait for the user and come last; by default, the agent's own question.
+// LATESTLAST puts the entries in the order of their newest message, replies included, not of their first; the waiting
+// ones still come last.
+function pageThread(log, itemKinds, waiting, latestLast) {
+  var entries = [], byKey = {}, state = {};
+  log.forEach(function (e) {
+    if (e.action === 'status') state[e.to] = e.status;
+    else if (e.action === 'accept') state[e.to] = 'accepted';
+    else if (e.action === 'reopen') state[e.to] = 'reopened';
+    // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
+    else if (e.action === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
+    // A reply under a finished item is a follow-up: the item goes back to the agent.
+    else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
+  });
+  log.forEach(function (e, i) {
+    // What an event answers: an answer to a decision names the decision; the rest name it in `to`.
+    var to = e.action === 'answer' ? e.decision : e.to;
+    if (e.action === 'comment' || e.action === 'delete') {
+      var c = byKey[e.id];
+      if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [], last: i }; entries.push(c); }
+      else if (e.action === 'delete') c.deleted = true;
+      else { c.e = e; c.edited = true; c.deleted = false; }
+    } else if ((e.action === 'reply' || e.action === 'answer' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && to)) && to && byKey[to]) { byKey[to].replies.push(e); byKey[to].last = i; if (e.id) byKey[e.id] = byKey[to]; }
+    else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
+    else { var n = { kind: e.action, e: e, replies: [], last: i }; if (e.id) byKey[e.id] = n; entries.push(n); }
+  });
+  // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
+  // comes last, next to the message box.
+  if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
+  var waits = waiting ? function (c) { return waiting(c, state); }
+    : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); };
+  entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
+  // Open: the user's items not yet accepted, with what was said under them, and the entries waiting for the user.
+  var open = entries.filter(function (c) {
+    return (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waits(c);
+  });
+  return { state: state, entries: entries, open: open };
+}
+
+// ---------- Markdown in messages ----------
+// What the user and the agent write in the conversation is Markdown: paragraphs (a single line break stays a line
+// break, as in a chat), headings, lists (nested by indenting), quotes, code spans and blocks, tables, rules, bold,
+// italic, strikethrough and links. Anything else shows as written. The text becomes a tree of plain objects, then
+// elements whose words are set as text, never as HTML, so a message cannot add markup or scripts to the page; a link
+// opens only an http, https or mailto address.
+var MD_ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])(?:[ \t]+(.*))?$/, MD_FENCE = /^ {0,3}(`{3,}|~{3,})/, MD_RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+var MD_HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/, MD_QUOTE = /^ {0,3}> ?/, MD_TABLE_RULE = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+// A heading's words without the closing #s it may end with. Done by hand: a pattern for it is slow on long runs of spaces.
+function mdHeadingText(t) {
+  t = (t || '').trim();
+  var end = t.length;
+  while (end > 0 && t[end - 1] === '#') end--;
+  return end < t.length && (end === 0 || /[ \t]/.test(t[end - 1])) ? t.slice(0, end).trim() : t;
+}
+function mdIndent(line) { return line.match(/^[ \t]*/)[0].replace(/\t/g, '    ').length; }
+function mdCells(line) {
+  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map(function (c) { return c.trim().replace(/\\\|/g, '|'); });
+}
+function mdTableStart(lines, i) {
+  return lines[i].indexOf('|') >= 0 && i + 1 < lines.length && lines[i + 1].indexOf('|') >= 0 && MD_TABLE_RULE.test(lines[i + 1]) &&
+    mdCells(lines[i + 1]).length === mdCells(lines[i]).length;
+}
+// A numbered line starts a list mid-paragraph only from 1, so "in\n2024. Then" stays a sentence.
+function mdStarts(lines, i) {
+  var l = lines[i], item = l.match(MD_ITEM);
+  return MD_FENCE.test(l) || MD_HEADING.test(l) || MD_RULE.test(l) || MD_QUOTE.test(l) || mdTableStart(lines, i) ||
+    !!item && (!/\d/.test(item[2]) || parseInt(item[2], 10) === 1);
+}
+// The words of a block, with their marks. A code span keeps the marks in it as written, and so does a backslash.
+var MD_INLINE = /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|\*\*\*(?=\S)([\s\S]*?\S)\*\*\*(?!\*)|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([\s\S]*?[^\s*\\])\*(?:(?!\*)|(?=\*\*[^\s*]))|(^|[^\w\\])_(?=[^\s_])([\s\S]*?[^\s_\\])_(?!\w)|(https?:\/\/(?:[^\s<>()]|\([^\s<>()]*\))*(?:[^\s<>().,;:!?'"\]*_]|\([^\s<>()]*\)))|\\([\\`*_{}\[\]()#+\-.!|~>])/g;
+// Link text cannot hold another link, such as a bare URL: keep its words only.
+function mdNoLinks(nodes) {
+  return nodes.reduce(function (a, n) {
+    return a.concat(n.tag === 'a' ? mdNoLinks(n.children) : [n.children ? Object.assign({}, n, { children: mdNoLinks(n.children) }) : n]);
+  }, []);
+}
+// Past MD_INLINE_MAX characters, a block's words show as written: an unclosed mark makes the search slow on long text.
+var MD_INLINE_MAX = 10000;
+function mdInline(text) {
+  if (text.length > MD_INLINE_MAX) return [{ text: text }];
+  var out = [], last = 0, m, re = new RegExp(MD_INLINE.source, 'g');
+  function words(s) { if (!s) return; var prev = out[out.length - 1]; if (prev && prev.tag == null) prev.text += s; else out.push({ text: s }); }
+  while ((m = re.exec(text))) {
+    words(text.slice(last, m.index)); last = re.lastIndex;
+    if (m[1]) out.push({ tag: 'code', children: [{ text: m[2].replace(/\n/g, ' ').replace(/^ (.*) $/, '$1') }] });
+    else if (m[3]) out.push(/^(https?:|mailto:)/i.test(m[4]) ? { tag: 'a', href: m[4], children: mdNoLinks(mdInline(m[3])) } : { text: m[0] });
+    else if (m[5]) out.push({ tag: 'strong', children: [{ tag: 'em', children: mdInline(m[5]) }] });
+    else if (m[6]) out.push({ tag: 'strong', children: mdInline(m[6]) });
+    else if (m[7]) out.push({ tag: 'del', children: mdInline(m[7]) });
+    else if (m[8]) out.push({ tag: 'em', children: mdInline(m[8]) });
+    else if (m[10]) { words(m[9]); out.push({ tag: 'em', children: mdInline(m[10]) }); }
+    else if (m[11]) out.push({ tag: 'a', href: m[11], children: [{ text: m[11] }] });
+    else words(m[12]);  // an escaped mark is the mark as written
+  }
+  words(text.slice(last));
+  return out;
+}
+// Each line break in a paragraph's words as a break element.
+function mdBreaks(nodes) {
+  return nodes.reduce(function (a, n) {
+    if (n.tag == null) n.text.split('\n').forEach(function (t, k) { if (k) a.push({ tag: 'br' }); if (t) a.push({ text: t }); });
+    else a.push(n.children && n.tag !== 'code' ? Object.assign({}, n, { children: mdBreaks(n.children) }) : n);
+    return a;
+  }, []);
+}
+// The blocks of a message, or of a list item or a quote inside it.
+// Past MD_DEPTH quotes or lists inside each other, the rest shows as written: deeper nesting could overflow the stack.
+var MD_DEPTH = 20;
+function mdBlocks(lines, depth) {
+  var out = [], i = 0, m;
+  depth = depth || 0;
+  if (depth > MD_DEPTH) return lines.join('').trim() ? [{ tag: 'p', children: [{ text: lines.join('\n') }] }] : [];
+  while (i < lines.length) {
+    var line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    if ((m = line.match(MD_FENCE))) {
+      // The code lines lose as many spaces as the fence is indented.
+      var fence = m[1], code = [], strip = new RegExp('^ {0,' + line.match(/^ */)[0].length + '}');
+      for (i++; i < lines.length && !(lines[i].trim().indexOf(fence) === 0 && !lines[i].trim().slice(fence.length).trim()); i++) code.push(lines[i].replace(strip, ''));
+      i++; out.push({ tag: 'pre', children: [{ tag: 'code', children: [{ text: code.join('\n') }] }] });
+    } else if ((m = line.match(MD_HEADING))) {
+      out.push({ tag: 'p', cls: 'md-h', children: [{ tag: 'strong', children: mdInline(mdHeadingText(m[2])) }] }); i++;
+    } else if (MD_RULE.test(line)) {
+      out.push({ tag: 'hr' }); i++;
+    } else if (MD_QUOTE.test(line)) {
+      var quoted = [];
+      for (; i < lines.length && MD_QUOTE.test(lines[i]); i++) quoted.push(lines[i].replace(MD_QUOTE, ''));
+      out.push({ tag: 'blockquote', children: mdBlocks(quoted, depth + 1) });
+    } else if ((m = line.match(MD_ITEM))) {
+      // One list: its items, each with the lines indented under it, which can hold a nested list.
+      var ordered = /\d/.test(m[2]), list = { tag: ordered ? 'ol' : 'ul', children: [] }, item = null, base = m[1].length, blank = false;
+      if (ordered && parseInt(m[2], 10) !== 1) list.start = parseInt(m[2], 10);
+      for (; i < lines.length; i++) {
+        var l = lines[i], im = l.match(MD_ITEM), ind = mdIndent(l);
+        if (im && ind < base + 2 && /\d/.test(im[2]) === ordered) {
+          item = { lines: [im[3] || ''], at: im[1].length + im[2].length + 1 }; list.children.push(item); blank = false;
+        } else if (!l.trim()) { blank = true; if (item) item.lines.push(''); }
+        else if (ind >= base + 2 || (!blank && !MD_ITEM.test(l) && !mdStarts(lines, i))) {
+          item.lines.push(ind >= base + 2 ? l.replace(/\t/g, '    ').slice(Math.min(ind, item.at)) : l); blank = false;
+        } else break;
+      }
+      list.children = list.children.map(function (it) {
+        var inner = mdBlocks(it.lines, depth + 1);
+        // A short item shows as words, not as a paragraph with its own space.
+        if (inner.length && inner[0].tag === 'p' && !inner[0].cls) inner.splice.apply(inner, [0, 1].concat(inner[0].children));
+        return { tag: 'li', children: inner };
+      });
+      out.push(list);
+    } else if (mdTableStart(lines, i)) {
+      var head = mdCells(line), align = mdCells(lines[i + 1]).map(function (c) {
+        return /^:-+:$/.test(c) ? 'center' : /-:$/.test(c) ? 'right' : '';
+      }), rows = [];
+      for (i += 2; i < lines.length && lines[i].trim() && lines[i].indexOf('|') >= 0; i++) rows.push(mdCells(lines[i]));
+      var cell = function (tag) { return function (c, k) { return { tag: tag, align: align[k], children: mdInline(c) }; }; };
+      out.push({ tag: 'table', children: [
+        { tag: 'thead', children: [{ tag: 'tr', children: head.map(cell('th')) }] },
+        { tag: 'tbody', children: rows.map(function (r) { return { tag: 'tr', children: head.map(function (_, k) { return r[k] || ''; }).map(cell('td')) }; }) }] });
+    } else {
+      // A paragraph runs to a blank line or the start of another block; each line break in it stays.
+      // Its marks can span a line break, such as bold over two lines.
+      var para = [];
+      for (; i < lines.length && lines[i].trim() && !(para.length && mdStarts(lines, i)); i++) para.push(lines[i].trim());
+      out.push({ tag: 'p', children: mdBreaks(mdInline(para.join('\n'))) });
+    }
+  }
+  return out;
+}
+function pageMarkdownTree(text) { return mdBlocks(String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n')); }
+// The message's words without its marks, on one line, such as for a short notice.
+function pageMarkdownText(text) {
+  var BLOCK = /^(p|li|pre|blockquote|ul|ol|table|tr|th|td|hr|br)$/;
+  function words(n) { return (BLOCK.test(n.tag) ? ' ' : '') + (n.text != null ? n.text : (n.children || []).map(words).join('')) + (BLOCK.test(n.tag) ? ' ' : ''); }
+  return pageMarkdownTree(text).map(words).join('').replace(/\s+/g, ' ').trim();
+}
+// The message as elements: a div of class "body md", with the text direction of its words.
+function pageMarkdown(text) {
+  function make(n) {
+    if (n.tag == null) return document.createTextNode(n.text);
+    var x = document.createElement(n.tag);
+    if (n.cls) x.className = n.cls;
+    if (n.start != null) x.start = n.start;
+    if (n.align) x.style.textAlign = n.align;
+    if (n.href) { x.href = n.href; x.target = '_blank'; x.rel = 'noopener noreferrer'; }
+    (n.children || []).forEach(function (c) { x.append(make(c)); });
+    return x;
+  }
+  var d = document.createElement('div'); d.className = 'body md'; d.dir = 'auto';
+  pageMarkdownTree(text).forEach(function (n) { d.append(make(n)); });
+  return d;
+}
+</script>
+<script>
+// The colours of DESIGN.md's table, read from page.css so the values shown are the ones the boards use.
+const COLOURS = [
+  ["cream", "page background; text on dark fills", ["ink", "heading", "muted", "umber", "terracotta-dark", "moss-dark", "error"]],
+  ["linen", "the agent's messages, code, a quiet panel", ["ink", "heading", "umber", "terracotta-dark", "error"]],
+  ["white", "inside fields; the user's own messages", ["ink", "heading", "muted"]],
+  ["umber", "header bar, primary buttons, waiting for you", ["cream"]],
+  ["ink", "body text, separating rules", ["cream"]],
+  ["heading", "headings, names", ["cream"]],
+  ["muted", "times, metadata (cream and white only)", []],
+  ["terracotta", "bands, the working bar, a selected outline; never text", ["heading"]],
+  ["terracotta-dark", "terracotta as text", ["cream"]],
+  ["moss-dark", "done, accepted, a feature", ["cream"]],
+  ["moss", "fill only: a done mark on a map", []],
+  ["sand", "thin box borders, seen bars", ["heading"]],
+  ["line", "hairlines between rows", []],
+  ["error", "failure, blocked, the server not answering", ["cream"]],
+  ["surround", "behind versions and exported slides", ["ink"]],
+  ["surround-dark", "the canvas's dark surround", ["cream"]],
+  ["frame", "a version's outline on light", []],
+  ["frame-dark", "a version's outline on dark", []],
+];
+const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue("--" + n).trim();
+function lum(hex) {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4);
+  return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+}
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => p - q); return ((y + .05) / (x + .05)).toFixed(1); };
+document.getElementById("swatches").replaceChildren(...COLOURS.map(([name, role, on]) => {
+  const li = document.createElement("li"), bg = v(name);
+  const chip = document.createElement("div"); chip.className = "chip"; chip.style.background = bg;
+  on.forEach(fg => { const s = document.createElement("span"); s.style.color = v(fg); s.textContent = "Aa"; s.title = `--${fg} on --${name}, ${ratio(v(fg), bg)}:1`; chip.append(s); });
+  const info = document.createElement("div"); info.className = "info";
+  info.innerHTML = `<b>--${name}</b> <code>${bg}</code><div class="role"></div>`;
+  info.querySelector(".role").textContent = role + (on.length ? `. Text: ${on.map(fg => `${fg} ${ratio(v(fg), bg)}:1`).join(", ")}.` : ".");
+  li.append(chip, info); return li;
+}));
+document.getElementById("n-colours").textContent = COLOURS.length;
+// The spacing scale, drawn from page.css.
+document.getElementById("spaces").replaceChildren(...["tight", "control", "item", "section", "edge", "group", "wide"].map(n => {
+  const li = document.createElement("li"), bar = document.createElement("i");
+  li.innerHTML = `<code>--space-${n}</code><span>${v("space-" + n)}</span>`;
+  bar.style.width = `var(--space-${n})`; li.append(bar); return li;
+}));
+
+const conv = pageConversation({ served: false, stream: false, name: "reference page", agent: "Agent", latestLast: true,
+  unsent: "This reference page has no agent." });
+conv.setLog([
+  { action: "note", id: "m1", at: "2026-11-20T16:40:00", note: "Why not server-sent events? They are one-way, but that is the direction we need." },
+  { action: "reply", to: "m1", at: "2026-11-20T16:41:00", text: "SSE could push replies to the page. Answers still need a separate path back." },
+  { action: "status", to: "m1", at: "2026-11-20T16:41:00", status: "done" },
+  { action: "note", id: "m2", at: "2026-11-20T16:43:00", note: "Say why the page has no login." },
+  { action: "status", to: "m2", at: "2026-11-20T16:43:00", status: "working" },
+  { action: "reply", id: "r3", at: "2026-11-20T16:44:00", text: "Is 2 seconds the right bound for a question to show in the page, or is 10 seconds fine?" },
+]);
+conv.start && conv.start();
+document.getElementById("progress-demo").replaceChildren(...["seen", "asked", "working", "done", "accepted", "reopened"].map(s => conv.progress(s)));
+document.getElementById("toast-ok").addEventListener("click", () => conv.flash("✓ Message sent to the agent", "ok"));
+document.getElementById("to-waiting").addEventListener("click", () => {
+  const q = document.querySelector(".thread > li:last-child"); if (!q) return;
+  q.scrollIntoView({ block: "nearest" }); const b = q.querySelector("button"); if (b) b.focus({ preventScroll: true });
+});
+// The meter: the user's messages the agent finished, out of all of them.
+const mine = ["m1", "m2"], done = 1;
+document.getElementById("n-done").innerHTML = `${done}<span class="of"> / ${mine.length}</span>`;
+document.getElementById("meter-done").style.width = `${100 * done / mine.length}%`;
+</script>
+</body></html>

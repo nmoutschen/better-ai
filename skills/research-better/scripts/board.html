@@ -6,29 +6,13 @@
 <style>
 /*__PAGE_CSS__*/
 /* What only the board shows; the shared look (bar, side column, conversation, buttons, toast) is page.css above. */
-/* The board's bar holds figures on the right, so it never wraps; its title and goal cut off instead. */
-header.bar--stats { flex-wrap:nowrap; align-items:flex-end; }
-/* Above the message box when no `wait` is connected, so a note sent while the coordinator is not watching is not lost in silence. */
-.unwatched { margin:0 0 12px; padding:8px 12px; background:var(--linen); border-left:3px solid var(--terracotta); color:var(--ink); font:500 13px/1.45 var(--sans); }
-.unwatched[hidden] { display:none; }
-header.bar--stats > div { min-width:0; }
-header.bar--stats h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.stat.wait b { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
-.goal { margin:4px 0 0; font:400 15px/1.4 var(--serif); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.goal { margin:var(--space-tight) 0 0; font:var(--font-subtitle); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
 .goal.open { white-space:normal; }
-.status { flex:none; display:flex; gap:24px; align-items:flex-end; margin:0; font-size:12px; }
-.stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
-.stat b { font:700 20px/1.1 var(--sans); }
-.stat .of { font-size:14px; opacity:.8; }
-.bar { width:140px; height:8px; border:1px solid var(--cream); margin-top:4px; display:flex; }
-.bar i { display:block; height:100%; background:var(--cream); }
 
 /* The map, on the untinted surround */
-.view { min-height:0; display:flex; flex-direction:column; padding:12px 20px; }
-.tools { flex:none; display:flex; gap:20px; align-items:center; justify-content:space-between; margin:0 0 12px; }
-.key { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; }
-.key li { display:inline-flex; align-items:center; gap:6px; }
-.zoombar { display:flex; gap:8px; }
+.view { min-height:0; display:flex; flex-direction:column; padding:var(--space-item) var(--space-edge); }
+.tools { flex:none; display:flex; gap:var(--space-edge); align-items:center; justify-content:space-between; margin:0 0 var(--space-item); }
+.zoombar { display:flex; gap:var(--space-control); }
 .zoombar .btn { min-width:36px; }
 .zoomwrap { flex:1; min-height:0; display:flex; border:1px solid var(--line); background:var(--cream); overflow:hidden; cursor:grab; touch-action:none; }
 .zoomwrap.drag { cursor:grabbing; }
@@ -48,60 +32,48 @@ svg.map { display:block; width:100%; height:100%; }
 .zoomwrap .empty { margin:auto; color:var(--muted); font-style:italic; }
 
 /* The pop-up for a question or an agent */
-.qpop { position:fixed; z-index:5; width:min(34rem, calc(100vw - 24px)); max-height:calc(100vh - 20px); overflow:auto; background:var(--cream);
-  color:var(--ink); border:2px solid var(--ink); box-shadow:0 8px 24px rgba(28,26,23,.25); padding:12px; font-size:14px; }
-.qpop h3 { font:700 17px/1.3 var(--serif); color:var(--heading); margin:6px 0 8px; }
-.qpop p, .qpop li, .qpop summary, .qpop textarea, .qpop .thread .body { font:400 14px/1.45 var(--sans); }
-.qpop p { margin:8px 0; }
-.qpop .meta, .qpop .chip, .qpop h2, .qpop .thread .head, .qpop .progress { font:700 11px/1.4 var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.qpop summary { font:var(--font-message); }
+.qpop p { margin:var(--space-control) 0; }
+.qpop .meta, .qpop .chip, .qpop h2, .qpop .thread .head, .qpop .progress { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
 .qpop .meta, .qpop h2 { color:var(--muted); }
-.qpop .btn { font-size:11px; }
-.qpop .meta { margin:0; padding-right:24px; }
-.qpop .x { position:absolute; top:8px; right:8px; border:0; background:none; font:700 18px var(--sans); color:var(--muted); cursor:pointer; }
-.qpop details { margin:8px 0; }
+.qpop .btn { font-size:var(--text-label); }
+.qpop .meta { margin:0; padding-right:var(--space-group); }
+.qpop details { margin:var(--space-control) 0; }
 .qpop summary { cursor:pointer; color:var(--umber); }
-.qpop details ul, .qpop .searches { padding-left:20px; margin:8px 0; }
-.qpop details li, .qpop .searches li { margin:4px 0; }
-.qpop .crumb { display:none; }
-.qpop .thread { flex:none; overflow:visible; padding:0; margin:12px 0 0; }
-.qpop .ask textarea { min-height:3em; }
-.ask { display:flex; gap:8px; align-items:stretch; margin-top:12px; }
-.ask textarea { flex:1; font:400 14px/1.45 var(--sans); color:var(--ink); background:#fff; border:1px solid var(--muted); padding:6px 8px; resize:vertical; }
-.chip { font:700 10px var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.qpop details ul, .qpop .searches { padding-left:var(--space-edge); margin:var(--space-control) 0; }
+.qpop details li, .qpop .searches li { margin:var(--space-tight) 0; }
+.chip { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
 .chip.ok { color:var(--moss-dark); }
 .chip.todo { color:var(--muted); }
-.chip.bad { color:var(--terracotta); }
-.chip.now { color:var(--cream); background:var(--umber); padding:1px 6px; }
+.chip.bad { color:var(--terracotta-dark); }
+.chip.now { color:var(--cream); background:var(--umber); padding:1px var(--space-control); }
 .muted { color:var(--muted); }
 
 /* The side column: the conversation, then the agents */
-.thread .crumb button { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; }
-.thread > li.msg.decision { border-left:4px solid var(--umber); }
-.thread > li.msg.decision > .head .who { color:var(--umber); }
-.thread > li.msg.decision > .head .when { color:var(--umber); font-weight:700; }
 /* A worker's message when it closes a question: white like the user's, with a sand edge, so the coordinator's stay distinct. */
 .thread > li.msg.worker { border-left:4px solid var(--sand); }
-.msg .what { margin:2px 0 0; font:700 12px/1.4 var(--sans); color:var(--ink); }
 .msg .qlink { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; text-align:left; }
-.msg .added { margin:4px 0 0; font-size:12px; color:var(--muted); }
-.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-bottom:1px solid var(--line); padding:0 20px 12px; margin-bottom:16px; }
-.agentsec h2 { margin:0 0 8px; font:700 12px var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); }
+.msg .added { margin:var(--space-tight) 0 0; font-size:var(--text-small); color:var(--muted); }
+/* The agents at work, at the top of the side column: a run can have twenty, and a list there scrolls on its own
+   (at most 30% of the height) without taking room from the map. */
+.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-bottom:1px solid var(--line); padding:0 var(--space-edge) var(--space-item); margin-bottom:var(--space-section); }
+.agentsec h2 { margin:0 0 var(--space-control); }
 .agents { list-style:none; margin:0; padding:0; }
 .agents button { display:block; width:100%; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
-  padding:4px 8px; margin:0 0 8px; font:400 14px/1.4 var(--sans); color:var(--ink); cursor:pointer; }
+  padding:var(--space-tight) var(--space-control); margin:0 0 var(--space-control); font:var(--font-message); color:var(--ink); cursor:pointer; }
 .agents button.verifier { border-color:var(--moss-dark); }
 .agents button:hover span { text-decoration:underline; }
-.agents .dry { display:block; font-style:normal; font-size:12px; color:var(--error); }
-.agents b { font-size:12px; letter-spacing:.08em; text-transform:uppercase; margin-right:8px; }
+.agents .dry { display:block; font-style:normal; font-size:var(--text-small); color:var(--error); }
+.agents b { font-size:var(--text-small); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--space-control); }
 </style></head><body>
 <div class="band"></div>
 <header class="bar--stats"><div><h1 id="title" dir="auto">Research board</h1><p class="goal" id="goal" dir="auto"></p></div>
-  <div class="status" id="status">Loading the board…</div></header>
+  <div class="stats" id="status">Loading the board…</div></header>
 <p class="offline" id="offline" role="status" hidden>The board is closed. Ask the agent to restart it.</p>
 <div class="work">
   <main class="view">
     <div class="tools">
-      <ul class="key" title="Key">
+      <ul class="legend" title="Key">
         <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="#6B7F5E" stroke="#33302B" stroke-width=".75"/></svg>answered</li>
         <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="#C4B69C" stroke="#33302B" stroke-width=".75"/></svg>to do</li>
         <li><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="#78736B" stroke-width="2"/></svg>proposed</li>
@@ -117,7 +89,7 @@ svg.map { display:block; width:100%; height:100%; }
     <div class="zoomwrap"><svg class="map" id="map" viewBox="70 25 800 560" role="group" aria-label="Map of the research questions"><g id="content"></g></svg></div>
   </main>
   <aside class="notes" aria-labelledby="notes-h">
-    <section class="agentsec" aria-labelledby="agents-h"><h2 id="agents-h">Agents</h2><ul class="agents" id="agents"></ul></section>
+    <section class="agentsec" aria-labelledby="agents-h"><h2 class="section-h" id="agents-h">Agents</h2><ul class="agents" id="agents"></ul></section>
     <div class="notes-top">
       <h2 id="notes-h">Conversation</h2>
     </div>
@@ -338,6 +310,7 @@ function decisionItem(c, state, actions) {
     : left > 0 ? `default in ${left < 90 ? "under 2 min" : Math.round(left / 60) + " min"}` : "default due now";
   const item = li(`msg decision ${status}`, `${headHTML("Coordinator", "", label)}${md(`${x.asked || ""}${def ? (status === "pending" ? "\n\nIf you don't answer: " : "\n\n") + def : ""}`)}`);
   item.dataset.d = x.id;
+  if (!answer && status === "pending") item.classList.add("open-q");  // the top bar's figure takes the user to the first one
   item.dataset.state = status === "changed" ? "done" : ast || (status === "pending" ? "asked" : "");
   const foot = document.createElement("div"); foot.className = "foot";
   if (answer) foot.append(conv.progress(ast)); else if (status === "pending") foot.append(conv.progress("asked"));
@@ -467,6 +440,8 @@ document.addEventListener("submit", ev => {
 document.addEventListener("click", ev => {
   const t = ev.target;
   if (t.closest("#goal")) { $("goal").classList.toggle("open"); return; }
+  if (t.closest("#to-waiting")) { const q = document.querySelector("#thread .open-q"); if (!q) return;
+    q.scrollIntoView({block: "start"}); const b = q.querySelector(".change"); if (b) b.focus({preventScroll: true}); return; }
   if (t.closest(".qpop .x")) return closePop();
   if (t.closest(".qpop")) return;
   const g = t.closest(".map .q"); if (g) return openPop("question", g.dataset.q, g);
@@ -497,15 +472,16 @@ function render(d) {
   const rate = answered / Math.max(1, now - start), eta = answered >= 3 && left ? ` ${left / rate < 90 ? "Under 2 min" : "About " + Math.round(left / rate / 60) + " min"} left at this pace.` : "";
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   const leftText = left / rate < 90 ? "<2 min" : `~${Math.round(left / rate / 60)} min`;
-  const waitingN = (d.decisions || []).filter(x => String(x.status || "pending").trim().toLowerCase() === "pending").length;
+  const answeredIds = new Set((d.conversation || []).filter(e => e.action === "answer").map(e => e.decision));
+  const waitingN = (d.decisions || []).filter(x => String(x.status || "pending").trim().toLowerCase() === "pending" && !answeredIds.has(x.id)).length;
   const phase = CLOSED_PAGE ? stat("Closed", `since ${new Date(now * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`)
     : b.status === "stopped" ? stat("Stopped", `after ${mins(now - start)}`, "done")
     : b.status === "checking" ? stat("Checking", "last claims") : stat(mins(now - start).replace(" min", "m").replace("under 2m", "<2m"), "running");
   const live = !CLOSED_PAGE && (b.status === "running" || !b.status);
   setHTML($("status"), `<span class="stat"><b>${answered}<span class="of"> / ${qs.length}</span></b>questions closed
-      <span class="bar" aria-hidden="true"><i style="width:${qs.length ? (100 * answered / qs.length).toFixed(0) : 0}%"></i></span></span>`
+      <span class="meter" aria-hidden="true"><i style="width:${qs.length ? (100 * answered / qs.length).toFixed(0) : 0}%"></i></span></span>`
     + (live ? stat(workers, workers === 1 ? "worker on questions" : "workers on questions") + (answered >= 3 && left ? stat(leftText, "left at this pace") : "") : "")
-    + (waitingN && !CLOSED_PAGE ? stat(waitingN, waitingN === 1 ? "decision waiting for you" : "decisions waiting for you", "wait") : "") + phase);
+    + (waitingN && !CLOSED_PAGE ? `<button type="button" class="stat" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "decision waiting for you" : "decisions waiting for you"}</button>` : "") + phase);
   const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, OPEN && OPEN.id === q.id]).concat([b.short]));
   if (key !== LAYOUT) { LAYOUT = key; drawMap(D); if (FITTED) fit(); }
   const replies = (d.conversation || []).filter(e => e.action === "reply");

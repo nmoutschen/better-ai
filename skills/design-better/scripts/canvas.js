@@ -73,6 +73,8 @@
   // Scrolling: frames of one screen size scroll together. The position is matched between elements with the
   // same id in both versions, such as headings, so versions of different length stay on the same section.
   // This works only for versions embedded from files; a page loaded from an address cannot be followed.
+  // An id counts only where it is unique in its document: versions can repeat an id, and the first match is then
+  // often the wrong element.
   var quietUntil = new WeakMap();
   function tops(win, ids) {
     var doc = win.document, end = doc.documentElement.scrollHeight;
@@ -85,8 +87,9 @@
     return marks;
   }
   function sharedIds(a, b) {
+    var inA = pageIdCounts(a.document), inB = pageIdCounts(b.document);
     return Array.prototype.map.call(a.document.querySelectorAll('[id]'), function (el) { return el.id; })
-      .filter(function (id) { return id && b.document.getElementById(id); });
+      .filter(function (id) { return id && inA[id] === 1 && inB[id] === 1; });
   }
   function match(from, to) {
     try {
@@ -174,7 +177,7 @@
       it.verdict = e.verdict || null; it.comment = e.comment || null;
     } else if (e.action === 'delete') {
       items = items.filter(function (x) { return x.id !== e.id; });
-      document.querySelectorAll('iframe').forEach(function (f) { try { var p = f.contentDocument.querySelector('.db-pin[data-id="' + e.id + '"]'); if (p) p.remove(); } catch (x) {} });
+      document.querySelectorAll('iframe').forEach(function (f) { try { comments.removePin(f.contentDocument.body, e.id); } catch (x) {} });
     } else if (e.action === 'verdict') { verdicts[e.version] = e.verdict || null; syncVersionButtons(); }
   }
   function byId(id) { return items.filter(function (x) { return x.id === id; })[0]; }
@@ -193,7 +196,21 @@
   });
 
   // Comment mode: hovering a version outlines the element under the pointer; a click opens the comment box for it.
-  var commenting = true, pop = document.querySelector('.pop'), draft = null;
+  var commenting = true, pop = document.querySelector('.pop');
+  var comments = pageElementComments({
+    pop: pop, pinClass: 'db-pin', byId: byId, send: send,
+    commenting: function () { return commenting; }, stopPinPropagation: true,
+    reopen: function (id) { conv.reopen(id); },
+    nextNumber: function () { return seq + 1; },
+    crumb: function (data) { return crumb(data.version, data.target); },
+    prepare: syncCommentVerdict,
+    allowEmpty: function (data) { return data.verdict; },
+    params: function (data, text) {
+      var anchor = data.item || data;
+      return { version: anchor.version, screen: anchor.screen, target: anchor.target, spot: anchor.spot,
+               verdict: data.verdict, comment: text || null };
+    }
+  });
   function setMode(on) {
     commenting = on; choose('data-mode', on ? 'comment' : 'use'); main.classList.toggle('commenting', on);
     document.querySelectorAll('iframe').forEach(function (f) { try { f.contentDocument.documentElement.classList.toggle('db-commenting', on); } catch (e) {} });
@@ -202,27 +219,24 @@
   document.querySelectorAll('button[data-mode]').forEach(function (b) {
     b.addEventListener('click', function () { setMode(b.dataset.mode === 'comment'); });
   });
-  document.addEventListener('keydown', function (e) {
-    if ((e.key === 'c' || e.key === 'C') && !/INPUT|TEXTAREA/.test(e.target.tagName) && !e.metaKey && !e.ctrlKey) setMode(!commenting);
-    if (e.key === 'Escape' && !pop.hidden) closePop();
-  });
-  function selectorOf(el) {
-    var parts = [];
-    while (el && el.nodeType === 1 && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
-      if (el.id) { parts.unshift('#' + CSS.escape(el.id)); break; }
-      var tag = el.tagName.toLowerCase(), n = 1, sib = el;
-      while ((sib = sib.previousElementSibling)) if (sib.tagName === el.tagName) n++;
-      parts.unshift(tag + ':nth-of-type(' + n + ')');
-      el = el.parentElement;
-    }
-    return parts.join(' > ') || 'body';
+  // C switches between commenting and using the versions, and Escape closes the comment box. A click in a version
+  // moves the focus into its frame, so each version's document listens too (see instrument).
+  function shortcut(e) {
+    if (e.defaultPrevented) return;  // the version handled the key itself
+    // composedPath()[0] is the field itself when it sits inside a web component's shadow root.
+    var t = e.composedPath ? e.composedPath()[0] : e.target, typing = t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable);
+    if ((e.key === 'c' || e.key === 'C') && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) setMode(!commenting);
+    if (e.key === 'Escape' && !pop.hidden) comments.close();
   }
+  document.addEventListener('keydown', shortcut);
   // What a click points at, in enough detail for the agent to find it without the user picking an exact element:
   // the element and its parents, the words under the pointer, an image's source, and where the click fell.
+  function elementText(x) {
+    return x.getAttribute('aria-label') || x.getAttribute('alt') || x.getAttribute('placeholder') || x.innerText || x.value || '';
+  }
   function brief(x) {
-    var t = (x.getAttribute('aria-label') || x.getAttribute('alt') || x.getAttribute('placeholder') ||
-             x.innerText || x.value || '').replace(/\s+/g, ' ').trim();
-    return { tag: x.tagName.toLowerCase(), id: x.id || null, cls: (x.getAttribute('class') || '').trim() || null, text: t.slice(0, 120) };
+    return { tag: x.tagName.toLowerCase(), id: x.id || null, cls: (x.getAttribute('class') || '').trim() || null,
+             text: elementText(x).replace(/\s+/g, ' ').trim().slice(0, 120) };
   }
   function wordsAt(doc, x, y) {
     var r = doc.caretRangeFromPoint ? doc.caretRangeFromPoint(x, y) : null;
@@ -272,7 +286,7 @@
     return '';
   }
   function describe(el, cx, cy) {
-    var doc = el.ownerDocument, win = doc.defaultView, r = el.getBoundingClientRect(), d = brief(el);
+    var doc = el.ownerDocument, win = doc.defaultView, r = el.getBoundingClientRect(), d = pageElementDescription(el, null, elementText(el), 120);
     // The nearest heading above the element in reading order, or the element itself if it is a heading.
     var heading = null;
     doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(function (x) {
@@ -283,7 +297,7 @@
     var img = el.tagName === 'IMG' ? el : null, image = null;
     if (img) image = { src: (img.currentSrc || img.getAttribute('src') || '').slice(0, 300), alt: img.getAttribute('alt') };
     else { var bg = win.getComputedStyle(el).backgroundImage; if (bg && bg !== 'none') image = { src: bg.slice(0, 300), alt: null }; }
-    return { selector: selectorOf(el), tag: d.tag, text: d.text, heading: heading, words: wordsAt(doc, cx, cy), image: image,
+    return { selector: d.selector, tag: d.tag, text: d.text, heading: heading, words: wordsAt(doc, cx, cy), image: image,
              place: placeOf(el),
              parents: parents, point: { x: Math.round(cx + win.scrollX), y: Math.round(cy + win.scrollY) },
              box: { x: Math.round(r.left + win.scrollX), y: Math.round(r.top + win.scrollY), w: Math.round(r.width), h: Math.round(r.height) } };
@@ -309,24 +323,15 @@
     doc.documentElement.dataset.dbReady = '1';
     var style = doc.createElement('style'); style.textContent = PIN_CSS; doc.head.appendChild(style);
     doc.documentElement.classList.toggle('db-commenting', commenting);
+    doc.addEventListener('keydown', shortcut);
     doc.addEventListener('click', function (e) {
       if (!menu.hidden) openMenu(false);
       // With a comment box open, a click elsewhere closes it instead of starting another comment.
-      if (!pop.hidden) { e.preventDefault(); e.stopPropagation(); closePop(); return; }
-      var pin = e.target.closest && e.target.closest('.db-pin');
-      if (pin) {
-        // A pin opens its comment, to read, change or delete it, whether or not comment mode is on.
-        e.preventDefault(); e.stopPropagation();
-        var found = items.filter(function (x) { return x.id === pin.dataset.id; })[0];
-        // A finished comment is not edited: it is reopened, with what is still wrong, from the conversation.
-        if (found && (pinState[found.id] === 'done' || pinState[found.id] === 'accepted')) conv.reopen(found.id);
-        else if (found) openPop(frame, null, null, e.clientX, e.clientY, found);
-        return;
-      }
-      if (!commenting) return;
-      e.preventDefault(); e.stopPropagation();
-      var el = e.target, r = el.getBoundingClientRect();
-      openPop(frame, el, { fx: (e.clientX - r.left) / Math.max(1, r.width), fy: (e.clientY - r.top) / Math.max(1, r.height) }, e.clientX, e.clientY);
+      if (!pop.hidden) { e.preventDefault(); e.stopPropagation(); comments.close(); return; }
+      comments.click(e, function () {
+        var el = e.target, r = el.getBoundingClientRect();
+        openPop(frame, el, { fx: (e.clientX - r.left) / Math.max(1, r.width), fy: (e.clientY - r.top) / Math.max(1, r.height) }, e.clientX, e.clientY);
+      }, function (it) { openPop(frame, null, null, e.clientX, e.clientY, it); });
     }, true);
     items.forEach(function (it) { placePin(frame, it); });
     fit();
@@ -337,90 +342,61 @@
   });
   function openPop(frame, el, at, cx, cy, existing) {
     var box = frame.getBoundingClientRect(), scale = box.width / +frame.getAttribute('width');
-    draft = existing ? { item: existing, version: existing.version, target: existing.target, verdict: existing.verdict }
+    var data = existing ? { item: existing, version: existing.version, target: existing.target, verdict: existing.verdict }
       : { version: labels[+frame.dataset.i], screen: frame.getAttribute('width') + 'x' + frame.getAttribute('height'),
           target: describe(el, cx, cy), spot: at, verdict: null };
-    pop.querySelector('.target').replaceChildren(crumb(draft.version, draft.target));
-    pop.querySelector('textarea').value = existing ? existing.comment || '' : '';
-    pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === draft.verdict)); });
-    pop.querySelector('.remove').hidden = !existing;
-    pop.querySelector('.ok').textContent = existing ? 'Update' : 'Send';
-    pop.hidden = false; opener = document.activeElement !== document.body ? document.activeElement : null;
-    var x = box.left + cx * scale + 12, y = box.top + cy * scale + 12;
-    pop.style.left = Math.max(12, Math.min(x, innerWidth - pop.offsetWidth - 12)) + 'px';
-    pop.style.top = Math.max(12, Math.min(y, innerHeight - pop.offsetHeight - 12)) + 'px';
-    pop.querySelector('textarea').focus();
+    comments.open(data, existing, document.activeElement !== document.body ? document.activeElement : null, function () {
+      return pageCommentPosition(box.left + cx * scale, box.top + cy * scale, pop);
+    });
   }
-  // The comment box returns focus to what opened it, so keyboard users keep their place.
-  var opener = null;
-  document.addEventListener('mousedown', function (e) { if (!pop.hidden && !pop.contains(e.target)) closePop(); });
+  document.addEventListener('mousedown', function (e) { if (!pop.hidden && !pop.contains(e.target)) comments.close(); });
   document.querySelectorAll('.vcomment').forEach(function (b) {
     b.addEventListener('click', function () {
       var frame = document.querySelector('main > section:not([hidden]) iframe[data-i="' + b.dataset.v + '"]');
       try { openPop(frame, frame.contentDocument.body, { fx: 0.5, fy: 0 }, 24, 24); } catch (e) {}
     });
   });
-  function closePop() { pop.hidden = true; draft = null; if (opener && document.contains(opener)) opener.focus(); opener = null; }
   function openEdit(it, from) {
     var r = from.getBoundingClientRect();
-    draft = { item: it, version: it.version, target: it.target, verdict: it.verdict };
-    pop.querySelector('.target').replaceChildren(crumb(it.version, it.target));
-    pop.querySelector('textarea').value = it.comment || '';
-    pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === draft.verdict)); });
-    pop.querySelector('.remove').hidden = false; pop.querySelector('.ok').textContent = 'Update';
-    pop.hidden = false; opener = from;
-    pop.style.left = Math.max(12, r.right - pop.offsetWidth) + 'px';
-    pop.style.top = Math.max(12, Math.min(r.bottom + 8, innerHeight - pop.offsetHeight - 12)) + 'px';
-    pop.querySelector('textarea').focus();
+    comments.open({ item: it, version: it.version, target: it.target, verdict: it.verdict }, it, from, function () {
+      return { x: Math.max(12, r.right - pop.offsetWidth),
+               y: Math.max(12, Math.min(r.bottom + 8, innerHeight - pop.offsetHeight - 12)) };
+    });
+  }
+  function syncCommentVerdict(data) {
+    pop.querySelectorAll('.vbtn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.verdict === data.verdict)); });
   }
   pop.querySelectorAll('.vbtn').forEach(function (b) {
     b.addEventListener('click', function () {
+      var draft = comments.draft();
       draft.verdict = draft.verdict === b.dataset.verdict ? null : b.dataset.verdict;
-      pop.querySelectorAll('.vbtn').forEach(function (o) { o.setAttribute('aria-pressed', String(o.dataset.verdict === draft.verdict)); });
+      syncCommentVerdict(draft);
     });
   });
-  pop.querySelector('.cancel').addEventListener('click', closePop);
-  pop.querySelector('.remove').addEventListener('click', function () { var it = draft && draft.item; closePop(); if (it) removeItem(it); });
-  pop.querySelector('textarea').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); }
-  });
-  pop.querySelector('.ok').addEventListener('click', submitComment);
-  function submitComment() {
-    var text = pop.querySelector('textarea').value.trim();
-    if (!draft || (!text && !draft.verdict)) { pop.querySelector('textarea').focus(); return; }
-    var it = draft.item, id = it ? it.id : 'c' + (seq + 1) + '-' + Date.now().toString(36), n = it ? it.n : seq + 1;
-    var params = it ? { id: id, n: n, version: it.version, screen: it.screen, target: it.target, spot: it.spot }
-                    : { id: id, n: n, version: draft.version, screen: draft.screen, target: draft.target, spot: draft.spot };
-    params.verdict = draft.verdict; params.comment = text || null;
-    closePop();
-    // An update reuses the comment's id, so the agent replaces the earlier version of it.
-    send('comment', params, 'Comment ' + n + (it ? ' (updated)' : ''));
-  }
-  function removeItem(it) { send('delete', { id: it.id, n: it.n }, 'Deletion of comment ' + it.n); }
   function movePins(frame) {
     var doc; try { doc = frame.contentDocument; } catch (e) { return; }
     if (!doc) return;
     doc.querySelectorAll('.db-pin').forEach(function (pin) {
-      var it = items.filter(function (x) { return x.id === pin.dataset.id; })[0];
+      var it = byId(pin.dataset.id);
       var el = it && doc.querySelector(it.target.selector); if (!el) return;
-      var r = el.getBoundingClientRect(), win = frame.contentWindow;
-      pin.style.left = (r.left + win.scrollX + it.spot.fx * r.width) + 'px';
-      pin.style.top = (r.top + win.scrollY + it.spot.fy * r.height) + 'px';
+      positionPin(pin, frame, el, it.spot);
     });
+  }
+  function positionPin(pin, frame, el, spot) {
+    var r = el.getBoundingClientRect(), win = frame.contentWindow;
+    pin.style.left = (r.left + win.scrollX + spot.fx * r.width) + 'px';
+    pin.style.top = (r.top + win.scrollY + spot.fy * r.height) + 'px';
   }
   function placePin(frame, it, fresh) {
     if (labels[+frame.dataset.i] !== it.version) return;
     var doc; try { doc = frame.contentDocument; } catch (e) { return; }
-    if (!doc || !doc.documentElement.dataset.dbReady || doc.querySelector('.db-pin[data-id="' + it.id + '"]')) return;
+    if (!doc || !doc.documentElement.dataset.dbReady || comments.findPin(doc.body, it.id)) return;
     var el; try { el = doc.querySelector(it.target.selector); } catch (e) { return; }
     if (!el) return;
-    var r = el.getBoundingClientRect(), win = frame.contentWindow, pin = doc.createElement('span');
-    pin.className = 'db-pin' + (fresh ? ' db-new' : ''); pin.dataset.id = it.id; pin.textContent = it.n;
-    pin.dataset.state = pinState[it.id] || 'new';
+    var pin = comments.placePin(doc.body, it);
+    if (fresh) pin.classList.add('db-new');
     pin.title = 'Comment ' + it.n + ': open to change or delete';
-    pin.style.left = (r.left + win.scrollX + it.spot.fx * r.width) + 'px';
-    pin.style.top = (r.top + win.scrollY + it.spot.fy * r.height) + 'px';
-    doc.body.appendChild(pin);
+    positionPin(pin, frame, el, it.spot);
   }
   // ---------- The conversation: page.js, shared with the other pages; the canvas adds verdicts and Decide ----------
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
@@ -435,17 +411,18 @@
     if (main.classList.contains('switch')) show(i);
     var frame = (sec || main).querySelector('iframe[data-i="' + i + '"]'); if (!frame) return;
     var doc; try { doc = frame.contentDocument; } catch (x) { return; }
-    var pin = doc.querySelector('.db-pin[data-id="' + e.id + '"]'); if (!pin) return;
-    pin.classList.remove('db-flash'); void pin.offsetWidth; pin.classList.add('db-flash');
+    var pin = comments.findPin(doc && doc.body, e.id); if (!pin) return;
+    comments.flashPin(pin, 'db-flash');
     frame.contentWindow.scrollTo({ top: Math.max(0, parseFloat(pin.style.top) - frame.contentWindow.innerHeight / 3), behavior: 'smooth' });
     setTimeout(function () { pin.classList.remove('db-flash'); }, 2800);
   }
-  var pinState = {}, STATE_WORD = { asked: 'waiting for you', replied: 'answered, back with the agent', followup: 'you replied, back with the agent', seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
+  var STATE_WORD = { asked: 'waiting for you', replied: 'answered, back with the agent', followup: 'you replied, back with the agent', seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
   function syncPins() {
     document.querySelectorAll('iframe').forEach(function (f) {
       try { f.contentDocument.querySelectorAll('.db-pin').forEach(function (pin) {
-        var st = pinState[pin.dataset.id] || 'new', it = byId(pin.dataset.id);
-        pin.dataset.state = st;
+        var it = byId(pin.dataset.id); if (!it) return;
+        comments.updatePin(pin, it);
+        var st = pin.dataset.state;
         pin.title = 'Comment ' + (it ? it.n : '') + ': ' + (STATE_WORD[st] || 'new') + '. Click to open it.';
       }); } catch (e) {}
     });
@@ -472,7 +449,7 @@
   var KEY = 'canvas-view:' + location.pathname, deciding = false;
   var conv = pageConversation({
     served: served, name: 'canvas', unsent: 'Use Copy all to paste it in the chat.', apply: apply, byId: byId,
-    reveal: reveal, edit: openEdit, remove: removeItem,
+    reveal: reveal, edit: openEdit, remove: comments.remove,
     showLabel: function (n) { return 'Show where comment ' + n + ' is'; },
     crumb: function (e) { return crumb(e.version, e.target || {}); }, commentBody: commentBody,
     kinds: { decide: decisionItem, verdict: verdictItem }, itemKinds: ['comment', 'note', 'decide'],
@@ -481,7 +458,7 @@
     beforeReload: function () {
       sessionStorage.setItem(KEY, JSON.stringify({ view: main.classList.contains('switch') ? 'switch' : 'side', current: current }));
     },
-    rendered: function (state) { pinState = state; syncPins(); }
+    rendered: function (state) { comments.state(state); syncPins(); }
   });
   function send(method, params, what, done) { conv.send(method, params, what, done); }
   var say = conv.say, noteBox = conv.noteBox, noteBtn = conv.noteBtn;
@@ -513,6 +490,7 @@
     : labels.map(function (l) { return ['Build ' + l, l]; }).concat([['Combine versions (say how below)', 'combine']]);
   OPTIONS.push(['None of these (say why below)', 'none']);
   function openItems() {
+    var pinState = comments.state();
     return items.filter(function (it) { return pinState[it.id] !== 'accepted' && pinState[it.id] !== 'done'; });
   }
   function setDeciding(on) {

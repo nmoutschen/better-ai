@@ -92,7 +92,7 @@ The profile is loaded into every conversation and can make agents agree with you
 <details>
 <summary><b>Works with</b></summary>
 
-- [`/write-better`](write-better.md) reads your `write-for-<name>` skill and follows it on top of its own rules. The guide also applies to [`/show-better`](show-better.md) panels and [`/teach-better`](teach-better.md) lessons.
+- [`/write-better`](write-better.md) reads your `write-for-<name>` skill and follows it on top of its own rules. The guide also applies to [`/show-better`](show-better.md) panels.
 - [`/review-better`](review-better.md) adds your `review-for-<name>` criteria to every review, and treats your blocking criteria as blocking findings.
 - It uses `/write-better` to word the guides.
 - [`/improve-better`](improve-better.md) can later propose changes to these personal skills.

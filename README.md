@@ -43,6 +43,7 @@ Run `/interview-me` first, then work as usual. See [Getting started](docs/gettin
 |---|---|
 | [`/interview-me`](docs/interview-me.md) | Interviews you about how you read, review and want agents to work, and writes personal guides other skills follow. |
 | [`/ask-better`](docs/ask-better.md) | Decides when the agent should ask you a question, and how to ask it. |
+| [`/architect-better`](docs/architect-better.md) | Designs and audits software systems, with before and after diagrams you can comment on. |
 | [`/code-better`](docs/code-better.md) | Writes, checks, reviews and audits code so it builds what you need. |
 | [`/decide-better`](docs/decide-better.md) | Helps you make a decision yourself: asks which way you lean, checks the options against what matters to you, and gives its view with the main drawback. |
 | [`/design-better`](docs/design-better.md) | Designs and audits an interface or page and its design language, shows you versions side by side on a live page, and has `/code-better` build the design. |
@@ -51,5 +52,4 @@ Run `/interview-me` first, then work as usual. See [Getting started](docs/gettin
 | [`/research-better`](docs/research-better.md) | Researches a topic from sources on a shared board, with verified claims, and writes a report. |
 | [`/review-better`](docs/review-better.md) | Reviews text, code, an interface, a plan or a report so each finding leads to an action. |
 | [`/show-better`](docs/show-better.md) | Introduces a dense document with a short story of visual slides you can comment on. |
-| [`/teach-better`](docs/teach-better.md) | Teaches you a topic so you can use it later without AI. |
 | [`/write-better`](docs/write-better.md) | Writes or rewrites text so you can understand and act on it. |
