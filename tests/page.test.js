@@ -645,3 +645,27 @@ test('an invalid record the board still shows is marked with its first message, 
   assert.deepEqual(d.qs.map(x => x.id), ['Q-1', 'Q-2']);  // merged without merged_into is not hidden
   assert.equal(d.byId['Q-2'].claimsList.length, 1);
 });
+
+test('an invalid merge, out-of-scope question or withdrawn claim stays visible, marked, and its claims stay on a drawn question', () => {
+  const q = (id, over) => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1, ...over });
+  const c = (id, question, over) => ({ id, question, source: 'S-1', status: 'unchecked', ...over });
+  const d = prepare({ brief: {}, sources: [], decisions: [], logs: {},
+    questions: [q('Q-w2-4', { status: 'merged', merged_into: 'Q-w9-9', _errors: ['merged_into: dangling'] }),
+      q('Q-2', { status: 'merged', merged_into: 'Q-1' }), q('Q-1'),
+      q('Q-5', { status: 'out of scope', _errors: ['owner: bad'] }), q('Q-6', { status: 'out of scope' })],
+    claims: [c('C-w2-7', 'Q-w2-4'), c('C-w2-8', 'Q-w2-4'), c('C-9', 'Q-1', { status: 'withdrawn', _errors: ['replaced_by: required'] }),
+      c('C-10', 'Q-1', { status: 'withdrawn' }), c('C-11', 'Q-2')] });
+  assert.deepEqual(d.qs.map(x => x.id), ['Q-w2-4', 'Q-1', 'Q-5']);  // a valid merge or out of scope question is not drawn
+  assert.deepEqual(d.byId['Q-w2-4'].claimsList.map(x => x.id), ['C-w2-7', 'C-w2-8']);
+  assert.deepEqual(d.byId['Q-1'].claimsList.map(x => x.id), ['C-9', 'C-11']);  // the valid merge sends C-11 to Q-1
+});
+
+test('the errors band says which records are shown marked and which are left out', () => {
+  const els = band();
+  showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] }, els);
+  assert.match(els.errors.innerHTML, /Questions, claims and sources they name are shown marked not valid; other records they name are left out of the page\./);
+});
+
+test('the board marks an invalid brief like any other record', () => {
+  assert.equal(notValid({ title: 'T', _errors: ['stop_at: must be one of "high"'] }), 'not valid: stop_at: must be one of "high"');
+});

@@ -322,6 +322,30 @@ class Invalid(unittest.TestCase):
             self.assertEqual(len(board.scan_cached(folder)["claims"]), 3)
             self.assertEqual(len(calls), 2)
 
+    def test_an_invalid_brief_is_kept_marked_and_its_status_still_stops_the_watch(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            brief = {**example("brief.json", "brief"), "status": "stopped", "stop_at": "soon"}
+            write_json(folder, "brief.json", brief)
+            data = board.load(folder)
+            self.assertEqual((data["brief"]["title"], data["brief"]["status"]), (brief["title"], "stopped"))
+            self.assertTrue(data["brief"]["_errors"][0].startswith("stop_at: "))
+            self.assertEqual([e["file"] for e in data["errors"]], ["brief.json"])
+            self.assertTrue(board.board_stopped(folder))
+            with (
+                mock.patch.object(board.page, "stop_like_ctrl_c"),
+                mock.patch.object(board.webbrowser, "open"),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                runner = threading.Thread(target=board.watch, args=(folder, 0, False, 0.2), daemon=True)
+                runner.start()
+                runner.join(15)
+            self.assertFalse(runner.is_alive())  # the invalid brief's `stopped` ended it
+            (folder / "brief.json").write_text("{not json")
+            data = board.load(folder)
+            self.assertEqual((data["brief"], [e["file"] for e in data["errors"]]), ({}, ["brief.json"]))
+
     def test_the_watch_loop_goes_on_after_a_failed_tick(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
