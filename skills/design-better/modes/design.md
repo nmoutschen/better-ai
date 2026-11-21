@@ -11,7 +11,9 @@ You design; `/code-better` builds. Two loops run: `/code-better`'s inner loop bu
 
 ## 1. Show directions before anything is built
 
-SKIP this step WHEN the change keeps the existing structure and the brief leaves one reasonable direction: FOLLOW the existing interface's patterns instead.
+SKIP this step and step 4 WHEN the change keeps the existing structure and the brief leaves one reasonable direction: FOLLOW the existing interface's patterns instead.
+
+IF the user already chose a direction, in the request or in the brief, RECORD it in the brief and GO to item 6 below, unless the brief records its review as settled: THEN GO ON at step 2 and SKIP step 4.
 
 1. ASK whether the user has a direction or references in mind, and show none of yours yet: seeing examples first narrows what people consider. PREFER pictures and examples of interfaces they like and dislike over adjectives. WAIT for the answer, unless the request already gives it or says the user has none.
 2. MAKE two or three rough directions that differ in a way the user can see: the structure, the order of content, or what is prominent. DO NOT vary only a colour or a font. USE the same real content in each. KEEP them rough: real structure and content, little styling, because polish changes how people rate a version and a rough one reveals largely the same problems.
@@ -37,7 +39,7 @@ READ [../templates/design.md](../templates/design.md). WRITE `.design/<slug>/des
 
 ## 4. Settle the review of the direction
 
-WAIT for the reviewer of step 1.6. REPRODUCE each finding in the direction's files. SHOW the user each confirmed finding, with the scenario step where a person is stopped and the fix you propose, together with any open question of step 2, by [Show versions on one page](../SKILL.md#show-versions-on-one-page) WHEN the page is still served. The user decides which fixes to apply: the direction is theirs. APPLY the fixes they accept to the design, and LIST the findings they accept as they are under its Assumptions.
+WAIT for the reviewer of step 1.6. REPRODUCE each finding in the direction's files. IF no finding is confirmed, GO ON without asking. SHOW the user each confirmed finding, with the scenario step where a person is stopped and the fix you propose, together with any open question of step 2, by [Show versions on one page](../SKILL.md#show-versions-on-one-page) WHEN the page is still served. The user decides which fixes to apply: the direction is theirs. APPLY the fixes they accept to the design, and LIST the findings they accept as they are under its Assumptions.
 
 IF the user's answer changes the structure or the flow of the direction, START a new reviewer on it as step 1.6 says, and SETTLE its report the same way. OTHERWISE, GO ON.
 
@@ -51,11 +53,11 @@ WAIT until the build is finished and its checks pass.
 
 ## 6. Accept: have a reviewer walk every scenario
 
-A fix is accepted only once a reviewer started after it walked every scenario. DO NOT walk the interface yourself instead, because you know what you meant it to do, and DO NOT hand back a change that no reviewer walked.
+The build and each fix are accepted only once a reviewer started after them walked every scenario. DO NOT walk the interface yourself instead, because you know what you meant it to do, and DO NOT hand back a change that no reviewer walked.
 
 1. START a reviewer: READ [../agents/reviewer.md](../agents/reviewer.md), FILL IN its Input with the built interface, the brief and the user's decisions, and START it as its HOW TO USE block says.
 2. WAIT until the reviewer hands back its report. DO NOT write to the user while it runs.
-3. REPRODUCE each finding in the rendered interface. IF no finding is confirmed and the reviewer walked every scenario with the pointer and the keyboard, the build is accepted: GO ON to SKILL.md step 6.
+3. REPRODUCE each finding in the rendered interface. IF the reviewer walked every scenario with the pointer and the keyboard and no confirmed finding stops or slows a scenario, the build is accepted: LIST the other confirmed findings as open, and GO ON to SKILL.md step 6. IF the reviewer could not operate the interface, FOLLOW the general rule [Missing capabilities](../SKILL.md#missing-capabilities) instead of starting another round.
 4. FIX each confirmed finding that stops or slows a scenario, and each error an automated checker reported: USE `/code-better`, GIVING it the finding as a defect against the design's requirement; IF it is not available, FIX it in the code and RUN the project's checks.
 5. GO BACK to 1. The new reviewer walks ALL scenarios again, not only the one that failed: fixing one problem in an interface often creates another.
 

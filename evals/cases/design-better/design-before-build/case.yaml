@@ -8,7 +8,7 @@ reads:
 situation: 'The Kade Street shifts app (index.html, app.js, styles.css, tokens.css, shifts.json) has a brief in
   .design/shift-swap/brief.md with two scenarios (Lena Vos offers her Saturday 12 December 07:00 shift; Ruben Claes
   approves Tom Peeters taking Sam Okafor''s Sunday 13 December 08:00 shift), the rough directions A.html and B.html,
-  and answers.jsonl recording the user''s decision for B. The user asks to build B. Before editing the app, the agent
+  and answers.jsonl recording the user''s decision for B; the brief records the review of B as settled. The user asks to build B. Before editing the app, the agent
   writes a design document with one requirement per scenario, ending in the scenario''s end state, and the interface
   requirements for the code (labels tied to fields, native buttons, keyboard, visible focus), then builds. The hidden
   check only confirms that the app now has an offer and an approval flow.'

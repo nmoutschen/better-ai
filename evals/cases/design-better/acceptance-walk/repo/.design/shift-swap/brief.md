@@ -60,6 +60,9 @@ The user chose B: offer a shift from its card in "Your shifts", with an optional
 "Waiting for your approval" list above the rota. They said A hides the offer behind a second "Swap board" page
 that staff would not find between customers.
 
+Review of the direction: settled. A reviewer walked both scenarios in B.html on 3 December and confirmed no
+finding that stops or slows a scenario; the user accepted B as it is.
+
 ## Out of scope
 
 - Notifications to colleagues; the real login

@@ -8,7 +8,7 @@ reads:
 - agents/reviewer.md
 situation: 'The Kade Street shifts app has a brief in .design/shift-swap/brief.md with two scenarios (Lena Vos offers
   her Saturday 12 December 07:00 shift; Ruben Claes approves Tom Peeters taking Sam Okafor''s Sunday 13 December 08:00
-  shift) and the user''s decision for direction B. After its last change to the app, the agent operates the built page
+  shift) and the user''s decision for direction B, whose review the brief records as settled. After its last change to the app, the agent operates the built page
   in a browser for both scenarios, by pointer and by keyboard, ideally through a fresh reviewer sub-agent, and fixes or
   reports what fails. The sandbox has Playwright for Python with Chromium. The script check only confirms that a
   browser or a script file ran at some point (a walk script the agent wrote runs as `python3 walk.py`, whose command

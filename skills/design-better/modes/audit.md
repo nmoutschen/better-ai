@@ -33,4 +33,4 @@ IF the user then asks for changes, READ [design.md](design.md) or [language.md](
 
 ## 5. Correct the work you are building
 
-SKIP this step unless SKILL.md sent you here without argument. ONLY WHEN SKILL.md sent you here without argument for an interface the current conversation is building: CORRECT each confirmed finding in that work. FOR a fix inside one screen, FOLLOW SKILL.md's line for small changes; OTHERWISE, READ [design.md](design.md) and FOLLOW it from its step 2. THEN START a new reviewer as step 2 says, and REPORT what you changed and what remains open.
+SKIP this step unless SKILL.md sent you here without argument. ONLY WHEN SKILL.md sent you here without argument for an interface the current conversation is building: CORRECT each confirmed finding in that work. FOR a fix inside one screen, FOLLOW SKILL.md's line for small changes; OTHERWISE, READ [design.md](design.md) and FOLLOW it from its step 2, without its step 4: its step 6 has a new reviewer walk the result. REPORT what you changed and what remains open.

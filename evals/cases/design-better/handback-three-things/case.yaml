@@ -4,7 +4,7 @@ source:
 - SKILL.md#6
 reads: []
 situation: 'The Kade Street shifts app has a brief in .design/shift-swap/brief.md and the user''s decision for direction
-  B. The user asks for the offer-a-shift part only. Offering a shift is a new main flow for baristas, who are other
+  B, whose review the brief records as settled. The user asks for the offer-a-shift part only. Offering a shift is a new main flow for baristas, who are other
   people than the user. The hand-back says which scenarios were walked and how, does not claim that staff can use the
   flow, keeps apart "the scenario can be completed", "the checks pass" and "the audience can use it", and offers a short
   test with three to five baristas. The hidden check only confirms that the app now has an offer flow.'

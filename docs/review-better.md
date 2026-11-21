@@ -105,7 +105,7 @@ It calls:
 It is called by:
 
 - [`/code-better`](code-better.md) for its review step.
-- [`/design-better`](design-better.md)'s audit mode and its review of each built interface.
+- [`/design-better`](design-better.md)'s audit mode and its review of the chosen direction and of each built interface.
 - [`/architect-better`](architect-better.md)'s design and audit modes, to confirm the perspective reviewers' findings.
 - [`/write-better`](write-better.md) when you ask for a review of a text without a rewrite.
 
