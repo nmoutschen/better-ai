@@ -50,7 +50,17 @@ TASKS = {
             "items": {"type": "string", "pattern": r"^S\d+$", "x-points-to": {"file": "spec.jsonl", "type": "spec"}},
         },
         "status": {
-            "enum": ["todo", "building", "built", "verifying", "changes needed", "verified", "merged", "done", "blocked"],
+            "enum": [
+                "todo",
+                "building",
+                "built",
+                "verifying",
+                "changes needed",
+                "verified",
+                "merged",
+                "done",
+                "blocked",
+            ],
             "x-mode-sets": {"file": "code.json", "field": "mode", "coordinate": COORDINATE, "other": OTHER},
         },
         "reason": {"enum": ["task", "user", "repair limit"]},
@@ -237,7 +247,9 @@ class Case(unittest.TestCase):
         self.change = self.root / "change"
         self.change.mkdir()
         self.write("spec.jsonl", jsonl(spec_line(1), spec_line(2)))
-        self.write("code.json", json.dumps({"type": "code", "at": AT, "by": "coordinator", "goal": "g", "mode": "coordinate"}))
+        self.write(
+            "code.json", json.dumps({"type": "code", "at": AT, "by": "coordinator", "goal": "g", "mode": "coordinate"})
+        )
 
     def put_schema(self, item):
         (self.schemas / item["$id"]).write_text(json.dumps(item), encoding="utf-8")
@@ -354,7 +366,19 @@ class Required(Case):
             "properties": {"type": {"const": "file"}},
         }
         self.put_schema(schema_)
-        self.write("code.json", json.dumps({"type": "code", "at": AT, "by": "x", "goal": "g", "mode": "tests", "design": {"type": "file", "path": "p"}}))
+        self.write(
+            "code.json",
+            json.dumps(
+                {
+                    "type": "code",
+                    "at": AT,
+                    "by": "x",
+                    "goal": "g",
+                    "mode": "tests",
+                    "design": {"type": "file", "path": "p"},
+                }
+            ),
+        )
         self.assertEqual(self.messages("code.json"), ["1: design.path: not allowed (the schema does not list it)"])
 
     def test_a_line_that_is_not_json_is_reported_with_its_line(self):
@@ -442,7 +466,12 @@ class Keywords(unittest.TestCase):
         self.assertEqual(self.errors(["a", 2], s), [("[1]", "expected string, got integer")])
 
     def test_properties_required_and_additional_properties(self):
-        s = {"type": "object", "required": ["a"], "properties": {"a": {"type": "string"}}, "additionalProperties": False}
+        s = {
+            "type": "object",
+            "required": ["a"],
+            "properties": {"a": {"type": "string"}},
+            "additionalProperties": False,
+        }
         self.assertEqual(self.errors({"a": "x"}, s), [])
         self.assertEqual(self.errors({}, s), [("a", "required")])
         self.assertEqual(self.errors({"a": 1}, s), [("a", "expected string, got integer")])
@@ -462,7 +491,9 @@ class Keywords(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("matches none of the allowed shapes", errors[0][1])
         self.assertEqual(self.errors("a", {"not": {"type": "integer"}}), [])
-        self.assertEqual(self.errors(1, {"not": {"type": "integer"}}), [("(record)", "must not match the excluded shape")])
+        self.assertEqual(
+            self.errors(1, {"not": {"type": "integer"}}), [("(record)", "must not match the excluded shape")]
+        )
 
     def test_if_then_else(self):
         s = {
@@ -476,7 +507,11 @@ class Keywords(unittest.TestCase):
         self.assertEqual(self.errors({"k": 2}, s), [("b", "required unless k is 1")])
 
     def test_ref_local_and_to_the_base_schema(self):
-        s = {"$defs": {"n": {"type": "integer"}}, "type": "object", "properties": {"a": {"$ref": "#/$defs/n"}, "at": {"$ref": "base.schema.json#/$defs/at"}}}
+        s = {
+            "$defs": {"n": {"type": "integer"}},
+            "type": "object",
+            "properties": {"a": {"$ref": "#/$defs/n"}, "at": {"$ref": "base.schema.json#/$defs/at"}},
+        }
         self.assertEqual(self.errors({"a": 1, "at": AT}, s), [])
         self.assertEqual(self.errors({"a": "x"}, s), [("a", "expected integer, got string")])
         self.assertEqual(len(self.errors({"at": "2026-11-21 10:00"}, s)), 1)
@@ -498,12 +533,23 @@ class Base(unittest.TestCase):
     """R8: the shared definitions the per-kind schemas build on."""
 
     def valid(self, name, value):
-        return schema.validate_instance(value, {"$ref": f"base.schema.json#/$defs/{name}"}, {"base.schema.json": BASE_DOC}) == []
+        return (
+            schema.validate_instance(value, {"$ref": f"base.schema.json#/$defs/{name}"}, {"base.schema.json": BASE_DOC})
+            == []
+        )
 
     def test_at_is_iso_8601_utc_with_z(self):
         for good in ("2026-11-21T10:40:00Z", "2026-12-31T23:59:59Z"):
             self.assertTrue(self.valid("at", good), good)
-        for bad in ("2026-11-21T10:40:00", "2026-11-21T10:40:00+01:00", "2026-11-21 10:40:00Z", "2026-13-01T00:00:00Z", "21/11/2026", 5, None):
+        for bad in (
+            "2026-11-21T10:40:00",
+            "2026-11-21T10:40:00+01:00",
+            "2026-11-21 10:40:00Z",
+            "2026-13-01T00:00:00Z",
+            "21/11/2026",
+            5,
+            None,
+        ):
             self.assertFalse(self.valid("at", bad), bad)
 
     def test_by_is_a_non_empty_string(self):
@@ -526,7 +572,9 @@ class BaseFields(Case):
         self.assertEqual(len(self.check("spec.jsonl")), 1)
 
     def test_r8_id_is_forbidden_on_a_kind_the_schema_marks_without_one(self):
-        self.write("logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"}))
+        self.write(
+            "logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"})
+        )
         self.write("logs/b.jsonl", jsonl({"type": "start", "at": AT, "by": "b", "text": "x", "id": "L1"}))
         self.assertEqual(self.messages("logs/b.jsonl"), ["1: id: not allowed (the schema does not list it)"])
 
@@ -540,10 +588,14 @@ class Pointers(Case):
 
     def test_r6_a_pointer_to_no_record_is_dangling_and_names_where_it_looked(self):
         self.write("tasks.jsonl", jsonl(task(1, requirements=["S1", "S9"])))
-        self.assertEqual(self.messages("tasks.jsonl"), ['1: requirements[1]: dangling: "S9" is not a spec record in spec.jsonl'])
+        self.assertEqual(
+            self.messages("tasks.jsonl"), ['1: requirements[1]: dangling: "S9" is not a spec record in spec.jsonl']
+        )
 
     def test_r6_a_record_of_another_type_does_not_count(self):
-        self.write("spec.jsonl", jsonl(spec_line(1), {"type": "gap", "at": AT, "by": "x", "id": "S2", "statement": "s"}))
+        self.write(
+            "spec.jsonl", jsonl(spec_line(1), {"type": "gap", "at": AT, "by": "x", "id": "S2", "statement": "s"})
+        )
         self.write("tasks.jsonl", jsonl(task(1, requirements=["S2"])))
         errors = self.messages("tasks.jsonl")
         self.assertEqual(len(errors), 1, errors)
@@ -551,7 +603,9 @@ class Pointers(Case):
 
     def test_r6_a_pointer_into_the_same_file(self):
         self.write("tasks.jsonl", jsonl(task(1), task(2, status="blocked", reason="task", waits_on="T7")))
-        self.assertEqual(self.messages("tasks.jsonl"), ['2: waits_on: dangling: "T7" is not a task record in tasks.jsonl'])
+        self.assertEqual(
+            self.messages("tasks.jsonl"), ['2: waits_on: dangling: "T7" is not a task record in tasks.jsonl']
+        )
 
     def test_r6_a_missing_target_file_is_dangling_too(self):
         (self.change / "spec.jsonl").unlink()
@@ -561,7 +615,10 @@ class Pointers(Case):
         self.assertIn("spec.jsonl does not exist", errors[0])
 
     def test_r6_a_pointer_into_a_folder_of_id_json_files(self):
-        self.write("questions/Q-w1-1.json", json.dumps({"type": "question", "at": AT, "by": "w1", "id": "Q-w1-1", "question": "why"}))
+        self.write(
+            "questions/Q-w1-1.json",
+            json.dumps({"type": "question", "at": AT, "by": "w1", "id": "Q-w1-1", "question": "why"}),
+        )
         claim = {"type": "claim", "at": AT, "by": "w1", "id": "C-w1-1", "question": "Q-w1-1", "status": "unchecked"}
         self.write("claims/C-w1-1.json", json.dumps(claim))
         self.assertEqual(self.messages("claims/C-w1-1.json"), [])
@@ -603,7 +660,14 @@ class Pointers(Case):
         }
         self.put_schema(s)
         self.write("tasks.jsonl", jsonl(task(1)))
-        self.write("gaps.jsonl", jsonl({"about": {"type": "task", "task": "T1"}}, {"about": {"type": "task", "task": "T4"}}, {"about": {"type": "change"}}))
+        self.write(
+            "gaps.jsonl",
+            jsonl(
+                {"about": {"type": "task", "task": "T1"}},
+                {"about": {"type": "task", "task": "T4"}},
+                {"about": {"type": "change"}},
+            ),
+        )
         errors = self.messages("gaps.jsonl")
         self.assertEqual(len(errors), 1, errors)
         self.assertIn('2: about.task: dangling: "T4"', errors[0])
@@ -627,7 +691,10 @@ class Identity(Case):
         self.assertEqual(self.messages("events.jsonl"), [])
 
     def test_a_folder_entry_is_named_after_its_id(self):
-        self.write("questions/Q-w1-2.json", json.dumps({"type": "question", "at": AT, "by": "w1", "id": "Q-w1-1", "question": "x"}))
+        self.write(
+            "questions/Q-w1-2.json",
+            json.dumps({"type": "question", "at": AT, "by": "w1", "id": "Q-w1-1", "question": "x"}),
+        )
         self.assertEqual(self.messages("questions/Q-w1-2.json"), ['1: id: must equal the file name "Q-w1-2"'])
 
 
@@ -636,7 +703,12 @@ class CrossRecord(Case):
 
     def test_r7_a_status_must_be_in_the_set_for_the_change_mode(self):
         self.write("tasks.jsonl", jsonl(task(1, status="done")))
-        self.assertEqual(self.messages("tasks.jsonl"), ['1: status: "done" is not allowed when mode is "coordinate" in code.json (allowed: todo, building, built, verifying, changes needed, verified, merged, blocked)'])
+        self.assertEqual(
+            self.messages("tasks.jsonl"),
+            [
+                '1: status: "done" is not allowed when mode is "coordinate" in code.json (allowed: todo, building, built, verifying, changes needed, verified, merged, blocked)'
+            ],
+        )
 
     def test_r7_the_other_set_applies_to_every_other_mode(self):
         for mode in ("feature", "bug fix", "refactor", "tests"):
@@ -654,7 +726,10 @@ class CrossRecord(Case):
         self.assertIn("code.json does not exist", errors[0])
 
     def verifier(self, name, task_id, at, last):
-        self.write(f"logs/{name}.card.json", json.dumps({"type": "card", "at": at, "by": "coordinator", "role": "verifier", "task": task_id}))
+        self.write(
+            f"logs/{name}.card.json",
+            json.dumps({"type": "card", "at": at, "by": "coordinator", "role": "verifier", "task": task_id}),
+        )
         lines = [{"type": "start", "at": at, "by": name, "text": "go"}]
         if last:
             lines.append({"type": "handed_back", "at": at, "by": name, "result": last, "text": "r"})
@@ -664,7 +739,7 @@ class CrossRecord(Case):
         self.write("tasks.jsonl", jsonl(task(1, status="verified")))
         errors = self.messages("tasks.jsonl")
         self.assertEqual(len(errors), 1)
-        self.assertIn("status: \"verified\" needs a verifier card for T1", errors[0])
+        self.assertIn('status: "verified" needs a verifier card for T1', errors[0])
 
     def test_r7_verified_needs_the_verifiers_last_line_to_be_handed_back_passes(self):
         self.write("tasks.jsonl", jsonl(task(1, status="verified")))
@@ -679,7 +754,9 @@ class CrossRecord(Case):
         self.write("tasks.jsonl", jsonl(task(1, status="verified")))
         self.verifier("v2", "T2", AT, "passes")
         self.assertEqual(len(self.check("tasks.jsonl")), 1)
-        self.write("logs/b1.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"}))
+        self.write(
+            "logs/b1.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"})
+        )
         self.write("logs/b1.jsonl", jsonl({"type": "handed_back", "at": AT, "by": "b1", "result": "done", "text": "r"}))
         self.assertEqual(len(self.check("tasks.jsonl")), 1)
 
@@ -698,10 +775,19 @@ class CrossRecord(Case):
         self.assertEqual(self.messages("tasks.jsonl"), [])
 
     def test_r7_handed_back_result_must_be_in_the_set_for_the_cards_role(self):
-        self.write("logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"}))
+        self.write(
+            "logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"})
+        )
         self.write("logs/b.jsonl", jsonl({"type": "handed_back", "at": AT, "by": "b", "result": "passes", "text": "r"}))
-        self.assertEqual(self.messages("logs/b.jsonl"), ['1: result: "passes" is not allowed when role is "builder" in b.card.json (allowed: done, partly done, blocked)'])
-        self.write("logs/v.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "verifier", "task": "T1"}))
+        self.assertEqual(
+            self.messages("logs/b.jsonl"),
+            [
+                '1: result: "passes" is not allowed when role is "builder" in b.card.json (allowed: done, partly done, blocked)'
+            ],
+        )
+        self.write(
+            "logs/v.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "verifier", "task": "T1"})
+        )
         self.write("logs/v.jsonl", jsonl({"type": "handed_back", "at": AT, "by": "v", "result": "done", "text": "r"}))
         self.assertEqual(len(self.check("logs/v.jsonl")), 1)
         self.write("logs/v.jsonl", jsonl({"type": "handed_back", "at": AT, "by": "v", "result": "fails", "text": "r"}))
@@ -714,8 +800,19 @@ class CrossRecord(Case):
         self.assertIn("x.card.json does not exist", errors[0])
 
     def test_r7_a_claim_checker_must_differ_from_its_author(self):
-        self.write("questions/Q-w1-1.json", json.dumps({"type": "question", "at": AT, "by": "w1", "id": "Q-w1-1", "question": "why"}))
-        claim = {"type": "claim", "at": AT, "by": "w1", "id": "C-w1-1", "question": "Q-w1-1", "status": "checking", "checker": "w1"}
+        self.write(
+            "questions/Q-w1-1.json",
+            json.dumps({"type": "question", "at": AT, "by": "w1", "id": "Q-w1-1", "question": "why"}),
+        )
+        claim = {
+            "type": "claim",
+            "at": AT,
+            "by": "w1",
+            "id": "C-w1-1",
+            "question": "Q-w1-1",
+            "status": "checking",
+            "checker": "w1",
+        }
         self.write("claims/C-w1-1.json", json.dumps(claim))
         self.assertEqual(self.messages("claims/C-w1-1.json"), ['1: checker: must differ from by ("w1")'])
         self.write("claims/C-w1-1.json", json.dumps({**claim, "checker": "v1"}))
@@ -739,7 +836,15 @@ class Hooks(unittest.TestCase):
 class Schemas(Case):
     def test_a_schema_that_cannot_be_applied_is_a_failure_with_a_message_not_a_traceback(self):
         result = subprocess.run(
-            [sys.executable, "-I", str(SCRIPT), "check", "--schemas", str(self.root / "missing"), str(self.change / "tasks.jsonl")],
+            [
+                sys.executable,
+                "-I",
+                str(SCRIPT),
+                "check",
+                "--schemas",
+                str(self.root / "missing"),
+                str(self.change / "tasks.jsonl"),
+            ],
             capture_output=True,
             text=True,
         )
@@ -748,7 +853,9 @@ class Schemas(Case):
 
     def test_the_most_specific_file_pattern_wins(self):
         # logs/*.card.json must use the card schema, not the log schema (which matches logs/*.jsonl only by extension)
-        self.write("logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"}))
+        self.write(
+            "logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"})
+        )
         self.assertEqual(self.messages("logs/b.card.json"), [])
 
 

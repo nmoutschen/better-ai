@@ -67,7 +67,7 @@ jobs:
       - name: JavaScript tests
         # page.js's thread model: each item's state and what Open lists, with Node's own test runner.
         run: node --test tests/*.test.js
-      - name: Shared page files are identical in every skill
+      - name: Shared page files and the schema validator are identical in every skill
         run: |
           # The skills' pages that talk to the agent share page.css (the look), page.py (the log, the server's
           # conversation endpoints, and wait, reply, status and pending) and page.js (the conversation on the page);
@@ -76,4 +76,11 @@ jobs:
             set -- skills/*/scripts/$name
             test -f "skills/architect-better/scripts/$name" || exit 1
             for f in "$@"; do cmp "$1" "$f"; done
+          done
+          # schema.py, the validator of every agent file, and the base schema its schemas build on, are in all five
+          # page skills and identical.
+          for name in scripts/schema.py schemas/base.schema.json; do
+            for skill in architect-better code-better research-better design-better show-better; do
+              cmp "skills/architect-better/$name" "skills/$skill/$name" || exit 1
+            done
           done
