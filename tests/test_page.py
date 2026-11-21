@@ -638,8 +638,17 @@ class Scripts(unittest.TestCase):
         """The dashboard serves its own page, and an answer to a question reaches `pending` with the decision it answers."""
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
-            (folder / "decisions").mkdir()
-            (folder / "decisions" / "D-1.md").write_text("id: D-1\nasked: Count weekends?\nstatus: waiting\n")
+            decision = {
+                "type": "decision",
+                "at": "2026-11-21T10:00:00Z",
+                "by": "coordinator",
+                "id": "D1",
+                "raised_by": "coordinator",
+                "about": {"type": "change"},
+                "asked": "Count weekends?",
+                "status": "waiting",
+            }
+            (folder / "decisions.jsonl").write_text(json.dumps(decision) + "\n")
             script = str(ROOT / "skills" / "code-better" / "scripts" / "dashboard.py")
             cmd = [sys.executable, "-I", script, "watch", str(folder), "--no-browser"]
             server = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -653,7 +662,7 @@ class Scripts(unittest.TestCase):
                     self.assertIn("dashboard.json", r.read().decode())
                 with urllib.request.urlopen(url + "dashboard.json", timeout=5) as r:
                     self.assertEqual(json.loads(r.read())["decisions"][0]["status"], "waiting")
-                params = {"id": "a1", "decision": "D-1", "text": "Business days only.", "default": False}
+                params = {"id": "a1", "decision": "D1", "text": "Business days only.", "default": False}
                 body = {"jsonrpc": "2.0", "id": 1, "method": "answer", "params": params}
                 headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
                 request = urllib.request.Request(url + "rpc", data=json.dumps(body).encode(), headers=headers)
@@ -663,80 +672,10 @@ class Scripts(unittest.TestCase):
                     [sys.executable, "-I", script, "pending", str(folder)], capture_output=True, text=True
                 )
                 item = json.loads(out.stdout.splitlines()[0])
-                self.assertEqual((item["type"], item["decision"], item["status"]), ("answer", "D-1", "new"))
+                self.assertEqual((item["type"], item["decision"], item["status"]), ("answer", "D1", "new"))
             finally:
                 server.send_signal(signal.SIGTERM)
                 server.communicate(timeout=10)
-
-
-class Dashboard(unittest.TestCase):
-    """What code-better's dashboard reads from a change folder: the tasks, the agents' logs and the decisions."""
-
-    def test_load_reads_tasks_agents_and_decisions(self):
-        spec = importlib.util.spec_from_file_location(
-            "dashboard", ROOT / "skills" / "code-better" / "scripts" / "dashboard.py"
-        )
-        dashboard = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(dashboard)
-        with tempfile.TemporaryDirectory() as d:
-            folder = Path(d)
-            (folder / "tasks.md").write_text(
-                "# Tasks: Late orders\n\nDesign: d.md\n\n"
-                "| # | Task | Mode | Requirements | Check | Status |\n|---|---|---|---|---|---|\n"
-                "| 1 | Order query | feature | R1 | t1 | done |\n| 2 | Orders page | feature | R2 | t2 | todo |\n\n"
-                "## Progress notes\n"
-            )
-            (folder / "specs.md").write_text(
-                "| ID | Requirement | Source | Checked by |\n|---|---|---|---|\n| R1 | The query shall list late orders. | d | t1 |\n"
-            )
-            (folder / "logs").mkdir()
-            (folder / "logs" / "b1.json").write_text(
-                '{"role": "builder", "task": "2", "mode": "feature", "branch": "code/late-2"}'
-            )
-            (folder / "logs" / "b1.md").write_text("start: reading\nstep: wrote the check\nasked: which sort order\n")
-            (folder / "logs" / "v1.json").write_text('{"role": "verifier", "task": "1", "mode": "feature"}')
-            (folder / "logs" / "v1.md").write_text("start: reading\nhanded back: passes, all met\n")
-            (folder / "logs" / "b2.json").write_text('{"role": "builder", "task": "1"}')  # started, no log line yet
-            (folder / "decisions").mkdir()
-            (folder / "decisions" / "D-1.md").write_text("id: D-1\nasked: Sort by days late?\nstatus: waiting\n")
-            data = dashboard.load(folder)
-        self.assertEqual(data["name"], "Late orders")
-        self.assertEqual([(t["id"], t["status"]) for t in data["tasks"]], [("1", "done"), ("2", "todo")])
-        agents = {a["name"]: a for a in data["agents"]}
-        self.assertEqual(
-            (agents["b1"]["role"], agents["b1"]["task"], agents["b1"]["state"]), ("builder", "2", "waiting")
-        )
-        self.assertEqual((agents["v1"]["role"], agents["v1"]["state"]), ("verifier", "finished"))
-        self.assertEqual(agents["b1"]["mode"], "feature")
-        self.assertEqual((agents["b2"]["task"], agents["b2"]["state"]), ("1", "working"))
-        self.assertEqual(data["tasks"][0]["requirements"], ["R1"])
-        self.assertEqual(data["requirements"], {"R1": "The query shall list late orders."})
-        self.assertEqual(data["decisions"][0]["status"], "waiting")
-
-    def test_load_reads_the_blocked_by_column(self):
-        """A blocked task's reason comes from its own column, cell as written; a list without the column still reads."""
-        spec = importlib.util.spec_from_file_location(
-            "dashboard", ROOT / "skills" / "code-better" / "scripts" / "dashboard.py"
-        )
-        dashboard = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(dashboard)
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "tasks.md"
-            path.write_text(
-                "# Tasks: Late orders\n\n"
-                "| # | Task | Mode | Requirements | Check | Status | Blocked by |\n|---|---|---|---|---|---|---|\n"
-                "| T1 | Order query | feature | R1 | t1 | Changes needed | |\n"
-                "| T2 | Orders page | feature | R2 | t2 | blocked | T1 |\n"
-                "| T3 | Export | feature | R3 | t3 | blocked | repair limit |\n"
-            )
-            tasks = dashboard.read_tasks(path)[1]
-            path.write_text("| # | Task | Status |\n|---|---|---|\n| 1 | Old list | blocked |\n")
-            old = dashboard.read_tasks(path)[1]
-        self.assertEqual(
-            [(t["id"], t["status"], t["blocked_by"]) for t in tasks],
-            [("T1", "Changes needed", ""), ("T2", "blocked", "T1"), ("T3", "blocked", "repair limit")],
-        )
-        self.assertEqual((old[0]["status"], old[0]["blocked_by"]), ("blocked", ""))
 
 
 if __name__ == "__main__":

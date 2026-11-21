@@ -1,0 +1,176 @@
+{
+ "code.json": [
+  {
+   "title": "code, from an architect design",
+   "line": "{\"type\": \"code\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"goal\": \"Users can upload files without silent failures\", \"design\": {\"type\": \"architect\", \"folder\": \"docs/designs/2026-11-upload/\"}, \"mode\": \"coordinate\"}"
+  },
+  {
+   "title": "code, from the request alone",
+   "line": "{\"type\": \"code\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"agent\", \"goal\": \"An empty upload shows an error\", \"design\": {\"type\": \"request\", \"text\": \"empty uploads should fail loudly\"}, \"mode\": \"bug fix\"}"
+  }
+ ],
+ "spec.jsonl": [
+  {
+   "title": "spec, from the design",
+   "line": "{\"type\": \"spec\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"S2\", \"statement\": \"If an uploaded file is empty, then the upload service shall reject it with 422.\", \"source\": {\"type\": \"design\", \"section\": \"Validation\"}, \"checked_by\": \"tests/test_upload.py::test_empty\"}"
+  },
+  {
+   "title": "spec, from a decision",
+   "line": "{\"type\": \"spec\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"S7\", \"statement\": \"The upload service shall reject files over 50 MB with 413.\", \"source\": {\"type\": \"decision\", \"decision\": \"D2\"}, \"checked_by\": \"tests/test_upload.py::test_limit\"}"
+  },
+  {
+   "title": "spec, from the request",
+   "line": "{\"type\": \"spec\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"agent\", \"id\": \"S1\", \"statement\": \"When an upload fails, the form shall show the reason.\", \"source\": {\"type\": \"request\", \"sentence\": \"empty uploads should fail loudly\"}, \"checked_by\": \"code review\"}"
+  },
+  {
+   "title": "spec, from an architect requirement",
+   "line": "{\"type\": \"spec\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"architect\", \"id\": \"S3\", \"statement\": \"WHEN a builder writes a question, the page SHALL show it within 2 seconds.\", \"source\": {\"type\": \"requirement\", \"requirement\": \"Q1\"}, \"checked_by\": \"Time a builder question from write to display.\"}"
+  },
+  {
+   "title": "gap, asked",
+   "line": "{\"type\": \"gap\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"G1\", \"text\": \"Whether a file of only whitespace counts as empty\", \"status\": \"asked\", \"decision\": \"D3\", \"if_wrong\": \"whitespace-only files are accepted\"}"
+  },
+  {
+   "title": "gap, answered",
+   "line": "{\"type\": \"gap\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"G1\", \"text\": \"Whether a file of only whitespace counts as empty\", \"status\": \"answered\", \"decision\": \"D3\", \"if_wrong\": \"whitespace-only files are accepted\"}"
+  },
+  {
+   "title": "gap, assumed",
+   "line": "{\"type\": \"gap\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"G2\", \"text\": \"The error message language\", \"status\": \"assumed\", \"choice\": \"English, as the rest of the form\", \"if_wrong\": \"the message is in English on a French form\"}"
+  },
+  {
+   "title": "unlinked",
+   "line": "{\"type\": \"unlinked\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"item\": \"The progress bar's colour\", \"why\": \"appearance only; nothing to check beyond the design review\"}"
+  }
+ ],
+ "tasks.jsonl": [
+  {
+   "title": "todo, building, built, verifying, changes needed, verified, merged, done: no dependent fields",
+   "line": "{\"type\": \"task\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"T3\", \"task\": \"Reject empty uploads\", \"mode\": \"bug fix\", \"requirements\": [\"S2\", \"S5\"], \"check\": \"uv run pytest tests/test_upload.py::test_empty\", \"status\": \"verifying\"}"
+  },
+  {
+   "title": "blocked on another task",
+   "line": "{\"type\": \"task\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"T4\", \"task\": \"Show upload errors in the form\", \"mode\": \"feature\", \"requirements\": [\"S1\"], \"check\": \"npx playwright test upload-errors\", \"status\": \"blocked\", \"reason\": \"task\", \"waits_on\": \"T3\"}"
+  },
+  {
+   "title": "blocked on the user",
+   "line": "{\"type\": \"task\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"T5\", \"task\": \"Limit upload size\", \"mode\": \"feature\", \"requirements\": [\"S7\"], \"check\": \"uv run pytest tests/test_upload.py::test_empty\", \"status\": \"blocked\", \"reason\": \"user\"}"
+  },
+  {
+   "title": "blocked by the repair limit (coordinate mode)",
+   "line": "{\"type\": \"task\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"T6\", \"task\": \"Stream large files\", \"mode\": \"refactor\", \"requirements\": [\"S8\"], \"check\": \"uv run pytest tests/test_upload.py::test_empty\", \"status\": \"blocked\", \"reason\": \"repair limit\"}"
+  }
+ ],
+ "progress.jsonl": [
+  {
+   "title": "progress, about one task",
+   "line": "{\"type\": \"progress\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"about\": {\"type\": \"task\", \"task\": \"T3\"}, \"text\": \"builder-t3 handed back partly done: R2 passes, empty multipart bodies still crash\"}"
+  },
+  {
+   "title": "progress, about the whole change",
+   "line": "{\"type\": \"progress\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"about\": {\"type\": \"change\"}, \"text\": \"checkpoint: all spec checks re-run, 9 of 12 pass\"}"
+  },
+  {
+   "title": "problem",
+   "line": "{\"type\": \"problem\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"P1\", \"about\": {\"type\": \"change\"}, \"text\": \"CI fails on main before any of our commits; tried a rerun\"}"
+  },
+  {
+   "title": "resolved",
+   "line": "{\"type\": \"resolved\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"to\": \"P1\", \"text\": \"CI fixed upstream in a1b2c3d\"}"
+  }
+ ],
+ "decisions.jsonl": [
+  {
+   "title": "decided",
+   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D1\", \"raised_by\": \"builder-t3\", \"about\": {\"type\": \"task\", \"task\": \"T3\"}, \"asked\": \"Return 400 or 422 for an empty file?\", \"status\": \"decided\", \"decision\": \"422, as the other validation errors do\"}"
+  },
+  {
+   "title": "waiting",
+   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"waiting\"}"
+  },
+  {
+   "title": "answered on the page",
+   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"answered\", \"answer\": {\"type\": \"page\", \"event\": \"a-lq3z\"}}"
+  },
+  {
+   "title": "answered in the chat",
+   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"answered\", \"answer\": {\"type\": \"chat\", \"text\": \"50 MB, same as the API gateway\"}}"
+  }
+ ],
+ "next-steps.jsonl": [
+  {
+   "title": "step",
+   "line": "{\"type\": \"step\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"N1\", \"step\": \"Add a size limit to the image resizer\", \"origin\": {\"type\": \"spec\", \"spec\": \"S7\"}, \"if_nobody\": \"a 2 GB image stalls the resizer for every user\", \"done_when\": \"an image over 50 MB is rejected with 413\", \"priority\": \"high\", \"status\": \"asked\"}"
+  }
+ ],
+ "instructions.jsonl": [
+  {
+   "title": "instruction",
+   "line": "{\"type\": \"instruction\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"instruction\": \"Do not commit; the user commits.\", \"said\": \"don't commit anything, I'll do it\"}"
+  }
+ ],
+ "logs/<agent>.card.json": [
+  {
+   "title": "card, a builder",
+   "line": "{\"type\": \"card\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"role\": \"builder\", \"task\": \"T3\", \"branch\": \"fix/t3-empty-uploads\"}"
+  },
+  {
+   "title": "card, a verifier",
+   "line": "{\"type\": \"card\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"role\": \"verifier\", \"task\": \"T3\", \"branch\": \"fix/t3-empty-uploads\"}"
+  }
+ ],
+ "logs/<agent>.jsonl": [
+  {
+   "title": "start",
+   "line": "{\"type\": \"start\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"builder-t3\", \"text\": \"reading the spec for S2 and S5\"}"
+  },
+  {
+   "title": "step",
+   "line": "{\"type\": \"step\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"builder-t3\", \"text\": \"wrote the check for S2; it fails as expected\"}"
+  },
+  {
+   "title": "asked",
+   "line": "{\"type\": \"asked\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"builder-t3\", \"text\": \"400 or 422 for an empty file\"}"
+  },
+  {
+   "title": "blocked",
+   "line": "{\"type\": \"blocked\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"builder-t3\", \"text\": \"needs the size limit from the user\"}"
+  },
+  {
+   "title": "handed_back, builder",
+   "line": "{\"type\": \"handed_back\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"builder-t3\", \"result\": \"done\", \"text\": \"S2 and S5 pass on the final code\"}"
+  },
+  {
+   "title": "handed_back, verifier",
+   "line": "{\"type\": \"handed_back\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"verifier-t3\", \"result\": \"fails\", \"text\": \"empty multipart bodies still crash\"}"
+  }
+ ],
+ "audit/<date>/evidence.jsonl": [
+  {
+   "title": "history",
+   "line": "{\"type\": \"history\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"auditor\", \"id\": \"E1\", \"fact\": \"billing/vat.py changed in 31 commits in 12 months, 9 of them fixes\", \"command\": \"git log --since=12.months --format=%s -- billing/vat.py\"}"
+  },
+  {
+   "title": "check",
+   "line": "{\"type\": \"check\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"auditor\", \"id\": \"E2\", \"fact\": \"3 of 214 tests fail\", \"command\": \"uv run pytest -q\"}"
+  },
+  {
+   "title": "rule",
+   "line": "{\"type\": \"rule\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"auditor\", \"id\": \"E3\", \"fact\": \"The repo forbids float for money\", \"command\": \"grep -n money CONTRIBUTING.md\"}"
+  }
+ ],
+ "audit/<date>/findings.jsonl": [
+  {
+   "title": "finding, confirmed",
+   "line": "{\"type\": \"finding\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"auditor\", \"id\": \"A1\", \"where\": [{\"file\": \"billing/vat.py\", \"lines\": \"40-58\"}], \"problem\": \"The VAT rate is written twice and the copies differ\", \"cost\": \"wrong invoices in BE\", \"change_frequency\": \"31 commits\", \"evidence\": \"test_vat_be fails\", \"evidence_ids\": [\"E1\", \"E2\"], \"status\": \"confirmed\", \"task\": {\"mode\": \"bug fix\", \"requirement\": \"The invoice shall use one VAT rate per country.\"}}"
+  },
+  {
+   "title": "finding, unconfirmed",
+   "line": "{\"type\": \"finding\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"auditor\", \"id\": \"A2\", \"where\": [{\"file\": \"billing/refund.py\", \"lines\": \"12-20\"}], \"problem\": \"Refunds round with float\", \"cost\": \"cents lost on partial refunds\", \"change_frequency\": null, \"evidence\": \"refund.py:15\", \"evidence_ids\": [\"E3\"], \"status\": \"unconfirmed\", \"settle\": \"a refund of 3 x 0.10 EUR in a test\", \"task\": {\"mode\": \"bug fix\", \"requirement\": \"Refunds shall be computed in integer cents.\"}}"
+  },
+  {
+   "title": "audit (in audit/<date>/audit.json)",
+   "line": "{\"type\": \"audit\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"auditor\", \"goal\": \"hand the billing module to a new team\", \"commit\": \"9f8e7d6\", \"not_read\": \"CI history older than 90 days\"}"
+  }
+ ]
+}
