@@ -4,7 +4,7 @@ source:
 - SKILL.md#5
 reads:
 - modes/bug-fix.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: A local quota check exists alongside a live billing suite left for CI; run only the quota check and report each
   check's status without claiming billing passed.

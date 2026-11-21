@@ -1,4 +1,4 @@
-reply: 'The quote total is written twice, in pricing.py and quote_pdf.py. The history shows they change together, and in December 2025 a rounding fix reached the PDF a week before pricing, so invoices disagreed with signed quotes. Proposed: one price function both call. Full list of 3 findings in .code/audit/findings.md.'
+reply: 'The quote total is written twice, in pricing.py and quote_pdf.py. The history shows they change together, and in December 2025 a rounding fix reached the PDF a week before pricing, so invoices disagreed with signed quotes. Proposed: one price function both call. Full list of 3 findings in .code/audit/2026-11-21/findings.jsonl.'
 actions:
 - bash: 'git log --name-only --format=''%h %ad %s'' --since=12.months'
 - read: README.md

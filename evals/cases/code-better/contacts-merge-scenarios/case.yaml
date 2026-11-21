@@ -2,10 +2,10 @@ id: contacts-merge-scenarios
 rule: requirements-as-scenarios
 source:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: 'A merge command whose inputs hold duplicate emails (differing case, differing names) and a row with no email,
   none of which the request covers; write the requirements as scenarios with concrete rows and results, including at least

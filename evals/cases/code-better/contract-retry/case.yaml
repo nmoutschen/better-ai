@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/specs.md
+- templates/spec.md
 situation: The invoice check fails on a stale contract snapshot and names a refresh script, which copies the same stale cache
   because the vendor contract is not installed; stop by the second identical failure and report.
 request: test_invoice.py has been failing since we renamed the invoice heading to “Invoice”. Please fix it.

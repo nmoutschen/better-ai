@@ -1,4 +1,4 @@
-reply: 'bookings.py is where change costs you: it changed in 11 commits this year and has no tests. Proposed: tests for each booking rule, then split book(). The legacy reports and plugins.py are duplicated or unused but have not changed since 2024, so they rank low. Full list of 3 findings in .code/audit/findings.md.'
+reply: 'bookings.py is where change costs you: it changed in 11 commits this year and has no tests. Proposed: tests for each booking rule, then split book(). The legacy reports and plugins.py are duplicated or unused but have not changed since 2024, so they rank low. Full list of 3 findings in .code/audit/2026-11-21/findings.jsonl.'
 actions:
 - bash: 'git log --name-only --format=''%h %ad %s'' --since=12.months'
 - read: README.md
@@ -6,11 +6,8 @@ actions:
 - read: plugins.py
 - read: legacy/daily.py
 - read: legacy/weekly.py
-- write: .code/audit/findings.md
+- write: .code/audit/2026-11-21/findings.jsonl
   content: |
-    # Audit
-
-    1. bookings.py changed in 11 commits this year, one rule each, all inside book(), and has no tests. Proposed task:
-       tests for each rule, then refactor book() into one check per rule.
-    2. legacy/daily.py and legacy/weekly.py duplicate one report; unchanged since 2024-11, so low cost.
-    3. plugins.py is a hook registry nothing uses; unchanged since 2024-11. Proposed task: remove it.
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A1", "where": [{"file": "bookings.py", "lines": "whole file"}], "problem": "bookings.py changed in 11 commits this year, one rule each, all inside book(), and has no tests.", "cost": "bookings.py changed in 11 commits this year, one rule each, all inside book(), and has no tests.", "change_frequency": null, "evidence": "the Git history and the code read in this run", "evidence_ids": [], "status": "confirmed", "task": {"mode": "tests", "requirement": "tests for each rule, then refactor book() into one check per rule"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A2", "where": [{"file": "legacy/daily.py", "lines": "whole file"}, {"file": "legacy/weekly.py", "lines": "whole file"}], "problem": "legacy/daily.py and legacy/weekly.py duplicate one report; unchanged since 2024-11, so low cost.", "cost": "legacy/daily.py and legacy/weekly.py duplicate one report; unchanged since 2024-11, so low cost.", "change_frequency": null, "evidence": "the Git history and the code read in this run", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "Address: legacy/daily.py and legacy/weekly.py duplicate one report; unchanged since 2024-11, so low cost."}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A3", "where": [{"file": "plugins.py", "lines": "whole file"}], "problem": "plugins.py is a hook registry nothing uses; unchanged since 2024-11.", "cost": "plugins.py is a hook registry nothing uses; unchanged since 2024-11.", "change_frequency": null, "evidence": "the Git history and the code read in this run", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "remove it"}}

@@ -18,7 +18,8 @@ COMMAND_TIMEOUT = 60
 GRADING_ERROR_MESSAGE = "Grading error"
 TEST_FILE = re.compile(r"(?:^|/)(?:test_|check_)[^/]*\.py$|_test\.py$")
 CACHE_FILE = re.compile(r"(?:^|/)__pycache__/|(?:^|/)\.pytest_cache/")
-MARKDOWN_NOTE = re.compile(r"\.(?:md|markdown)$", re.IGNORECASE)
+# A note is Markdown, or one of the agent's own JSON working files under .code/, such as an audit's findings.jsonl.
+MARKDOWN_NOTE = re.compile(r"\.(?:md|markdown)$|(?:^|/)\.code/.*\.jsonl?$", re.IGNORECASE)
 SNAPSHOT_SCRIPT = (
     'mkdir -p "$1/repo" "$1/grade" && cp -a ./. "$1/repo/"'
     ' && find "$1/repo" -name __pycache__ -type d -prune -exec rm -rf {} +'

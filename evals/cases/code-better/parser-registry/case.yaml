@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: New file types register in the PARSERS table and raise FormatError for unreadable content; add JSON there instead
   of branching on the extension.

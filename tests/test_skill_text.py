@@ -217,7 +217,7 @@ class CodeBetterTextTest(unittest.TestCase):
 
     def test_code_better_case_files_name_no_old_file(self):
         """The case files name the templates and files of the new format."""
-        old = re.compile(r"templates/specs\.md|\.code/\S*\.md\b|\bnotes\.md\b|\bspecs\.md\b")
+        old = re.compile(r"templates/specs\.md|\.code/\S*\.md\b|(?<![\w-])notes\.md\b|\bspecs\.md\b")
         found = [
             f"{path.relative_to(ROOT)}: {match.group(0)}"
             for path in sorted(CASES.rglob("*.yaml"))
