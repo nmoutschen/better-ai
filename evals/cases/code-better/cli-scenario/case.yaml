@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: 'Both scenarios need a check on the final code that compares the decoded --json values and the exact plain output:
   a test the grader reruns against output mutants, or an inline check the judge reads.'

@@ -5,17 +5,17 @@ description: Use for a change of structure, dependency or data format that keeps
 
 # Mode: refactor or migration
 
-FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
 ## 1. Update the spec
 
-KEEP a spec for every change, however small: a one-line change needs one requirement. IF no existing spec covers the change, READ [../templates/specs.md](../templates/specs.md) and WRITE `.code/<change>/specs.md` in the template's format. WRITE in the spec that observable behaviour stays the same: LIST the paths the change touches, and for a data migration, the data it moves. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
+KEEP a spec for every change, however small: a one-line change needs one requirement. WRITE `.code/<change>/code.json`: the goal, the design and the mode. READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format, always: from the existing spec when one covers the change. WRITE in the spec that observable behaviour stays the same: LIST the paths the change touches, and for a data migration, the data it moves. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files from it. WHEN `code.json` names an architect folder as the design, its `spec.jsonl` is the spec: UPDATE it there and WRITE no copy.
 
 IF the design says some behaviour changes, that part is not this change: LIST it as a proposed next step, or, under a coordinator, as its own task.
 
 FOR a data migration, IF the design does not say what happens to records the old format allows and the new one does not, ASK the user.
 
-WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.md` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task todo.
+WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.jsonl` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task `todo`.
 
 ## 2. Pin the current behaviour
 
@@ -46,4 +46,4 @@ FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fa
 
 DO NOT describe results you did not observe. Behaviour is kept only IF every check of step 2 gave its recorded result on the final code.
 
-IF there is a task list, SET each task whose check you saw pass to done, in an edit of its own.
+IF there is a task list, SET the `status` of each task whose check you saw pass to `done` in `tasks.jsonl`, in an edit of its own.

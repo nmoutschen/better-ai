@@ -96,10 +96,11 @@ The dashboard reads the change's folder, `.code/<change>/`, and keeps running un
 <summary><b>What you get</b></summary>
 
 - The code change, kept to one purpose.
-- When the change needs them, these files, from the skill's templates:
-  - **Requirements**: the need, what changes for you, scenarios, constraints, out of scope, assumptions.
-  - **Plan**: tasks with a check for each, progress notes, open questions.
-  - When it coordinates agents: each agent's log, each decision and question, and your conversation with the coordinator (`conversation.jsonl`).
+- Its working files in `.code/<change>/`, typed JSON checked against a schema after each write, from the skill's templates:
+  - **Change and requirements**: `code.json` holds your goal, the design and the mode. `spec.jsonl` holds the requirements, each with its source and its check, the gaps with what you were asked about each, and the design items with no requirement.
+  - **Plan**: `tasks.jsonl` holds the tasks with a check for each, `progress.jsonl` the progress and open problems, and `instructions.jsonl` what you told it about how to work.
+  - **Next steps**: `next-steps.jsonl` holds the work outside the change.
+  - When it coordinates agents: each agent's card and log in `logs/`, each decision and question in `decisions.jsonl`, and your conversation with the coordinator (`conversation.jsonl`).
 - For structural changes, the design and spec from `/architect-better` that the build follows.
 - A report:
   - what changed and why, in terms of the requirements
@@ -109,7 +110,7 @@ The dashboard reads the change's folder, `.code/<change>/`, and keeps running un
 
   The report keeps three things apart: meeting the requirements, passing the checks, and your acceptance.
 - For an audit, no code change. Instead:
-  - every finding, with its evidence and a proposed task, in `.code/audit/findings.md`, for an agent to pick up later
+  - every finding, with its evidence and a proposed task, in `.code/audit/<date>/findings.jsonl`, with the facts it rests on in `evidence.jsonl` and the goal and commit in `audit.json`, for an agent to pick up later
   - a short report with what costs you now and the five to ten findings of highest value
 
 </details>

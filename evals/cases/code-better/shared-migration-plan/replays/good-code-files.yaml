@@ -1,0 +1,40 @@
+reply: ''
+actions:
+- write: reports/sales.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("sales")
+- write: reports/stock.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("stock")
+- write: reports/staff.py
+  content: |
+    from new_db import fetch
+
+
+    def rows():
+        return fetch("staff")
+- bash: python -c "import reports.sales as m; assert m.rows() == [('sales', 'new')]"
+- bash: python -c "import reports.stock as m; assert m.rows() == [('stock', 'new')]"
+- bash: python -c "import reports.staff as m; assert m.rows() == [('staff', 'new')]"
+- write: .code/migration/code.json
+  content: |
+    {"type": "code", "at": "2026-11-21T00:00:00Z", "by": "agent", "goal": "Move every migration module", "design": {"type": "request", "text": "Move every migration module"}, "mode": "refactor"}
+- write: .code/migration/spec.jsonl
+  content: |
+    {"type": "spec", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "S1", "statement": "Each migration module meets the new logging with the same behaviour.", "source": {"type": "request", "sentence": "Each migration module meets the new logging with the same behaviour."}, "checked_by": "the check of each task"}
+- write: .code/migration/tasks.jsonl
+  content: |
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T1", "task": "Move sales to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "python -c \"import reports.sales as m; assert m.rows() == [('sales', 'new')]\"", "status": "done"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T2", "task": "Move stock to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "python -c \"import reports.stock as m; assert m.rows() == [('stock', 'new')]\"", "status": "done"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T3", "task": "Move staff to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "python -c \"import reports.staff as m; assert m.rows() == [('staff', 'new')]\"", "status": "done"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T4", "task": "Move suppliers to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "python -c \"import reports.suppliers as m; assert m.rows() == [('suppliers', 'new')]\"", "status": "todo"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T5", "task": "Move returns to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "python -c \"import reports.returns as m; assert m.rows() == [('returns', 'new')]\"", "status": "todo"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T6", "task": "Move payroll to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "python -c \"import reports.payroll as m; assert m.rows() == [('payroll', 'new')]\"", "status": "todo"}

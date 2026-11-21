@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: A command-line report whose output is its print calls; the project's ruff configuration does not flag print, and
   CONTRIBUTING.md says `ruff check .` must pass. The new line must be printed to standard output like the others, not logged,

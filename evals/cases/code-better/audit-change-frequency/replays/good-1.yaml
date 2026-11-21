@@ -1,4 +1,4 @@
-reply: 'bookings.py is where change costs you: it changed in 11 commits this year and has no tests. Proposed: tests for each booking rule, then split book(). The legacy reports and plugins.py are duplicated or unused but have not changed since 2024, so they rank low. Full list of 3 findings in .code/audit/findings.md.'
+reply: 'bookings.py is where change costs you: it changed in 11 commits this year and has no tests. Proposed: tests for each booking rule, then split book(). The legacy reports and plugins.py are duplicated or unused but have not changed since 2024, so they rank low. Full list of 3 findings in .code/audit/2026-11-21/findings.jsonl.'
 actions:
 - bash: 'git log --name-only --format=''%h %ad %s'' --since=12.months'
 - read: README.md
@@ -6,11 +6,15 @@ actions:
 - read: plugins.py
 - read: legacy/daily.py
 - read: legacy/weekly.py
-- write: .code/audit/findings.md
+- write: .code/audit/2026-11-21/audit.json
   content: |
-    # Audit
-
-    1. bookings.py changed in 11 commits this year, one rule each, all inside book(), and has no tests. Proposed task:
-       tests for each rule, then refactor book() into one check per rule.
-    2. legacy/daily.py and legacy/weekly.py duplicate one report; unchanged since 2024-11, so low cost.
-    3. plugins.py is a hook registry nothing uses; unchanged since 2024-11. Proposed task: remove it.
+    {"type": "audit", "at": "2026-11-21T00:00:00Z", "by": "agent", "goal": "add booking rules without breaking the existing ones", "commit": "a1b2c3d", "not_read": null}
+- write: .code/audit/2026-11-21/evidence.jsonl
+  content: |
+    {"type": "history", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "E1", "fact": "bookings.py changed in 11 commits from January to November 2026, one rule each, all in book().", "command": "git log --since=12.months --format=%h -- bookings.py"}
+    {"type": "history", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "E2", "fact": "legacy/daily.py, legacy/weekly.py and plugins.py have not changed since November 2024.", "command": "git log --format=%ad -- legacy plugins.py"}
+- write: .code/audit/2026-11-21/findings.jsonl
+  content: |
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A1", "where": [{"file": "bookings.py", "lines": "book"}], "problem": "bookings.py changed in 11 commits this year, one rule each, all inside book(), and has no tests.", "cost": "Every new rule goes into one growing function with nothing to catch a mistake.", "change_frequency": "11 commits in twelve months, all in book()", "evidence": "The history shows 11 commits and no test covers bookings.py.", "evidence_ids": ["E1"], "status": "confirmed", "task": {"mode": "tests", "requirement": "tests for each rule, then refactor book() into one check per rule"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A2", "where": [{"file": "legacy/daily.py", "lines": "whole file"}, {"file": "legacy/weekly.py", "lines": "whole file"}], "problem": "legacy/daily.py and legacy/weekly.py duplicate one report.", "cost": "Low: nobody changes either copy, so they have not drifted.", "change_frequency": "unchanged since 2024-11", "evidence": "The history shows no change since 2024-11.", "evidence_ids": ["E2"], "status": "confirmed", "task": {"mode": "refactor", "requirement": "one report function used by both files"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A3", "where": [{"file": "plugins.py", "lines": "whole file"}], "problem": "plugins.py is a hook registry nothing uses.", "cost": "Low: it is read only when someone browses the code.", "change_frequency": "unchanged since 2024-11", "evidence": "The history shows no change since 2024-11.", "evidence_ids": ["E2"], "status": "confirmed", "task": {"mode": "refactor", "requirement": "remove plugins.py"}}

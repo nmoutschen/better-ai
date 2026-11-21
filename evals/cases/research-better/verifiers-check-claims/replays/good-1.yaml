@@ -41,6 +41,10 @@ actions:
     "hard": false}
 
     '
+- write: .research/checkout-drop/sources/S-w2-3.json
+  content: '{"type": "source", "at": "2026-11-21T10:00:00Z", "by": "w2", "id": "S-w2-3", "author": "Support team", "date": null, "title": "Support ticket themes, March", "publisher": "Tallow wiki", "url": "wiki/support/ticket-themes-march.md", "ids": [], "category": "other", "read": "raw", "trust": "medium", "trust_reason": "internal team page", "repeats": null, "status": "kept"}
+
+    '
 - write: .research/checkout-drop/claims/C-w2-4.json
   content: '{"type": "claim", "at": "2026-11-21T10:00:00Z", "by": "w2", "id": "C-w2-4", "claim": "Tickets about failed card
     verification were three times as frequent in March as in February.", "question": "Q-coordinator-3", "source": "S-w2-3",

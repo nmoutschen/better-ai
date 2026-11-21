@@ -4,7 +4,7 @@ source:
 - SKILL.md#5
 reads:
 - modes/bug-fix.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: average() uses floor division; the user asks for the fix and says they want no explanation, so make it and reply
   with at most a short summary of what changed, without explaining or quizzing.

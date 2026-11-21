@@ -83,6 +83,18 @@ async def test_note_written(plant: Plant) -> None:
     assert await files.note_written({}, repo)
 
 
+async def test_note_written_counts_json_working_files_under_code(plant: Plant) -> None:
+    """An audit's findings.jsonl under .code/ is a note; a JSON file elsewhere is not."""
+    repo = await plant({"a.py": "x = 1\n"})
+    await repo.sandbox_env.exec(["sh", "-c", "echo .code/ >> .git/info/exclude"])
+    await repo.sandbox_env.write_file("data.json", "{}\n")
+    repo = files.Checkout(repo.sandbox_env, repo.start, repo.workdir)
+    assert not await files.note_written({}, repo)
+    await repo.sandbox_env.write_file(".code/audit/2026-11-21/findings.jsonl", "{}\n")
+    repo = files.Checkout(repo.sandbox_env, repo.start, repo.workdir)
+    assert await files.note_written({}, repo)
+
+
 async def test_diff_max_lines(plant: Plant) -> None:
     """Counts added plus removed lines in planted files only."""
     repo = await plant({"a.py": "x = 1\n"})

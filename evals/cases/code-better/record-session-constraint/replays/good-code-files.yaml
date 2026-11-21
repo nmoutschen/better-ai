@@ -1,0 +1,76 @@
+reply: Added --since and --json with tests, and recorded the vendor/ rule in .code/expense-report/instructions.jsonl.
+actions:
+- read: docs/requirements.md
+- write: .code/expense-report/instructions.jsonl
+  content: |
+    {"type": "instruction", "at": "2026-11-21T00:00:00Z", "by": "agent", "instruction": "Never change anything under vendor/.", "said": "from now on never touch anything under vendor/ - we sync that folder from upstream and local edits get wiped."}
+- read: report.py
+- write: report.py
+  content: |
+    import argparse
+    import csv
+    import json
+    import sys
+
+    from vendor.tablefmt import render
+
+
+    def load_rows(path):
+        with open(path, newline="", encoding="utf-8") as handle:
+            return [
+                {"date": row["date"], "item": row["item"], "amount": int(row["amount"])}
+                for row in csv.DictReader(handle)
+            ]
+
+
+    def main(argv=None):
+        parser = argparse.ArgumentParser(prog="report")
+        parser.add_argument("csv_file")
+        parser.add_argument("--since", help="leave out rows dated before this YYYY-MM-DD day")
+        parser.add_argument("--json", action="store_true", help="print the rows as JSON")
+        args = parser.parse_args(argv)
+        rows = load_rows(args.csv_file)
+        if args.since:
+            rows = [row for row in rows if row["date"] >= args.since]
+        if args.json:
+            print(json.dumps(rows))
+        else:
+            print(render(rows, ["date", "item", "amount"]))
+        return 0
+
+
+    if __name__ == "__main__":
+        sys.exit(main())
+- write: tests/test_report.py
+  content: |
+    import io
+    import json
+    import unittest
+    from contextlib import redirect_stdout
+
+    from report import load_rows, main
+
+
+    def run(argv):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(argv)
+        return output.getvalue()
+
+
+    class ReportTest(unittest.TestCase):
+        def test_load_rows_converts_amounts(self):
+            rows = load_rows("data/expenses.csv")
+            self.assertEqual(rows[0], {"date": "2026-01-14", "item": "paper", "amount": 1250})
+
+        def test_prints_table(self):
+            self.assertIn("chairs", run(["data/expenses.csv"]))
+
+        def test_since_and_json(self):
+            rows = json.loads(run(["data/expenses.csv", "--since", "2026-02-01", "--json"]))
+            self.assertEqual([row["item"] for row in rows], ["coffee", "chairs"])
+
+
+    if __name__ == "__main__":
+        unittest.main()
+- bash: python -m unittest discover tests

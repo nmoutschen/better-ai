@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: A nearby fee function invites changes; keep the fix focused and leave fee exactly as it was.
 request: A 30-day rental should be accepted. Fix the boundary.
