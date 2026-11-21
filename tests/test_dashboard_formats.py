@@ -17,6 +17,9 @@ from contextlib import redirect_stdout, suppress
 from pathlib import Path
 from unittest import mock
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wrong_types  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "skills" / "code-better" / "scripts"
 SCHEMAS = ROOT / "skills" / "code-better" / "schemas"
@@ -571,7 +574,7 @@ class Dashboard(unittest.TestCase):
             self.assertEqual(dashboard.load(folder)["errors"], [])
 
 
-WRONG = [[1], {"k": 1}, 5, True, None, "x"]
+WRONG, RAW_LINES = wrong_types.WRONG, wrong_types.RAW_LINES
 
 
 class WrongTypes(unittest.TestCase):
@@ -610,18 +613,7 @@ class WrongTypes(unittest.TestCase):
         }
 
     def variants(self, records):
-        for index, record in enumerate(records):
-            for key, value in record.items():
-                options = [(key,), *([(key, inner) for inner in value] if isinstance(value, dict) else [])]
-                for path in options:
-                    original = value if len(path) == 1 else value[path[1]]
-                    for wrong in WRONG:
-                        if wrong == original and type(wrong) is type(original):
-                            continue
-                        changed = json.loads(json.dumps(records))
-                        target = changed[index][key] if len(path) == 2 else changed[index]
-                        target[path[-1]] = wrong
-                        yield f"{'.'.join(path)}[{index}]={wrong!r}", changed
+        return wrong_types.variants(records)
 
     def test_no_wrong_type_breaks_check_load_or_the_page(self):
         node = shutil.which("node")
@@ -639,7 +631,7 @@ class WrongTypes(unittest.TestCase):
                     with self.subTest(name):
                         write(folder, relative, changed, as_json)
                         data = dashboard.load(folder)
-                        json.dumps(data)
+                        json.dumps(data, allow_nan=False)
                         out = io.StringIO()
                         with (
                             mock.patch.object(sys, "argv", ["dashboard.py", "check", str(folder)]),
@@ -649,7 +641,16 @@ class WrongTypes(unittest.TestCase):
                             dashboard.main()
                         payloads.append({"label": name, "data": data})
                 write(folder, relative, records, as_json)
-            self.assertGreater(len(payloads), 300)
+            for relative, (records, as_json) in base.items():
+                for raw in RAW_LINES:
+                    with self.subTest(f"{relative}: raw {raw[:10]}"):
+                        path = folder / relative
+                        path.write_text(raw + "\n" + ("" if as_json else path.read_text()), encoding="utf-8")
+                        data = dashboard.load(folder)
+                        json.dumps(data, allow_nan=False)
+                        payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": data})
+                write(folder, relative, records, as_json)
+            self.assertGreater(len(payloads), 1000)
             if node:
                 path = root / "payloads.json"
                 path.write_text(json.dumps(payloads))
