@@ -1,54 +1,16 @@
 reply: I answered the autocomplete question myself.
 actions:
-- write: .research/checkout-drop/claims/C-coordinator-1.md
-  content: 'id: C-coordinator-1
-
-    claim: Autocomplete had no significant effect.
-
-    question: Q-coordinator-8
-
-    source: S-w4-1
-
-    quote: "which was not statistically significant."
-
-    verified: verified
-
-    checker: v1
-
-    span: "which was not statistically significant."
-
-    hard: no
-
-    reason: none
+- write: .research/checkout-drop/claims/C-coordinator-1.json
+  content: '{"type": "claim", "at": "2026-11-21T10:00:00Z", "by": "coordinator", "id": "C-coordinator-1", "claim": "Autocomplete
+    had no significant effect.", "question": "Q-coordinator-8", "source": "S-w4-1", "quote": "which was not statistically
+    significant.", "status": "verified", "checker": "v1", "span": "which was not statistically significant.", "hard": false}
 
     '
-- write: .research/checkout-drop/questions/Q-coordinator-8.md
-  content: 'id: Q-coordinator-8
-
-    question: Did the address autocomplete in release 26.3 change checkout conversion?
-
-    title: Autocomplete effect on conversion
-
-    priority: high
-
-    status: answered
-
-    owner: w3
-
-    origin: Q-coordinator-1
-
-    kind: seed
-
-    stakes: whether autocomplete is a candidate to roll back
-
-    done-when: a test or analysis gives autocomplete''s effect on conversion
-
-    answer: none
-
-    summary: none
-
-    gist: none
-
-    note: none
+- write: .research/checkout-drop/questions/Q-coordinator-8.json
+  content: '{"type": "question", "at": "2026-11-21T10:00:00Z", "by": "coordinator", "id": "Q-coordinator-8", "question": "Did
+    the address autocomplete in release 26.3 change checkout conversion?", "title": "Autocomplete effect on conversion", "priority":
+    "high", "status": "answered", "owner": "w3", "summary": "The sources answer this question.", "gist": "Answered by the
+    sources.", "origin": {"type": "question", "question": "Q-coordinator-1"}, "kind": "seed", "stakes": "whether autocomplete
+    is a candidate to roll back", "done_when": "a test or analysis gives autocomplete''s effect on conversion", "note": null}
 
     '

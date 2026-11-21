@@ -1,0 +1,3 @@
+{"type": "comment", "at": "2026-12-03T14:02:11Z", "by": "user", "id": "c-1k2", "text": "Nobody will open a second page between customers.", "on": {"version": "A", "screen": "390x844", "target": {"selector": "nav > a:nth-child(2)", "text": "Swap board"}, "spot": {"fx": 0.5, "fy": 0.5}}, "verdict": "down"}
+{"type": "comment", "at": "2026-12-03T14:03:40Z", "by": "user", "id": "c-1k7", "text": "Yes, right on the shift. Keep the note optional.", "on": {"version": "B", "screen": "390x844", "target": {"selector": "li.shift > button", "text": "Offer this shift"}, "spot": {"fx": 0.5, "fy": 0.5}}, "verdict": "up"}
+{"type": "decide", "at": "2026-12-03T14:05:02Z", "by": "user", "id": "d-1k9", "option": "B", "label": "B", "carries": ["c-1k7"], "text": "B, with the note optional."}

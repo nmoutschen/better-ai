@@ -101,7 +101,7 @@ def scan(board: Path) -> dict:
             pieces.pop()
         records = {}
         for number, piece in enumerate(pieces, 1):
-            with contextlib.suppress(ValueError):
+            with contextlib.suppress(ValueError, RecursionError):
                 records[number] = json.loads(piece)
         messages: dict = {}
         reported: set = set()

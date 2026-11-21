@@ -476,11 +476,51 @@ class Keywords(unittest.TestCase):
         self.assertEqual(self.errors("a", {"minLength": 1}), [])
         self.assertEqual(self.errors(5, {"pattern": "x", "minLength": 3}), [])  # they apply to strings only
 
+    def test_only_finite_numbers_are_numbers(self):
+        for value in (float("nan"), float("inf"), -float("inf")):
+            problems = self.errors(value, {"type": "number"})
+            self.assertEqual(len(problems), 1, value)
+            self.assertIn("got non-finite number", problems[0][1])
+        self.assertEqual(self.errors(1e300, {"type": "number"}), [])
+        self.assertEqual(
+            self.errors(float("nan"), {"type": ["string", "number"]})[0][1],
+            "expected string or number, got non-finite number",
+        )
+
     def test_min_items_and_items(self):
         s = {"type": "array", "minItems": 1, "items": {"type": "string"}}
         self.assertEqual(self.errors(["a"], s), [])
         self.assertEqual(self.errors([], s), [("(record)", "must have at least 1 item")])
         self.assertEqual(self.errors(["a", 2], s), [("[1]", "expected string, got integer")])
+
+    def test_minimum_and_maximum(self):
+        s = {"type": "number", "minimum": 0, "maximum": 1}
+        self.assertEqual(self.errors(0, s), [])
+        self.assertEqual(self.errors(1, s), [])
+        self.assertEqual(self.errors(0.5, s), [])
+        self.assertEqual(self.errors(-0.1, s), [("(record)", "must be at least 0")])
+        self.assertEqual(self.errors(1.5, s), [("(record)", "must be at most 1")])
+        self.assertEqual(self.errors("2", {"minimum": 3}), [])  # they apply to numbers only
+        self.assertEqual(self.errors(True, {"minimum": 3}), [])  # a boolean is not a number
+
+    def test_max_items(self):
+        s = {"type": "array", "maxItems": 2}
+        self.assertEqual(self.errors(["a", "b"], s), [])
+        self.assertEqual(self.errors(["a", "b", "c"], s), [("(record)", "must have at most 2 items")])
+        self.assertEqual(self.errors([1], {"maxItems": 0}), [("(record)", "must have at most 0 items")])
+        self.assertEqual(self.errors([1], {"maxItems": 1}), [])
+
+    def test_prefix_items_checks_each_position_and_items_covers_the_rest(self):
+        s = {"type": "array", "minItems": 2, "prefixItems": [{}, {"type": "number"}]}
+        self.assertEqual(self.errors(["2020", 1], s), [])
+        self.assertEqual(self.errors([2020, 1, "more"], s), [])
+        self.assertEqual(self.errors(["2020", "x"], s), [("[1]", "expected number, got string")])
+        self.assertEqual(
+            self.errors(["2020"], {"prefixItems": [{"type": "number"}]}), [("[0]", "expected number, got string")]
+        )
+        both = {"prefixItems": [{"type": "string"}], "items": {"type": "integer"}}
+        self.assertEqual(self.errors(["a", 1, 2], both), [])
+        self.assertEqual(self.errors(["a", "b"], both), [("[1]", "expected integer, got string")])
 
     def test_properties_required_and_additional_properties(self):
         s = {
@@ -873,6 +913,94 @@ class Hooks(unittest.TestCase):
         self.assertIn("verified-needs-passing-verifier", schema.HOOKS)
 
 
+class HookSafety(Case):
+    """A hook only sees a record that has no shape errors, and a hook that raises is reported, never a traceback."""
+
+    def setUp(self):
+        super().setUp()
+        self.seen = []
+
+        @schema.hook("test-count")
+        def count(record, ctx):
+            self.seen.append(record)
+            return [("a", "the hook's finding")] if record.get("a") == "bad" else []
+
+        @schema.hook("test-raise")
+        def explode(record, ctx):
+            raise TypeError("unhashable type")
+
+        self.addCleanup(schema.HOOKS.pop, "test-count", None)
+        self.addCleanup(schema.HOOKS.pop, "test-raise", None)
+        self.put_schema(
+            {
+                "$id": "probe.schema.json",
+                "x-files": ["probe.jsonl"],
+                "x-check": "test-count",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+            }
+        )
+        self.put_schema(
+            {"$id": "boom.schema.json", "x-files": ["boom.jsonl"], "x-check": "test-raise", "type": "object"}
+        )
+
+    def test_the_hook_is_not_called_for_a_record_with_a_shape_error(self):
+        self.write("probe.jsonl", jsonl({"a": 5}, {"b": 1}))
+        errors = self.messages("probe.jsonl")
+        self.assertEqual(self.seen, [])
+        self.assertEqual(len(errors), 2)
+        self.assertFalse(any("the hook's finding" in e for e in errors))
+
+    def test_the_hook_is_called_for_a_record_without_shape_errors_and_its_findings_are_reported(self):
+        self.write("probe.jsonl", jsonl({"a": "good"}, {"a": "bad"}))
+        errors = self.messages("probe.jsonl")
+        self.assertEqual(self.seen, [{"a": "good"}, {"a": "bad"}])
+        self.assertEqual(errors, ["2: a: the hook's finding"])
+
+    def test_check_record_runs_hooks_only_on_a_well_shaped_record(self):
+        names = ["probe.schema.json"]
+        self.assertEqual(
+            schema.check_record({"a": 5}, names, self.schemas, cross=True), [("a", "expected string, got integer")]
+        )
+        self.assertEqual(self.seen, [])
+        self.assertEqual(
+            schema.check_record({"a": "bad"}, names, self.schemas, cross=True), [("a", "the hook's finding")]
+        )
+
+    def test_whatever_a_validator_raises_is_one_error_for_the_record(self):
+        self.write("probe.jsonl", jsonl({"a": "x"}, {"a": "y"}))
+        for error in (ValueError("boom"), RecursionError(), KeyError("k")):
+            with self.subTest(type(error).__name__), mock.patch.object(schema.Validator, "validate", side_effect=error):
+                message = (
+                    "is nested too deeply to check"
+                    if isinstance(error, RecursionError)
+                    else f"could not be checked: {type(error).__name__}"
+                )
+                self.assertEqual(self.messages("probe.jsonl"), [f"1: (record): {message}", f"2: (record): {message}"])
+                self.assertEqual(
+                    schema.check_record({"a": "x"}, ["probe.schema.json"], self.schemas, cross=True),
+                    [("(record)", message)],
+                )
+
+    def test_a_file_nested_too_deeply_to_read_is_one_error_not_a_traceback(self):
+        for depth in (200, 1200, 50000):
+            with self.subTest(depth):
+                self.write("probe.jsonl", '{"a": ' + "[" * depth + "]" * depth + "}\n")
+                errors = self.messages("probe.jsonl")
+                self.assertEqual(len(errors), 1, errors)
+                self.assertRegex(errors[0], r"^1: ")
+                self.assertNotIn("Traceback", errors[0])
+
+    def test_a_hook_that_raises_is_reported_as_a_failed_check(self):
+        self.write("boom.jsonl", jsonl({"a": 1}))
+        self.assertEqual(self.messages("boom.jsonl"), ["1: (record): check failed: test-raise"])
+        self.assertEqual(
+            schema.check_record({}, ["boom.schema.json"], self.schemas, cross=True),
+            [("(record)", "check failed: test-raise")],
+        )
+
+
 class Schemas(Case):
     def test_a_schema_that_cannot_be_applied_is_a_failure_with_a_message_not_a_traceback(self):
         result = subprocess.run(
@@ -1032,6 +1160,41 @@ class SchemaAudit(Case):
 
     def test_an_unsupported_keyword_under_an_optional_property_is_refused_on_load(self):
         self.refused({"multipleOf": 2}, "multipleOf")
+
+    def test_the_numeric_keywords_need_numbers_and_prefix_items_a_list_of_schemas(self):
+        self.refused({"minimum": "0"}, "minimum")
+        self.refused({"maximum": True}, "maximum")
+        self.refused({"maxItems": -1}, "maxItems")
+        self.refused({"prefixItems": {"type": "string"}}, "prefixItems")
+        self.refused({"prefixItems": [{"nope": 1}]}, "nope")
+
+    def test_a_condition_on_a_field_that_is_absent_or_empty_says_so(self):
+        s = {
+            "type": "object",
+            "if": {"not": {"required": ["kids"], "properties": {"kids": {"type": "array", "minItems": 1}}}},
+            "then": {"required": ["value"]},
+        }
+        self.assertEqual(
+            [(e.field, e.message) for e in schema.validate_instance({"kids": []}, s, {})],
+            [("value", "required when kids is absent or empty")],
+        )
+        self.assertEqual(
+            [(e.field, e.message) for e in schema.validate_instance({}, s, {})],
+            [("value", "required when kids is absent or empty")],
+        )
+        self.assertEqual(schema.validate_instance({"kids": [1]}, s, {}), [])
+
+    def test_a_condition_on_a_missing_field_is_worded_as_absent(self):
+        s = {
+            "type": "object",
+            "if": {"not": {"required": ["mode"]}},
+            "then": {"required": ["kind"]},
+        }
+        self.assertEqual(
+            [(e.field, e.message) for e in schema.validate_instance({}, s, {})],
+            [("kind", "required when mode is absent")],
+        )
+        self.assertEqual(schema.validate_instance({"mode": "a"}, s, {}), [])
 
     def test_an_unsupported_keyword_in_every_place_a_schema_nests(self):
         for node in (
@@ -1259,6 +1422,15 @@ class StripInvalid(unittest.TestCase):
         self.assertEqual(
             schema.strip_invalid(record, self.errors("(record)")), {"a": 1, "_errors": ["(record): bad (record)"]}
         )
+
+    def test_a_record_too_deeply_nested_to_copy_keeps_only_its_errors_and_a_plain_id(self):
+        deep: list = []
+        for _ in range(50000):
+            deep = [deep]
+        stripped = schema.strip_invalid({"id": "T1", "x": deep, "mode": 5}, self.errors("mode"))
+        self.assertEqual(stripped, {"id": "T1", "_errors": ["mode: bad mode"]})
+        stripped = schema.strip_invalid({"id": ["T1"], "x": deep}, self.errors("(record)"))
+        self.assertEqual(stripped, {"_errors": ["(record): bad (record)"]})
 
     def test_the_record_is_copied_not_changed(self):
         record = {"a": [1], "b": 2}

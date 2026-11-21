@@ -12,7 +12,7 @@ request: The research in .research/checkout-drop is done. Write up the findings 
 graders:
 - type: planted_unchanged
   except:
-  - .research/checkout-drop/brief.md
+  - .research/checkout-drop/brief.json
   - .research/checkout-drop/logs/*
   - .research/checkout-drop/questions/*
 - type: judge

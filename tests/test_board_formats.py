@@ -300,6 +300,17 @@ class Invalid(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("conversation.jsonl:2: at:", result.stdout)
 
+    def test_a_record_nested_50000_deep_is_an_error_and_the_board_still_scans(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            (folder / "questions").mkdir(exist_ok=True)
+            (folder / "questions" / "Q-deep.json").write_text(
+                '{"type": "question", "x": ' + "[" * 50000 + "]" * 50000 + "}"
+            )
+            data = board.scan(folder)
+        self.assertTrue(any(e["file"] == "questions/Q-deep.json" for e in data["errors"]))
+
     def test_a_tick_scans_once_and_board_json_reuses_a_scan_until_a_file_changes(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)

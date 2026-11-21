@@ -367,6 +367,15 @@ class Dashboard(unittest.TestCase):
         self.assertEqual([(e["file"], e["line"]) for e in data["errors"]], [("tasks.jsonl", 2)])
         self.assertNotIn("by", data["errors"][0])
 
+    def test_a_line_nested_50000_deep_is_an_error_and_the_other_tasks_still_show(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            with (folder / "tasks.jsonl").open("a") as f:
+                f.write('{"type": "task", "x": ' + "[" * 50000 + "]" * 50000 + "}\n")
+            data = dashboard.load(folder)
+        self.assertEqual([t["id"] for t in data["tasks"]][:1], ["T1"])
+        self.assertTrue(any(e["line"] == 2 for e in data["errors"]))
+
     def test_the_dashboard_reads_each_file_it_shows(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[task("T1", status="building"), task("T2", mode="bug fix")])

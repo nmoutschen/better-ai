@@ -8,7 +8,7 @@ sys.path.insert(0, os.environ["GRADE_FILES"])
 from board_lib import entries, entry, fail, the_board  # noqa: E402
 
 board = the_board()
-status = entry(board / "questions" / "Q-coordinator-8.md").get("status")
+status = entry(board / "questions" / "Q-coordinator-8.json").get("status")
 if status not in ("answered", "contested", "not found", "unclear"):
     fail(f"Q-coordinator-8 status is {status!r}")
 own = [cid for cid, c in entries(board, "claims").items()

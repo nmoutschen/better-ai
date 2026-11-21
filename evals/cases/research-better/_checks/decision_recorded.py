@@ -9,7 +9,7 @@ from board_lib import entries, fail, none, the_board  # noqa: E402
 
 decisions = entries(the_board(), "decisions")
 if not decisions:
-    fail("no decision in decisions/")
+    fail("no decision in decisions.jsonl")
 for did, d in decisions.items():
     if all(not none(d.get(k)) for k in ("asked", "default", "deadline")) and d.get("status") in (
             "pending", "default", "changed"):
