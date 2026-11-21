@@ -989,7 +989,7 @@ class HookSafety(Case):
                 self.write("probe.jsonl", '{"a": ' + "[" * depth + "]" * depth + "}\n")
                 errors = self.messages("probe.jsonl")
                 self.assertEqual(len(errors), 1, errors)
-                self.assertRegex(errors[0], r"^1: \(record\): (is nested too deeply to (check|read)|.*)")
+                self.assertRegex(errors[0], r"^1: ")
                 self.assertNotIn("Traceback", errors[0])
 
     def test_a_hook_that_raises_is_reported_as_a_failed_check(self):

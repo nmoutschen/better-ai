@@ -432,7 +432,17 @@ def shape_errors(spec) -> list[str]:
 
 
 def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
-    """Return (errors, warnings, digest lines). The shape is schema.py's; the rest needs the rendering's knowledge."""
+    """Return (errors, warnings, digest lines). The shape is schema.py's; the rest needs the rendering's knowledge.
+    Whatever the spec holds, the answer is errors, never a traceback."""
+    try:
+        return check_spec(spec)
+    except RecursionError:
+        return ["(record): is nested too deeply to check"], [], []
+    except Exception as error:
+        return [f"(record): could not be checked: {type(error).__name__}"], [], []
+
+
+def check_spec(spec: dict) -> tuple[list[str], list[str], list[str]]:
     spec = without_nulls(spec)
     errors, warnings, digest = shape_errors(spec), [], []
     if errors:
@@ -3780,8 +3790,11 @@ def render_command(args) -> None:
         spec = json.loads(Path(args.spec).expanduser().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         sys.exit(f"error: cannot read {args.spec}: {exc}")
-    spec = without_nulls(spec)
+    except RecursionError:
+        sys.exit(f"error: cannot read {args.spec}: is nested too deeply to read")
     errors, warnings, digest = check(spec)
+    if not errors:
+        spec = without_nulls(spec)
     for w in warnings:
         print(f"warning: {w}", file=sys.stderr)
     for e in errors:

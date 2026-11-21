@@ -425,7 +425,7 @@
     "childnode": {
       "description": "a part of the tree: a leaf has its value, a node with children may take the sum of them",
       "allOf": [{"$ref": "#/$defs/treenode"}],
-      "if": {"not": {"required": ["children"]}},
+      "if": {"not": {"required": ["children"], "properties": {"children": {"type": "array", "minItems": 1}}}},
       "then": {"required": ["value"], "properties": {"value": {"type": "number"}}}
     },
     "treenode": {
@@ -454,7 +454,7 @@
             }
           }
         },
-        "highlight": {"type": ["array", "string", "null"]}
+        "highlight": {"type": ["array", "string", "null"], "items": {"type": ["string", "number"]}}
       }
     },
     "kind_concept": {
@@ -555,7 +555,16 @@
       "type": "object",
       "required": ["columns", "rows"],
       "properties": {
-        "columns": {"type": "array", "minItems": 1, "items": {"type": ["string", "object"]}},
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "anyOf": [
+              {"$ref": "#/$defs/text"},
+              {"type": "object", "required": ["label"], "properties": {"label": {"$ref": "#/$defs/text"}}}
+            ]
+          }
+        },
         "rows": {
           "type": "array",
           "minItems": 1,
@@ -758,7 +767,7 @@
             "properties": {
               "before": {"type": "number"},
               "after": {"type": "number"},
-              "label": {"type": "string"},
+              "label": {"$ref": "#/$defs/text"},
               "detail": {"$ref": "#/$defs/detail"}
             }
           }
@@ -832,7 +841,7 @@
               "points": {
                 "type": "array",
                 "minItems": 2,
-                "items": {"type": "array", "minItems": 2, "prefixItems": [{}, {"type": "number"}]}
+                "items": {"type": "array", "minItems": 2, "prefixItems": [{"type": ["string", "number"]}, {"type": "number"}]}
               },
               "detail": {"$ref": "#/$defs/detail"}
             }

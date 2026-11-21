@@ -62,6 +62,7 @@ import argparse
 import copy
 import fnmatch
 import json
+import math
 import os
 import re
 import sys
@@ -156,7 +157,7 @@ def _parses(text: str, lines: bool) -> bool:
         for piece in _lines(text) if lines else [text]:
             if piece.strip() or not lines:
                 json.loads(piece)
-    except ValueError:
+    except (ValueError, RecursionError):
         return False
     return True
 
@@ -217,7 +218,7 @@ class Context:
         if key not in self._cache:
             try:
                 self._cache[key] = json.loads(read_checked(path, False))
-            except (OSError, ValueError):
+            except (OSError, ValueError, RecursionError):
                 self._cache[key] = None
         return self._cache[key]
 
@@ -268,7 +269,7 @@ def _lines(text: str) -> list[str]:
 def _loads(text: str) -> Any:
     try:
         return json.loads(text)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
 
 
@@ -278,6 +279,8 @@ def _loads(text: str) -> Any:
 def _type_name(value: Any) -> str:
     if value is None:
         return "null"
+    if isinstance(value, float) and not math.isfinite(value):
+        return "non-finite number"  # NaN and Infinity are not JSON numbers
     if isinstance(value, bool):
         return "boolean"
     if isinstance(value, int):
@@ -568,10 +571,17 @@ def validate_instance(value: Any, schema: dict, docs: dict[str, dict], context: 
 def validate_record(value: Any, schemas: list[dict], docs: dict[str, dict], context: Context | None) -> list[Problem]:
     """The problems of one record against each of its schemas: first everything but the hooks, then, if the record has
     no shape error, the hooks, whose findings come last."""
-    first = [p for schema in schemas for p in Validator(docs, context, "off").validate(value, schema, (), schema)]
-    if context is None or any(p.kind != "cross" for p in first):
-        return first
-    hooked = [p for schema in schemas for p in Validator(docs, context, "only").validate(value, schema, (), schema)]
+    try:
+        first = [p for schema in schemas for p in Validator(docs, context, "off").validate(value, schema, (), schema)]
+        if context is None or any(p.kind != "cross" for p in first):
+            return first
+        hooked = [p for schema in schemas for p in Validator(docs, context, "only").validate(value, schema, (), schema)]
+    except SchemaError:
+        raise  # the schema is wrong, which is not a problem of the record
+    except RecursionError:
+        return [Problem(ROOT, "is nested too deeply to check")]
+    except Exception as error:  # whatever one record makes the validator raise is that record's error, not a traceback
+        return [Problem(ROOT, f"could not be checked: {type(error).__name__}")]
     return first + [p for p in hooked if p.kind == "cross"]
 
 
@@ -880,6 +890,9 @@ def check_text(path: Path, text: str, docs: dict[str, dict], cache: dict[str, An
             record = json.loads(line)
         except ValueError as error:
             errors.append(Error(where, number, ROOT, f"not valid JSON: {error}"))
+            continue
+        except RecursionError:
+            errors.append(Error(where, number, ROOT, "is nested too deeply to read"))
             continue
         if not isinstance(record, dict):
             errors.append(Error(where, number, ROOT, f"expected object, got {_type_name(record)}"))
