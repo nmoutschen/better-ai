@@ -569,3 +569,50 @@ test('delete, accept and reopen point at their item with to, and reopen carries 
   assert.equal(t.state.c2, 'reopened');
   assert.deepEqual(Array.from(t.entries[1].replies, r => r.text), ['still wrong']);
 });
+
+// The research board's page: its errors band and how it shapes the new record fields. Both are read out of board.js,
+// between marker comments and between `const has =` and the map's layout, so the test runs the shipped code.
+const boardJs = fs.readFileSync(path.join(__dirname, '..', 'skills', 'research-better', 'scripts', 'board.js'), 'utf8');
+const realEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const { showLoaded } = new Function('esc', 'plural', boardJs.split('// errors:begin')[1].split('// errors:end')[0] + '; return {showLoaded};')(realEsc, plural);
+const { prepare } = new Function('const has =' + boardJs.split('const has =')[1].split('// ---------- Slices')[0] + '; return {prepare};')();
+const band = () => ({ offline: { hidden: false }, unwatched: { hidden: false }, errors: { hidden: true, innerHTML: '' } });
+
+test('a board with invalid records shows its errors band and never the closed notice', () => {
+  const els = band();
+  showLoaded({ listening: true, errors: [
+    { file: 'claims/C-w2-9.json', line: 1, field: 'question', message: 'dangling: "Q-w9-1" is not a question record in ../questions/', by: 'w2' },
+    { file: 'logs/w2.jsonl', line: 2, field: 'query', message: 'required' },
+  ] }, els);
+  assert.equal(els.offline.hidden, true);
+  assert.equal(els.errors.hidden, false);
+  assert.match(els.errors.innerHTML, /2 problems/);
+  assert.match(els.errors.innerHTML, /<code>claims\/C-w2-9\.json:1<\/code> question: dangling/);
+  assert.match(els.errors.innerHTML, /\(by w2\)/);
+  assert.match(els.errors.innerHTML, /<code>logs\/w2\.jsonl:2<\/code> query: required/);
+});
+
+test('the errors band is hidden when the board has no errors, and shows a message as text, never as HTML', () => {
+  const els = band();
+  showLoaded({ listening: true, errors: [] }, els);
+  assert.deepEqual([els.errors.hidden, els.errors.innerHTML, els.offline.hidden], [true, '', true]);
+  showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: '<u>', message: '<img src=x>' }] }, els);
+  assert.ok(!els.errors.innerHTML.includes('<img'));
+  assert.ok(!els.errors.innerHTML.includes('<u>'));
+});
+
+test("the board's map reads the new fields: claims by question, merged and withdrawn records, where a question was raised", () => {
+  const q = (id, over) => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1, ...over });
+  const c = (id, question, status, source) => ({ id, question, source: source || 'S-1', status });
+  const d = prepare({ brief: {}, logs: { w2: { searches: [{ question: 'Q-1', query: 'a', new_terms: [] }, { question: 'Q-1', query: 'b', new_terms: ['x'] }] } },
+    sources: [], decisions: [],
+    questions: [q('Q-1'), q('Q-2', { kind: 'frontier', raised_in: 'Q-1' }), q('Q-3', { status: 'merged', merged_into: 'Q-1' }),
+      q('Q-4', { origin: { type: 'source', source: 'S-9' } })],
+    claims: [c('C-1', 'Q-1', 'verified'), c('C-2', 'Q-3', 'unchecked'), c('C-3', 'Q-1', 'withdrawn'), c('C-4', 'Q-1', 'checking', 'S-8'), c('C-5', 'Q-1', 'unchecked', 'S-9')] });
+  assert.deepEqual(d.qs.map(x => x.id), ['Q-1', 'Q-2', 'Q-4']);
+  assert.deepEqual(d.byId['Q-1'].claimsList.map(x => x.id), ['C-1', 'C-2', 'C-4', 'C-5']);
+  assert.equal(d.byId['Q-2'].parent, 'Q-1');
+  assert.equal(d.byId['Q-4'].parent, 'Q-1');  // the question of the first claim that cites its source
+  assert.equal(d.byId['Q-1'].searches, 2);
+});

@@ -134,9 +134,21 @@ def broken(file: str, label: str, **over) -> dict:
 INVALID = [
     ("brief.json", "brief", broken("brief.json", "brief", stop_at="soon"), "stop_at", "must be one of"),
     ("decisions.jsonl", "decision", broken("decisions.jsonl", "pending", status="changed"), "answer", "required"),
-    ("questions", "question", broken("questions/<id>.json", "answered, contested, not found, unclear", gist=...), "gist", "required"),
+    (
+        "questions",
+        "question",
+        broken("questions/<id>.json", "answered, contested, not found, unclear", gist=...),
+        "gist",
+        "required",
+    ),
     ("claims", "claim", broken("claims/<id>.json", "verified", span=...), "span", "required"),
-    ("sources", "source", broken("sources/<id>.json", "source, a duplicate", replaced_by=...), "replaced_by", "required"),
+    (
+        "sources",
+        "source",
+        broken("sources/<id>.json", "source, a duplicate", replaced_by=...),
+        "replaced_by",
+        "required",
+    ),
     ("logs", "log line", broken("logs/<agent>.jsonl", "search", new_terms="none"), "new_terms", "expected array"),
 ]
 
