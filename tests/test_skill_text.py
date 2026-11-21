@@ -499,12 +499,41 @@ class CodeBetterTextTest(unittest.TestCase):
     def test_code_better_template_instructions_are_capitalised_imperatives(self):
         """The instructions in a template's fill-in block use verbs in capitals, as PRINCIPLES 6.1 asks."""
         weak = re.compile(
-            r"(?:^- |[.:] )(?:Save|Add|Keep|Set|Give|Begin|Change|List|Put|Use|Write|Run|Read|Drop|Fix)\b"
+            r"(?:^- |[.:] )(?:Save|Add|Keep|Set|Give|Begin|Change|List|Put|Use|Write|Run|Read|Drop|Fix|Rewrite|Commit)\b"
         )
         for path in sorted((CODE_BETTER / "templates").glob("*.md")):
             block = path.read_text().split("<HOW TO FILL", 1)[1].split(">\n", 1)[0]
             found = [line[:50] for line in block.splitlines() if weak.search(line)]
             self.assertEqual(found, [], path.name)
+
+    def test_code_better_an_architect_spec_never_points_to_a_code_better_decision(self):
+        """With an architect folder's spec, a question goes to decisions.jsonl and the answer becomes a request source."""
+        rule = "NEVER write a gap or a source in it that points to a decision"
+        for path in (
+            CODE_BETTER / "templates" / "spec.md",
+            CODE_BETTER / "SKILL.md",
+            CODE_BETTER / "modes" / "coordinate.md",
+        ):
+            text = path.read_text()
+            self.assertIn("architect folder's `spec.jsonl`", text, path.name)
+            self.assertIn(rule, text, path.name)
+            self.assertIn("source `request`", text, path.name)
+
+    def test_code_better_small_text_fixes_of_round_three(self):
+        """The decisions schema names its writers as the text does; the notes table and the tasks template are exact."""
+        comment = json.loads((CODE_SCHEMAS / "decisions.schema.json").read_text())["$comment"]
+        self.assertIn("In coordinate mode only the coordinator writes it", comment)
+        skill = (CODE_BETTER / "SKILL.md").read_text()
+        self.assertIn("EACH file below is typed JSON", skill)
+        self.assertIn("`.code/audit/<YYYY-MM-DD>/audit.json`, `evidence.jsonl` and `findings.jsonl`", skill)
+        tasks = (CODE_BETTER / "templates" / "tasks.md").read_text()
+        self.assertIn(
+            "SAVE the tasks in `.code/<change>/tasks.jsonl`; IF the repo's spec tool also keeps tasks, "
+            "UPDATE its tasks from it",
+            tasks,
+        )
+        self.assertIn("REWRITE the line in place", tasks)
+        self.assertIn("COMMIT after each task", tasks)
 
     def test_code_better_case_files_name_no_old_file(self):
         """The case files name the templates and files of the new format."""
