@@ -591,3 +591,160 @@ def test_judge_cost_includes_the_skill_reads_judge() -> None:
         metadata={"case": "a", "condition": "skill", "rule": "5.1"},
     )
     assert report.read_result(sample).judge_cost == pytest.approx(0.75)  # type: ignore[arg-type]
+
+
+def run(case: str, condition: str, passed: float) -> report.SampleResult:
+    """One scored run of a case, on Sonnet, from a log started on 2026-11-21."""
+    return report.SampleResult(
+        f"{case}-{condition}", case, condition, "r", passed, started="2026-11-21T10:00:00", agent_model="sonnet"
+    )
+
+
+CATEGORIES = [
+    {"name": "Owns", "does": "Owns the error", "cases": ["a1", "a2", "a3"]},
+    {"name": "Reads", "does": "Reads the situation", "cases": ["b1"]},
+]
+
+
+def scored() -> list[report.SampleResult]:
+    """No skill fails category Owns, the skill passes it; category Reads has one case."""
+    return [
+        run("a1", "no-skill", 0),
+        run("a2", "no-skill", 0),
+        run("a3", "no-skill", 0.5),
+        run("a1", "skill", 1),
+        run("a2", "skill", 1),
+        run("a3", "skill", 1),
+        run("b1", "no-skill", 1),
+        run("b1", "skill", 0),
+    ]
+
+
+def test_category_rows_pair_cases_and_mark_only_a_clear_change() -> None:
+    """A change whose interval excludes zero gets ▲; a one-case category has no interval and gets =."""
+    columns, rows = report.category_rows(scored(), CATEGORIES)
+    assert columns == ["no-skill", "skill"]
+    assert rows[0].cases == 3 and rows[0].rates == {"no-skill": pytest.approx(1 / 6), "skill": 1.0}
+    assert rows[0].mark() == "▲ +83" and rows[0].low is not None and rows[0].low > 0
+    assert rows[1].low is None and rows[1].mark() == "="
+
+
+def test_category_rows_compare_before_and_after() -> None:
+    """With logs of the skill before the change, the change is after − before."""
+    before = [run("a1", "skill", 1), run("a2", "skill", 1), run("a3", "skill", 1), run("b1", "skill", 1)]
+    columns, rows = report.category_rows(scored(), CATEGORIES, before)
+    assert columns == ["no-skill", "before", "after"]
+    assert rows[0].change == 0 and rows[0].mark() == "="
+    assert rows[1].change == -1
+
+
+def test_case_outside_every_category_stops() -> None:
+    """A case that ran but is in no category stops the report instead of dropping out."""
+    with pytest.raises(SystemExit, match="c1"):
+        report.category_rows([*scored(), run("c1", "skill", 1)], CATEGORIES)
+
+
+def test_pr_lines_bold_the_compared_cells_of_a_clear_change() -> None:
+    """The PR table names the columns, gives percentages and bolds only a clear change's compared cells."""
+    columns, rows = report.category_rows(scored(), CATEGORIES)
+    lines = report.pr_lines(columns, rows, scored())
+    assert lines[0] == "Tested on 4 cases with sonnet."
+    assert lines[2] == "| Category | Cases | No skill | Skill | Change |"
+    assert lines[4] == "| 1 Owns | 3 | **17%** | **100%** | ▲ +83 |"
+    assert lines[5] == "| 2 Reads | 1 | 100% | 0% | = |"
+
+
+def test_docs_lines_show_what_the_skill_does_without_a_comparison() -> None:
+    """The docs table gives the skill's pass rate per category, under what it does."""
+    columns, rows = report.category_rows(scored(), CATEGORIES)
+    lines = report.docs_lines(columns, rows, scored())
+    assert lines[0] == "Tested on 4 situations with sonnet (2026-11-21)."
+    assert lines[2:] == [
+        "| What it does | Passed |",
+        "| --- | ---: |",
+        "| Owns the error | 100% |",
+        "| Reads the situation | 0% |",
+    ]
+
+
+def test_chart_svg_draws_one_dot_per_category_and_an_interval_where_there_is_one() -> None:
+    """The chart is valid SVG with a dot per category and an interval line only for several cases."""
+    import xml.etree.ElementTree as ET
+
+    _, rows = report.category_rows(scored(), CATEGORIES)
+    root = ET.fromstring(report.chart_svg(rows))
+    ns = "{http://www.w3.org/2000/svg}"
+    assert len(root.findall(f"{ns}circle")) == 2
+    assert len([line for line in root.findall(f"{ns}line") if line.get("stroke-width") == "3"]) == 1
+
+
+def test_load_priorities_checks_names_cases_and_duplicates(tmp_path: Path) -> None:
+    """A missing file, an unknown case and a case in two categories each stop with the reason."""
+    with pytest.raises(SystemExit, match="missing"):
+        report.load_priorities("x", tmp_path)
+    for case in ("a1", "b1"):
+        (tmp_path / "x" / case).mkdir(parents=True)
+        (tmp_path / "x" / case / "case.yaml").write_text("id: " + case)
+    path = tmp_path / "x" / "priorities.yaml"
+    path.write_text("categories:\n  - {name: A, does: a, cases: [a1, zz]}\n")
+    with pytest.raises(SystemExit, match="zz"):
+        report.load_priorities("x", tmp_path)
+    path.write_text("categories:\n  - {name: A, does: a, cases: [a1]}\n  - {name: B, does: b, cases: [a1, b1]}\n")
+    with pytest.raises(SystemExit, match="both"):
+        report.load_priorities("x", tmp_path)
+
+
+def test_every_priorities_file_covers_each_of_its_skills_cases_once() -> None:
+    """Each skill's priorities.yaml loads and lists every case folder of that skill."""
+    for path in sorted(report.CASES_DIR.glob(f"*/{report.PRIORITIES_FILE}")):
+        listed = {case for category in report.load_priorities(path.parent.name) for case in category["cases"]}
+        folders = {folder.name for folder in path.parent.iterdir() if (folder / "case.yaml").exists()}
+        assert listed == folders, path
+
+
+def test_main_prints_the_pr_table_and_writes_the_chart(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """`--pr --chart` prints the table of each skill and writes its chart; the full report is not printed."""
+    monkeypatch.setattr(report, "read_results", lambda paths: scored())
+    monkeypatch.setattr(report, "load_priorities", lambda skill: CATEGORIES)
+    chart = tmp_path / "chart.svg"
+    assert report.main(["x.eval", "--pr", "--chart", str(chart)]) == 0
+    printed = capsys.readouterr().out
+    assert "| 1 Owns | 3 | **17%** | **100%** | ▲ +83 |" in printed and "## Pass rate" not in printed
+    assert chart.read_text().startswith("<svg")
+
+
+def test_column_missing_a_case_stops() -> None:
+    """A case scored in one column but not another stops the report, naming the case and the column."""
+    runs = [r for r in scored() if not (r.case == "a3" and r.condition == "no-skill")]
+    with pytest.raises(SystemExit, match=r"a3 \(No skill\)"):
+        report.category_rows(runs, CATEGORIES)
+
+
+def test_change_that_rounds_to_zero_points_is_equal() -> None:
+    """A change under half a point is = even when its interval excludes zero."""
+    assert report.CategoryRow("A", "a", 3, {}, 0.004, 0.004, 0.004).mark() == "="
+    assert report.CategoryRow("A", "a", 3, {}, -0.004, -0.004, -0.004).mark() == "="
+
+
+def test_chart_escapes_category_names() -> None:
+    """A category name with & or < still gives valid SVG."""
+    import xml.etree.ElementTree as ET
+
+    ET.fromstring(report.chart_svg([report.CategoryRow("a & <b>", "a", 2, {}, 0.1, 0.0, 0.2)]))
+
+
+def test_before_without_runs_of_the_group_stops(monkeypatch: pytest.MonkeyPatch) -> None:
+    """--before logs of another model or skill stop the report instead of showing no change."""
+    other = [report.SampleResult("a1-skill", "a1", "skill", "r", 1, agent_model="opus")]
+    monkeypatch.setattr(report, "read_results", lambda paths: scored() if paths == [Path("x.eval")] else other)
+    monkeypatch.setattr(report, "load_priorities", lambda skill: CATEGORIES)
+    with pytest.raises(SystemExit, match="no runs"):
+        report.main(["x.eval", "--pr", "--before", "old.eval"])
+
+
+def test_tested_on_counts_only_cases_with_scored_runs() -> None:
+    """A case whose every run errored is not counted as tested."""
+    runs = [*scored(), report.SampleResult("z-skill", "z", "skill", "r", math.nan, error="429", started="2026")]
+    assert report.tested_on(runs)[0] == 4
