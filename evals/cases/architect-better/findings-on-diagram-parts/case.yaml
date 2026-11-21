@@ -1,0 +1,42 @@
+id: findings-on-diagram-parts
+rule: attach-findings-to-parts
+source:
+- modes/design.md
+- agents/perspective-reviewer.md
+reads:
+- modes/design.md
+- agents/perspective-reviewer.md
+- scripts/example/README.md
+situation: >-
+  The change folder docs/designs/2026-11-order-export/ holds an order-history export design the user approved in the
+  page (approval-1, four perspectives). Planted flaw: decision D2 serves each export CSV from the public static
+  website at /exports/<token>.csv, with no login and no expiry (box exportfiles, edge e10, step export/x8), which
+  breaks RQ2 and API standard rule 3. After the reviews, the agent writes each finding to findings.jsonl on the
+  diagram parts it affects, as box:, edge: and step: keys of design.json, with a boolean confirmed and handled_by. A
+  script checks that every part key resolves and the field types; the judge checks that the public-link exposure is a
+  finding on the export files box or the download arrow or step.
+request: I approved the order export design in the page. Carry on with docs/designs/2026-11-order-export.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/findings_on_parts.py"
+  files:
+    findings_on_parts.py: checks/findings_on_parts.py
+- type: judge
+  rubric: >-
+    Rule: the agent writes each review finding to findings.jsonl on the diagram parts it affects. Planted facts: the
+    approved design in docs/designs/2026-11-order-export/ serves each export CSV from the public static website at
+    /exports/<token>.csv (decision D2): box exportfiles "Export files", edge e10 "Customer to Export files: downloads
+    CSV from emailed link", and step x8 of flow export (also flow2) "GET /exports/<token>.csv (no login)". Anyone who has
+    the link, such as from a forwarded email, gets the customer's name, addresses and order history without logging in,
+    and the file is never deleted; this breaks RQ2 (own data only, behind the session cookie) and docs/standards/api.md
+    rule 3. A script already checked that every part key in findings.jsonl names a part of design.json and that
+    confirmed is a boolean. PASS only if all hold: (1) findings.jsonl holds a finding that states this exposure: the
+    export is reachable without login by anyone who has the link, or it stays available with no expiry; (2) that
+    finding's parts include box:exportfiles, edge:e10 or a step key for x8 (step:export/x8 or step:flow2/x8), alone or
+    joined with + to other keys. FAIL if any of: no finding in findings.jsonl states the public-link exposure, even if
+    the reply mentions it; that finding is attached only to parts the exposure does not pass through, such as box:api
+    or box:db alone. Does not count: other findings and their parts; whether the exposure finding is marked confirmed;
+    whether reviewers ran as sub-agents; whether the design was changed after the review; Git's own files under .git/
+    and caches; notes in .code/ or a temporary folder; serving the live page and the files it writes (.server,
+    .conversation-seen, conversation.jsonl entries written by architect.py); asking the user to confirm in the page; a
+    run that ends waiting for the user.

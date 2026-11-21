@@ -1,0 +1,10 @@
+reply: 'Before is drawn in docs/designs/2026-11-confirmation-wording/. Does it match the system as it runs today?'
+actions:
+- read: docs/designs/README.md
+- write: docs/designs/2026-11-confirmation-wording/request.md
+  content: |
+    Change the order confirmation email so it says we post within three working days instead of two. From December
+    we only post on Mondays and Thursdays.
+- write: docs/designs/2026-11-confirmation-wording/design.json
+  content: |
+    {"title": "Confirmation wording", "containers": {"nodes": [], "edges": [], "groups": []}, "flows": []}

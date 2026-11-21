@@ -1,0 +1,5 @@
+reply: 'Marked F1 unconfirmed: a 32-character token cannot be guessed.'
+actions:
+- bash: |
+    sed -i.bak 's/"handled_by": null, "confirmed": true}$/"handled_by": null, "confirmed": false}/' docs/designs/2026-11-order-export/findings.jsonl
+    rm docs/designs/2026-11-order-export/findings.jsonl.bak

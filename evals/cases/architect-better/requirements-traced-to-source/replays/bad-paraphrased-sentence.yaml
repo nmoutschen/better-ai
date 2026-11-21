@@ -1,0 +1,5 @@
+reply: 'Requirements are in the page; please confirm.'
+actions:
+- write: docs/designs/2026-11-order-export/requirements.jsonl
+  content: |
+    {"id": "RQ1", "kind": "functional", "text": "Customers download their orders as CSV.", "source": {"type": "request", "sentence": "Customers can download their order history as CSV."}}

@@ -1,0 +1,337 @@
+{
+  "title": "Order history export",
+  "summary": "Customers download their own order history as CSV from their account page.",
+  "scope": "shop API, jobs, SQLite data, outbox emails",
+  "containers": {
+    "nodes": [
+      {
+        "id": "customer",
+        "label": "Customer",
+        "kind": "person",
+        "detail": "logged in on the website"
+      },
+      {
+        "id": "website",
+        "label": "Website",
+        "kind": "page",
+        "detail": "static, on Netlify"
+      },
+      {
+        "id": "api",
+        "label": "shop API",
+        "kind": "service",
+        "detail": "shop/api.py"
+      },
+      {
+        "id": "db",
+        "label": "shop.db",
+        "kind": "store",
+        "detail": "SQLite: customers, orders, order_lines, outbox"
+      },
+      {
+        "id": "paylane",
+        "label": "PayLane",
+        "kind": "external",
+        "detail": "card payments"
+      },
+      {
+        "id": "mailjob",
+        "label": "send_emails",
+        "kind": "job",
+        "detail": "cron, every minute"
+      },
+      {
+        "id": "mailrelay",
+        "label": "MailRelay",
+        "kind": "external",
+        "detail": "SMTP relay"
+      },
+      {
+        "id": "exportjob",
+        "label": "build_exports",
+        "kind": "job",
+        "detail": "cron, every minute",
+        "in": [
+          "after"
+        ]
+      },
+      {
+        "id": "exportfiles",
+        "label": "Export files",
+        "kind": "files",
+        "detail": "data/exports/<token>.csv on the VPS, deleted after 7 days",
+        "in": [
+          "after"
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "from": "customer",
+        "to": "website",
+        "label": "orders books"
+      },
+      {
+        "id": "e2",
+        "from": "website",
+        "to": "api",
+        "label": "HTTPS, session cookie"
+      },
+      {
+        "id": "e3",
+        "from": "api",
+        "to": "db",
+        "label": "orders, outbox rows"
+      },
+      {
+        "id": "e4",
+        "from": "api",
+        "to": "paylane",
+        "label": "charges card"
+      },
+      {
+        "id": "e5",
+        "from": "mailjob",
+        "to": "db",
+        "label": "reads unsent outbox"
+      },
+      {
+        "id": "e6",
+        "from": "mailjob",
+        "to": "mailrelay",
+        "label": "SMTP"
+      },
+      {
+        "id": "e7",
+        "from": "api",
+        "to": "db",
+        "label": "export request row",
+        "in": [
+          "after"
+        ]
+      },
+      {
+        "id": "e8",
+        "from": "exportjob",
+        "to": "db",
+        "label": "reads orders, writes outbox row",
+        "in": [
+          "after"
+        ]
+      },
+      {
+        "id": "e9",
+        "from": "exportjob",
+        "to": "exportfiles",
+        "label": "writes CSV",
+        "in": [
+          "after"
+        ]
+      },
+      {
+        "id": "e11",
+        "from": "api",
+        "to": "exportfiles",
+        "label": "reads CSV for its owner",
+        "in": [
+          "after"
+        ]
+      },
+      {
+        "id": "e12",
+        "from": "customer",
+        "to": "website",
+        "label": "downloads export (session cookie)",
+        "in": [
+          "after"
+        ]
+      }
+    ],
+    "groups": [
+      {
+        "id": "vps",
+        "label": "VPS",
+        "members": [
+          "api",
+          "db",
+          "mailjob",
+          "exportjob",
+          "exportfiles"
+        ]
+      }
+    ]
+  },
+  "flows": [
+    {
+      "id": "order",
+      "name": "Place an order",
+      "participants": [
+        {
+          "id": "website",
+          "box": "website"
+        },
+        {
+          "id": "api",
+          "box": "api"
+        },
+        {
+          "id": "paylane",
+          "box": "paylane"
+        },
+        {
+          "id": "db",
+          "box": "db"
+        },
+        {
+          "id": "mailjob",
+          "box": "mailjob"
+        }
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "from": "website",
+          "to": "api",
+          "label": "POST /v1/orders"
+        },
+        {
+          "id": "s2",
+          "from": "api",
+          "to": "paylane",
+          "label": "charge card"
+        },
+        {
+          "id": "s3",
+          "from": "paylane",
+          "to": "api",
+          "label": "charge id",
+          "kind": "response"
+        },
+        {
+          "id": "s4",
+          "from": "api",
+          "to": "db",
+          "label": "save order + outbox row, one transaction"
+        },
+        {
+          "id": "s5",
+          "from": "api",
+          "to": "website",
+          "label": "201 order id",
+          "kind": "response"
+        },
+        {
+          "id": "s6",
+          "from": "mailjob",
+          "to": "db",
+          "label": "read unsent outbox rows",
+          "kind": "async"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "name": "Export order history",
+      "in": [
+        "after"
+      ],
+      "participants": [
+        {
+          "id": "customer",
+          "box": "customer"
+        },
+        {
+          "id": "website",
+          "box": "website"
+        },
+        {
+          "id": "api",
+          "box": "api"
+        },
+        {
+          "id": "db",
+          "box": "db"
+        },
+        {
+          "id": "exportjob",
+          "box": "exportjob"
+        },
+        {
+          "id": "exportfiles",
+          "box": "exportfiles"
+        },
+        {
+          "id": "mailjob",
+          "box": "mailjob"
+        }
+      ],
+      "steps": [
+        {
+          "id": "x1",
+          "from": "website",
+          "to": "api",
+          "label": "POST /v1/account/export (session cookie)"
+        },
+        {
+          "id": "x2",
+          "from": "api",
+          "to": "db",
+          "label": "insert exports row (pending)"
+        },
+        {
+          "id": "x3",
+          "from": "api",
+          "to": "website",
+          "label": "202 Accepted",
+          "kind": "response"
+        },
+        {
+          "id": "x4",
+          "from": "exportjob",
+          "to": "db",
+          "label": "read pending exports, the customer's orders",
+          "kind": "async"
+        },
+        {
+          "id": "x5",
+          "from": "exportjob",
+          "to": "exportfiles",
+          "label": "write data/exports/<token>.csv"
+        },
+        {
+          "id": "x6",
+          "from": "exportjob",
+          "to": "db",
+          "label": "outbox row: email with download link"
+        },
+        {
+          "id": "x7",
+          "from": "mailjob",
+          "to": "db",
+          "label": "read outbox, send link email",
+          "kind": "async"
+        },
+        {
+          "id": "x8",
+          "from": "website",
+          "to": "api",
+          "label": "GET /v1/account/export/<token> (session cookie)"
+        },
+        {
+          "id": "x9",
+          "from": "api",
+          "to": "exportfiles",
+          "label": "read CSV if the export is the customer's and under 7 days old"
+        }
+      ]
+    }
+  ],
+  "accepted": [
+    "requirements",
+    "containers",
+    "flows",
+    "perspectives",
+    "decisions"
+  ]
+}

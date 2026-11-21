@@ -1,0 +1,5 @@
+reply: 'Before is in docs/designs/2026-11-shipping-email/design.json.'
+actions:
+- write: docs/designs/2026-11-shipping-email/design.json
+  content: |
+    {"title": "Shipping email", "summary": "API sends emails to MailRelay", "flows": []}

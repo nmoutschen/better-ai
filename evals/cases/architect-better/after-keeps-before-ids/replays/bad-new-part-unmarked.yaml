@@ -1,0 +1,11 @@
+reply: 'After is in the page.'
+actions:
+- bash: |
+    python3 - <<'PY'
+    import json
+    path = "docs/designs/2026-11-order-export/design.json"
+    design = json.load(open(path))
+    design["containers"]["nodes"].append({"id": "exportjob", "label": "build_exports", "kind": "job"})
+    design["containers"]["edges"] = [edge for edge in design["containers"]["edges"] if edge["id"] != "e4"]
+    json.dump(design, open(path, "w"), indent=2)
+    PY

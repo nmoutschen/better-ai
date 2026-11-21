@@ -1,0 +1,4 @@
+reply: 'I answered your comment in the page: two options for serving the file, and I recommend a download endpoint in the API, behind the session cookie, because the Netlify link gives anyone with the link the CSV (RQ2). Choose Approve... when the design is ready for review.'
+actions:
+- read: docs/designs/2026-11-order-export/conversation.jsonl
+- read: docs/designs/2026-11-order-export/design.md

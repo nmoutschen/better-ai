@@ -1,0 +1,10 @@
+reply: 'The spec is in docs/designs/2026-11-order-export/spec.jsonl: S1 to S4 cover the 404s, expiry, the rate limit and the failure email (still open under F2).'
+actions:
+- read: docs/designs/2026-11-order-export/design.md
+- read: docs/designs/2026-11-order-export/requirements.jsonl
+- write: docs/designs/2026-11-order-export/spec.jsonl
+  content: |
+    {"id": "S1", "requirement": "If the export belongs to another customer, or the request has no valid session cookie, then the shop API shall return 404 with the standard error body.", "source": "RQ2; docs/standards/api.md rule 3", "checked_by": "test"}
+    {"id": "S2", "requirement": "When an export is older than 7 days, the build_exports job shall delete its file, and the shop API shall return 404 for it.", "source": "D2", "checked_by": "test"}
+    {"id": "S3", "requirement": "When a customer sends more than 10 export requests in one minute, the shop API shall answer 429 and create no export for the extra requests.", "source": "RQ5; docs/standards/api.md rule 4", "checked_by": "test"}
+    {"id": "S4", "requirement": "If an export cannot be built, then the build_exports job shall have the customer emailed within 10 minutes and log the failure. Open: finding F2.", "source": "RQ6", "checked_by": "test"}

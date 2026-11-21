@@ -76,7 +76,7 @@ ASK the user, USING `/ask-better` if available, in these cases:
 - **Decisions.** ASK about each decision that changes behaviour, cost, risk or how the system is maintained, with the options, your recommendation, its main reason and its main drawback. USE `/decide-better` if available. IF the user does not read code, DESCRIBE each option by what they would observe or pay.
 - **Conflicts.** ASK about two requirements that conflict, a requirement that contradicts a recorded decision or a repo standard, and a requirement that cannot or should not hold as written, with the change you propose. DO NOT design to your own version until it is agreed. ONCE agreed, REVISE the requirement in place.
 
-TREAT a constraint the user set as a requirement. KEEP working on the parts your questions do not affect.
+TREAT a constraint the user set as a requirement. KEEP working on the parts your questions do not affect, EXCEPT where a step says to wait for the user.
 
 ### Missing capabilities
 

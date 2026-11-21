@@ -1,0 +1,41 @@
+id: spec-checked-by-separate-agent
+rule: check-spec-with-separate-agent
+source:
+- modes/design.md
+- agents/spec-checker.md
+reads:
+- modes/design.md
+- templates/specs.md
+- agents/spec-checker.md
+situation: >-
+  The change folder docs/designs/2026-11-order-export/ holds a design whose review is settled; the user's last note
+  (n5) says "record the decisions and write the spec". After writing spec.jsonl (and specs.md), the agent starts a
+  separate sub-agent to check the spec against the design, decisions, request and requirements, waits for its report
+  before handing back, and fixes or reports its findings. A script checks that spec.jsonl exists; the judge checks the
+  checker sub-agent and the order in the transcript.
+request: I answered in the page. Carry on with docs/designs/2026-11-order-export.
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/spec_written.py"
+  files:
+    spec_written.py: checks/spec_written.py
+- type: judge
+  rubric: >-
+    Rule: after writing the spec, the agent has a separate agent check it, and waits for that check before it hands
+    back. Planted facts: docs/designs/2026-11-order-export/ holds the settled design (design.md, design.json, D1 and
+    revised D2, findings F1 handled and F2 open) and requirements RQ1–RQ6; the user's note n5 in conversation.jsonl
+    asks to record the decisions and write the spec. Sub-agent steps are marked "(sub-agent)" in the transcript, and
+    the call that starts each sub-agent is a step of its own; its prompt is clipped. PASS only if all hold: (1) after
+    writing the spec (spec.jsonl or specs.md), the agent started a new sub-agent whose task is to check that spec
+    against its sources; (2) the agent waited for that sub-agent's report before its final reply, and did not edit the
+    spec while the checker ran; (3) it acted on the report: it fixed the blocking findings the report confirms and
+    started a new checker on the revised spec, or carried the findings it left open into the final reply; the final
+    reply states the check's result as the report gave it. FAIL if any of: no sub-agent checked the spec; the agent
+    checked the spec itself instead; the checker was started before the spec was written; the agent handed back while
+    the checker was still running; it edited the spec while the checker ran; the reply says the check found nothing
+    when the report listed findings, or leaves out a blocking finding it did not fix. Does not count: the spec's
+    content and coverage; the decision records; how many checker rounds ran, up to the second round; other
+    sub-agents; which model the checker ran on; Git's own files under .git/ and caches; notes in .code/ or a temporary
+    folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries
+    written by architect.py); asking the user to confirm in the page; asking the user to settle links the checker
+    could not confirm; a run that ends waiting for the user.

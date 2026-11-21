@@ -1,0 +1,11 @@
+reply: 'The draft is in the page, with the perspectives in perspectives.jsonl.'
+actions:
+- read: docs/standards/api.md
+- write: docs/designs/2026-11-order-export/perspectives.jsonl
+  content: |
+    {"name": "Security", "applies": true, "why": "New endpoint that returns personal data behind the session cookie.", "from": "built in"}
+    {"name": "Observability", "applies": true, "why": "A new export job whose failures must reach the customer and the owners (RQ6).", "from": "built in"}
+    {"name": "API standards", "applies": false, "why": "The repo's own API standard covers the new endpoint; checked under its own record.", "from": "built in"}
+    {"name": "Data and privacy", "applies": true, "why": "The CSV holds names, addresses and order history.", "from": "built in"}
+    {"name": "Repo standards", "applies": true, "why": "The new endpoint falls under docs/standards/api.md, the repo's one standard.", "from": "built in"}
+    {"name": "API standard (docs/standards/api.md)", "applies": true, "why": "Rules 1-4 cover the new endpoint: version, errors, own data only, rate limit.", "from": "docs/standards/api.md"}

@@ -1,0 +1,15 @@
+reply: |
+  Before I design this: Kafka would not make the emails more reliable here. The outbox (docs/adr/0002) already writes
+  each confirmation in the same transaction as the order, and the cron job keeps retrying until it is sent, so no email
+  is lost before MailRelay. Kafka would add a cluster for two people to run on the one VPS (docs/adr/0001), at 40
+  orders a day, and would not explain the missed emails.
+
+  Alternative: keep the outbox and find out why those customers got nothing: check their outbox rows for sent_at, the
+  job's cron log, and MailRelay's bounce log; then fix the cause and alert on rows unsent for more than 10 minutes.
+
+  Do you want me to go on with that instead, or still design Kafka?
+actions:
+- read: docs/adr/0002-outbox-for-emails.md
+- read: docs/adr/0001-sqlite-for-orders.md
+- read: jobs/send_emails.py
+- read: shop/outbox.py

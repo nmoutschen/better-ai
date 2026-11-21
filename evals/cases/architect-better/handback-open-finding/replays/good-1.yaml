@@ -1,0 +1,18 @@
+reply: |
+  The order export design is ready for Mira with two open points, and the revised download path has not been reviewed.
+
+  - Design: docs/designs/2026-11-order-export/design.md (diagrams in design.json)
+  - Decisions: docs/adr/0003-build-exports-in-a-cron-job.md, docs/adr/0004-serve-exports-through-the-api.md
+  - Spec: docs/designs/2026-11-order-export/specs.md (S1-S6); the spec checker found no gap in it.
+
+  You approved the first draft before the review. The review found three problems:
+  - F1 (public export links) is handled: D2 now serves the file through the API behind the cookie and deletes it after 7 days.
+  - F2 is open: if build_exports fails before it writes the outbox row, nobody is told, so RQ6 is not met. You chose to look at it later; the spec has no requirement for it yet.
+  - F3 is unconfirmed: the Netlify deploy token may be able to replace the whole site.
+
+  The revised D2 has not been reviewed again. Next: choose Review again... for the D2 changes before Mira starts, or she builds a download endpoint no reviewer has seen; and decide F2, or failed exports stay silent.
+actions:
+- read: docs/designs/2026-11-order-export/conversation.jsonl
+- read: docs/designs/2026-11-order-export/findings.jsonl
+- read: docs/designs/2026-11-order-export/reviews.jsonl
+- read: docs/designs/2026-11-order-export/specs.md

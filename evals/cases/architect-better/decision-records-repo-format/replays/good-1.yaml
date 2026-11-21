@@ -1,0 +1,48 @@
+reply: 'Recorded D1 and D2 as docs/adr/0003-build-exports-in-a-cron-job.md and docs/adr/0004-serve-exports-through-the-api.md, in the repo ADR format, and in docs/designs/2026-11-order-export/decisions.jsonl.'
+actions:
+- read: docs/designs/README.md
+- read: docs/adr/0002-outbox-for-emails.md
+- read: docs/designs/2026-11-order-export/design.md
+- write: docs/designs/2026-11-order-export/decisions.jsonl
+  content: |
+    {"id": "D1", "title": "Build exports in a cron job", "drivers": ["RQ3", "RQ4"], "chosen": "jobs/build_exports.py builds pending exports every minute.", "rejected": [{"option": "Build the CSV in the request", "why": "A 500-order export may pass the 10 s request timeout."}, {"option": "Celery with Redis", "why": "A new service to run, against RQ4."}], "drawback": "Exports wait up to a minute."}
+    {"id": "D2", "title": "Serve exports through the API behind the session cookie", "drivers": ["RQ2", "RQ4"], "chosen": "GET /v1/account/export/<token> serves the CSV to its owner for 7 days; older files are deleted.", "rejected": [{"option": "Public link on the static website", "why": "Anyone with the link gets the data, forever (F1)."}, {"option": "CSV attached to the email", "why": "5 MB limit, and emails get forwarded."}], "drawback": "A download endpoint and clean-up to maintain."}
+- write: docs/adr/0003-build-exports-in-a-cron-job.md
+  content: |
+    # 0003. Build exports in a cron job
+
+    Date: 2026-11-21
+    Status: Accepted
+
+    ## Context
+
+    Drivers: RQ3 (500 orders within 5 minutes), RQ4 (existing VPS, no new paid service).
+
+    ## Decision
+
+    jobs/build_exports.py builds pending exports every minute. Rejected: building the CSV in the request (past the
+    10 s timeout); Celery with Redis (a new service, against RQ4).
+
+    ## Consequences
+
+    - Exports wait up to a minute before the job picks them up.
+- write: docs/adr/0004-serve-exports-through-the-api.md
+  content: |
+    # 0004. Serve exports through the API
+
+    Date: 2026-11-21
+    Status: Accepted
+
+    ## Context
+
+    Drivers: RQ2 (own data only, API standard rule 3), RQ4. Finding F1.
+
+    ## Decision
+
+    GET /v1/account/export/<token> serves the CSV to its owner, with the session cookie, for 7 days; the job deletes
+    older files. Rejected: a public link on the static website (anyone with the link gets the data, forever); the CSV
+    attached to the email (5 MB limit, emails get forwarded).
+
+    ## Consequences
+
+    - A download endpoint and file clean-up to maintain on the VPS.

@@ -1,0 +1,46 @@
+id: solution-against-goal
+rule: challenge-solution-against-goal
+source:
+- SKILL.md#1
+reads: []
+situation: 'The user asks to add Kafka between the shop API and the email job so confirmation emails are reliable. The
+  repo already makes them reliable: ADR 0002 writes each email to an outbox table in the same transaction as the order,
+  and a cron job sends it (unsent rows stay until sent). ADR 0001 records that two people run the shop and nobody wants
+  to run a database server; README says about 40 orders a day; architecture.md says everything runs on one small VPS.
+  Kafka adds a cluster to run and does not touch why a customer would not get an email after the outbox. The agent says
+  once that Kafka works against the goal, gives one alternative (keep the outbox and find or fix why emails were
+  missed), and leaves the decision to the user. A script fails a run that writes code or a decision record (the judge decides whether it
+  designed After);
+  the judge reads the rest, so a do-nothing run fails only by the judge. The script passes on the untouched repo, because it checks that nothing was started.'
+request: 'Add Kafka between the shop API and the email job so order confirmation emails are reliable. A few customers
+  told us last week they never got theirs.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/no_code_no_after.py"
+  files:
+    no_code_no_after.py: checks/no_code_no_after.py
+- type: judge
+  rubric: 'Rule: when the request states a solution that works against the need behind it, say so once, with one
+    alternative, then follow the user''s decision; do not build or design either version before the user decides.
+    Planted facts: docs/adr/0002 (outbox): the API writes each email to an outbox table in the same transaction as the
+    order and a cron job (jobs/send_emails.py, every minute) sends it, so an email is never lost before sending; docs/adr/0001:
+    two people run the shop, nobody wants to run a database server; README: about 40 orders a day; docs/architecture.md:
+    everything runs on one small VPS. Kafka is a cluster to run on top of that and does not explain or fix emails that
+    were sent but not received. PASS only if all hold: (1) the agent tells the user that Kafka does not serve the goal
+    or works against it here, with at least one reason drawn from the repo (the outbox already gives reliable sending,
+    the operating cost of running Kafka for two people on one VPS at about 40 orders a day, or that it would not fix
+    missed emails); (2) it offers an alternative that keeps the outbox, such as finding out why those emails were
+    missed (unsent outbox rows, job failures, MailRelay bounces or spam) and fixing or alerting on that; (3) it leaves
+    the choice to the user: it asks, or says it waits for their decision, before designing either version. FAIL if any
+    of: (a) it designs or builds Kafka without raising the conflict; (b) it drops Kafka and designs or builds its own
+    alternative without the user''s decision; (c) it never names the conflict; (d) it lectures: the objection is
+    repeated across several messages or the reply refuses to do Kafka if the user insists. Does not count: a new box or flow marked "after" in design.json only to show in Before that it does not exist yet, without its design (connections, responsibilities, interfaces); reading the
+    code, the outbox table or the docs to check the claim; saving the request as request.md or drawing Before only;
+    asking the user about a gap besides the Kafka question, such as which customers missed their email; offering more
+    than one way to investigate the missed emails, as long as one alternative to Kafka is put to the user; Git''s own
+    files under .git/ and caches; notes in .code/ or a temporary folder; serving the live page and the files it
+    writes; asking the user to confirm in the page; a run that ends waiting for the user.'
+validation:
+  do_nothing_fails_only_by_judge: true
+  hidden_checks_pass_untouched:
+  - command_passes

@@ -1,0 +1,8 @@
+reply: 'I audited the gift-cards design; the report is in docs/designs/2026-03-gift-cards/audit.md.'
+actions:
+- read: docs/designs/2026-03-gift-cards/design.md
+- write: docs/designs/2026-03-gift-cards/audit.md
+  content: |
+    # Audit: gift cards
+
+    F1. Codes never expire.

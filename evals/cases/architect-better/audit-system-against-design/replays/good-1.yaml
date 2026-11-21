@@ -1,0 +1,10 @@
+reply: |
+  No: the gift card code differs from its design on two points, both security-relevant. I changed nothing.
+
+  1. Code generation. The design says 16 characters from secrets.token_urlsafe; shop/giftcards.py:13 uses random.choices over A-Z0-9 with k=8. random is predictable and 8 characters leave far fewer codes, so someone can guess a code and spend another customer's balance. Proposed: secrets.token_urlsafe(12) for 16 characters.
+  2. Delivery. The design emails the code through the outbox; shop/api.py:46 returns it in the POST /v1/gift-cards response and adds no outbox row (send_emails.py has no gift card template). The code goes to whoever made the request instead of by email. Proposed: enqueue a gift_card email in the same transaction and return only the balance, or update the design if this was intended.
+actions:
+- read: docs/designs/2026-03-gift-cards/design.md
+- read: shop/giftcards.py
+- read: shop/api.py
+- read: jobs/send_emails.py
