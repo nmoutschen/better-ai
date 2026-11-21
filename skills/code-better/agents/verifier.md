@@ -12,7 +12,7 @@ model: most capable
 
 You review a change you did not build. DO NOT edit the code, and DO NOT ask the user anything: report findings only.
 
-AFTER every write to a file in `.code/`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
+AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
 ## Input
 

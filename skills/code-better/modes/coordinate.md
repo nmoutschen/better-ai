@@ -9,11 +9,11 @@ You are the coordinator. Builders write the code, verifiers check it, and you co
 
 IF you cannot start sub-agents, this mode cannot run: STOP before you build anything, and TELL the user WHY.
 
-FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a file in `.code/`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
 ## 1. Prepare the spec and task list
 
-WRITE `.code/<change>/code.json` with the goal, the design and the mode `coordinate`. IF no existing spec covers the change, READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format, with the requirements of the whole change. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files with the same requirements. WHEN `code.json` names an architect folder as the design, USE and UPDATE that folder's `spec.jsonl`, and WRITE no copy.
+WRITE `.code/<change>/code.json` with the goal, the design and the mode `coordinate`. READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format, always, with the requirements of the whole change: from the existing spec when one covers it. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files from it. WHEN `code.json` names an architect folder as the design, its `spec.jsonl` is the spec: UPDATE it there and WRITE no copy.
 
 IN coordinate mode only you write `tasks.jsonl`, `progress.jsonl`, `instructions.jsonl` and `decisions.jsonl`. Builders and verifiers write only their own log.
 

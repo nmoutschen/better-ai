@@ -1,7 +1,7 @@
 # Audit: <scope>
 
 <HOW TO FILL THIS IN — delete this block when done.
-- Save three files in `.code/audit/<YYYY-MM-DD>/`: `audit.json`, one record; `evidence.jsonl`, one line per fact; and `findings.jsonl`, one line per finding, in the order of the ranking. `schemas/audit.schema.json`, `schemas/evidence.schema.json` and `schemas/findings.schema.json` are the authority.
+- SAVE three files in `.code/audit/<YYYY-MM-DD>/`: `audit.json`, one record; `evidence.jsonl`, one line per fact; and `findings.jsonl`, one line per finding, in the order of the ranking. `schemas/audit.schema.json`, `schemas/evidence.schema.json` and `schemas/findings.schema.json` are the authority.
 - Conventions: START each record with `type`, `at` (UTC, ending in Z) and `by` (your agent name). WRITE a missing value as `null`, a list as a JSON array, and a value that has a fixed set as one of its exact lowercase words. A field the schema does not name is an error. WRITE one record per line, as ASCII JSON, and the record a pointer names before the pointer: each fact in `evidence.jsonl` before the finding whose `evidence_ids` names it. AFTER each write, RUN `python3 <skill dir>/scripts/schema.py check <the file>` and FIX what it reports.
 - `audit.json` holds the GOAL, the commit, and in `not_read` the history, checks or areas left out, and why, or `null`.
 - WRITE each fact of step 2 as one evidence record, with the command that produced it.

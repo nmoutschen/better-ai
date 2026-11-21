@@ -5,11 +5,11 @@ description: Use for a change of structure, dependency or data format that keeps
 
 # Mode: refactor or migration
 
-FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a file in `.code/`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
 ## 1. Update the spec
 
-KEEP a spec for every change, however small: a one-line change needs one requirement. WRITE `.code/<change>/code.json`: the goal, the design and the mode. IF no existing spec covers the change, READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format. WRITE in the spec that observable behaviour stays the same: LIST the paths the change touches, and for a data migration, the data it moves. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files with the same requirements. WHEN `code.json` names an architect folder as the design, UPDATE that folder's `spec.jsonl` and WRITE no copy.
+KEEP a spec for every change, however small: a one-line change needs one requirement. WRITE `.code/<change>/code.json`: the goal, the design and the mode. READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format, always: from the existing spec when one covers the change. WRITE in the spec that observable behaviour stays the same: LIST the paths the change touches, and for a data migration, the data it moves. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files from it. WHEN `code.json` names an architect folder as the design, its `spec.jsonl` is the spec: UPDATE it there and WRITE no copy.
 
 IF the design says some behaviour changes, that part is not this change: LIST it as a proposed next step, or, under a coordinator, as its own task.
 

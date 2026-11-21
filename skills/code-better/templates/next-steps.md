@@ -1,9 +1,9 @@
 # Proposed next steps: <short name of the change>
 
 <HOW TO FILL THIS IN — delete this block when done.
-- Save them in `.code/<change>/next-steps.jsonl`, one line per piece of work outside the change, in the format of `schemas/next-steps.schema.json`, which is the authority.
+- SAVE them in `.code/<change>/next-steps.jsonl`, one line per piece of work outside the change, in the format of `schemas/next-steps.schema.json`, which is the authority.
 - Conventions: START each record with `type`, `at` (UTC, ending in Z) and `by` (your agent name). WRITE a missing value as `null`, a list as a JSON array, and a value that has a fixed set as one of its exact lowercase words. A field the schema does not name is an error. WRITE one record per line, as ASCII JSON, and the record a pointer names before the pointer. AFTER each write, RUN `python3 <skill dir>/scripts/schema.py check <the file>` and FIX what it reports.
-- Set `priority` from `if_nobody` alone. Drop a step already in the tasks or an earlier hand-back.
+- SET `priority` from `if_nobody` alone. DROP a step already in the tasks or an earlier hand-back.
 - `origin` says where the step came up: a file, a requirement of the spec, an audit finding, or a task.
 - IF a coordinator runs the change, it may admit a step that stays inside the design and asks the user about the rest. OTHERWISE, every step goes to the user in the hand-back.>
 

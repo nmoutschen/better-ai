@@ -423,7 +423,7 @@ class CodeBetterTextTest(unittest.TestCase):
                     path = Path(temp) / relative
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(text)
-                problems += [f"{run}: {error}" for error in schema.check_paths([Path(temp)], CODE_SCHEMAS)]
+                problems += [f"{run}: {error}" for error in schema.check_paths([Path(temp) / ".code"], CODE_SCHEMAS)]
         self.assertEqual(problems, [])
 
     def test_code_better_a_solo_mode_can_record_a_question_and_the_spec_always_exists(self):
@@ -490,7 +490,7 @@ class CodeBetterTextTest(unittest.TestCase):
             with self.subTest(replay=str(replay.relative_to(CASES))):
                 self.assertIn("/audit.json", text)
                 self.assertIn("/evidence.jsonl", text)
-                block = text[text.index("findings.jsonl") :]
+                block = text[text.index("write: .code/audit/2026-11-21/findings.jsonl") :]
                 for line in re.findall(r"(?m)^    (\{.*\})$", block):
                     record = json.loads(line)
                     self.assertTrue(record["where"], record["id"])

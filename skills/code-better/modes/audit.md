@@ -5,7 +5,7 @@ description: Use when the user asks for an audit of existing code, such as its t
 
 # Mode: audit
 
-FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a file in `.code/`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
 An audit reports; it does not change the code. DO NOT edit, create or delete any file outside `.code/`, even for a one-line fix: PROPOSE each fix as a task instead.
 
