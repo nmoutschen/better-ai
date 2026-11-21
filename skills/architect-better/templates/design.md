@@ -35,7 +35,10 @@ Diagrams: <link to design JSON>
 
 ## Decisions summary
 
-- <Choice>: <recommendation, drivers, trade-off, rejected alternatives and reasons, or link to the decision record>
+- <Choice>: <recommendation> (<link to the decision record, once written>)
+  - Drivers: <requirement IDs>
+  - Rejected: <alternative>: <reason>
+  - Drawback: <main cost, risk or maintenance burden of the chosen option>
   - Assumes: <what must stay true for this choice to hold>
 
 ## Departures from existing patterns
