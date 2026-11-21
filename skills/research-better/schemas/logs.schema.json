@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "logs.schema.json",
+  "title": "one line of an agent's log: what it searched, raised, found missing or stopped for; only that agent writes it",
+  "x-files": ["logs/*.jsonl"],
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {"enum": ["search", "frontier", "challenge", "chain", "gap", "strategy", "stop", "failure", "checked"]}
+  },
+  "allOf": [
+    {"if": {"required": ["type"], "properties": {"type": {"const": "search"}}}, "then": {"$ref": "#/$defs/search"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "frontier"}}}, "then": {"$ref": "#/$defs/frontier"}},
+    {"if": {"required": ["type"], "properties": {"type": {"enum": ["challenge", "chain"]}}}, "then": {"$ref": "#/$defs/after"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "gap"}}}, "then": {"$ref": "#/$defs/gap"}},
+    {"if": {"required": ["type"], "properties": {"type": {"enum": ["strategy", "stop"]}}}, "then": {"$ref": "#/$defs/text"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "failure"}}}, "then": {"$ref": "#/$defs/failure"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "checked"}}}, "then": {"$ref": "#/$defs/checked"}}
+  ],
+  "$defs": {
+    "question": {"type": "string", "x-points-to": {"file": "../questions/", "type": "question"}},
+    "words": {"type": "string", "minLength": 1},
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "query", "question", "new_terms"],
+      "properties": {
+        "type": {"const": "search"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "query": {"$ref": "#/$defs/words"},
+        "question": {"$ref": "#/$defs/question"},
+        "new_terms": {"type": "array", "items": {"$ref": "#/$defs/words"}}
+      }
+    },
+    "frontier": {
+      "description": "the worker raised questions after one; the lenses that found something are named by the questions they raised",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "after", "empty_lenses"],
+      "properties": {
+        "type": {"const": "frontier"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "after": {"$ref": "#/$defs/question"},
+        "empty_lenses": {"description": "the lenses the worker checked and found nothing for", "type": "array", "items": {"$ref": "#/$defs/words"}}
+      }
+    },
+    "after": {
+      "description": "a challenge or a chain step run after a question",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "after"],
+      "properties": {
+        "type": {"enum": ["challenge", "chain"]},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "after": {"$ref": "#/$defs/question"}
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "text", "queries"],
+      "properties": {
+        "type": {"const": "gap"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "text": {"$ref": "#/$defs/words"},
+        "queries": {"type": "array", "items": {"$ref": "#/$defs/words"}}
+      }
+    },
+    "text": {
+      "description": "a change of strategy, or why the agent stopped",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "text"],
+      "properties": {
+        "type": {"enum": ["strategy", "stop"]},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "text": {"$ref": "#/$defs/words"}
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "collection", "text"],
+      "properties": {
+        "type": {"const": "failure"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "collection": {"$ref": "#/$defs/words"},
+        "text": {"$ref": "#/$defs/words"}
+      }
+    },
+    "checked": {
+      "description": "a verifier checked a claim; the verdict lives on the claim",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "claim"],
+      "properties": {
+        "type": {"const": "checked"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "claim": {"type": "string", "x-points-to": {"file": "../claims/", "type": "claim"}}
+      }
+    }
+  }
+}

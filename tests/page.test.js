@@ -386,12 +386,15 @@ test('element selectors use the nearest document-unique id in a page or slide', 
   assert.deepEqual(escaped, ['name', 'anchor']);
 });
 
-// The dashboard's task status and agent tag: read out of dashboard.html between `// status:begin` and `// status:end`.
+// The dashboard's task status and agent tag, on the JSON the dashboard now reads: read out of dashboard.html between `// status:begin` and `// status:end`.
 const statusCode = html.split('// status:begin')[1].split('// status:end')[0];
 const { taskStatus, agentTag, agentClass, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, agentTag, agentClass, DONE, isDone};')(s => String(s));
-const shown = (status, blocked_by, tasks) => { const s = taskStatus({ status, blocked_by }, tasks || [{ id: 'T2' }]); return [s.key, s.word]; };
+// A task record is tasks.jsonl's: a blocked task names `reason` (task, user or repair limit) and, for task, `waits_on`.
+const blockedFields = by => by === undefined || by === '' ? {} : by === 'user' || by === 'repair limit' ? { reason: by }
+  : /^T\d+$/.test(by) ? { reason: 'task', waits_on: by } : { reason: by };
+const shown = (status, blocked_by, tasks) => { const s = taskStatus({ status, ...blockedFields(blocked_by) }, tasks || [{ id: 'T2' }]); return [s.key, s.word]; };
 
-test("a task shows the status tasks.md gives it, each of the coordinate mode's stages with its own icon", () => {
+test("a task shows the status tasks.jsonl gives it, each of the coordinate mode's stages with its own icon", () => {
   assert.deepEqual(shown('todo'), ['todo', 'to do']);
   assert.deepEqual(shown('building'), ['building', 'building']);
   assert.deepEqual(shown('built'), ['built', 'built']);
@@ -405,7 +408,7 @@ test("a task shows the status tasks.md gives it, each of the coordinate mode's s
   assert.equal(new Set(keys).size, keys.length);
 });
 
-test('a blocked task says what it waits on, from the Blocked by column only', () => {
+test('a blocked task says what it waits on, from its reason and waits_on only', () => {
   assert.deepEqual(shown('blocked', 'T2'), ['blocked', 'waiting on T2']);
   assert.deepEqual(shown('blocked', 'user'), ['blocked', 'waiting on you']);
   assert.deepEqual(shown('blocked', 'repair limit'), ['blocked', 'repair limit']);
@@ -416,10 +419,18 @@ test('a blocked task says what it waits on, from the Blocked by column only', ()
   assert.deepEqual(shown('blocked', 'needs a key'), ['blocked', 'blocked: needs a key']);
 });
 
+test('a task that did not validate shows as not valid with its first message; an unknown status still shows as written', () => {
+  const t = (status, _errors) => { const s = taskStatus({ status, _errors }, []); return [s.key, s.word]; };
+  assert.deepEqual(t('built', ['requirements[0]: dangling']), ['other', 'not valid: requirements[0]: dangling']);
+  assert.deepEqual(t('blocked', ['reason: required']), ['other', 'not valid: reason: required']);
+  assert.deepEqual(t('in review', ['status: must be one of x']), ['other', 'not a status: in review']);
+  assert.deepEqual(t('built', []), ['built', 'built']);
+});
+
 test('a status or a blocked reason with markup shows as text, never as HTML', () => {
   const realEsc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const { statusLabel } = new Function('esc', statusCode + '; return {statusLabel};')(realEsc);
-  assert.doesNotMatch(statusLabel({ status: 'blocked', blocked_by: '<img src=x onerror=alert(1)>' }, []), /<img/);
+  assert.doesNotMatch(statusLabel({ status: 'blocked', reason: '<img src=x onerror=alert(1)>' }, []), /<img/);
   assert.match(statusLabel({ status: '<b>x</b>' }, []), /&lt;b&gt;x&lt;\/b&gt;/);
 });
 
@@ -444,6 +455,96 @@ test('a verifier shows as a verifier, a builder by its mode', () => {
   assert.equal(agentClass(b), 'm-bugfix');
   assert.equal(agentClass(n), 'm-feature');  // no role: shown as a builder
   assert.match(agentTag({ role: ' Verifier ' }), />verifier</);
+});
+
+// A kept invalid record can hold any type in any field: the page draws what it can and never throws.
+test('a task with a wrongly typed requirements or mode still draws the task list', () => {
+  const rows = html.split("// A task's requirements with their text")[1].split('const taskLabel')[0];
+  const drawCode = html.split('const svg = body =>')[1].split("// The task list's own scroll bar")[0];
+  const el = { hidden: true, textContent: '', html: '' };
+  const OPENTASKS = new Set();
+  const setHTML = (e, h) => { e.html = h; };
+  const { drawTasks } = new Function('esc', 'has', 'D', '$', 'setHTML', 'OPENTASKS', 'ICON',
+    statusCode + ';const reqsOf' + rows.split('const reqsOf')[1] + ';const svg = body =>' + drawCode + '; return {drawTasks};')(
+    realEsc, v => v && v !== 'none', { requirements: { R1: 'text' }, tasks: [], agents: [] }, () => el, setHTML, OPENTASKS,
+    { working: '', finished: '', blocked: '' });
+  const bad = { id: 'T2', task: 'x', mode: 5, requirements: 'R1', check: 7, status: 'built', _errors: ['requirements: expected array'] };
+  drawTasks({ tasks: [{ id: 'T1', task: 'ok', mode: 'feature', requirements: ['R1'], status: 'todo' }, bad], agents: [] });
+  assert.match(el.html, /T1/);
+  assert.match(el.html, /T2/);
+  assert.match(el.html, /not valid: requirements: expected array/);
+});
+
+test('a decision that did not validate says so, with its first message', () => {
+  const card = x => ({ e: { x: { id: 'd1', status: 'waiting', asked: 'Which?', at: '2026-11-20T10:00:00Z', ...x } }, replies: [] });
+  const [item] = decisionItem(card({ _errors: ['about.task: dangling: "T9"'] }), {}, true);
+  assert.match(item.html, /class="what invalid">not valid: about\.task: dangling/);
+  const [clean] = decisionItem(card({ _errors: [] }), {}, true);
+  assert.doesNotMatch(clean.html, /not valid/);
+  const [odd] = decisionItem(card({ asked: 5, from: {}, task: [], _errors: ['asked: expected string'] }), {}, true);
+  assert.match(odd.html, /not valid/);
+});
+
+test('an invalid task marked done or merged does not count toward the done total', () => {
+  assert.equal([{ status: 'done' }, { status: 'merged', _errors: ['x'] }, { status: 'merged', _errors: [] }].filter(isDone).length, 2);
+});
+
+// ---------- The errors band: records that did not validate are listed, and the page stays live ----------
+const errorsCode = html.split('// errors:begin')[1].split('// errors:end')[0];
+const realEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const { errorsHTML } = new Function('esc', errorsCode + '; return {errorsHTML};')(realEsc);
+const badRecords = [
+  { file: 'tasks.jsonl', line: 2, field: 'status', message: 'must be one of "todo", "building"', by: 'coordinator' },
+  { file: 'logs/b1.jsonl', line: 7, field: 'result', message: 'required when type is "handed_back"' },
+];
+
+test('the errors band lists each invalid record with its file and line, its field, the reason and who wrote it', () => {
+  const band = errorsHTML(badRecords);
+  assert.match(band, /2 records are not valid/);
+  assert.match(band, /tasks\.jsonl:2/);
+  assert.match(band, /status/);
+  assert.match(band, /must be one of &quot;todo&quot;, &quot;building&quot;/);
+  assert.match(band, /coordinator/);
+  assert.match(band, /logs\/b1\.jsonl:7/);
+  assert.match(errorsHTML([badRecords[0]]), /1 record is not valid/);
+  assert.equal(errorsHTML([]), '');
+  assert.equal(errorsHTML(undefined), '');
+});
+
+test('markup in an invalid record shows as text in the errors band', () => {
+  const band = errorsHTML([{ file: '<b>f</b>', line: 1, field: '<img src=x>', message: '<script>x</script>', by: '<i>' }]);
+  assert.doesNotMatch(band, /<img|<script|<i>|<b>f/);
+  assert.match(band, /&lt;b&gt;f&lt;\/b&gt;/);
+});
+
+// tick() is read out of dashboard.html between `// load:begin` and `// load:end`, with stubs for what a page has.
+const loadCode = html.split('// load:begin')[1].split('// load:end')[0];
+function pageWith(answer) {
+  const els = {};
+  const el = id => els[id] || (els[id] = { hidden: true, textContent: '', id });
+  const drawn = [];
+  const body = new Function('fetch', '$', 'render', 'let D = null, CLOSED_PAGE = false;' + loadCode + '; return {tick, state: () => ({ fails, CLOSED_PAGE })};')(
+    () => answer(), el, d => drawn.push(d));
+  return { ...body, el, drawn };
+}
+const served = data => () => Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
+
+test('a folder with invalid records is not a closed dashboard: the page renders what is valid and the closed notice stays hidden', async () => {
+  const page = pageWith(served({ tasks: [{ id: 'T1' }], agents: [], errors: badRecords, now: 1 }));
+  await page.tick();
+  await page.tick();
+  assert.equal(page.el('offline').hidden, true);
+  assert.equal(page.state().CLOSED_PAGE, false);
+  assert.equal(page.drawn.length, 2);
+  assert.equal(page.drawn[0].errors.length, 2);
+});
+
+test('the closed notice shows when the server cannot be reached', async () => {
+  const page = pageWith(() => Promise.reject(new Error('down')));
+  await page.tick();
+  assert.equal(page.el('offline').hidden, true);  // once is a blip
+  await page.tick();
+  assert.equal(page.el('offline').hidden, false);
 });
 
 // ---------- Sending: what the user sees when the server refuses an event, as against when it cannot be reached ----------
@@ -568,4 +669,104 @@ test('delete, accept and reopen point at their item with to, and reopen carries 
   assert.equal(t.entries[0].deleted, true);
   assert.equal(t.state.c2, 'reopened');
   assert.deepEqual(Array.from(t.entries[1].replies, r => r.text), ['still wrong']);
+});
+
+// The research board's page: its errors band and how it shapes the new record fields. Both are read out of board.js,
+// between marker comments and between `const has =` and the map's layout, so the test runs the shipped code.
+const boardJs = fs.readFileSync(path.join(__dirname, '..', 'skills', 'research-better', 'scripts', 'board.js'), 'utf8');
+const realEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const { showLoaded, notValid } = new Function('esc', 'plural', boardJs.split('// errors:begin')[1].split('// errors:end')[0] + '; return {showLoaded, notValid};')(realEsc, plural);
+const { prepare } = new Function('const has =' + boardJs.split('const has =')[1].split('// ---------- Slices')[0] + '; return {prepare};')();
+const band = () => ({ offline: { hidden: false }, unwatched: { hidden: false }, errors: { hidden: true, innerHTML: '' } });
+
+test('a board with invalid records shows its errors band and never the closed notice', () => {
+  const els = band();
+  showLoaded({ listening: true, errors: [
+    { file: 'claims/C-w2-9.json', line: 1, field: 'question', message: 'dangling: "Q-w9-1" is not a question record in ../questions/', by: 'w2' },
+    { file: 'logs/w2.jsonl', line: 2, field: 'query', message: 'required' },
+  ] }, els);
+  assert.equal(els.offline.hidden, true);
+  assert.equal(els.errors.hidden, false);
+  assert.match(els.errors.innerHTML, /2 problems/);
+  assert.match(els.errors.innerHTML, /<code>claims\/C-w2-9\.json:1<\/code> question: dangling/);
+  assert.match(els.errors.innerHTML, /\(by w2\)/);
+  assert.match(els.errors.innerHTML, /<code>logs\/w2\.jsonl:2<\/code> query: required/);
+});
+
+test('the errors band is hidden when the board has no errors, and shows a message as text, never as HTML', () => {
+  const els = band();
+  showLoaded({ listening: true, errors: [] }, els);
+  assert.deepEqual([els.errors.hidden, els.errors.innerHTML, els.offline.hidden], [true, '', true]);
+  showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: '<u>', message: '<img src=x>' }] }, els);
+  assert.ok(!els.errors.innerHTML.includes('<img'));
+  assert.ok(!els.errors.innerHTML.includes('<u>'));
+});
+
+test("the board's map reads the new fields: claims by question, merged and withdrawn records, where a question was raised", () => {
+  const q = (id, over) => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1, ...over });
+  const c = (id, question, status, source) => ({ id, question, source: source || 'S-1', status });
+  const d = prepare({ brief: {}, logs: { w2: { searches: [{ question: 'Q-1', query: 'a', new_terms: [] }, { question: 'Q-1', query: 'b', new_terms: ['x'] }] } },
+    sources: [], decisions: [],
+    questions: [q('Q-1'), q('Q-2', { kind: 'frontier', raised_in: 'Q-1' }), q('Q-3', { status: 'merged', merged_into: 'Q-1' }),
+      q('Q-4', { origin: { type: 'source', source: 'S-9' } })],
+    claims: [c('C-1', 'Q-1', 'verified'), c('C-2', 'Q-3', 'unchecked'), c('C-3', 'Q-1', 'withdrawn'), c('C-4', 'Q-1', 'checking', 'S-8'), c('C-5', 'Q-1', 'unchecked', 'S-9')] });
+  assert.deepEqual(d.qs.map(x => x.id), ['Q-1', 'Q-2', 'Q-4']);
+  assert.deepEqual(d.byId['Q-1'].claimsList.map(x => x.id), ['C-1', 'C-2', 'C-4', 'C-5']);
+  assert.equal(d.byId['Q-2'].parent, 'Q-1');
+  assert.equal(d.byId['Q-4'].parent, 'Q-1');  // the question of the first claim that cites its source
+  assert.equal(d.byId['Q-1'].searches, 2);
+});
+
+test('searches on a merged question count for the question it was merged into', () => {
+  const q = (id, over) => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1, ...over });
+  const d = prepare({ brief: {}, sources: [], decisions: [], claims: [],
+    logs: { w2: { searches: [{ question: 'Q-3', query: 'a', new_terms: [] }, { question: 'Q-1', query: 'b', new_terms: [] }] } },
+    questions: [q('Q-1'), q('Q-3', { status: 'merged', merged_into: 'Q-1' })] });
+  assert.equal(d.byId['Q-1'].searches, 2);
+});
+
+test('the errors band is written only when its text changes, so a screen reader is not read it every poll', () => {
+  let writes = 0, html = '';
+  const els = { offline: { hidden: false }, unwatched: { hidden: false },
+    errors: { hidden: true, get innerHTML() { return html; }, set innerHTML(v) { writes++; html = v; } } };
+  const d = { listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] };
+  showLoaded(d, els); showLoaded(d, els); showLoaded({ ...d }, els);
+  assert.equal(writes, 1);
+  showLoaded({ listening: true, errors: [] }, els);
+  assert.equal(writes, 2);
+});
+
+test('an invalid record the board still shows is marked with its first message, and the map copes with missing fields', () => {
+  assert.equal(notValid({ _errors: ['status: must be one of "a"', 'x: y'] }), 'not valid: status: must be one of "a"');
+  assert.equal(notValid({}), '');
+  const d = prepare({ brief: {}, sources: [{ id: 'S-1', _errors: ['trust: bad'] }], decisions: [], logs: {},
+    questions: [{ id: 'Q-1', _errors: ['status: bad'], status: 'merged' }, { id: 'Q-2', _errors: ['origin: required'] }],
+    claims: [{ id: 'C-1', _errors: ['question: required'] }, { id: 'C-2', question: 'Q-2', source: 'S-1' }] });
+  assert.deepEqual(d.qs.map(x => x.id), ['Q-1', 'Q-2']);  // merged without merged_into is not hidden
+  assert.equal(d.byId['Q-2'].claimsList.length, 1);
+});
+
+test('an invalid merge, out-of-scope question or withdrawn claim stays visible, marked, and its claims stay on a drawn question', () => {
+  const q = (id, over) => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1, ...over });
+  const c = (id, question, over) => ({ id, question, source: 'S-1', status: 'unchecked', ...over });
+  const d = prepare({ brief: {}, sources: [], decisions: [], logs: {},
+    questions: [q('Q-w2-4', { status: 'merged', merged_into: 'Q-w9-9', _errors: ['merged_into: dangling'] }),
+      q('Q-2', { status: 'merged', merged_into: 'Q-1' }), q('Q-1'),
+      q('Q-5', { status: 'out of scope', _errors: ['owner: bad'] }), q('Q-6', { status: 'out of scope' })],
+    claims: [c('C-w2-7', 'Q-w2-4'), c('C-w2-8', 'Q-w2-4'), c('C-9', 'Q-1', { status: 'withdrawn', _errors: ['replaced_by: required'] }),
+      c('C-10', 'Q-1', { status: 'withdrawn' }), c('C-11', 'Q-2')] });
+  assert.deepEqual(d.qs.map(x => x.id), ['Q-w2-4', 'Q-1', 'Q-5']);  // a valid merge or out of scope question is not drawn
+  assert.deepEqual(d.byId['Q-w2-4'].claimsList.map(x => x.id), ['C-w2-7', 'C-w2-8']);
+  assert.deepEqual(d.byId['Q-1'].claimsList.map(x => x.id), ['C-9', 'C-11']);  // the valid merge sends C-11 to Q-1
+});
+
+test('the errors band says which records are shown marked and which are left out', () => {
+  const els = band();
+  showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] }, els);
+  assert.match(els.errors.innerHTML, /Questions, claims and sources they name are shown marked not valid; other records they name are left out of the page\./);
+});
+
+test('the board marks an invalid brief like any other record', () => {
+  assert.equal(notValid({ title: 'T', _errors: ['stop_at: must be one of "high"'] }), 'not valid: stop_at: must be one of "high"');
 });

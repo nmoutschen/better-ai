@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evidence.schema.json",
+  "title": "one line of audit/<date>/evidence.jsonl: a fact an audit finding rests on",
+  "$comment": "",
+  "x-files": [
+    "audit/*/evidence.jsonl"
+  ],
+  "type": "object",
+  "required": [
+    "type",
+    "at",
+    "by"
+  ],
+  "properties": {
+    "type": {
+      "enum": [
+        "history",
+        "check",
+        "rule"
+      ]
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "history"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/history"
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "check"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "rule"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  ],
+  "$defs": {
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "fact",
+        "command"
+      ],
+      "properties": {
+        "type": {
+          "const": "history"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id",
+          "pattern": "^E\\d+$"
+        },
+        "fact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "fact",
+        "command"
+      ],
+      "properties": {
+        "type": {
+          "const": "check"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id",
+          "pattern": "^E\\d+$"
+        },
+        "fact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "fact",
+        "command"
+      ],
+      "properties": {
+        "type": {
+          "const": "rule"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id",
+          "pattern": "^E\\d+$"
+        },
+        "fact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

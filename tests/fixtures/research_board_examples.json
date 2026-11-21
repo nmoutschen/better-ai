@@ -1,0 +1,459 @@
+{
+ "brief.json": [
+  {
+   "label": "brief",
+   "record": {
+    "type": "brief",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "coordinator",
+    "topic": "why did checkout conversion drop in October",
+    "title": "Why checkout conversion dropped",
+    "short": "Checkout drop",
+    "meaning": "…",
+    "goal": "decide whether to roll back the new form",
+    "limit": null,
+    "stop_at": "medium",
+    "collections": [
+     "web",
+     "wiki"
+    ],
+    "missing": [],
+    "changes": [
+     {
+      "at": "2026-11-21T10:30:00Z",
+      "text": "dropped vendor blogs"
+     }
+    ],
+    "status": "running"
+   }
+  }
+ ],
+ "decisions.jsonl": [
+  {
+   "label": "pending",
+   "record": {
+    "type": "decision",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "coordinator",
+    "id": "D1",
+    "asked": "The analytics wiki asks for a login",
+    "default": "Go on without it and list it as missing",
+    "deadline": "2026-11-21T10:30:00Z",
+    "status": "pending"
+   }
+  },
+  {
+   "label": "default",
+   "record": {
+    "type": "decision",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "coordinator",
+    "id": "D1",
+    "asked": "The analytics wiki asks for a login",
+    "default": "Go on without it and list it as missing",
+    "deadline": "2026-11-21T10:30:00Z",
+    "status": "default"
+   }
+  },
+  {
+   "label": "changed",
+   "record": {
+    "type": "decision",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "coordinator",
+    "id": "D1",
+    "asked": "The analytics wiki asks for a login",
+    "default": "Go on without it and list it as missing",
+    "deadline": "2026-11-21T10:30:00Z",
+    "status": "changed",
+    "answer": {
+     "type": "page",
+     "event": "a-lq3z"
+    }
+   }
+  }
+ ],
+ "questions/<id>.json": [
+  {
+   "label": "proposed, open, out of scope",
+   "record": {
+    "type": "question",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "Q-w2-4",
+    "question": "Did the October form add a step before payment?",
+    "title": "Did the form add steps",
+    "priority": "high",
+    "status": "open",
+    "origin": {
+     "type": "source",
+     "source": "S-w1-1"
+    },
+    "kind": "frontier",
+    "raised_in": "Q-w1-2",
+    "lens": "newer",
+    "stakes": "if it did, the drop is self-inflicted",
+    "done_when": "release notes show the steps",
+    "note": null
+   }
+  },
+  {
+   "label": "in progress",
+   "record": {
+    "type": "question",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "Q-w2-4",
+    "question": "Did the October form add a step before payment?",
+    "title": "Did the form add steps",
+    "priority": "high",
+    "status": "in progress",
+    "owner": "w2",
+    "origin": {
+     "type": "source",
+     "source": "S-w1-1"
+    },
+    "kind": "frontier",
+    "raised_in": "Q-w1-2",
+    "lens": "newer",
+    "stakes": "if it did, the drop is self-inflicted",
+    "done_when": "release notes show the steps",
+    "note": null
+   }
+  },
+  {
+   "label": "answered, contested, not found, unclear",
+   "record": {
+    "type": "question",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "Q-w2-4",
+    "question": "Did the October form add a step before payment?",
+    "title": "Did the form add steps",
+    "priority": "high",
+    "status": "answered",
+    "owner": "w2",
+    "summary": "The release notes list a new address step before payment.",
+    "gist": "Yes: an address step was added.",
+    "origin": {
+     "type": "source",
+     "source": "S-w1-1"
+    },
+    "kind": "frontier",
+    "raised_in": "Q-w1-2",
+    "lens": "newer",
+    "stakes": "if it did, the drop is self-inflicted",
+    "done_when": "release notes show the steps",
+    "note": null
+   }
+  },
+  {
+   "label": "merged",
+   "record": {
+    "type": "question",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w3",
+    "id": "Q-w3-2",
+    "question": "Did the October form add a step before payment?",
+    "title": "Did the form add steps",
+    "priority": "high",
+    "status": "merged",
+    "merged_into": "Q-w2-4",
+    "origin": {
+     "type": "source",
+     "source": "S-w1-1"
+    },
+    "kind": "frontier",
+    "raised_in": "Q-w1-2",
+    "lens": "newer",
+    "stakes": "if it did, the drop is self-inflicted",
+    "done_when": "release notes show the steps",
+    "note": null
+   }
+  }
+ ],
+ "claims/<id>.json": [
+  {
+   "label": "unchecked",
+   "record": {
+    "type": "claim",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "C-w2-7",
+    "claim": "The October release added an address step before payment.",
+    "question": "Q-w2-4",
+    "source": "S-w2-3",
+    "quote": "we've added an address confirmation step before payment",
+    "status": "unchecked"
+   }
+  },
+  {
+   "label": "checking",
+   "record": {
+    "type": "claim",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "C-w2-7",
+    "claim": "The October release added an address step before payment.",
+    "question": "Q-w2-4",
+    "source": "S-w2-3",
+    "quote": "we've added an address confirmation step before payment",
+    "status": "checking",
+    "checker": "v1"
+   }
+  },
+  {
+   "label": "verified",
+   "record": {
+    "type": "claim",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "C-w2-7",
+    "claim": "The October release added an address step before payment.",
+    "question": "Q-w2-4",
+    "source": "S-w2-3",
+    "quote": "we've added an address confirmation step before payment",
+    "status": "verified",
+    "checker": "v1",
+    "span": "We've added an address confirmation step before payment.",
+    "hard": false
+   }
+  },
+  {
+   "label": "verified, source fields differ",
+   "record": {
+    "type": "claim",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "C-w2-7",
+    "claim": "The October release added an address step before payment.",
+    "question": "Q-w2-4",
+    "source": "S-w2-3",
+    "quote": "we've added an address confirmation step before payment",
+    "status": "verified",
+    "checker": "v1",
+    "span": "…",
+    "hard": false,
+    "differs": "date: the page says 2026-10-03"
+   }
+  },
+  {
+   "label": "unverified",
+   "record": {
+    "type": "claim",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "C-w2-8",
+    "claim": "The step cut conversion by 20%.",
+    "question": "Q-w2-4",
+    "source": "S-w2-3",
+    "quote": "we've added an address confirmation step before payment",
+    "status": "unverified",
+    "checker": "v1",
+    "span": "conversion moved by about 12%",
+    "hard": true,
+    "reason": "the span gives 12%, the claim 20%"
+   }
+  },
+  {
+   "label": "unverified, page blocked",
+   "record": {
+    "type": "claim",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "C-w2-9",
+    "claim": "The October release added an address step before payment.",
+    "question": "Q-w2-4",
+    "source": "S-w2-3",
+    "quote": "we've added an address confirmation step before payment",
+    "status": "unverified",
+    "checker": "v1",
+    "blocked": true,
+    "hard": false,
+    "reason": "blocked"
+   }
+  },
+  {
+   "label": "withdrawn",
+   "record": {
+    "type": "claim",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "C-w3-1",
+    "claim": "The October release added an address step before payment.",
+    "question": "Q-w2-4",
+    "source": "S-w2-3",
+    "quote": "we've added an address confirmation step before payment",
+    "status": "withdrawn",
+    "replaced_by": "C-w2-7"
+   }
+  }
+ ],
+ "sources/<id>.json": [
+  {
+   "label": "source, a paper with a DOI",
+   "record": {
+    "type": "source",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "S-w2-4",
+    "author": "Lee, K.",
+    "date": "2026-10-02",
+    "title": "Checkout usability",
+    "publisher": "Journal of Usability Studies",
+    "url": "https://doi.org/10.1234/jus.2024.0042",
+    "ids": [
+     {
+      "type": "doi",
+      "doi": "10.1234/jus.2024.0042"
+     }
+    ],
+    "category": "peer-reviewed",
+    "read": "raw",
+    "trust": "medium",
+    "trust_reason": "the vendor's own notes",
+    "repeats": null,
+    "status": "kept"
+   }
+  },
+  {
+   "label": "source, a page with no identifier",
+   "record": {
+    "type": "source",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "id": "S-w2-3",
+    "author": "Shop Inc.",
+    "date": "2026-10-02",
+    "title": "October release notes",
+    "publisher": "Shop Inc. blog",
+    "url": "https://example.com/releases/october",
+    "ids": [],
+    "category": "documentation",
+    "read": "raw",
+    "trust": "medium",
+    "trust_reason": "the vendor's own notes",
+    "repeats": null,
+    "status": "kept"
+   }
+  },
+  {
+   "label": "source, a duplicate",
+   "record": {
+    "type": "source",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w3",
+    "id": "S-w3-1",
+    "author": "Shop Inc.",
+    "date": "2026-10-02",
+    "title": "October release notes",
+    "publisher": "Shop Inc. blog",
+    "url": "https://example.com/releases/october",
+    "ids": [],
+    "category": "documentation",
+    "read": "raw",
+    "trust": "medium",
+    "trust_reason": "the vendor's own notes",
+    "repeats": null,
+    "status": "duplicate",
+    "replaced_by": "S-w2-3"
+   }
+  }
+ ],
+ "logs/<agent>.jsonl": [
+  {
+   "label": "search",
+   "record": {
+    "type": "search",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "query": "checkout address step october release",
+    "question": "Q-w2-4",
+    "new_terms": [
+     "address confirmation"
+    ]
+   }
+  },
+  {
+   "label": "frontier",
+   "record": {
+    "type": "frontier",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "after": "Q-w2-4",
+    "empty_lenses": [
+     "origin",
+     "field",
+     "region"
+    ]
+   }
+  },
+  {
+   "label": "challenge",
+   "record": {
+    "type": "challenge",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "after": "Q-w2-4"
+   }
+  },
+  {
+   "label": "chain",
+   "record": {
+    "type": "chain",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "after": "Q-w2-4"
+   }
+  },
+  {
+   "label": "gap",
+   "record": {
+    "type": "gap",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "text": "no step-level drop-off data in public sources",
+    "queries": [
+     "checkout step drop-off october"
+    ]
+   }
+  },
+  {
+   "label": "strategy",
+   "record": {
+    "type": "strategy",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "text": "release notes before blogs"
+   }
+  },
+  {
+   "label": "stop",
+   "record": {
+    "type": "stop",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "text": "context is long; Q-w2-12 still open"
+   }
+  },
+  {
+   "label": "failure",
+   "record": {
+    "type": "failure",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "w2",
+    "collection": "wiki",
+    "text": "asks for a login"
+   }
+  },
+  {
+   "label": "checked (verifier)",
+   "record": {
+    "type": "checked",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "v1",
+    "claim": "C-w2-8"
+   }
+  }
+ ]
+}

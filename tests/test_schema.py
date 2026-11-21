@@ -271,6 +271,21 @@ class Case(unittest.TestCase):
         self.assertTrue(any(text in e for e in errors), f"{text!r} not in {errors}")
 
 
+class CheckText(Case):
+    def test_check_text_checks_the_text_it_is_given_and_check_file_is_check_text_of_the_file(self):
+        good, bad = jsonl(task(1)), jsonl(task(1), task(2, status="blocked"))
+        path = self.write("tasks.jsonl", good)
+        docs = schema.load_schemas(self.schemas)
+        self.assertEqual(
+            schema.check_text(path, bad, docs),
+            [schema.Error(str(path), 2, "reason", 'required when status is "blocked"')],
+        )
+        self.assertEqual(schema.check_text(path, good, docs), [])
+        self.assertEqual(schema.check_file(path, docs), schema.check_text(path, schema.read_checked(path, True), docs))
+        path.write_text(bad, encoding="utf-8")
+        self.assertEqual(schema.check_file(path, docs), schema.check_text(path, bad, docs))
+
+
 class CommandLine(Case):
     def run_cli(self, *args):
         return subprocess.run(
@@ -1329,6 +1344,46 @@ class Records(Case):
             self.put_schema({**item, "x-versioned": True})
         self.write("log.jsonl", jsonl(self.record(id="c1"), self.record(id="c1")))
         self.assertEqual(self.messages("log.jsonl"), [])
+
+
+class StripInvalid(unittest.TestCase):
+    """strip_invalid: a record that failed its checks, without the top-level fields the errors name, so a page that
+    shows it only meets well-typed fields or missing ones."""
+
+    def errors(self, *fields):
+        return [schema.Error("f.jsonl", 2, field, f"bad {field}") for field in fields]
+
+    def test_the_fields_the_errors_name_are_removed_and_named_in__errors(self):
+        record = {"type": "task", "id": ["T1"], "task": "x", "mode": 5}
+        stripped = schema.strip_invalid(record, self.errors("id", "mode"))
+        self.assertEqual(stripped, {"type": "task", "task": "x", "_errors": ["id: bad id", "mode: bad mode"]})
+
+    def test_a_nested_or_indexed_path_removes_its_top_level_field(self):
+        record = {"answer": {"type": "page", "event": ["a"]}, "requirements": ["S1", 5], "text": "t"}
+        stripped = schema.strip_invalid(record, self.errors("answer.event", "requirements[1]"))
+        self.assertEqual(sorted(stripped), ["_errors", "text"])
+        self.assertEqual(
+            stripped["_errors"], ["answer.event: bad answer.event", "requirements[1]: bad requirements[1]"]
+        )
+
+    def test_an_error_on_the_record_as_a_whole_removes_nothing(self):
+        record = {"a": 1}
+        self.assertEqual(
+            schema.strip_invalid(record, self.errors("(record)")), {"a": 1, "_errors": ["(record): bad (record)"]}
+        )
+
+    def test_the_record_is_copied_not_changed(self):
+        record = {"a": [1], "b": 2}
+        stripped = schema.strip_invalid(record, self.errors("b"))
+        self.assertEqual(record, {"a": [1], "b": 2})
+        self.assertEqual(stripped["a"], [1])
+        self.assertIsNot(stripped["a"], record["a"])
+
+    def test_no_errors_leaves_a_copy_without__errors(self):
+        self.assertEqual(schema.strip_invalid({"a": 1}, []), {"a": 1})
+
+    def test_a_field_the_record_lacks_is_fine(self):
+        self.assertEqual(schema.strip_invalid({"a": 1}, self.errors("b")), {"a": 1, "_errors": ["b: bad b"]})
 
 
 if __name__ == "__main__":

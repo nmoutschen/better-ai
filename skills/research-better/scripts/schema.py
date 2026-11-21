@@ -8,7 +8,8 @@ and the exit code is 1 if there is any error and 0 if there is none. A JSONL fil
 is checked line by line, a JSON file as one record; `<line>` is 1 for a JSON file. The page's own scripts call
 `check_paths` instead of keeping checks of their own; a script keeps only checks that need its own knowledge, such as
 whether a slide can be drawn. A script that writes one record at a time, as page.py does for an event, calls
-`check_record` with the names of the schemas the record must meet before it writes the record.
+`check_record` with the names of the schemas the record must meet before it writes the record. A page that still shows a
+record that failed its checks calls `strip_invalid`, which drops the fields the errors name.
 
 Each skill carries an identical copy of this file in `scripts/`, with `schemas/base.schema.json` next to it in
 `schemas/`, as it does page.py; the Scripts workflow fails if the copies differ. Standard library only.
@@ -58,6 +59,7 @@ a name no hook has is an error in the schema.
 from __future__ import annotations
 
 import argparse
+import copy
 import fnmatch
 import json
 import os
@@ -499,7 +501,11 @@ class Validator:
         if self.hooks != "only":
             if "x-points-to" in schema and isinstance(value, str):
                 problems += self._points_to(value, schema["x-points-to"], at)
-            if "x-mode-sets" in schema and isinstance(value, str):
+            if (
+                "x-mode-sets" in schema
+                and isinstance(value, str)
+                and not ("enum" in schema and value not in schema["enum"])
+            ):
                 problems += self._mode_sets(value, schema["x-mode-sets"], at)
             if "x-differs-from" in schema and isinstance(parent, dict):
                 other = schema["x-differs-from"]
@@ -535,7 +541,7 @@ class Validator:
         field = rule["field"]
         record = self.context.read_json(relative)
         if not isinstance(record, dict):
-            return [Problem(at, f"cannot be checked: {relative} does not exist", "cross")]
+            return [Problem(at, f"cannot be checked: {relative} does not exist or is not valid JSON", "cross")]
         mode = record.get(field)
         sets = {k: v for k, v in rule.items() if k not in ("file", "field")}
         allowed = sets.get(mode) if isinstance(mode, str) and mode in sets else sets.get("other")
@@ -851,6 +857,15 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
         text = read_checked(path, path.suffix == ".jsonl")
     except (OSError, UnicodeDecodeError) as error:
         return [Error(where, 1, "(file)", f"cannot be read: {error}")]
+    return check_text(path, text, docs, cache)
+
+
+def check_text(path: Path, text: str, docs: dict[str, dict], cache: dict[str, Any] | None = None) -> list[Error]:
+    """The errors of a file's text, which the caller has read once: it validates that text and shows the same lines."""
+    found = _match(path, docs)
+    where = str(path)
+    if not found:
+        return [Error(where, 1, "(file)", "no schema describes this file")]
     context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
     errors: list[Error] = []
     seen: dict[str, int] = {}
@@ -881,6 +896,17 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
                     Error(where, number, "id", f'must equal the file name "{path.name.removesuffix(".json")}"')
                 )
     return errors
+
+
+def strip_invalid(record: dict, errors: list[Error]) -> dict:
+    """A copy of a record that failed its checks, for a page that still shows it: without each top-level field the
+    errors name (`answer.event` and `requirements[0]` name `answer` and `requirements`), so what is left is well typed
+    or missing. `errors` are the record's own; the copy lists them in `_errors` as `field: message`."""
+    names = {re.match(r"[^.\[]*", error.field).group(0) for error in errors}
+    stripped = {key: copy.deepcopy(value) for key, value in record.items() if key not in names}
+    if errors:
+        stripped["_errors"] = [f"{error.field}: {error.message}" for error in errors]
+    return stripped
 
 
 def check_record(
