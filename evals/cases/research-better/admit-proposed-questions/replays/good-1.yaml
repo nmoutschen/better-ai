@@ -1,0 +1,62 @@
+reply: Merged the duplicate release question and opened the autocomplete question.
+actions:
+- write: .research/checkout-drop/questions/Q-w2-6.md
+  content: 'id: Q-w2-6
+
+    question: Which checkout changes shipped in release 26.3?
+
+    title: Release 26.3 checkout changes
+
+    priority: high
+
+    status: out of scope
+
+    owner: none
+
+    origin: S-w1-3
+
+    kind: frontier
+
+    stakes: which changes are candidates to roll back
+
+    done-when: the release notes list the checkout changes
+
+    answer: none
+
+    summary: none
+
+    gist: none
+
+    note: merged into Q-coordinator-1
+
+    '
+- write: .research/checkout-drop/questions/Q-w1-7.md
+  content: 'id: Q-w1-7
+
+    question: Did the address autocomplete in release 26.3 change checkout conversion?
+
+    title: Autocomplete effect on conversion
+
+    priority: high
+
+    status: open
+
+    owner: none
+
+    origin: S-w1-1
+
+    kind: frontier
+
+    stakes: whether autocomplete is a candidate to roll back
+
+    done-when: a test or analysis gives autocomplete''s effect on conversion
+
+    answer: none
+
+    summary: none
+
+    gist: none
+
+    note: none
+
+    '

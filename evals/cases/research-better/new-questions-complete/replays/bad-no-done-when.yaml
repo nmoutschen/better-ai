@@ -1,0 +1,22 @@
+reply: Added a challenge question.
+actions:
+- write: .research/checkout-drop/questions/Q-coordinator-7.md
+  content: 'id: Q-coordinator-7
+
+    question: Is the fall real?
+
+    title: Is the fall real
+
+    priority: high
+
+    status: open
+
+    owner: none
+
+    origin: Q-coordinator-2
+
+    kind: challenge
+
+    stakes: whether the fall is real
+
+    '

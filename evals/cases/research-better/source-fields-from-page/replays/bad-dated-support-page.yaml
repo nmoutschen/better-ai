@@ -1,0 +1,508 @@
+reply: 'Most of the fall is in card payments, and the 3-D Secure 2 challenge step is the likeliest cause; the frontend guild
+  disputes this. Roll back nothing yet: tune the 3-D Secure threshold first. Board: .research/checkout-drop.'
+actions:
+- read: wiki/index.md
+- read: wiki/analytics/checkout-conversion-march.md
+- write: .research/checkout-drop/brief.md
+  content: 'topic: Why did checkout conversion drop after the March 2026 release, and what should we roll back first?
+
+    title: Checkout conversion drop after release 26.3
+
+    short: Checkout drop
+
+    meaning: The fall in the web shop''s checkout conversion after release 26.3 (2026-03-04), and which of its changes caused
+    it
+
+    goal: Decide which change of release 26.3 to roll back first
+
+    limit: none
+
+    stop-at: high
+
+    collections: the wiki export in wiki/
+
+    missing: none
+
+    changes: none
+
+    status: stopped
+
+    '
+- write: .research/checkout-drop/logs/w1.md
+  content: 'search "release 26.3 checkout" for Q-coordinator-1 — new terms: 3-D Secure 2, image CDN
+
+    search "checkout conversion March" for Q-coordinator-2 — new terms: card payments, PayPal
+
+    '
+- write: .research/checkout-drop/logs/w2.md
+  content: 'search "conversion drop cause" for Q-coordinator-3 — new terms: challenge rate, LCP
+
+    search "card verification failed" for Q-coordinator-3 — new terms: none
+
+    '
+- write: .research/checkout-drop/claims/C-w1-1.md
+  content: 'id: C-w1-1
+
+    claim: Release 26.3 moved card payments to the 3-D Secure 2 flow.
+
+    question: Q-coordinator-1
+
+    source: S-w1-1
+
+    quote: "Card payments now use the new 3-D Secure 2 flow from our payment provider."
+
+    verified: verified
+
+    checker: v1
+
+    span: "Card payments now use the new 3-D Secure 2 flow from our payment provider."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w1-2.md
+  content: 'id: C-w1-2
+
+    claim: Checkout conversion fell from 3.1% to 2.6% between the weeks of 23 February and 9 March 2026.
+
+    question: Q-coordinator-2
+
+    source: S-w1-2
+
+    quote: "Checkout conversion fell from 3.1% in the week of 2026-02-23 to 2.6% in the week of 2026-03-09."
+
+    verified: verified
+
+    checker: v1
+
+    span: "Checkout conversion fell from 3.1% in the week of 2026-02-23 to 2.6% in the week of 2026-03-09."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w1-3.md
+  content: 'id: C-w1-3
+
+    claim: The fall is in card payments, while PayPal orders stayed at 3.4%.
+
+    question: Q-coordinator-2
+
+    source: S-w1-2
+
+    quote: "The fall is concentrated in card payments: conversion for orders paid by card fell from 3.0% to 2.3%, while orders
+    paid with PayPal stayed at 3.4%."
+
+    verified: verified
+
+    checker: v1
+
+    span: "The fall is concentrated in card payments: conversion for orders paid by card fell from 3.0% to 2.3%, while orders
+    paid with PayPal stayed at 3.4%."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w2-1.md
+  content: 'id: C-w2-1
+
+    claim: The share of card payments with a 3-D Secure challenge rose from 8% to 31% after release 26.3.
+
+    question: Q-coordinator-3
+
+    source: S-w2-1
+
+    quote: "Since release 26.3, the share of card payments that get a 3-D Secure challenge rose from 8% to 31%."
+
+    verified: verified
+
+    checker: v1
+
+    span: "Since release 26.3, the share of card payments that get a 3-D Secure challenge rose from 8% to 31%."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w2-2.md
+  content: 'id: C-w2-2
+
+    claim: The checkout page''s largest contentful paint at the 75th percentile went from 1.9 s to 3.4 s after the CDN switch.
+
+    question: Q-coordinator-3
+
+    source: S-w2-2
+
+    quote: "After the switch to the new image CDN, the largest contentful paint on the checkout page went from 1.9 s to 3.4
+    s at the 75th percentile."
+
+    verified: verified
+
+    checker: v1
+
+    span: "After the switch to the new image CDN, the largest contentful paint on the checkout page went from 1.9 s to 3.4
+    s at the 75th percentile."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/claims/C-w2-4.md
+  content: 'id: C-w2-4
+
+    claim: Tickets about failed card verification were three times as frequent in March as in February.
+
+    question: Q-coordinator-3
+
+    source: S-w2-3
+
+    quote: "Tickets with the theme "card verification failed" were three times as frequent in March as in February."
+
+    verified: verified
+
+    checker: v1
+
+    span: "Tickets with the theme "card verification failed" were three times as frequent in March as in February."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/sources/S-w1-1.md
+  content: 'id: S-w1-1
+
+    author: Release team
+
+    date: 2026-03-04
+
+    title: Release 26.3 notes
+
+    publisher: Tallow wiki
+
+    url: wiki/releases/2026-03-release-notes.md
+
+    type: documentation
+
+    read: raw
+
+    trust: medium
+
+    trust-reason: internal team page with its own data
+
+    repeats: none
+
+    '
+- write: .research/checkout-drop/sources/S-w1-2.md
+  content: 'id: S-w1-2
+
+    author: Raman, P.
+
+    date: 2026-03-20
+
+    title: Checkout conversion, March 2026
+
+    publisher: Tallow wiki
+
+    url: wiki/analytics/checkout-conversion-march.md
+
+    type: other
+
+    read: raw
+
+    trust: medium
+
+    trust-reason: internal team page with its own data
+
+    repeats: none
+
+    '
+- write: .research/checkout-drop/sources/S-w2-1.md
+  content: 'id: S-w2-1
+
+    author: Weber, J.
+
+    date: 2026-03-28
+
+    title: 3-D Secure 2 rollout review
+
+    publisher: Tallow wiki
+
+    url: wiki/payments/3ds-rollout-review.md
+
+    type: other
+
+    read: raw
+
+    trust: medium
+
+    trust-reason: internal team page with its own data
+
+    repeats: none
+
+    '
+- write: .research/checkout-drop/sources/S-w2-2.md
+  content: 'id: S-w2-2
+
+    author: Frontend guild
+
+    date: 2026-03-18
+
+    title: Checkout page speed after the CDN switch
+
+    publisher: Tallow wiki
+
+    url: wiki/frontend/checkout-page-speed.md
+
+    type: other
+
+    read: raw
+
+    trust: medium
+
+    trust-reason: internal team page with its own data
+
+    repeats: none
+
+    '
+- write: .research/checkout-drop/sources/S-w1-3.md
+  content: 'id: S-w1-3
+
+    author: Product office
+
+    date: 2026-03-30
+
+    title: Weekly leadership update, 30 March
+
+    publisher: Tallow wiki
+
+    url: wiki/weekly/2026-03-30-leadership-update.md
+
+    type: other
+
+    read: raw
+
+    trust: low
+
+    trust-reason: summarises other wiki pages
+
+    repeats: S-w1-2
+
+    '
+- write: .research/checkout-drop/sources/S-w2-3.md
+  content: 'id: S-w2-3
+
+    author: Support team
+
+    date: 2026-03-31
+
+    title: Support ticket themes, March
+
+    publisher: Tallow wiki
+
+    url: wiki/support/ticket-themes-march.md
+
+    type: other
+
+    read: raw
+
+    trust: medium
+
+    trust-reason: internal team page with its own data
+
+    repeats: none
+
+    '
+- write: .research/checkout-drop/questions/Q-coordinator-1.md
+  content: 'id: Q-coordinator-1
+
+    question: Which changes did release 26.3 make to checkout?
+
+    title: What release 26.3 changed
+
+    priority: high
+
+    status: answered
+
+    owner: none
+
+    origin: goal
+
+    kind: seed
+
+    stakes: which changes are candidates to roll back
+
+    done-when: the release notes list the checkout changes
+
+    answer: C-w1-1
+
+    summary: Release 26.3 changed three parts of checkout: 3-D Secure 2 for card payments, address autocomplete, and a new
+    image CDN. Each has its own flag.
+
+    gist: Three checkout changes: 3-D Secure 2, address autocomplete, new image CDN.
+
+    note: none
+
+    '
+- write: .research/checkout-drop/questions/Q-coordinator-2.md
+  content: 'id: Q-coordinator-2
+
+    question: How much did checkout conversion fall after release 26.3, and for which orders?
+
+    title: Size and shape of the fall
+
+    priority: high
+
+    status: answered
+
+    owner: none
+
+    origin: goal
+
+    kind: seed
+
+    stakes: whether the fall points to one payment method or to the whole checkout
+
+    done-when: a dashboard or analysis gives conversion before and after the release, by payment method
+
+    answer: C-w1-2, C-w1-3
+
+    summary: Conversion fell from 3.1% to 2.6% between the weeks of 23 February and 9 March. The fall is in card payments
+    (3.0% to 2.3%); PayPal stayed at 3.4%. The analytics page is the only primary source; the leadership update repeats its
+    figures.
+
+    gist: Conversion fell from 3.1% to 2.6%, all of it in card payments.
+
+    note: none
+
+    '
+- write: .research/checkout-drop/questions/Q-coordinator-3.md
+  content: 'id: Q-coordinator-3
+
+    question: Which change of release 26.3 explains the fall in conversion?
+
+    title: What explains the fall
+
+    priority: high
+
+    status: contested
+
+    owner: none
+
+    origin: goal
+
+    kind: seed
+
+    stakes: which change to roll back first
+
+    done-when: sources attribute the fall to a change with data on that change''s effect
+
+    answer: C-w2-1, C-w2-2, C-w2-4
+
+    summary: The payments review links the fall to 3-D Secure challenges, which rose from 8% to 31% of card payments. The
+    frontend guild says the slower checkout page after the CDN switch explains most of it. Neither source measures the other
+    change''s effect.
+
+    gist: Contested: 3-D Secure challenges or the slower page after the CDN switch.
+
+    note: none
+
+    '
+- write: .research/checkout-drop/questions/Q-coordinator-4.md
+  content: 'id: Q-coordinator-4
+
+    question: Did the mobile app''s checkout conversion fall too?
+
+    title: Did the app fall too
+
+    priority: high
+
+    status: not found
+
+    owner: none
+
+    origin: meaning
+
+    kind: seed
+
+    stakes: whether the cause is in the web checkout only
+
+    done-when: a source gives app conversion before and after release 26.3
+
+    answer: none
+
+    summary: No wiki page gives the app''s conversion. The analytics page says the mobile app team keeps its own numbers.
+
+    gist: Not found: the wiki has no app conversion data.
+
+    note: three searches: app conversion, mobile app checkout, app team numbers
+
+    '
+- write: .research/checkout-drop/questions/Q-w1-5.md
+  content: 'id: Q-w1-5
+
+    question: What evidence would contradict that release 26.3 changed these parts of checkout?
+
+    title: Challenge: release contents
+
+    priority: high
+
+    status: answered
+
+    owner: none
+
+    origin: Q-coordinator-1
+
+    kind: challenge
+
+    stakes: whether a change outside the release could be the cause
+
+    done-when: a source lists checkout changes not in the release notes, or none does after three searches
+
+    answer: none
+
+    summary: No page names another checkout change in March.
+
+    gist: No other checkout change in March appears in the wiki.
+
+    note: none
+
+    '
+- write: .research/checkout-drop/questions/Q-w2-5.md
+  content: 'id: Q-w2-5
+
+    question: What evidence would contradict the size of the fall and its concentration in card payments?
+
+    title: Challenge: size of the fall
+
+    priority: high
+
+    status: answered
+
+    owner: none
+
+    origin: Q-coordinator-2
+
+    kind: challenge
+
+    stakes: whether the fall is in card payments only
+
+    done-when: a source gives other conversion figures for the same weeks, or none does after three searches
+
+    answer: none
+
+    summary: No page gives other figures for these weeks. The leadership update repeats the analytics page, so it is not a
+    second source.
+
+    gist: No contradicting figures; the leadership update only repeats them.
+
+    note: none
+
+    '

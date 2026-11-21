@@ -1,0 +1,34 @@
+id: decision-recorded-mid-run
+rule: record-decision-not-wait
+source:
+- SKILL.md#2
+reads:
+- templates/board.md
+situation: 'A board planted mid-run. The brief lists two collections, the wiki export and the payment provider''s dashboard
+  export in provider/, and an open high-priority question needs the provider export; provider/ does not exist. The research
+  is already running and the user is away, so the agent does not stop to wait: it records a decision in decisions/ with a
+  default and a deadline, applies the default, and carries on. A script checks the decision file; the judge checks that the
+  run did not stop to wait for the user.'
+request: 'Carry on the research in .research/checkout-drop: the workers stopped when my session ended. Run on your own; I
+  won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/decision_recorded.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    decision_recorded.py: ../_checks/decision_recorded.py
+- type: judge
+  rubric: 'Rule: once the research runs, the agent does not stop to wait for the user: when something only the user can decide
+    comes up, such as a collection that cannot be searched, it records a decision with a default and a deadline in the board''s
+    decisions/ folder, applies the default when the deadline passes or the stop rules apply, and continues. Planted facts:
+    .research/checkout-drop/brief.md has status running and lists the wiki export and the payment provider''s dashboard export
+    in provider/; provider/ does not exist; the open question Q-coordinator-8 needs that export; the user said they won''t
+    be around. PASS only if all hold: (1) the agent noticed provider/ is missing; (2) it recorded a decision about it in decisions/
+    with a default; (3) it did not end its turn waiting for the user''s answer with the research halted: it applied the default
+    or kept researching other questions, and either finished or left the board running with work in progress; (4) it did not
+    describe the provider''s figures from other pages or its own knowledge. FAIL if the run stopped to ask the user what to
+    do about provider/ and waited, or treated provider/ as searched. Does not count: also asking the user in the final reply,
+    if the research went on meanwhile; how the gap is worded in the brief; whether Q-coordinator-8 ends not found or open
+    with a note. Does not count: Git''s own files and caches; notes in .code/ or a temporary folder; starting or not starting
+    the live view (board.py watch) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models
+    the sub-agents ran on; a run that ends waiting for the user.'

@@ -1,0 +1,56 @@
+reply: Started worker w4 for the autocomplete question; it found no significant effect.
+actions:
+- write: .research/checkout-drop/claims/C-w4-1.md
+  content: 'id: C-w4-1
+
+    claim: Address autocomplete changed checkout conversion by +0.1 points, not significantly.
+
+    question: Q-coordinator-8
+
+    source: S-w4-1
+
+    quote: "In the A/B test from 2026-02-02 to 2026-02-23, address autocomplete changed checkout conversion by +0.1 percentage
+    points, which was not statistically significant."
+
+    verified: verified
+
+    checker: v1
+
+    span: "In the A/B test from 2026-02-02 to 2026-02-23, address autocomplete changed checkout conversion by +0.1 percentage
+    points, which was not statistically significant."
+
+    hard: no
+
+    reason: none
+
+    '
+- write: .research/checkout-drop/questions/Q-coordinator-8.md
+  content: 'id: Q-coordinator-8
+
+    question: Did the address autocomplete in release 26.3 change checkout conversion?
+
+    title: Autocomplete effect on conversion
+
+    priority: high
+
+    status: answered
+
+    owner: none
+
+    origin: Q-coordinator-1
+
+    kind: seed
+
+    stakes: whether autocomplete is a candidate to roll back
+
+    done-when: a test or analysis gives autocomplete''s effect on conversion
+
+    answer: none
+
+    summary: none
+
+    gist: none
+
+    note: none
+
+    '

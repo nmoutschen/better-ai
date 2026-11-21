@@ -1,0 +1,19 @@
+id: source-fields-from-page
+rule: copy-source-fields
+source:
+- SKILL.md#5.2
+reads:
+- templates/board.md
+situation: A fresh research run on the planted wiki export. The wiki index lists the analytics page as by the analytics team,
+  18 March; the page itself says Priya Raman, 2026-03-20. The support page has no date. Each source's author and date are
+  copied from the page itself, not from the index or from memory, with n.d. for the undated page. A script compares each source
+  with its page.
+request: 'Research why checkout conversion dropped after our March 2026 release, so I can decide what to roll back first.
+  The only place to search is our wiki export in wiki/: there is no web access, and no other system holds anything on this.
+  Run on your own until you have an answer; I won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/source_fields.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    source_fields.py: ../_checks/source_fields.py
