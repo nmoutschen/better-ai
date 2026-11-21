@@ -1168,6 +1168,22 @@ class SchemaAudit(Case):
         self.refused({"prefixItems": {"type": "string"}}, "prefixItems")
         self.refused({"prefixItems": [{"nope": 1}]}, "nope")
 
+    def test_a_condition_on_a_field_that_is_absent_or_empty_says_so(self):
+        s = {
+            "type": "object",
+            "if": {"not": {"required": ["kids"], "properties": {"kids": {"type": "array", "minItems": 1}}}},
+            "then": {"required": ["value"]},
+        }
+        self.assertEqual(
+            [(e.field, e.message) for e in schema.validate_instance({"kids": []}, s, {})],
+            [("value", "required when kids is absent or empty")],
+        )
+        self.assertEqual(
+            [(e.field, e.message) for e in schema.validate_instance({}, s, {})],
+            [("value", "required when kids is absent or empty")],
+        )
+        self.assertEqual(schema.validate_instance({"kids": [1]}, s, {}), [])
+
     def test_a_condition_on_a_missing_field_is_worded_as_absent(self):
         s = {
             "type": "object",
@@ -1406,6 +1422,15 @@ class StripInvalid(unittest.TestCase):
         self.assertEqual(
             schema.strip_invalid(record, self.errors("(record)")), {"a": 1, "_errors": ["(record): bad (record)"]}
         )
+
+    def test_a_record_too_deeply_nested_to_copy_keeps_only_its_errors_and_a_plain_id(self):
+        deep: list = []
+        for _ in range(50000):
+            deep = [deep]
+        stripped = schema.strip_invalid({"id": "T1", "x": deep, "mode": 5}, self.errors("mode"))
+        self.assertEqual(stripped, {"id": "T1", "_errors": ["mode: bad mode"]})
+        stripped = schema.strip_invalid({"id": ["T1"], "x": deep}, self.errors("(record)"))
+        self.assertEqual(stripped, {"_errors": ["(record): bad (record)"]})
 
     def test_the_record_is_copied_not_changed(self):
         record = {"a": [1], "b": 2}
