@@ -154,6 +154,28 @@ actions:
     reason: none
 
     '
+- write: .research/checkout-drop/claims/C-w2-4.md
+  content: 'id: C-w2-4
+
+    claim: Tickets about failed card verification were three times as frequent in March as in February.
+
+    question: Q-coordinator-3
+
+    source: S-w2-3
+
+    quote: "Tickets with the theme "card verification failed" were three times as frequent in March as in February."
+
+    verified: verified
+
+    checker: v1
+
+    span: "Tickets with the theme "card verification failed" were three times as frequent in March as in February."
+
+    hard: no
+
+    reason: none
+
+    '
 - write: .research/checkout-drop/sources/S-w1-1.md
   content: 'id: S-w1-1
 
@@ -250,30 +272,6 @@ actions:
     repeats: none
 
     '
-- write: .research/checkout-drop/sources/S-w2-3.md
-  content: 'id: S-w2-3
-
-    author: Support team
-
-    date: n.d.
-
-    title: Support ticket themes, March
-
-    publisher: Tallow wiki
-
-    url: wiki/support/ticket-themes-march.md
-
-    type: other
-
-    read: raw
-
-    trust: medium
-
-    trust-reason: internal team page with its own data
-
-    repeats: none
-
-    '
 - write: .research/checkout-drop/sources/S-w1-3.md
   content: 'id: S-w1-3
 
@@ -296,6 +294,30 @@ actions:
     trust-reason: summarises other wiki pages
 
     repeats: S-w1-2
+
+    '
+- write: .research/checkout-drop/sources/S-w2-3.md
+  content: 'id: S-w2-3
+
+    author: Support team
+
+    date: n.d.
+
+    title: Support ticket themes, March
+
+    publisher: Tallow wiki
+
+    url: wiki/support/ticket-themes-march.md
+
+    type: other
+
+    read: raw
+
+    trust: medium
+
+    trust-reason: internal team page with its own data
+
+    repeats: none
 
     '
 - write: .research/checkout-drop/questions/Q-coordinator-1.md
@@ -351,7 +373,8 @@ actions:
     answer: C-w1-2, C-w1-3
 
     summary: Conversion fell from 3.1% to 2.6% between the weeks of 23 February and 9 March. The fall is in card payments
-    (3.0% to 2.3%); PayPal stayed at 3.4%. Only one source, the analytics page, gives these figures.
+    (3.0% to 2.3%); PayPal stayed at 3.4%. The analytics page is the only primary source; the leadership update repeats its
+    figures. Its challenge question is still to come.
 
     gist: Conversion fell from 3.1% to 2.6%, all of it in card payments.
 
@@ -379,7 +402,7 @@ actions:
 
     done-when: sources attribute the fall to a change with data on that change''s effect
 
-    answer: C-w2-1, C-w2-2
+    answer: C-w2-1, C-w2-2, C-w2-4
 
     summary: The payments review links the fall to 3-D Secure challenges, which rose from 8% to 31% of card payments. The
     frontend guild says the slower checkout page after the CDN switch explains most of it. Neither source measures the other
@@ -443,7 +466,7 @@ actions:
 
     answer: none
 
-    summary: No page names another checkout change in March. The leadership update repeats the release''s changes.
+    summary: No page names another checkout change in March.
 
     gist: No other checkout change in March appears in the wiki.
 

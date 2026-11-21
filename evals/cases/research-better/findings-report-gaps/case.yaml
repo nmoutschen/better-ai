@@ -14,6 +14,7 @@ graders:
   except:
   - .research/checkout-drop/brief.md
   - .research/checkout-drop/logs/*
+  - .research/checkout-drop/questions/*
 - type: judge
   rubric: 'Rule: the findings lead with the answer, state where sources disagree or the evidence is weak, state what each
     main claim''s challenge question found, and list the questions that remain open. Planted facts: .research/checkout-drop/

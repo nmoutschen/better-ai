@@ -37,8 +37,12 @@ def entries(board: Path, kind: str) -> dict:
 
 
 def unquote(value: str) -> str:
+    """The value without its outer straight, curly or single quotes."""
     value = value.strip()
-    return value[1:-1] if len(value) >= 2 and value[0] == value[-1] == '"' else value
+    for left, right in (('"', '"'), ("“", "”"), ("'", "'")):
+        if len(value) >= 2 and value.startswith(left) and value.endswith(right):
+            return value[1:-1]
+    return value
 
 
 def none(value) -> bool:

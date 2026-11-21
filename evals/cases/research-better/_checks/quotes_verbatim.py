@@ -2,6 +2,7 @@
 each source records how it was read."""
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -10,7 +11,22 @@ from board_lib import entries, fail, none, the_board, unquote  # noqa: E402
 
 
 def norm(text: str) -> str:
-    return " ".join(text.replace("**", "").replace("`", "").split())
+    """Whitespace, Markdown emphasis and escaped quotes do not count."""
+    return " ".join(text.replace("**", "").replace("`", "").replace('\\"', '"').split())
+
+
+def found(quote: str, page: str) -> bool:
+    """Each part of the quote, split at an elision, appears in the page, in order."""
+    at = 0
+    for part in re.split(r"\.\.\.|…", quote):
+        part = norm(part)
+        if not part:
+            continue
+        at = page.find(part, at)
+        if at < 0:
+            return False
+        at += len(part)
+    return True
 
 
 board = the_board()
@@ -26,9 +42,10 @@ for cid, c in claims.items():
         fail(f"{cid} cites {c.get('source')!r}, which is not on the board")
     url = s.get("url", "")
     page = url[url.find("wiki/"):] if "wiki/" in url else url
+    page = re.split(r"[#\s]|:\d", page, maxsplit=1)[0]
     if not Path(page).is_file():
         fail(f"{cid}: source url {url!r} is not a wiki page")
     quote = unquote(c.get("quote", ""))
-    if none(quote) or norm(quote) not in norm(Path(page).read_text(encoding="utf-8")):
+    if none(quote) or not found(quote, norm(Path(page).read_text(encoding="utf-8"))):
         fail(f"{cid}: quote not found word for word in {page}: {quote[:80]!r}")
 print(f"{len(claims)} quotes found in their pages")

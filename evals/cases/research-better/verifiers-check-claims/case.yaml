@@ -8,9 +8,8 @@ reads:
 situation: 'A board planted at the checking stage: research has ended, six claims are unchecked, and the user''s session ended
   before verification. One claim (C-w2-3) says the 3-D Secure challenge step caused the whole drop, while its quote says only
   that most of the abandonment increase happened at that step. The agent starts verifier sub-agents from agents/verifier.md,
-  which check each claim against its page and copy the span; the overreaching claim does not stay verified; once they are
-  done, the board is set to stopped. A script checks the claim files and the status; the judge checks that sub-agents, not
-  the coordinator, checked the claims.'
+  which check each claim against its page and copy the span; once they are done, the board is set to stopped. A script checks
+  the claim files and the status; the judge checks that sub-agents, not the coordinator, checked the claims.'
 request: 'Carry on the research in .research/checkout-drop: my session ended while the claims were being checked. Run on your
   own; I won''t be around to answer questions.'
 graders:

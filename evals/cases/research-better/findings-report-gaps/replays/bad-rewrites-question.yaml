@@ -1,34 +1,26 @@
 reply: 3-D Secure caused the drop.
 actions:
-- write: .research/checkout-drop/questions/Q-coordinator-3.md
-  content: 'id: Q-coordinator-3
+- write: .research/checkout-drop/claims/C-w2-2.md
+  content: 'id: C-w2-2
 
-    question: Which change of release 26.3 explains the fall in conversion?
+    claim: The checkout page''s largest contentful paint at the 75th percentile went from 1.9 s to 3.4 s after the CDN switch.
 
-    title: What explains the fall
+    question: Q-coordinator-3
 
-    priority: high
+    source: S-w2-2
 
-    status: answered
+    quote: "After the switch to the new image CDN, the largest contentful paint on the checkout page went from 1.9 s to 3.4
+    s at the 75th percentile."
 
-    owner: none
+    verified: unverified
 
-    origin: goal
+    checker: v1
 
-    kind: seed
+    span: "After the switch to the new image CDN, the largest contentful paint on the checkout page went from 1.9 s to 3.4
+    s at the 75th percentile."
 
-    stakes: which change to roll back first
+    hard: no
 
-    done-when: sources attribute the fall to a change with data on that change''s effect
-
-    answer: C-w2-1, C-w2-2, C-w2-3
-
-    summary: The payments review links the fall to 3-D Secure challenges, which rose from 8% to 31% of card payments. The
-    frontend guild says the slower checkout page after the CDN switch explains most of it. Neither source measures the other
-    change''s effect.
-
-    gist: Contested: 3-D Secure challenges or the slower page after the CDN switch.
-
-    note: none
+    reason: none
 
     '
