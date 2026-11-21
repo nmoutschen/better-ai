@@ -45,7 +45,7 @@
       }
     },
     "note": {
-      "description": "the user's message; `to` is the item it answers, or null for a message of its own",
+      "description": "the user's message; `to` is the item it answers, or null for a message of its own; `on` is what the page adds, and the page's own schema says whether it may",
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "at", "by", "id", "text", "to"],
@@ -55,7 +55,8 @@
         "by": {"$ref": "#/$defs/user"},
         "id": {"$ref": "#/$defs/id"},
         "text": {"$ref": "#/$defs/words"},
-        "to": {"type": ["string", "null"]}
+        "to": {"type": ["string", "null"]},
+        "on": {"type": "object"}
       }
     },
     "reply": {

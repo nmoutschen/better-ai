@@ -22,6 +22,10 @@
       }
     },
     {
+      "if": {"required": ["type"], "properties": {"type": {"const": "note"}}},
+      "then": {"not": {"required": ["on"]}}
+    },
+    {
       "if": {"required": ["type"], "properties": {"type": {"const": "approve"}}},
       "then": {"$ref": "#/$defs/approve"}
     },

@@ -6,7 +6,8 @@ Usage:
                         [--serve [--port N]]
   python3 canvas.py wait DIR [--timeout S]
   python3 canvas.py reply DIR TEXT [--to ID]
-  python3 canvas.py status DIR seen|asked|working|done|accepted ID...
+  python3 canvas.py status DIR seen|asked|working|done ID...
+  python3 canvas.py status DIR accepted ID... --text "the user's words"
   python3 canvas.py pending DIR
 
 VERSION is LABEL=SOURCE or SOURCE. SOURCE is an HTML file, embedded into the page, or an http(s) address, loaded

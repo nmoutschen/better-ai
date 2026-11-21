@@ -385,7 +385,7 @@ VALID = {
             "text": "which source?",
             "on": {"slide": 2, "part": "headline", "headline": "H", "target": {}, "spot": {"fx": 0.1, "fy": 0.2}},
         },
-        "note": {"id": "m-x", "text": "hi", "to": None},
+        "note": {"id": "m-x", "text": "hi", "to": None, "on": {"slide": 2, "part": "Does it arrive?"}},
         "delete": {"to": "c1-x"},
         "accept": {"to": "c1-x"},
         "reopen": {"to": "c1-x", "text": "still wrong"},
@@ -580,7 +580,7 @@ def load_schema(module):
 class Scripts(unittest.TestCase):
     """Each script that serves a page, run as the agent runs it: serve, the user sends, wait, reply, status, pending."""
 
-    def serve_and_talk(self, cmd: list, folder: Path, extra_get: str):
+    def serve_and_talk(self, cmd: list, folder: Path, extra_get: str, note_extra: dict | None = None):
         server = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         try:
             for _ in range(80):
@@ -590,7 +590,7 @@ class Scripts(unittest.TestCase):
             url = (folder / ".server").read_text().strip()
             with urllib.request.urlopen(url + extra_get, timeout=5) as r:
                 self.assertEqual(r.status, 200)
-            params = {"id": "m1", "text": "hi", "to": None}
+            params = {"id": "m1", "text": "hi", "to": None, **(note_extra or {})}
             body = {"jsonrpc": "2.0", "id": 1, "method": "note", "params": params}
             headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
             request = urllib.request.Request(url + "rpc", data=json.dumps(body).encode(), headers=headers)
@@ -629,7 +629,9 @@ class Scripts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
             panel = {"kind": "text", "headline": "The slide states one point.", "body": "Text.", "source": "test"}
-            (folder / "spec.json").write_text(json.dumps({"title": "T", "question": "Q?", "panels": [panel]}))
+            (folder / "spec.json").write_text(
+                json.dumps({"type": "slides", "title": "T", "question": "Q?", "panels": [panel]})
+            )
             script = str(ROOT / "skills" / "show-better" / "scripts" / "show.py")
             cmd = [
                 sys.executable,
@@ -640,7 +642,7 @@ class Scripts(unittest.TestCase):
                 "--out",
                 str(folder / "page.html"),
             ]
-            self.serve_and_talk([*cmd, "--serve"], folder, "rev")
+            self.serve_and_talk([*cmd, "--serve"], folder, "rev", {"on": {"slide": 1, "part": None}})
 
     def test_research_better_board(self):
         with tempfile.TemporaryDirectory() as d:
