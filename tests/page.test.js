@@ -760,10 +760,34 @@ test('an invalid merge, out-of-scope question or withdrawn claim stays visible, 
   assert.deepEqual(d.byId['Q-1'].claimsList.map(x => x.id), ['C-9', 'C-11']);  // the valid merge sends C-11 to Q-1
 });
 
-test('the errors band says which records are shown marked and which are left out', () => {
+test('a question merged into itself, or two merged into each other, stay drawn with their claims', () => {
+  const q = (id, over) => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1, ...over });
+  const c = (id, question) => ({ id, question, source: 'S-1', status: 'unchecked' });
+  const d = prepare({ brief: {}, sources: [], decisions: [], logs: {},
+    questions: [q('Q-1', { status: 'merged', merged_into: 'Q-1' }),
+      q('Q-2', { status: 'merged', merged_into: 'Q-3' }), q('Q-3', { status: 'merged', merged_into: 'Q-2' }),
+      q('Q-4', { status: 'merged', merged_into: 'Q-2' }), q('Q-5'), q('Q-6', { status: 'merged', merged_into: 'Q-5' })],
+    claims: [c('C-1', 'Q-1'), c('C-2', 'Q-2'), c('C-3', 'Q-3'), c('C-4', 'Q-4'), c('C-5', 'Q-6')] });
+  assert.deepEqual(d.qs.map(x => x.id), ['Q-1', 'Q-2', 'Q-3', 'Q-5']);  // Q-4 is merged into Q-2, which is drawn
+  assert.deepEqual(d.byId['Q-1'].claimsList.map(x => x.id), ['C-1']);
+  assert.deepEqual(d.byId['Q-2'].claimsList.map(x => x.id), ['C-2', 'C-4']);
+  assert.deepEqual(d.byId['Q-3'].claimsList.map(x => x.id), ['C-3']);
+  assert.deepEqual(d.byId['Q-5'].claimsList.map(x => x.id), ['C-5']);
+});
+
+test('a kept invalid claim with a list for its question does not stop the board from preparing', () => {
+  const q = id => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1 });
+  const d = prepare({ brief: {}, sources: [], decisions: [], logs: {}, questions: [q('Q-1')],
+    claims: [{ id: 'C-1', question: ['Q-1'], source: ['S-1'], _errors: ['question: expected string, got array'] },
+      { id: 'C-2', source: 'S-1', _errors: ['question: required'] }] });
+  assert.deepEqual(d.qs.map(x => x.id), ['Q-1']);
+  assert.deepEqual(d.byId['Q-1'].claimsList, []);
+});
+
+test('the errors band says which records are shown marked and which are only listed', () => {
   const els = band();
   showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] }, els);
-  assert.match(els.errors.innerHTML, /Questions, claims and sources they name are shown marked not valid; other records they name are left out of the page\./);
+  assert.match(els.errors.innerHTML, /Questions are shown marked not valid, and claims and sources under the question they name; other records are only listed here\./);
 });
 
 test('the board marks an invalid brief like any other record', () => {

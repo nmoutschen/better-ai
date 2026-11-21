@@ -10,6 +10,7 @@ import copy
 import importlib.util
 import io
 import json
+import shutil
 import signal
 import subprocess
 import sys
@@ -32,6 +33,9 @@ FILES = {
     "sources/<id>.json": "sources",
     "logs/<agent>.jsonl": "logs",
 }
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wrong_types  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("board_under_test", SCRIPT)
 board = importlib.util.module_from_spec(spec)
@@ -82,11 +86,11 @@ def support(folder: Path) -> None:
     write_lines(folder, "conversation.jsonl", [{**answer, "text": "go on", "default": False}])
 
 
-def seeded(id: str) -> dict:
+def seeded(id: str, **over) -> dict:
     """A seed question: no raised_in or lens."""
     record = question(id, kind="seed", origin={"type": "user"})
     record.pop("raised_in"), record.pop("lens")
-    return record
+    return {**record, **over}
 
 
 def put(folder: Path, file: str, record: dict) -> None:
@@ -503,6 +507,159 @@ class Reading(unittest.TestCase):
             finally:
                 server.send_signal(signal.SIGTERM)
                 server.communicate(timeout=10)
+
+
+def render(payloads: list) -> subprocess.CompletedProcess:
+    """The research board's page drawn, in node, for each {label, data}; None where node is not installed."""
+    node = shutil.which("node")
+    if not node:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "payloads.json"
+        path.write_text(json.dumps(payloads))
+        script = ROOT / "tests" / "render-board-payloads.js"
+        return subprocess.run([node, str(script), str(path)], capture_output=True, text=True, timeout=300)
+
+
+class Stripped(unittest.TestCase):
+    """A record that is kept although it is not valid reaches the page without the fields that failed."""
+
+    def test_a_kept_invalid_record_loses_the_fields_that_failed(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_entry(folder, claim("C-w2-9", question=["Q-w2-4"], span=5))
+            write_entry(folder, {**seeded("Q-w2-9"), "title": 5, "origin": {"type": "question", "question": ["x"]}})
+            write_entry(folder, {**source("S-w2-9"), "trust": ["x"]})
+            write_json(folder, "brief.json", {**example("brief.json", "brief"), "stop_at": ["soon"]})
+            data = board.load(folder)
+        bad = next(c for c in data["claims"] if c["id"] == "C-w2-9")
+        self.assertNotIn("question", bad)
+        self.assertNotIn("span", bad)
+        self.assertTrue(bad["_errors"])
+        self.assertEqual(bad["claim"], claim("C-w2-9")["claim"])
+        asked = next(q for q in data["questions"] if q["id"] == "Q-w2-9")
+        self.assertNotIn("title", asked)
+        self.assertNotIn("origin", asked)
+        self.assertNotIn("trust", next(s for s in data["sources"] if s["id"] == "S-w2-9"))
+        self.assertNotIn("stop_at", data["brief"])
+        self.assertTrue(data["brief"]["_errors"])
+
+    def test_a_record_whose_id_failed_is_shown_by_its_file_name(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_json(folder, "claims/C-w2-9.json", {**claim("C-w2-9"), "id": ["x"]})
+            data = board.load(folder)
+        self.assertEqual(sorted(c["id"] for c in data["claims"]), ["C-w2-7", "C-w2-8", "C-w2-9"])
+
+    def test_a_kept_invalid_claim_with_a_list_question_does_not_crash_the_page(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_entry(folder, claim("C-w2-9", question=["Q-w2-4"]))
+            write_entry(folder, claim("C-w2-6", question={"k": 1}, source=5))
+            data = board.load(folder)
+        result = render([{"label": "list question", "data": data}])
+        if result:
+            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+
+
+class MergeCycles(unittest.TestCase):
+    """A question merged into itself, or two merged into each other, stays on the page with its claims."""
+
+    def test_a_question_merged_into_itself_is_reported(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_entry(folder, seeded("Q-w2-9", status="merged", merged_into="Q-w2-9"))
+            errors = [e for e in board.load(folder)["errors"] if e["file"] == "questions/Q-w2-9.json"]
+        self.assertEqual([e["field"] for e in errors], ["merged_into"])
+
+    def test_a_merge_into_another_question_is_valid(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_entry(folder, seeded("Q-w2-9", status="merged", merged_into="Q-w2-4"))
+            self.assertEqual(board.load(folder)["errors"], [])
+
+    def test_two_questions_merged_into_each_other_are_drawn_with_their_claims(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            for one, other in (("Q-w2-8", "Q-w2-9"), ("Q-w2-9", "Q-w2-8")):
+                write_entry(folder, seeded(one, status="merged", merged_into=other))
+            write_entry(folder, claim("C-w2-9", question="Q-w2-8"))
+            data = board.load(folder)
+        self.assertEqual(data["errors"], [])
+        result = render([{"label": "mutual merge", "data": data}])
+        if result:
+            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+
+
+class WrongTypes(unittest.TestCase):
+    """For every field of every kind of record the board reads, each wrong type, one at a time, and the field
+    deleted, and an extra field: `check` and `load` do not fail, the payload is JSON, and the page draws it."""
+
+    WRONG = [[1], [[1]], {"k": 1}, 5, True, None, "x"]
+
+    def records(self) -> dict:
+        """One file for each example, as (records, written as one JSON record)."""
+        files: dict = {}
+        for file, items in EXAMPLES.items():
+            for item in items:
+                record = item["record"]
+                where = FILES[file]
+                if where == "brief.json":
+                    files["brief.json"] = ([record], True)
+                elif where == "decisions.jsonl":
+                    files.setdefault("decisions.jsonl", ([], False))[0].append(record)
+                elif where == "logs":
+                    files.setdefault(f"logs/{record['by']}.jsonl", ([], False))[0].append(record)
+                else:
+                    files[f"{where}/{record['id']}.json"] = ([record], True)
+        note = {"type": "note", "at": "2026-11-21T10:00:00Z", "by": "user", "id": "m-1", "text": "hi", "to": None}
+        answer = {"type": "answer", "at": "2026-11-21T10:05:00Z", "by": "user", "id": "a-lq3z", "decision": "D1"}
+        comment = {**note, "id": "c-1", "type": "comment", "on": {"kind": "question", "id": "Q-w2-4", "title": "t"}}
+        files["conversation.jsonl"] = ([{**answer, "text": "go on", "default": False}, note, comment], False)
+        return files
+
+    def test_no_wrong_type_breaks_check_load_or_the_page(self):
+        """Each file on a board of its own (the records its pointers need, and that file), so a scan reads few files."""
+        payloads = []
+
+        def put_file(folder, relative, records, as_json):
+            (write_json if as_json else write_lines)(folder, relative, records[0] if as_json else records)
+
+        for relative, (records, as_json) in self.records().items():
+            with tempfile.TemporaryDirectory() as d:
+                folder = Path(d)
+                support(folder)
+                put_file(folder, relative, records, as_json)
+                for label, changed in wrong_types.variants(records, self.WRONG):
+                    with self.subTest(f"{relative}: {label}"):
+                        put_file(folder, relative, changed, as_json)
+                        payloads.append({"label": f"{relative}: {label}", "data": self.survives(folder)})
+                put_file(folder, relative, records, as_json)
+                for raw in wrong_types.RAW_LINES:
+                    if as_json:
+                        break
+                    with self.subTest(f"{relative}: raw {raw[:10]}"):
+                        (folder / relative).write_text(raw + "\n" + "".join(json.dumps(r) + "\n" for r in records))
+                        payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": self.survives(folder)})
+        self.assertGreater(len(payloads), 1000)
+        result = render(payloads)
+        if result:
+            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+
+    def survives(self, folder: Path) -> dict:
+        """`load` and `check` do not raise, and what `load` returns is JSON a browser reads."""
+        board.SCANS.clear()
+        data = board.load(folder)
+        json.dumps(data, allow_nan=False)
+        with contextlib.redirect_stdout(io.StringIO()):
+            board.check(folder)
+        return data
 
 
 if __name__ == "__main__":
