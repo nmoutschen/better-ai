@@ -6,12 +6,16 @@ dashboard.py must show every valid record next to the errors of the invalid ones
 """
 
 import importlib.util
+import io
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "skills" / "code-better" / "scripts"
@@ -556,6 +560,116 @@ class Dashboard(unittest.TestCase):
             folder = change(Path(d))
             write(folder, "audit/2026-11-21/findings.jsonl", [{"type": "finding"}])
             self.assertEqual(dashboard.load(folder)["errors"], [])
+
+
+WRONG = [[1], {"k": 1}, 5, True, None, "x"]
+
+
+class WrongTypes(unittest.TestCase):
+    """For every field of every record the dashboard reads, each wrong type, one at a time: `check` and `load` do not
+    fail, and the page draws what it gets. A record that is not valid is shown without the fields that failed."""
+
+    def files(self):
+        gap = {
+            "type": "gap",
+            "at": AT,
+            "by": "coordinator",
+            "id": "G1",
+            "text": "t",
+            "status": "asked",
+            "decision": "D1",
+        }
+        gap["if_wrong"] = "x"
+        decision = {"type": "decision", "at": AT, "by": "coordinator", "raised_by": "b1", "asked": "Which?"}
+        decision |= {"about": {"type": "task", "task": "T1"}}
+        answered = {**decision, "id": "D1", "status": "answered", "answer": {"type": "page", "event": "a-1"}}
+        chat = {**decision, "id": "D2", "status": "answered", "answer": {"type": "chat", "text": "50 MB"}}
+        decided = {**decision, "id": "D4", "status": "decided", "decision": "Yes"}
+        waiting = {**decision, "id": "D3", "status": "waiting"}
+        event = {"type": "answer", "at": AT, "by": "user", "id": "a-1", "decision": "D1", "text": "A", "default": False}
+        return {
+            "code.json": ([code("coordinate", {"type": "file", "path": "d.md"})], True),
+            "spec.jsonl": ([spec("S1"), gap], False),
+            "tasks.jsonl": (
+                [task("T1", status="building"), task("T2", status="blocked", reason="task", waits_on="T1")],
+                False,
+            ),
+            "decisions.jsonl": ([answered, chat, waiting, decided], False),
+            "conversation.jsonl": ([event], False),
+            "logs/b1.card.json": ([card("builder", "T1")], True),
+            "logs/b1.jsonl": ([log("start", "b1"), log("handed_back", "b1", result="done")], False),
+        }
+
+    def variants(self, records):
+        for index, record in enumerate(records):
+            for key, value in record.items():
+                options = [(key,), *([(key, inner) for inner in value] if isinstance(value, dict) else [])]
+                for path in options:
+                    original = value if len(path) == 1 else value[path[1]]
+                    for wrong in WRONG:
+                        if wrong == original and type(wrong) is type(original):
+                            continue
+                        changed = json.loads(json.dumps(records))
+                        target = changed[index][key] if len(path) == 2 else changed[index]
+                        target[path[-1]] = wrong
+                        yield f"{'.'.join(path)}[{index}]={wrong!r}", changed
+
+    def test_no_wrong_type_breaks_check_load_or_the_page(self):
+        node = shutil.which("node")
+        payloads = []
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".git").mkdir()
+            folder = root / ".code" / "c"
+            base = self.files()
+            for relative, (records, as_json) in base.items():
+                write(folder, relative, records, as_json)
+            for relative, (records, as_json) in base.items():
+                for label, changed in self.variants(records):
+                    name = f"{relative}: {label}"
+                    with self.subTest(name):
+                        write(folder, relative, changed, as_json)
+                        data = dashboard.load(folder)
+                        json.dumps(data)
+                        out = io.StringIO()
+                        with (
+                            mock.patch.object(sys, "argv", ["dashboard.py", "check", str(folder)]),
+                            redirect_stdout(out),
+                        ):
+                            try:
+                                dashboard.main()
+                            except SystemExit:
+                                pass
+                        payloads.append({"label": name, "data": data})
+                write(folder, relative, records, as_json)
+            self.assertGreater(len(payloads), 300)
+            if node:
+                path = root / "payloads.json"
+                path.write_text(json.dumps(payloads))
+                run = subprocess.run(
+                    [node, str(ROOT / "tests" / "render-payloads.js"), str(path)], capture_output=True, text=True
+                )
+                self.assertEqual(run.returncode, 0, run.stderr[:3000])
+
+    def test_an_invalid_record_shows_without_the_fields_that_failed(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d), tasks=[{**task("T1"), "id": ["T1"], "requirements": "S1", "mode": 5}, task("T2")])
+            data = dashboard.load(folder)
+        first, second = data["tasks"]
+        self.assertEqual(first["id"], "(line 1)")
+        self.assertNotIn("requirements", first)
+        self.assertNotIn("mode", first)
+        self.assertEqual(first["task"], "Reject empty uploads")
+        self.assertTrue(first["_errors"])
+        self.assertEqual(second["id"], "T2")
+        self.assertEqual({e["field"] for e in data["errors"]}, {"id", "requirements", "mode"})
+
+    def test_a_status_that_failed_stays_as_written_text(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d), tasks=[task("T1", status="in review"), {**task("T2"), "status": ["x"]}])
+            data = dashboard.load(folder)
+        self.assertEqual(data["tasks"][0]["status"], "in review")
+        self.assertNotIn("status", data["tasks"][1])
 
 
 class Check(unittest.TestCase):
