@@ -10,6 +10,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -44,6 +45,10 @@ OLD_FIELDS = [
     r"\banswer:",
     r"\banswer line",
 ]
+CHECK_SENTENCE = (
+    "After every write to the board, run `python3 <skill dir>/scripts/schema.py check <file>` "
+    "and fix every error before your next step."
+)
 RECORD_FILES = {
     "brief": "brief.schema.json",
     "question": "questions.schema.json",
@@ -105,25 +110,20 @@ class ResearchBetterText(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(name, text)
 
-    def test_every_write_step_runs_schema_check(self) -> None:
-        """Each prompt, the coordinator's board steps and the template tell the writer to run `schema.py check`."""
-        for path in TEXTS[:4]:
+    def test_each_loop_starts_with_the_schema_check_sentence(self) -> None:
+        """SKILL.md step 2, the worker's loop and the verifier's loop each say once, up front, to check every write."""
+        for path in TEXTS[:3]:
             with self.subTest(file=path.name):
-                self.assertIn("schema.py check", path.read_text(encoding="utf-8"))
-        skill = (RESEARCH / "SKILL.md").read_text(encoding="utf-8")
-        for start, end in (("#### 5.2.", "#### 5.3."), ("#### 6.2.", "### 7.")):
-            section = skill[skill.index(start) : skill.index(end)]
-            with self.subTest(section=start):
-                self.assertIn("schema.py check", section)
-        for name, markers in (
-            ("worker.md", ("After each search or page read", "## Adding questions")),
-            ("verifier.md", ("Before you write",)),
-        ):
+                self.assertIn(CHECK_SENTENCE, path.read_text(encoding="utf-8"))
+        for name in ("worker.md", "verifier.md"):
             text = (RESEARCH / "agents" / name).read_text(encoding="utf-8")
-            for marker in markers:
-                paragraph = text[text.index(marker) :].split("\n## ")[0]
-                with self.subTest(file=name, step=marker):
-                    self.assertIn("schema.py check", paragraph)
+            loop = text[text.index("## Loop") :]
+            with self.subTest(file=name):
+                self.assertTrue(
+                    loop[len("## Loop") :].lstrip().startswith(CHECK_SENTENCE), "not at the head of the loop"
+                )
+        skill = (RESEARCH / "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotIn("from this skill's directory", skill)
 
     def test_no_step_deletes_a_record_others_point_to(self) -> None:
         """The coordinator's steps withdraw, mark a duplicate or merge; none says to delete."""
@@ -140,12 +140,54 @@ class ResearchBetterText(unittest.TestCase):
         logs = schema_json("logs.schema.json")["properties"]["type"]["enum"]
         self.assertEqual(types, set(RECORD_FILES) | set(logs))
         for kind, name in RECORD_FILES.items():
-            if kind == "brief":
-                continue  # its status does not change which fields it has
+            lines = {value.strip(" <>") for r in records if r["type"] == kind for value in str(r["status"]).split("|")}
             for status in schema_json(name)["properties"]["status"]["enum"]:
                 with self.subTest(kind=kind, status=status):
-                    lines = [r["status"] for r in records if r["type"] == kind]
-                    self.assertTrue(any(status in line for line in lines), f"no {kind} line for status {status}")
+                    self.assertIn(status, lines, f"no {kind} line for status {status}")
+
+    def test_template_has_placeholders_only(self) -> None:
+        """The template holds no example IDs, and its challenge question has a question as origin."""
+        text = (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8")
+        self.assertIsNone(re.search(r"\b[QCS]-w\d", text), "an example ID")
+        for record in template_records():
+            if record["type"] == "question" and record["kind"] == "<seed | challenge>":
+                self.assertNotIn("user", str(record["origin"]["type"]))
+
+    def test_null_date_is_accepted_and_planted_in_the_missing_field_board(self) -> None:
+        """A source with date null passes the schema check, and S-w2-2 of findings-missing-field has none."""
+        planted = ROOT / "evals/cases/research-better/findings-missing-field/repo/.research/checkout-drop/sources"
+        record = json.loads((planted / "S-w2-2.json").read_text(encoding="utf-8"))
+        self.assertIsNone(record["date"])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sources" / "S-w2-2.json"
+            path.parent.mkdir()
+            path.write_text(json.dumps(record), encoding="utf-8")
+            done = subprocess.run(
+                [sys.executable, "-I", str(SCHEMA_PY), "check", str(path)], capture_output=True, text=True
+            )
+            self.assertEqual(done.returncode, 0, done.stdout)
+
+    def test_planted_challenge_questions_are_not_owned_by_the_answerer(self) -> None:
+        """A planted challenge question is not owned by the agent that owns the question it challenges."""
+        for path in sorted((ROOT / "evals/cases/research-better").glob("*/repo/.research/*/questions/*.json")):
+            q = json.loads(path.read_text(encoding="utf-8"))
+            if q["kind"] != "challenge" or "owner" not in q:
+                continue
+            origin = json.loads((path.parent / (q["origin"]["question"] + ".json")).read_text(encoding="utf-8"))
+            with self.subTest(path=str(path.relative_to(ROOT))):
+                self.assertNotEqual(q["owner"], origin.get("owner"))
+
+    def test_eval_board_lib_reads_a_pretty_printed_json_file(self) -> None:
+        """board_lib.entry reads a .json file that spans several lines, as schema.py does."""
+        sys.path.insert(0, str(ROOT / "evals/cases/research-better/_checks"))
+        try:
+            import board_lib
+        finally:
+            sys.path.pop(0)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Q-w1-1.json"
+            path.write_text(json.dumps({"id": "Q-w1-1", "status": "open"}, indent=2), encoding="utf-8")
+            self.assertEqual(board_lib.entry(path)["status"], "open")
 
     def test_template_lines_use_only_the_schemas_fields(self) -> None:
         """Each placeholder line holds every field its record type requires and no field its schema lacks."""
