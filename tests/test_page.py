@@ -433,6 +433,31 @@ class Dashboard(unittest.TestCase):
         self.assertEqual(data["requirements"], {"R1": "The query shall list late orders."})
         self.assertEqual(data["decisions"][0]["status"], "waiting")
 
+    def test_load_reads_the_blocked_by_column(self):
+        """A blocked task's reason comes from its own column, cell as written; a list without the column still reads."""
+        spec = importlib.util.spec_from_file_location(
+            "dashboard", ROOT / "skills" / "code-better" / "scripts" / "dashboard.py"
+        )
+        dashboard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(dashboard)
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "tasks.md"
+            path.write_text(
+                "# Tasks: Late orders\n\n"
+                "| # | Task | Mode | Requirements | Check | Status | Blocked by |\n|---|---|---|---|---|---|---|\n"
+                "| T1 | Order query | feature | R1 | t1 | Changes needed | |\n"
+                "| T2 | Orders page | feature | R2 | t2 | blocked | T1 |\n"
+                "| T3 | Export | feature | R3 | t3 | blocked | repair limit |\n"
+            )
+            tasks = dashboard.read_tasks(path)[1]
+            path.write_text("| # | Task | Status |\n|---|---|---|\n| 1 | Old list | blocked |\n")
+            old = dashboard.read_tasks(path)[1]
+        self.assertEqual(
+            [(t["id"], t["status"], t["blocked_by"]) for t in tasks],
+            [("T1", "Changes needed", ""), ("T2", "blocked", "T1"), ("T3", "blocked", "repair limit")],
+        )
+        self.assertEqual((old[0]["status"], old[0]["blocked_by"]), ("blocked", ""))
+
 
 if __name__ == "__main__":
     unittest.main()

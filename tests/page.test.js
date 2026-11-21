@@ -390,3 +390,63 @@ test('element selectors use the nearest document-unique id in a page or slide', 
   assert.equal(context.pageElementSelector(second), 'body > section:nth-of-type(1) > p:nth-of-type(2)');
   assert.deepEqual(escaped, ['name', 'anchor']);
 });
+
+// The dashboard's task status and agent tag: read out of dashboard.html between `// status:begin` and `// status:end`.
+const statusCode = html.split('// status:begin')[1].split('// status:end')[0];
+const { taskStatus, agentTag, agentClass, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, agentTag, agentClass, DONE, isDone};')(s => String(s));
+const shown = (status, blocked_by, tasks) => { const s = taskStatus({ status, blocked_by }, tasks || [{ id: 'T2' }]); return [s.key, s.word]; };
+
+test("a task shows the status tasks.md gives it, each of the coordinate mode's stages with its own icon", () => {
+  assert.deepEqual(shown('todo'), ['todo', 'to do']);
+  assert.deepEqual(shown('building'), ['building', 'building']);
+  assert.deepEqual(shown('built'), ['built', 'built']);
+  assert.deepEqual(shown('verifying'), ['verifying', 'verifying']);
+  assert.deepEqual(shown('changes needed'), ['changes', 'changes needed']);
+  assert.deepEqual(shown('verified'), ['verified', 'verified']);
+  assert.deepEqual(shown('merged'), ['merged', 'merged']);
+  assert.deepEqual(shown('done'), ['done', 'done']);
+  assert.deepEqual(shown(' Merged '), ['merged', 'merged']);
+  const keys = ['todo', 'building', 'built', 'verifying', 'changes needed', 'verified', 'merged', 'blocked'].map(s => shown(s)[0]);
+  assert.equal(new Set(keys).size, keys.length);
+});
+
+test('a blocked task says what it waits on, from the Blocked by column only', () => {
+  assert.deepEqual(shown('blocked', 'T2'), ['blocked', 'waiting on T2']);
+  assert.deepEqual(shown('blocked', 'user'), ['blocked', 'waiting on you']);
+  assert.deepEqual(shown('blocked', 'repair limit'), ['blocked', 'repair limit']);
+  assert.deepEqual(shown('blocked', ''), ['blocked', 'blocked']);
+  assert.deepEqual(shown('blocked', undefined), ['blocked', 'blocked']);
+  // A reason that is not a task of the list, nor one of the two words, shows as written: never guessed into a task.
+  assert.deepEqual(shown('blocked', 'T9'), ['blocked', 'blocked: T9']);
+  assert.deepEqual(shown('blocked', 'needs a key'), ['blocked', 'blocked: needs a key']);
+});
+
+test('a status or a blocked reason with markup shows as text, never as HTML', () => {
+  const realEsc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  const { statusLabel } = new Function('esc', statusCode + '; return {statusLabel};')(realEsc);
+  assert.doesNotMatch(statusLabel({ status: 'blocked', blocked_by: '<img src=x onerror=alert(1)>' }, []), /<img/);
+  assert.match(statusLabel({ status: '<b>x</b>' }, []), /&lt;b&gt;x&lt;\/b&gt;/);
+});
+
+test('an unknown status shows as an error, with the status as written', () => {
+  assert.deepEqual(shown('in review'), ['other', 'not a status: in review']);
+  assert.deepEqual(shown('In Review'), ['other', 'not a status: In Review']);  // as written, casing kept
+  assert.deepEqual(shown('Merged'), ['merged', 'merged']);
+  assert.deepEqual(shown(''), ['other', 'no status']);
+});
+
+test('only merged and done tasks count as done, in any casing', () => {
+  assert.deepEqual([...DONE].sort(), ['done', 'merged']);
+  assert.equal([{ status: 'Merged' }, { status: ' DONE ' }, { status: 'verified' }, { status: '' }, {}].filter(isDone).length, 2);
+});
+
+test('a verifier shows as a verifier, a builder by its mode', () => {
+  const v = { role: 'verifier', mode: 'bug fix' }, b = { role: 'builder', mode: 'bug fix' }, n = { mode: 'feature' };
+  assert.match(agentTag(v), /class="mode r-verifier"[^>]*>verifier</);
+  assert.doesNotMatch(agentTag(v), /bug fix/);
+  assert.equal(agentClass(v), 'm-bugfix');  // the card edge is its task's mode colour; the tag says verifier
+  assert.match(agentTag(b), /class="mode m-bugfix"[^>]*>bug fix</);
+  assert.equal(agentClass(b), 'm-bugfix');
+  assert.equal(agentClass(n), 'm-feature');  // no role: shown as a builder
+  assert.match(agentTag({ role: ' Verifier ' }), />verifier</);
+});

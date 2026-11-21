@@ -37,6 +37,7 @@
 .mode.m-refactor { background:var(--umber); color:var(--cream); }
 .mode.m-tests { background:var(--sand); color:var(--heading); }
 .mode.m-other { border:1px solid var(--muted); color:var(--ink); }
+.mode.r-verifier { background:var(--heading); color:var(--cream); }
 /* The state as an icon, named for screen readers and on hover; the key under the heading says what each means. */
 .state { display:inline-flex; align-items:center; gap:var(--space-tight); font:var(--font-small-strong); line-height:1; color:var(--ink); }
 .state svg { width:14px; height:14px; flex:none; }
@@ -67,10 +68,14 @@
 .tasks .n { flex:none; width:2em; font:var(--font-message-strong); color:var(--muted); }
 .tasks .t { flex:1; min-width:0; }
 .tasks .on { flex:none; font-size:var(--text-small); color:var(--muted); }
-.tasks .tstat { flex:none; width:9em; white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-tight); font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
-.tasks .tstat svg { width:13px; height:13px; }
-.tasks .tstat.done { color:var(--moss-dark); }
-.tasks .tstat.blocked { color:var(--error); }
+.tasks .tstat { flex:none; width:11.5em; white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-tight); font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
+.tasks .tstat svg { width:13px; height:13px; flex:none; }
+.tasks .tstat .w { overflow:hidden; text-overflow:ellipsis; }
+.tasks .tstat.verified, .tasks .tstat.merged, .tasks .tstat.done { color:var(--moss-dark); }
+.tasks .tstat.changes { color:var(--terracotta-dark); }
+.tasks .tstat.blocked, .tasks .tstat.other { color:var(--error); }
+/* An unknown status is an error: its label takes the room it needs, so the status as written stays readable. */
+.tasks .tstat.other { width:auto; min-width:11.5em; max-width:50%; }
 /* Past five rows the list scrolls, with a scroll bar that stays visible. macOS hides scroll bars until you scroll,
    and Firefox lets no page change that, so the page hides the browser's bar and draws its own track and thumb. */
 .tasks-box { display:flex; gap:var(--space-tight); }
@@ -135,20 +140,44 @@ const QUIET = 15 * 60;
 const ORDER = {blocked: 0, quiet: 1, waiting: 2, working: 3};
 const stateOf = (a, now) => a.state === "working" && now - a._changed > QUIET ? "quiet" : a.state;
 const word = (a, now) => stateOf(a, now) === "quiet" ? `quiet ${Math.round((now - a._changed) / 60)} min` : STATEWORD[a.state];
-const DONE = new Set(["done", "merged"]);
 let D = null, OPEN = null, REPLIES = -1, CLOSED_PAGE = false;  // OPEN: the agent the pop-up shows, as {id, anchor}
 
 // An agent's log line without its first word, as a person reads it: "step: wrote the check" shows "wrote the check".
 const KINDS = ["start", "step", "asked", "blocked", "handed back"];
 const words = line => { const i = String(line).indexOf(":"), kind = i < 0 ? "" : line.slice(0, i).trim().toLowerCase(), rest = line.slice(i + 1).trim();
   return !KINDS.includes(kind) ? line : kind === "step" ? rest : `${kind[0].toUpperCase()}${kind.slice(1)}: ${rest}`; };
-// Who the agent is: its name, with its role only when the name does not already say it.
-// Who the agent is and what it does: its name, its role, and for a builder the mode of its task.
-// The mode of the agent's task shows as a tag with one colour per mode; a verifier's tag is its task's mode.
+// status:begin
+// What an agent does: the card's edge is the mode of its task, one colour per mode. A builder's tag is that mode; a
+// verifier's tag says "verifier", so it never reads as a builder at work on the task again. No role counts as a builder.
 const MODES = {feature: "feature", "bug fix": "bugfix", bugfix: "bugfix", refactor: "refactor", tests: "tests"};
 const modeOf = a => String(a.mode || "").trim().toLowerCase();
+const isVerifier = a => String(a.role || "").trim().toLowerCase() === "verifier";
 const modeClass = a => { const m = modeOf(a); return m && m !== "none" ? "m-" + (MODES[m] || "other") : "m-other"; };
-const modeTag = a => { const m = modeOf(a); return m && m !== "none" ? `<span class="mode ${modeClass(a)}">${esc(m)}</span>` : ""; };
+const agentClass = modeClass;
+const agentTag = a => { const m = modeOf(a);
+  return isVerifier(a) ? `<span class="mode r-verifier">verifier</span>` : m && m !== "none" ? `<span class="mode ${modeClass(a)}">${esc(m)}</span>` : ""; };
+// A task's status as tasks.md writes it (modes/coordinate.md), as an icon key and a word. A blocked task says what it
+// waits on from its Blocked by cell: a task of the list, the user, or the repair limit; anything else shows as written.
+// An unknown status is an error the coordinator made: it shows in red as written, never as another stage.
+const TASK_STATUS = {todo: ["todo", "to do"], building: ["building", "building"], built: ["built", "built"],
+  verifying: ["verifying", "verifying"], "changes needed": ["changes", "changes needed"], verified: ["verified", "verified"],
+  merged: ["merged", "merged"], done: ["done", "done"]};
+const DONE = new Set(["done", "merged"]);
+const isDone = t => DONE.has(String(t.status || "").trim().toLowerCase());
+function taskStatus(t, tasks) {
+  const raw = String(t.status || "").trim(), s = raw.toLowerCase(), by = String(t.blocked_by || "").trim();
+  if (s === "blocked") {
+    const word = !by || by.toLowerCase() === "none" ? "blocked" : by.toLowerCase() === "user" ? "waiting on you"
+      : by.toLowerCase() === "repair limit" ? "repair limit" : tasks.some(x => x.id === by) ? `waiting on ${by}` : `blocked: ${by}`;
+    return {key: "blocked", word};
+  }
+  const [key, word] = TASK_STATUS[s] || ["other", raw ? `not a status: ${raw}` : "no status"];
+  return {key, word};
+}
+// The status word as HTML: it may carry a cell of tasks.md as written, so it is escaped; a long one is cut, in full on hover.
+const statusLabel = (t, tasks, icons) => { const {key, word} = taskStatus(t, tasks);
+  return `<span class="tstat ${key}" title="${esc(word)}">${(icons || {})[key] || ""}<span class="w">${esc(word)}</span></span>`; };
+// status:end
 // One icon per state, drawn in currentColor so blocked and quiet take the red of their text.
 const ICON = {
   working: '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 2l9 5-9 5z" fill="currentColor"/></svg>',
@@ -175,8 +204,8 @@ function drawAgents(d) {
   const num = a => { const i = (d.tasks || []).findIndex(t => t.id === a.task); return i < 0 ? Infinity : i; }, now = d.now;
   const live = d.agents.filter(a => a.state !== "finished")
     .sort((a, z) => ORDER[stateOf(a, now)] - ORDER[stateOf(z, now)] || num(a) - num(z) || a.name.localeCompare(z.name));
-  setHTML($("cards"), live.map(a => `<li><button type="button" class="card ${stateOf(a, now)} ${modeClass(a)}" data-a="${esc(a.name)}">
-      <p class="meta">${modeTag(a)} ${stateIcon(a, now)} ${who(a)}</p>
+  setHTML($("cards"), live.map(a => `<li><button type="button" class="card ${stateOf(a, now)} ${agentClass(a)}" data-a="${esc(a.name)}">
+      <p class="meta">${agentTag(a)} ${stateIcon(a, now)} ${who(a)}</p>
       <h3 dir="auto">${esc(taskLabel(a))}</h3>
       ${reqsOf(taskOf(a)).length ? `<ul class="reqs">${reqItems(taskOf(a))}</ul>` : ""}
       <ol>${a.lines.filter(l => l.slice(0, l.indexOf(":")).trim().toLowerCase() !== "start").slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
@@ -184,22 +213,31 @@ function drawAgents(d) {
     || `<li class="empty">No agent is working right now.</li>`);
 }
 // ---------- The tasks ----------
-const TICON = {todo: '<svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
-  done: ICON.finished, blocked: ICON.blocked, active: ICON.working};
+const svg = body => `<svg viewBox="0 0 14 14" aria-hidden="true">${body}</svg>`;
+const TICON = {todo: svg('<circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/>'),
+  building: ICON.working,
+  built: svg('<circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 7.2l1.8 1.8 3.3-3.8" fill="none" stroke="currentColor" stroke-width="1.6"/>'),
+  verifying: svg('<circle cx="6" cy="6" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.7 8.7L12.5 12.5" stroke="currentColor" stroke-width="2"/>'),
+  changes: svg('<path d="M11.5 3v4.5H3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.5 4.3L3.2 7.5l3.3 3.2" fill="none" stroke="currentColor" stroke-width="1.8"/>'),
+  verified: ICON.finished,
+  // merged: two branches joined
+  merged: svg('<circle cx="4" cy="2.8" r="1.7" fill="currentColor"/><circle cx="4" cy="11.2" r="1.7" fill="currentColor"/><circle cx="10.5" cy="7" r="1.7" fill="currentColor"/><path d="M4 4.5V9.5M4 4.5C4 7 6.5 7 8.8 7" fill="none" stroke="currentColor" stroke-width="1.6"/>'),
+  // done, in a single-agent list: finished, a filled tick
+  done: svg('<circle cx="7" cy="7" r="6" fill="currentColor"/><path d="M4.3 7.2l1.9 1.9 3.6-4" fill="none" style="stroke:var(--cream)" stroke-width="1.8"/>'),
+  blocked: ICON.blocked,
+  other: svg('<circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 5.6a1.8 1.8 0 1 1 2.5 1.6c-.5.3-.8.6-.8 1.2v.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="7" cy="10.4" r=".85" fill="currentColor"/>')};
 function drawTasks(d) {
   const tasks = d.tasks || [];
   $("tasks-sec").hidden = !tasks.length;
   // The heading says how many tasks are done of how many, since past five rows the list scrolls and the rest are out of sight.
-  $("tasks-h").textContent = `Tasks: ${tasks.filter(t => DONE.has(t.status)).length} of ${tasks.length} done`;
-  // The tasks keep their own order, the one tasks.md gives; a task an agent works on reads "in progress".
+  $("tasks-h").textContent = `Tasks: ${tasks.filter(isDone).length} of ${tasks.length} done`;
+  // The tasks keep their own order, the one tasks.md gives, each with the status tasks.md gives it.
   setHTML($("tasks"), tasks.map(t => {
     const live = d.agents.filter(a => a.task && a.task === t.id && a.state !== "finished");
-    const st = DONE.has(t.status) ? "done" : t.status === "blocked" ? "blocked" : live.length ? "active" : "todo";
-    const word = st === "active" ? "in progress" : st;
     const tag = has(t.mode) ? `<span class="mode m-${MODES[t.mode.trim().toLowerCase()] || "other"}">${esc(t.mode)}</span>` : "";
     const open = OPENTASKS.has(t.id) ? " open" : "";
     return `<li><details data-t="${esc(t.id)}"${open}><summary><span class="n">${esc(t.id)}</span>
-      <span class="tstat ${st}">${TICON[st]}${word}</span>${tag}<span class="t" dir="auto">${esc(t.task)}</span>
+      ${statusLabel(t, tasks, TICON)}${tag}<span class="t" dir="auto">${esc(t.task)}</span>
       ${live.length ? `<span class="on">${esc(live.map(a => a.name).join(", "))}</span>` : ""}</summary>
       <div class="body">${reqsOf(t).length ? `<ul class="req-list">${reqItems(t)}</ul>` : '<p class="empty">No requirement named.</p>'}
       ${has(t.check) ? `<p class="check">Check: <code>${esc(t.check)}</code></p>` : ""}
@@ -330,9 +368,9 @@ function fillPop() {
   const task = taskOf(a), reqs = reqsOf(task).length, check = task && has(task.check);
   // The header says who and what; then what the agent must make true, its steps, and the conversation about its work.
   const html = `<button type="button" class="x" aria-label="Close">×</button>
-    <div class="hd"><p class="kind">${modeTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>
+    <div class="hd"><p class="kind">${agentTag(a)} ${stateIcon(a, D.now)} ${who(a)}${has(a.branch) ? " on " + esc(a.branch) : ""}</p>
     <h3 dir="auto">${esc(taskLabel(a))}</h3></div>
-    <div class="bd">${reqs || check ? `<div class="sec"><h4 class="section-h">Must make true</h4>${reqs ? `<ul class="req-list">${reqItems(task)}</ul>` : ""}
+    <div class="bd">${reqs || check ? `<div class="sec"><h4 class="section-h">${isVerifier(a) ? "Checks the work against" : "Must make true"}</h4>${reqs ? `<ul class="req-list">${reqItems(task)}</ul>` : ""}
     ${check ? `<p class="check">Check: <code>${esc(task.check)}</code></p>` : ""}</div>` : ""}
     <div class="sec"><h4 class="section-h">Steps so far</h4><ol class="steps">${a.lines.map(l => `<li dir="auto">${esc(words(l))}</li>`).join("") || "<li>None logged yet.</li>"}</ol></div>
     <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>
@@ -379,7 +417,7 @@ document.addEventListener("keydown", ev => {
 function render(d) {
   D = d;
   $("title").textContent = d.name || "Change dashboard"; document.title = `${$("title").textContent} · Change dashboard`;
-  const tasks = d.tasks || [], done = tasks.filter(t => DONE.has(t.status)).length;
+  const tasks = d.tasks || [], done = tasks.filter(isDone).length;
   const working = d.agents.filter(a => a.state !== "finished").length;
   // A question the user answered in the page no longer waits for them, even before the coordinator applies the answer.
   // It waits again when the coordinator asked back about the answer.

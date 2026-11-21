@@ -9,7 +9,8 @@ Usage:
   python3 dashboard.py status CHANGE seen|asked|working|done|accepted ID...
   python3 dashboard.py pending CHANGE                           list the user's items that are not done
 
-CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it: tasks.md, specs.md, in
+CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it: tasks.md (with the task
+statuses and Blocked by reasons modes/coordinate.md defines), specs.md, in
 logs/ one JSON file per agent with its role, task, mode and branch (modes/coordinate.md) and the agent's log (its
 format is in agents/builder.md and agents/verifier.md) and the coordinator's decisions and
 questions in decisions/ (templates/decision.md). The page shows the agents at work and their latest steps, the tasks with the requirements of specs.md, and a conversation
@@ -87,7 +88,8 @@ def read_tasks(path: Path) -> tuple:
                 "mode": row.get("mode", ""),
                 "requirements": [r.strip() for r in row.get("requirements", "").split(",") if r.strip()],
                 "check": row.get("check that tells done from not done", row.get("check", "")),
-                "status": row.get("status", "").lower(),
+                "status": row.get("status", ""),  # as written: the page matches it without case
+                "blocked_by": row.get("blocked by", ""),  # a task's #, user or repair limit (modes/coordinate.md)
             }
         )
     return name, tasks
