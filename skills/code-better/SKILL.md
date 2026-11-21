@@ -100,7 +100,21 @@ IF the change adds a module, a data model, a dependency or a migration and no de
 
 ### Working notes
 
-KEEP your working files in `.code/<change>/`, and ADD `.code/` to `.git/info/exclude`. KEEP `.code/conventions.md` as a short list of facts about the repo, each with its source. IN a session the harness may compact, WRITE each constraint the user gives to `.code/<change>/notes.md`, and READ it again after each compaction.
+KEEP your working files in `.code/<change>/`, and ADD `.code/` to `.git/info/exclude`. EACH is typed JSON, and its schema in `schemas/` is the authority: READ the template before you first write a file, and WRITE the record a pointer names before the pointer.
+
+| File | Holds | Template |
+|---|---|---|
+| `code.json`, `spec.jsonl` | the goal, the design and the mode; the requirements, gaps and design items with no requirement | [templates/spec.md](templates/spec.md) |
+| `tasks.jsonl`, `progress.jsonl` | the tasks and their status; progress, problems and their resolution | [templates/tasks.md](templates/tasks.md) |
+| `decisions.jsonl` | decisions taken and questions to the user | [templates/decision.md](templates/decision.md) |
+| `next-steps.jsonl` | the proposed next steps | [templates/next-steps.md](templates/next-steps.md) |
+| `instructions.jsonl` | the user's instructions on how to work | [templates/instructions.md](templates/instructions.md) |
+| `logs/<agent>.card.json`, `logs/<agent>.jsonl` | what an agent works on; its steps | [templates/log.md](templates/log.md) |
+| `audit/<YYYY-MM-DD>/audit.json`, `evidence.jsonl`, `findings.jsonl` | one audit | [templates/audit.md](templates/audit.md) |
+
+AFTER every write to a file in `.code/`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step. IN a session the harness may compact, WRITE each instruction the user gives on how to work to `instructions.jsonl`, with their words, and each constraint on what the code does into the spec, and READ both again after each compaction.
+
+KEEP `.code/conventions.md` as a short list of facts about the repo, each with its source.
 
 ### Missing capabilities
 

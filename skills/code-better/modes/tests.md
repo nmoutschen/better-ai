@@ -5,13 +5,13 @@ description: Use to add or improve tests for existing code, without changing the
 
 # Mode: tests
 
-FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a file in `.code/`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
 ## 1. Update the spec
 
-KEEP a spec for every change, however small: a one-line change needs one requirement. IF no existing spec covers the change, READ [../templates/specs.md](../templates/specs.md) and WRITE `.code/<change>/specs.md` in the template's format. WRITE the behaviour the tests must cover in the spec. TAKE each expected value from the spec, the design or the documented behaviour, never from what the code does. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
+KEEP a spec for every change, however small: a one-line change needs one requirement. WRITE `.code/<change>/code.json`: the goal, the design and the mode. IF no existing spec covers the change, READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format. WRITE the behaviour the tests must cover in the spec. TAKE each expected value from the spec, the design or the documented behaviour, never from what the code does. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files with the same requirements. WHEN `code.json` names an architect folder as the design, UPDATE that folder's `spec.jsonl` and WRITE no copy.
 
-WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.md` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task todo.
+WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.jsonl` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task `todo`.
 
 ## 2. Protect the existing tests
 
@@ -35,4 +35,4 @@ FIX each test that fails for a reason of its own, THEN RUN the tests again. STOP
 
 DO NOT describe results you did not observe.
 
-IF there is a task list, SET each task whose check you saw pass to done, in an edit of its own.
+IF there is a task list, SET the `status` of each task whose check you saw pass to `done` in `tasks.jsonl`, in an edit of its own.

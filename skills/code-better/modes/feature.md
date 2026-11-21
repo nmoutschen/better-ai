@@ -5,17 +5,17 @@ description: Use for a new or changed behaviour.
 
 # Mode: feature
 
-FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a file in `.code/`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
 ## 1. Update the spec
 
-KEEP a spec for every change, however small: a one-line change needs one requirement. IF no existing spec covers the change, READ [../templates/specs.md](../templates/specs.md) and WRITE `.code/<change>/specs.md` in the template's format. WRITE the requirements of this change in the spec. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
+KEEP a spec for every change, however small: a one-line change needs one requirement. WRITE `.code/<change>/code.json`: the goal, the design and the mode. IF no existing spec covers the change, READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format. WRITE the requirements of this change in the spec. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files with the same requirements. WHEN `code.json` names an architect folder as the design, UPDATE that folder's `spec.jsonl` and WRITE no copy.
 
-WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.md` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task todo.
+WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.jsonl` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task `todo`.
 
 ## 2. Write the checks
 
-WRITE one check per requirement. A check compares the result with an expected value: a check that only runs the code does not count. IF the project would keep the check, ADD it as a test next to the existing tests, in their style. OTHERWISE, WRITE it as a command and RECORD it in the spec. DO NOT add test helpers or frameworks the project does not use.
+WRITE one check per requirement. A check compares the result with an expected value: a check that only runs the code does not count. IF the project would keep the check, ADD it as a test next to the existing tests, in their style. OTHERWISE, WRITE it as a command and RECORD it as the `checked_by` of its requirement. DO NOT add test helpers or frameworks the project does not use.
 
 RUN the checks on the current code and RECORD each result. A check for new or changed behaviour FAILS, for the reason its requirement gives. A check for behaviour that stays the same PASSES. IF a result differs, the check or your understanding is wrong: FIX that before step 3.
 
@@ -42,4 +42,4 @@ FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fa
 
 DO NOT describe results you did not observe. A requirement is met only IF its check passed on the final code.
 
-IF there is a task list, SET each task whose check you saw pass to done, in an edit of its own.
+IF there is a task list, SET the `status` of each task whose check you saw pass to `done` in `tasks.jsonl`, in an edit of its own.

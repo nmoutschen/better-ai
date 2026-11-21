@@ -58,9 +58,6 @@ TEMPLATES = {
 # A shape a schema does not name with an if/then, but that a template must still show.
 EXTRA_SHAPES = {"tasks": [("reason", {"user"}), ("reason", {"repair limit"})]}
 
-WRITING = re.compile(r"\b(?:WRITE|ADD|SET|RECORD|CREATE|UPDATE|REVISE|MARK|APPEND)\b")
-JSON_FILE = re.compile(r"[\w<>/.-]*\.jsonl?\b")
-
 
 def read_schema(name: str) -> dict:
     return json.loads((SCHEMAS / f"{name}.schema.json").read_text())
@@ -131,10 +128,6 @@ def placeholder_lines(template: str) -> list[dict]:
     return lines
 
 
-def sections(text: str) -> list[str]:
-    return re.split(r"(?m)^#{1,4} ", text)
-
-
 class CodeBetterTextTest(unittest.TestCase):
     def test_code_better_text_names_no_old_file_or_field(self):
         """No instruction, template or doc names a Markdown file the skill replaced, or a field a schema dropped."""
@@ -146,18 +139,15 @@ class CodeBetterTextTest(unittest.TestCase):
         ]
         self.assertEqual(found, [])
 
-    def test_code_better_every_writing_step_runs_schema_check(self):
-        """A step that writes a JSON file tells the writer to run `schema.py check` after the write."""
-        missing = []
-        for path in TEXT_FILES:
-            if path.name == "code-better.md":
-                continue
-            for section in sections(path.read_text()):
-                writes = any(
-                    WRITING.search(paragraph) and JSON_FILE.search(paragraph) for paragraph in section.split("\n\n")
-                )
-                if writes and "schema.py check" not in section:
-                    missing.append(f"{path.relative_to(ROOT)}: {section.splitlines()[0][:60]}")
+    def test_code_better_every_entry_point_runs_schema_check_after_a_write(self):
+        """SKILL.md, each mode, the builder and the verifier say once to check every file written in `.code/`."""
+        sentence = (
+            "after every write to a file in `.code/`, run `python3 <skill dir>/scripts/schema.py check <file>` "
+            "and fix every error before your next step."
+        )
+        entry_points = [CODE_BETTER / "SKILL.md", *sorted((CODE_BETTER / "modes").glob("*.md"))]
+        entry_points += sorted((CODE_BETTER / "agents").glob("*.md"))
+        missing = [str(p.relative_to(ROOT)) for p in entry_points if sentence not in p.read_text().casefold()]
         self.assertEqual(missing, [])
 
     def test_code_better_every_template_is_present(self):

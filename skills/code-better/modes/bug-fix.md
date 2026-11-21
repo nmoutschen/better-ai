@@ -5,17 +5,17 @@ description: Use for a defect in existing behaviour.
 
 # Mode: bug fix
 
-FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a file in `.code/`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
 
 ## 1. Update the spec
 
-KEEP a spec for every change, however small: a one-line change needs one requirement. IF no existing spec covers the change, READ [../templates/specs.md](../templates/specs.md) and WRITE `.code/<change>/specs.md` in the template's format. WRITE the behaviour the fix restores in the spec, usually one or two requirements. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files instead and WRITE no `specs.md`.
+KEEP a spec for every change, however small: a one-line change needs one requirement. WRITE `.code/<change>/code.json`: the goal, the design and the mode. IF no existing spec covers the change, READ [../templates/spec.md](../templates/spec.md) and WRITE `.code/<change>/spec.jsonl` in the template's format. WRITE the behaviour the fix restores in the spec, usually one or two requirements. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files with the same requirements. WHEN `code.json` names an architect folder as the design, UPDATE that folder's `spec.jsonl` and WRITE no copy.
 
-WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.md` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task todo.
+WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.jsonl` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task `todo`.
 
 ## 2. Reproduce the defect
 
-WRITE a check that reproduces the defect with the input that triggers it, and compares the result with the expected value. IF the project would keep the check, ADD it as a test next to the existing tests, in their style. OTHERWISE, WRITE it as a command and RECORD it in the spec.
+WRITE a check that reproduces the defect with the input that triggers it, and compares the result with the expected value. IF the project would keep the check, ADD it as a test next to the existing tests, in their style. OTHERWISE, WRITE it as a command and RECORD it as the `checked_by` of its requirement.
 
 RUN it on the current code: it FAILS, and you RECORD the result. IF you cannot make it fail, STOP and REPORT what you tried: the defect is not understood yet.
 
@@ -43,4 +43,4 @@ FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fa
 
 DO NOT describe results you did not observe. The defect is fixed only IF the check of step 2 passed on the final code.
 
-IF there is a task list, SET each task whose check you saw pass to done, in an edit of its own.
+IF there is a task list, SET the `status` of each task whose check you saw pass to `done` in `tasks.jsonl`, in an edit of its own.
