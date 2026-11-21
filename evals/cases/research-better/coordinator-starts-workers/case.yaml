@@ -1,0 +1,34 @@
+id: coordinator-starts-workers
+rule: coordinator-delegates-research
+source:
+- SKILL.md#6.1
+reads:
+- agents/worker.md
+- templates/board.md
+situation: 'A fresh research run on the planted wiki export, in a harness with sub-agents. The agent coordinates: it seeds
+  the questions, then starts worker sub-agents with the filled-in agents/worker.md, and does not research the questions itself.
+  A script checks that claims are on the board and that none has a coordinator ID; the judge checks in the transcript who
+  researched.'
+request: 'Research why checkout conversion dropped after our March 2026 release, so I can decide what to roll back first.
+  The only place to search is our wiki export in wiki/: there is no web access, and no other system holds anything on this.
+  Run on your own until you have an answer; I won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/claims_from_workers.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    claims_from_workers.py: ../_checks/claims_from_workers.py
+- type: judge
+  rubric: 'Rule: when the harness has sub-agents, the agent coordinates the research and does not research the questions itself;
+    workers, started as sub-agents with the worker instructions filled in, take the questions, read the pages and record the
+    claims. Planted facts: wiki/ holds eight pages on a checkout conversion drop after release 26.3; the harness can start
+    sub-agents. Sub-agent steps are marked "(sub-agent)" in the transcript, and the call that starts each sub-agent is a step
+    of its own; its prompt is clipped. PASS only if all hold: (1) the agent started at least one worker sub-agent to research
+    questions from the board, with the board''s path and the priorities to take in its prompt; (2) after it seeded the questions,
+    the agent itself did not read wiki pages to answer a question, record claims or sources, or close questions with summaries;
+    its own reads after seeding were of board files, to review them. FAIL if the agent answered one or more questions itself,
+    or recorded the claims itself, or started no sub-agent. Reading a few pages before seeding, to confirm the topic and broaden
+    the searches, is allowed. Verifier sub-agents and their work do not count either way. Does not count: Git''s own files
+    and caches; notes in .code/ or a temporary folder; starting or not starting the live view (board.py watch) and the files
+    it writes (.server, .conversation-seen, conversation.jsonl); which models the sub-agents ran on; a run that ends waiting
+    for the user.'

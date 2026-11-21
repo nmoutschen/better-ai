@@ -1,6 +1,7 @@
 """Tests for skill_evals/cases.py and the parts of skill_evals/agent.py that need no sandbox or model."""
 
 import subprocess
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -304,3 +305,42 @@ def test_agent_metadata_flags_a_dirty_skill_folder(tmp_path: Path, monkeypatch: 
     assert agent.agent_metadata("fake", "m", "demo")["skill_dirty"] is False
     (folder / "SKILL.md").write_text("two\n")
     assert agent.agent_metadata("fake", "m", "demo")["skill_dirty"] is True
+
+
+def test_run_ends_after_result_event_although_a_background_shell_runs(tmp_path: Path) -> None:
+    """A CLI that printed its final result but stays open, like `claude -p` with a background server, is ended."""
+    fake = tmp_path / "fake-claude"
+    fake.write_text(
+        "#!/bin/sh\n"
+        'echo \'{"type":"assistant","text":"a quoted \\"type\\":\\"result\\" does not end the run"}\'\n'
+        "sleep 20\n"
+        'echo \'{"type":"result","stop_reason":"end_turn"}\'\n'
+        "exec sleep 600\n"
+    )
+    fake.chmod(0o755)
+    out = tmp_path / "run.out"
+    script = agent.END_AFTER_RESULT.format(run=f"{fake} > {out} < /dev/null", out=out)
+    started = time.monotonic()
+    subprocess.run(["sh", "-c", script], check=False, timeout=90)
+    elapsed = time.monotonic() - started
+    # Ended after the real result (printed at 20 s), not after the quoted look-alike, and not at the timeout.
+    assert 20 < elapsed < 50
+    assert out.read_text().splitlines()[-1] == '{"type":"result","stop_reason":"end_turn"}'
+
+
+def test_run_continues_when_events_follow_a_result(tmp_path: Path) -> None:
+    """A result followed by another turn, as when a background task finishes, does not end the run early."""
+    fake = tmp_path / "fake-claude"
+    fake.write_text(
+        "#!/bin/sh\n"
+        'echo \'{"type":"result","stop_reason":"end_turn"}\'\n'
+        "sleep 4\n"
+        'echo \'{"type":"assistant","text":"a background task finished"}\'\n'
+        "sleep 14\n"
+        'echo \'{"type":"result","stop_reason":"end_turn","turn":2}\'\n'
+    )
+    fake.chmod(0o755)
+    out = tmp_path / "run.out"
+    script = agent.END_AFTER_RESULT.format(run=f"{fake} > {out} < /dev/null", out=out)
+    subprocess.run(["sh", "-c", script], check=False, timeout=90)
+    assert out.read_text().splitlines()[-1] == '{"type":"result","stop_reason":"end_turn","turn":2}'

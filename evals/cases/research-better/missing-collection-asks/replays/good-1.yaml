@@ -1,0 +1,4 @@
+reply: tickets/ does not exist here, so I can't search the support ticket export. Should I wait for it, continue with the
+  wiki alone and record the gap, or will you give me the export?
+actions:
+- bash: ls tickets wiki

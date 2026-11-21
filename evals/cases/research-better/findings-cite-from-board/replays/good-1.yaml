@@ -1,0 +1,22 @@
+reply: 'Findings in .research/checkout-drop/findings.md: 3-D Secure challenges are the likeliest cause.'
+actions:
+- read: .research/checkout-drop/sources/S-w2-3.md
+- write: .research/checkout-drop/findings.md
+  content: '# Findings
+
+
+    Conversion fell from 3.1% to 2.6%, all in card payments (Raman, 2026). Challenges rose from 8% to 31% of
+
+    card payments (Weber, 2026); support tickets on card verification tripled (Support team, n.d.).
+
+
+    ## References
+
+
+    Raman, P. (2026, March 20). *Checkout conversion, March 2026*. Tallow wiki. wiki/analytics/checkout-conversion-march.md
+
+    Support team. (n.d.). *Support ticket themes, March*. Tallow wiki. wiki/support/ticket-themes-march.md
+
+    Weber, J. (2026, March 28). *3-D Secure 2 rollout review*. Tallow wiki. wiki/payments/3ds-rollout-review.md
+
+    '

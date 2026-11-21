@@ -1,0 +1,16 @@
+id: challenge-for-answered-high
+rule: challenge-high-priority-answers
+source:
+- SKILL.md#6.2
+situation: A board planted mid-run with status running. Q-coordinator-2, a high-priority question, is answered and has no
+  challenge question; Q-coordinator-1, the other answered high-priority question, has one (Q-w1-5). When the agent reviews
+  the board, it adds a challenge question, kind challenge, with Q-coordinator-2 as its origin. A script checks that the question
+  is on the board.
+request: 'Carry on the research in .research/checkout-drop: the workers stopped when my session ended. Run on your own; I
+  won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/challenge_added.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    challenge_added.py: ../_checks/challenge_added.py

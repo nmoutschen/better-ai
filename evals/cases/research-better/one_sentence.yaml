@@ -1,0 +1,12 @@
+# One sentence per source of skills/research-better: the core instruction of that SKILL.md section or skill file
+# (draft, 2026-11-21, not yet reviewed by the user). Keys are the sources that cases name in `source`. The
+# one-sentence condition appends the sentence for a case's first source to its request; cases whose first source has
+# no entry are not run in that condition. The short-skill condition installs every sentence as the body of a short
+# SKILL.md.
+"SKILL.md#2": "Keep the research board on disk in .research/<topic-slug>/ in the board file format, with a brief and questions that each say what evidence would answer them, and don't commit it."
+"SKILL.md#5.2": "After each search or page read, record the query, each new source with how you read it and whether it repeats another source, and each claim with a verbatim quote."
+"SKILL.md#6.1": "When you have sub-agents, coordinate: start worker sub-agents with the filled-in worker instructions to research the questions, start separate verifier sub-agents to check claims, and don't research questions yourself."
+"SKILL.md#6.2": "Each time you review the board, add a challenge question for every answered high-priority question that lacks one."
+"SKILL.md#7": "Present findings that state where sources disagree, what each main claim's challenge found and which questions remain open, with APA citations and a reference list built only from the board's sources."
+"SKILL.md#tools-and-collections": "If a collection the topic needs cannot be searched, tell me which one before the research runs and ask whether to wait, continue without it, or get the sources from me."
+"agents/worker.md": "When you research a question from the board, copy each claim's quote word for word from the page you read."

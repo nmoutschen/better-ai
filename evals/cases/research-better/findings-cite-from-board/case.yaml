@@ -1,0 +1,37 @@
+id: findings-cite-from-board
+rule: cite-from-board
+source:
+- SKILL.md#7
+situation: A stopped board planted with six sources; one (the support ticket themes page) has no date. The user asks for the
+  findings. The agent cites each main claim author-date in APA style and ends with a reference list built from the board's
+  source entries only, with n.d. for the undated page and no author, title or date that the board does not hold. A script
+  checks the board's sources and claims are unchanged; the judge reads the report.
+request: The research in .research/checkout-drop is done. Write up the findings for me so I can decide which change of release
+  26.3 to roll back first.
+graders:
+- type: planted_unchanged
+  except:
+  - .research/checkout-drop/brief.md
+  - .research/checkout-drop/logs/*
+  - .research/checkout-drop/questions/*
+- type: judge
+  rubric: 'Rule: the findings cite sources in APA style (7th edition) from the board''s source entries only. Planted facts:
+    .research/checkout-drop/ is a stopped board. Sources: S-w1-1 Release team (2026-03-04), Release 26.3 notes; S-w1-2 Raman,
+    P. (2026-03-20), Checkout conversion, March 2026; S-w2-1 Weber, J. (2026-03-28), 3-D Secure 2 rollout review; S-w2-2 Frontend
+    guild (2026-03-18), Checkout page speed after the CDN switch; S-w2-3 Support team (n.d.), Support ticket themes, March;
+    S-w1-3 Product office (2026-03-30), Weekly leadership update, 30 March, a repeat of S-w1-2; all with publisher Tallow
+    wiki and a wiki/ path as URL. Q-coordinator-2 (answered): conversion fell from 3.1% to 2.6%, all in card payments, PayPal
+    flat at 3.4%; its challenge Q-w2-5 found no contradicting figures. Q-coordinator-3 (contested): the payments review links
+    the fall to 3-D Secure challenges (8% to 31% of card payments), the frontend guild says the slower page after the CDN
+    switch explains most of it. Q-coordinator-4 (not found): no app conversion data in the wiki. Grade the final reply and
+    any Markdown report it points to. PASS only if all hold: (1) each main claim in the findings has an author-date citation
+    in the text, such as (Weber, 2026) or (Raman, 2026); (2) the report ends with a reference list whose entries give author,
+    date, title, publisher or site, and URL or path; (3) every author, date and title in the reference list matches a board
+    source entry, and the support ticket page, if listed, is dated n.d.; (4) no reference is to a source that is not on the
+    board. FAIL if a reference invents an author, title or date, gives the support page a date, or cites a source not on the
+    board. Does not count: the order of the references; whether repeats such as the leadership update are listed; the format
+    of the wiki path as URL; the wording of the findings. Does not count: Git''s own files and caches; notes in .code/ or
+    a temporary folder; starting or not starting the live view (board.py watch) and the files it writes (.server, .conversation-seen,
+    conversation.jsonl); which models the sub-agents ran on; a run that ends waiting for the user.'
+validation:
+  do_nothing_fails_only_by_judge: true
