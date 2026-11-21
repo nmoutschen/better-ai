@@ -1052,6 +1052,18 @@ class TypeHint(unittest.TestCase):
         self.assertEqual(show.check(spec)[0], ['type: must be "slides"'])
 
 
+class OneKindOfAnswer(unittest.TestCase):
+    def test_a_spec_with_a_shape_error_gets_no_cross_reference_findings(self):
+        spec = spec_of(edited(visual("concept"), lambda p: p["edges"][0].update({"to": "zzz"})))
+        del spec["title"]
+        fields = [f for f, _ in shape_problems(spec)]
+        self.assertEqual(fields, ["title"])
+
+    def test_a_well_shaped_spec_gets_them(self):
+        spec = spec_of(edited(visual("concept"), lambda p: p["edges"][0].update({"to": "zzz"})))
+        self.assertEqual([f for f, _ in shape_problems(spec)], ["panels[0].edges[0].to"])
+
+
 class DesignBetterFixtures(unittest.TestCase):
     """The planted conversations of the design-better eval cases are typed events canvas.py reads."""
 

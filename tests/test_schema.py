@@ -887,6 +887,70 @@ class Hooks(unittest.TestCase):
         self.assertIn("verified-needs-passing-verifier", schema.HOOKS)
 
 
+class HookSafety(Case):
+    """A hook only sees a record that has no shape errors, and a hook that raises is reported, never a traceback."""
+
+    def setUp(self):
+        super().setUp()
+        self.seen = []
+
+        @schema.hook("test-count")
+        def count(record, ctx):
+            self.seen.append(record)
+            return [("a", "the hook's finding")] if record.get("a") == "bad" else []
+
+        @schema.hook("test-raise")
+        def explode(record, ctx):
+            raise TypeError("unhashable type")
+
+        self.addCleanup(schema.HOOKS.pop, "test-count", None)
+        self.addCleanup(schema.HOOKS.pop, "test-raise", None)
+        self.put_schema(
+            {
+                "$id": "probe.schema.json",
+                "x-files": ["probe.jsonl"],
+                "x-check": "test-count",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+            }
+        )
+        self.put_schema(
+            {"$id": "boom.schema.json", "x-files": ["boom.jsonl"], "x-check": "test-raise", "type": "object"}
+        )
+
+    def test_the_hook_is_not_called_for_a_record_with_a_shape_error(self):
+        self.write("probe.jsonl", jsonl({"a": 5}, {"b": 1}))
+        errors = self.messages("probe.jsonl")
+        self.assertEqual(self.seen, [])
+        self.assertEqual(len(errors), 2)
+        self.assertFalse(any("the hook's finding" in e for e in errors))
+
+    def test_the_hook_is_called_for_a_record_without_shape_errors_and_its_findings_are_reported(self):
+        self.write("probe.jsonl", jsonl({"a": "good"}, {"a": "bad"}))
+        errors = self.messages("probe.jsonl")
+        self.assertEqual(self.seen, [{"a": "good"}, {"a": "bad"}])
+        self.assertEqual(errors, ["2: a: the hook's finding"])
+
+    def test_check_record_runs_hooks_only_on_a_well_shaped_record(self):
+        names = ["probe.schema.json"]
+        self.assertEqual(
+            schema.check_record({"a": 5}, names, self.schemas, cross=True), [("a", "expected string, got integer")]
+        )
+        self.assertEqual(self.seen, [])
+        self.assertEqual(
+            schema.check_record({"a": "bad"}, names, self.schemas, cross=True), [("a", "the hook's finding")]
+        )
+
+    def test_a_hook_that_raises_is_reported_as_a_failed_check(self):
+        self.write("boom.jsonl", jsonl({"a": 1}))
+        self.assertEqual(self.messages("boom.jsonl"), ["1: (record): check failed: test-raise"])
+        self.assertEqual(
+            schema.check_record({}, ["boom.schema.json"], self.schemas, cross=True),
+            [("(record)", "check failed: test-raise")],
+        )
+
+
 class Schemas(Case):
     def test_a_schema_that_cannot_be_applied_is_a_failure_with_a_message_not_a_traceback(self):
         result = subprocess.run(
