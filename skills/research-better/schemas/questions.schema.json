@@ -19,7 +19,7 @@
     "owner": {"type": "string", "minLength": 1},
     "summary": {"type": "string", "minLength": 1},
     "gist": {"description": "the answer in one plain sentence", "type": "string", "minLength": 1},
-    "merged_into": {"type": "string", "x-points-to": {"file": "../questions/", "type": "question"}},
+    "merged_into": {"type": "string", "x-differs-from": "id", "x-points-to": {"file": "../questions/", "type": "question"}},
     "origin": {
       "anyOf": [
         {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "user"}}},
