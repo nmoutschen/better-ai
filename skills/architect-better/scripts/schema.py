@@ -17,7 +17,9 @@ record: one line of a JSONL file, or one JSON file. These keywords of JSON Schem
 in a schema is an error, so a rule is never silently ignored: type, const, enum, pattern, minLength, minItems, required,
 properties, additionalProperties, items, allOf, anyOf, not, if/then/else and $ref (to `#/...` in the same schema, or to
 `<name>.schema.json#/...` in the schemas folder, such as the shared `base.schema.json`). `title`, `description`,
-`$schema`, `$id`, `$comment`, `$defs`, `examples` and `default` are notes.
+`$schema`, `$id`, `$comment`, `$defs`, `examples` and `default` are notes. The schemas are checked as a whole when
+they load: an unsupported keyword or a `type` that is not a type name is an error even where no record reaches it.
+A file that does not parse is read once more before the parse error is reported, in case it was caught mid-write.
 
 An error under if/then/else names the rule: `reason: required when status is "blocked"`.
 
@@ -56,6 +58,7 @@ import json
 import os
 import re
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -89,6 +92,8 @@ EXTENSIONS = {
     "x-differs-from",
     "x-check",
 }
+TYPE_NAMES = {"string", "integer", "number", "boolean", "null", "object", "array"}
+PAUSE = 0.05  # seconds before a file that failed to parse is read once more
 ROOT = "(record)"
 SKIPPED_FOLDERS = {"__pycache__", "node_modules"}
 
@@ -129,6 +134,30 @@ def hook(name: str):
 
 
 # ---------------------------------------------------------------- reading files
+
+
+def read_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _parses(text: str, lines: bool) -> bool:
+    try:
+        for piece in _lines(text) if lines else [text]:
+            if piece.strip() or not lines:
+                json.loads(piece)
+    except ValueError:
+        return False
+    return True
+
+
+def read_checked(path: Path, lines: bool) -> str:
+    """The text of a JSON or JSONL file. If it does not parse, the file may have been caught mid-write: read it once
+    more and use that read, so a parse error is reported only if the second read fails too."""
+    text = read_text(path)
+    if not _parses(text, lines):
+        time.sleep(PAUSE)
+        text = read_text(path)
+    return text
 
 
 class Context:
@@ -173,7 +202,7 @@ class Context:
         key = f"json:{path}"
         if key not in self._cache:
             try:
-                self._cache[key] = json.loads(path.read_text(encoding="utf-8"))
+                self._cache[key] = json.loads(read_checked(path, False))
             except (OSError, ValueError):
                 self._cache[key] = None
         return self._cache[key]
@@ -183,7 +212,7 @@ class Context:
         key = f"jsonl:{path}"
         if key not in self._cache:
             try:
-                text = path.read_text(encoding="utf-8")
+                text = read_checked(path, True)
             except OSError:
                 self._cache[key] = None
             else:
@@ -523,6 +552,39 @@ def _verified_needs_passing_verifier(record: dict, context: Context) -> list[tup
 # ---------------------------------------------------------------- checking files
 
 
+def _audit(node: Any, where: str, boolean_ok: bool = False) -> None:
+    """Refuse an unsupported keyword or a bad `type` anywhere in a schema, whether or not a record reaches it."""
+    if boolean_ok and isinstance(node, bool):
+        return
+    if not isinstance(node, dict):
+        raise SchemaError(f"{where}: a schema must be an object, got {_show(node)}")
+    for keyword in node:
+        if keyword not in KEYWORDS | ANNOTATIONS | EXTENSIONS:
+            raise SchemaError(f"{where}: unsupported keyword {keyword!r}")
+    if "type" in node:
+        names = node["type"] if isinstance(node["type"], list) else [node["type"]]
+        if not names or any(not isinstance(n, str) or n not in TYPE_NAMES for n in names):
+            raise SchemaError(f"{where}: type must be one of {', '.join(sorted(TYPE_NAMES))} or a list of them")
+    for keyword in ("properties", "$defs"):
+        if keyword in node and not isinstance(node[keyword], dict):
+            raise SchemaError(f"{where}: {keyword} must be an object")
+    for keyword in ("allOf", "anyOf"):
+        if keyword in node and not isinstance(node[keyword], list):
+            raise SchemaError(f"{where}: {keyword} must be a list")
+    for name, sub in node.get("properties", {}).items():
+        _audit(sub, f"{where}/properties/{name}")
+    for name, sub in node.get("$defs", {}).items():
+        _audit(sub, f"{where}/$defs/{name}")
+    for keyword in ("allOf", "anyOf"):
+        for i, sub in enumerate(node.get(keyword, [])):
+            _audit(sub, f"{where}/{keyword}/{i}")
+    for keyword in ("items", "not", "if", "then", "else"):
+        if keyword in node:
+            _audit(node[keyword], f"{where}/{keyword}")
+    if "additionalProperties" in node:
+        _audit(node["additionalProperties"], f"{where}/additionalProperties", boolean_ok=True)
+
+
 def load_schemas(directory: Path) -> dict[str, dict]:
     if not directory.is_dir():
         raise SchemaError(f"no schemas folder at {directory}")
@@ -532,6 +594,7 @@ def load_schemas(directory: Path) -> dict[str, dict]:
             docs[path.name] = json.loads(path.read_text(encoding="utf-8"))
         except ValueError as error:
             raise SchemaError(f"{path}: not valid JSON: {error}") from None
+        _audit(docs[path.name], path.name)
     return docs
 
 
@@ -559,7 +622,7 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
         return [Error(where, 1, "(file)", "no schema describes this file")]
     _, schema = found
     try:
-        text = path.read_text(encoding="utf-8")
+        text = read_checked(path, path.suffix == ".jsonl")
     except (OSError, UnicodeDecodeError) as error:
         return [Error(where, 1, "(file)", f"cannot be read: {error}")]
     context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
