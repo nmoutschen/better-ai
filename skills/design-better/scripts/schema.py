@@ -476,7 +476,11 @@ class Validator:
         problems = []
         if "x-points-to" in schema and isinstance(value, str):
             problems += self._points_to(value, schema["x-points-to"], at)
-        if "x-mode-sets" in schema and isinstance(value, str):
+        if (
+            "x-mode-sets" in schema
+            and isinstance(value, str)
+            and not ("enum" in schema and value not in schema["enum"])
+        ):
             problems += self._mode_sets(value, schema["x-mode-sets"], at)
         if "x-differs-from" in schema and isinstance(parent, dict):
             other = schema["x-differs-from"]
@@ -508,7 +512,7 @@ class Validator:
         field = rule["field"]
         record = self.context.read_json(relative)
         if not isinstance(record, dict):
-            return [Problem(at, f"cannot be checked: {relative} does not exist", "cross")]
+            return [Problem(at, f"cannot be checked: {relative} does not exist or is not valid JSON", "cross")]
         mode = record.get(field)
         sets = {k: v for k, v in rule.items() if k not in ("file", "field")}
         allowed = sets.get(mode) if isinstance(mode, str) and mode in sets else sets.get("other")
@@ -668,6 +672,15 @@ def check_file(path: Path, docs: dict[str, dict], cache: dict[str, Any] | None =
         text = read_checked(path, path.suffix == ".jsonl")
     except (OSError, UnicodeDecodeError) as error:
         return [Error(where, 1, "(file)", f"cannot be read: {error}")]
+    return check_text(path, text, docs, cache)
+
+
+def check_text(path: Path, text: str, docs: dict[str, dict], cache: dict[str, Any] | None = None) -> list[Error]:
+    """The errors of a file's text, which the caller has read once: it validates that text and shows the same lines."""
+    found = _match(path, docs)
+    where = str(path)
+    if not found:
+        return [Error(where, 1, "(file)", "no schema describes this file")]
     context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
     validator = Validator(docs, context)
     errors: list[Error] = []

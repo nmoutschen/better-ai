@@ -419,6 +419,14 @@ test('a blocked task says what it waits on, from its reason and waits_on only', 
   assert.deepEqual(shown('blocked', 'needs a key'), ['blocked', 'blocked: needs a key']);
 });
 
+test('a task that did not validate shows as not valid with its first message; an unknown status still shows as written', () => {
+  const t = (status, _errors) => { const s = taskStatus({ status, _errors }, []); return [s.key, s.word]; };
+  assert.deepEqual(t('built', ['requirements[0]: dangling']), ['other', 'not valid: requirements[0]: dangling']);
+  assert.deepEqual(t('blocked', ['reason: required']), ['other', 'not valid: reason: required']);
+  assert.deepEqual(t('in review', ['status: must be one of x']), ['other', 'not a status: in review']);
+  assert.deepEqual(t('built', []), ['built', 'built']);
+});
+
 test('a status or a blocked reason with markup shows as text, never as HTML', () => {
   const realEsc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const { statusLabel } = new Function('esc', statusCode + '; return {statusLabel};')(realEsc);

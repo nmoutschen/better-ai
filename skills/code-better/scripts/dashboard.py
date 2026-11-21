@@ -15,7 +15,7 @@ Usage:
 CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it, in the formats of
 schemas/: code.json (the goal, the design and the mode), spec.jsonl (or the one in the architect folder code.json names),
 tasks.jsonl, decisions.jsonl, and in logs/ one <agent>.card.json with the agent's role, task and branch and the agent's
-log, <agent>.jsonl. progress.jsonl, next-steps.jsonl, instructions.jsonl and audit/ are checked too, and not shown.
+log, <agent>.jsonl. progress.jsonl, next-steps.jsonl and instructions.jsonl are checked too, and not shown.
 The page shows the agents at work and their latest steps, the tasks with the requirements of the spec, and a
 conversation with the coordinator in which its decisions and its questions to the user appear. The user writes to the
 coordinator, asks about an agent, answers a question or replies to a decision. Each action is a JSON-RPC call from the
@@ -53,7 +53,6 @@ STATES = {"start": "working", "step": "working", "asked": "waiting", "blocked": 
 # Where the spec is: next to the other files, or in the architect folder code.json names.
 SPEC = {"from": "code.json", "field": "design.folder", "name": "spec.jsonl", "else": "spec.jsonl"}
 CHECKED_ONLY = ("progress.jsonl", "next-steps.jsonl", "instructions.jsonl")  # the page does not show them
-AUDIT = ("audit/*/audit.json", "audit/*/evidence.jsonl", "audit/*/findings.jsonl")
 
 
 def lines_of(text: str, jsonl: bool) -> list:
@@ -83,31 +82,41 @@ class Reader:
                     pass
         return str(path)
 
-    def records(self, path: Path) -> list:
-        """The valid records of one file, in line order; none if it does not exist."""
+    def records(self, path: Path, keep_invalid: bool = False) -> list:
+        """The records of one file, in line order; none if it does not exist. The file is read once and that text is
+        validated and shown, so a write in between is in neither. A record with errors is left out, unless
+        `keep_invalid`: then it stays, with its messages in `_errors`, so the page can show what it can of it. A line
+        that is not JSON is never a record."""
         if not path.is_file():
             return []
         name = self.shown(path)
-        found = schema.check_file(path, self.docs, self.cache)
         jsonl = path.suffix == ".jsonl"
         try:
-            pieces = lines_of(schema.read_checked(path, jsonl), jsonl)
-        except (OSError, UnicodeDecodeError):
-            pieces = []
+            text = schema.read_checked(path, jsonl)
+        except (OSError, UnicodeDecodeError) as error:
+            self.errors.append({"file": name, "line": 1, "field": "(file)", "message": f"cannot be read: {error}"})
+            return []
+        found = schema.check_text(path, text, self.docs, self.cache)
         parsed = {}
-        for number, piece in enumerate(pieces, 1):
+        for number, piece in enumerate(lines_of(text, jsonl), 1):
             try:
                 value = json.loads(piece)
             except ValueError:
                 continue
             parsed[number] = value if isinstance(value, dict) else None
-        invalid = {error.line for error in found}
+        messages: dict = {}
         for error in found:
             record = parsed.get(error.line)
             by = record.get("by") if record else None
             entry = {"file": name, "line": error.line, "field": error.field, "message": error.message}
             self.errors.append({**entry, "by": by} if isinstance(by, str) and by else entry)
-        return [record for number, record in parsed.items() if record is not None and number not in invalid]
+            messages.setdefault(error.line, []).append(error.message)
+        kept = []
+        for number, record in parsed.items():
+            if record is None or (number in messages and not keep_invalid):
+                continue
+            kept.append({**record, "_errors": messages[number]} if number in messages else record)
+        return kept
 
     def spec_records(self) -> list:
         """The spec records, from spec.jsonl, or from the architect folder code.json names."""
@@ -147,18 +156,21 @@ def agent(reader: Reader, name: str, modes: dict) -> dict:
 
 
 def decision(record: dict, answers: dict, changed: float) -> dict:
-    """A decision as the page shows it: the user's answer is the page event it points to, or the words said in the chat."""
-    answer = record.get("answer") or {}
+    """A decision as the page shows it: the user's answer is the page event it points to, or the words said in the chat.
+    A decision that did not validate shows what it has, with its messages in `_errors`."""
+    answer = record.get("answer") if isinstance(record.get("answer"), dict) else {}
     text = answers.get(answer.get("event"), "") if answer.get("type") == "page" else answer.get("text", "")
+    about = record.get("about") if isinstance(record.get("about"), dict) else {}
     return {
-        "id": record["id"],
-        "asked": record["asked"],
-        "status": record["status"],
+        "id": record.get("id", ""),
+        "asked": record.get("asked", ""),
+        "status": record.get("status", ""),
         "decision": record.get("decision", ""),
-        "answer": text,
-        "from": record["raised_by"],
-        "task": record["about"].get("task", ""),
-        "at": record["at"],
+        "answer": text if isinstance(text, str) else "",
+        "from": record.get("raised_by", ""),
+        "task": about.get("task", ""),
+        "at": record.get("at", ""),
+        "_errors": record.get("_errors", []),
         "_changed": changed,
     }
 
@@ -177,14 +189,15 @@ def collect(change: Path) -> dict:
             "errors": [{"file": "schemas", "line": 1, "field": "(schemas)", "message": str(error)}],
         }
     reader.records(change / "code.json")  # shown only through the errors it may hold; the tasks carry their own mode
-    tasks = reader.records(change / "tasks.jsonl")
+    tasks = reader.records(change / "tasks.jsonl", keep_invalid=True)
     spec = reader.spec_records()
     conversation_events = reader.records(change / LOG)
     answers = {e["id"]: e["text"] for e in conversation_events if e.get("type") == "answer"}
     decisions = [
-        decision(r, answers, mtime(change / "decisions.jsonl")) for r in reader.records(change / "decisions.jsonl")
+        decision(r, answers, mtime(change / "decisions.jsonl"))
+        for r in reader.records(change / "decisions.jsonl", keep_invalid=True)
     ]
-    modes = {t["id"]: t["mode"] for t in tasks}
+    modes = {t["id"]: t.get("mode", "") for t in tasks if "id" in t}
     names = sorted(
         {
             f.name.removesuffix(".card.json").removesuffix(".jsonl")
@@ -192,8 +205,8 @@ def collect(change: Path) -> dict:
         }
     )
     agents = [agent(reader, name, modes) for name in names]
-    for path in [change / name for name in CHECKED_ONLY] + [p for pattern in AUDIT for p in reader.folder(pattern)]:
-        reader.records(path)
+    for name in CHECKED_ONLY:
+        reader.records(change / name)
     return {
         "name": change.name,
         "tasks": tasks,

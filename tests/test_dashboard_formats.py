@@ -340,15 +340,18 @@ class StatusRules(unittest.TestCase):
 class Dashboard(unittest.TestCase):
     def test_a_folder_with_one_bad_task_still_shows_every_other_task(self):
         with tempfile.TemporaryDirectory() as d:
-            tasks = [task("T1"), {**task("T2"), "task": ""}, task("T3", status="built")]
+            tasks = [task("T1"), task("T2", status="in review"), task("T3", status="built")]
             folder = change(Path(d), tasks=tasks)
             data = dashboard.load(folder)
-        self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T3"])
-        (error,) = data["errors"]
+        # the bad task stays on the page, marked, so the page can show its status as written
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T2", "T3"])
+        self.assertEqual([bool(t.get("_errors")) for t in data["tasks"]], [False, True, False])
+        (error,) = data["errors"]  # one error: the enum, not also the mode set
         self.assertEqual(
-            (error["file"], error["line"], error["field"], error["by"]), ("tasks.jsonl", 2, "task", "coordinator")
+            (error["file"], error["line"], error["field"], error["by"]), ("tasks.jsonl", 2, "status", "coordinator")
         )
-        self.assertIn("at least 1 character", error["message"])
+        self.assertIn("must be one of", error["message"])
+        self.assertEqual(data["tasks"][1]["_errors"], [error["message"]])
 
     def test_an_unparsed_line_is_an_error_without_an_author(self):
         with tempfile.TemporaryDirectory() as d:
@@ -435,7 +438,7 @@ class Dashboard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[task("T1"), task("T2", requirements=["S4"])])
             data = dashboard.load(folder)
-        self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T2"])
         self.assertIn("dangling", data["errors"][0]["message"])
         self.assertEqual(data["errors"][0]["field"], "requirements[0]")
 
@@ -475,13 +478,84 @@ class Dashboard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[task("T1", status="verified")])
             data = dashboard.load(folder)
-        self.assertEqual(data["tasks"], [])
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
+        self.assertIn("verifier", data["tasks"][0]["_errors"][0])
         self.assertIn("verifier", data["errors"][0]["message"])
 
     def test_a_coordinate_task_with_status_done_is_listed(self):
         with tempfile.TemporaryDirectory() as d:
             data = dashboard.load(change(Path(d), tasks=[task("T1", status="done")]))
         self.assertEqual([(e["file"], e["field"]) for e in data["errors"]], [("tasks.jsonl", "status")])
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
+
+    def test_a_broken_code_json_does_not_empty_the_task_list(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d), tasks=[task("T1"), task("T2", status="built")])
+            (folder / "code.json").write_text("{broken")
+            data = dashboard.load(folder)
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T2"])
+        messages = [e["message"] for e in data["errors"]]
+        self.assertTrue(any("not valid JSON" in m for m in messages), messages)
+        self.assertTrue(any("does not exist or is not valid JSON" in m for m in messages), messages)
+
+    def test_a_waiting_decision_with_a_bad_task_pointer_stays_so_the_user_can_answer_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            bad = {
+                "type": "decision",
+                "at": AT,
+                "by": "coordinator",
+                "id": "D1",
+                "raised_by": "b1",
+                "about": {"type": "task", "task": "T9"},
+                "asked": "Which limit?",
+                "status": "waiting",
+            }
+            write(folder, "decisions.jsonl", [bad])
+            data = dashboard.load(folder)
+        self.assertEqual(
+            [(x["id"], x["status"], x["asked"]) for x in data["decisions"]], [("D1", "waiting", "Which limit?")]
+        )
+        self.assertTrue(data["decisions"][0]["_errors"])
+        self.assertIn("dangling", data["errors"][0]["message"])
+
+    def test_a_decision_missing_fields_still_shows(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            write(
+                folder,
+                "decisions.jsonl",
+                [{"type": "decision", "at": AT, "by": "coordinator", "id": "D1", "status": "waiting"}],
+            )
+            data = dashboard.load(folder)
+        self.assertEqual([x["id"] for x in data["decisions"]], ["D1"])
+        self.assertTrue(data["errors"])
+
+    def test_a_line_written_after_the_read_is_not_shown_unchecked(self):
+        """One read: the text that is validated is the text that is shown, so a line added between is in neither."""
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            real = dashboard.schema.check_text
+
+            def late(path, text, docs, cache=None):
+                if path.name == "tasks.jsonl":
+                    with path.open("a") as f:
+                        f.write(json.dumps(task("T2", status="in review")) + "\n")
+                return real(path, text, docs, cache)
+
+            dashboard.schema.check_text = late
+            try:
+                data = dashboard.load(folder)
+            finally:
+                dashboard.schema.check_text = real
+        self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
+        self.assertEqual(data["errors"], [])
+
+    def test_the_audit_folder_is_not_the_changes(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            write(folder, "audit/2026-11-21/findings.jsonl", [{"type": "finding"}])
+            self.assertEqual(dashboard.load(folder)["errors"], [])
 
 
 class Check(unittest.TestCase):
@@ -495,12 +569,12 @@ class Check(unittest.TestCase):
             good = self.run_check(folder)
             self.assertEqual((good.returncode, good.stdout), (0, ""))
             with (folder / "tasks.jsonl").open("a") as f:
-                f.write(json.dumps({**task("T2"), "task": ""}) + "\n")
+                f.write(json.dumps(task("T2", status="in review")) + "\n")
             bad = self.run_check(folder)
             self.assertEqual(bad.returncode, 1)
             lines = bad.stdout.strip().splitlines()
             self.assertEqual(len(lines), 1)
-            self.assertRegex(lines[0], r"tasks\.jsonl:2: task: must have at least 1 character")
+            self.assertRegex(lines[0], r"tasks\.jsonl:2: status: must be one of")
             data = dashboard.load(folder)
             self.assertEqual(lines, [f"{e['file']}:{e['line']}: {e['field']}: {e['message']}" for e in data["errors"]])
 
