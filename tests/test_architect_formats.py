@@ -171,19 +171,12 @@ class Examples(unittest.TestCase):
             self.assertEqual([str(e) for e in check(folder)], [])
             self.assertEqual(run_check(folder)[0], 0)
 
-    def test_the_example_folder_and_every_planted_eval_folder_check_clean(self):
-        folders = [
-            SCRIPTS / "example",
-            *sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*/architect.json")),
-        ]
-        self.assertGreater(len(folders), 10)
-        folders = [f.parent if f.name == "architect.json" else f for f in folders]
-        for folder in folders:
-            with self.subTest(folder=str(folder.relative_to(ROOT))):
-                self.assertEqual([str(e) for e in schema.check_paths([folder], SCHEMAS)], [])
-                if folder == SCRIPTS / "example":  # the other repos' sources are in their own repos, not this one
-                    self.assertEqual(run_check(folder)[0], 0)
-                self.assertFalse((folder / "request.md").exists())
+    def test_the_example_folder_checks_clean(self):
+        """The planted eval folders are checked in MovedChecks, as repositories of their own."""
+        folder = SCRIPTS / "example"
+        self.assertEqual([str(e) for e in schema.check_paths([folder], SCHEMAS)], [])
+        self.assertEqual(run_check(folder)[0], 0)
+        self.assertFalse((folder / "request.md").exists())
 
 
 class OneBadRecordPerKind(unittest.TestCase):
@@ -688,6 +681,136 @@ class EveryAcceptedExampleRenders(unittest.TestCase):
                     text=True,
                 )
                 self.assertEqual(run.returncode, 0, run.stderr[:3000])
+
+
+class MovedChecks(unittest.TestCase):
+    """The diagram's references and the sources' files are checked by schema.py, so `schema.py check` alone rejects what
+    `architect.py check` rejects."""
+
+    def design_with(self, change):
+        made = design()
+        change(made)
+        return made
+
+    def broken_designs(self):
+        def edge_to(d):
+            d["containers"]["edges"][0]["to"] = "nowhere"
+
+        def edge_from(d):
+            d["containers"]["edges"][0]["from"] = "nowhere"
+
+        def step_from(d):
+            d["flows"][0]["steps"][0]["from"] = "ghost"
+
+        def participant_box(d):
+            d["flows"][0]["participants"][0]["box"] = "nowhere"
+
+        def group_member(d):
+            d["containers"]["groups"] = [{"id": "g", "label": "G", "members": ["user", "nowhere"]}]
+
+        def box_in_two_groups(d):
+            d["containers"]["groups"] = [
+                {"id": "g1", "label": "G1", "members": ["user"]},
+                {"id": "g2", "label": "G2", "members": ["user"]},
+            ]
+
+        def duplicate_node(d):
+            d["containers"]["nodes"].append(dict(d["containers"]["nodes"][0]))
+
+        def duplicate_step(d):
+            d["flows"][0]["steps"].append(dict(d["flows"][0]["steps"][0]))
+
+        def unknown_kind(d):
+            d["containers"]["nodes"][0]["kind"] = "unknown-widget"
+
+        return {
+            "edge to a missing box": (edge_to, "nowhere"),
+            "edge from a missing box": (edge_from, "nowhere"),
+            "step from a missing participant": (step_from, "ghost"),
+            "participant on a missing box": (participant_box, "nowhere"),
+            "group member that is no box": (group_member, "nowhere"),
+            "box in two groups": (box_in_two_groups, "more than one group"),
+            "node id used twice": (duplicate_node, "Duplicate id"),
+            "step id used twice": (duplicate_step, "Duplicate id"),
+            "box kind not in the register": (unknown_kind, "unknown-widget"),
+        }
+
+    def test_schema_check_alone_rejects_each_broken_design_and_architect_check_agrees(self):
+        for label, (change, word) in self.broken_designs().items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as d:
+                folder = make_folder(Path(d), **{"findings.jsonl": [], "reviews.jsonl": None})
+                write(folder, "design.json", [self.design_with(change)])
+                errors = [e for e in check(folder) if e.file.endswith("design.json")]
+                self.assertTrue(errors, label)
+                self.assertTrue(any(word in e.message for e in errors), [str(e) for e in errors])
+                code, out, _ = run_check(folder)
+                self.assertEqual(code, 1)
+                for e in errors:
+                    self.assertIn(f"design.json:{e.line}: {e.field}: {e.message}", out)
+                self.assertNotIn("(diagram)", out)
+
+    def test_a_good_design_passes_both(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = make_folder(Path(d))
+            self.assertEqual([str(e) for e in check(folder)], [])
+            self.assertEqual(run_check(folder)[0], 0)
+
+    def test_every_box_kind_of_the_register_is_accepted(self):
+        kinds = [k["name"] for k in json.loads((SCRIPTS / "kinds.json").read_text())]
+        with tempfile.TemporaryDirectory() as d:
+            folder = make_folder(Path(d))
+            made = read(folder, "design.json")
+            for i, kind in enumerate(kinds):
+                made["containers"]["nodes"].append({"id": f"k{i}", "label": kind, "kind": kind})
+            write(folder, "design.json", [made])
+            self.assertEqual([str(e) for e in check(folder)], [])
+
+    def test_a_requirement_source_file_must_exist_in_the_repo(self):
+        cases = {
+            "docs/there.md": None,
+            "docs/missing.md": "missing or out-of-scope source",
+            "../outside.md": "invalid source path",
+            "/etc/passwd": "invalid source path",
+            ".git/config": "invalid source path",
+            "docs": "missing or out-of-scope source",
+        }
+        for path, message in cases.items():
+            with self.subTest(path), tempfile.TemporaryDirectory() as d:
+                folder = make_folder(Path(d))
+                (Path(d) / "docs").mkdir(exist_ok=True)
+                (Path(d) / "docs" / "there.md").write_text("x\n")
+                requirements = read(folder, "requirements.jsonl")
+                requirements[0]["source"] = {"type": "file", "file": path, "symbol": "s"}
+                write(folder, "requirements.jsonl", requirements)
+                errors = [e for e in check(folder) if e.file.endswith("requirements.jsonl")]
+                if message is None:
+                    self.assertEqual(errors, [])
+                    self.assertEqual(run_check(folder)[0], 0)
+                else:
+                    self.assertEqual([(e.line, e.field) for e in errors], [(1, "source.file")], errors)
+                    self.assertIn(message, errors[0].message)
+                    self.assertIn(f"requirements.jsonl:1: source.file: {errors[0].message}", run_check(folder)[1])
+
+    def test_the_planted_eval_repos_pass_schema_check_as_repos_of_their_own(self):
+        """An eval case's `repo/` is checked out as a repository of its own; its sources are files of that repository."""
+        cases = sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*/architect.json"))
+        self.assertGreater(len(cases), 10)
+        for architect_json in cases:
+            repo = architect_json.parents[3]
+            with self.subTest(case=repo.parent.name), tempfile.TemporaryDirectory() as d:
+                copy = Path(d) / "repo"
+                shutil.copytree(repo, copy)
+                (copy / ".git").mkdir()
+                folder = copy / architect_json.parent.relative_to(repo)
+                self.assertEqual([str(e) for e in schema.check_paths([folder], SCHEMAS)], [])
+                self.assertEqual(run_check(folder)[0], 0)
+
+    def test_the_schema_does_not_duplicate_what_diagram_py_still_checks(self):
+        """diagram.py keeps only what needs the drawing: a finding target that names no part of the layout."""
+        text = (SCRIPTS / "diagram.py").read_text()
+        self.assertNotIn("belongs to more than one group", text)
+        self.assertNotIn("references missing", text)
+        self.assertIn("Finding target", text)
 
 
 class ModeText(unittest.TestCase):
