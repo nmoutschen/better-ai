@@ -350,8 +350,8 @@ class CodeBetterTextTest(unittest.TestCase):
     def test_code_better_every_entry_point_runs_schema_check_after_a_write(self):
         """SKILL.md, each mode, the builder and the verifier say once to check every file written in `.code/`."""
         sentence = (
-            "after every write to a file in `.code/`, run `python3 <skill dir>/scripts/schema.py check <file>` "
-            "and fix every error before your next step."
+            "after every write to a json or jsonl file in `.code/`, or to the architect folder's `spec.jsonl`, "
+            "run `python3 <skill dir>/scripts/schema.py check <file>` and fix every error before your next step."
         )
         entry_points = [CODE_BETTER / "SKILL.md", *sorted((CODE_BETTER / "modes").glob("*.md"))]
         entry_points += sorted((CODE_BETTER / "agents").glob("*.md"))
@@ -413,15 +413,98 @@ class CodeBetterTextTest(unittest.TestCase):
                         files.append((f"{case.name}/{replay.name}:{match.group(1)}", body))
         self.assertTrue(files, "no case plants or writes a file under .code/")
         problems = []
+        runs: dict[str, list[tuple[str, str]]] = {}
         for where, text in files:
-            relative = where.split(":", 1)[1]
-            self.assertFalse(relative.endswith(".md"), f"{where} is an old Markdown file")
+            runs.setdefault(where.split(":", 1)[0], []).append((where.split(":", 1)[1], text))
+        for run, written in runs.items():
             with tempfile.TemporaryDirectory() as temp:
-                path = Path(temp) / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(text)
-                problems += [f"{where}: {error}" for error in schema.check_paths([path], CODE_SCHEMAS)]
+                for relative, text in written:
+                    self.assertFalse(relative.endswith(".md"), f"{run}: {relative} is an old Markdown file")
+                    path = Path(temp) / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(text)
+                problems += [f"{run}: {error}" for error in schema.check_paths([Path(temp)], CODE_SCHEMAS)]
         self.assertEqual(problems, [])
+
+    def test_code_better_a_solo_mode_can_record_a_question_and_the_spec_always_exists(self):
+        """A solo run records its questions, and every mode writes spec.jsonl, which tasks and gaps point to."""
+        skill = (CODE_BETTER / "SKILL.md").read_text()
+        self.assertIn(
+            "RECORD each question you ask in `decisions.jsonl` with status `waiting` before the gap that points to it",
+            skill,
+        )
+        decision = (CODE_BETTER / "templates" / "decision.md").read_text()
+        self.assertIn("In coordinate mode only the coordinator writes it", decision)
+        self.assertNotIn("Only the coordinator writes it", decision)
+        for mode in ("feature", "bug-fix", "refactor", "tests", "coordinate"):
+            text = (CODE_BETTER / "modes" / f"{mode}.md").read_text()
+            self.assertIn("WRITE `.code/<change>/spec.jsonl`", text, mode)
+            self.assertNotIn("IF no existing spec covers the change, READ", text, mode)
+            self.assertIn("UPDATE its files from it", text, mode)
+
+    def test_code_better_eval_note_checks_count_code_json_working_files(self):
+        """The hidden checks that look for notes accept a `.code/` JSON working file, as a run of the skill writes."""
+        cases = [
+            ("record-session-constraint/checks/command_passes_3/recorded.py", [], "instructions.jsonl"),
+            ("shared-migration-plan/checks/command_passes_1/plan.py", ["sales", "stock"], "tasks.jsonl"),
+            ("oldlog-multi-session-plan/checks/command_passes/plan.py", ["billing", "search"], "tasks.jsonl"),
+        ]
+        for script, arguments, name in cases:
+            with self.subTest(script=script), tempfile.TemporaryDirectory() as temp:
+                repo = Path(temp)
+                git = ["git", "-C", temp, "-c", "user.name=t", "-c", "user.email=t@t"]
+                subprocess.run([*git, "init", "-q"], check=True)
+                (repo / "a.py").write_text("x = 1\n")
+                subprocess.run([*git, "add", "."], check=True)
+                subprocess.run([*git, "commit", "-q", "-m", "start"], check=True)
+                start = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+                (repo / ".git" / "info" / "exclude").write_text(".code/\n")
+                (repo / ".code" / "change").mkdir(parents=True)
+                line = {"said": "Never change anything under vendor/", "text": " ".join(arguments) or "vendor/"}
+                (repo / ".code" / "change" / name).write_text(json.dumps(line) + "\n")
+                result = subprocess.run(
+                    [sys.executable, str(CASES / script), *arguments],
+                    cwd=temp,
+                    env={"START_COMMIT": start, "PATH": "/usr/bin:/bin"},
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_code_better_judge_and_rubrics_name_the_json_working_files(self):
+        """The judge's record and the no-plan rubrics cover `.code/` working files as well as Markdown notes."""
+        judge = (ROOT / "evals" / "skill_evals" / "grading" / "judge.py").read_text()
+        self.assertNotIn('"Markdown notes the agent wrote or changed"', judge)
+        for case in ("iso-dates-no-plan", "no-plan-one-session", "no-plan-small-fix"):
+            text = (CASES / case / "case.yaml").read_text()
+            self.assertIn("any Markdown note or `.code/` working file", " ".join(text.split()), case)
+        oldlog = " ".join((CASES / "oldlog-multi-session-plan" / "case.yaml").read_text().split())
+        self.assertIn("Markdown notes or `.code/` working files", oldlog)
+
+    def test_code_better_good_audit_replays_model_the_format(self):
+        """A good audit replay writes audit.json, evidence.jsonl and findings.jsonl, with a real cost and a where."""
+        for replay in sorted(CASES.glob("audit-*/replays/good-*.yaml")):
+            text = replay.read_text()
+            if "findings.jsonl" not in text:
+                continue
+            with self.subTest(replay=str(replay.relative_to(CASES))):
+                self.assertIn("/audit.json", text)
+                self.assertIn("/evidence.jsonl", text)
+                block = text[text.index("findings.jsonl") :]
+                for line in re.findall(r"(?m)^    (\{.*\})$", block):
+                    record = json.loads(line)
+                    self.assertTrue(record["where"], record["id"])
+                    self.assertNotEqual(record["cost"], record["problem"], record["id"])
+
+    def test_code_better_template_instructions_are_capitalised_imperatives(self):
+        """The instructions in a template's fill-in block use verbs in capitals, as PRINCIPLES 6.1 asks."""
+        weak = re.compile(
+            r"(?:^- |[.:] )(?:Save|Add|Keep|Set|Give|Begin|Change|List|Put|Use|Write|Run|Read|Drop|Fix)\b"
+        )
+        for path in sorted((CODE_BETTER / "templates").glob("*.md")):
+            block = path.read_text().split("<HOW TO FILL", 1)[1].split(">\n", 1)[0]
+            found = [line[:50] for line in block.splitlines() if weak.search(line)]
+            self.assertEqual(found, [], path.name)
 
     def test_code_better_case_files_name_no_old_file(self):
         """The case files name the templates and files of the new format."""
