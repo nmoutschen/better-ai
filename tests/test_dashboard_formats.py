@@ -220,10 +220,7 @@ class OneBadRecordPerKind(unittest.TestCase):
                 write(folder, "code.json", [code("feature")], as_json=True)
                 if kind == "logs/<agent>.jsonl":
                     write(folder, "logs/builder-t3.card.json", [card("builder", "T3")], as_json=True)
-                if kind in ("code.json", "logs/<agent>.card.json"):
-                    records = [mutate(good)]
-                else:
-                    records = [good, mutate(good)]
+                records = [mutate(good)] if kind in ("code.json", "logs/<agent>.card.json") else [good, mutate(good)]
                 path = write(folder, relative, records, as_json=kind.endswith(".json"))
                 errors = [e for e in schema.check_paths([path], SCHEMAS) if e.field.split(".")[0] == field]
                 self.assertTrue(errors, f"{kind}: no error on {field} for {title}")
@@ -343,15 +340,15 @@ class StatusRules(unittest.TestCase):
 class Dashboard(unittest.TestCase):
     def test_a_folder_with_one_bad_task_still_shows_every_other_task(self):
         with tempfile.TemporaryDirectory() as d:
-            tasks = [task("T1"), task("T2", status="in review"), task("T3", status="built")]
+            tasks = [task("T1"), {**task("T2"), "task": ""}, task("T3", status="built")]
             folder = change(Path(d), tasks=tasks)
             data = dashboard.load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T3"])
         (error,) = data["errors"]
         self.assertEqual(
-            (error["file"], error["line"], error["field"], error["by"]), ("tasks.jsonl", 2, "status", "coordinator")
+            (error["file"], error["line"], error["field"], error["by"]), ("tasks.jsonl", 2, "task", "coordinator")
         )
-        self.assertIn("must be one of", error["message"])
+        self.assertIn("at least 1 character", error["message"])
 
     def test_an_unparsed_line_is_an_error_without_an_author(self):
         with tempfile.TemporaryDirectory() as d:
@@ -498,12 +495,12 @@ class Check(unittest.TestCase):
             good = self.run_check(folder)
             self.assertEqual((good.returncode, good.stdout), (0, ""))
             with (folder / "tasks.jsonl").open("a") as f:
-                f.write(json.dumps(task("T2", status="in review")) + "\n")
+                f.write(json.dumps({**task("T2"), "task": ""}) + "\n")
             bad = self.run_check(folder)
             self.assertEqual(bad.returncode, 1)
             lines = bad.stdout.strip().splitlines()
             self.assertEqual(len(lines), 1)
-            self.assertRegex(lines[0], r"tasks\.jsonl:2: status: must be one of")
+            self.assertRegex(lines[0], r"tasks\.jsonl:2: task: must have at least 1 character")
             data = dashboard.load(folder)
             self.assertEqual(lines, [f"{e['file']}:{e['line']}: {e['field']}: {e['message']}" for e in data["errors"]])
 

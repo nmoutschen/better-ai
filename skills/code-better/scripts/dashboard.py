@@ -4,21 +4,28 @@
 Usage:
   python3 dashboard.py watch CHANGE [--port N] [--no-browser]   serve the page; prints each action the user takes as
                                                                 one JSON line; runs until stopped
+  python3 dashboard.py check CHANGE                             print the records that are not valid, one per line as
+                                                                file:line: field: message; exit 1 if there are any
   python3 dashboard.py wait CHANGE [--timeout S]                wait for the user's next actions on the served page
   python3 dashboard.py reply CHANGE TEXT [--to ID]              show the coordinator's reply in the page
-  python3 dashboard.py status CHANGE seen|asked|working|done|accepted ID...
-  python3 dashboard.py pending CHANGE                           list the user's items that are not done
+  python3 dashboard.py status CHANGE seen|asked|working|done ID...
+  python3 dashboard.py status CHANGE accepted ID... --text "the user's words"
+  python3 dashboard.py pending CHANGE                           list the user's items that are not done or accepted
 
-CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it: tasks.md (with the task
-statuses and Blocked by reasons modes/coordinate.md defines), specs.md, in
-logs/ one JSON file per agent with its role, task, mode and branch (modes/coordinate.md) and the agent's log (its
-format is in agents/builder.md and agents/verifier.md) and the coordinator's decisions and
-questions in decisions/ (templates/decision.md). The page shows the agents at work and their latest steps, the tasks with the requirements of specs.md, and a conversation
-with the coordinator in which its decisions and its questions to the user appear. The user writes to the coordinator,
-asks about an agent, answers a question or replies to a decision. Each action is a JSON-RPC call from the page; the
-script appends it to conversation.jsonl in the folder and prints it to stdout. `wait` is for harnesses that only
-notify when a command ends. `reply` and `status` work with or without a server, so a resumed run can answer what the
-user wrote while no agent was running.
+CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it, in the formats of
+schemas/: code.json (the goal, the design and the mode), spec.jsonl (or the one in the architect folder code.json names),
+tasks.jsonl, decisions.jsonl, and in logs/ one <agent>.card.json with the agent's role, task and branch and the agent's
+log, <agent>.jsonl. progress.jsonl, next-steps.jsonl, instructions.jsonl and audit/ are checked too, and not shown.
+The page shows the agents at work and their latest steps, the tasks with the requirements of the spec, and a
+conversation with the coordinator in which its decisions and its questions to the user appear. The user writes to the
+coordinator, asks about an agent, answers a question or replies to a decision. Each action is a JSON-RPC call from the
+page; the script appends it to conversation.jsonl in the folder and prints it to stdout. `wait` is for harnesses that
+only notify when a command ends. `reply` and `status` work with or without a server, so a resumed run can answer what
+the user wrote while no agent was running.
+
+Every record is checked against its schema on its own. The page shows each valid record; the invalid ones, with where
+they are, which field and why, are listed in an errors band, and `check` prints the same list: one bad record never
+hides the others.
 """
 
 from __future__ import annotations
@@ -26,7 +33,6 @@ from __future__ import annotations
 import argparse
 import http.server
 import json
-import re
 import sys
 import threading
 import time
@@ -36,132 +42,171 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent  # dashboard.html, the page template, sits next to this script
 sys.path.insert(0, str(HERE))  # page.py, the conversation every page that talks to the agent shares, sits here too
 import page  # noqa: E402
+import schema  # noqa: E402
 
+SCHEMAS = HERE.parent / "schemas"
 LOG, SEEN, ADDRESS = "conversation.jsonl", ".conversation-seen", ".server"
 METHODS = ("comment", "note", "answer")  # what the page may send
 ITEMS = ("comment", "note", "answer")  # what the coordinator tracks with status
-# The first word of an agent's log line, and the state it leaves the agent in (agents/builder.md, agents/verifier.md).
-STEPS = {"start": "working", "step": "working", "asked": "waiting", "blocked": "blocked", "handed back": "finished"}
+# What an agent's last log line says about it, as the page shows it: the line's type, and the state it leaves the agent in.
+STATES = {"start": "working", "step": "working", "asked": "waiting", "blocked": "blocked", "handed_back": "finished"}
+# Where the spec is: next to the other files, or in the architect folder code.json names.
+SPEC = {"from": "code.json", "field": "design.folder", "name": "spec.jsonl", "else": "spec.jsonl"}
+CHECKED_ONLY = ("progress.jsonl", "next-steps.jsonl", "instructions.jsonl")  # the page does not show them
+AUDIT = ("audit/*/audit.json", "audit/*/evidence.jsonl", "audit/*/findings.jsonl")
 
 
-def md_files(folder: Path) -> list:
-    """The .md files in a folder, in name order; none if the folder does not exist yet."""
-    return sorted(folder.glob("*.md")) if folder.is_dir() else []
+def lines_of(text: str, jsonl: bool) -> list:
+    """The lines of a JSONL file, split on newlines only, without the empty piece after the last; a JSON file is one."""
+    if not jsonl:
+        return [text]
+    pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
+    return pieces[:-1] if pieces and pieces[-1] == "" else pieces
 
 
-def read_entry(path: Path) -> dict:
-    entry = {}
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        key, sep, value = line.partition(":")
-        if sep and key.strip() and " " not in key.strip():
-            entry[key.strip()] = value.strip()
-    entry.setdefault("id", path.stem)
-    entry["_changed"] = path.stat().st_mtime
-    return entry
+class Reader:
+    """Reads the files of one change folder record by record through schema.py: the valid records come back, and each
+    invalid one goes to `errors` with its file, line, field, reason and, if it parsed, its `by`."""
+
+    def __init__(self, change: Path):
+        self.change, self.errors, self.cache = change, [], {}
+        self.docs = schema.load_schemas(SCHEMAS)
+        self.context = schema.Context(change, "tasks.jsonl", self.cache)
+
+    def shown(self, path: Path) -> str:
+        """A file's name as the errors give it: from the change folder, or from the repo root for another folder."""
+        for base in (self.change, self.context.repo_root()):
+            if base is not None:
+                try:
+                    return path.resolve().relative_to(base.resolve()).as_posix()
+                except ValueError:
+                    pass
+        return str(path)
+
+    def records(self, path: Path) -> list:
+        """The valid records of one file, in line order; none if it does not exist."""
+        if not path.is_file():
+            return []
+        name = self.shown(path)
+        found = schema.check_file(path, self.docs, self.cache)
+        jsonl = path.suffix == ".jsonl"
+        try:
+            pieces = lines_of(schema.read_checked(path, jsonl), jsonl)
+        except (OSError, UnicodeDecodeError):
+            pieces = []
+        parsed = {}
+        for number, piece in enumerate(pieces, 1):
+            try:
+                value = json.loads(piece)
+            except ValueError:
+                continue
+            parsed[number] = value if isinstance(value, dict) else None
+        invalid = {error.line for error in found}
+        for error in found:
+            record = parsed.get(error.line)
+            by = record.get("by") if record else None
+            entry = {"file": name, "line": error.line, "field": error.field, "message": error.message}
+            self.errors.append({**entry, "by": by} if isinstance(by, str) and by else entry)
+        return [record for number, record in parsed.items() if record is not None and number not in invalid]
+
+    def spec_records(self) -> list:
+        """The spec records, from spec.jsonl, or from the architect folder code.json names."""
+        target, shown = self.context.target(SPEC)
+        if target is None:
+            self.errors.append({"file": "code.json", "line": 1, "field": "design.folder", "message": shown})
+            return []
+        path = Path(target)
+        return self.records(path if path.is_absolute() else self.change / path)
+
+    def folder(self, pattern: str) -> list:
+        return sorted(self.change.glob(pattern))
 
 
-def read_tasks(path: Path) -> tuple:
-    """The change's name and its tasks, from the table in tasks.md (templates/tasks.md). Columns are found by their
-    heading, so a table with columns added or moved still reads."""
-    if not path.exists():
-        return "", []
-    name, head, tasks = "", None, []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if line.startswith("# ") and not name:
-            name = re.sub(r"^#\s*Tasks:\s*", "", line).strip()
-        if not line.lstrip().startswith("|"):
-            head = None if tasks else head
-            continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if all(re.fullmatch(r":?-+:?", c) for c in cells if c):
-            continue
-        if head is None:
-            head = [c.lower() for c in cells]
-            continue
-        row = dict(zip(head, cells, strict=False))  # a short row leaves the last columns empty
-        if not row.get("task") or row.get("task", "").startswith("<"):
-            continue  # the template's placeholder row
-        tasks.append(
-            {
-                "id": row.get("#", ""),
-                "task": row["task"],
-                "mode": row.get("mode", ""),
-                "requirements": [r.strip() for r in row.get("requirements", "").split(",") if r.strip()],
-                "check": row.get("check that tells done from not done", row.get("check", "")),
-                "status": row.get("status", ""),  # as written: the page matches it without case
-                "blocked_by": row.get("blocked by", ""),  # a task's #, user or repair limit (modes/coordinate.md)
-            }
-        )
-    return name, tasks
+def mtime(*paths: Path) -> float:
+    return max((p.stat().st_mtime for p in paths if p.exists()), default=0.0)
 
 
-def read_requirements(path: Path) -> dict:
-    """Each requirement's text by its ID, from the table in specs.md (templates/specs.md)."""
-    if not path.exists():
-        return {}
-    head, found = None, {}
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if not line.lstrip().startswith("|"):
-            head = None
-            continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if all(re.fullmatch(r":?-+:?", c) for c in cells if c):
-            continue
-        if head is None:
-            head = [c.lower() for c in cells]
-            continue
-        row = dict(zip(head, cells, strict=False))
-        if row.get("id") and row.get("requirement") and not row["id"].startswith("<"):
-            found[row["id"]] = row["requirement"]
-    return found
-
-
-def read_agent(logs: Path, name: str) -> dict:
-    """An agent from its two files in logs/: what it works on from <name>.json, which the coordinator writes when it
-    starts the agent (role, task, mode, branch), and its state from the last line of <name>.md, the log the agent
-    writes. A log line that starts with no known word counts as a step, so a slip never hides an agent."""
-    card, log = logs / f"{name}.json", logs / f"{name}.md"
-    try:
-        about = json.loads(card.read_text(encoding="utf-8")) if card.exists() else {}
-    except ValueError:
-        about = {}
-    about = about if isinstance(about, dict) else {}
-    lines = (
-        [x.strip() for x in log.read_text(encoding="utf-8", errors="replace").splitlines() if x.strip()]
-        if log.exists()
-        else []
-    )
-    state = "working"
-    for line in lines:
-        state = STEPS.get(line.partition(":")[0].strip().lower(), "working")
+def agent(reader: Reader, name: str, modes: dict) -> dict:
+    """An agent from its two files in logs/: what it works on from <name>.card.json, which the coordinator writes when
+    it starts the agent (role, task, branch), and its state from the last valid line of <name>.jsonl, the log the agent
+    writes. Its mode is its task's."""
+    logs = reader.change / "logs"
+    card, log = logs / f"{name}.card.json", logs / f"{name}.jsonl"
+    about = next(iter(reader.records(card)), {})
+    lines = [
+        {key: line[key] for key in ("type", "text", "result", "at") if key in line} for line in reader.records(log)
+    ]
     return {
         "name": name,
-        **{key: "" if about.get(key) is None else str(about[key]) for key in ("role", "task", "mode", "branch")},
-        "state": state,
+        **{key: about.get(key) or "" for key in ("role", "task", "branch")},
+        "mode": modes.get(about.get("task"), ""),
+        "state": STATES.get(lines[-1]["type"], "working") if lines else "working",
         "lines": lines[-40:],
-        "_changed": max(f.stat().st_mtime for f in (card, log) if f.exists()),
+        "_changed": mtime(card, log),
     }
 
 
-def read_agents(logs: Path) -> list:
-    """Every agent of the change, by the names of its files in logs/, so an agent shows as soon as it is started."""
-    if not logs.is_dir():
-        return []
-    names = sorted({f.stem for f in logs.iterdir() if f.suffix in (".md", ".json")})
-    return [read_agent(logs, name) for name in names]
+def decision(record: dict, answers: dict, changed: float) -> dict:
+    """A decision as the page shows it: the user's answer is the page event it points to, or the words said in the chat."""
+    answer = record.get("answer") or {}
+    text = answers.get(answer.get("event"), "") if answer.get("type") == "page" else answer.get("text", "")
+    return {
+        "id": record["id"],
+        "asked": record["asked"],
+        "status": record["status"],
+        "decision": record.get("decision", ""),
+        "answer": text,
+        "from": record["raised_by"],
+        "task": record["about"].get("task", ""),
+        "at": record["at"],
+        "_changed": changed,
+    }
+
+
+def collect(change: Path) -> dict:
+    """Everything the page shows from the folder's files, and `errors`, the records that are not valid."""
+    try:
+        reader = Reader(change)
+    except schema.SchemaError as error:
+        return {
+            "tasks": [],
+            "requirements": {},
+            "agents": [],
+            "decisions": [],
+            "conversation": [],
+            "errors": [{"file": "schemas", "line": 1, "field": "(schemas)", "message": str(error)}],
+        }
+    reader.records(change / "code.json")  # shown only through the errors it may hold; the tasks carry their own mode
+    tasks = reader.records(change / "tasks.jsonl")
+    spec = reader.spec_records()
+    conversation_events = reader.records(change / LOG)
+    answers = {e["id"]: e["text"] for e in conversation_events if e.get("type") == "answer"}
+    decisions = [
+        decision(r, answers, mtime(change / "decisions.jsonl")) for r in reader.records(change / "decisions.jsonl")
+    ]
+    modes = {t["id"]: t["mode"] for t in tasks}
+    names = sorted(
+        {
+            f.name.removesuffix(".card.json").removesuffix(".jsonl")
+            for f in [*reader.folder("logs/*.card.json"), *reader.folder("logs/*.jsonl")]
+        }
+    )
+    agents = [agent(reader, name, modes) for name in names]
+    for path in [change / name for name in CHECKED_ONLY] + [p for pattern in AUDIT for p in reader.folder(pattern)]:
+        reader.records(path)
+    return {
+        "name": change.name,
+        "tasks": tasks,
+        "requirements": {r["id"]: r["statement"] for r in spec if r.get("type") == "spec"},
+        "agents": agents,
+        "decisions": decisions,
+        "conversation": conversation_events,
+        "errors": reader.errors,
+    }
 
 
 def load(change: Path) -> dict:
-    name, tasks = read_tasks(change / "tasks.md")
-    return {
-        "name": name or change.name,
-        "tasks": tasks,
-        "requirements": read_requirements(change / "specs.md"),
-        "agents": read_agents(change / "logs"),
-        "decisions": [read_entry(path) for path in md_files(change / "decisions")],
-        "conversation": conversation(change).events(),
-        "now": time.time(),
-    }
+    return {**collect(change), "now": time.time()}
 
 
 def dashboard_page() -> str:
@@ -241,6 +286,8 @@ def main() -> None:
         description="Show a coordinated change as a live page and collect the user's input."
     )
     sub = parser.add_subparsers(dest="command", required=True)
+    c = sub.add_parser("check", help="print the records that are not valid, and exit 1 if there are any")
+    c.add_argument("change")
     w = sub.add_parser("watch", help="serve the live page")
     w.add_argument("change")
     w.add_argument("--port", type=int, default=0, help="port to serve on (default: any free port)")
@@ -263,7 +310,12 @@ def main() -> None:
     change = Path(args.change).expanduser().resolve()
     if not change.is_dir():
         sys.exit(f"error: {change} is not a directory")
-    if args.command == "watch":
+    if args.command == "check":
+        errors = collect(change)["errors"]
+        for error in errors:
+            print(f"{error['file']}:{error['line']}: {error['field']}: {error['message']}")
+        sys.exit(1 if errors else 0)
+    elif args.command == "watch":
         watch(change, args.port, not args.no_browser)
     elif args.command == "wait":
         sys.exit(conversation(change).wait(args.timeout))

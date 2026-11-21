@@ -84,3 +84,5 @@ jobs:
               cmp "skills/architect-better/$name" "skills/$skill/$name" || exit 1
             done
           done
+          # spec.schema.json, the spec format, is in code-better and architect-better and identical.
+          cmp skills/architect-better/schemas/spec.schema.json skills/code-better/schemas/spec.schema.json || exit 1

@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "progress.schema.json",
+  "title": "one line of progress.jsonl: progress on a task or the change, a problem, and the line that resolves it",
+  "$comment": "An open problem is a problem with no resolved record pointing to it. In coordinate mode only the coordinator writes it.",
+  "x-files": [
+    "progress.jsonl"
+  ],
+  "type": "object",
+  "required": [
+    "type",
+    "at",
+    "by"
+  ],
+  "properties": {
+    "type": {
+      "enum": [
+        "progress",
+        "problem",
+        "resolved"
+      ]
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "progress"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/progress"
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "problem"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/problem"
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "resolved"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/resolved"
+      }
+    }
+  ],
+  "$defs": {
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "about",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "progress"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "about": {
+          "description": "what the record is about: a task, or the whole change",
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "task",
+                "change"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "task"
+                  }
+                }
+              },
+              "then": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "task"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "task"
+                  },
+                  "task": {
+                    "type": "string",
+                    "pattern": "^T\\d+$",
+                    "x-points-to": {
+                      "file": "tasks.jsonl",
+                      "type": "task"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "change"
+                  }
+                }
+              },
+              "then": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "change"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "about",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "problem"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id",
+          "pattern": "^P\\d+$"
+        },
+        "about": {
+          "description": "what the record is about: a task, or the whole change",
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "task",
+                "change"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "task"
+                  }
+                }
+              },
+              "then": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "task"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "task"
+                  },
+                  "task": {
+                    "type": "string",
+                    "pattern": "^T\\d+$",
+                    "x-points-to": {
+                      "file": "tasks.jsonl",
+                      "type": "task"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "change"
+                  }
+                }
+              },
+              "then": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "change"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "resolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "to",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "resolved"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^P\\d+$",
+          "x-points-to": {
+            "file": "progress.jsonl",
+            "type": "problem"
+          }
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -93,12 +93,20 @@
 .qpop .sec > ul.req-list { padding-left:0; }
 .qpop .steps li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
 
-/* The conversation: the coordinator's decisions and questions */
+/* The records that did not validate: listed above the work, never hiding the valid ones */
+.errors { flex:none; max-height:30vh; overflow-y:auto; padding:var(--space-control) var(--space-edge); background:var(--linen); border-left:4px solid var(--error); border-bottom:1px solid var(--line); font:var(--font-message); color:var(--ink); }
+.errors[hidden] { display:none; }
+.errors h2 { margin:0 0 var(--space-tight); font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; color:var(--error); }
+.errors ul { list-style:none; margin:0; padding:0; }
+.errors li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
+.errors code { font:var(--font-code); }
+.errors .by { color:var(--muted); }
 </style></head><body>
 <div class="band"></div>
 <header class="bar--stats"><div><h1 id="title" dir="auto">Change dashboard</h1></div>
   <div class="stats" id="status">Loading…</div></header>
 <p class="offline" id="offline" role="status" hidden>The dashboard is closed. Ask the agent to restart it.</p>
+<section class="errors" id="errors" aria-labelledby="errors-h" hidden></section>
 <div class="work">
   <main class="view">
    <div class="agents-pane">
@@ -142,10 +150,10 @@ const stateOf = (a, now) => a.state === "working" && now - a._changed > QUIET ? 
 const word = (a, now) => stateOf(a, now) === "quiet" ? `quiet ${Math.round((now - a._changed) / 60)} min` : STATEWORD[a.state];
 let D = null, OPEN = null, REPLIES = -1, CLOSED_PAGE = false;  // OPEN: the agent the pop-up shows, as {id, anchor}
 
-// An agent's log line without its first word, as a person reads it: "step: wrote the check" shows "wrote the check".
-const KINDS = ["start", "step", "asked", "blocked", "handed back"];
-const words = line => { const i = String(line).indexOf(":"), kind = i < 0 ? "" : line.slice(0, i).trim().toLowerCase(), rest = line.slice(i + 1).trim();
-  return !KINDS.includes(kind) ? line : kind === "step" ? rest : `${kind[0].toUpperCase()}${kind.slice(1)}: ${rest}`; };
+// An agent's log line as a person reads it: a step shows its text, any other line says what kind it is first.
+const LABEL = {start: "Start", asked: "Asked", blocked: "Blocked", handed_back: "Handed back"};
+const words = l => l.type === "step" ? l.text : l.type === "handed_back" ? `${LABEL.handed_back}: ${[l.result, l.text].filter(Boolean).join(", ")}`
+  : `${LABEL[l.type] || l.type}: ${l.text}`;
 // status:begin
 // What an agent does: the card's edge is the mode of its task, one colour per mode. A builder's tag is that mode; a
 // verifier's tag says "verifier", so it never reads as a builder at work on the task again. No role counts as a builder.
@@ -156,8 +164,8 @@ const modeClass = a => { const m = modeOf(a); return m && m !== "none" ? "m-" + 
 const agentClass = modeClass;
 const agentTag = a => { const m = modeOf(a);
   return isVerifier(a) ? `<span class="mode r-verifier">verifier</span>` : m && m !== "none" ? `<span class="mode ${modeClass(a)}">${esc(m)}</span>` : ""; };
-// A task's status as tasks.md writes it (modes/coordinate.md), as an icon key and a word. A blocked task says what it
-// waits on from its Blocked by cell: a task of the list, the user, or the repair limit; anything else shows as written.
+// A task's status as tasks.jsonl writes it (modes/coordinate.md), as an icon key and a word. A blocked task says what it
+// waits on from its reason and waits_on: a task of the list, the user, or the repair limit; anything else shows as written.
 // An unknown status is an error the coordinator made: it shows in red as written, never as another stage.
 const TASK_STATUS = {todo: ["todo", "to do"], building: ["building", "building"], built: ["built", "built"],
   verifying: ["verifying", "verifying"], "changes needed": ["changes", "changes needed"], verified: ["verified", "verified"],
@@ -165,16 +173,17 @@ const TASK_STATUS = {todo: ["todo", "to do"], building: ["building", "building"]
 const DONE = new Set(["done", "merged"]);
 const isDone = t => DONE.has(String(t.status || "").trim().toLowerCase());
 function taskStatus(t, tasks) {
-  const raw = String(t.status || "").trim(), s = raw.toLowerCase(), by = String(t.blocked_by || "").trim();
+  const raw = String(t.status || "").trim(), s = raw.toLowerCase();
   if (s === "blocked") {
-    const word = !by || by.toLowerCase() === "none" ? "blocked" : by.toLowerCase() === "user" ? "waiting on you"
-      : by.toLowerCase() === "repair limit" ? "repair limit" : tasks.some(x => x.id === by) ? `waiting on ${by}` : `blocked: ${by}`;
+    const reason = String(t.reason || "").trim(), r = reason.toLowerCase(), on = String(t.waits_on || "").trim();
+    const word = !r ? "blocked" : r === "user" ? "waiting on you" : r === "repair limit" ? "repair limit"
+      : r === "task" ? (tasks.some(x => x.id === on) ? `waiting on ${on}` : `blocked: ${on}`) : `blocked: ${reason}`;
     return {key: "blocked", word};
   }
   const [key, word] = TASK_STATUS[s] || ["other", raw ? `not a status: ${raw}` : "no status"];
   return {key, word};
 }
-// The status word as HTML: it may carry a cell of tasks.md as written, so it is escaped; a long one is cut, in full on hover.
+// The status word as HTML: it may carry a field of tasks.jsonl as written, so it is escaped; a long one is cut, in full on hover.
 const statusLabel = (t, tasks, icons) => { const {key, word} = taskStatus(t, tasks);
   return `<span class="tstat ${key}" title="${esc(word)}">${(icons || {})[key] || ""}<span class="w">${esc(word)}</span></span>`; };
 // status:end
@@ -191,16 +200,24 @@ const stateIcon = (a, now) => { const s = stateOf(a, now), w = word(a, now);
   return `<span class="state ${s}" role="img" aria-label="${esc(w)}" title="${esc(w)}">${ICON[s]}${s === "quiet" ? esc(w.replace(/^quiet /, "")) : ""}</span>`; };
 const who = a => esc(a.name);
 const taskOf = a => a.task ? (D.tasks || []).find(t => t.id === a.task) : undefined;
-// A task's requirements with their text from specs.md; an ID the spec does not hold shows as missing, not hidden.
+// A task's requirements with their text from the spec; an ID the spec does not hold shows as missing, not hidden.
 const reqsOf = t => ((t || {}).requirements || []).map(id => [id, (D.requirements || {})[id]]);
 const reqItems = t => reqsOf(t).map(([id, text]) => `<li dir="auto"><b>${esc(id)}</b>${text ? esc(text) : '<span class="missing">not in the spec</span>'}</li>`).join("");
 const taskLabel = a => { const t = taskOf(a); return t ? `${t.id}: ${t.task}` : a.task ? `Task ${a.task}` : "No task named"; };
+
+// errors:begin
+// The records that did not validate, as a band above the work: where each is, its field, why, and who wrote it. A file
+// can hold anything, so every part is text. The valid records are on the page as usual; this band never replaces them.
+const errorsHTML = errors => !errors || !errors.length ? "" :
+  `<h2 id="errors-h">${errors.length} ${errors.length === 1 ? "record is" : "records are"} not valid</h2><ul>${errors.map(e =>
+    `<li><code>${esc(e.file)}:${esc(e.line)}</code> <b>${esc(e.field)}</b>: ${esc(e.message)}${e.by ? ` <span class="by">written by ${esc(e.by)}</span>` : ""}</li>`).join("")}</ul>`;
+// errors:end
 
 // ---------- The agents ----------
 function drawAgents(d) {
   setHTML($("key"), ["working", "waiting", "blocked", "quiet"].map(s => `<li><span class="state ${s}">${ICON[s]}</span>${s === "waiting" ? "waiting on coordinator" : s}</li>`).join(""));
   // The stuck agents first, then by task number, so the user finds both a problem and a given task without reading every card.
-  // The tasks keep tasks.md's order, so the agents follow it too.
+  // The tasks keep tasks.jsonl's order, so the agents follow it too.
   const num = a => { const i = (d.tasks || []).findIndex(t => t.id === a.task); return i < 0 ? Infinity : i; }, now = d.now;
   const live = d.agents.filter(a => a.state !== "finished")
     .sort((a, z) => ORDER[stateOf(a, now)] - ORDER[stateOf(z, now)] || num(a) - num(z) || a.name.localeCompare(z.name));
@@ -208,7 +225,7 @@ function drawAgents(d) {
       <p class="meta">${agentTag(a)} ${stateIcon(a, now)} ${who(a)}</p>
       <h3 dir="auto">${esc(taskLabel(a))}</h3>
       ${reqsOf(taskOf(a)).length ? `<ul class="reqs">${reqItems(taskOf(a))}</ul>` : ""}
-      <ol>${a.lines.filter(l => l.slice(0, l.indexOf(":")).trim().toLowerCase() !== "start").slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
+      <ol>${a.lines.filter(l => l.type !== "start").slice(-3).map(l => `<li dir="auto">${esc(words(l))}</li>`).join("")}</ol>
       <p class="ago">Updated ${ago(d.now - a._changed)}</p></button></li>`).join("")
     || `<li class="empty">No agent is working right now.</li>`);
 }
@@ -231,7 +248,7 @@ function drawTasks(d) {
   $("tasks-sec").hidden = !tasks.length;
   // The heading says how many tasks are done of how many, since past five rows the list scrolls and the rest are out of sight.
   $("tasks-h").textContent = `Tasks: ${tasks.filter(isDone).length} of ${tasks.length} done`;
-  // The tasks keep their own order, the one tasks.md gives, each with the status tasks.md gives it.
+  // The tasks keep their own order, the one tasks.jsonl gives, each with the status tasks.jsonl gives it.
   setHTML($("tasks"), tasks.map(t => {
     const live = d.agents.filter(a => a.task && a.task === t.id && a.state !== "finished");
     const tag = has(t.mode) ? `<span class="mode m-${MODES[t.mode.trim().toLowerCase()] || "other"}">${esc(t.mode)}</span>` : "";
@@ -432,6 +449,8 @@ function render(d) {
     + (waitingN ? `<button type="button" class="stat" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "open question" : "open questions"}</button>`
       : stat(0, "open questions"))
     + (CLOSED_PAGE ? stat("Closed", `since ${new Date(d.now * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`) : ""));
+  const band = errorsHTML(d.errors);
+  $("errors").hidden = !band; setHTML($("errors"), band);
   drawAgents(d);
   drawTasks(d);
   syncBar();
@@ -441,11 +460,13 @@ function render(d) {
   if (OPEN) fillPop();
 }
 
+// load:begin
 let fails = 0;
 function tick() {
   return fetch("dashboard.json", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(d => { fails = 0; CLOSED_PAGE = false; $("offline").hidden = true; $("unwatched").hidden = d.listening !== false; render(d); },
       () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("offline").hidden = false; $("unwatched").hidden = true; if (D) render(D); } });
 }
+// load:end
 tick(); setInterval(tick, 2000);
 </script></body></html>

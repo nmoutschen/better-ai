@@ -473,7 +473,8 @@ test('the errors band lists each invalid record with its file and line, its fiel
 
 test('markup in an invalid record shows as text in the errors band', () => {
   const band = errorsHTML([{ file: '<b>f</b>', line: 1, field: '<img src=x>', message: '<script>x</script>', by: '<i>' }]);
-  assert.doesNotMatch(band, /<b>|<img|<script|<i>/);
+  assert.doesNotMatch(band, /<img|<script|<i>|<b>f/);
+  assert.match(band, /&lt;b&gt;f&lt;\/b&gt;/);
 });
 
 // tick() is read out of dashboard.html between `// load:begin` and `// load:end`, with stubs for what a page has.
@@ -482,8 +483,8 @@ function pageWith(answer) {
   const els = {};
   const el = id => els[id] || (els[id] = { hidden: true, textContent: '', id });
   const drawn = [];
-  const body = new Function('fetch', '$', 'render', 'unwatched', loadCode + '; return {tick, state: () => ({ fails, CLOSED_PAGE })};')(
-    () => answer(), el, d => drawn.push(d), () => {});
+  const body = new Function('fetch', '$', 'render', 'let D = null, CLOSED_PAGE = false;' + loadCode + '; return {tick, state: () => ({ fails, CLOSED_PAGE })};')(
+    () => answer(), el, d => drawn.push(d));
   return { ...body, el, drawn };
 }
 const served = data => () => Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
