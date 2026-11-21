@@ -601,19 +601,16 @@ def validate_record(value: Any, schemas: list[dict], docs: dict[str, dict], cont
 @hook("merge-loop")
 def _merge_loop(record: dict, context: Context) -> list[tuple[str, str]]:
     """A question merged into another that is merged into it, directly or through others, is in a loop: each member
-    is an error on `merged_into`. A question merged into itself is left to `x-differs-from`."""
-    questions = {}
-    for path in sorted(context.path(".").glob("*.json")):
-        found = context.read_json(path.name)
-        if isinstance(found, dict) and isinstance(found.get("id"), str):
-            questions[found["id"]] = found
+    is an error on `merged_into`. A question's file is named for its id, so only the chain is read, one file a step.
+    A question merged into itself is left to `x-differs-from`."""
     start = record.get("id")
-    chain = [start]
+    chain, seen = [start], {start}
     at = record.get("merged_into")
-    while isinstance(at, str) and at != start and at not in chain and len(chain) <= len(questions):
+    while isinstance(at, str) and at not in seen and "/" not in at and "\\" not in at:
         chain.append(at)
-        step = questions.get(at, {})
-        at = step.get("merged_into") if step.get("status") == "merged" else None
+        seen.add(at)
+        step = context.read_json(f"{at}.json")
+        at = step.get("merged_into") if isinstance(step, dict) and step.get("status") == "merged" else None
     if at == start and len(chain) > 1:
         return [("merged_into", f"merge loop: {' → '.join([*chain, start])}")]
     return []
