@@ -575,7 +575,7 @@ test('delete, accept and reopen point at their item with to, and reopen carries 
 const boardJs = fs.readFileSync(path.join(__dirname, '..', 'skills', 'research-better', 'scripts', 'board.js'), 'utf8');
 const realEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-const { showLoaded } = new Function('esc', 'plural', boardJs.split('// errors:begin')[1].split('// errors:end')[0] + '; return {showLoaded};')(realEsc, plural);
+const { showLoaded, notValid } = new Function('esc', 'plural', boardJs.split('// errors:begin')[1].split('// errors:end')[0] + '; return {showLoaded, notValid};')(realEsc, plural);
 const { prepare } = new Function('const has =' + boardJs.split('const has =')[1].split('// ---------- Slices')[0] + '; return {prepare};')();
 const band = () => ({ offline: { hidden: false }, unwatched: { hidden: false }, errors: { hidden: true, innerHTML: '' } });
 
@@ -615,4 +615,33 @@ test("the board's map reads the new fields: claims by question, merged and withd
   assert.equal(d.byId['Q-2'].parent, 'Q-1');
   assert.equal(d.byId['Q-4'].parent, 'Q-1');  // the question of the first claim that cites its source
   assert.equal(d.byId['Q-1'].searches, 2);
+});
+
+test('searches on a merged question count for the question it was merged into', () => {
+  const q = (id, over) => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1, ...over });
+  const d = prepare({ brief: {}, sources: [], decisions: [], claims: [],
+    logs: { w2: { searches: [{ question: 'Q-3', query: 'a', new_terms: [] }, { question: 'Q-1', query: 'b', new_terms: [] }] } },
+    questions: [q('Q-1'), q('Q-3', { status: 'merged', merged_into: 'Q-1' })] });
+  assert.equal(d.byId['Q-1'].searches, 2);
+});
+
+test('the errors band is written only when its text changes, so a screen reader is not read it every poll', () => {
+  let writes = 0, html = '';
+  const els = { offline: { hidden: false }, unwatched: { hidden: false },
+    errors: { hidden: true, get innerHTML() { return html; }, set innerHTML(v) { writes++; html = v; } } };
+  const d = { listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] };
+  showLoaded(d, els); showLoaded(d, els); showLoaded({ ...d }, els);
+  assert.equal(writes, 1);
+  showLoaded({ listening: true, errors: [] }, els);
+  assert.equal(writes, 2);
+});
+
+test('an invalid record the board still shows is marked with its first message, and the map copes with missing fields', () => {
+  assert.equal(notValid({ _errors: ['status: must be one of "a"', 'x: y'] }), 'not valid: status: must be one of "a"');
+  assert.equal(notValid({}), '');
+  const d = prepare({ brief: {}, sources: [{ id: 'S-1', _errors: ['trust: bad'] }], decisions: [], logs: {},
+    questions: [{ id: 'Q-1', _errors: ['status: bad'], status: 'merged' }, { id: 'Q-2', _errors: ['origin: required'] }],
+    claims: [{ id: 'C-1', _errors: ['question: required'] }, { id: 'C-2', question: 'Q-2', source: 'S-1' }] });
+  assert.deepEqual(d.qs.map(x => x.id), ['Q-1', 'Q-2']);  // merged without merged_into is not hidden
+  assert.equal(d.byId['Q-2'].claimsList.length, 1);
 });

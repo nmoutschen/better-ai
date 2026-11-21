@@ -5,17 +5,21 @@ small board whose other records are what the example points to, and must pass bo
 each kind must be reported with its file, line and field while the rest of the board still loads.
 """
 
+import contextlib
 import copy
 import importlib.util
+import io
 import json
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills" / "research-better" / "scripts" / "board.py"
@@ -185,11 +189,167 @@ class Invalid(unittest.TestCase):
             support(folder)
             write_entry(folder, claim("C-w2-9", status="verified"))  # verified without a checker, a span or hard
             data = board.load(folder)
-            self.assertEqual(sorted(c["id"] for c in data["claims"]), ["C-w2-7", "C-w2-8"])
+            self.assertEqual(sorted(c["id"] for c in data["claims"]), ["C-w2-7", "C-w2-8", "C-w2-9"])
+            bad = next(c for c in data["claims"] if c["id"] == "C-w2-9")
+            self.assertTrue(bad["_errors"][0].startswith("checker: "))
+            self.assertFalse(any("_errors" in c for c in data["claims"] if c["id"] != "C-w2-9"))
             self.assertEqual(len(data["questions"]), 2)
             self.assertEqual(len(data["sources"]), 2)
             self.assertEqual({e["file"] for e in data["errors"]}, {"claims/C-w2-9.json"})
             self.assertTrue(any(e["field"] == "checker" for e in data["errors"]))
+
+    def test_an_invalid_record_stays_on_the_board_marked_and_listed(self):
+        for kind, bad in (
+            ("questions", {"status": "unknown"}),
+            ("claims", {"status": "verified"}),
+            ("sources", {"trust": "x"}),
+        ):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as d:
+                folder = Path(d)
+                support(folder)
+                make = {"questions": seeded, "claims": claim, "sources": source}[kind]
+                id = {"questions": "Q-w2-9", "claims": "C-w2-9", "sources": "S-w2-9"}[kind]
+                write_entry(folder, {**make(id), **bad})
+                data = board.load(folder)
+                shown = next(r for r in data[kind] if r["id"] == id)
+                self.assertTrue(shown["_errors"])
+                self.assertTrue(any(e["file"] == f"{kind}/{id}.json" for e in data["errors"]))
+
+    def test_an_invalid_record_without_an_id_or_a_valid_at_is_still_shown(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_json(folder, "claims/C-w2-9.json", {"claim": "x", "at": "yesterday"})
+            shown = next(c for c in board.load(folder)["claims"] if c["_errors"])
+            self.assertEqual((shown["id"], shown["_born"]), ("C-w2-9", 0.0))
+
+    def test_one_bad_file_never_empties_a_column_and_a_line_that_is_not_json_is_only_listed(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            for n in (7, 8):
+                write_entry(folder, claim(f"C-w2-{n}", status="nonsense"))  # every claim file is bad
+            (folder / "claims" / "C-w2-5.json").write_text("{not json")
+            write_lines(folder, "logs/w2.jsonl", [example("logs/<agent>.jsonl", "gap")])
+            with (folder / "logs" / "w2.jsonl").open("a") as f:
+                f.write("{broken\n")
+            data = board.load(folder)
+            self.assertEqual(sorted(c["id"] for c in data["claims"]), ["C-w2-7", "C-w2-8"])
+            self.assertEqual({e["file"] for e in data["errors"]} >= {"claims/C-w2-5.json", "logs/w2.jsonl"}, True)
+            self.assertEqual([r["type"] for r in data["logs"]["w2"]["records"]], ["gap"])
+
+    def test_a_source_date_may_be_a_year_and_month(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_entry(folder, source("S-w2-8", date="2024-03"))
+            self.assertEqual(board.load(folder)["errors"], [])
+            write_entry(folder, source("S-w2-9", date="2024-3"))
+            self.assertEqual([e["file"] for e in board.load(folder)["errors"]], ["sources/S-w2-9.json"])
+
+    def test_what_is_shown_is_the_text_that_was_validated(self):
+        """A file is read once; an agent writing after that read changes neither what is shown nor what is reported."""
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            log = folder / "logs" / "w2.jsonl"
+            write_lines(folder, "logs/w2.jsonl", [example("logs/<agent>.jsonl", "search")])
+            claim_file = folder / "claims" / "C-w2-7.json"
+            late = json.dumps(
+                {"type": "search", "at": "2026-11-21T10:00:00Z", "by": "w2", "query": "q", "question": "Q-w2-4"}
+            )
+            real = board.schema.read_checked
+
+            def reading(path, lines):
+                text = real(path, lines)
+                if path.name == "w2.jsonl":  # an agent appends a bad line just after the read
+                    with log.open("a") as f:
+                        f.write(late + "\n")
+                if path.name == "C-w2-7.json":  # and rewrites a claim
+                    claim_file.write_text(
+                        json.dumps({**claim("C-w2-7"), "claim": "rewritten", "status": "bogus"}) + "\n"
+                    )
+                return text
+
+            board.schema.read_checked = reading
+            self.addCleanup(setattr, board.schema, "read_checked", real)
+            data = board.load(folder)
+            self.assertEqual(
+                [r["query"] for r in data["logs"]["w2"]["searches"]], ["checkout address step october release"]
+            )
+            shown = next(c for c in data["claims"] if c["id"] == "C-w2-7")
+            self.assertEqual(
+                (shown["claim"], "_errors" in shown),
+                ("The October release added an address step before payment.", False),
+            )
+            self.assertEqual(data["errors"], [])
+
+    def test_the_conversation_is_checked_for_errors_too(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            reply = {"type": "reply", "at": "yesterday", "by": "coordinator", "id": "r-1", "text": "hi", "to": None}
+            with (folder / "conversation.jsonl").open("a") as f:
+                f.write(json.dumps(reply) + "\n")
+            data = board.load(folder)
+            self.assertEqual(
+                [(e["file"], e["line"], e["field"]) for e in data["errors"]], [("conversation.jsonl", 2, "at")]
+            )
+            self.assertEqual(len(data["conversation"]), 2)  # the page still gets the events from the conversation
+            result = check(folder)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("conversation.jsonl:2: at:", result.stdout)
+
+    def test_a_tick_scans_once_and_board_json_reuses_a_scan_until_a_file_changes(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            calls = []
+            real = board.scan
+            board.scan = lambda b: calls.append(1) or real(b)
+            self.addCleanup(setattr, board, "scan", real)
+            board.ANNOUNCED.clear()
+            first = board.scan_cached(folder)
+            self.assertIs(board.scan_cached(folder), first)
+            board.load(folder)
+            self.assertEqual(len(calls), 1)
+            conv = board.conversation(folder)
+            board.announce_closes(conv, initial=False, data=first)
+            self.assertTrue(board.board_stopped(folder, {"brief": {"status": "stopped"}}))
+            self.assertEqual(len(calls), 1)
+            time.sleep(0.01)
+            write_entry(folder, claim("C-w2-9"))
+            self.assertEqual(len(board.scan_cached(folder)["claims"]), 3)
+            self.assertEqual(len(calls), 2)
+
+    def test_the_watch_loop_goes_on_after_a_failed_tick(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            brief = {**example("brief.json", "brief"), "status": "stopped"}
+            write_json(folder, "brief.json", brief)
+            real, calls = board.announce_closes, []
+
+            def flaky(conv, initial, data=None):
+                calls.append(1)
+                if len(calls) == 2:  # the first tick of the loop
+                    raise KeyError("status")
+                return real(conv, initial, data)
+
+            board.announce_closes = flaky
+            self.addCleanup(setattr, board, "announce_closes", real)
+            stderr = io.StringIO()
+            with (
+                mock.patch.object(board.page, "stop_like_ctrl_c"),
+                mock.patch.object(board.webbrowser, "open"),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(stderr),
+            ):
+                runner = threading.Thread(target=board.watch, args=(folder, 0, False, 0.2), daemon=True)
+                runner.start()
+                runner.join(15)
+            self.assertFalse(runner.is_alive())  # it stopped by itself, so it outlived the failed tick
+            self.assertIn("KeyError", stderr.getvalue())
 
     def test_a_bad_line_in_a_log_hides_only_that_line(self):
         with tempfile.TemporaryDirectory() as d:
@@ -315,7 +475,7 @@ class Reading(unittest.TestCase):
                     self.assertEqual(r.status, 200)
                     data = json.loads(r.read())
                 self.assertEqual([e["file"] for e in data["errors"]], ["claims/C-w2-9.json"])
-                self.assertEqual(len(data["claims"]), 2)
+                self.assertEqual(len(data["claims"]), 3)
             finally:
                 server.send_signal(signal.SIGTERM)
                 server.communicate(timeout=10)

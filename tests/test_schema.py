@@ -271,6 +271,21 @@ class Case(unittest.TestCase):
         self.assertTrue(any(text in e for e in errors), f"{text!r} not in {errors}")
 
 
+class CheckText(Case):
+    def test_check_text_checks_the_text_it_is_given_and_check_file_is_check_text_of_the_file(self):
+        good, bad = jsonl(task(1)), jsonl(task(1), task(2, status="blocked"))
+        path = self.write("tasks.jsonl", good)
+        docs = schema.load_schemas(self.schemas)
+        self.assertEqual(
+            schema.check_text(path, bad, docs),
+            [schema.Error(str(path), 2, "reason", 'required when status is "blocked"')],
+        )
+        self.assertEqual(schema.check_text(path, good, docs), [])
+        self.assertEqual(schema.check_file(path, docs), schema.check_text(path, schema.read_checked(path, True), docs))
+        path.write_text(bad, encoding="utf-8")
+        self.assertEqual(schema.check_file(path, docs), schema.check_text(path, bad, docs))
+
+
 class CommandLine(Case):
     def run_cli(self, *args):
         return subprocess.run(
