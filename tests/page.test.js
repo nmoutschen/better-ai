@@ -428,8 +428,8 @@ test('a status or a blocked reason with markup shows as text, never as HTML', ()
   assert.match(statusLabel({ status: '<b>x</b>' }, []), /&lt;b&gt;x&lt;\/b&gt;/);
 });
 
-test('an unknown status shows as written', () => {
-  assert.deepEqual(shown('in review'), ['other', 'in review']);
+test('an unknown status shows as an error, with the status as written', () => {
+  assert.deepEqual(shown('in review'), ['other', 'not a status: in review']);
   assert.deepEqual(shown(''), ['other', 'no status']);
 });
 
@@ -441,9 +441,9 @@ test('a verifier shows as a verifier, a builder by its mode', () => {
   const v = { role: 'verifier', mode: 'bug fix' }, b = { role: 'builder', mode: 'bug fix' }, n = { mode: 'feature' };
   assert.match(agentTag(v), /class="mode r-verifier"[^>]*>verifier</);
   assert.doesNotMatch(agentTag(v), /bug fix/);
-  assert.equal(agentClass(v), 'r-verifier');
+  assert.equal(agentClass(v), 'm-bugfix');  // the card edge is its task's mode colour; the tag says verifier
   assert.match(agentTag(b), /class="mode m-bugfix"[^>]*>bug fix</);
   assert.equal(agentClass(b), 'm-bugfix');
   assert.equal(agentClass(n), 'm-feature');  // no role: shown as a builder
-  assert.equal(agentClass({ role: ' Verifier ' }), 'r-verifier');
+  assert.match(agentTag({ role: ' Verifier ' }), />verifier</);
 });
