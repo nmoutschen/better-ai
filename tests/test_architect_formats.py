@@ -1054,7 +1054,7 @@ class NullIsAbsent(unittest.TestCase):
     def test_a_status_driven_field_is_still_refused_as_null(self):
         finding = {**examples("findings.jsonl")[0][1], "status": "open", "handled_by": None}
         self.assertEqual(
-            [p[0] for p in schema.check_record(finding, ["findings.schema.json"], SCHEMAS)], ["handled_by"]
+            {p[0] for p in schema.check_record(finding, ["findings.schema.json"], SCHEMAS)}, {"handled_by"}
         )
 
     def test_a_folder_with_nulls_loads_draws_and_hashes_like_one_without(self):
