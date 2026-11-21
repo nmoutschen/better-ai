@@ -969,7 +969,7 @@ class LoadNeverRaises(unittest.TestCase):
     def test_a_source_file_that_goes_away_between_check_and_read_is_an_error_entry(self):
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d))
-            (Path(d) / "docs").mkdir()
+            (Path(d) / "docs").mkdir(exist_ok=True)
             (Path(d) / "docs" / "there.md").write_text("x\n")
             requirements = read(folder, "requirements.jsonl")
             requirements[0]["source"] = {"type": "file", "file": "docs/there.md", "symbol": "s"}
@@ -1059,6 +1059,8 @@ class NullIsAbsent(unittest.TestCase):
 
     def test_a_folder_with_nulls_loads_draws_and_hashes_like_one_without(self):
         with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "a").mkdir()
+            (Path(d) / "b").mkdir()
             plain = make_folder(Path(d) / "a")
             nulls = make_folder(Path(d) / "b")
             made = read(nulls, "design.json")

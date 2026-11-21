@@ -5,6 +5,10 @@
   "x-files": [
     "perspectives.jsonl"
   ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -78,7 +82,10 @@
                 "const": "built_in"
               },
               "method": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "null"
+                ],
                 "minLength": 1
               }
             }

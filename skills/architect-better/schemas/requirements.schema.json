@@ -5,6 +5,10 @@
   "x-files": [
     "requirements.jsonl"
   ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": [

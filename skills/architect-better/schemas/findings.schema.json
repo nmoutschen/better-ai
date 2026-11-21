@@ -6,6 +6,10 @@
   "x-files": [
     "findings.jsonl"
   ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": [

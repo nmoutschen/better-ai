@@ -6,6 +6,10 @@
   "x-files": [
     "architect.json"
   ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": [

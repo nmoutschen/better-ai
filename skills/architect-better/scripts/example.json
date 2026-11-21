@@ -211,6 +211,7 @@
   },
   "flows": [
     {
+      "id": "ask",
       "name": "A builder's question reaches you and your answer gets back",
       "participants": [
         {
@@ -349,6 +350,7 @@
       ]
     },
     {
+      "id": "open",
       "name": "You open the dashboard and see the agents at work",
       "in": [
         "after"

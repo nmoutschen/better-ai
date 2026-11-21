@@ -33,6 +33,9 @@ Extensions, which other JSON Schema tools ignore:
   shell: `["tasks.jsonl"]`, `["logs/*.jsonl"]`, `["questions/*.json"]`. The most specific pattern wins. When several
   schemas share the most specific pattern, a record must meet each of them: a page's `conversation.jsonl` is checked
   against the shared `conversation.schema.json` and the page's own `<page>-events.schema.json`.
+- `x-required-files` (schema root): files a folder must hold when it holds a file this schema describes, as names
+  in that folder: `["architect.json", "design.json"]`. `check <folder>` reports `<name>:1: (file): missing file` for
+  each one that is not there, once per folder, so a folder missing a file its other files need fails the check.
 - `x-versioned` (schema root): true when a line may reuse an `id`, as in a page conversation, where the latest line is
   the item's current version. Otherwise an `id` repeated in a file is an error.
 - `x-id-from-filename` (schema root): true when the file is one entry of a folder, named `<id>.json`.
@@ -97,6 +100,7 @@ KEYWORDS = {
 }
 EXTENSIONS = {
     "x-files",
+    "x-required-files",
     "x-versioned",
     "x-id-from-filename",
     "x-points-to",
@@ -718,6 +722,8 @@ def _request_sentence(record: dict, context: Context) -> list[tuple[str, str]]:
     if not isinstance(sentence, str) or not sentence:
         return []
     design = context.read_json("architect.json")
+    if design is None:
+        return []  # a missing or unreadable architect.json is reported as such
     request = design.get("request") if isinstance(design, dict) else None
     text = request.get("text") if isinstance(request, dict) else None
     if not isinstance(text, str):
@@ -755,7 +761,7 @@ def design_problems(design: dict) -> list[tuple[str, str]]:
             problems.append((f"{field}.{key}", f"{scope} {item['id']!r}: {key} references missing {item[key]!r}"))
 
     containers = design["containers"]
-    nodes, edges, groups = containers["nodes"], containers.get("edges", []), containers.get("groups", [])
+    nodes, edges, groups = containers["nodes"], containers.get("edges") or [], containers.get("groups") or []
     node_ids = index(nodes, "Container nodes", "containers.nodes")
     index(edges, "Container edges", "containers.edges")
     index(groups, "Container groups", "containers.groups")
@@ -1061,6 +1067,9 @@ def load_schemas(directory: Path) -> dict[str, dict]:
         files = docs[path.name].get("x-files", []) if isinstance(docs[path.name], dict) else []
         if not isinstance(files, list) or not all(isinstance(f, str) for f in files):
             raise SchemaError(f"{path.name}: x-files must be a list of file patterns")
+        needed = docs[path.name].get("x-required-files", []) if isinstance(docs[path.name], dict) else []
+        if not isinstance(needed, list) or not all(isinstance(f, str) and f for f in needed):
+            raise SchemaError(f"{path.name}: x-required-files must be a list of file names")
     return docs
 
 
@@ -1179,11 +1188,19 @@ def check_paths(paths: list[Path], schemas: Path | None = None) -> list[Error]:
             matched = False
             for folder, names, files in os.walk(path):
                 names[:] = sorted(n for n in names if n not in SKIPPED_FOLDERS and not n.startswith("."))
+                needed: list[str] = []
                 for name in sorted(files):
                     file = Path(folder) / name
-                    if _match(file, docs):
+                    found = _match(file, docs)
+                    if found:
                         matched = True
                         errors += check_file(file, docs, cache)
+                        needed += [n for _, doc in found for n in doc.get("x-required-files", []) if n not in needed]
+                errors += [
+                    Error(str(Path(folder) / n), 1, "(file)", "missing file")
+                    for n in needed
+                    if not (Path(folder) / n).exists()
+                ]
             if not matched:
                 errors.append(Error(str(path), 1, "(folder)", "no file here has a schema"))
         elif path.exists():

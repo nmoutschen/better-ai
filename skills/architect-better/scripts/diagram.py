@@ -41,13 +41,34 @@ ARROWS = {
 }
 
 
+def without_nulls(value):
+    """A copy with every null dropped from the objects in it: the schemas let an optional field be null, which means
+    the same as leaving it out."""
+    if isinstance(value, dict):
+        return {key: without_nulls(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [without_nulls(item) for item in value]
+    return value
+
+
+def shape_problems(design: dict) -> list[str]:
+    """What is wrong with the shape of a design, by design.schema.json; the fields the page adds (`findings`), a `title` and the
+    base fields a design.json carries are not part of what diagram.py is given."""
+    candidate = {"type": "design", "at": "2026-01-01T00:00:00Z", "by": "diagram.py", "flows": []}
+    candidate.update({key: value for key, value in design.items() if key not in ("findings", "flow", "title")})
+    found = schema.check_record(candidate, ["design.schema.json"], HERE.parent / "schemas")
+    return [f"{field}: {message}" for field, message in found]
+
+
 def validate(design: dict) -> list[str]:
-    """Report what stops a design from being laid out. The references inside it, and the box kinds, are schema.py's to
-    check (`design_problems`); this keeps the one check that needs the layout: a finding that names no part of it."""
-    try:
-        errors = [message for _, message in schema.design_problems(design)]
-    except (AttributeError, KeyError, TypeError) as exc:
-        return [f"The design is not the shape design.schema.json describes: {exc!r}"]
+    """Report what stops a design from being laid out. The shape is design.schema.json's, and the references inside a
+    well-shaped design, and its box kinds, are schema.py's (`design_problems`); this keeps the one check that needs
+    the layout: a finding that names no part of it."""
+    design = without_nulls(design)
+    errors = shape_problems(design)
+    if errors:
+        return errors
+    errors = [message for _, message in schema.design_problems(design)]
     if "flow" in design:
         errors.append("Use a flows list instead of flow")
     targets = {node["id"] for node in design["containers"]["nodes"]}
@@ -129,6 +150,7 @@ def layers(nodes, edges):
 
 def layout(design: dict) -> dict:
     """Compute positions once for the union of Before and After."""
+    design = without_nulls(design)
     errors = validate(design)
     if errors:
         raise ValueError("\n".join(errors))

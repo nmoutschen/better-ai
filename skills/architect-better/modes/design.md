@@ -15,7 +15,7 @@ After every write to a file in the change folder, run `python3 <skill dir>/scrip
 
 LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP the design of a change in its own folder, the change folder, in the design location. KEEP decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` as the change folder and for the spec, and `.architect/<change>/decisions/` for decision records.
 
-KEEP the files the page reads in the change folder. READ and FOLLOW [../scripts/example/README.md](../scripts/example/README.md) for the fields of each file. RUN scripts from this skill's directory, with the full path of the change folder as `<folder>`. `python3 scripts/architect.py check <folder>` checks the whole folder, and the diagram and the sources too: RUN it before you start the page, and FIX what it reports.
+KEEP the files the page reads in the change folder. READ and FOLLOW [../scripts/example/README.md](../scripts/example/README.md) for the fields of each file. READ and FOLLOW [../templates/records.md](../templates/records.md) for one line of each kind of record and the conventions for writing them. RUN scripts from this skill's directory, with the full path of the change folder as `<folder>`. `python3 scripts/architect.py check <folder>` checks the whole folder, and the diagram and the sources too: RUN it before you start the page, and FIX what it reports.
 
 ### Live page conversation
 

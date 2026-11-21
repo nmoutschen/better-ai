@@ -6,6 +6,10 @@
   "x-files": [
     "reviews.jsonl"
   ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -52,7 +56,10 @@
       }
     },
     "labels": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": {
         "type": "string"
       }

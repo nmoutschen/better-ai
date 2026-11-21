@@ -29,7 +29,9 @@ class DiagramTests(unittest.TestCase):
     def test_check_refuses_unknown_kind(self):
         result = subprocess.run(
             [sys.executable, SCRIPTS / "diagram.py", "check", "/dev/stdin"],
-            input=json.dumps({"containers": {"nodes": [{"id": "x", "kind": "unknown-widget"}]}, "flows": []}),
+            input=json.dumps(
+                {"containers": {"nodes": [{"id": "x", "label": "X", "kind": "unknown-widget"}]}, "flows": []}
+            ),
             text=True,
             capture_output=True,
         )
@@ -155,9 +157,9 @@ class DiagramTests(unittest.TestCase):
 
     def test_check_names_string_participant(self):
         self.design["flows"][0]["participants"].append("missing-participant")
-        self.assertIn(
-            "Flow 1 participant 'missing-participant': expected an object with id and box",
-            diagram.validate(self.design),
+        errors = diagram.validate(self.design)
+        self.assertTrue(
+            any(e.startswith("flows[0].participants[") and "expected object, got string" in e for e in errors), errors
         )
 
     def test_findings_are_hidden_and_follow_parts_across_views(self):

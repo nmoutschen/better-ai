@@ -6,6 +6,10 @@
   "x-files": [
     "design.json"
   ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -56,10 +60,16 @@
                 "minLength": 1
               },
               "detail": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "in": {
-                "type": "array",
+                "type": [
+                  "array",
+                  "null"
+                ],
                 "minItems": 1,
                 "items": {
                   "enum": [
@@ -72,7 +82,10 @@
           }
         },
         "edges": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -95,10 +108,16 @@
                 "pattern": "^[^\\s:+/]+$"
               },
               "label": {
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "in": {
-                "type": "array",
+                "type": [
+                  "array",
+                  "null"
+                ],
                 "minItems": 1,
                 "items": {
                   "enum": [
@@ -111,7 +130,10 @@
           }
         },
         "groups": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -137,7 +159,10 @@
                 }
               },
               "in": {
-                "type": "array",
+                "type": [
+                  "array",
+                  "null"
+                ],
                 "minItems": 1,
                 "items": {
                   "enum": [
@@ -172,7 +197,10 @@
             "minLength": 1
           },
           "in": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "minItems": 1,
             "items": {
               "enum": [
@@ -200,7 +228,10 @@
                   "pattern": "^[^\\s:+/]+$"
                 },
                 "in": {
-                  "type": "array",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
                   "minItems": 1,
                   "items": {
                     "enum": [
@@ -236,17 +267,24 @@
                   "pattern": "^[^\\s:+/]+$"
                 },
                 "label": {
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "kind": {
                   "enum": [
                     "request",
                     "response",
-                    "async"
+                    "async",
+                    null
                   ]
                 },
                 "in": {
-                  "type": "array",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
                   "minItems": 1,
                   "items": {
                     "enum": [
