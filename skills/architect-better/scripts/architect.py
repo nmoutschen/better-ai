@@ -495,9 +495,10 @@ def specs_md(records, meta):
     if gaps:
         out += ["", "## Gaps", ""]
         for gap in gaps:
-            how = (
-                f"asked ({gap.get('decision')})" if gap.get("status") != "assumed" else f"assumed: {gap.get('choice')}"
-            )
+            if gap.get("status") == "assumed":
+                how = f"assumed: {gap.get('choice')}"
+            else:
+                how = f"{gap.get('status')} ({gap.get('decision')})"
             out.append(
                 f"- {gap.get('id')}: {gap.get('text')} {how}. If wrong, the user would see: {gap.get('if_wrong')}"
             )

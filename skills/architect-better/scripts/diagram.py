@@ -64,6 +64,8 @@ def validate(design: dict) -> list[str]:
     """Report what stops a design from being laid out. The shape is design.schema.json's, and the references inside a
     well-shaped design, and its box kinds, are schema.py's (`design_problems`); this keeps the one check that needs
     the layout: a finding that names no part of it."""
+    if not isinstance(design, dict):
+        return ["design: expected an object"]
     design = without_nulls(design)
     errors = shape_problems(design)
     if errors:
@@ -652,6 +654,9 @@ def main(argv=None):
             args.out.write_text(register(), encoding="utf-8")
             return 0
         design = json.loads(args.design.read_text(encoding="utf-8"))
+        if not isinstance(design, dict):
+            raise ValueError("design: expected an object")
+        design = without_nulls(design)  # an optional field that is null is absent: no render path sees one
         if args.command == "check":
             errors = validate(design)
             if errors:

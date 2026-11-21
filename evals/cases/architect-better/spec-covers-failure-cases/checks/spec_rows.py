@@ -1,5 +1,6 @@
-"""Pass when spec.jsonl in the change folder holds at least one record, each with a non-empty `statement` and a
-`source` that names a design section, a request sentence, a decision or a requirement."""
+"""Pass when spec.jsonl in the change folder holds at least one `spec` record, each with a non-empty `statement` and a
+`source` that names a design section, a request sentence, a decision or a requirement. Its `gap` and `unlinked` records
+are other kinds and are not held to that."""
 
 import json
 import sys
@@ -17,11 +18,13 @@ for number, line in enumerate(SPEC.read_text().splitlines(), 1):
         row = json.loads(line)
     except json.JSONDecodeError as error:
         sys.exit(f"{SPEC} line {number} is not JSON: {error}")
-    rows.append(row)
     name = row.get("id", f"line {number}") if isinstance(row, dict) else f"line {number}"
     if not isinstance(row, dict):
         problems.append(f"{name}: not a JSON object")
         continue
+    if row.get("type") != "spec":
+        continue
+    rows.append(row)
     if not isinstance(row.get("statement"), str) or not row["statement"].strip():
         problems.append(f"{name}: statement is empty or missing")
     source = row.get("source")
@@ -31,7 +34,7 @@ for number, line in enumerate(SPEC.read_text().splitlines(), 1):
     if not isinstance(named, str) or not named.strip():
         problems.append(f"{name}: source is empty or names nothing")
 if not rows:
-    sys.exit(f"{SPEC} holds no requirement")
+    sys.exit(f"{SPEC} holds no spec requirement")
 if problems:
     sys.exit("\n".join(problems))
 print(len(rows), "spec requirements, each with a source")

@@ -67,8 +67,7 @@
       ]
     },
     "handled_by": {
-      "type": "string",
-      "minLength": 1
+      "description": "what addresses the finding; only when status is handled"
     }
   },
   "allOf": [
@@ -86,7 +85,13 @@
       "then": {
         "required": [
           "handled_by"
-        ]
+        ],
+        "properties": {
+          "handled_by": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       },
       "else": {
         "not": {
