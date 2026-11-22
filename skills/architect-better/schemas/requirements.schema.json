@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "requirements.schema.json",
+  "title": "one line of requirements.jsonl: a requirement and where it comes from",
+  "x-files": [
+    "requirements.jsonl"
+  ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "id",
+    "kind",
+    "text",
+    "source"
+  ],
+  "properties": {
+    "type": {
+      "const": "requirement"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "id": {
+      "$ref": "base.schema.json#/$defs/id",
+      "pattern": "^[A-Z]+\\d+$"
+    },
+    "kind": {
+      "enum": [
+        "functional",
+        "quality",
+        "constraint"
+      ]
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "request",
+            "file",
+            "user",
+            "guessed"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "request"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "sentence"
+            ],
+            "properties": {
+              "type": {
+                "const": "request"
+              },
+              "sentence": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "x-check": "request-sentence-in-request"
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "file"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "file",
+              "symbol"
+            ],
+            "properties": {
+              "type": {
+                "const": "file"
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "x-check": "source-file-exists"
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "user"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "at"
+            ],
+            "properties": {
+              "type": {
+                "const": "user"
+              },
+              "at": {
+                "$ref": "base.schema.json#/$defs/at"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "guessed"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "guessed"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

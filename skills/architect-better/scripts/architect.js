@@ -8,6 +8,12 @@ const text = value => String(value).replace(/[&<>"']/g, char => ({
 }[char]));
 const inlineCode = value => value.split(/(`[^`]+`)/).map((part, index) =>
   index % 2 ? '<code>' + text(part.slice(1, -1)) + '</code>' : text(part)).join('');
+const invalid = record => record._errors && record._errors.length ?
+  '<p class="invalid">' + chip('Not valid', 'guess') + ' ' + text(record._errors[0]) + '</p>' : '';
+const nameOf = (perspectives, id) => (perspectives.find(p => p.id === id) || {}).name || id;
+// A perspective's origin as words: a sum type tagged by type, so no string mixes cases.
+const fromWords = from => from.type === 'built_in' ? 'built in' + (from.method ? ' (' + from.method + ')' : '') :
+  from.type === 'standard' ? from.file : 'not valid';
 const chip = (value, kind = '') => '<span class="chip ' + kind + '">' + text(value) + '</span>';
 
 function table(headers, rows) {
@@ -29,8 +35,9 @@ const changeButton = '<button class="btn btn--quiet btn--sm" type="button" data-
 
 function sourceLink(source) {
   if (source.type === 'guessed') return chip('guessed', 'guess');
-  if (source.type === 'user') return 'You, on this page<br>' + text(source.at.slice(11, 16));
-  const query = new URLSearchParams({file: source.type === 'request' ? 'request.md' : source.file});
+  if (source.type === 'user') return 'You, on this page<br>' + text(String(source.at).slice(11, 16));
+  if (source.type !== 'request' && source.type !== 'file') return chip('no valid source', 'guess');
+  const query = new URLSearchParams({file: source.type === 'request' ? 'request' : source.file});
   return '<a class="src" href="/source?' + text(query) + '" target="_blank" rel="noopener">' +
     (source.sentence ? text(source.sentence) : text(source.file) +
       (source.symbol ? '<br>' + text(source.symbol) : '')) + '</a>';
@@ -38,9 +45,9 @@ function sourceLink(source) {
 
 function requirementRows(requirements) {
   return requirements.map(req => row([
-    '<strong>' + text(req.id) + '</strong>', text(req.kind), text(req.text) + editor('New wording for ' + req.id, req.text),
+    '<strong>' + text(req.id) + '</strong>', text(req.kind), text(req.text) + invalid(req) + editor('New wording for ' + req.id, req.text),
     '<span class="req-source">' + sourceLink(req.source) + '</span>',
-    '<div class="row-actions">' + changeButton + (req.source.type === 'guessed' ?
+    '<div class="row-actions">' + changeButton + (req.source.type === 'guessed' && !(req._errors || []).length ?
       '<button class="btn btn--sm answer" type="button" data-confirm aria-label="Confirm the guess">✓</button>' : '') + '</div>'
   ], 'id="req-' + text(req.id) + '" data-record="' + text(req.id) + '"'));
 }
@@ -54,7 +61,7 @@ function decisionRecords(decisions) {
       '<li><strong>' + text(alt.option) + '</strong><span class="muted">Not chosen: ' + text(alt.why) + '</span></li>'
     ).join('');
     return '<article class="dec" id="dec-' + text(decision.id) + '" data-record="' + text(decision.id) + '">' +
-      '<div class="dh"><span>' + text(decision.id) + '</span><h3>' + text(decision.title) + '</h3>' + changeButton + '</div>' +
+      '<div class="dh"><span>' + text(decision.id) + '</span><h3>' + text(decision.title) + '</h3>' + changeButton + '</div>' + invalid(decision) +
       editor('What should change in ' + decision.id) + '<p class="drv">Driven by ' + drivers + '</p>' +
       '<div class="chosen"><span class="lbl">Chosen</span><p>' + inlineCode(decision.chosen) + '</p></div>' +
       '<details class="rej"><summary>Rejected alternatives (' + decision.rejected.length +
@@ -68,22 +75,47 @@ function controls(perspectives, review) {
     options.map(([key, name]) => '<button type="button" data-' + attr + '="' + text(key) +
       '" aria-pressed="false">' + text(name) + '</button>').join('') + '</div>';
   return '<div class="controls">' + segment('State', 'version', [['before', 'Before'], ['after', 'After']]) +
-    (review ? segment('Findings', 'findings', [['', 'No findings'], ...perspectives.map(p => [p.name, p.name])]) : '') + '</div>';
+    (review ? segment('Findings', 'findings', [['', 'No findings'], ...perspectives.map(p => [p.id, p.name])]) : '') + '</div>';
 }
 
-function figures(versions) {
+function figures(versions, empty = 'This flow does not exist before the change.') {
   return Object.entries(versions).map(([state, svg]) => '<div class="fig" data-state="' + state + '" hidden>' +
-    (svg || '<p class="muted">This flow does not exist before the change.</p>') + '</div>').join('');
+    (svg || '<p class="muted">' + text(empty) + '</p>') + '</div>').join('');
+}
+
+function specSource(source) {
+  if (!source) return '';
+  return source.type === 'design' ? 'design: ' + source.section : source.type === 'request' ? 'request: ' + source.sentence :
+    source.type + ' ' + (source[source.type] ?? '');
+}
+
+function specTables(records) {
+  const rules = records.filter(r => r.type === 'spec');
+  const gaps = records.filter(r => r.type === 'gap');
+  const unlinked = records.filter(r => r.type === 'unlinked');
+  return table(['ID', 'Requirement', 'Source', 'Checked by'], rules.map(rule =>
+    row([text(rule.id), text(rule.statement) + invalid(rule), text(specSource(rule.source)), text(rule.checked_by)]))) +
+    (gaps.length ? '<h3>Gaps</h3>' + table(['ID', 'Gap', 'State', 'If wrong'], gaps.map(gap => row([text(gap.id), text(gap.text) + invalid(gap),
+      text(gap.status === 'assumed' ? 'assumed: ' + (gap.choice ?? '') : (gap.status ?? '') + ' ' + (gap.decision ?? '')),
+      text(gap.if_wrong ?? '')]))) : '') +
+    (unlinked.length ? '<h3>Design items with no requirement</h3>' + table(['Item', 'Why'],
+      unlinked.map(item => row([text(item.item ?? ''), text(item.why ?? '') + invalid(item)]))) : '');
+}
+
+function errorsHTML(errors) {
+  return !errors || !errors.length ? '' : '<h2 id="errors-h">' + errors.length + (errors.length === 1 ? ' record is' : ' records are') +
+    ' not valid</h2><ul>' + errors.map(e => '<li><code>' + text(e.file) + ':' + text(e.line) + '</code> <b>' + text(e.field) + '</b>: ' +
+      text(e.message) + (e.by ? ' <span class="by">written by ' + text(e.by) + '</span>' : '') + '</li>').join('') + '</ul>';
 }
 
 function perspectiveTables(perspectives, findings, parts, reviewed, removedLabels = {}) {
   const summary = table(['Perspective', 'Applicability', 'Why', 'From'], perspectives.map(p =>
     row(['<strong>' + text(p.name) + '</strong>', p.applies ? chip('Applies', 'ok') : chip('Does not apply'),
-      text(p.why), '<span class="muted">' + text(p.from) + '</span>'])));
+      text(p.why) + invalid(p), '<span class="muted">' + text(fromWords(p.from)) + '</span>'])));
   if (!reviewed) return summary + '<p>' + chip('Review runs once you approve the design') + '</p>';
   return summary + perspectives.filter(p => p.applies).map(p => {
     const headers = ['ID', 'Part', 'Finding', 'Handled by'];
-    const rows = findings.filter(f => f.perspective === p.name).map(f => {
+    const rows = findings.filter(f => f.perspective === p.id).map(f => {
       const links = f.parts.map(part => {
         const group = part.split('+');
         const refs = group.map(id => parts[id]);
@@ -98,11 +130,11 @@ function perspectiveTables(perspectives, findings, parts, reviewed, removedLabel
         const label = refs.length === 2 && edge && step ?
           edge.route + ': ' + step.description : refs.map(ref => ref.label).join(' · ');
         return '<a class="boxref ' + first.kind + '" href="#panel-' + first.view + '" data-parts="' +
-          text(JSON.stringify(group)) + '" data-perspective="' + text(p.name) + '" data-badge="' + text(f.id) + '">' +
+          text(JSON.stringify(group)) + '" data-perspective="' + text(p.id) + '" data-badge="' + text(f.id) + '">' +
           icon + '<span>' + text(label) + '</span></a>';
       }).join('<br>');
       return row(['<strong>' + text(f.id) + '</strong>', links, text(f.text) +
-        (f.confirmed ? '' : ' ' + chip('Unconfirmed', 'guess')), text(f.handled_by ?? 'Open')]);
+        (f.confirmed ? '' : ' ' + chip('Unconfirmed', 'guess')) + invalid(f), text(f.handled_by ?? 'Open')]);
     });
     return '<h3>' + text(p.name) + '</h3>' + (rows.length ? table(headers, rows) : '<p class="muted">No findings.</p>');
   }).join('');
@@ -134,7 +166,8 @@ function start(data) {
   const {perspectives} = data;
   const review = data.reviews.at(-1);
   const applicable = perspectives.filter(p => p.applies);
-  const reviewNames = data.rerun;
+  const reviewIds = data.rerun;
+  const reviewNames = reviewIds.map(id => nameOf(perspectives, id));
   const items = ['comment', 'note', 'approve', 'confirm'];
   const waiting = (entry, states) => states[entry.e.id] === 'asked' ||
     (entry.kind === 'reply' && !entry.e.to && entry.e.id && !entry.replies.some(reply => reply.type === 'note'));
@@ -152,6 +185,9 @@ function start(data) {
     panel(key).innerHTML = '<h2>' + text(heading) + '</h2>' + content;
   }
 
+  const band = errorsHTML(data.errors);
+  byId('errors').hidden = !band;
+  byId('errors').innerHTML = band;
   document.title = 'Design: ' + data.title;
   byId('title').textContent = document.title;
   byId('accepted-count').innerHTML = new Set(data.accepted).size + '<span class="of"> / ' + (tabs.length - 1) + '</span>';
@@ -167,14 +203,13 @@ function start(data) {
     text(data.scope) + '</p><h3>Sections</h3>' + table(['Section', 'Status'], sections));
   section('requirements', 'Requirements', table(['ID', 'Kind', 'Requirement', 'Source', 'Actions'], requirementRows(data.requirements)));
   const diagramControls = controls(applicable, review);
-  section('containers', 'Containers', diagramControls + figures(data.containers));
+  section('containers', 'Containers', diagramControls + figures(data.containers, 'The containers are not drawn: see the errors above.'));
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
     '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'open') : '') + '</h3>' +
     figures(flow.versions)).join(''));
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
   section('decisions', 'Decision records', decisionRecords(data.decisions));
-  section('spec', 'Spec', table(['ID', 'Requirement', 'Source', 'Checked by'], data.spec.map(rule =>
-    row([text(rule.id), text(rule.requirement), text(rule.source), text(rule.checked_by)]))));
+  section('spec', 'Spec', specTables(data.spec));
 
   for (const [key, part] of Object.entries(data.parts)) {
     if (key !== part.key) continue;
@@ -463,7 +498,7 @@ function start(data) {
   runReview.addEventListener('click', () => {
     runReview.disabled = true;
     const label = review ? 'Review requested again' : 'Design approved';
-    conversation.send('approve', {id: 'approval-' + Date.now().toString(36), again: !!review, perspectives: reviewNames,
+    conversation.send('approve', {id: 'approval-' + Date.now().toString(36), again: !!review, perspectives: reviewIds,
       changes: data.since, text: label + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')},
     'Review request', () => { toggleReview(false); runReview.disabled = false; },
     () => { runReview.disabled = false; });

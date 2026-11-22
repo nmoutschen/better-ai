@@ -1,6 +1,6 @@
 # Design: order history export
 
-Request: [request.md](request.md)
+Request: [architect.json](architect.json)
 Requirements: RQ1–RQ6 in [requirements.jsonl](requirements.jsonl), all confirmed by the user on 2026-11-21.
 Diagrams: [design.json](design.json)
 
@@ -43,7 +43,7 @@ Flow `export` in design.json: steps x1–x9. On failure the job marks the export
 
 - D1 Build exports in a cron job, not in the request: drivers RQ3, RQ4. The API stays responsive and the job follows the outbox pattern. Rejected: build the CSV in the request (a 500-order export with lines may take longer than the website's 10 s request timeout); a task queue such as Celery with Redis (a new service to run, against RQ4).
   - Assumes: one job run per minute keeps up with exports (a few a day).
-- D2 Serve exports through the API behind the session cookie, revised after review finding F1: drivers RQ2, RQ4. The CSV stays in `data/exports/` on the VPS; `GET /v1/account/export/<token>` serves it to its owner only, for 7 days; the job deletes older files. Rejected: a public link on the static website (anyone with the link gets the data, forever: F1); attaching the CSV to the email (MailRelay limits attachments to 5 MB, and emails get forwarded).
+- D2 Serve exports through the API behind the session cookie, revised after review finding V1: drivers RQ2, RQ4. The CSV stays in `data/exports/` on the VPS; `GET /v1/account/export/<token>` serves it to its owner only, for 7 days; the job deletes older files. Rejected: a public link on the static website (anyone with the link gets the data, forever: V1); attaching the CSV to the email (MailRelay limits attachments to 5 MB, and emails get forwarded).
   - Assumes: exports stay small enough for the VPS disk (a few a day, deleted after 7 days).
 
 ## Departures from existing patterns

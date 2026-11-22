@@ -2,4 +2,4 @@ reply: 'The spec is in docs/designs/2026-11-order-export/spec.jsonl.'
 actions:
 - write: docs/designs/2026-11-order-export/spec.jsonl
   content: |
-    {"id": "S1", "requirement": "If the export belongs to another customer, then the shop API shall return 404.", "source": "", "checked_by": "test"}
+    {"type": "spec", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "S1", "statement": "If the export belongs to another customer, then the shop API shall return 404.", "source": {"type": "design", "section": ""}, "checked_by": "test"}

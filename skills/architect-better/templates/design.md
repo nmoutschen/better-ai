@@ -1,6 +1,6 @@
 # Design: <short name of the change>
 
-Request: <link to request.md>
+Request: <link to architect.json>
 Requirements: <agreed requirement IDs, observable scenarios, constraints and sources>
 Diagrams: <link to design JSON>
 

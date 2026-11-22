@@ -7,6 +7,8 @@ description: Use when reviewing an existing software design or checking how a sy
 
 FOLLOW these steps in order. The general rules of SKILL.md apply throughout. KEEP the audit report-only. LEAVE the design, code and repo files as they are.
 
+After every write to a file in the change folder, run `python3 <skill dir>/scripts/schema.py check <file>` and fix every error before your next step.
+
 ## 1. Establish what to review
 
 NAME the goal and scenarios the design must serve, from the design, its recorded decisions and its requirements. WHEN checking the system against its design, READ the relevant callers, configuration and tests as well as the code.

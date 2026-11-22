@@ -58,7 +58,7 @@
         "by": {"const": "user"},
         "id": {"$ref": "base.schema.json#/$defs/id"},
         "again": {"type": "boolean"},
-        "perspectives": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "perspectives": {"type": "array", "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "perspectives.jsonl", "type": "perspective"}}},
         "changes": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "text": {"type": "string", "minLength": 1}
       }
@@ -73,7 +73,7 @@
         "at": {"$ref": "base.schema.json#/$defs/at"},
         "by": {"const": "user"},
         "id": {"$ref": "base.schema.json#/$defs/id"},
-        "requirement": {"type": "string", "minLength": 1},
+        "requirement": {"type": "string", "minLength": 1, "x-points-to": {"file": "requirements.jsonl", "type": "requirement"}},
         "wording": {"type": "string", "minLength": 1},
         "text": {"type": "string", "minLength": 1}
       }

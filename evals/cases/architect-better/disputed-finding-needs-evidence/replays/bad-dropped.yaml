@@ -1,6 +1,6 @@
-reply: 'Dropped F1 as you asked.'
+reply: 'Dropped V1 as you asked.'
 actions:
 - write: docs/designs/2026-11-order-export/findings.jsonl
   content: |
-    {"id": "F2", "perspective": "Observability", "parts": ["box:exportjob"], "text": "Silent failures before the outbox row.", "handled_by": null, "confirmed": true}
-    {"id": "F3", "perspective": "Security", "parts": ["box:exportjob"], "text": "Deploy token scope.", "handled_by": null, "confirmed": false}
+    {"type": "finding", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "V2", "perspective": "observability", "parts": ["box:exportjob"], "text": "Silent failures before the outbox row.", "confirmed": true, "status": "open"}
+    {"type": "finding", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "V3", "perspective": "security", "parts": ["box:exportjob"], "text": "Deploy token scope.", "confirmed": false, "status": "open"}

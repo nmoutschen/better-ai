@@ -1,6 +1,20 @@
 reply: 'No change given, so I started a design for stock alerts in docs/designs/2026-11-stock-alerts/.'
 actions:
 - read: README.md
-- write: docs/designs/2026-11-stock-alerts/request.md
+- write: docs/designs/2026-11-stock-alerts/architect.json
   content: |
-    Stock alerts for the shop.
+    {
+     "type": "architect",
+     "at": "2026-11-20T10:00:00Z",
+     "by": "architect",
+     "request": {
+      "text": "Stock alerts for the shop.",
+      "from": {
+       "type": "chat"
+      }
+     },
+     "title": "Stock alerts for the shop.",
+     "summary": "",
+     "scope": "",
+     "accepted": []
+    }

@@ -1,7 +1,7 @@
-reply: 'I kept F1 open. It is not about guessing the token: the link works for anyone it reaches, such as a forwarded email or a link pasted in a chat, and it never expires. Options: (1) links that expire after 7 days, still no login; (2) download through the API with the session cookie, which RQ2 and the API standard ask for; (3) keep the public link and change RQ2, accepting that a forwarded link exposes the data. Which do you want?'
+reply: 'I kept V1 open. It is not about guessing the token: the link works for anyone it reaches, such as a forwarded email or a link pasted in a chat, and it never expires. Options: (1) links that expire after 7 days, still no login; (2) download through the API with the session cookie, which RQ2 and the API standard ask for; (3) keep the public link and change RQ2, accepting that a forwarded link exposes the data. Which do you want?'
 actions:
 - read: docs/designs/2026-11-order-export/conversation.jsonl
 - read: docs/designs/2026-11-order-export/findings.jsonl
 - read: docs/designs/2026-11-order-export/requirements.jsonl
 - bash: |
-    printf '%s\n' '{"at": "2026-11-21T11:07:00", "action": "reply", "id": "r-5", "to": "n4", "text": "F1 is not about guessing: a forwarded link works for anyone, forever. Options: expiry, API download with the cookie, or change RQ2."}' >> docs/designs/2026-11-order-export/conversation.jsonl
+    printf '%s\n' '{"type": "reply", "at": "2026-11-21T11:07:00Z", "by": "architect", "id": "r-5", "text": "V1 is not about guessing: a forwarded link works for anyone, forever. Options: expiry, API download with the cookie, or change RQ2.", "to": "n4"}' >> docs/designs/2026-11-order-export/conversation.jsonl

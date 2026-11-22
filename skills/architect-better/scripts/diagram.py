@@ -19,6 +19,9 @@ from string import Template
 from urllib.parse import quote
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))  # schema.py, which checks a design's references, is next to this script
+import schema  # noqa: E402
+
 KINDS = {kind["name"]: kind for kind in json.loads((HERE / "kinds.json").read_text(encoding="utf-8"))}
 ICONS = json.loads((HERE / "icons.json").read_text(encoding="utf-8"))
 
@@ -38,68 +41,45 @@ ARROWS = {
 }
 
 
+def without_nulls(value):
+    """A copy with every null dropped from the objects in it: the schemas let an optional field be null, which means
+    the same as leaving it out."""
+    if isinstance(value, dict):
+        return {key: without_nulls(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [without_nulls(item) for item in value]
+    return value
+
+
+def shape_problems(design: dict) -> list[str]:
+    """What is wrong with the shape of a design, by design.schema.json; the fields the page adds (`findings`), a `title` and the
+    base fields a design.json carries are not part of what diagram.py is given."""
+    candidate = {"type": "design", "at": "2026-01-01T00:00:00Z", "by": "diagram.py", "flows": []}
+    candidate.update({key: value for key, value in design.items() if key not in ("findings", "flow", "title")})
+    found = schema.check_record(candidate, ["design.schema.json"], HERE.parent / "schemas")
+    return [f"{field}: {message}" for field, message in found]
+
+
 def validate(design: dict) -> list[str]:
-    """Report invalid kinds, IDs and references before laying out a design."""
-    errors = []
-
-    def index(items, scope):
-        ids = set()
-        for item in items:
-            ident = item["id"]
-            if not isinstance(ident, str) or not ident:
-                errors.append(f"{scope}: expected a nonempty string id, got {ident!r}")
-            if ident in ids:
-                errors.append(f"{scope}: Duplicate id {ident!r}")
-            ids.add(ident)
-        return ids
-
-    def reference(item, field, ids, scope):
-        if item[field] not in ids:
-            errors.append(f"{scope} {item['id']!r}: {field} references missing {item[field]!r}")
-
-    containers = design["containers"]
-    nodes = containers["nodes"]
-    edges = containers.get("edges", [])
-    groups = containers.get("groups", [])
-    node_ids = index(nodes, "Container nodes")
-    edge_ids = index(edges, "Container edges")
-    index(groups, "Container groups")
-    for node in nodes:
-        if node["kind"] not in KINDS:
-            errors.append(f"Box {node['id']!r}: unknown kind {node['kind']!r}")
-    for edge in edges:
-        for field in ("from", "to"):
-            reference(edge, field, node_ids, "Edge")
-    members = set()
-    for group in groups:
-        for member in group["members"]:
-            if member not in node_ids:
-                errors.append(f"Group {group['id']!r}: missing member {member!r}")
-            if member in members:
-                errors.append(f"Box {member!r} belongs to more than one group or is listed twice")
-            members.add(member)
+    """Report what stops a design from being laid out. The shape is design.schema.json's, and the references inside a
+    well-shaped design, and its box kinds, are schema.py's (`design_problems`); this keeps the one check that needs
+    the layout: a finding that names no part of it."""
+    if not isinstance(design, dict):
+        return ["design: expected an object"]
+    design = without_nulls(design)
+    errors = shape_problems(design)
+    if errors:
+        return errors
+    errors = [message for _, message in schema.design_problems(design)]
     if "flow" in design:
         errors.append("Use a flows list instead of flow")
-    targets = node_ids | {f"edge:{ident}" for ident in edge_ids}
+    targets = {node["id"] for node in design["containers"]["nodes"]}
+    targets |= {f"edge:{edge['id']}" for edge in design["containers"].get("edges", [])}
     step_counts = Counter()
     for i, flow in enumerate(design.get("flows", []), 1):
-        participants = []
-        for participant in flow["participants"]:
-            if isinstance(participant, dict):
-                participants.append(participant)
-            else:
-                errors.append(f"Flow {i} participant {participant!r}: expected an object with id and box")
-        participant_ids = index(participants, f"Flow {i} participants")
-        step_ids = index(flow["steps"], f"Flow {i} steps")
+        step_ids = [step["id"] for step in flow["steps"]]
         step_counts.update(step_ids)
         targets.update(f"flow{i}:step:{ident}" for ident in step_ids)
-        for participant in participants:
-            reference(participant, "box", node_ids, f"Flow {i} participant")
-        for step in flow["steps"]:
-            for field in ("from", "to"):
-                reference(step, field, participant_ids, f"Flow {i} step")
-            if step.get("kind", "request") not in ARROWS:
-                errors.append(f"Flow {i} step {step['id']!r}: unknown kind {step['kind']!r}")
     targets.update(f"step:{ident}" for ident, count in step_counts.items() if count == 1)
     for target in design.get("findings", {}):
         if target not in targets:
@@ -172,6 +152,7 @@ def layers(nodes, edges):
 
 def layout(design: dict) -> dict:
     """Compute positions once for the union of Before and After."""
+    design = without_nulls(design)
     errors = validate(design)
     if errors:
         raise ValueError("\n".join(errors))
@@ -673,6 +654,9 @@ def main(argv=None):
             args.out.write_text(register(), encoding="utf-8")
             return 0
         design = json.loads(args.design.read_text(encoding="utf-8"))
+        if not isinstance(design, dict):
+            raise ValueError("design: expected an object")
+        design = without_nulls(design)  # an optional field that is null is absent: no render path sees one
         if args.command == "check":
             errors = validate(design)
             if errors:
@@ -688,8 +672,16 @@ def main(argv=None):
         args.out.mkdir(parents=True, exist_ok=True)
         for name, svg in files.items():
             (args.out / name).write_text(svg + "\n", encoding="utf-8")
-    except (OSError, ValueError, TypeError, KeyError) as error:
+    except RecursionError:
+        print("design: nested too deeply", file=sys.stderr)
+        return 1
+    except (OSError, ValueError) as error:  # a file that cannot be read, a JSON error, what validate found
         print(error, file=sys.stderr)
+        return 1
+    except (
+        Exception
+    ) as error:  # whatever else one design makes the check or the drawing raise is its error, not a traceback
+        print(f"design: could not be checked: {type(error).__name__}", file=sys.stderr)
         return 1
     return 0
 

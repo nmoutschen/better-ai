@@ -2,5 +2,5 @@ reply: 'The draft is in the page.'
 actions:
 - write: docs/designs/2026-11-order-export/perspectives.jsonl
   content: |
-    {"name": "Security", "applies": "yes", "why": "", "from": "built in"}
-    {"name": "API standard", "applies": true, "why": "", "from": "docs/standards/api.md"}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "security", "name": "Security", "applies": "yes", "why": "", "from": {"type": "built_in"}}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "api-standard", "name": "API standard", "applies": true, "why": "", "from": {"type": "standard", "file": "docs/standards/api.md"}}

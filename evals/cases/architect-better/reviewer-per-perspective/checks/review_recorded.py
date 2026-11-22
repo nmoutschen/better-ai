@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 REVIEWS = Path("docs/designs/2026-11-order-export/reviews.jsonl")
-APPROVED = {"Security", "Observability", "Data and privacy", "API standard (docs/standards/api.md)"}
+APPROVED = {"security", "observability", "data-and-privacy", "api-standard"}  # the ids in perspectives.jsonl
 
 if not REVIEWS.is_file():
     sys.exit(f"{REVIEWS} does not exist: no review run was recorded")

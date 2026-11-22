@@ -401,6 +401,27 @@ VALID = {
         "answer": {"id": "a-x", "decision": "D1", "text": "Business days.", "default": False},
     },
 }
+# The records of the architect folder the architect page's events point to, by id.
+_BASE = {"at": "2026-11-21T10:00:00Z", "by": "architect"}
+ARCHITECT_FILES = {
+    "perspectives.jsonl": {
+        "type": "perspective",
+        **_BASE,
+        "id": "security",
+        "name": "Security",
+        "applies": True,
+        "why": "A local server takes input.",
+        "from": {"type": "built_in"},
+    },
+    "requirements.jsonl": {
+        "type": "requirement",
+        **_BASE,
+        "id": "F1",
+        "kind": "functional",
+        "text": "Show the agents.",
+        "source": {"type": "guessed"},
+    },
+}
 # One event per page the schemas must refuse, and the field the answer names.
 INVALID = {
     "architect": ("confirm", {"id": "confirm-x", "requirement": "F1", "text": "t"}, "wording"),
@@ -476,6 +497,9 @@ class Pages(unittest.TestCase):
         for name, module in self.modules().items():
             with self.subTest(page=name), tempfile.TemporaryDirectory() as d:
                 conv, base = self.serve(module, Path(d))
+                if name == "architect":  # the approve event names a perspective, the confirmation a requirement
+                    Path(d, "perspectives.jsonl").write_text(json.dumps(ARCHITECT_FILES["perspectives.jsonl"]) + "\n")
+                    Path(d, "requirements.jsonl").write_text(json.dumps(ARCHITECT_FILES["requirements.jsonl"]) + "\n")
                 for method, params in VALID[name].items():
                     self.send(base, method, params)
                 conv.reply("seen it", None)
