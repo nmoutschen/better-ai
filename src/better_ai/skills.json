@@ -1,5 +1,5 @@
 {
-  "format_cutoff": "2026-11-22T00:00:00Z",
+  "format_cutoff": "2026-11-22T20:42:00Z",
   "shared": [
     "better_ai/__init__.py",
     "better_ai/cli.py",
