@@ -1,6 +1,94 @@
+// The canvas page: the versions at each screen size, built from the unit's data (the server's /data, or the data a
+// rendered page carries), with comments pinned in each version, thumbs, and Approve. The conversation is page.js's.
 (function () {
-  var main = document.querySelector('main');
-  var labels = JSON.parse(main.dataset.labels), current = 0;
+  function icon(path) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + path + '</svg>'; }
+  var ICONS = {
+    Desktop: icon('<rect x="2" y="4" width="20" height="13" rx="1"/><path d="M8 21h8M12 17v4"/>'),
+    Tablet: icon('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/>'),
+    Mobile: icon('<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'),
+    side: icon('<rect x="3" y="4" width="8" height="16"/><rect x="13" y="4" width="8" height="16"/>'),
+    'switch': icon('<rect x="5" y="4" width="14" height="16"/><path d="M9 12h6M13 9l3 3-3 3"/>'),
+    up: icon('<path d="M7 10v11H3V10zM7 10l4-8a3 3 0 0 1 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7"/>'),
+    down: icon('<path d="M17 14V3h4v11zM17 14l-4 8a3 3 0 0 1-3-3v-4H4a2 2 0 0 1-2-2.3l1.4-8A2 2 0 0 1 5.4 3H17"/>')
+  };
+  function node(tag, cls, text, attrs) {
+    var x = document.createElement(tag);
+    if (cls) x.className = cls;
+    if (text != null) x.textContent = text;
+    Object.keys(attrs || {}).forEach(function (k) { x.setAttribute(k, attrs[k]); });
+    return x;
+  }
+  function iconButton(attrs, svg, text) {
+    var b = node('button', 'ico', null, Object.assign({ type: 'button' }, attrs));
+    b.innerHTML = svg; b.append(node('span', null, text));
+    return b;
+  }
+  // One version at one screen size, with its label and buttons. Full size shows it alone, so it needs another button.
+  function figure(i, v, size, verdicts, full) {
+    var fig = node('figure', null, null, { 'data-i': i }), label = node('div', 'label'), acts = node('span', 'acts');
+    label.append(node('b', null, v.label, { title: v.label }), acts);
+    if (verdicts) [['up', 'Good'], ['down', 'Not good']].forEach(function (p) {
+      var b = node('button', 'vbtn', null, { type: 'button', 'data-v': i, 'data-verdict': p[0], 'aria-pressed': 'false', 'aria-label': p[1] + ': ' + v.label });
+      b.innerHTML = ICONS[p[0]]; acts.append(b);
+    });
+    // Keyboard users comment on a whole version with this button; it shows only when focused.
+    acts.append(node('button', 'vcomment', 'Comment on ' + v.label, { type: 'button', 'data-v': i }));
+    if (full) acts.append(node('button', 'full', 'Full size', { type: 'button' }));
+    var frame = node('iframe', null, null, { 'data-i': i, title: v.label + ', ' + size.w + ' × ' + size.h + ' px', width: size.w, height: size.h });
+    if (v.src) frame.setAttribute('src', v.src); else frame.srcdoc = v.srcdoc || '';
+    var screen = node('div', 'screen'); screen.append(frame);
+    var stage = node('div', 'stage'); stage.append(screen);
+    fig.append(label, stage);
+    return fig;
+  }
+  // The controls that depend on the sizes and versions, and the frames. The rest of the controls are in canvas.html.
+  function build(data, main, controls) {
+    var versions = data.versions, sizes = data.sizes, verdicts = versions.length > 2, mode = controls.firstElementChild;
+    var names = sizes.map(function (s) { return s.name; });
+    if (names.some(function (n, k) { return names.indexOf(n) !== k; })) names = sizes.map(function (s) { return s.w + ' × ' + s.h; });
+    function cycle(label) { return node('div', 'seg cycle', null, { role: 'group', 'aria-label': label }); }
+    if (sizes.length > 1) {
+      var screens = cycle('Screen');
+      sizes.forEach(function (s, k) {
+        var title = names[k] + ', ' + s.w + ' × ' + s.h + ' px';
+        screens.append(iconButton({ 'data-size': k, 'aria-pressed': String(k === 0), title: title, 'aria-label': title }, ICONS[names[k]] || '', names[k]));
+      });
+      controls.insertBefore(screens, mode);
+    }
+    if (versions.length > 1) {
+      var views = cycle('View');
+      views.append(iconButton({ 'data-view': 'side', 'aria-pressed': 'true', title: 'Side by side', 'aria-label': 'Side by side' }, ICONS.side, 'Side by side'),
+        iconButton({ 'data-view': 'switch', 'aria-pressed': 'false', title: 'Switch in place (Space)', 'aria-label': 'Switch in place' }, ICONS['switch'], 'Switch'));
+      controls.insertBefore(views, mode);
+      // In switch view, the version shown is picked from tabs inside the viewer, so the toolbar keeps its layout.
+      var tabs = node('div', 'seg pick', null, { role: 'group', 'aria-label': 'Version shown', hidden: '' });
+      versions.forEach(function (v, i) { tabs.append(node('button', null, v.label, { type: 'button', 'data-pick': i, 'aria-pressed': 'false' })); });
+      main.append(tabs);
+    }
+    sizes.forEach(function (s, k) {
+      var sec = node('section', null, null, { 'data-size': k, 'aria-label': 'Screen ' + s.w + ' × ' + s.h + ' px' }), row = node('div', 'row');
+      if (k) sec.hidden = true;
+      row.style.setProperty('--n', versions.length);
+      versions.forEach(function (v, i) { row.append(figure(i, v, s, verdicts, versions.length > 1)); });
+      sec.append(row); main.append(sec);
+    });
+  }
+
+  function boot(data) {
+  var main = document.querySelector('main'), controls = document.getElementById('controls');
+  document.title = data.title;
+  document.getElementById('title').textContent = data.title;
+  if (data.question) { var goal = document.getElementById('goal'); goal.textContent = data.question; goal.hidden = false; }
+  if (data.error) {
+    var problem = document.getElementById('canvas-problem'); problem.textContent = data.error; problem.hidden = false;
+    document.getElementById('status').textContent = '';
+    watchForChange();
+    return;
+  }
+  build(data, main, controls);
+  // The controls sit in the header, where the stats of the other pages are.
+  var status = document.getElementById('status'); status.replaceChildren(controls); controls.hidden = false;
+  var labels = data.versions.map(function (v) { return v.label; }), current = 0;
   var viewButtons = document.querySelectorAll('[data-view]'), pickButtons = document.querySelectorAll('[data-pick]');
   // In the bar, a two-option setting shows only its current option; clicking it picks the other one.
   document.querySelectorAll('.controls > .seg.cycle').forEach(function (seg) {
@@ -203,6 +291,13 @@
 
   // Comment mode: hovering a version outlines the element under the pointer; a click opens the comment box for it.
   var commenting = true, pop = document.querySelector('.pop');
+  // The comment box has the thumbs too: a comment can be only a verdict.
+  var thumbs = node('div', 'verdicts');
+  [['up', 'Good'], ['down', 'Not good']].forEach(function (p) {
+    var b = node('button', 'vbtn', null, { type: 'button', 'data-verdict': p[0], 'aria-pressed': 'false', 'aria-label': p[1] });
+    b.innerHTML = ICONS[p[0]]; thumbs.append(b);
+  });
+  pop.insertBefore(thumbs, pop.querySelector('textarea'));
   var comments = pageElementComments({
     pop: pop, pinClass: 'db-pin', byId: byId, send: send,
     commenting: function () { return commenting; }, stopPinPropagation: true,
@@ -405,7 +500,7 @@
     pin.title = 'Comment ' + it.n + ': open to change or delete';
     positionPin(pin, frame, el, it.spot);
   }
-  // ---------- The conversation: page.js, shared with the other pages; the canvas adds verdicts and Decide ----------
+  // ---------- The conversation: page.js, shared with the other pages; the canvas adds verdicts and Approve ----------
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
   function time(at) { return pageTime(at); }
   // Show a comment where it was made: its screen size, its version, scrolled to its pin, which flashes.
@@ -441,9 +536,9 @@
     if (e.text) body.append(e.text);
     return body;
   }
-  function decisionItem(c) {
+  function approvalItem(c) {
     var e = c.e, li = el('li', 'msg me decision'), head = el('div', 'head');
-    head.append(el('span', 'who', 'You decided'), el('span', 'when', time(e.at)));
+    head.append(el('span', 'who', 'You approved'), el('span', 'when', time(e.at)));
     var d = el('p', 'body'); d.append(el('strong', '', e.label || e.option));
     if (e.carries && e.carries.length) d.append(el('span', 'with', ' with comments ' + e.carries.map(function (id) { var x = conv.log().filter(function (y) { return y.id === id; })[0]; return x && x.n ? x.n : '?'; }).join(', ')));
     li.append(head, d); if (e.text) li.append(el('p', 'body', e.text));
@@ -456,12 +551,12 @@
   // New versions from the agent load on the same view and version; the screen size is kept by SIZE_KEY above.
   var KEY = 'canvas-view:' + location.pathname, deciding = false;
   var conv = pageConversation({
-    served: served, name: 'canvas', unsent: 'Use Copy all to paste it in the chat.', apply: apply, reset: reset, byId: byId,
+    served: served, agent: 'Agent', unsent: 'Use Copy all to paste it in the chat.', apply: apply, reset: reset, byId: byId,
     reveal: reveal, edit: openEdit, remove: comments.remove,
     showLabel: function (n) { return 'Show where comment ' + n + ' is'; },
     crumb: function (e) { var on = e.on || e; return crumb(on.version, on.target || {}); }, commentBody: commentBody,
-    kinds: { decide: decisionItem, verdict: verdictItem }, itemKinds: ['comment', 'note', 'decide'],
-    sendMode: function () { return deciding ? sendDecision : null; },
+    kinds: { approve: approvalItem, verdict: verdictItem }, itemKinds: ['comment', 'note', 'approve'],
+    sendMode: function () { return deciding ? sendApproval : null; },
     busy: function () { return !pop.hidden; },
     beforeReload: function () {
       sessionStorage.setItem(KEY, JSON.stringify({ view: main.classList.contains('switch') ? 'switch' : 'side', current: current }));
@@ -472,8 +567,8 @@
   var say = conv.say, noteBox = conv.noteBox, noteBtn = conv.noteBtn;
   function asText() {
     var lines = [], log = conv.log();
-    var dec = log.filter(function (x) { return x.type === 'decide'; }).pop();
-    if (dec) lines.push('I decide: ' + (dec.label || dec.option) + (dec.carries && dec.carries.length ? ', with comments ' +
+    var dec = log.filter(function (x) { return x.type === 'approve'; }).pop();
+    if (dec) lines.push('I approve: ' + (dec.label || dec.option) + (dec.carries && dec.carries.length ? ', with comments ' +
       dec.carries.map(function (id) { var x = byId(id); return x ? x.n : '?'; }).join(', ') : '') + '.' + (dec.text ? ' ' + dec.text : ''));
     labels.forEach(function (v) { if (verdicts[v]) lines.push(v + ': ' + (verdicts[v] === 'up' ? 'good' : 'not good') + '.'); });
     items.forEach(function (it) {
@@ -484,15 +579,23 @@
     log.forEach(function (e) { if (e.type === 'note') lines.push(e.text); });
     return lines.join('\n');
   }
-  var copyBtn = document.querySelector('.notes .copy');
-  copyBtn.hidden = served;
-  copyBtn.addEventListener('click', function () {
-    navigator.clipboard.writeText(asText()).then(function () { say('Copied. Paste it in the chat with the agent.'); },
-      function () { say('Could not copy. Select the conversation and copy it by hand.', true); });
-  });
-  // Decide: one confirmed decision, sent with the open comments that come with it and the message as its note.
-  // The Send button becomes Confirm while the decision panel is open, so the same place sends both.
-  var decideBtn = document.querySelector('.decide-btn'), panel = document.querySelector('.decide');
+  // Without a server, nothing reaches the agent: Copy all copies the feedback as text to paste in the chat.
+  if (!served) {
+    var copyBtn = el('button', 'btn btn--quiet copy', 'Copy all'); copyBtn.type = 'button';
+    document.querySelector('.notes .send').insertBefore(copyBtn, document.querySelector('.notes .send .status'));
+    copyBtn.addEventListener('click', function () {
+      navigator.clipboard.writeText(asText()).then(function () { say('Copied. Paste it in the chat with the agent.'); },
+        function () { say('Could not copy. Select the conversation and copy it by hand.', true); });
+    });
+  }
+  // Approve: one confirmed approval, sent with the open comments that come with it and the message as its note. The
+  // Send button becomes Confirm while the panel is open, so the same place sends both. page.js opens and closes the panel.
+  var panel = el('div', 'approval'), approveBtn = el('button', 'btn btn--quiet', 'Approve…');
+  approveBtn.type = 'button'; approveBtn.setAttribute('aria-expanded', 'false'); panel.hidden = true;
+  panel.append(el('p', 'menu-h', 'Your approval'), el('div', 'dopts'), el('div', 'carry'));
+  panel.querySelector('.dopts').setAttribute('role', 'radiogroup'); panel.querySelector('.dopts').setAttribute('aria-label', 'Approval');
+  document.querySelector('.notes .composer').insertBefore(panel, document.querySelector('.notes .composer label'));
+  noteBtn.parentElement.insertBefore(approveBtn, noteBtn.nextSibling);
   var beforeAfter = labels.length === 2 && labels[0].toLowerCase() === 'before' && labels[1].toLowerCase() === 'after';
   var OPTIONS = beforeAfter ? [['Ship After', 'After'], ['Keep Before', 'Before']]
     : labels.map(function (l) { return ['Build ' + l, l]; }).concat([['Combine versions (say how below)', 'combine']]);
@@ -501,14 +604,19 @@
     var pinState = comments.state();
     return items.filter(function (it) { return pinState[it.id] !== 'accepted' && pinState[it.id] !== 'done'; });
   }
-  function setDeciding(on) {
-    deciding = on; panel.hidden = !on; decideBtn.setAttribute('aria-expanded', String(on));
-    decideBtn.textContent = on ? 'Cancel' : 'Decide…';
-    noteBtn.textContent = on ? 'Confirm decision' : 'Send';
+  function approval() {
+    var pick = panel.querySelector('input[name="approval"]:checked'), note = noteBox.value.trim();
+    return { option: pick.value, label: pick.parentElement.textContent.trim(),
+             carries: openItems().map(function (it) { return it.id; }), text: note || null };
+  }
+  function fillPanel(on) {
+    deciding = on;
+    approveBtn.textContent = on ? 'Cancel' : 'Approve…';
+    noteBtn.textContent = on ? 'Confirm approval' : 'Send';
     if (!on) return;
     var box = panel.querySelector('.dopts'); box.replaceChildren();
     OPTIONS.forEach(function (o, k) {
-      var lab = el('label', 'dopt'), r = el('input'); r.type = 'radio'; r.name = 'decision'; r.value = o[1]; if (!k) r.checked = true;
+      var lab = el('label', 'dopt'), r = el('input'); r.type = 'radio'; r.name = 'approval'; r.value = o[1]; if (!k) r.checked = true;
       lab.append(r, ' ' + o[0]); box.append(lab);
     });
     var open = openItems(), carry = panel.querySelector('.carry'); carry.replaceChildren();
@@ -518,14 +626,11 @@
     }
     noteBox.focus();
   }
-  decideBtn.addEventListener('click', function () { setDeciding(!deciding); });
-  function sendDecision() {
-    var pick = panel.querySelector('input[name="decision"]:checked'), note = noteBox.value.trim();
-    if ((pick.value === 'combine' || pick.value === 'none') && !note) { say('Say how to combine them, or why none fits, in the message.', true); return noteBox.focus(); }
-    var label = pick.parentElement.textContent.trim();
-    send('decide', { id: 'd-' + Date.now().toString(36), option: pick.value, label: label,
-                     carries: openItems().map(function (it) { return it.id; }), text: note || null },
-         'Decision', function () { noteBox.value = ''; setDeciding(false); });
+  var approve = pageApprove({ button: approveBtn, panel: panel, label: 'Approval', params: approval, onToggle: fillPanel });
+  function sendApproval() {
+    var pick = approval();
+    if ((pick.option === 'combine' || pick.option === 'none') && !pick.text) { say('Say how to combine them, or why none fits, in the message.', true); return noteBox.focus(); }
+    approve.send(conv, function () { noteBox.value = ''; });
   }
   conv.start();
   if (served) {
@@ -538,4 +643,21 @@
       }
     } catch (e) {}
   }
+  }
+
+  // A page whose unit cannot be read still reloads once the unit is fixed.
+  function watchForChange() {
+    var rev = null;
+    (function poll() {
+      fetch('/rev').then(function (r) { return r.text(); }).then(function (v) {
+        if (rev === null) rev = v; else if (v !== rev) location.reload();
+      }).catch(function () {}).then(function () { setTimeout(poll, 2000); });
+    })();
+  }
+  var carried = document.getElementById('page-data');
+  if (carried) boot(JSON.parse(carried.textContent));
+  else fetch('/data').then(function (r) { return r.json(); }).then(boot).catch(function () {
+    var problem = document.getElementById('canvas-problem');
+    problem.textContent = 'The page could not load its versions: ask the agent to restart it.'; problem.hidden = false;
+  });
 })();

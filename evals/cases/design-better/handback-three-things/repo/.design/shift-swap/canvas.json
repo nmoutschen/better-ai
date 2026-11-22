@@ -1,0 +1,9 @@
+{
+  "type": "canvas",
+  "at": "2026-11-20T14:00:00Z",
+  "by": "designer",
+  "title": "Shift swap",
+  "question": "Which version of the swap flow do we build?",
+  "widths": ["390x844"],
+  "versions": [{"label": "A", "file": "A.html"}, {"label": "B", "file": "B.html"}]
+}

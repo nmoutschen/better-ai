@@ -11,6 +11,7 @@ as absent, and no wrongly typed value crashes a check.
 
 import copy
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -738,6 +739,20 @@ def note(**more):
     return {"type": "note", "at": AT, "by": "user", "id": "m-1", "text": "hi", "to": None, **more}
 
 
+def canvas_schemas() -> Path:
+    """design-better's event schemas now live in src/better_ai/; this validator wants them in one folder, without x-old-format."""
+    folder = Path(tempfile.mkdtemp(prefix="canvas-schemas-"))
+    for source, name in (
+        (ROOT / "src" / "better_ai" / "schemas", "base.schema.json"),
+        (ROOT / "src" / "better_ai" / "schemas", "conversation.schema.json"),
+        (ROOT / "src" / "better_ai" / "design" / "schemas", "canvas-events.schema.json"),
+    ):
+        doc = json.loads((source / name).read_text(encoding="utf-8"))
+        doc.pop("x-old-format", None)
+        (folder / name).write_text(json.dumps(doc), encoding="utf-8")
+    return folder
+
+
 def note_problems(skill, events, event):
     """(field, message) of each problem an event has against the shared conversation schema and a skill's own."""
     docs = schema.load_schemas(*resources.schema_sources(skill.removesuffix("-better")))
@@ -1327,7 +1342,7 @@ class FilesThatAreNotSpecs(unittest.TestCase):
 
 
 class DesignBetterFixtures(unittest.TestCase):
-    """The planted conversations of the design-better eval cases are typed events canvas.py reads."""
+    """The planted conversations of the design-better eval cases are typed events the unit's `check` and `pending` read."""
 
     CASES = ("acceptance-walk", "design-before-build", "direction-review-before-build", "handback-three-things")
 
@@ -1335,18 +1350,17 @@ class DesignBetterFixtures(unittest.TestCase):
         return ROOT / "evals" / "cases" / "design-better" / case / "repo" / ".design" / "shift-swap"
 
     def test_each_file_passes_the_schemas_and_pending_lists_the_planted_items(self):
+        sys.path.insert(0, str(ROOT / "tests"))
+        import better
+
         for case in self.CASES:
-            with self.subTest(case):
-                log = self.folder(case) / "conversation.jsonl"
-                self.assertEqual(schema.check_paths([log], CANVAS / "schemas"), [])
-                with tempfile.TemporaryDirectory() as d:
-                    copy_to = Path(d) / "shift-swap"
-                    copy_to.mkdir()
-                    (copy_to / "conversation.jsonl").write_text(log.read_text())
-                    script = str(CANVAS / "scripts" / "canvas.py")
-                    done = subprocess.run(
-                        [sys.executable, "-I", script, "pending", str(copy_to)], capture_output=True, text=True
-                    )
+            with self.subTest(case), tempfile.TemporaryDirectory() as d:
+                repo = Path(d)
+                subprocess.run(["git", "init", "-q", str(repo)], check=True)
+                shutil.copytree(self.folder(case), repo / ".design" / "shift-swap")
+                checked = better.run("design-better", "check", ".design/shift-swap", cwd=repo)
+                self.assertEqual((checked.returncode, checked.stdout), (0, ""), checked.stderr)
+                done = better.run("design-better", "pending", ".design/shift-swap", cwd=repo)
                 self.assertIn("3 not done", done.stdout)
                 self.assertIn('"id": "d-1k9"', done.stdout)
 
