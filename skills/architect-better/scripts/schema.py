@@ -127,6 +127,9 @@ def never_raise(what: str, verb: str | dict[str, str] = "checked"):
     def decorate(entry):
         @functools.wraps(entry)
         def run(*args, **kwargs):
+            for stream in (sys.stdout, sys.stderr):  # a value that is not text prints escaped, never as a failure
+                with contextlib.suppress(Exception):
+                    stream.reconfigure(errors="backslashreplace")
             try:
                 return entry(*args, **kwargs)
             except (SystemExit, KeyboardInterrupt):
@@ -336,6 +339,12 @@ def _is_text(value: str) -> bool:
     return True
 
 
+def plain(text: str) -> str:
+    """Text that can be written as UTF-8: a lone surrogate in it is shown escaped (`\\ud800`). Whatever a message or
+    an error entry copies out of a file goes through this, so nothing a loader answers can fail to print or encode."""
+    return text if _is_text(text) else text.encode("utf-8", "backslashreplace").decode("ascii", "backslashreplace")
+
+
 def _type_name(value: Any) -> str:
     if value is None:
         return "null"
@@ -356,8 +365,6 @@ def _type_name(value: Any) -> str:
 
 def _is_type(value: Any, name: str) -> bool:
     actual = _type_name(value)
-    if name == "integer" and actual == "number":  # JSON has one kind of number: 1.0 is the integer 1
-        return value.is_integer()
     return actual == name or (name == "number" and actual == "integer")
 
 
@@ -608,7 +615,7 @@ class Validator:
             except Exception:  # a hook is code: whatever it meets, the answer is an error, not a traceback
                 return [*problems, Problem(ROOT, f"check failed: {name}", "cross")]
             for field, message in found:
-                problems.append(Problem(_render(_join(path, field)) if path else field, message, "cross"))
+                problems.append(Problem(_render(_join(path, field)) if path else field, plain(message), "cross"))
         return problems
 
     def _points_to(self, value: str, rule: dict, at: str) -> list[Problem]:

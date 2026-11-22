@@ -108,7 +108,7 @@ class Reader:
 
     def error(self, name, line, field, message, by=None):
         entry = {"file": name, "line": line, "field": field, "message": message}
-        self.errors.append({**entry, "by": by} if isinstance(by, str) and by else entry)
+        self.errors.append({**entry, "by": schema.plain(by)} if isinstance(by, str) and by else entry)
 
     def records(self, name: str, keep_invalid: bool = False) -> list:
         """What `_records` reads; whatever else goes wrong with one file, for any reason, is that file's error."""

@@ -125,7 +125,7 @@ class Reader:
             record = parsed.get(error.line)
             by = record.get("by") if record else None
             entry = {"file": name, "line": error.line, "field": error.field, "message": error.message}
-            self.errors.append({**entry, "by": by} if isinstance(by, str) and by else entry)
+            self.errors.append({**entry, "by": schema.plain(by)} if isinstance(by, str) and by else entry)
             by_line.setdefault(error.line, []).append(error)
         kept = []
         for number, record in parsed.items():
@@ -135,7 +135,9 @@ class Reader:
                 status = record.get("status")
                 record = schema.strip_invalid(record, by_line[number])
                 if isinstance(status, str):
-                    record["status"] = status  # only text on the page, so a status that failed shows as written
+                    record["status"] = schema.plain(
+                        status
+                    )  # only text on the page, so a status that failed shows as written
                 if not isinstance(record.get("id"), str) or not record["id"]:
                     record["id"] = f"(line {number})"
             kept.append(record)

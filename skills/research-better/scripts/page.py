@@ -14,6 +14,7 @@ is not written. A page event answers with the JSON-RPC error -32602 and the vali
 from __future__ import annotations
 
 import contextlib
+import errno
 import functools
 import http.server
 import importlib.util
@@ -202,7 +203,7 @@ class Conversation:
         try:
             with urllib.request.urlopen(f"{self.address.read_text().strip()}listening", timeout=2):
                 return True
-        except OSError:
+        except (OSError, ValueError):  # no server there, or an address file that holds no address
             return False
 
     # ---------- The agent's side: wait, reply, status, pending ----------
@@ -211,7 +212,10 @@ class Conversation:
         """Print the user's actions the agent has not seen yet, waiting for the served page to receive one."""
         if not self.address.exists():
             sys.exit(f"error: no page is served from {self.folder}. Start it with `{self.start}` first.")
-        seen = int(self.seen.read_text() or 0) if self.seen.exists() else 0
+        try:
+            seen = int(self.seen.read_text() or 0) if self.seen.exists() else 0
+        except ValueError:  # a file's content is not what it should be: that is the file's error, not a usage error
+            raise OSError(errno.EINVAL, "does not hold a number", str(self.seen)) from None
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
@@ -219,6 +223,8 @@ class Conversation:
                     total = int(r.read())
             except OSError:
                 sys.exit("error: the page's server is not answering. Is it still running?")
+            except ValueError:  # the address file holds something that is not an address
+                raise OSError(errno.EINVAL, "does not hold an address", str(self.address)) from None
             if total <= seen:
                 continue
             lines = self.lines()[seen:total]

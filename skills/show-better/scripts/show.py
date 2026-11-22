@@ -3045,12 +3045,18 @@ TEXT = {
     "fork": t_fork,
 }
 
-# Every kind needs a check, a visual and a text form; fail at start-up, not later in one output format.
-for _name, _table in (("PANEL_CHECKS", PANEL_CHECKS), ("VISUALS", VISUALS), ("TEXT", TEXT)):
-    if set(_table) != set(KINDS):
-        raise RuntimeError(
-            f"{_name} does not match KINDS: missing {sorted(set(KINDS) - set(_table))}, extra {sorted(set(_table) - set(KINDS))}"
-        )
+
+def _tables_match_kinds() -> bool:
+    """Every kind needs a check, a visual and a text form; fail at start-up, not later in one output format."""
+    for name, table in (("PANEL_CHECKS", PANEL_CHECKS), ("VISUALS", VISUALS), ("TEXT", TEXT)):
+        if set(table) != set(KINDS):
+            raise RuntimeError(
+                f"{name} does not match KINDS: missing {sorted(set(KINDS) - set(table))}, extra {sorted(set(table) - set(KINDS))}"
+            )
+    return True
+
+
+TABLES_MATCH_KINDS = _tables_match_kinds()
 
 
 def visual_of(p, spec):

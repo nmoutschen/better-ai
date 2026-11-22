@@ -103,7 +103,7 @@ def scan_file(path: Path, board: Path, docs: dict, cache: dict, data: dict) -> N
         entry = {"file": shown, "line": error.line, "field": error.field, "message": error.message}
         record = records.get(error.line)
         if isinstance(record, dict) and isinstance(record.get("by"), str):
-            entry["by"] = record["by"]
+            entry["by"] = schema.plain(record["by"])
         data["errors"].append(entry)
         messages.setdefault(error.line, []).append(error)
     kept = {n: r for n, r in records.items() if isinstance(r, dict)}
