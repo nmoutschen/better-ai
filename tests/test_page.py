@@ -27,7 +27,11 @@ SCRIPTS = ROOT / "skills" / "code-better" / "scripts"
 # The log tests below use the canvas's comment anchor and events; its schemas now live in src/better_ai/.
 CANVAS_SCHEMAS = Path(tempfile.mkdtemp(prefix="canvas-schemas-"))
 for _source in (ROOT / "src" / "better_ai" / "schemas", ROOT / "src" / "better_ai" / "design" / "schemas"):
-    for _file in (f for f in _source.glob("*.json") if f.name in ("base.schema.json", "conversation.schema.json", "canvas-events.schema.json")):
+    for _file in (
+        f
+        for f in _source.glob("*.json")
+        if f.name in ("base.schema.json", "conversation.schema.json", "canvas-events.schema.json")
+    ):
         _doc = json.loads(_file.read_text(encoding="utf-8"))
         _doc.pop("x-old-format", None)  # the old validator these tests load does not know it
         (CANVAS_SCHEMAS / _file.name).write_text(json.dumps(_doc), encoding="utf-8")

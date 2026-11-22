@@ -49,7 +49,7 @@ class Architect(unittest.TestCase):
         path.write_text("".join(json.dumps(record) + "\n" for record in value))
 
     def test_shared_page_files_match_design_better(self):
-        shared = ROOT / "skills" / "design-better" / "scripts"
+        shared = ROOT / "skills" / "code-better" / "scripts"  # design-better's copies moved to src/better_ai/page/
         for name in ("page.py", "page.css", "page.js"):
             with self.subTest(name=name):
                 self.assertEqual((SCRIPTS / name).read_bytes(), (shared / name).read_bytes())

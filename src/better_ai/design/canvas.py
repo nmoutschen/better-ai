@@ -118,7 +118,9 @@ def version_data(unit: Unit, version: dict, warnings: list) -> dict:
     """One version as the page loads it: `srcdoc` (its HTML) for a file, `src` for an address."""
     label = str(version["label"])
     if isinstance(version.get("address"), str):
-        warnings.append(f"{version['address']} is loaded when the page is viewed: it shows only while that address answers.")
+        warnings.append(
+            f"{version['address']} is loaded when the page is viewed: it shows only while that address answers."
+        )
         return {"label": label, "src": version["address"]}
     file = version.get("file")
     path = version_path(file)
@@ -128,7 +130,10 @@ def version_data(unit: Unit, version: dict, warnings: list) -> dict:
         doc = paths.read_bytes(unit, path).decode("utf-8", "replace")
     except (OSError, ValueError, Refused):
         warnings.append(f"{file} is not a file of the unit.")
-        return {"label": label, "srcdoc": f"<p style='font:16px sans-serif;padding:1em'>{_escape(str(file))} is not a file of the unit.</p>"}
+        return {
+            "label": label,
+            "srcdoc": f"<p style='font:16px sans-serif;padding:1em'>{_escape(str(file))} is not a file of the unit.</p>",
+        }
     missed: set = set()
     doc = embed_links(unit, path, doc, missed)
     for link in sorted(missed):
@@ -230,7 +235,9 @@ def static_page(data: dict) -> str:
             raise ValueError(f"the shell does not link {url}")
         text = text.replace(tag, new, 1)
     marker = '<script type="application/json" id="page-config">'
-    return text.replace(marker, f'<script type="application/json" id="page-data">{_script_json(data)}</script>\n{marker}', 1)
+    return text.replace(
+        marker, f'<script type="application/json" id="page-data">{_script_json(data)}</script>\n{marker}', 1
+    )
 
 
 def _render_arguments(parser: argparse.ArgumentParser) -> None:

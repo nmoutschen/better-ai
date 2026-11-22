@@ -1,13 +1,13 @@
 // The thread model in page.js: how the log becomes each item's state, the entries and what Open lists.
 // Run with `node --test tests/*.test.js`. page.js is identical in every skill (the Scripts workflow checks it); this loads
-// design-better's copy.
+// the shared copy in src/better_ai/page/.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'skills', 'design-better', 'scripts', 'page.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', 'page', 'page.js'), 'utf8');
 const context = {};
 vm.runInNewContext(source, context);
 const ITEMS = ['comment', 'note'];

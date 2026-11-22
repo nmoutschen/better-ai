@@ -6,6 +6,7 @@ Run with `python3 -m unittest tests.test_design_unit`. No test opens a browser.
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -104,7 +105,9 @@ class Unit(unittest.TestCase):
         text = page.read_text()
         data = json.loads(re.search(r'id="page-data">(.*?)</script>', text, re.S).group(1))
         self.assertEqual([v["label"] for v in data["versions"]], ["A", "B"])
-        self.assertEqual([(s["w"], s["h"], s["name"]) for s in data["sizes"]], [(1280, 800, "Desktop"), (375, 700, "Mobile")])
+        self.assertEqual(
+            [(s["w"], s["h"], s["name"]) for s in data["sizes"]], [(1280, 800, "Desktop"), (375, 700, "Mobile")]
+        )
         self.assertIn("data:image/png;base64,", data["versions"][0]["srcdoc"])  # p.png is embedded
         self.assertIn("data:text/css", data["versions"][0]["srcdoc"])
         self.assertIn("href='other.html'", data["versions"][1]["srcdoc"])  # a link to another page stays
@@ -113,7 +116,9 @@ class Unit(unittest.TestCase):
 
     def test_render_warns_about_an_address_and_a_link_it_cannot_embed(self):
         (self.folder / "a.html").write_text('<img src="missing.png">')
-        self.create({**HEAD, "versions": [{"label": "A", "file": "a.html"}, {"label": "B", "address": "https://example.com/x"}]})
+        self.create(
+            {**HEAD, "versions": [{"label": "A", "file": "a.html"}, {"label": "B", "address": "https://example.com/x"}]}
+        )
         done = run(self.root, "render", ".design/pay")
         self.assertEqual(done.returncode, 0)
         self.assertIn("missing.png", done.stderr)
@@ -139,6 +144,16 @@ class Unit(unittest.TestCase):
         self.assertNotRegex(done.stdout, r"(?m)^    show\b")
 
 
+class Script(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_canvas_js_is_valid_javascript_and_has_no_decide(self):
+        path = Path(__file__).resolve().parent.parent / "src" / "better_ai" / "design" / "canvas.js"
+        self.assertEqual(subprocess.run(["node", "--check", str(path)], capture_output=True).returncode, 0)
+        text = path.read_text()
+        self.assertNotIn("'decide'", text)
+        self.assertIn("pageApprove", text)
+
+
 class Served(unittest.TestCase):
     """`serve` on a real unit: the page, its data and revision, what the page may send, and the conversation verbs."""
 
@@ -151,9 +166,15 @@ class Served(unittest.TestCase):
         env = {**os.environ, "BETTER_AI_SKILL": SKILL, "PYTHONUNBUFFERED": "1"}
         self.server = subprocess.Popen(
             better.command("serve", ".design/pay", "--no-browser"),
-            cwd=self.root, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+            cwd=self.root,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
         )
-        self.url = re.search(r"http://\S+/", self.server.stdout.readline()).group(0)  # printed as it happens, on a pipe too
+        self.url = re.search(r"http://\S+/", self.server.stdout.readline()).group(
+            0
+        )  # printed as it happens, on a pipe too
 
     def tearDown(self):
         self.server.terminate()
@@ -248,7 +269,15 @@ class Events(unittest.TestCase):
             (folder / "conversation.jsonl").write_text(json.dumps(event) + "\n")
             return run(root, "check", ".design/pay")
 
-    DECIDE = {"type": "decide", "by": "user", "id": "d1", "option": "A", "label": "Build A", "carries": [], "text": None}
+    DECIDE = {
+        "type": "decide",
+        "by": "user",
+        "id": "d1",
+        "option": "A",
+        "label": "Build A",
+        "carries": [],
+        "text": None,
+    }
 
     def test_an_old_decide_is_a_notice_not_an_error(self):
         done = self.log({**self.DECIDE, "at": "2026-11-01T10:00:00Z"})

@@ -798,7 +798,9 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     serving = threading.Thread(target=server.serve_forever, daemon=True)
     try:
         if args.once:
-            server.daemon_threads = False  # the request runs in a thread: `server_close` waits for it, so it is answered
+            server.daemon_threads = (
+                False  # the request runs in a thread: `server_close` waits for it, so it is answered
+            )
             server.handle_request()
             return 0
         serving.start()
