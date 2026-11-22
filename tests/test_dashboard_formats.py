@@ -432,7 +432,7 @@ class Dashboard(unittest.TestCase):
             write(folder, "decisions.jsonl", [{**decision, **chat}, {**decision, "id": "D2", "status": "waiting"}])
             data = dashboard.load(folder)
         self.assertEqual(data["errors"], [])
-        self.assertEqual(data["name"], "c")
+        self.assertEqual(data["name"], "Uploads fail loudly")
         self.assertEqual(data["requirements"], {"S1": "The upload service shall reject empty files."})
         agents = {a["name"]: a for a in data["agents"]}
         self.assertEqual(

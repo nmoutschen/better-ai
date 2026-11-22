@@ -230,7 +230,9 @@ def _collect(change: Path) -> dict:
             "conversation": [],
             "errors": [{"file": "schemas", "line": 1, "field": "(schemas)", "message": str(error)}],
         }
-    reader.records(change / "code.json")  # shown only through the errors it may hold; the tasks carry their own mode
+    code = reader.records(change / "code.json")  # its errors are shown; the tasks carry their own mode
+    goal = code[0].get("goal") if code else None
+    title = goal.strip().splitlines()[0].strip() if isinstance(goal, str) and goal.strip() else change.name
     tasks = reader.records(change / "tasks.jsonl", keep_invalid=True)
     spec = reader.spec_records()
     conversation_events = reader.records(change / LOG)
@@ -250,7 +252,7 @@ def _collect(change: Path) -> dict:
     for name in CHECKED_ONLY:
         reader.records(change / name)
     return {
-        "name": change.name,
+        "name": title,
         "tasks": tasks,
         "requirements": {r["id"]: r["statement"] for r in spec if r.get("type") == "spec"},
         "agents": agents,
