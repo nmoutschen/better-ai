@@ -17,6 +17,10 @@ BETTER_AI_SWEEP=full python3 -I -m unittest discover tests
 
 A test picks its cases with `sweep.cases(items, key=...)` from `tests/sweep.py`; `key` gives an item's class.
 
+The shared command in `src/better_ai/` is run from source by `tests/better.py`: `run(skill, *args, stdin=None, cwd=None,
+env=None)` starts it with `python -I`, `src/` on `sys.path` and `BETTER_AI_SKILL` set. Run single modules without `-I`
+(`python3 -m unittest tests.test_core`), since `-I` keeps the working directory off `sys.path`.
+
 `tests/test_build.py` and `tests/test_smoke.py` check `tools/build.py` and `tools/smoke.py` on fixture repositories in
 temporary folders. The build needs Python 3.12 or later, so on Python 3.10 the tests that build skip themselves (set
 `BETTER_AI_PYTHON310` to a Python 3.10 to run the refusal test from a newer one). `tests/pyz.py` has
