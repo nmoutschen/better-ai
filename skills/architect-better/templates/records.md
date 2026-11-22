@@ -38,6 +38,6 @@ Leave `in` out for a part in both versions; use `["before"]` for a part the chan
 
 {"type": "decision", "title": "<title>", "drivers": ["<requirement id>"], "chosen": "<what was chosen>", "rejected": [{"option": "<option>", "why": "<why not>"}], "drawback": "<main drawback of the chosen option>"}
 
-`reviews.jsonl`, written by the `review` command, never by `add`:
+`reviews.jsonl`: WRITE it with the `review` command and never with `add`:
 
 {"type": "review", "perspectives": ["<perspective id>"], "changed": ["box:<box id>"], "hashes": {"box:<box id>": "<SHA-256 of the part's JSON>"}, "labels": {"box:<box id>": "<label>"}}

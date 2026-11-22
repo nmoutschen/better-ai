@@ -1,25 +1,23 @@
 # Presentation spec
 
-A spec is a JSON object that `python3 <skill dir>/scripts/better.pyz` renders as a page of slides or as plain text. `check` validates it and names each wrong field as `panels[2].items[0].value: required`.
+```
+python3 <skill dir>/scripts/better.pyz create .show/SLUG --by AGENT
+python3 <skill dir>/scripts/better.pyz set .show/SLUG spec
+python3 <skill dir>/scripts/better.pyz check .show/SLUG
+python3 <skill dir>/scripts/better.pyz render .show/SLUG
+python3 <skill dir>/scripts/better.pyz render .show/SLUG --format text
+python3 <skill dir>/scripts/better.pyz render .show/SLUG --format md
+python3 <skill dir>/scripts/better.pyz serve .show/SLUG --open
+python3 <skill dir>/scripts/better.pyz wait .show/SLUG --timeout S
+python3 <skill dir>/scripts/better.pyz reply .show/SLUG --to ID
+python3 <skill dir>/scripts/better.pyz status .show/SLUG seen|asked|working|done ID...
+python3 <skill dir>/scripts/better.pyz status .show/SLUG accepted ID... --text
+python3 <skill dir>/scripts/better.pyz pending .show/SLUG
+```
 
-```
-better.pyz create .show/SLUG --by AGENT        # the spec on stdin
-better.pyz set .show/SLUG spec                 # change fields of the spec, on stdin
-better.pyz check .show/SLUG                    # validate, print every value the slides will show
-better.pyz render .show/SLUG                   # the page
-better.pyz render .show/SLUG --format text     # plain text for a terminal
-better.pyz render .show/SLUG --format md       # Markdown, diagrams in code blocks
-better.pyz serve .show/SLUG [--open]           # the page with the conversation
-better.pyz wait .show/SLUG [--timeout S]       # the user's next actions on the served page
-better.pyz reply .show/SLUG TEXT [--to ID]     # a reply under the item it answers
-better.pyz status .show/SLUG seen|asked|working|done ID...
-better.pyz status .show/SLUG accepted ID... --text "the user's words"
-better.pyz pending .show/SLUG                  # the items not done or accepted
-```
+`create` and `set` take the spec on stdin, `reply` and `status --text` the words on stdin. `check` names each wrong field as `panels[2].items[0].value: required`.
 
 Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only). `--format text --screen-reader` prints each slide as sentences and value lists, without box lines, bars, rules or symbols. In text output, an `svg` visual shows only its `alt`.
-
-`check` stops with an error when a slide cannot be drawn correctly, and prints a warning when a slide is likely hard to read. It prints a digest: every headline, value, label, detail and source, in order, for comparison with the document.
 
 The page shows the opening slide, then one slide per panel. Slide N is panel N − 1.
 

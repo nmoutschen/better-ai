@@ -11,15 +11,15 @@ FOLLOW these steps in order. The general rules of SKILL.md and the rules of this
 
 ### Files
 
-LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP the records of the change in `.architect/<change>/`, the change folder, and CALL it `<unit>` in the commands. KEEP `design.md`, in a folder of its own for the change, in the design location, and decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` for it, and `.architect/<change>/decisions/` for decision records.
+LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP the records of the change in `.architect/<change>/` at the repo root, the change folder, and CALL it `<unit>` in the commands. KEEP `design.md`, in a folder of its own for the change, in the design location, and decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` for it, and `.architect/<change>/decisions/` for decision records.
 
-READ and FOLLOW [../templates/records.md](../templates/records.md) for one line of each kind of record, the fields of each, and the conventions for writing them. RUN `python3 <skill dir>/scripts/better.pyz check <unit>`: it checks the whole folder, and the diagram and the sources too. RUN it before you start the page, and FIX what it reports.
+READ and FOLLOW [../templates/records.md](../templates/records.md) for one line of each kind of record, the fields of each, and the conventions for writing them. RUN `python3 <skill dir>/scripts/better.pyz check <unit>` before you start the page, and FIX what it reports.
 
 ### Live page conversation
 
 - RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` to wait for new actions. WHEN it returns, START it again and HANDLE those actions.
 - RUN `python3 <skill dir>/scripts/better.pyz pending <unit>` to read open items and their threads on each wake or resume.
-- RUN `python3 <skill dir>/scripts/better.pyz reply <unit> "<text>" --to <id>` to reply under the item you answer.
+- RUN `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id>`, with your words on stdin, to reply under the item you answer.
 - RUN `python3 <skill dir>/scripts/better.pyz status <unit> <state> <id>...` to set the state of items.
 
 REPLY in the page, in one or two short sentences. MARK each item `seen` when it arrives and `asked` when you need an answer. KEEP `working` on the items you are changing now, usually one. WHEN an item needs only an answer, MARK it `done` once answered. WHEN the user's answer leads to a change, MARK the item `done` once the change is in the page, and PUT your next question in a new message. MARK it `accepted` when the user accepts it in words. TREAT a reply to a finished item as work to do.
