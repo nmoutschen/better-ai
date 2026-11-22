@@ -33,7 +33,7 @@ IF the repository has no history, or less than the period above, SAY so in the r
 
 ## 3. Run the review
 
-START a separate reviewer for every audit, however small the scope: DO NOT review the code yourself instead. USE `/review-better` to run the review, if available. The work is the code in scope. The GOAL of the review is that the user can choose what to improve next. The reviewer does not change the code, and reports every finding it confirms, however small, because the full list is for agents to work from: the report to the user stays short in step 6. GIVE the reviewer `evidence.jsonl` and this list of what to look for:
+START a separate reviewer for every audit, however small the scope: DO NOT review the code yourself instead. USE `/review-better` to run the review, if available. The work is the code in scope. The GOAL of the review is that the user can choose what to improve next. The reviewer does not change the code, and reports every finding it confirms, however small, because the full list is for agents to work from: the report to the user stays short in step 6. GIVE the reviewer the evidence records and this list of what to look for:
 
 1. Code that gives wrong results now, or loses data, money or what users are told.
 2. Knowledge written in more than one place, such as a rate, a rule or a format, where the copies already differ, or where the history shows one copy changed without the other. Repeated lines alone are not a finding: duplicated code causes defects in some systems and not in others.

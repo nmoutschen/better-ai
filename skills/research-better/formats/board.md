@@ -1,6 +1,6 @@
 # Board records
 
-A board holds records of five types, `brief`, `decision`, `question`, `claim` and `source`, and a log for each agent; `reply` adds your words to the conversation. ADD each with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, its fields as JSON on stdin; for a log line, use `--for <the log's agent name>` instead of `--by`. CHANGE one with `python3 <skill dir>/scripts/better.pyz set <board> <id>`, or `set <board> brief` for the brief. The command gives each record its ID, so several agents can add at the same time without overwriting each other. IF it refuses a record, FIX the record and RUN it again. This file shows the fields of each type: copy a line and replace the `<placeholders>`.
+A board holds records of five types, `brief`, `decision`, `question`, `claim` and `source`, and a log for each agent. ADD each with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, its fields as JSON on stdin; for a log line, use `--for <the log's agent name>` instead of `--by`. CHANGE one with `python3 <skill dir>/scripts/better.pyz set <board> <id>`, or `set <board> brief` for the brief. IF it refuses a record, FIX the record and RUN it again. This file shows the fields of each type: copy a line and replace the `<placeholders>`.
 
 ## Conventions
 

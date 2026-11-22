@@ -13,8 +13,25 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
 FIVE = ("architect-better", "code-better", "design-better", "research-better", "show-better")
 
-WRITE_LIKE = re.compile(r"\b(?:write|writes|written|writing|save|saves|put|keep|record|add)\b", re.IGNORECASE)
-RECORD_FILE = re.compile(r"[\w<>./*-]*\.jsonl?\b|\b(?:questions|claims|sources|logs)/<")
+WRITE_LIKE = re.compile(
+    r"\b(?:write|writes|written|writing|save|saves|put|keep|record|add|append|appends|update|updates|edit|edits"
+    r"|create|creates|store|stores|fill)\b",
+    re.IGNORECASE,
+)
+RECORD_FILE = re.compile(r"[\w<>./*-]*\.jsonl?\b|\b(?:questions|claims|sources|logs)/|\bas a file\b|\ba file in\b")
+# a sentence that tells the agent to read a file is not a write
+READ = re.compile(r"\b(?:re-?read|reads?)\s+<?[\w`]", re.IGNORECASE)
+
+
+def writes_to_a_record_file(sentence: str) -> bool:
+    return (
+        bool(WRITE_LIKE.search(sentence))
+        and bool(RECORD_FILE.search(sentence))
+        and "better.pyz" not in sentence
+        and not READ.search(sentence)
+    )
+
+
 TEMPLATE_PATH = re.compile(r"\btemplates/([\w.-]+)")
 
 
@@ -69,9 +86,29 @@ class RecordWording(unittest.TestCase):
             for path in texts()
             for number, line in lines(path)
             for sentence in sentences(line)
-            if WRITE_LIKE.search(sentence) and RECORD_FILE.search(sentence) and "better.pyz" not in sentence
+            if writes_to_a_record_file(sentence)
         ]
         self.assertEqual(found, [])
+
+    def test_the_check_catches_each_way_of_sending_an_agent_to_a_record_file(self):
+        for bad in (
+            "WRITE it to `tasks.jsonl`.",
+            "SAVE the brief in brief.json.",
+            "APPEND each task to `tasks.jsonl`.",
+            "UPDATE `.code/<change>/progress.jsonl` with the result.",
+            "EDIT `decisions.jsonl` when the user answers.",
+            "CREATE a file in `questions/` for each question.",
+            "ADD each open question as a file in `questions/`.",
+        ):
+            with self.subTest(bad):
+                self.assertTrue(writes_to_a_record_file(bad))
+        for good in (
+            "ADD each with `python3 <skill dir>/scripts/better.pyz add <board> question --by coordinator`.",
+            "Read <BOARD>/questions/ first, and do not add a question another worker owns.",
+            "Before each `add` or `set`, re-read <BOARD>/brief.json and your question.",
+        ):
+            with self.subTest(good):
+                self.assertFalse(writes_to_a_record_file(good))
 
     def test_the_word_template_only_points_at_a_file_under_templates(self):
         """In show-better, `template` is the layout field of a slide, not a file."""

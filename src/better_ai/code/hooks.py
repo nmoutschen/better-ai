@@ -146,7 +146,7 @@ def a_log_line_needs_the_card(ctx: records.AddContext) -> None:
         raise refusal(
             ctx.unit.label,
             f"{ctx.for_agent} has no card",
-            f"write it first: add {ctx.unit.label} card --for {ctx.for_agent}",
+            f"add it first: add {ctx.unit.label} card --for {ctx.for_agent} --by coordinator",
         )
 
 

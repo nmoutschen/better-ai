@@ -76,7 +76,7 @@ KEEP each skill self-contained: SKILL.md, its templates, formats and scripts DO 
 
 KEEP the number of rules low: agents follow fewer of them as rules are added, and keep earlier rules better. PUT the rules that matter most first in each section. BEFORE adding a rule or a Principles bullet to a SKILL.md, LOOK in that SKILL.md for one that covers the same case, and MERGE the new content into it instead. STATE each rule once in a SKILL.md. A template that an agent reads without SKILL.md, such as a worker brief, MAY restate it.
 
-PUT each document an agent writes in `templates/` and the shape of each record type in `formats/`, with placeholders only. DO NOT include example content in either. A format opens with the command that adds the record, never with a fill-in block or a document heading.
+PUT each document an agent writes in `templates/` and the shape of each record type in `formats/`, with placeholders only. DO NOT include example content in either. A format opens with the command that adds the record, never with a fill-in block or a heading that holds placeholders.
 
 ### 6.3. Say what invoking the skill means
 
