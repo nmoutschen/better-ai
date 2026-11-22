@@ -1171,6 +1171,246 @@ class Verbs(unittest.TestCase):
             self.assertIn("exiting", output)
 
 
+class Changes(unittest.TestCase):
+    """The brief's `changes`: the agent types no time. The patch holds the new entries first, then every earlier entry
+    as the brief shows it; the command stamps the new ones."""
+
+    UTC = Verbs.UTC
+    WHY = "changes must hold the new entries first, then every earlier entry as the brief shows it"
+
+    def board_with_history(self, d):
+        board_dir = made_board(Path(d))
+        for text in ("Dropped the wiki", "Searched the archive"):
+            earlier = json.loads((board_dir / "brief.json").read_text())["changes"]
+            patch = json.dumps({"changes": [{"text": text}, *earlier]})
+            done = better.run(SKILL, "set", ".research/b", "brief", stdin=patch, cwd=d)
+            assert done.returncode == 0, done.stdout + done.stderr
+        return board_dir
+
+    def changes(self, board_dir):
+        return json.loads((board_dir / "brief.json").read_text())["changes"]
+
+    def set(self, d, changes):
+        return better.run(SKILL, "set", ".research/b", "brief", stdin=json.dumps({"changes": changes}), cwd=d)
+
+    def test_the_good_path_stamps_the_new_entry_and_keeps_the_earlier_ones_exactly(self):
+        with tempfile.TemporaryDirectory() as d:
+            board_dir = self.board_with_history(d)
+            earlier = self.changes(board_dir)
+            self.assertEqual([c["text"] for c in earlier], ["Searched the archive", "Dropped the wiki"])
+            done = self.set(d, [{"text": "Narrowed the goal"}, *earlier])
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            now = self.changes(board_dir)
+            self.assertEqual(now[1:], earlier)
+            self.assertRegex(now[0]["at"], self.UTC)
+            self.assertEqual(better.run(SKILL, "check", ".research/b", cwd=d).returncode, 0)
+
+    def test_a_time_typed_on_a_new_entry_is_refused(self):
+        for typed in ("2020-01-01T00:00:00Z", "2099-01-01T00:00:00Z"):
+            with self.subTest(typed=typed), tempfile.TemporaryDirectory() as d:
+                board_dir = self.board_with_history(d)
+                before = (board_dir / "brief.json").read_text()
+                done = self.set(d, [{"text": "x", "at": typed}, *self.changes(board_dir)])
+                self.assertEqual(done.returncode, 1)
+                self.assertIn("remove 'at' from the new entries", done.stderr + done.stdout)
+                self.assertEqual((board_dir / "brief.json").read_text(), before)
+
+    def test_sending_only_the_new_entry_is_refused_and_the_history_stays(self):
+        with tempfile.TemporaryDirectory() as d:
+            board_dir = self.board_with_history(d)
+            before = (board_dir / "brief.json").read_text()
+            done = self.set(d, [{"text": "Only this"}])
+            self.assertEqual(done.returncode, 1)
+            self.assertIn(self.WHY, done.stderr + done.stdout)
+            self.assertIn("Give the earlier entries back unchanged after the new ones", done.stderr + done.stdout)
+            self.assertEqual((board_dir / "brief.json").read_text(), before)
+
+    def test_a_rewritten_earlier_entry_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            board_dir = self.board_with_history(d)
+            before = (board_dir / "brief.json").read_text()
+            earlier = self.changes(board_dir)
+            for rewrite in ({**earlier[0], "text": "Rewritten"}, {**earlier[0], "at": "2020-01-01T00:00:00Z"}):
+                with self.subTest(rewrite=rewrite):
+                    done = self.set(d, [{"text": "new"}, rewrite, *earlier[1:]])
+                    self.assertEqual(done.returncode, 1)
+                    self.assertIn(self.WHY, done.stderr + done.stdout)
+                    self.assertEqual((board_dir / "brief.json").read_text(), before)
+            reordered = self.set(d, [{"text": "new"}, earlier[1], earlier[0]])
+            self.assertEqual(reordered.returncode, 1)
+
+    def test_a_patch_that_is_not_a_list_of_objects_is_left_to_the_schema(self):
+        with tempfile.TemporaryDirectory() as d:
+            made_board(Path(d))
+            for bad in ("x", [1], [{"text": 5}]):
+                with self.subTest(bad=bad):
+                    done = self.set(d, bad)
+                    self.assertEqual(done.returncode, 1)
+                    self.assertNotIn("bug in", done.stderr)
+
+
+class OldDecisions(unittest.TestCase):
+    OLD = {"type": "decision", "at": "2026-11-19T17:12:37Z", "by": "coordinator", "id": "D1", "asked": "Login?"}
+    OLD |= {"default": "Go on", "deadline": "2026-11-19T17:22:37Z", "status": "pending"}
+
+    def board(self, d):
+        board_dir = made_board(Path(d))
+        write_lines(board_dir, "decisions.jsonl", [self.OLD])
+        return board_dir
+
+    def test_set_on_an_old_decision_names_the_missing_fields_as_the_fix(self):
+        with tempfile.TemporaryDirectory() as d:
+            board_dir = self.board(d)
+            before = (board_dir / "decisions.jsonl").read_text()
+            done = better.run(SKILL, "set", ".research/b", "D1", stdin='{"status": "defaulted"}', cwd=d)
+            self.assertEqual(done.returncode, 1)
+            said = done.stdout + done.stderr
+            self.assertIn("written before this change", said)
+            self.assertIn("raised_by", said)
+            self.assertIn("about", said)
+            self.assertEqual((board_dir / "decisions.jsonl").read_text(), before)
+
+    def test_set_on_an_old_decision_works_once_it_gives_the_new_fields(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.board(d)
+            patch = {"status": "defaulted", "raised_by": "coordinator", "about": {"type": "board"}}
+            done = better.run(SKILL, "set", ".research/b", "D1", stdin=json.dumps(patch), cwd=d)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertEqual(better.run(SKILL, "check", ".research/b", cwd=d).returncode, 0)
+
+    def test_the_old_status_words_are_refused_on_a_decision(self):
+        for word in ("default", "pending", "changed"):
+            with self.subTest(word=word), tempfile.TemporaryDirectory() as d:
+                made_board(Path(d))
+                decision = {"raised_by": "coordinator", "about": {"type": "board"}, "asked": "Use it?"}
+                decision |= {"status": "waiting", "default": "Skip", "deadline": "+30m"}
+                added = better.run(
+                    SKILL, "add", ".research/b", "decision", "--by", "coordinator", stdin=json.dumps(decision), cwd=d
+                )
+                self.assertEqual(added.returncode, 0, added.stdout)
+                done = better.run(SKILL, "set", ".research/b", "D1", stdin=json.dumps({"status": word}), cwd=d)
+                self.assertEqual(done.returncode, 1)
+                self.assertIn("status", done.stdout + done.stderr)
+
+
+class Malformed(unittest.TestCase):
+    """`render` and `check` on boards that are not what they should be: a clean exit and no bug line, whatever is there."""
+
+    def files(self) -> list:
+        deep = "[" * 100000 + "]" * 100000
+        question = json.dumps(seeded("Q-w9-1"))
+        return [
+            ("questions/Q-w9-1.json", deep),
+            ("questions/Q-w9-1.json", '{"a":' * 50000 + "1" + "}" * 50000),
+            ("questions/Q-w9-1.json", question.replace("high", "\ud800")),  # a lone surrogate, escaped
+            ("questions/Q-w9-1.json", '{"type": "question", "\ud800": 1}'),
+            ("claims/C-w9-1.json", "\xff"),
+            ("brief.json", '{"title": "\ud800", "status": "\ud800"}'),
+            ("decisions.jsonl", '{"id": "D1", "asked": "\ud800"}\n' + "[" * 100000 + "\n"),
+            ("logs/w9.jsonl", '{"type": "search", "query": "\ud800"}\n'),
+            ("conversation.jsonl", '{"type": "note", "text": "\ud800"}\n' + "[" * 100000 + "\n"),
+            ("sources/S-w9-1.json", "\x00\x00"),
+        ]
+
+    def test_render_and_check_never_raise_on_a_malformed_file(self):
+        for relative, text in self.files():
+            with self.subTest(file=relative, start=text[:12]), tempfile.TemporaryDirectory() as d:
+                board_dir = made_board(Path(d))
+                target = board_dir / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(text.encode("utf-8", "surrogatepass") if "\\x" not in text else b"\xff\xfe")
+                for verb in ("check", "render"):
+                    done = better.run(SKILL, verb, ".research/b", cwd=d)
+                    self.assertIn(done.returncode, (0, 1), f"{verb}: {done.stderr[:300]}")
+                    self.assertNotIn("bug in better.pyz", done.stderr)
+                    self.assertNotIn("Traceback", done.stderr)
+
+    def test_a_lone_surrogate_in_a_record_is_reported_and_the_page_still_renders_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            board_dir = made_board(Path(d))
+            text = json.dumps(seeded("Q-w9-1")).replace("high", "\\ud800")
+            (board_dir / "questions").mkdir(exist_ok=True)
+            (board_dir / "questions" / "Q-w9-1.json").write_text(text, encoding="utf-8")
+            checked = better.run(SKILL, "check", ".research/b", cwd=d)
+            self.assertEqual(checked.returncode, 1)
+            self.assertIn("Q-w9-1.json", checked.stdout)
+            self.assertEqual(better.run(SKILL, "render", ".research/b", cwd=d).returncode, 0)
+            data = board.load(unit(board_dir))
+            json.dumps(data)  # what the page is given is plain JSON
+
+
+def surrogate_places(value) -> list:
+    """Each string value and each key of a JSON value as (kind, path to the object holding it, key or index)."""
+    found, pending = [], [(value, ())]
+    while pending:
+        item, path = pending.pop()
+        if isinstance(item, dict):
+            for key, child in item.items():
+                found.append(("key", path, key))
+                pending.append((child, (*path, key)))
+        elif isinstance(item, list):
+            pending.extend((child, (*path, i)) for i, child in enumerate(item))
+        elif isinstance(item, str) and path:
+            found.append(("value", path[:-1], path[-1]))
+    return found
+
+
+def with_a_surrogate(record: dict, place: tuple) -> tuple:
+    record = copy.deepcopy(record)
+    kind, path, key = place
+    holder = record
+    for step in path:
+        holder = holder[step]
+    if kind == "value":
+        holder[key] = "\ud800"
+        return record, (*path, key)
+    renamed = {(key + "\ud800" if k == key else k): v for k, v in holder.items()}
+    holder.clear()
+    holder.update(renamed)
+    return record, (*path, key + "\ud800")
+
+
+class Surrogates(unittest.TestCase):
+    """A lone surrogate in a string or a key of every example record of the research schemas is reported on that field,
+    in a message that can be printed, and the record can still be stripped and serialised for the page."""
+
+    def test_every_example_with_a_lone_surrogate_is_reported_and_stripped(self):
+        docs = board.docs()
+        every = []
+        for file, items in EXAMPLES.items():
+            sample = file.replace("<id>", "X-1").replace("<agent>", "agent")
+            for item in items:
+                every += [(file, sample, item["record"], place) for place in surrogate_places(item["record"])]
+        picked = sweep.cases(every, key=[lambda c: (c[0], c[3][0]), lambda c: c[3][2]])
+        self.assertGreater(len(picked), 20)
+        for file, sample, record, place in picked:
+            changed, at = with_a_surrogate(record, place)
+            field = schema._render(at)
+            with self.subTest(file=file, place=field):
+                found = schema._match(Path("/folder") / sample, docs)
+                self.assertTrue(found, f"{sample}: no schema")
+                problems = schema.validate_record(changed, [doc for _, doc in found], docs, None)
+                self.assertIn(field, {p.field for p in problems})
+                errors = [schema.Error("f", 1, p.field, p.message) for p in problems]
+                for error in errors:
+                    str(error).encode("utf-8")  # printable
+                json.dumps(schema.strip_invalid(changed, errors), ensure_ascii=False).encode("utf-8")
+
+
+class PageRefusals(unittest.TestCase):
+    def test_a_closed_event_sent_from_the_page_is_refused_and_nothing_is_written(self):
+        with tempfile.TemporaryDirectory() as d:
+            board_dir = made_board(Path(d))
+            verbs = Verbs()
+            process, url = verbs.served(board_dir)
+            body = {"id": "c-1", "question": "Q-w2-4", "status": "answered"}
+            refused = verbs.rpc(url, "closed", **body)
+            self.assertEqual(refused["error"]["code"], -32601)
+            self.assertFalse((board_dir / "conversation.jsonl").exists())
+            process.send_signal(signal.SIGTERM)
+            process.communicate(timeout=20)
+
+
 class Replies(unittest.TestCase):
     def test_reply_and_status_answer_the_users_item_as_the_coordinator(self):
         with tempfile.TemporaryDirectory() as d:
