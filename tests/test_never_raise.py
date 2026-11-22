@@ -51,6 +51,8 @@ SKILLS = ROOT / "skills"
 EXCEPTIONS = (RuntimeError, KeyError, RecursionError, MemoryError)
 DEPTHS = (300, 2000, 50000)
 SURROGATE = "a\ud800b"
+# The steps of a request that page.Handler's guard is made of: patching one to fail takes the guard itself away.
+GUARDS = {"guarded", "setup", "handle", "finish"}
 # What every script calls from the standard library, where a script's own closures cannot be patched by name.
 STDLIB = [
     (Path, "read_text"),
@@ -342,11 +344,11 @@ def watched(module) -> dict:
     found = {id(getattr(o, n).__code__): (o, n) for o, n in STDLIB}  # by identity: equal code objects compare equal
     for owner in owners:
         for name, value in list(vars(owner).items()) if owner is not None else []:
-            if inspect.isfunction(value) and value.__module__ == owner.__name__:
+            if inspect.isfunction(value) and value.__module__ == owner.__name__ and name != "entry":
                 found[id(value.__code__)] = (owner, name)
             elif inspect.isclass(value) and value.__module__ == owner.__name__:
                 for attr, member in list(vars(value).items()):
-                    if inspect.isfunction(member) and not attr.startswith(("__", "do_")):
+                    if inspect.isfunction(member) and not attr.startswith(("__", "do_")) and attr not in GUARDS:
                         found[id(member.__code__)] = (value, attr)
     return found
 
@@ -634,7 +636,7 @@ class ServedPage:
         return {
             id(m.__code__): (self.handler, n)
             for n, m in vars(self.handler).items()
-            if inspect.isfunction(m) and not n.startswith(("__", "do_"))
+            if inspect.isfunction(m) and not n.startswith(("__", "do_")) and n not in GUARDS
         }
 
 
