@@ -107,7 +107,11 @@ def problems(skill: str, text: str):
     if verb == "status" and positional[1:2] and not all(s in STATES or s == "<X>" for s in positional[1].split("|")):
         out.append(f"state {positional[1]!r} is not one of {sorted(STATES)}")
     if verb == "render" and "--format" in found_values:
-        out += [f"format {v!r}" for v in found_values["--format"] if v != "<X>" and not all(p in FORMATS for p in v.split("|"))]
+        out += [
+            f"format {v!r}"
+            for v in found_values["--format"]
+            if v != "<X>" and not all(p in FORMATS for p in v.split("|"))
+        ]
     if verb == "reply" and "--state" in found_values:
         out += [f"state {v!r}" for v in found_values["--state"] if v not in ("asked", "working", "<X>")]
     return out
