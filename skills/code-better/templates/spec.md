@@ -8,6 +8,7 @@
 - GIVE each requirement its `source`, THEN CHECK the other direction: every decision and stated behaviour in the design has a requirement; WRITE each one that has none as an `unlinked` record.
 - One `gap` record per gap, with `if_wrong`: what the user would see. A `gap` that is asked points to its decision in `decisions.jsonl`, and holds `answered` instead of `asked` once the user answered; an assumed one holds `choice`.
 - WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file, and once the user has answered, WRITE the requirement with source `request` holding the user's words.
+- USE a source of type `requirement` only when the spec is an architect folder's `spec.jsonl`: a spec in `.code/<change>/` has no `requirements.jsonl` for it to point to.
 - CHANGE a requirement only as the general rule Ask the user of SKILL.md says, and REVISE its line in place.>
 
 Conventions and fields: `schemas/*.schema.json` of this skill.
