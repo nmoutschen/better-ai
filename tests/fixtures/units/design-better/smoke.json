@@ -1,0 +1,16 @@
+{
+  "repo_files": {".design/demo/a.html": "a.html", ".design/demo/b.html": "b.html"},
+  "steps": [
+    {"args": ["create", ".design/demo", "--by", "smoke"], "stdin_file": "head.json", "stdout_matches": "created"},
+    {"args": ["add", ".design/demo", "canvas", "--by", "smoke"], "stdin_file": "head.json", "exit": 1},
+    {"args": ["set", ".design/demo", "canvas"], "stdin_file": "more.json"},
+    {"args": ["check", ".design/demo"]},
+    {"args": ["render", ".design/demo"], "stdout_matches": "index\\.html"},
+    {"args": ["serve", ".design/demo", "--no-browser", "--once"], "serve": true}
+  ],
+  "worktree_steps": [
+    {"args": ["add", "{repo}/.design/demo", "canvas", "--by", "smoke"], "stdin_file": "head.json", "exit": 1},
+    {"args": ["set", "{repo}/.design/demo", "canvas"], "stdin_file": "head.json"},
+    {"args": ["check", "{repo}/.design/demo"]}
+  ]
+}

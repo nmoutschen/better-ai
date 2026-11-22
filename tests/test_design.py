@@ -12,7 +12,14 @@ ROOT = Path(__file__).resolve().parent.parent
 PAGE_CSS = ROOT / "skills" / "research-better" / "scripts" / "page.css"
 PAGES = [
     p
-    for pattern in ("skills/*/scripts/*.css", "skills/*/scripts/*.html", "skills/*/scripts/*.js")
+    for pattern in (
+        "skills/*/scripts/*.css",
+        "skills/*/scripts/*.html",
+        "skills/*/scripts/*.js",
+        "src/better_ai/design/*.css",
+        "src/better_ai/design/*.html",
+        "src/better_ai/design/*.js",
+    )
     for p in sorted(ROOT.glob(pattern))
 ]
 
@@ -61,9 +68,12 @@ def board_css():
         for n, line in enumerate(text.splitlines(), 1):
             if first <= n <= last and ".map" not in line:
                 yield scripts / name, n, line
-    for name in ("design-better/scripts/canvas.css", "architect-better/scripts/architect.css"):
-        for n, line in enumerate((scripts / name).read_text(encoding="utf-8").splitlines(), 1):
-            yield scripts / name, n, line
+    canvas = ROOT / "src" / "better_ai" / "design" / "canvas.css"
+    for n, line in enumerate(canvas.read_text(encoding="utf-8").splitlines(), 1):
+        yield canvas, n, line
+    architect = scripts / "architect-better/scripts/architect.css"
+    for n, line in enumerate(architect.read_text(encoding="utf-8").splitlines(), 1):
+        yield architect, n, line
     show = scripts / "show-better/scripts/show.css"
     for n, line in enumerate(show.read_text(encoding="utf-8").splitlines(), 1):
         if line.startswith("/* ---------- A slide"):

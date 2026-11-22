@@ -9,7 +9,6 @@ import re
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 import urllib.error
 import urllib.request
@@ -152,17 +151,13 @@ class Served(unittest.TestCase):
         env = {**os.environ, "BETTER_AI_SKILL": SKILL, "PYTHONUNBUFFERED": "1"}
         self.server = subprocess.Popen(
             better.command("serve", ".design/pay", "--no-browser"),
-            cwd=self.root, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True,
+            cwd=self.root, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
         )
-        address = self.folder / ".server"  # the first line of stdout is buffered on a pipe (python -I ignores PYTHONUNBUFFERED)
-        for _ in range(100):
-            if address.exists() and address.read_text().strip():
-                break
-            time.sleep(0.1)
-        self.url = address.read_text().strip()
+        self.url = re.search(r"http://\S+/", self.server.stdout.readline()).group(0)  # printed as it happens, on a pipe too
 
     def tearDown(self):
         self.server.terminate()
+        self.server.stdout.close()
         self.server.wait(timeout=20)
         self.tmp.cleanup()
 
@@ -221,6 +216,20 @@ class Served(unittest.TestCase):
         done = run(self.root, "status", ".design/pay", "accepted", "m1", "--text", stdin="good")
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
+
+    def test_a_head_that_holds_anything_is_still_answered(self):
+        heads = [
+            "[]",
+            "not json",
+            '{"versions": 5, "widths": "x", "title": 3}',
+            '{"versions": [5, {"label": 1}, {"label": "A", "file": 5}, {"label": "B", "file": "../x"}, {"label": "C"}]}',
+            r'{"versions": [{"label": "A\ud800", "file": "a\ud800.html"}], "title": "\ud800"}',
+        ]
+        for text in heads:
+            with self.subTest(head=text):
+                (self.folder / "canvas.json").write_text(text)
+                self.assertIsInstance(json.loads(self.get("data")), dict)
+                self.assertIsInstance(self.get("rev"), str)
 
     def test_a_head_that_is_gone_is_an_error_the_page_shows(self):
         os.unlink(self.folder / "canvas.json")

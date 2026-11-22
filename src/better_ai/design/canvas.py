@@ -71,7 +71,7 @@ def _embed(unit: Unit, folder: str, link: str, warnings: set, seen: tuple = ()) 
         if path is None:
             raise FileNotFoundError(link)
         data = paths.read_bytes(unit, path)
-    except (FileNotFoundError, IsADirectoryError, NotADirectoryError, Refused):
+    except (OSError, ValueError, Refused):
         warnings.add(link)
         return None
     if len(data) > MAX_EMBED:
@@ -116,19 +116,19 @@ def embed_links(unit: Unit, file: str, doc: str, warnings: set) -> str:
 
 def version_data(unit: Unit, version: dict, warnings: list) -> dict:
     """One version as the page loads it: `srcdoc` (its HTML) for a file, `src` for an address."""
-    label = version["label"]
-    if "address" in version:
+    label = str(version["label"])
+    if isinstance(version.get("address"), str):
         warnings.append(f"{version['address']} is loaded when the page is viewed: it shows only while that address answers.")
         return {"label": label, "src": version["address"]}
-    file = version["file"]
+    file = version.get("file")
     path = version_path(file)
     try:
         if path is None:
             raise Refused(f"{file} is not a path inside the unit")
         doc = paths.read_bytes(unit, path).decode("utf-8", "replace")
-    except (FileNotFoundError, IsADirectoryError, Refused):
+    except (OSError, ValueError, Refused):
         warnings.append(f"{file} is not a file of the unit.")
-        return {"label": label, "srcdoc": f"<p style='font:16px sans-serif;padding:1em'>{_escape(file)} is not a file of the unit.</p>"}
+        return {"label": label, "srcdoc": f"<p style='font:16px sans-serif;padding:1em'>{_escape(str(file))} is not a file of the unit.</p>"}
     missed: set = set()
     doc = embed_links(unit, path, doc, missed)
     for link in sorted(missed):
@@ -144,11 +144,14 @@ def data_of(unit: Unit) -> tuple[dict, list]:
     """What the page shows, and what to warn about."""
     head = read_head(unit)
     warnings: list = []
-    versions = [version_data(unit, v, warnings) for v in head.get("versions", []) if isinstance(v, dict) and "label" in v]
-    widths = [w for w in head.get("widths", []) if isinstance(w, str) and SIZE.match(w)] or list(DEFAULTS)
+    listed = head.get("versions") if isinstance(head.get("versions"), list) else []
+    versions = [version_data(unit, v, warnings) for v in listed if isinstance(v, dict) and "label" in v]
+    listed = head.get("widths") if isinstance(head.get("widths"), list) else []
+    widths = [w for w in listed if isinstance(w, str) and SIZE.match(w)] or list(DEFAULTS)
+    title, question = head.get("title"), head.get("question")
     data = {
-        "title": head.get("title") or "Versions",
-        "question": head.get("question") or "",
+        "title": title if isinstance(title, str) and title else "Versions",
+        "question": question if isinstance(question, str) else "",
         "sizes": sizes(widths),
         "versions": versions,
     }
@@ -172,13 +175,13 @@ def revision(unit: Unit) -> str:
     except Refused:
         return "missing"
     parts.append(json.dumps(head, sort_keys=True))
-    for version in head.get("versions", []):
+    for version in head.get("versions") if isinstance(head.get("versions"), list) else []:
         path = version_path(version.get("file")) if isinstance(version, dict) else None
         if path is None:
             continue
         try:
             stat = unit.target(path).stat()
-        except (OSError, Refused):
+        except (OSError, ValueError, Refused):
             parts.append(f"{path}:missing")
         else:
             parts.append(f"{path}:{stat.st_mtime_ns}:{stat.st_size}")

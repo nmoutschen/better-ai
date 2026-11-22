@@ -1,7 +1,8 @@
 """Tests for page.py, the conversation between a served page and the agent, and for the scripts that serve it.
 
 Run with `python3 -m unittest discover tests`. page.py is identical in every skill (the Scripts workflow checks it);
-these tests load design-better's copy, and run each serving script once as the agent would.
+these tests load code-better's copy, and run each serving script once as the agent would. design-better's page is
+tested in test_design_unit.py.
 """
 
 import contextlib
@@ -22,7 +23,14 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPTS = ROOT / "skills" / "design-better" / "scripts"
+SCRIPTS = ROOT / "skills" / "code-better" / "scripts"
+# The log tests below use the canvas's comment anchor and events; its schemas now live in src/better_ai/.
+CANVAS_SCHEMAS = Path(tempfile.mkdtemp(prefix="canvas-schemas-"))
+for _source in (ROOT / "src" / "better_ai" / "schemas", ROOT / "src" / "better_ai" / "design" / "schemas"):
+    for _file in (f for f in _source.glob("*.json") if f.name in ("base.schema.json", "conversation.schema.json", "canvas-events.schema.json")):
+        _doc = json.loads(_file.read_text(encoding="utf-8"))
+        _doc.pop("x-old-format", None)  # the old validator these tests load does not know it
+        (CANVAS_SCHEMAS / _file.name).write_text(json.dumps(_doc), encoding="utf-8")
 SPEC = importlib.util.spec_from_file_location("page", SCRIPTS / "page.py")
 page = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(page)
@@ -47,7 +55,7 @@ def conversation(folder: Path, items=("comment", "note"), agent="agent") -> "pag
         items,
         agent,
         "serve it",
-        schemas=SCRIPTS.parent / "schemas",
+        schemas=CANVAS_SCHEMAS,
         events="canvas-events.schema.json",
     )
 
@@ -365,20 +373,6 @@ VALID = {
         "delete": {"to": "c1-x"},
         "accept": {"to": "c1-x"},
     },
-    "canvas": {
-        "comment": {
-            "id": "c1-x",
-            "n": 1,
-            "text": "too small",
-            "on": {"version": "A", "screen": "390x844", "target": {"selector": "#pay"}, "spot": {"fx": 0.5, "fy": 0.5}},
-        },
-        "note": {"id": "m-x", "text": "hi", "to": None},
-        "verdict": {"version": "A", "verdict": "up"},
-        "decide": {"id": "d-x", "option": "A", "label": "Build A", "carries": ["c1-x"], "text": None},
-        "delete": {"to": "c1-x"},
-        "accept": {"to": "c1-x"},
-        "reopen": {"to": "c1-x", "text": "still wrong"},
-    },
     "show": {
         "comment": {
             "id": "c1-x",
@@ -426,7 +420,6 @@ ARCHITECT_FILES = {
 # One event per page the schemas must refuse, and the field the answer names.
 INVALID = {
     "architect": ("confirm", {"id": "confirm-x", "requirement": "F1", "text": "t"}, "wording"),
-    "canvas": ("comment", {**VALID["canvas"]["comment"], "text": None}, "verdict"),
     "show": ("comment", {**VALID["show"]["comment"], "on": {"part": "headline"}}, "slide"),
     "board": ("answer", {"id": "a-x", "text": "t", "default": False}, "decision"),
     "dashboard": ("answer", {"id": "a-x", "decision": "D1", "text": "", "default": False}, "text"),
@@ -440,7 +433,6 @@ class Pages(unittest.TestCase):
     def modules(self):
         return {
             "architect": load("architect-better", "architect.py"),
-            "canvas": load("design-better", "canvas.py"),
             "show": load("show-better", "show.py"),
             "board": load("research-better", "board.py"),
             "dashboard": load("code-better", "dashboard.py"),
@@ -546,10 +538,7 @@ class Pages(unittest.TestCase):
                 self.assertEqual([(e["id"], e["text"]) for e in shown], [(first["id"], "edited")])
 
     def test_a_verdict_only_comment_is_the_canvas_only_comment_without_text(self):
-        with tempfile.TemporaryDirectory() as d:
-            conv, base = self.serve(load("design-better", "canvas.py"), Path(d))
-            thumbs = {**VALID["canvas"]["comment"], "id": "c2-x", "text": None, "verdict": "up"}
-            self.assertEqual(self.send(base, "comment", thumbs).get("result"), "saved")
+        # design-better's side of this, a verdict-only comment is saved, is in test_design_unit.py.
         for name in ("show", "board"):
             with tempfile.TemporaryDirectory() as d:
                 conv, base = self.serve(self.modules()[name], Path(d))
@@ -618,14 +607,6 @@ class Scripts(unittest.TestCase):
             server.send_signal(signal.SIGTERM)  # as a harness ends a command: the script still removes .server
             server.communicate(timeout=10)
         self.assertFalse((folder / ".server").exists())
-
-    def test_design_better_canvas(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = Path(d)
-            (folder / "a.html").write_text("<p>A</p>")
-            script = str(ROOT / "skills" / "design-better" / "scripts" / "canvas.py")
-            cmd = [sys.executable, "-I", script, "show", str(folder / "a.html"), "--out", str(folder / "page.html")]
-            self.serve_and_talk([*cmd, "--serve"], folder, "rev")
 
     def test_show_better_slides(self):
         with tempfile.TemporaryDirectory() as d:

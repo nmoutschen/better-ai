@@ -270,29 +270,10 @@ def show_commands(root: Path) -> list:
     ]
 
 
-def canvas_folder(root: Path) -> Path:
-    folder = root / "versions"
-    folder.mkdir()
-    for label in "ab":
-        (folder / f"{label}.html").write_text(f"<html><body><p>{label}</p></body></html>", encoding="utf-8")
-    return folder
-
-
-def canvas_commands(root: Path) -> list:
-    folder = canvas_folder(root)
-    return [
-        ["show", folder / "a.html", folder / "b.html", "--out", folder / "page.html"],
-        ["pending", folder],
-        ["reply", folder, "hello"],
-        ["status", folder, "seen", "m-1"],
-        ["wait", folder, "--timeout", "0.1"],
-    ]
-
-
 def folder_with_a_reply(skill: str, root: Path) -> Path:
     """A folder holding a conversation log with one agent reply, written the way the skill's own script writes it."""
-    folder = {"show-better": show_folder, "design-better": canvas_folder}[skill](root)
-    module = module_of(SKILLS / skill / "scripts" / {"show-better": "show.py", "design-better": "canvas.py"}[skill])
+    folder = {"show-better": show_folder}[skill](root)
+    module = module_of(SKILLS / skill / "scripts" / {"show-better": "show.py"}[skill])
     with contextlib.redirect_stdout(io.StringIO()):
         module.conversation(folder).reply("hello", None)
     return folder
@@ -303,14 +284,12 @@ PROGRAMS = {
     "code-better": "dashboard.py",
     "research-better": "board.py",
     "show-better": "show.py",
-    "design-better": "canvas.py",
 }
 SCHEMA_FOLDERS = {
     "architect-better": lambda root: architects.make_folder(root),
     "code-better": lambda root: dashboards.change(root),
     "research-better": board_folder,
     "show-better": lambda root: folder_with_a_reply("show-better", root),
-    "design-better": lambda root: folder_with_a_reply("design-better", root),
 }
 
 
@@ -324,7 +303,6 @@ COMMANDS = {
     "code-better/dashboard.py": dashboard_commands,
     "research-better/board.py": board_commands,
     "show-better/show.py": show_commands,
-    "design-better/canvas.py": canvas_commands,
 }
 
 
@@ -513,7 +491,7 @@ class Wrapper(unittest.TestCase):
 
     def test_every_script_that_runs_as_a_program_calls_one_wrapped_entry_point(self):
         scripts = scripts_with_main()
-        self.assertGreaterEqual(len(scripts), 11)  # architect, diagram, dashboard, board, show, canvas, five schema
+        self.assertGreaterEqual(len(scripts), 9)  # architect, diagram, dashboard, board, show, four schema
         for path in scripts:
             with self.subTest(script=name_of(path)):
                 entry, problems = entry_of(path)
@@ -521,7 +499,7 @@ class Wrapper(unittest.TestCase):
                 self.assertTrue(hasattr(getattr(module_of(path), entry), "__wrapped__"))
 
     def test_every_file_under_scripts_is_a_library_or_a_program_with_a_wrapped_entry_point(self):
-        self.assertGreaterEqual(len(all_scripts()), 16)
+        self.assertGreaterEqual(len(all_scripts()), 13)
         for path in all_scripts():
             with self.subTest(script=name_of(path)):
                 self.assertEqual(top_level_problems(path), [])
@@ -602,18 +580,12 @@ def show_serving(root: Path) -> tuple:
     return (served_page(folder), 0, False), folder
 
 
-def canvas_serving(root: Path) -> tuple:
-    folder = canvas_folder(root)
-    return (served_page(folder), 0, False), folder
-
-
 # script -> (the function that starts the server, what it is given on a fresh folder, the events the page sends)
 HANDLERS = {
     "architect-better/architect.py": ("serve", architect_serving, "architect"),
     "code-better/dashboard.py": ("watch", dashboard_serving, "dashboard"),
     "research-better/board.py": ("watch", board_serving, "board"),
     "show-better/show.py": ("serve", show_serving, "show"),
-    "design-better/canvas.py": ("serve", canvas_serving, "canvas"),
 }
 PATHS = [
     "/",
@@ -867,7 +839,6 @@ CONVERSATIONS = {
     "code-better": ("dashboard.py", lambda root: dashboards.change(root)),
     "research-better": ("board.py", board_folder),
     "show-better": ("show.py", lambda root: folder_with_a_reply("show-better", root)),
-    "design-better": ("canvas.py", lambda root: folder_with_a_reply("design-better", root)),
 }
 
 
@@ -1046,7 +1017,6 @@ class Loaders(unittest.TestCase):
 
 PAGE_SKILLS = {
     "architect": "architect-better",
-    "canvas": "design-better",
     "show": "show-better",
     "board": "research-better",
     "dashboard": "code-better",
