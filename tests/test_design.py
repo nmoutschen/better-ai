@@ -9,10 +9,17 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGE_CSS = ROOT / "skills" / "research-better" / "scripts" / "page.css"
+PAGE_CSS = ROOT / "src" / "better_ai" / "page" / "page.css"
 PAGES = [
     p
-    for pattern in ("skills/*/scripts/*.css", "skills/*/scripts/*.html", "skills/*/scripts/*.js")
+    for pattern in (
+        "skills/*/scripts/*.css",
+        "skills/*/scripts/*.html",
+        "skills/*/scripts/*.js",
+        "src/better_ai/*/*.css",
+        "src/better_ai/*/*.html",
+        "src/better_ai/*/*.js",
+    )
     for p in sorted(ROOT.glob(pattern))
 ]
 
@@ -50,7 +57,7 @@ def board_css():
     page_css = PAGE_CSS.read_text(encoding="utf-8")
     start = page_css[: page_css.index("\n}\n")].count("\n") + 2
     yield from ((PAGE_CSS, n, line) for n, line in enumerate(page_css.splitlines(), 1) if n >= start)
-    board = scripts / "research-better/scripts/board.css"
+    board = ROOT / "src" / "better_ai" / "research" / "board.css"
     for n, line in enumerate(board.read_text(encoding="utf-8").splitlines(), 1):
         if ".map" not in line:
             yield board, n, line
@@ -138,7 +145,7 @@ class Design(unittest.TestCase):
         for name, tag in (("page.css", "style"), ("page.js", "script")):
             match = re.search(rf'<{tag} id="{name.replace(".", "-")}">\n(.*?)</{tag}>', html, re.S)
             self.assertIsNotNone(match, f"DESIGN.html has no <{tag} id=...> with {name}")
-            current = (ROOT / "skills" / "research-better" / "scripts" / name).read_text(encoding="utf-8")
+            current = (ROOT / "src" / "better_ai" / "page" / name).read_text(encoding="utf-8")
             self.assertEqual(match.group(1), current, f"DESIGN.html's copy of {name} is out of date: paste it again")
 
     def test_design_html_lists_the_same_colours(self):

@@ -391,11 +391,6 @@ VALID = {
         "accept": {"to": "c1-x"},
         "reopen": {"to": "c1-x", "text": "still wrong"},
     },
-    "board": {
-        "comment": {"id": "c-x", "text": "check this", "on": ANCHOR},
-        "note": {"id": "m-x", "text": "hi", "to": None},
-        "answer": {"id": "a-x", "decision": "D1", "text": "Use the default.", "default": True},
-    },
     "dashboard": {
         "comment": {"id": "c-x", "text": "why this agent?", "on": {"kind": "agent", "id": "b1", "title": "b1"}},
         "note": {"id": "m-x", "text": "hi", "to": None},
@@ -428,7 +423,6 @@ INVALID = {
     "architect": ("confirm", {"id": "confirm-x", "requirement": "F1", "text": "t"}, "wording"),
     "canvas": ("comment", {**VALID["canvas"]["comment"], "text": None}, "verdict"),
     "show": ("comment", {**VALID["show"]["comment"], "on": {"part": "headline"}}, "slide"),
-    "board": ("answer", {"id": "a-x", "text": "t", "default": False}, "decision"),
     "dashboard": ("answer", {"id": "a-x", "decision": "D1", "text": "", "default": False}, "text"),
 }
 
@@ -442,7 +436,6 @@ class Pages(unittest.TestCase):
             "architect": load("architect-better", "architect.py"),
             "canvas": load("design-better", "canvas.py"),
             "show": load("show-better", "show.py"),
-            "board": load("research-better", "board.py"),
             "dashboard": load("code-better", "dashboard.py"),
         }
 
@@ -550,23 +543,11 @@ class Pages(unittest.TestCase):
             conv, base = self.serve(load("design-better", "canvas.py"), Path(d))
             thumbs = {**VALID["canvas"]["comment"], "id": "c2-x", "text": None, "verdict": "up"}
             self.assertEqual(self.send(base, "comment", thumbs).get("result"), "saved")
-        for name in ("show", "board"):
+        for name in ("show",):
             with tempfile.TemporaryDirectory() as d:
                 conv, base = self.serve(self.modules()[name], Path(d))
                 thumbs = {**VALID[name]["comment"], "text": None, "verdict": "up"}
                 self.assertEqual(self.send(base, "comment", thumbs)["error"]["code"], -32602)
-
-    def test_the_researchers_closing_message_carries_its_question(self):
-        module = self.modules()["board"]
-        with tempfile.TemporaryDirectory() as d:
-            conv, _ = self.serve(module, Path(d))
-            conv.append({"type": "closed", "by": "w2", "id": "c-1", "question": "Q-w2-4", "status": "answered"})
-            self.assertEqual(
-                {k: conv.events()[0][k] for k in ("type", "by", "id", "question", "status")},
-                {"type": "closed", "by": "w2", "id": "c-1", "question": "Q-w2-4", "status": "answered"},
-            )
-            with self.assertRaises(module.page.EventError):
-                conv.append({"type": "closed", "by": "w2", "id": "c-2", "q": "Q-w2-4", "status": "answered"})
 
 
 def load_schema(module):
@@ -645,14 +626,6 @@ class Scripts(unittest.TestCase):
                 str(folder / "page.html"),
             ]
             self.serve_and_talk([*cmd, "--serve"], folder, "rev", {"on": {"slide": 1, "part": None}})
-
-    def test_research_better_board(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = Path(d)
-            script = str(ROOT / "skills" / "research-better" / "scripts" / "board.py")
-            self.serve_and_talk(
-                [sys.executable, "-I", script, "watch", str(folder), "--no-browser"], folder, "board.json"
-            )
 
     def test_code_better_dashboard(self):
         with tempfile.TemporaryDirectory() as d:
