@@ -103,6 +103,7 @@ class Fixture(unittest.TestCase):
             mock.patch.object(resources, "read_bytes", data),
             mock.patch.object(page.webbrowser, "open", return_value=True),  # never a real browser
             mock.patch.dict(os.environ, {"BETTER_AI_SKILL": "code-better"}),
+            mock.patch.object(sys, "stdout", io.StringIO()),  # the server prints each user event, as `serve` does
         ):
             target.start()
             self.addCleanup(target.stop)

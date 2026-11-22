@@ -641,7 +641,7 @@ function pageMarkdown(text) {
 // The server fills the shell with the page's config (see page/__init__.py, PageSpec): `{agent, title, capabilities}`.
 // A page uses a capability only when it declares it; the server refuses the events of one it does not declare.
 function pageConfig() {
-  var node = typeof document !== 'undefined' && document.getElementById('page-config');
+  var node = typeof document !== 'undefined' && document.getElementById && document.getElementById('page-config');
   try { return node ? JSON.parse(node.textContent) : {}; } catch (e) { return {}; }
 }
 function pageRole() { return pageConfig().agent || 'agent'; }
