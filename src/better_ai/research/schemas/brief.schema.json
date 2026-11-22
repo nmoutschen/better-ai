@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "brief.schema.json",
+  "title": "the research's contract: the topic, its confirmed meaning, the goal, the limits, where to search, and the state of the run",
+  "x-files": ["brief.json"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "topic", "title", "short", "meaning", "goal", "limit", "stop_at", "collections", "missing", "changes", "status"],
+  "properties": {
+    "type": {"const": "brief"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "topic": {"type": "string", "minLength": 1},
+    "title": {"description": "the topic in at most eight plain words", "type": "string", "minLength": 1},
+    "short": {"description": "the topic in two or three words, for the centre of the map", "type": "string", "minLength": 1},
+    "meaning": {"type": "string", "minLength": 1},
+    "goal": {"type": "string", "minLength": 1},
+    "limit": {"type": ["string", "null"]},
+    "stop_at": {"enum": ["high", "medium", "low"]},
+    "collections": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "missing": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "changes": {
+      "description": "what the coordinator changed in the scope or method during the run, newest first",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "text"],
+        "properties": {
+          "at": {"$ref": "base.schema.json#/$defs/at"},
+          "text": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "status": {"enum": ["running", "checking", "stopped"]}
+  }
+}

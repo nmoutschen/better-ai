@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reviews.schema.json",
+  "title": "one line of reviews.jsonl: a review run and a fingerprint of each part it looked at",
+  "$comment": "architect.py review writes it. A part key is as in findings.jsonl; the review-parts hook of schema.py checks them.",
+  "x-files": [
+    "reviews.jsonl"
+  ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "perspectives",
+    "changed",
+    "hashes"
+  ],
+  "properties": {
+    "type": {
+      "const": "review"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "perspectives": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "x-points-to": {
+          "file": "perspectives.jsonl",
+          "type": "perspective"
+        }
+      }
+    },
+    "changed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "hashes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "labels": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "x-check": "review-parts"
+    }
+  ]
+}

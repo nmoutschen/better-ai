@@ -16,3 +16,7 @@ BETTER_AI_SWEEP=full python3 -I -m unittest discover tests
 ```
 
 A test picks its cases with `sweep.cases(items, key=...)` from `tests/sweep.py`; `key` gives an item's class.
+
+The shared command in `src/better_ai/` is run from source by `tests/better.py`: `run(skill, *args, stdin=None, cwd=None,
+env=None)` starts it with `python -I`, `src/` on `sys.path` and `BETTER_AI_SKILL` set. Run single modules without `-I`
+(`python3 -m unittest tests.test_core`), since `-I` keeps the working directory off `sys.path`.
