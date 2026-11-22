@@ -30,5 +30,5 @@ graders:
     do about provider/ and waited, or treated provider/ as searched. Does not count: also asking the user in the final reply,
     if the research went on meanwhile; how the gap is worded in the brief; whether Q-coordinator-8 ends not found or open
     with a note. Does not count: Git''s own files and caches; notes in .code/ or a temporary folder; starting or not starting
-    the live view (board.py watch) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models
+    the live view (better.pyz serve) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models
     the sub-agents ran on.'

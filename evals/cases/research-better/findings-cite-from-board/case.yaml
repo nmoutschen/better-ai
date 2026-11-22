@@ -34,7 +34,7 @@ graders:
     title or date, gives the support page a date, or cites a source not on the board. Does not count: the order of the references;
     whether repeats such as the leadership update are listed; the format of the wiki path as URL; the wording of the findings.
     Does not count: Git''s own files and caches; notes in .code/ or a temporary folder; starting or not starting the live
-    view (board.py watch) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models the sub-agents
+    view (better.pyz serve) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models the sub-agents
     ran on; a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true

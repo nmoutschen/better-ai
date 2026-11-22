@@ -37,6 +37,6 @@ graders:
     shows the API sending email to MailRelay directly (in Before), or leaves out the email job or the outbox path to
     MailRelay; no design.json was written. Does not count: Git''s own files under .git/ and caches; notes in .code/ or a
     temporary folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl
-    entries written by architect.py); asking the user to confirm Before in the page; asking about a remaining gap after
+    entries written by better.pyz); asking the user to confirm Before in the page; asking about a remaining gap after
     Before is drawn; a run that ends waiting for the user; a register.html or rendered diagrams; extra boxes that match
     the code, such as PayLane or the website.'

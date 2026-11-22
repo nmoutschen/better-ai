@@ -43,4 +43,4 @@ graders:
     "errors are handled". Does not count: other requirements and their order; the "Checked by" column; where specs.md
     is saved; the spec checker; the decision records; Git's own files under .git/ and caches; notes in .code/ or a
     temporary folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl
-    entries written by architect.py); asking the user to confirm in the page; a run that ends waiting for the user.
+    entries written by better.pyz); asking the user to confirm in the page; a run that ends waiting for the user.

@@ -40,7 +40,7 @@ graders:
     per customer, a monthly budget) or other gaps that change what users see; saving the request in architect.json or
     drawing Before; stating minor assumptions; Git''s own files under .git/ and caches; notes in .code/ or a temporary
     folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries
-    written by architect.py); asking the user to confirm in the page; a run that ends waiting for the user.'
+    written by better.pyz); asking the user to confirm in the page; a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true
   hidden_checks_pass_untouched:

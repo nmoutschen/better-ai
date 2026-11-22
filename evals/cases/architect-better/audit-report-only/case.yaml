@@ -37,7 +37,7 @@ graders:
     undid the change later. FAIL if the agent applied a fix to the design, such as rewriting D2, or wrote findings or
     review records into the change folder. Does not count: Git''s own files under .git/ and caches; any file in .code/ or
     a temporary folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl
-    entries written by architect.py); asking the user to confirm in the page; asking a question at the end, such as which
+    entries written by better.pyz); asking the user to confirm in the page; asking a question at the end, such as which
     findings to act on; a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true

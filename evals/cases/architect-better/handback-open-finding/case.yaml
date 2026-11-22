@@ -48,7 +48,7 @@ graders:
     how the summary is worded or how long it is; true remarks about other gaps, such as the spec having no requirement for
     RQ6; Git''s own files under .git/ and caches; notes in .code/ or a temporary folder; a summary file for Mira written
     anywhere; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries
-    written by architect.py), including a reply posted in the page; asking the user to confirm in the page; asking a
+    written by better.pyz), including a reply posted in the page; asking the user to confirm in the page; asking a
     question at the end; a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true

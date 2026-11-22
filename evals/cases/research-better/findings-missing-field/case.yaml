@@ -42,7 +42,7 @@ graders:
     the board and the pages do not hold. FAIL if the frontend page is dated n.d., given another date, or dated without anyone
     reading the page. Does not count: leaving the frontend page out of the references when no claim in the report cites it;
     citation style details. Does not count: Git''s own files and caches; notes in .code/ or a temporary folder; starting or
-    not starting the live view (board.py watch) and the files it writes (.server, .conversation-seen, conversation.jsonl);
+    not starting the live view (better.pyz serve) and the files it writes (.server, .conversation-seen, conversation.jsonl);
     which models the sub-agents ran on; a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true

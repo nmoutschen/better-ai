@@ -35,5 +35,5 @@ graders:
     Does not count: whether API standards is marked as applying or as covered by the repo standard''s record; extra
     records for other perspectives; how design.md presents the same table; the design''s decisions; Git''s own files
     under .git/ and caches; notes in .code/ or a temporary folder; serving the live page and the files it writes
-    (.server, .conversation-seen, conversation.jsonl entries written by architect.py); asking the user to confirm in
+    (.server, .conversation-seen, conversation.jsonl entries written by better.pyz); asking the user to confirm in
     the page or to choose Approve...; a run that ends waiting for the user.'
