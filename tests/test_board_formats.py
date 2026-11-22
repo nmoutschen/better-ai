@@ -613,6 +613,30 @@ class MergeCycles(unittest.TestCase):
         board.SCANS.clear()
         return board.load(folder)
 
+    def test_a_loop_of_2000_questions_is_reported_for_each_member_in_good_time(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            count = 2000
+            links = {f"Q-w2-{100 + k}": f"Q-w2-{100 + (k + 1) % count}" for k in range(count)}
+            started = time.monotonic()
+            data = self.merged(folder, links)
+            took = time.monotonic() - started
+            loops = [e for e in data["errors"] if "merge loop" in e["message"]]
+        self.assertEqual(len(loops), count)
+        self.assertLess(took, 5)
+
+    def test_a_chain_of_2000_questions_reports_nothing_in_good_time(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            count = 2000
+            links = {f"Q-w2-{100 + k}": f"Q-w2-{100 + k + 1}" for k in range(count)}
+            started = time.monotonic()
+            data = self.merged(folder, links)
+            took = time.monotonic() - started
+            loops = [e for e in data["errors"] if "merge loop" in e["message"]]
+        self.assertEqual(loops, [])
+        self.assertLess(took, 5)
+
     def test_two_questions_merged_into_each_other_are_both_reported_and_drawn_marked(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
