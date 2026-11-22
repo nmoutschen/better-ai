@@ -26,10 +26,6 @@ IF a field is missing, SAY so in the output and review what you have.
 - `code`: <paths of the code the design describes or changes, or none>
 - `scope`: <the whole design, or the IDs of the boxes, arrows and flow steps changed since the last review>
 
-## Messages
-
-None. PUT everything in the output.
-
 ## How to review
 
 - READ `goal`, `requirements` and `decided` first. DO NOT review against your own idea of what the design should be.
