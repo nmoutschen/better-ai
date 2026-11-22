@@ -760,7 +760,7 @@ class SlideOnNotes(unittest.TestCase):
         self.assertRegex(source, r"noteParams:\s*function \(\) \{ return \{ on: \{ slide: cur \+ 1, part: [^}]*null")
 
 
-# The crashes a verifier found: wrongly typed values the hook once met with a TypeError.
+# Wrongly typed values that once made the hook raise a TypeError.
 CRASH_1 = {
     "type": "slides",
     "title": "The answer.",
