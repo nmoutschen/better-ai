@@ -143,14 +143,14 @@ USE the `svg` kind only when no other kind fits. KEEP one direction of flow, und
 ## 5. Build, check and show
 
 1. **Extract.** WRITE the extract in section 2.
-2. **Write the spec.** WRITE a JSON spec in the format in [templates/spec.md](templates/spec.md). SAVE it as `.show/<slug>/spec.json` in the working directory. DO NOT commit it unless the user asks.
-3. **Check the spec.** RUN `python3 scripts/show.py check <spec>` from this skill's directory. FIX every error. TREAT each warning as a reason to split or simplify the slide, unless you can say why it does not apply.
+2. **Write the spec.** WRITE a JSON spec in the format in [templates/spec.md](templates/spec.md). RUN `python3 <skill dir>/scripts/better.pyz create .show/<slug> --by <your name>` at the repo root, with the spec on stdin. DO NOT commit it unless the user asks. WRITE each later change to the spec with `python3 <skill dir>/scripts/better.pyz set .show/<slug> spec`. IF a command refuses the spec, FIX the spec and RUN it again. IF it reports busy, RUN it again. DO NOT write the spec by hand to get past a refusal.
+3. **Check the spec.** RUN `python3 <skill dir>/scripts/better.pyz check .show/<slug>`. FIX every error. TREAT each warning as a reason to split or simplify the slide, unless you can say why it does not apply.
 4. **Compare the digest with the document.** The check prints every headline, value, label, detail and source. CHECK each against the extract and the document, and CHECK that each headline matches its visual and that nothing the GOAL needs is missing.
 5. **Render and show.** CHOOSE the first route the user can read:
-   1. IF the user's browser can reach this machine, SERVE the page: RUN `python3 scripts/show.py render <spec> --out .show/<slug>/index.html --serve --open` in the background, GIVE the address it prints, and FOLLOW section 6.
-   2. IF the user asks to share the slides, or their browser cannot reach this machine and you can publish a page, RENDER without `--serve` and PUBLISH that file: opened as a file, it shows the slides without the conversation. GIVE the link.
-   3. IF the user reads in a terminal, RENDER `--format text`, or `--format md` for Markdown. USE `--ascii` when the output must survive plain-text files. IF the user reads with a screen reader or finds the diagrams hard to follow, RENDER `--format text --screen-reader`.
-   4. IF you cannot run Python, WRITE the slides in Markdown: the question and answer first, then each slide as a bold headline, its content as a table or list, and its source. USE a plain-text diagram only for a flow of at most four short steps, and CHECK each value against the document by hand.
+   1. IF the user's browser can reach this machine, SERVE the page: RUN `python3 <skill dir>/scripts/better.pyz serve .show/<slug> --open` in the background, GIVE the address it prints, and FOLLOW section 6.
+   2. IF the user asks to share the slides, or their browser cannot reach this machine and you can publish a page, RUN `python3 <skill dir>/scripts/better.pyz render .show/<slug>` and PUBLISH the page it writes: opened as a file, it shows the slides without the conversation. GIVE the link.
+   3. IF the user reads in a terminal, RUN `python3 <skill dir>/scripts/better.pyz render .show/<slug> --format text`, or `--format md` for Markdown. USE `--ascii` when the output must survive plain-text files. IF the user reads with a screen reader or finds the diagrams hard to follow, RUN `render` with `--format text --screen-reader`.
+   4. IF you cannot run commands, SAY the spec was not written, THEN WRITE the slides in Markdown: the question and answer first, then each slide as a bold headline, its content as a table or list, and its source. USE a plain-text diagram only for a flow of at most four short steps, and CHECK each value against the document by hand.
 6. **Look at the result.** IF you can view the page or a screenshot, CHECK each slide: the headline matches the most prominent feature, labels do not overlap or get cut off, and highlights are visible. FOR text output, READ it as printed. DO NOT describe a page you have not rendered.
 
 The page also offers Export, which downloads the slides alone as a presentation. TELL the user about it WHEN they want to present the slides.
@@ -159,17 +159,17 @@ REPORT only the checks you performed. IF you could not look at the result, SAY s
 
 ## 6. Work with the user in the page
 
-On the served page, the user reads the slides, switches to Comment and clicks any part of a slide to comment on it, or writes a message in the column on the right. Each action is printed as one JSON line and appended to `conversation.jsonl` next to the page. A comment names the slide, its part and headline, the clicked text, the nearest drawn item and where the click fell: WORK OUT what the user pointed at from all of these.
+On the served page, the user reads the slides, switches to Comment and clicks any part of a slide to comment on it, or writes a message in the column on the right. Each action is printed as one JSON line. A comment names the slide, its part and headline, the clicked text, the nearest drawn item and where the click fell: WORK OUT what the user pointed at from all of these.
 
 1. RECEIVE the actions by the first route your harness offers:
    1. IF your harness can stream a background command's output to you as it arrives, STREAM the serve command's output. A stream that expires stops only the watch: START it again.
-   2. OTHERWISE, IF you can run a command in the background and be told when it ends, RUN `python3 scripts/show.py wait .show/<slug>` that way. It ends with the actions you have not seen: START it again at once, before you act on them, and KEEP it running while the page is served. WHILE no `wait` runs, the page tells the user that you are not watching.
-   3. OTHERWISE, ASK the user to say "sent" in the chat, THEN READ the new lines of `conversation.jsonl`.
+   2. OTHERWISE, IF you can run a command in the background and be told when it ends, RUN `python3 <skill dir>/scripts/better.pyz wait .show/<slug>` that way. It ends with the actions you have not seen: START it again at once, before you act on them, and KEEP it running while the page is served. WHILE no `wait` runs, the page tells the user that you are not watching.
+   3. OTHERWISE, ASK the user to say "sent" in the chat, THEN RUN `python3 <skill dir>/scripts/better.pyz pending .show/<slug>`.
 2. TREAT each action as the user's reply. WHILE the user works in the page, PUT everything for them in the page, and DO NOT answer each page action in the chat.
-   - TRACK each comment and message with `python3 scripts/show.py status .show/<slug> seen|asked|working|done <id>...` (and `accepted <id>... --text "the user's words"` when the user accepts in the chat): MARK it `seen` when it arrives, `asked` when you asked the user something and wait for the answer, `working` only while you are changing it now, and `done` once the answer or the change is in the page. READ a note the user adds under an item as part of that item's thread, in the order of the `at` times. ONCE an answer leads to a change, MARK the item `done` and ASK the next question as a new message. TREAT an item as finished only when the user accepts it, in the page or in words (then MARK it `accepted`).
-   - REPLY in the page with `python3 scripts/show.py reply .show/<slug> "<text>" --to <id>`, in one or two short sentences: what you changed, or the one thing you need.
-   - TO change slides, EDIT the spec, CHECK it, and RUN the same `render` command without `--serve` and `--open`: the open page loads the new slides by itself once the user is not typing.
-   - RUN `python3 scripts/show.py pending .show/<slug>` after each batch of changes, before you wait again, and after an interruption: FINISH or ANSWER what it lists.
+   - TRACK each comment and message with `python3 <skill dir>/scripts/better.pyz status .show/<slug> seen|asked|working|done <id>...` (and `accepted <id>... --text "the user's words"` when the user accepts in the chat): MARK it `seen` when it arrives, `asked` when you asked the user something and wait for the answer, `working` only while you are changing it now, and `done` once the answer or the change is in the page. READ a note the user adds under an item as part of that item's thread, in the order of the `at` times. ONCE an answer leads to a change, MARK the item `done` and ASK the next question as a new message. TREAT an item as finished only when the user accepts it, in the page or in words (then MARK it `accepted`).
+   - REPLY in the page with `python3 <skill dir>/scripts/better.pyz reply .show/<slug> "<text>" --to <id>`, in one or two short sentences: what you changed, or the one thing you need.
+   - TO change slides, UPDATE the spec with `set`, CHECK it, and the open page loads the new slides by itself once the user is not typing.
+   - RUN `python3 <skill dir>/scripts/better.pyz pending .show/<slug>` after each batch of changes, before you wait again, and after an interruption: FINISH or ANSWER what it lists.
 3. STOP the server only when the user says so.
 
 ## 7. Hand it over

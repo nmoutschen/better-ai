@@ -642,5 +642,60 @@ class CodeBetterTextTest(unittest.TestCase):
         self.assertEqual(found, [])
 
 
+class UnifiedCommandText(unittest.TestCase):
+    """architect-better, design-better and show-better: their text names `better.pyz` and no old script, states the
+    record rule once in SKILL.md, and shows template lines with only each record's own fields."""
+
+    SKILLS = ("architect-better", "design-better", "show-better")
+    OLD = re.compile(r"\b(architect|diagram|canvas|show|schema|page)\.py\b|schemas/")
+    RULE = (
+        "WRITE each record of the unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, "
+        "or `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. "
+        "DO NOT write the record by hand to get past a refusal."
+    )
+
+    def texts(self, *names):
+        for name in names or self.SKILLS:
+            for path in sorted((ROOT / "skills" / name).rglob("*.md")):
+                if "scripts" not in path.relative_to(ROOT / "skills" / name).parts:
+                    yield path
+
+    def test_no_text_names_an_old_script_or_schemas_as_the_authority(self):
+        found = [f"{p.relative_to(ROOT)}: {m.group(0)}" for p in self.texts() for m in self.OLD.finditer(p.read_text())]
+        self.assertEqual(found, [])
+
+    def test_the_record_rule_is_stated_once_per_skill_that_writes_records(self):
+        for name in ("architect-better", "design-better"):
+            with self.subTest(name):
+                self.assertEqual((ROOT / "skills" / name / "SKILL.md").read_text().count(self.RULE), 1)
+
+    def test_no_text_tells_the_agent_to_check_after_every_write(self):
+        for path in self.texts():
+            with self.subTest(path.name):
+                self.assertNotIn("AFTER every write", path.read_text())
+
+    def test_no_template_example_line_holds_at_by_or_id(self):
+        """The record templates are architect-better's; show-better's spec template is one object, not lines."""
+        lines = 0
+        for path in self.texts("architect-better"):
+            if path.parent.name != "templates":
+                continue
+            for line in path.read_text().splitlines():
+                if line.startswith("{") and line.endswith("}"):
+                    lines += 1
+                    record = json.loads(re.sub(r"<[^<>\"]+>", "text", line))  # the spec of show-better is one JSON object
+                    for field in ("at", "by", "id"):
+                        self.assertNotIn(field, record, line)
+        self.assertGreater(lines, 20)
+
+    def test_show_better_names_commands_only_and_design_better_approves(self):
+        spec = (ROOT / "skills" / "show-better" / "templates" / "spec.md").read_text()
+        for verb in ("create", "check", "render", "serve", "wait", "reply", "status", "pending"):
+            self.assertIn(f"better.pyz {verb} ", spec)
+        design = (ROOT / "skills" / "design-better" / "SKILL.md").read_text()
+        self.assertIn("`canvas.json`", design)
+        self.assertNotIn("Decide", design)
+
+
 if __name__ == "__main__":
     unittest.main()
