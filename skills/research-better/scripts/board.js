@@ -406,7 +406,7 @@ function render(d) {
 // A record the board still shows although it broke the schema says so, in the error colour, with its first message.
 const notValid = r => r && r._errors && r._errors.length ? `not valid: ${r._errors[0]}` : "";
 const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))}</span>` : "";
-const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions are shown marked not valid, and claims and sources under the question they name; other records are only listed here.</p><ul>`
+const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here.</p><ul>`
   + errors.map(e => `<li><code>${esc(e.file)}:${esc(e.line)}</code> ${esc(e.field)}: ${esc(e.message)}${e.by ? ` <span class="by">(by ${esc(e.by)})</span>` : ""}</li>`).join("") + "</ul>";
 function showLoaded(d, els) {
   const errors = d.errors || [];

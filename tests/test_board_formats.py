@@ -37,6 +37,15 @@ FILES = {
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wrong_types  # noqa: E402
 
+
+def schema_main(argv: list) -> tuple:
+    """research-better's schema.py on the command line: its exit code and what it printed."""
+    run = subprocess.run(
+        [sys.executable, "-I", str(SCRIPT.parent / "schema.py"), *argv], capture_output=True, text=True, timeout=60
+    )
+    return run.returncode, run.stdout
+
+
 spec = importlib.util.spec_from_file_location("board_under_test", SCRIPT)
 board = importlib.util.module_from_spec(spec)
 sys.path.insert(0, str(SCRIPT.parent))
@@ -594,18 +603,85 @@ class MergeCycles(unittest.TestCase):
             write_entry(folder, seeded("Q-w2-9", status="merged", merged_into="Q-w2-4"))
             self.assertEqual(board.load(folder)["errors"], [])
 
-    def test_two_questions_merged_into_each_other_are_drawn_with_their_claims(self):
+    def merged(self, folder: Path, links: dict) -> list:
+        """Write a question for each id of `links`, merged into the id it maps to (None: not merged), and a claim
+        for the first; the errors `board.load` reports for the questions."""
+        support(folder)
+        for one, other in links.items():
+            write_entry(folder, seeded(one, status="merged", merged_into=other) if other else seeded(one))
+        write_entry(folder, claim("C-w2-9", question=next(iter(links))))
+        board.SCANS.clear()
+        return board.load(folder)
+
+    def test_two_questions_merged_into_each_other_are_both_reported_and_drawn_marked(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
-            support(folder)
-            for one, other in (("Q-w2-8", "Q-w2-9"), ("Q-w2-9", "Q-w2-8")):
-                write_entry(folder, seeded(one, status="merged", merged_into=other))
-            write_entry(folder, claim("C-w2-9", question="Q-w2-8"))
-            data = board.load(folder)
-        self.assertEqual(data["errors"], [])
+            data = self.merged(folder, {"Q-w2-8": "Q-w2-9", "Q-w2-9": "Q-w2-8"})
+            errors = [(e["file"], e["field"], e["message"]) for e in data["errors"]]
+            self.assertEqual(
+                sorted(errors),
+                [
+                    ("questions/Q-w2-8.json", "merged_into", "merge loop: Q-w2-8 → Q-w2-9 → Q-w2-8"),
+                    ("questions/Q-w2-9.json", "merged_into", "merge loop: Q-w2-9 → Q-w2-8 → Q-w2-9"),
+                ],
+            )
+            drawn = {q["id"]: q for q in data["questions"]}
+            self.assertTrue(drawn["Q-w2-8"]["_errors"] and drawn["Q-w2-9"]["_errors"])
+            self.assertEqual(sorted(c["id"] for c in data["claims"]), ["C-w2-7", "C-w2-8", "C-w2-9"])
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(board.check(folder), 1)
+            self.assertEqual(out.getvalue().count("merge loop"), 2)
+            result = schema_main(["check", str(folder / "questions")])
+            self.assertEqual(result[0], 1)
+            self.assertEqual(result[1].count("merge loop"), 2)
         result = render([{"label": "mutual merge", "data": data}])
         if result:
             self.assertEqual(result.returncode, 0, result.stderr[:3000])
+
+    def test_a_loop_of_three_reports_each_member_and_not_a_question_merged_into_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            data = self.merged(folder, {"Q-w2-1": "Q-w2-2", "Q-w2-2": "Q-w2-3", "Q-w2-3": "Q-w2-1", "Q-w2-5": "Q-w2-1"})
+            errors = {e["file"]: e["message"] for e in data["errors"]}
+        self.assertEqual(
+            errors,
+            {
+                "questions/Q-w2-1.json": "merge loop: Q-w2-1 → Q-w2-2 → Q-w2-3 → Q-w2-1",
+                "questions/Q-w2-2.json": "merge loop: Q-w2-2 → Q-w2-3 → Q-w2-1 → Q-w2-2",
+                "questions/Q-w2-3.json": "merge loop: Q-w2-3 → Q-w2-1 → Q-w2-2 → Q-w2-3",
+            },
+        )
+
+    def test_a_stray_file_with_a_question_id_does_not_hide_a_loop(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            for one, other in (("Q-w2-1", "Q-w2-2"), ("Q-w2-2", "Q-w2-1")):
+                write_entry(folder, seeded(one, status="merged", merged_into=other))
+            write_json(folder, "questions/zz.json", {"id": "Q-w2-2", "type": "question"})
+            board.SCANS.clear()
+            files = {e["file"] for e in board.load(folder)["errors"] if "merge loop" in e["message"]}
+        self.assertEqual(files, {"questions/Q-w2-1.json", "questions/Q-w2-2.json"})
+
+    def test_two_thousand_questions_merged_into_one_load_quickly(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            for n in range(100, 2100):
+                write_entry(folder, seeded(f"Q-w2-{n}", status="merged", merged_into="Q-w2-4"))
+            board.SCANS.clear()
+            started = time.monotonic()
+            errors = board.load(folder)["errors"]
+            took = time.monotonic() - started
+        self.assertEqual(errors, [])
+        self.assertLess(took, 10)
+
+    def test_a_long_chain_that_ends_is_not_a_loop(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            ids = [f"Q-w2-{n}" for n in range(1, 8)]
+            data = self.merged(folder, {**dict(zip(ids, ids[1:], strict=False)), ids[-1]: None})
+        self.assertEqual(data["errors"], [])
 
 
 class WrongTypes(unittest.TestCase):
@@ -653,10 +729,11 @@ class WrongTypes(unittest.TestCase):
                         payloads.append({"label": f"{relative}: {label}", "data": self.survives(folder)})
                 put_file(folder, relative, records, as_json)
                 for raw in wrong_types.RAW_LINES:
-                    if as_json:
-                        break
                     with self.subTest(f"{relative}: raw {raw[:10]}"):
-                        (folder / relative).write_text(raw + "\n" + "".join(json.dumps(r) + "\n" for r in records))
+                        # a single-JSON file holds the raw text alone; a JSONL file, the raw line before its records
+                        (folder / relative).write_text(
+                            raw + "\n" + ("" if as_json else "".join(json.dumps(r) + "\n" for r in records))
+                        )
                         payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": self.survives(folder)})
         self.assertGreater(len(payloads), 1000)
         result = render(payloads)
