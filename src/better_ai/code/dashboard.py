@@ -252,7 +252,7 @@ def static_page(unit: Unit) -> str:
         if url.endswith(".css"):
             text = text.replace(f'<link href="{url}" rel="stylesheet">', "<style>\n" + asset + "\n</style>")
         elif url == "/page.js":
-            data = page._json_for_html({**load(unit), "now": time.time(), "old": page.old_count_of(unit)})
+            data = page._json_for_html({**load(unit), "now": time.time()})
             text = text.replace(
                 f'<script src="{url}"></script>',
                 f'<script type="application/json" id="page-data">{data}</script>\n<script>\n'
@@ -278,6 +278,6 @@ def _render_arguments(parser: argparse.ArgumentParser) -> None:
 )
 def render(args: argparse.Namespace, run: cli.Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
-    paths.write_atomic(unit, STATIC, static_page(unit).encode("utf-8"))
+    paths.write_atomic(unit, STATIC, page.with_old_note(unit, static_page(unit)).encode("utf-8"))
     run.out(f"{unit.label}/{STATIC}")
     return cli.EXIT_DONE

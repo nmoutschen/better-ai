@@ -233,7 +233,7 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
     paths.write_atomic(
         unit,
         f"{RENDER_FOLDER}/index.html",
-        static_page(unit, run, {**payload, "old": page.old_count_of(unit)}).encode("utf-8"),
+        page.with_old_note(unit, static_page(unit, run, payload)).encode("utf-8"),
     )
     if payload["errors"]:
         run.err(f"warning: {len(payload['errors'])} records are not valid: run check {unit.label}")

@@ -306,11 +306,7 @@ def static_page(data: dict) -> str:
         tag = f'<script src="{html.escape(url)}"></script>'
         script = "<script>\n" + resources.read_text(table[url]).replace("</script", "<\\/script") + "\n</script>"
         if url == "/page.js":
-            count = json.dumps({"old": data.get("old", 0)})  # the shared page reads the count from page-data
-            script = (
-                f'<script type="application/json" id="page-data">{count}</script>\n'
-                f"<script>var BOARD_SNAPSHOT = {embedded};</script>\n" + script
-            )
+            script = f"<script>var BOARD_SNAPSHOT = {embedded};</script>\n" + script
         text = text.replace(tag, script, 1)
     return text
 
@@ -329,6 +325,6 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
     if not unit.exists():
         raise paths.refusal(unit.label, "it holds no board", f"run create {unit.label} first")
-    paths.write_atomic(unit, RENDERED, static_page({**load(unit), "old": page.old_count_of(unit)}).encode("utf-8"))
+    paths.write_atomic(unit, RENDERED, page.with_old_note(unit, static_page(load(unit))).encode("utf-8"))
     run.out(f"wrote {Path(unit.label) / RENDERED}")
     return cli.EXIT_DONE

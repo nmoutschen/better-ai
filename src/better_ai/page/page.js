@@ -401,8 +401,6 @@ function pageConversation(o) {
   }
   function start() {
     renderThread();
-    var carried = document.getElementById('page-data');  // a page written by `render` carries its data, and its count
-    if (carried) { try { oldNote(Number(JSON.parse(carried.textContent).old) || 0); } catch (e) {} }
     if (!o.served) return;
     (function count() {
       fetch('/old').then(function (r) { return r.json(); }).then(function (n) { oldNote(Number(n) || 0); })

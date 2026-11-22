@@ -19,6 +19,8 @@ sys.path.insert(0, str(HERE.parent / "src"))
 
 import better  # noqa: E402
 
+from better_ai import page  # noqa: E402
+
 SRC = HERE.parent / "src" / "better_ai"
 UNITS = HERE / "fixtures" / "units"
 OLD_AT = "2026-11-01T10:00:00Z"
@@ -126,7 +128,12 @@ class OldFormatCountTest(unittest.TestCase):
                     server.communicate(timeout=10)
 
     def test_a_rendered_page_carries_the_same_count_as_the_served_one(self):
-        outputs = {"code-better": "dashboard.html", "research-better": "board.html", "design-better": "index.html"}
+        outputs = {
+            "code-better": "dashboard.html",
+            "research-better": "board.html",
+            "design-better": "index.html",
+            "show-better": "page.html",
+        }
         for skill, name in outputs.items():
             unit, setup, make_old, expected = CASES[skill]
             with self.subTest(skill), tempfile.TemporaryDirectory() as tmp:
@@ -142,12 +149,16 @@ class OldFormatCountTest(unittest.TestCase):
                 done = better.run(skill, "render", unit, cwd=repo)
                 self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
                 text = (repo / unit / name).read_text()
-                self.assertRegex(text, r'id="page-data">.*"old": ?1')
+                # The count is in the page as it opens, not only in data a script may never read.
+                self.assertRegex(
+                    text, r'<p class="oldnote" id="oldnote" role="status">1 record in the format before this'
+                )
 
     def test_no_skill_draws_a_count_of_its_own(self):
         for path in SRC.glob("*/*"):
             if path.suffix in (".js", ".html", ".css") and path.parent.name != "page":
-                text = path.read_text()
+                # A static page that does not use the shell holds the shared empty element, which render fills.
+                text = path.read_text().replace(page.OLD_NOTE, "")
                 self.assertNotIn("format before this change", text, path.name)
                 self.assertNotIn("oldnote", text, path.name)
 

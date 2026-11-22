@@ -220,6 +220,23 @@ def old_format_count(unit: Unit, docs: dict[str, dict], cutoff: str | None) -> i
     return len(notices)
 
 
+OLD_NOTE = '<p class="oldnote" id="oldnote" role="status" hidden></p>'
+
+
+def old_note_text(count: int) -> str:
+    """The words of the count, the same as page.js writes on a served page."""
+    noun = "record" if count == 1 else "records"
+    return f"{count} {noun} in the format before this change: kept as is, not converted."
+
+
+def with_old_note(unit: Unit, page_html: str) -> str:
+    """A page written by `render`, with the unit's old-format count filled into it, so it shows without a script."""
+    count = old_count_of(unit)
+    if not count or OLD_NOTE not in page_html:
+        return page_html
+    return page_html.replace(OLD_NOTE, f'<p class="oldnote" id="oldnote" role="status">{old_note_text(count)}</p>', 1)
+
+
 def old_count_of(unit: Unit) -> int:
     """`old_format_count` for a unit's own skill and this build's cutoff, for a page written by `render`."""
     return old_format_count(unit, load_docs(unit.skill), resources.build_info().cutoff)
@@ -895,6 +912,7 @@ __all__ = [
     "PageSpec",
     "make_server",
     "old_count_of",
+    "with_old_note",
     "old_format_count",
     "register",
     "revision_of",

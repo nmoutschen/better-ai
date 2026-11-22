@@ -258,7 +258,7 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
         named = version_path(version.get("file")) if isinstance(version, dict) else None
         if is_page(named):
             raise Refused(f"{unit.label}: {page_reason(named)}. set {unit.label} canvas")
-    paths.write_atomic(unit, "index.html", static_page({**data, "old": page.old_count_of(unit)}).encode("utf-8"))
+    paths.write_atomic(unit, "index.html", page.with_old_note(unit, static_page(data)).encode("utf-8"))
     for warning in warnings:
         run.err(f"warning: {warning}")
     run.out(str(unit.target("index.html")))
