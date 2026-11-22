@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -87,6 +88,55 @@ class Unit(unittest.TestCase):
         self.assertEqual(self.create({**HEAD, **both}).returncode, 1)
         outside = {"versions": [{"label": "A", "file": "../x.html"}]}
         self.assertEqual(self.create({**HEAD, **outside}).returncode, 1)
+
+    def test_a_version_may_not_be_index_html_which_render_writes(self):
+        (self.folder / "index.html").write_text("<p>my own page</p>")
+        head = {**HEAD, "versions": [{"label": "A", "file": "index.html"}, {"label": "B", "file": "b.html"}]}
+        done = self.create(head)
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("index.html is the compare page render writes", done.stdout + done.stderr)
+        # set and check refuse it too, and render never overwrites the file
+        self.create()
+        done = run(self.root, "set", ".design/pay", "canvas", stdin=json.dumps({"versions": head["versions"]}))
+        self.assertEqual(done.returncode, 1)
+        (self.folder / "canvas.json").write_text(
+            json.dumps({"type": "canvas", "at": "2026-11-22T10:00:00Z", "by": "x", **head})
+        )
+        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 1)
+        done = run(self.root, "render", ".design/pay")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("index.html", done.stderr)
+        self.assertEqual((self.folder / "index.html").read_text(), "<p>my own page</p>")
+
+    def test_a_symlinked_version_is_refused_by_check_as_render_refuses_it(self):
+        (self.folder / "link.html").symlink_to(self.folder / "a.html")
+        head = {**HEAD, "versions": [{"label": "A", "file": "link.html"}, {"label": "B", "file": "b.html"}]}
+        done = self.create(head)
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("is a symlink: copy the file into the unit", done.stdout + done.stderr)
+        self.create()
+        (self.folder / "canvas.json").write_text(
+            json.dumps({"type": "canvas", "at": "2026-11-22T10:00:00Z", "by": "x", **head})
+        )
+        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 1)
+
+    def test_render_over_malformed_heads_never_shows_a_traceback(self):
+        heads = [
+            "[]",
+            "not json",
+            "",
+            '{"versions": 5, "widths": "x", "title": 3}',
+            '{"versions": [5, {"label": 1}, {"label": "A", "file": 5}, {"label": "B", "file": "../x"}, {"label": "C"}]}',
+            r'{"versions": [{"label": "A\ud800", "file": "a\ud800.html"}], "title": "\ud800", "question": "\ud800"}',
+            '{"versions": [{"label": "A", "file": "' + "a/" * 300 + 'x.html"}]}',
+            "[" * 50000,
+        ]
+        for text in heads:
+            with self.subTest(head=text[:40]):
+                (self.folder / "canvas.json").write_text(text)
+                done = run(self.root, "render", ".design/pay")
+                self.assertNotIn("Traceback", done.stderr)
+                self.assertLess(done.returncode, 5, done.stderr)
 
     def test_set_canvas_changes_the_versions(self):
         self.create()
@@ -227,6 +277,72 @@ class Served(unittest.TestCase):
         self.assertEqual(self.send("decide", {**approval, "id": "d1"})["error"]["code"], -32601)  # decide is gone
         self.assertEqual(self.send("approve", {"id": "ap2", "option": "A"})["error"]["code"], -32602)
 
+    ON = {"version": "A", "screen": "1280x800", "target": {"selector": "#a"}, "spot": {"fx": 0.5, "fy": 0.5}}
+    EVENTS = {
+        "comment": {"id": "c1-x", "n": 1, "text": "too small", "on": ON},
+        "note": {"id": "m-x", "text": "hi", "to": None},
+        "verdict": {"version": "A", "verdict": "up"},
+        "approve": {"id": "ap-x", "option": "A", "label": "Build A", "carries": ["c1-x"], "text": None},
+        "delete": {"to": "c1-x"},
+        "accept": {"to": "c1-x"},
+        "reopen": {"to": "c1-x", "text": "still wrong"},
+    }
+
+    def log(self):
+        return [json.loads(x) for x in (self.folder / "conversation.jsonl").read_text().splitlines()]
+
+    def test_every_method_the_page_sends_has_a_valid_event_that_is_saved_as_the_users(self):
+        for method, params in self.EVENTS.items():
+            answer = self.send(method, params)
+            self.assertEqual(answer.get("result"), "saved", f"{method}: {answer}")
+        events = self.log()
+        self.assertEqual([e["type"] for e in events], list(self.EVENTS))
+        self.assertEqual({e["by"] for e in events}, {"user"})
+        self.assertTrue(all(re.match(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$", e["at"]) for e in events))
+        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
+
+    def test_the_log_is_conversation_jsonl_only_and_valid_with_the_agents_replies(self):
+        for method, params in self.EVENTS.items():
+            self.send(method, params)
+        self.assertEqual(run(self.root, "reply", ".design/pay", "--to", "m-x", stdin="seen it").returncode, 0)
+        self.assertEqual(run(self.root, "status", ".design/pay", "done", "m-x").returncode, 0)
+        done = run(self.root, "status", ".design/pay", "accepted", "m-x", "--text", stdin="fine")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
+        for old in ("answers.jsonl", ".answers-seen"):
+            self.assertFalse((self.folder / old).exists())
+
+    def test_a_comment_with_no_text_and_no_verdict_is_refused_naming_the_verdict(self):
+        answer = self.send("comment", {**self.EVENTS["comment"], "text": None})
+        self.assertEqual(answer["error"]["code"], -32602)
+        self.assertIn("verdict", answer["error"]["message"])
+        self.assertFalse((self.folder / "conversation.jsonl").exists())
+
+    def test_a_verdict_only_comment_is_saved(self):
+        thumbs = {**self.EVENTS["comment"], "id": "c2-x", "text": None, "verdict": "up"}
+        self.assertEqual(self.send("comment", thumbs).get("result"), "saved")
+
+    def test_a_page_supplied_by_is_rejected(self):
+        answer = self.send("note", {**self.EVENTS["note"], "by": "agent"})
+        self.assertEqual(answer["error"]["code"], -32602)
+        self.assertIn("by", answer["error"]["message"])
+        self.assertFalse((self.folder / "conversation.jsonl").exists())
+
+    def test_a_reused_comment_id_is_a_new_version_of_the_comment(self):
+        first = self.EVENTS["comment"]
+        self.send("comment", first)
+        self.send("comment", {**first, "text": "edited"})
+        self.assertEqual([e["id"] for e in self.log()], [first["id"]] * 2)
+        out = run(self.root, "pending", ".design/pay").stdout
+        shown = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
+        self.assertEqual([(e["id"], e["text"]) for e in shown], [(first["id"], "edited")])
+
+    def test_sigterm_ends_the_server_and_removes_its_address(self):
+        self.assertTrue((self.folder / ".server").exists())
+        self.server.send_signal(signal.SIGTERM)
+        self.server.wait(timeout=20)
+        self.assertFalse((self.folder / ".server").exists())
+
     def test_the_agent_answers_and_tracks_with_the_shared_verbs(self):
         self.send("note", {"id": "m1", "text": "hello", "to": None})
         waited = run(self.root, "wait", ".design/pay", "--timeout", "10")
@@ -285,7 +401,7 @@ class Events(unittest.TestCase):
         self.assertIn("format", done.stdout)
 
     def test_a_new_decide_is_refused(self):
-        self.assertEqual(self.log({**self.DECIDE, "at": "2026-11-23T10:00:00Z"}).returncode, 1)
+        self.assertEqual(self.log({**self.DECIDE, "at": "2026-11-22T10:00:00Z"}).returncode, 1)
 
     def test_an_approve_is_accepted(self):
         event = {**self.DECIDE, "type": "approve", "at": "2026-11-22T10:00:00Z"}

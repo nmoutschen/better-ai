@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import PurePosixPath
 from typing import Any
 
+from .. import paths
 from ..schema import Context, hook
+
+PAGE = "index.html"  # what `render` writes in the unit: no version may be this file
 
 
 def version_path(file: Any) -> str | None:
@@ -17,6 +19,33 @@ def version_path(file: Any) -> str | None:
     if pure.is_absolute() or {"..", "."} & set(pure.parts):
         return None
     return str(pure)
+
+
+def unit_of(directory) -> paths.Unit:
+    """The unit whose folder is `directory`, for the same file helpers `render` and `serve` read the versions with."""
+    from . import SKILL
+
+    root = directory
+    for folder in (directory, *directory.parents):
+        if (folder / ".git").exists():
+            root = folder
+            break
+    return paths.Unit(path=directory, root=root, kind=SKILL.kinds[0], skill=SKILL)
+
+
+def version_problem(unit: paths.Unit, path: str) -> str | None:
+    """Why a version's file cannot be read as `render` reads it (the same `paths.read_bytes`), or None."""
+    if path == PAGE:
+        return f"{PAGE} is the compare page render writes: rename the version"
+    try:
+        paths.read_bytes(unit, path)
+    except paths.Refused as error:
+        if "symlink" in str(error):
+            return f"{path} is a symlink: copy the file into the unit"
+        return f"{path} is not a file of the unit"
+    except OSError:
+        return f"{path} is not a file of the unit"
+    return None
 
 
 @hook("canvas-versions")
@@ -40,6 +69,8 @@ def _canvas_versions(record: dict, context: Context) -> list[tuple[str, str]]:
         path = version_path(version["file"])
         if path is None:
             problems.append((f"versions/{index}/file", "must be a path inside the unit's folder, without .."))
-        elif not os.path.isfile(context.path(path)):
-            problems.append((f"versions/{index}/file", f"{path} is not a file of the unit"))
+        else:
+            why = version_problem(unit_of(context.directory), path)
+            if why:
+                problems.append((f"versions/{index}/file", why))
     return problems
