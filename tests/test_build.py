@@ -40,24 +40,50 @@ main()
 """
 
 
-def record_schema(rtype, prefix, files, required=("type", "at", "by", "id")):
-    return {
-        "$id": f"{rtype}.schema.json",
-        "x-files": files,
-        "type": "object",
-        "required": list(required),
-        "properties": {
-            "type": {"const": rtype},
-            "at": {"type": "string"},
-            "by": {"type": "string"},
-            "id": {"type": "string"},
-        },
-        "x-id": {"prefix": prefix},
-    }
+SNAPSHOTS = ROOT / "tests" / "fixtures" / "build-schemas"
+
+
+def snapshot(name):
+    """A schema copied from the real tree (tests/fixtures/build-schemas), as a dict to change and write."""
+    return json.loads((SNAPSHOTS / name).read_text())
+
+
+def snapshot_text(name):
+    return (SNAPSHOTS / name).read_text()
+
+
+ALPHA_INIT = '''"""alpha, shaped like code-better: a change and an audit."""
+
+from ..skill import Skill, UnitKind
+
+SKILL = Skill(
+    name="alpha-better",
+    package="alpha",
+    kinds=(
+        UnitKind(kind="change", folder=".alpha", head="code.json", head_type="code", folders=("logs",)),
+        UnitKind(kind="audit", folder=".alpha/audit", head="audit.json", head_type="audit"),
+    ),
+    exclude=".alpha/",
+)
+'''
+
+BETA_INIT = '''"""beta, shaped like research-better: one kind of unit."""
+
+from ..skill import Skill, UnitKind
+
+SKILL = Skill(
+    name="beta-better",
+    package="beta",
+    kinds=(UnitKind(kind="board", folder=".beta", head="brief.json", head_type="brief"),),
+    exclude=".beta/",
+)
+'''
 
 
 def fixture_files():
-    """The fixture source tree: {path under src/: text}."""
+    """The fixture source tree: {path under src/: text}. The schemas are copies of real ones (decisions, code's
+    code, tasks, progress, next-steps and audit, research's claims) and the packages declare their unit kinds the way
+    the real ones do."""
     files = {
         "skills.json": json.dumps(
             {
@@ -65,6 +91,7 @@ def fixture_files():
                 "shared": [
                     "better_ai/__init__.py",
                     "better_ai/cli.py",
+                    "better_ai/skill.py",
                     "better_ai/_entry.py",
                     "better_ai/schemas/",
                     "better_ai/page/",
@@ -74,16 +101,19 @@ def fixture_files():
         ),
         "__init__.py": "",
         "_entry.py": ENTRY,
-        "cli.py": "import json\nimport os.path\nfrom better_ai import page\nfrom . import _entry\n",
+        "cli.py": "import json\nimport os.path\nfrom better_ai import page\nfrom . import _entry\nfrom .skill import Skill\n",
+        "skill.py": snapshot_text("skill.py.txt"),
         "page/__init__.py": "",
         "page/page.js": "export const a = 1;\n",
-        "schemas/decisions.schema.json": json.dumps(record_schema("decision", "D", ["decisions.jsonl"])),
-        "alpha/__init__.py": "from better_ai.cli import json\n",
-        "alpha/schemas/alpha.schema.json": json.dumps(record_schema("alpha", "A", ["alpha.jsonl"])),
-        "beta/__init__.py": "import better_ai.cli\n",
-        "beta/schemas/beta.schema.json": json.dumps(record_schema("beta", "B", ["beta.jsonl"])),
+        "schemas/base.schema.json": snapshot_text("base.schema.json"),
+        "schemas/decisions.schema.json": snapshot_text("decisions.schema.json"),
+        "alpha/__init__.py": ALPHA_INIT,
+        "beta/__init__.py": BETA_INIT,
     }
-    return {f"better_ai/{k}" if k != "skills.json" else "better_ai/skills.json": v for k, v in files.items()}
+    for name in ["code", "tasks", "progress", "next-steps", "audit"]:
+        files[f"alpha/schemas/{name}.schema.json"] = snapshot_text(f"{name}.schema.json")
+    files["beta/schemas/claims.schema.json"] = snapshot_text("claims.schema.json")
+    return {f"better_ai/{k}": v for k, v in files.items()}
 
 
 def git(repo, *args):
@@ -99,14 +129,17 @@ class Fixture:
         self.root.mkdir()
         (self.root / "tools").mkdir()
         shutil.copy(BUILD, self.root / "tools" / "build.py")
+        git(self.root, "init", "-q", "-b", "main")
         for name, text in fixture_files().items():
             self.write(f"src/{name}", text)
-        git(self.root, "init", "-q", "-b", "main")
 
-    def write(self, rel, text):
+    def write(self, rel, text, tracked=True):
+        """Write a file; one under src/ is staged, as a maintainer's would be (the build reads tracked files)."""
         path = self.root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
+        if tracked and rel.startswith("src/"):
+            git(self.root, "add", "-f", rel)
 
     def run(self, *args, env=None, python=None):
         cmd = [python or pyz.build_python(), "-I", str(self.root / "tools" / "build.py"), *args]
@@ -154,25 +187,27 @@ class TestBuild(BuildTestCase):
     def test_each_pyz_holds_what_skills_json_lists_and_no_other_skill(self):
         # S57
         self.repo.build()
-        shared = [
+        source = [k for k in fixture_files() if k != "better_ai/skills.json"]
+        base = [
             "__main__.py",
-            "better_ai/__init__.py",
             "better_ai/_build.json",
-            "better_ai/_entry.py",
-            "better_ai/cli.py",
-            "better_ai/page/__init__.py",
-            "better_ai/page/page.js",
-            "better_ai/schemas/decisions.schema.json",
+            *[k for k in source if "/alpha/" not in k and "/beta/" not in k],
         ]
-        self.assertEqual(
-            self.entries("alpha-better"),
-            sorted([*shared, "better_ai/alpha/__init__.py", "better_ai/alpha/schemas/alpha.schema.json"]),
-        )
-        self.assertEqual(
-            self.entries("beta-better"),
-            sorted([*shared, "better_ai/beta/__init__.py", "better_ai/beta/schemas/beta.schema.json"]),
-        )
+        alpha = [k for k in source if "/alpha/" in k]
+        beta = [k for k in source if "/beta/" in k]
+        self.assertEqual(self.entries("alpha-better"), sorted([*base, *alpha]))
+        self.assertEqual(self.entries("beta-better"), sorted([*base, *beta]))
         self.assertFalse(any("beta" in n for n in self.entries("alpha-better") if n != "better_ai/_build.json"))
+        self.assertFalse(any("alpha" in n for n in self.entries("beta-better")))
+
+    def test_an_untracked_file_never_enters_a_pyz(self):
+        self.repo.build()
+        before = self.repo.pyz("alpha-better").read_bytes()
+        self.repo.write("src/better_ai/page/.DS_Store", "junk", tracked=False)
+        self.repo.write("src/better_ai/alpha/.__init__.py.swp", "junk", tracked=False)
+        self.repo.write("src/better_ai/alpha/new_module.py", "x = 1\n", tracked=False)
+        self.repo.build()
+        self.assertEqual(before, self.repo.pyz("alpha-better").read_bytes())
 
     def test_main_is_a_copy_of_the_entry_and_build_info_names_the_skill(self):
         self.repo.build()
@@ -248,6 +283,7 @@ class TestBuild(BuildTestCase):
 
     def test_a_symlink_in_the_source_is_refused(self):
         os.symlink("/etc/hosts", self.repo.root / "src" / "better_ai" / "page" / "link.js")
+        git(self.repo.root, "add", "-f", "src/better_ai/page/link.js")
         result = self.repo.run()
         self.assertEqual(result.returncode, 1)
         self.assertIn("symlink", result.stderr)
@@ -333,19 +369,38 @@ class TestCheck(BuildTestCase):
         self.assertNotIn("__pycache__", err)
 
     def test_a_record_type_that_does_not_require_type_at_by_fails(self):
-        self.repo.write(
-            "src/better_ai/alpha/schemas/alpha.schema.json",
-            json.dumps(record_schema("alpha", "A", ["alpha.jsonl"], required=("type", "id"))),
-        )
+        tasks = snapshot("tasks.schema.json")
+        tasks["required"] = [f for f in tasks["required"] if f not in ("at", "by")]
+        self.repo.write("src/better_ai/alpha/schemas/tasks.schema.json", json.dumps(tasks))
         self.built_repo()
         code, err = self.check()
         self.assertEqual(code, 1)
-        self.assertIn("base fields: better_ai/alpha/schemas/alpha.schema.json: type alpha does not require at", err)
-        self.assertIn("type alpha does not require by", err)
+        self.assertIn("base fields: better_ai/alpha/schemas/tasks.schema.json: type task does not require at", err)
+        self.assertIn("type task does not require by", err)
         self.assertNotIn("does not require type", err)
 
+    def test_a_dispatching_root_is_judged_by_the_branches_that_select_each_type(self):
+        # the shape of research's logs.schema.json: the root only dispatches, and each branch requires the fields
+        progress = snapshot("progress.schema.json")
+        progress["required"] = ["type"]
+        for branch in progress["$defs"].values():
+            branch["required"] = [f for f in branch["required"] if f != "by"]
+        self.repo.write("src/better_ai/alpha/schemas/progress.schema.json", json.dumps(progress))
+        self.built_repo()
+        code, err = self.check()
+        self.assertEqual(code, 1)
+        for rtype in ["progress", "problem", "resolved"]:
+            self.assertIn(f"type {rtype} does not require by", err)
+
+    def test_a_dispatching_root_whose_branches_require_the_fields_passes(self):
+        progress = snapshot("progress.schema.json")
+        progress["required"] = ["type"]
+        self.repo.write("src/better_ai/alpha/schemas/progress.schema.json", json.dumps(progress))
+        self.built_repo()
+        self.assertEqual(self.check(), (0, ""))
+
     def test_a_third_party_import_names_the_skill_and_the_module(self):
-        self.repo.write("src/better_ai/alpha/__init__.py", "import requests\nfrom yaml import safe_load\n")
+        self.repo.write("src/better_ai/alpha/__init__.py", "import requests\nfrom yaml import safe_load\n" + ALPHA_INIT)
         self.built_repo()
         code, err = self.check()
         self.assertEqual(code, 1)
@@ -354,8 +409,9 @@ class TestCheck(BuildTestCase):
         self.assertNotIn("beta-better", err)
 
     def test_an_import_of_a_module_another_skill_owns_is_missing_from_the_pyz(self):
-        self.repo.write("src/better_ai/alpha/__init__.py", "from better_ai.beta import thing\nfrom ..cli import x\n")
-        self.repo.write("src/better_ai/beta/__init__.py", "thing = 1\n")
+        extra = "from better_ai.beta import thing\nfrom ..cli import x\n"
+        self.repo.write("src/better_ai/alpha/__init__.py", extra + ALPHA_INIT)
+        self.repo.write("src/better_ai/beta/thing.py", "thing = 1\n")
         self.built_repo()
         code, err = self.check()
         self.assertEqual(code, 1)
@@ -364,6 +420,42 @@ class TestCheck(BuildTestCase):
             err,
         )
         self.assertNotIn("better_ai.cli", err)
+
+    def test_an_imported_name_that_is_another_skills_module_is_missing_from_the_pyz(self):
+        # `from better_ai import beta` and `from .. import beta` import a module through the names
+        self.repo.write(
+            "src/better_ai/alpha/__init__.py", "from better_ai import beta\nfrom .. import beta as b2\n" + ALPHA_INIT
+        )
+        self.repo.write("src/better_ai/alpha/helper.py", "from . import missing_attribute\nfrom . import helper2\n")
+        self.repo.write("src/better_ai/beta/helper2.py", "x = 1\n")
+        self.repo.write("src/better_ai/alpha/helper2.py", "x = 2\n")
+        self.built_repo()
+        code, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("import: alpha-better: better_ai.beta: imported by better_ai/alpha/__init__.py: is in src/", err)
+        self.assertNotIn("missing_attribute", err)  # a name that is no module anywhere is an attribute
+        self.assertNotIn("helper2", err)  # a sibling module that is in the .pyz
+
+    def test_a_module_that_from_dot_import_names_but_skills_json_does_not_list_is_reported(self):
+        self.repo.write("src/better_ai/cli.py", "from . import extra\nfrom . import page\n")
+        self.repo.write("src/better_ai/extra.py", "x = 1\n")
+        self.built_repo()
+        code, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("import: alpha-better: better_ai.extra: imported by better_ai/cli.py: is in src/ but not in", err)
+        self.assertNotIn("better_ai.page:", err)
+
+    def test_a_standard_library_module_newer_than_python_3_10_is_refused(self):
+        self.repo.write(
+            "src/better_ai/alpha/__init__.py", "import tomllib\nfrom asyncio import taskgroups\n" + ALPHA_INIT
+        )
+        self.built_repo()
+        code, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "import: alpha-better: tomllib: imported by better_ai/alpha/__init__.py: not in the standard library of Python 3.10",
+            err,
+        )
 
     def test_build_and_src_changed_together_fails_when_a_base_is_given(self):
         self.built_repo()
@@ -404,7 +496,7 @@ class TestCheck(BuildTestCase):
         self.assertIn("no --base given", result.stdout)
 
     def test_every_failure_is_reported_not_just_the_first(self):
-        self.repo.write("src/better_ai/alpha/__init__.py", "import requests\n")
+        self.repo.write("src/better_ai/alpha/__init__.py", "import requests\n" + ALPHA_INIT)
         self.built_repo()
         self.repo.write("skills/alpha-better/scripts/old.py", "x\n")
         self.repo.commit("stray")
@@ -436,49 +528,174 @@ class TestUnitKindInvariants(BuildTestCase):
             self.assertIsNotNone(line, result.stderr)
             self.assertIn(subject_part, line)
 
-    def test_a_type_in_two_files_of_one_skill_is_refused(self):
-        # the shape of today's `step`: one type in a log and in next-steps
-        self.repo.write(
-            "src/better_ai/alpha/schemas/other.schema.json", json.dumps(record_schema("alpha", "X", ["other.jsonl"]))
-        )
-        self.expect("duplicate type", "alpha-better: alpha")
+    def test_a_type_in_two_files_of_one_unit_kind_is_refused(self):
+        # today's code-better `step`: in a log and in next-steps
+        self.repo.write("src/better_ai/alpha/schemas/log.schema.json", snapshot_text("log.schema.json"))
+        self.expect("duplicate type", "alpha-better/change: step")
         self.assertFalse((self.repo.root / "skills").exists())
 
     def test_one_schema_listing_two_files_for_a_type_is_refused(self):
-        self.repo.write(
-            "src/better_ai/alpha/schemas/alpha.schema.json",
-            json.dumps(record_schema("alpha", "A", ["alpha.jsonl", "logs/*.jsonl"])),
-        )
-        self.expect("duplicate type", "alpha-better: alpha")
+        tasks = snapshot("tasks.schema.json")
+        tasks["x-files"] = ["tasks.jsonl", "logs/*.jsonl"]
+        self.repo.write("src/better_ai/alpha/schemas/tasks.schema.json", json.dumps(tasks))
+        self.expect("duplicate type", "alpha-better/change: task")
 
-    def test_two_types_sharing_an_id_prefix_are_refused(self):
-        self.repo.write(
-            "src/better_ai/alpha/schemas/other.schema.json", json.dumps(record_schema("other", "A", ["other.jsonl"]))
-        )
-        self.expect("overlapping prefix", "alpha-better: A")
+    def test_two_types_sharing_an_id_prefix_in_different_files_are_refused(self):
+        # x-id sits on the `id` property, as in the real schemas; next-steps takes tasks' prefix
+        steps = snapshot("next-steps.schema.json")
+        steps["properties"]["id"]["x-id"] = {"prefix": "T"}
+        self.repo.write("src/better_ai/alpha/schemas/next-steps.schema.json", json.dumps(steps))
+        self.expect("overlapping prefix", "alpha-better/change: T")
+
+    def test_an_x_id_on_the_record_node_counts_too(self):
+        steps = snapshot("next-steps.schema.json")
+        del steps["properties"]["id"]["x-id"]
+        steps["x-id"] = {"prefix": "T"}
+        self.repo.write("src/better_ai/alpha/schemas/next-steps.schema.json", json.dumps(steps))
+        self.expect("overlapping prefix", "alpha-better/change: T")
+
+    def test_an_agent_prefix_counts_with_a_plain_one(self):
+        # research's claims use C with an agent; a second type in another file taking C overlaps
+        other = snapshot("claims.schema.json")
+        other["properties"]["type"] = {"const": "claim2"}
+        other["x-files"] = ["claims2/*.json"]
+        self.repo.write("src/better_ai/beta/schemas/claims2.schema.json", json.dumps(other))
+        self.expect("overlapping prefix", "beta-better/board: C")
 
     def test_the_same_type_in_the_same_file_by_two_schemas_is_fine(self):
-        # conversation.jsonl is described by a shared schema and by a skill's events schema
-        self.repo.write(
-            "src/better_ai/alpha/schemas/more.schema.json", json.dumps(record_schema("alpha", "A", ["alpha.jsonl"]))
-        )
+        self.repo.write("src/better_ai/alpha/schemas/tasks2.schema.json", snapshot_text("tasks.schema.json"))
         self.assertEqual(self.repo.run().returncode, 0)
 
-    def test_prefix_by_maps_and_agent_prefixes_count(self):
-        doc = record_schema("req", "R", ["req.jsonl"])
-        doc["x-id"] = {"prefix_by": "kind", "map": {"functional": "F", "quality": "Q"}}
-        self.repo.write("src/better_ai/alpha/schemas/req.schema.json", json.dumps(doc))
-        other = record_schema("question", "Q", ["q.jsonl"])
-        other["x-id"] = {"prefix": "Q", "agent": True}
-        self.repo.write("src/better_ai/alpha/schemas/q.schema.json", json.dumps(other))
-        self.expect("overlapping prefix", "alpha-better: Q")
+    def test_one_prefix_shared_by_types_of_one_file_is_fine(self):
+        # evidence's history, check and rule share E in one file
+        evidence = snapshot("tasks.schema.json")
+        second = json.loads(json.dumps(evidence))
+        second["properties"]["type"] = {"const": "task2"}
+        evidence["$defs"] = {"task2": second}
+        evidence["allOf"] = [{"if": {"properties": {"type": {"const": "task2"}}}, "then": {"$ref": "#/$defs/task2"}}]
+        self.repo.write("src/better_ai/alpha/schemas/tasks.schema.json", json.dumps(evidence))
+        self.assertEqual(self.repo.run().returncode, 0)
+
+    def test_the_same_type_in_the_audit_and_the_change_kinds_is_fine(self):
+        # code-better's units are changes and audits: a type may repeat across the two kinds
+        audit_tasks = snapshot("tasks.schema.json")
+        audit_tasks["x-files"] = ["audit/*/tasks.jsonl"]
+        self.repo.write("src/better_ai/alpha/schemas/audit-tasks.schema.json", json.dumps(audit_tasks))
+        self.assertEqual(self.repo.run().returncode, 0)
+        # and the same clash inside the audit kind is still refused
+        audit_tasks2 = json.loads(json.dumps(audit_tasks))
+        audit_tasks2["x-files"] = ["audit/*/other.jsonl"]
+        self.repo.write("src/better_ai/alpha/schemas/audit-tasks2.schema.json", json.dumps(audit_tasks2))
+        self.expect("duplicate type", "alpha-better/audit: task")
+
+    def test_pointer_definitions_and_dispatching_defs_are_not_record_types(self):
+        # decisions' $defs (about, answer) and progress' $defs branches are shared by two skills and pass as they are
+        self.assertEqual(self.repo.run().returncode, 0)
 
     def test_the_other_skill_is_not_affected(self):
-        self.repo.write(
-            "src/better_ai/alpha/schemas/other.schema.json", json.dumps(record_schema("other", "B", ["other.jsonl"]))
-        )
-        # B is alpha's and beta's own prefix, but they never share a skill: no failure
+        other = snapshot("tasks.schema.json")
+        other["x-files"] = ["other.jsonl"]
+        self.repo.write("src/better_ai/beta/schemas/tasks.schema.json", json.dumps(other))
+        # beta has no task elsewhere, and alpha's tasks are its own: no failure
         self.assertEqual(self.repo.run().returncode, 0)
+
+
+class TestRealTree(BuildTestCase):
+    """L3: every static step runs on the real src/better_ai, not only on fixtures shaped by hand."""
+
+    KNOWN = (
+        # code-better's `step` is in both log.schema.json and next-steps.schema.json until it is renamed next_step
+        "duplicate type: code-better/change: step: ",
+        # show-better's spec.json (`slides`) has no at and by until it gets them
+        "base fields: better_ai/show/schemas/spec.schema.json: type slides does not require ",
+        # nothing is built and committed in this copy
+        "stale: ",
+    )
+
+    def real_copy(self):
+        repo = self.tmp / "real"
+        shutil.copytree(ROOT / "src", repo / "src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        (repo / "tools").mkdir()
+        shutil.copy(BUILD, repo / "tools" / "build.py")
+        # files other tasks add (records.py, page/) may be missing: placeholders so skills.json resolves
+        package = repo / "src" / "better_ai"
+        for rel in json.loads((package / "skills.json").read_text())["shared"]:
+            target = repo / "src" / rel
+            if rel.endswith("/") and not target.exists():
+                target.mkdir(parents=True)
+                (target / "__init__.py").write_text("")
+            elif not rel.endswith("/") and not target.exists():
+                target.write_text("")
+        git(repo, "init", "-q", "-b", "main")
+        git(repo, "add", "-A")
+        return repo
+
+    def assert_only_known(self, result):
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertNotIn("build.py:", result.stderr, result.stderr)  # a refused source, not a check result
+        for line in result.stderr.splitlines():
+            self.assertTrue(line.startswith(self.KNOWN), f"unexpected failure on the real tree: {line}")
+
+    def test_check_and_compare_on_the_real_tree_report_only_the_known_failures(self):
+        repo = self.real_copy()
+        python = pyz.build_python()
+        for mode in ["--check", "--compare"]:
+            result = subprocess.run(
+                [python, "-I", str(repo / "tools" / "build.py"), mode, "--root", str(repo)],
+                capture_output=True,
+                text=True,
+                cwd=repo,
+            )
+            self.assert_only_known(result)
+
+    def test_the_real_tree_builds_every_skill_when_the_known_failures_are_fixed_in_a_copy(self):
+        # nothing but the skills' own fixes stands between the real tree and a build
+        repo = self.real_copy()
+        python = pyz.build_python()
+        result = subprocess.run(
+            [python, "-I", str(repo / "tools" / "build.py"), "--root", str(repo)],
+            capture_output=True,
+            text=True,
+            cwd=repo,
+        )
+        self.assertIn("duplicate type: code-better/change: step", result.stderr)  # the build refuses it too
+        self.assert_only_known(result)
+
+
+class TestWorkflow(unittest.TestCase):
+    """The shell line CI runs for the JavaScript syntax step must fail on a bad file."""
+
+    def step_line(self):
+        for line in (ROOT / ".github" / "workflows" / "scripts.yml").read_text().splitlines():
+            if "node --check" in line:
+                return line.split("run:", 1)[1].strip()
+        self.fail("no node --check step in scripts.yml")
+
+    def run_step(self, files):
+        if not shutil.which("node"):
+            self.skipTest("node is not installed")
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, text in files.items():
+                path = Path(tmp) / "src" / "better_ai" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+            return subprocess.run(["sh", "-c", self.step_line()], cwd=tmp, capture_output=True, text=True)
+
+    def test_a_good_file_passes(self):
+        self.assertEqual(self.run_step({"a.js": "const a = 1;\n", "page/b.js": "let b;\n"}).returncode, 0)
+
+    def test_a_bad_file_fails_the_step_even_when_another_is_good(self):
+        result = self.run_step({"a.js": "const a = 1;\n", "page/b.js": "function (\n", "page/c.js": "let c;\n"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SyntaxError", result.stderr)
+
+    def test_the_workflows_pin_actions_by_sha_and_have_read_only_permissions(self):
+        for name in ["scripts.yml", "base-build.yml"]:
+            text = (ROOT / ".github" / "workflows" / name).read_text()
+            self.assertIn("permissions:\n  contents: read", text)
+            for line in text.splitlines():
+                if "uses: actions/checkout" in line or "uses: actions/setup-python" in line:
+                    self.assertRegex(line, r"@[0-9a-f]{40}\b")
 
 
 class TestCompareAndPullRequestData(BuildTestCase):

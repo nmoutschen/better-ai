@@ -38,13 +38,14 @@ def git(cwd: Path, *args: str) -> None:
     subprocess.run(cmd, cwd=cwd, check=True, capture_output=True)
 
 
-def run_step(pyz: Path, step: dict, cwd: Path, fixture: Path) -> str | None:
+def run_step(pyz: Path, step: dict, cwd: Path, fixture: Path, repo: Path) -> str | None:
     """Run one fixture step; return what went wrong, or None."""
-    args = [sys.executable, "-I", str(pyz), *step["args"]]
+    step_args = [a.replace("{repo}", str(repo)) for a in step["args"]]
+    args = [sys.executable, "-I", str(pyz), *step_args]
     stdin = step.get("stdin")
     if "stdin_file" in step:
         stdin = (fixture / step["stdin_file"]).read_text()
-    label = " ".join(step["args"])
+    label = " ".join(step_args)
     if step.get("serve"):
         return run_serve(args, cwd, label)
     try:
@@ -86,6 +87,21 @@ def run_serve(args: list[str], cwd: Path, label: str) -> str | None:
             proc.wait()
 
 
+REQUIRED_VERBS = ("create", "add", "set", "check", "render")
+
+
+def coverage_problems(spec: dict) -> list[str]:
+    """S41: the fixture must exercise create, add, set, check, render, serve and an add from a second worktree."""
+    steps = spec.get("steps", [])
+    verbs = {step["args"][0] for step in steps if step.get("args")}
+    missing = [v for v in REQUIRED_VERBS if v not in verbs]
+    if not any(step.get("serve") for step in steps):
+        missing.append('serve (a step with "serve": true)')
+    if not any(step.get("args", [""])[0] == "add" for step in spec.get("worktree_steps", [])):
+        missing.append("an add in worktree_steps")
+    return [f"fixture does not cover: {', '.join(missing)}"] if missing else []
+
+
 def smoke_skill(skill: str, skills: Path, fixtures: Path) -> list[str]:
     pyz = skills / skill / "scripts" / "better.pyz"
     if not pyz.is_file():
@@ -95,7 +111,7 @@ def smoke_skill(skill: str, skills: Path, fixtures: Path) -> list[str]:
     if not spec_path.is_file():
         return [f"{skill}: no fixture unit: add {spec_path}"]
     spec = json.loads(spec_path.read_text())
-    problems: list[str] = []
+    problems: list[str] = [f"{skill}: {p}" for p in coverage_problems(spec)]
     try:
         info = json.loads(zipfile.ZipFile(pyz).read("better_ai/_build.json"))
     except (OSError, KeyError, ValueError, zipfile.BadZipFile) as err:
@@ -116,7 +132,7 @@ def smoke_skill(skill: str, skills: Path, fixtures: Path) -> list[str]:
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "--allow-empty", "-m", "start")
         for step in spec.get("steps", []):
-            problem = run_step(pyz, step, repo, fixture)
+            problem = run_step(pyz, step, repo, fixture, repo)
             if problem:
                 problems.append(f"{skill}: {problem}")
                 break
@@ -125,7 +141,7 @@ def smoke_skill(skill: str, skills: Path, fixtures: Path) -> list[str]:
             other = Path(scratch) / "second"
             git(repo, "worktree", "add", "-q", "-b", "smoke-second", str(other))
             for step in worktree_steps:
-                problem = run_step(pyz, step, other, fixture)
+                problem = run_step(pyz, step, other, fixture, repo)
                 if problem:
                     problems.append(f"{skill}: second worktree: {problem}")
                     break

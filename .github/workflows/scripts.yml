@@ -77,7 +77,7 @@ jobs:
         run: |
           if [ -n "$(find src/better_ai -name '*.html')" ]; then npx html-validate "src/better_ai/**/*.html"; fi
       - name: JavaScript syntax
-        run: find src/better_ai -name '*.js' -print -exec node --check {} \;
+        run: find src/better_ai -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: JavaScript tests
         # page.js's thread model: each item's state and what Open lists, with Node's own test runner.
         run: node --test tests/*.test.js

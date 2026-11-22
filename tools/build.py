@@ -58,12 +58,39 @@ class BuildError(Exception):
 # ---------------------------------------------------------------- reading the source
 
 
+def _tracked_files(src: Path) -> list[str] | None:
+    """The files git tracks under <src>/better_ai, relative to <src>, so an untracked file (.DS_Store, a swap file)
+    never enters a .pyz. None when <src> is not in a git work tree or the folder holds no tracked file."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(src), "ls-files", "-z", "--", f"{PACKAGE}"], capture_output=True, check=False
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    names = sorted(n for n in result.stdout.decode().split("\0") if n)
+    return names or None
+
+
 def read_tree(src: Path) -> dict[str, bytes]:
     """Every file under <src>/better_ai as {"better_ai/<path>": bytes}. Symlinks are refused."""
     base = src / PACKAGE
     if not base.is_dir() or base.is_symlink():
         raise BuildError(f"{base}: not a folder. Pass --src with the folder that holds {PACKAGE}/")
     files: dict[str, bytes] = {}
+    tracked = _tracked_files(src)
+    if tracked is not None:
+        for rel in tracked:
+            path = src / rel
+            if path.is_symlink():
+                raise BuildError(f"{path}: a symlink. The build does not follow symlinks; remove it")
+            if rel.endswith(".pyc") or any(p in SKIPPED_PARTS for p in rel.split("/")):
+                continue
+            if not path.is_file():
+                raise BuildError(f"{path}: tracked by git but missing. Restore it or `git rm` it")
+            files[rel] = path.read_bytes()
+        return files
     for folder, dirs, names in os.walk(base):
         dirs[:] = sorted(d for d in dirs if d not in SKIPPED_PARTS)
         for d in dirs:
@@ -234,17 +261,6 @@ def differing_entries(a: Path, b: Path) -> list[str]:
 # ---------------------------------------------------------------- schema steps
 
 
-def _record_nodes(doc: dict):
-    """The subschemas that describe one record type: the root, each $defs value, each root allOf `then`."""
-    yield doc
-    for value in (doc.get("$defs") or {}).values():
-        if isinstance(value, dict):
-            yield value
-    for branch in doc.get("allOf") or []:
-        if isinstance(branch, dict) and isinstance(branch.get("then"), dict):
-            yield branch["then"]
-
-
 def _node_types(node: dict) -> list[str]:
     prop = (node.get("properties") or {}).get("type")
     if not isinstance(prop, dict):
@@ -256,14 +272,44 @@ def _node_types(node: dict) -> list[str]:
     return []
 
 
-def _walk(node):
-    if isinstance(node, dict):
-        yield node
-        for v in node.values():
-            yield from _walk(v)
-    elif isinstance(node, list):
-        for v in node:
-            yield from _walk(v)
+def _resolve(doc: dict, node: object) -> list[dict]:
+    """A subschema and, when it is a `#/$defs/<name>` reference, the definition it points to."""
+    if not isinstance(node, dict):
+        return []
+    out = [node]
+    ref = node.get("$ref")
+    if isinstance(ref, str) and ref.startswith("#/$defs/"):
+        target = (doc.get("$defs") or {}).get(ref.removeprefix("#/$defs/"))
+        if isinstance(target, dict):
+            out.append(target)
+    return out
+
+
+def record_types(doc: dict) -> dict[str, list[dict]]:
+    """{record type: the nodes that describe it}. The types are the root's `type` const or enum, widened by the root
+    `allOf` branches that select on `type` (their `then`, with a `$ref` into `$defs` followed). A `$defs` entry that
+    no branch selects, such as a pointer object, is not a record type."""
+    found: dict[str, list[dict]] = {}
+    for rtype in _node_types(doc):
+        found.setdefault(rtype, []).append(doc)
+    for branch in doc.get("allOf") or []:
+        if not isinstance(branch, dict):
+            continue
+        nodes = _resolve(doc, branch.get("then"))
+        selected = _node_types({"properties": (branch.get("if") or {}).get("properties")}) if branch.get("if") else []
+        for rtype in selected or [t for n in nodes for t in _node_types(n)]:
+            found.setdefault(rtype, []).extend(n for n in nodes if n not in found.get(rtype, []))
+    return found
+
+
+def _x_ids(nodes: list[dict]) -> list[dict]:
+    """The `x-id` rules of a record's nodes, from the node itself and from its `id` property."""
+    rules = []
+    for node in nodes:
+        for holder in (node, (node.get("properties") or {}).get("id")):
+            if isinstance(holder, dict) and isinstance(holder.get("x-id"), dict):
+                rules.append(holder["x-id"])
+    return rules
 
 
 def _prefixes(x_id) -> list[str]:
@@ -289,57 +335,102 @@ def bundled_schemas(files: dict[str, bytes]) -> dict[str, dict]:
     return out
 
 
-def unit_kind_failures(skill: str, schemas: dict[str, dict]) -> list[tuple[str, str, str]]:
-    """S58, per skill: a record type is declared for one place, and two record types do not share an id prefix."""
+def skill_kinds(skill: str, package: str, files: dict[str, bytes]) -> list[tuple[str, str]]:
+    """(unit kind name, folder relative to the skill's root) read as data from the package's `UnitKind(...)` calls,
+    never imported. A package that declares none is one kind named after the skill."""
+    try:
+        tree = ast.parse(files.get(f"{PACKAGE}/{package}/__init__.py", b""))
+    except SyntaxError:
+        tree = ast.Module(body=[], type_ignores=[])
+    found = []
+    for node in ast.walk(tree):
+        is_kind = isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) == "UnitKind"
+        if not is_kind:
+            continue
+        values = {k.arg: k.value.value for k in node.keywords if isinstance(k.value, ast.Constant)}
+        if isinstance(values.get("kind"), str) and isinstance(values.get("folder"), str):
+            found.append((values["kind"], values["folder"]))
+    if not found:
+        return [(skill, "")]
+    root = found[0][1].split("/")[0]
+    return [(name, folder.removeprefix(root).strip("/")) for name, folder in found]
+
+
+def schemas_by_unit_kind(skill: str, package: str, files: dict[str, bytes]) -> dict[str, dict[str, dict]]:
+    """{`<skill>/<unit kind>`: {schema file: schema}}: a schema belongs to the kind whose folder is the longest
+    prefix of one of its `x-files` patterns (`audit/*/audit.json` is code-better's audit; `tasks.jsonl` its change)."""
+    kinds = skill_kinds(skill, package, files)
+    out: dict[str, dict[str, dict]] = {f"{skill}/{name}": {} for name, _ in kinds}
+    for name, doc in bundled_schemas(files).items():
+        for pattern in doc.get("x-files") or ["*"]:
+            best = max(
+                (k for k in kinds if k[1] == "" or pattern == k[1] or pattern.startswith(k[1] + "/")),
+                key=lambda k: len(k[1]),
+                default=None,
+            )
+            if best:
+                out[f"{skill}/{best[0]}"][name] = doc
+    return out
+
+
+def unit_kind_failures(unit_kind: str, schemas: dict[str, dict]) -> list[tuple[str, str, str]]:
+    """S58, per unit kind: a record type is described for one file, and two record types that live in different
+    files do not share an id prefix (types that share a file share its id sequence, as evidence's three types do)."""
     places: dict[str, dict[str, tuple[str, ...]]] = {}
-    prefixes: dict[str, dict[str, str]] = {}
+    prefixes: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {}
     for name, doc in sorted(schemas.items()):
         place = tuple(sorted(doc.get("x-files") or ()))
-        for node in _record_nodes(doc):
-            for rtype in _node_types(node):
-                places.setdefault(rtype, {})[name] = place
-        for node in _walk(doc):
-            if "x-id" not in node:
-                continue
-            types = _node_types(node) or ["?"]
-            for prefix in _prefixes(node["x-id"]):
-                for rtype in types:
-                    prefixes.setdefault(prefix, {})[rtype] = name
+        for rtype, nodes in record_types(doc).items():
+            places.setdefault(rtype, {})[name] = place
+            for rule in _x_ids(nodes):
+                for prefix in _prefixes(rule):
+                    prefixes.setdefault(prefix, {})[rtype] = (name, place)
     failures = []
     for rtype, where in sorted(places.items()):
-        distinct = {p for p in where.values()}
+        distinct = set(where.values())
         if len(distinct) > 1 or any(len(p) > 1 for p in distinct):
             detail = "; ".join(f"{n.rsplit('/', 1)[-1]}: {', '.join(p) or 'no x-files'}" for n, p in where.items())
             failures.append(
                 (
                     "duplicate type",
-                    f"{skill}: {rtype}",
+                    f"{unit_kind}: {rtype}",
                     f"the type maps to more than one file ({detail}); keep it in one file or rename one type",
                 )
             )
     for prefix, owners in sorted(prefixes.items()):
-        if len(owners) > 1:
-            detail = ", ".join(f"{t} ({n.rsplit('/', 1)[-1]})" for t, n in sorted(owners.items()))
+        if len({place for _, place in owners.values()}) > 1:
+            detail = ", ".join(f"{t} ({n.rsplit('/', 1)[-1]})" for t, (n, _) in sorted(owners.items()))
             failures.append(
-                ("overlapping prefix", f"{skill}: {prefix}", f"claimed by {detail}; give each type its own prefix")
+                ("overlapping prefix", f"{unit_kind}: {prefix}", f"claimed by {detail}; give each type its own prefix")
             )
     return failures
 
 
+def all_unit_kind_failures(source: Source) -> list[tuple[str, str, str]]:
+    failures = []
+    for skill, files in source.files.items():
+        package = source.cfg["skills"][skill]["package"]
+        for unit_kind, schemas in schemas_by_unit_kind(skill, package, files).items():
+            failures += unit_kind_failures(unit_kind, schemas)
+    return failures
+
+
 def base_field_failures(schemas: dict[str, dict]) -> list[tuple[str, str, str]]:
-    """C6: every record type requires type, at and by. Page event schemas (`*-events.schema.json`) are input the
-    server stamps, so they are not records."""
+    """C6: every record type requires type, at and by, in the root or in the branch that selects it. Page event
+    schemas (`*-events.schema.json`) are input the server stamps, so they are not records."""
     failures = []
     for name, doc in sorted(schemas.items()):
         if name.endswith("-events.schema.json") or not doc.get("x-files"):
             continue
-        for node in _record_nodes(doc):
-            for rtype in _node_types(node):
-                for field in BASE_FIELDS:
-                    if field not in (node.get("required") or []):
-                        failures.append(
-                            ("base fields", name, f"type {rtype} does not require {field}: add it to `required`")
-                        )
+        for rtype, nodes in record_types(doc).items():
+            required = set(doc.get("required") or ())
+            for node in nodes:
+                required |= set(node.get("required") or ())
+            for field in BASE_FIELDS:
+                if field not in required:
+                    failures.append(
+                        ("base fields", name, f"type {rtype} does not require {field}: add it to `required`")
+                    )
     return sorted(set(failures))
 
 
@@ -351,9 +442,41 @@ def _module_exists(files: dict[str, bytes], dotted: str) -> bool:
     return f"{path}.py" in files or f"{path}/__init__.py" in files
 
 
+# Standard-library modules added after Python 3.10, which a .pyz must still run on. sys.stdlib_module_names is the
+# newest Python's list, so these are named here.
+POST_310_STDLIB = (
+    "tomllib",
+    "asyncio.taskgroups",
+    "asyncio.timeouts",
+    "wsgiref.types",
+    "importlib.resources.abc",
+    "importlib.resources.readers",
+    "importlib.resources.simple",
+    "zipfile._path",
+    "annotationlib",
+    "compression",
+    "concurrent.interpreters",
+    "pathlib.types",
+    "string.templatelib",
+)
+
+
+def _is_post_310(dotted: str) -> bool:
+    return any(dotted == m or dotted.startswith(m + ".") for m in POST_310_STDLIB)
+
+
 def import_failures(skill: str, files: dict[str, bytes], tree: dict[str, bytes]) -> list[tuple[str, str, str]]:
     stdlib = set(sys.stdlib_module_names) | {"__future__"}
     failures = []
+
+    def missing(dotted: str, name: str) -> None:
+        where = (
+            "is in src/ but not in this skill's .pyz: add its path to skills.json, or do not import it"
+            if _module_exists(tree, dotted)
+            else "does not exist under src/"
+        )
+        failures.append(("import", f"{skill}: {dotted}", f"imported by {name}: {where}"))
+
     for name in sorted(files):
         if not name.endswith(".py"):
             continue
@@ -364,24 +487,34 @@ def import_failures(skill: str, files: dict[str, bytes], tree: dict[str, bytes])
             continue
         package = name.rsplit("/", 1)[0].replace("/", ".") if "/" in name else ""
         for node in ast.walk(module):
-            wanted: list[str] = []
+            wanted: list[tuple[str, list[str]]] = []  # (module, names imported from it)
             if isinstance(node, ast.Import):
-                wanted = [a.name for a in node.names]
+                wanted = [(a.name, []) for a in node.names]
             elif isinstance(node, ast.ImportFrom):
+                names = [a.name for a in node.names if a.name != "*"]
                 if node.level:
                     parts = package.split(".") if package else []
                     keep = len(parts) - (node.level - 1)
                     if keep < 0:
                         failures.append(("import", f"{skill}: {name}", "relative import goes above the root"))
                         continue
-                    wanted = [".".join([*parts[:keep], *(node.module.split(".") if node.module else [])])]
+                    wanted = [(".".join([*parts[:keep], *(node.module.split(".") if node.module else [])]), names)]
                 else:
-                    wanted = [node.module or ""]
-            for dotted in wanted:
+                    wanted = [(node.module or "", names)]
+            for dotted, names in wanted:
                 top = dotted.split(".")[0]
                 if not dotted:
                     continue
                 if top != PACKAGE and top in stdlib:
+                    if _is_post_310(dotted):
+                        failures.append(
+                            (
+                                "import",
+                                f"{skill}: {dotted}",
+                                f"imported by {name}: not in the standard library of Python 3.10, which the .pyz "
+                                "must run on",
+                            )
+                        )
                     continue
                 if top != PACKAGE:
                     failures.append(
@@ -392,13 +525,15 @@ def import_failures(skill: str, files: dict[str, bytes], tree: dict[str, bytes])
                             "the build ships no third-party code",
                         )
                     )
-                elif not _module_exists(files, dotted):
-                    where = (
-                        "is in src/ but not in this skill's .pyz: add its path to skills.json, or do not import it"
-                        if _module_exists(tree, dotted)
-                        else "does not exist under src/"
-                    )
-                    failures.append(("import", f"{skill}: {dotted}", f"imported by {name}: {where}"))
+                    continue
+                if not _module_exists(files, dotted):
+                    missing(dotted, name)
+                # `from better_ai import beta` imports a module when `better_ai.beta` is one; a name that is no module
+                # anywhere in src/ is an attribute and needs no file.
+                for imported in names:
+                    sub = f"{dotted}.{imported}"
+                    if _module_exists(tree, sub) and not _module_exists(files, sub):
+                        missing(sub, name)
     return sorted(set(failures))
 
 
@@ -545,12 +680,10 @@ def run_check(args, source: Source, skills: Path, root: Path | None) -> list[tup
                 failures += build_with_src_failures(root, args.base)
             else:
                 print("note: no --base given, skipped the check that tools/build.py and src/ change in separate PRs")
-        schemas_by_skill = {s: bundled_schemas(f) for s, f in source.files.items()}
-        for skill, schemas in schemas_by_skill.items():
-            failures += unit_kind_failures(skill, schemas)
-        every = {}
-        for schemas in schemas_by_skill.values():
-            every.update(schemas)
+        failures += all_unit_kind_failures(source)
+        every: dict[str, dict] = {}
+        for files in source.files.values():
+            every.update(bundled_schemas(files))
         failures += base_field_failures(every)
         for skill, files in source.files.items():
             failures += import_failures(skill, files, source.tree)
@@ -599,7 +732,7 @@ def main(argv: list[str] | None = None) -> int:
             for kind, subject, fix in failures:
                 print(f"{kind}: {subject}: {fix}", file=sys.stderr)
             return 1 if failures else 0
-        failures = [x for s, fl in source.files.items() for x in unit_kind_failures(s, bundled_schemas(fl))]
+        failures = all_unit_kind_failures(source)
         if failures:
             for kind, subject, fix in failures:
                 print(f"{kind}: {subject}: {fix}", file=sys.stderr)

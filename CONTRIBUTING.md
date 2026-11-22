@@ -11,7 +11,8 @@ Each skill that has scripts ships one file, `skills/<skill>/scripts/better.pyz`,
 python3 tools/build.py
 ```
 
-Needs Python 3.12 or later; the `.pyz` it writes runs on Python 3.10. The result is byte-identical on every machine:
+The build reads the files git tracks under `src/better_ai/` (`git add` a new file first), so a stray `.DS_Store` or
+swap file never enters a `.pyz`. It needs Python 3.12 or later; the `.pyz` it writes runs on Python 3.10. The result is byte-identical on every machine:
 the same source gives the same bytes. Commit the changed `.pyz` files with your source change.
 
 `python3 tools/build.py --check` rebuilds and compares with what is committed, and reports every difference as
