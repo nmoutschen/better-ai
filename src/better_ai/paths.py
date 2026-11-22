@@ -280,6 +280,12 @@ def write_state(unit: Unit, relative: str, data: bytes) -> None:
         os.close(fd)
 
 
+def make_unit_folder(unit: Unit) -> None:
+    """Make the unit's own folder, and the skill folder above it if it is missing (`resolve_unit` has refused a symlink
+    on the way). Only `create` calls it."""
+    os.makedirs(unit.path, exist_ok=True)
+
+
 def make_folder(unit: Unit, relative: str) -> None:
     """Make a folder inside the unit (and the folders above it inside the unit), refusing a symlink on the way."""
     pure = PurePosixPath(relative)
