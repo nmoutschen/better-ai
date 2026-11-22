@@ -60,7 +60,7 @@ ANSWER what builders send you, in plain language, and SAY whether an answer came
 - A gap the design, the spec or the repo answers: ANSWER it yourself.
 - A decision within what the user agreed with you, the design and its recorded decisions: DECIDE it, REVISE the spec in place if needed (WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file, and once the user has answered, WRITE the requirement with source `request` holding the user's words.), and RECORD it in `.code/<change>/decisions.jsonl`: READ [../templates/decision.md](../templates/decision.md) and WRITE it in its format.
 - Anything that would change what the user agreed, or that only the user can answer: ASK the user, with everything the builder gave.
-- A blocked task: GIVE what is missing, SPLIT the task (a split task gets a new `T<n>`, never `T5b`), or ASK the user. DO NOT build the task yourself.
+- A blocked task: GIVE what is missing, SPLIT the task, GIVING each new task its own new `T<n>`, never a suffixed id such as `T5b`, or ASK the user. DO NOT build the task yourself.
 
 EACH time this mode says ASK the user, ALSO RECORD the question in `.code/<change>/decisions.jsonl` with the status `waiting`, so the dashboard shows it. ASK it in the chat too, because the user may not be watching the page. The user answers in either: APPLY the first answer, THEN SET the status to `answered` and SET `answer` to the page's answer event, or to the user's words from the chat.
 

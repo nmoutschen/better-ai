@@ -574,7 +574,9 @@ class CodeBetterTextTest(unittest.TestCase):
             "REWRITE that lesson's line in place, keeping `at` and `by`, with the task added to `found_in`", coordinate
         )
         self.assertIn("WRITE no second lesson", coordinate)
-        self.assertIn("a split task gets a new `T<n>`, never `T5b`", coordinate)
+        self.assertIn(
+            "SPLIT the task, GIVING each new task its own new `T<n>`, never a suffixed id such as `T5b`", coordinate
+        )
         self.assertIn("found_in", coordinate)
         self.assertIn("`.code/<change>/lessons.jsonl` in every builder's and verifier's `lessons` input", coordinate)
         self.assertIn(
