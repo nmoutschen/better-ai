@@ -418,7 +418,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def after(self) -> int:
         value = self.path.split("=", 1)[1]
-        return int(value) if value.isdigit() else 0
+        return int(value) if value.isdigit() and len(value) <= 12 else 0  # a count, not a number past any log
 
     def conversation_get(self) -> bool:
         """Answer the conversation's own GET paths; False when the path is the page's. A request addressed to another
