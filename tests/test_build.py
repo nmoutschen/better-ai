@@ -644,64 +644,41 @@ class TestUnitKindInvariants(BuildTestCase):
 
 
 class TestRealTree(BuildTestCase):
-    """L3: every static step runs on the real src/better_ai, not only on fixtures shaped by hand."""
-
-    KNOWN = (
-        # code-better's `step` is in both log.schema.json and next-steps.schema.json until it is renamed next_step
-        "duplicate type: code-better/change: step: ",
-        # show-better's spec.json (`slides`) has no at and by until it gets them
-        "base fields: better_ai/show/schemas/spec.schema.json: type slides does not require ",
-        # nothing is built and committed in this copy
-        "stale: ",
-    )
+    """L3: every static step runs on the real src/better_ai and the real committed skills/*/scripts/better.pyz, not only
+    on fixtures shaped by hand: the real tree has no failure."""
 
     def real_copy(self):
         repo = self.tmp / "real"
-        shutil.copytree(ROOT / "src", repo / "src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        ignore = shutil.ignore_patterns("__pycache__", "*.pyc")
+        shutil.copytree(ROOT / "src", repo / "src", ignore=ignore)
+        shutil.copytree(ROOT / "skills", repo / "skills", ignore=ignore)
         (repo / "tools").mkdir()
         shutil.copy(BUILD, repo / "tools" / "build.py")
-        # files other tasks add (records.py, page/) may be missing: placeholders so skills.json resolves
-        package = repo / "src" / "better_ai"
-        for rel in json.loads((package / "skills.json").read_text())["shared"]:
-            target = repo / "src" / rel
-            if rel.endswith("/") and not target.exists():
-                target.mkdir(parents=True)
-                (target / "__init__.py").write_text("")
-            elif not rel.endswith("/") and not target.exists():
-                target.write_text("")
         git(repo, "init", "-q", "-b", "main")
         git(repo, "add", "-A")
         return repo
 
-    def assert_only_known(self, result):
-        self.assertNotIn("Traceback", result.stderr)
-        self.assertNotIn("build.py:", result.stderr, result.stderr)  # a refused source, not a check result
-        for line in result.stderr.splitlines():
-            self.assertTrue(line.startswith(self.KNOWN), f"unexpected failure on the real tree: {line}")
-
-    def test_check_and_compare_on_the_real_tree_report_only_the_known_failures(self):
-        repo = self.real_copy()
-        python = pyz.build_python()
-        for mode in ["--check", "--compare"]:
-            result = subprocess.run(
-                [python, "-I", str(repo / "tools" / "build.py"), mode, "--root", str(repo)],
-                capture_output=True,
-                text=True,
-                cwd=repo,
-            )
-            self.assert_only_known(result)
-
-    def test_the_real_tree_builds_every_skill_when_the_known_failures_are_fixed_in_a_copy(self):
-        # nothing but the skills' own fixes stands between the real tree and a build
-        repo = self.real_copy()
-        python = pyz.build_python()
-        result = subprocess.run(
-            [python, "-I", str(repo / "tools" / "build.py"), "--root", str(repo)],
+    def run_build(self, repo, *args):
+        return subprocess.run(
+            [pyz.build_python(), "-I", str(repo / "tools" / "build.py"), *args, "--root", str(repo)],
             capture_output=True,
             text=True,
             cwd=repo,
         )
-        self.assert_only_known(result)
+
+    def test_check_and_compare_pass_on_the_real_tree(self):
+        repo = self.real_copy()
+        for mode in ["--check", "--compare"]:
+            result = self.run_build(repo, mode)
+            self.assertEqual((result.returncode, result.stderr), (0, ""), mode)
+
+    def test_the_real_tree_builds_the_committed_bytes(self):
+        repo = self.real_copy()
+        committed = {p: p.read_bytes() for p in (repo / "skills").glob("*/scripts/better.pyz")}
+        self.assertEqual(len(committed), len(json.loads((ROOT / "src/better_ai/skills.json").read_text())["skills"]))
+        result = self.run_build(repo)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+        self.assertEqual({p: p.read_bytes() for p in committed}, committed)
 
 
 class TestWorkflow(unittest.TestCase):

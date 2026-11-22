@@ -272,3 +272,12 @@ test('the shared count says how many records are in the format before this chang
   assert.equal(note.hidden, true);
   assert.equal(note.textContent, '');
 });
+
+test('the research board and the code-better dashboard draw a decision question with the shared renderer, and neither has its own', () => {
+  for (const rel of ['research/board.js', 'code/dashboard.js']) {
+    const text = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', rel), 'utf8');
+    assert.match(text, /pageDecision\(\{/, rel + ' does not call pageDecision');
+    assert.doesNotMatch(text, /['"`]Use the default['"`]/, rel + ' words the default button itself');
+  }
+  assert.match(source, /Use the default/);
+});

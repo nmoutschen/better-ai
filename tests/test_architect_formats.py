@@ -1359,6 +1359,30 @@ class ModeText(unittest.TestCase):
         "DO NOT get past a refusal by editing the records by hand."
     )
 
+    def test_design_mode_names_create_the_design_locations_and_the_generated_marker_rule(self):
+        """S61: `create` for `.architect/<change>`, `docs/` locations first and the change folder otherwise, and `specs.md`
+        written only when it is missing or starts with the marker."""
+        mode = (SKILL / "modes" / "design.md").read_text()
+        self.assertIn("better.pyz create .architect/<change> --by", mode)
+        for location in ("`docs/`", "`docs/adr/`", "`docs/decisions/`", "`.architect/<change>/decisions/`"):
+            self.assertIn(location, mode)
+        self.assertIn("WHEN a location has no repo convention", mode)
+        specs = (SKILL / "formats" / "specs.md").read_text()
+        self.assertIn("only if that file is missing or its first line is that marker", specs)
+
+    def test_records_format_shows_the_diagram_placeholders_and_the_design_mode_points_to_it(self):
+        """S65: `in`, node `detail`, group `members`, step `kind` and the part-key syntax, and the mode names the file."""
+        records = (SKILL / "formats" / "records.md").read_text()
+        for shown in (
+            '"in": ["<before | after>"]',
+            '"detail"',
+            '"members"',
+            "<request | response | async>",
+            "box:<box id>",
+        ):
+            self.assertIn(shown, records)
+        self.assertIn("formats/records.md", (SKILL / "modes" / "design.md").read_text())
+
     def test_the_record_rule_is_stated_once_in_skill_md_and_not_in_the_modes(self):
         self.assertEqual((SKILL / "SKILL.md").read_text().count(self.RULE), 1)
         for name in ("design.md", "audit.md"):
