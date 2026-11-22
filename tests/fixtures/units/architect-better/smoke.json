@@ -1,0 +1,120 @@
+{
+ "steps": [
+  {
+   "args": [
+    "create",
+    ".architect/demo",
+    "--by",
+    "architect"
+   ],
+   "stdin": "{\"request\": {\"text\": \"Add a page. Show each agent's task, mode and state.\", \"from\": {\"type\": \"chat\"}}, \"title\": \"Demo\", \"summary\": \"\", \"scope\": \"\", \"accepted\": []}"
+  },
+  {
+   "args": [
+    "add",
+    ".architect/demo",
+    "design",
+    "--by",
+    "architect"
+   ],
+   "stdin": "{\"containers\": {\"nodes\": [{\"id\": \"user\", \"label\": \"You\", \"kind\": \"person\"}, {\"id\": \"page\", \"label\": \"Page\", \"kind\": \"page\"}, {\"id\": \"server\", \"label\": \"Server\", \"kind\": \"service\"}], \"edges\": [{\"id\": \"e1\", \"from\": \"user\", \"to\": \"page\", \"label\": \"reads\"}, {\"id\": \"e2\", \"from\": \"page\", \"to\": \"server\", \"label\": \"POST\"}], \"groups\": []}, \"flows\": [{\"id\": \"ask\", \"name\": \"Ask\", \"participants\": [{\"id\": \"page\", \"box\": \"page\"}, {\"id\": \"server\", \"box\": \"server\"}], \"steps\": [{\"id\": \"s1\", \"from\": \"page\", \"to\": \"server\", \"label\": \"POST\"}]}]}"
+  },
+  {
+   "args": [
+    "add",
+    ".architect/demo",
+    "requirement",
+    "--by",
+    "architect"
+   ],
+   "stdin": "{\"kind\": \"functional\", \"text\": \"Show each agent's task, mode and state.\", \"source\": {\"type\": \"request\", \"sentence\": \"Show each agent's task, mode and state.\"}}",
+   "stdout_matches": "^F1"
+  },
+  {
+   "args": [
+    "add",
+    ".architect/demo",
+    "perspective",
+    "--by",
+    "architect",
+    "--id",
+    "security"
+   ],
+   "stdin": "{\"name\": \"Security\", \"applies\": true, \"why\": \"A local server takes input.\", \"from\": {\"type\": \"built_in\"}}"
+  },
+  {
+   "args": [
+    "set",
+    ".architect/demo",
+    "F1"
+   ],
+   "stdin": "{\"text\": \"Show each agent's task, mode and state.\"}"
+  },
+  {
+   "args": [
+    "check",
+    ".architect/demo"
+   ]
+  },
+  {
+   "args": [
+    "add",
+    ".architect/demo",
+    "review",
+    "--by",
+    "architect"
+   ],
+   "stdin": "{}",
+   "exit": 1
+  },
+  {
+   "args": [
+    "review",
+    ".architect/demo",
+    "--perspectives",
+    "security"
+   ]
+  },
+  {
+   "args": [
+    "register",
+    ".architect/demo"
+   ],
+   "stdout_matches": "register.html"
+  },
+  {
+   "args": [
+    "render",
+    ".architect/demo"
+   ],
+   "stdout_matches": "index.html"
+  },
+  {
+   "args": [
+    "serve",
+    ".architect/demo",
+    "--no-browser",
+    "--once"
+   ],
+   "serve": true
+  }
+ ],
+ "worktree_steps": [
+  {
+   "args": [
+    "add",
+    "{repo}/.architect/demo",
+    "requirement",
+    "--by",
+    "architect"
+   ],
+   "stdin": "{\"kind\": \"quality\", \"text\": \"Each action shows within a second.\", \"source\": {\"type\": \"guessed\"}}"
+  },
+  {
+   "args": [
+    "check",
+    "{repo}/.architect/demo"
+   ]
+  }
+ ]
+}

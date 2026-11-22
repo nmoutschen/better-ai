@@ -41,7 +41,6 @@ from unittest import mock
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import sweep  # noqa: E402
-import test_architect_formats as architects  # noqa: E402
 import test_board_formats as boards  # noqa: E402
 import test_dashboard_formats as dashboards  # noqa: E402
 import test_page as pages  # noqa: E402
@@ -187,34 +186,10 @@ def name_of(path: Path) -> str:
 
 
 def schema_module():
-    return module_of(SKILLS / "architect-better" / "scripts" / "schema.py")
+    return module_of(SKILLS / "show-better" / "scripts" / "schema.py")
 
 
 # ---------------------------------------------------------------- the commands of each script, on a fresh folder
-
-
-def architect_commands(root: Path) -> list:
-    folder = architects.make_folder(root)
-    perspective = architects.read(folder, "perspectives.jsonl")[0]["id"]
-    return [
-        ["check", folder],
-        ["specs", folder, "--out", root / "specs.md"],
-        ["review", folder, "--perspectives", perspective],
-        ["reply", folder, "hello"],
-        ["status", folder, "seen", "m-1"],
-        ["pending", folder],
-        ["wait", folder, "--timeout", "0.1"],
-    ]
-
-
-def diagram_commands(root: Path) -> list:
-    design = root / "design.json"
-    design.write_text(json.dumps(architects.design()), encoding="utf-8")
-    return [
-        ["check", design],
-        ["render", design, "--out", root / "svg"],
-        ["register", "--out", root / "register.html"],
-    ]
 
 
 def dashboard_commands(root: Path) -> list:
@@ -299,14 +274,12 @@ def folder_with_a_reply(skill: str, root: Path) -> Path:
 
 
 PROGRAMS = {
-    "architect-better": "architect.py",
     "code-better": "dashboard.py",
     "research-better": "board.py",
     "show-better": "show.py",
     "design-better": "canvas.py",
 }
 SCHEMA_FOLDERS = {
-    "architect-better": lambda root: architects.make_folder(root),
     "code-better": lambda root: dashboards.change(root),
     "research-better": board_folder,
     "show-better": lambda root: folder_with_a_reply("show-better", root),
@@ -319,8 +292,6 @@ def schema_commands(skill: str, root: Path) -> list:
 
 
 COMMANDS = {
-    "architect-better/architect.py": architect_commands,
-    "architect-better/diagram.py": diagram_commands,
     "code-better/dashboard.py": dashboard_commands,
     "research-better/board.py": board_commands,
     "show-better/show.py": show_commands,
@@ -377,7 +348,7 @@ def watched(module) -> dict:
     shared schema.py's and page.py's."""
     page = getattr(module, "page", None)  # the modules this script itself imported
     owners = [module, page]
-    if "architect-better" in module.__name__:  # schema.py is identical in every skill: its functions are tried once
+    if "show-better" in module.__name__:  # schema.py is identical in every skill: its functions are tried once
         owners += [getattr(module, "schema", None), getattr(page, "schema", None)]
     found = {id(getattr(o, n).__code__): (o, n) for o, n in STDLIB}  # by identity: equal code objects compare equal
     for owner in owners:
@@ -474,7 +445,6 @@ class Wrapper(unittest.TestCase):
         port = busy.getsockname()[1]
         try:
             for script, command, build in (
-                ("architect-better/architect.py", "serve", architect_serving),
                 ("code-better/dashboard.py", "watch", dashboard_serving),
                 ("research-better/board.py", "watch", board_serving),
             ):
@@ -513,7 +483,9 @@ class Wrapper(unittest.TestCase):
 
     def test_every_script_that_runs_as_a_program_calls_one_wrapped_entry_point(self):
         scripts = scripts_with_main()
-        self.assertGreaterEqual(len(scripts), 11)  # architect, diagram, dashboard, board, show, canvas, five schema
+        self.assertGreaterEqual(
+            len(scripts), 8
+        )  # dashboard, board, show, canvas, four schema (architect-better runs from better.pyz)
         for path in scripts:
             with self.subTest(script=name_of(path)):
                 entry, problems = entry_of(path)
@@ -521,7 +493,7 @@ class Wrapper(unittest.TestCase):
                 self.assertTrue(hasattr(getattr(module_of(path), entry), "__wrapped__"))
 
     def test_every_file_under_scripts_is_a_library_or_a_program_with_a_wrapped_entry_point(self):
-        self.assertGreaterEqual(len(all_scripts()), 16)
+        self.assertGreaterEqual(len(all_scripts()), 12)
         for path in all_scripts():
             with self.subTest(script=name_of(path)):
                 self.assertEqual(top_level_problems(path), [])
@@ -582,11 +554,6 @@ def served_page(folder: Path) -> Path:
     return path
 
 
-def architect_serving(root: Path) -> tuple:
-    folder = architects.make_folder(root)
-    return (folder, 0, False), folder
-
-
 def dashboard_serving(root: Path) -> tuple:
     folder = dashboards.change(root)
     return (folder, 0, False), folder
@@ -609,7 +576,6 @@ def canvas_serving(root: Path) -> tuple:
 
 # script -> (the function that starts the server, what it is given on a fresh folder, the events the page sends)
 HANDLERS = {
-    "architect-better/architect.py": ("serve", architect_serving, "architect"),
     "code-better/dashboard.py": ("watch", dashboard_serving, "dashboard"),
     "research-better/board.py": ("watch", board_serving, "board"),
     "show-better/show.py": ("serve", show_serving, "show"),
@@ -858,12 +824,10 @@ class ServedBrokenFiles(unittest.TestCase):
 
 # skill -> (script, how to build a folder, the loader's answer for a folder)
 LOADERS = {
-    "architect-better": ("architect.py", lambda root: architects.make_folder(root), lambda m, f: m.load(f)),
     "code-better": ("dashboard.py", lambda root: dashboards.change(root), lambda m, f: m.load(f)),
     "research-better": ("board.py", board_folder, lambda m, f: m.load(f)),
 }
 CONVERSATIONS = {
-    "architect-better": ("architect.py", lambda root: architects.make_folder(root)),
     "code-better": ("dashboard.py", lambda root: dashboards.change(root)),
     "research-better": ("board.py", board_folder),
     "show-better": ("show.py", lambda root: folder_with_a_reply("show-better", root)),
@@ -1045,7 +1009,6 @@ class Loaders(unittest.TestCase):
 # ---------------------------------------------------------------- a lone surrogate in every string and key of every kind
 
 PAGE_SKILLS = {
-    "architect": "architect-better",
     "canvas": "design-better",
     "show": "show-better",
     "board": "research-better",
@@ -1057,9 +1020,6 @@ AT = "2026-11-21T10:00:00Z"
 def example_records() -> list:
     """(skill, label, the file name the record would have, the record) for the examples of every kind of file."""
     found = []
-    for kind in architects.KINDS:
-        for title, record in architects.examples(kind):
-            found.append(("architect-better", f"{kind}: {title}", kind, record))
     for kind, (_, relative) in dashboards.KINDS.items():
         for title, record in dashboards.examples(kind):
             found.append(("code-better", f"{kind}: {title}", relative, record))
@@ -1095,7 +1055,7 @@ class Surrogates(unittest.TestCase):
 
     def test_the_examples_are_enough_to_cover_every_kind(self):
         kinds = {(skill, sample) for skill, _, sample, _ in example_records()}
-        self.assertGreaterEqual(len(kinds), 30)
+        self.assertGreaterEqual(len(kinds), 22)
 
     def test_every_string_and_every_key_of_every_example_that_holds_a_surrogate_is_reported_and_stripped(self):
         schema = schema_module()

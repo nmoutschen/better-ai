@@ -1,18 +1,16 @@
 """Tests for the architecture diagram renderer."""
 
 import copy
-import importlib.util
 import json
-import subprocess
 import sys
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "skills" / "architect-better" / "scripts"
-SPEC = importlib.util.spec_from_file_location("diagram", SCRIPTS / "diagram.py")
-diagram = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(diagram)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from better_ai.architect import diagram  # noqa: E402
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 NS = {"svg": "http://www.w3.org/2000/svg"}
 
@@ -24,19 +22,13 @@ def content(svg, element_id):
 
 class DiagramTests(unittest.TestCase):
     def setUp(self):
-        self.design = json.loads((SCRIPTS / "example.json").read_text(encoding="utf-8"))
+        self.design = json.loads((FIXTURES / "example.json").read_text(encoding="utf-8"))
 
     def test_check_refuses_unknown_kind(self):
-        result = subprocess.run(
-            [sys.executable, SCRIPTS / "diagram.py", "check", "/dev/stdin"],
-            input=json.dumps(
-                {"containers": {"nodes": [{"id": "x", "label": "X", "kind": "unknown-widget"}]}, "flows": []}
-            ),
-            text=True,
-            capture_output=True,
+        errors = diagram.validate(
+            {"containers": {"nodes": [{"id": "x", "label": "X", "kind": "unknown-widget"}]}, "flows": []}
         )
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("unknown-widget", result.stderr)
+        self.assertTrue(any("unknown-widget" in error for error in errors), errors)
 
     def test_check_reports_references_and_duplicate_ids(self):
         self.design["containers"]["edges"][0]["to"] = "missing-node"

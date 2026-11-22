@@ -1,0 +1,436 @@
+{
+ "type": "design",
+ "at": "2026-11-20T10:00:00Z",
+ "by": "architect",
+ "containers": {
+  "nodes": [
+   {
+    "id": "user",
+    "label": "You",
+    "kind": "person",
+    "detail": "the user"
+   },
+   {
+    "id": "coord",
+    "label": "Coordinator agent",
+    "kind": "agent",
+    "detail": "plans, answers, merges"
+   },
+   {
+    "id": "page",
+    "label": "Dashboard page",
+    "kind": "page",
+    "detail": "dashboard.html, page.js",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "builders",
+    "label": "Builder agents",
+    "kind": "agent",
+    "detail": "one per task"
+   },
+   {
+    "id": "verifiers",
+    "label": "Verifier agents",
+    "kind": "agent",
+    "detail": "one per finished task"
+   },
+   {
+    "id": "server",
+    "label": "dashboard.py",
+    "kind": "service",
+    "detail": "local HTTP server and CLI",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "change",
+    "label": ".code/<change>/",
+    "kind": "files",
+    "detail": "spec.jsonl, tasks.jsonl, decisions.jsonl"
+   },
+   {
+    "id": "logs",
+    "label": "Agent logs",
+    "kind": "files",
+    "detail": "logs/<agent>.jsonl and .card.json",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "git",
+    "label": "Task branches",
+    "kind": "files",
+    "detail": "git worktrees"
+   },
+   {
+    "id": "notes",
+    "label": "progress.jsonl",
+    "kind": "file",
+    "detail": "status for you to read (invented for this demo)",
+    "in": [
+     "before"
+    ]
+   }
+  ],
+  "edges": [
+   {
+    "id": "e1",
+    "from": "user",
+    "to": "coord",
+    "label": "asks and answers in chat"
+   },
+   {
+    "id": "e2",
+    "from": "user",
+    "to": "page",
+    "label": "reads, comments, answers",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "e3",
+    "from": "page",
+    "to": "server",
+    "label": "HTTP /rpc, /events",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "e4",
+    "from": "coord",
+    "to": "server",
+    "label": "wait, reply, status, pending",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "e5",
+    "from": "coord",
+    "to": "builders",
+    "label": "starts, answers"
+   },
+   {
+    "id": "e6",
+    "from": "coord",
+    "to": "verifiers",
+    "label": "starts"
+   },
+   {
+    "id": "e7",
+    "from": "coord",
+    "to": "change",
+    "label": "writes spec, tasks, decisions"
+   },
+   {
+    "id": "e8",
+    "from": "server",
+    "to": "change",
+    "label": "reads; appends conversation",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "e9",
+    "from": "server",
+    "to": "logs",
+    "label": "reads",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "e10",
+    "from": "builders",
+    "to": "logs",
+    "label": "writes",
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "e11",
+    "from": "builders",
+    "to": "git",
+    "label": "commits"
+   },
+   {
+    "id": "e12",
+    "from": "verifiers",
+    "to": "git",
+    "label": "checks the diff"
+   },
+   {
+    "id": "e13",
+    "from": "coord",
+    "to": "notes",
+    "label": "writes progress",
+    "in": [
+     "before"
+    ]
+   }
+  ],
+  "groups": [
+   {
+    "id": "g-agents",
+    "label": "Agent team",
+    "members": [
+     "coord",
+     "builders",
+     "verifiers"
+    ]
+   },
+   {
+    "id": "g-dash",
+    "label": "Live dashboard",
+    "members": [
+     "page",
+     "server",
+     "logs"
+    ],
+    "in": [
+     "after"
+    ]
+   },
+   {
+    "id": "g-repo",
+    "label": "Repository working copy",
+    "members": [
+     "notes",
+     "change",
+     "git"
+    ]
+   }
+  ]
+ },
+ "flows": [
+  {
+   "id": "ask",
+   "name": "A builder's question reaches you and your answer gets back",
+   "participants": [
+    {
+     "id": "user",
+     "box": "user"
+    },
+    {
+     "id": "page",
+     "in": [
+      "after"
+     ],
+     "box": "page"
+    },
+    {
+     "id": "server",
+     "in": [
+      "after"
+     ],
+     "box": "server"
+    },
+    {
+     "id": "coord",
+     "box": "coord"
+    },
+    {
+     "id": "dec",
+     "box": "change"
+    },
+    {
+     "id": "builder",
+     "box": "builders"
+    }
+   ],
+   "steps": [
+    {
+     "id": "s1",
+     "from": "builder",
+     "to": "coord",
+     "label": "question: retry on timeout?",
+     "kind": "async"
+    },
+    {
+     "id": "s2",
+     "from": "coord",
+     "to": "dec",
+     "label": "write D-3 to decisions.jsonl, status waiting",
+     "in": [
+      "after"
+     ],
+     "kind": "request"
+    },
+    {
+     "id": "s3",
+     "from": "coord",
+     "to": "user",
+     "label": "asks in chat",
+     "kind": "async"
+    },
+    {
+     "id": "s4",
+     "from": "server",
+     "to": "page",
+     "label": "D-3 waits for you (/events)",
+     "in": [
+      "after"
+     ],
+     "kind": "response"
+    },
+    {
+     "id": "s5",
+     "from": "user",
+     "to": "page",
+     "label": "answers under D-3",
+     "in": [
+      "after"
+     ],
+     "kind": "async"
+    },
+    {
+     "id": "s6",
+     "from": "page",
+     "to": "server",
+     "label": "POST /rpc",
+     "in": [
+      "after"
+     ],
+     "kind": "request"
+    },
+    {
+     "id": "s7",
+     "from": "server",
+     "to": "coord",
+     "label": "wait ends with the answer",
+     "in": [
+      "after"
+     ],
+     "kind": "response"
+    },
+    {
+     "id": "s8",
+     "from": "user",
+     "to": "coord",
+     "label": "answers in chat",
+     "in": [
+      "before"
+     ],
+     "kind": "async"
+    },
+    {
+     "id": "s9",
+     "from": "coord",
+     "to": "dec",
+     "label": "D-3: status answered, copy answer",
+     "in": [
+      "after"
+     ],
+     "kind": "request"
+    },
+    {
+     "id": "s10",
+     "from": "coord",
+     "to": "server",
+     "label": "reply --to, status done",
+     "in": [
+      "after"
+     ],
+     "kind": "request"
+    },
+    {
+     "id": "s11",
+     "from": "coord",
+     "to": "builder",
+     "label": "restarts the task with the answer",
+     "kind": "async"
+    }
+   ]
+  },
+  {
+   "id": "open",
+   "name": "You open the dashboard and see the agents at work",
+   "in": [
+    "after"
+   ],
+   "participants": [
+    {
+     "id": "user",
+     "box": "user"
+    },
+    {
+     "id": "page",
+     "box": "page"
+    },
+    {
+     "id": "server",
+     "box": "server"
+    },
+    {
+     "id": "logs",
+     "box": "logs"
+    },
+    {
+     "id": "change",
+     "box": "change"
+    }
+   ],
+   "steps": [
+    {
+     "id": "f2s1",
+     "from": "user",
+     "to": "page",
+     "label": "opens the address",
+     "kind": "async",
+     "in": [
+      "after"
+     ]
+    },
+    {
+     "id": "f2s2",
+     "from": "page",
+     "to": "server",
+     "label": "GET /events",
+     "kind": "request",
+     "in": [
+      "after"
+     ]
+    },
+    {
+     "id": "f2s3",
+     "from": "server",
+     "to": "logs",
+     "label": "read logs/<agent>.card.json",
+     "kind": "request",
+     "in": [
+      "after"
+     ]
+    },
+    {
+     "id": "f2s4",
+     "from": "server",
+     "to": "change",
+     "label": "read tasks.jsonl, decisions.jsonl",
+     "kind": "request",
+     "in": [
+      "after"
+     ]
+    },
+    {
+     "id": "f2s5",
+     "from": "server",
+     "to": "page",
+     "label": "agents, tasks, open questions",
+     "kind": "response",
+     "in": [
+      "after"
+     ]
+    }
+   ]
+  }
+ ]
+}

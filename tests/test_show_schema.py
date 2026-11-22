@@ -753,11 +753,6 @@ class SlideOnNotes(unittest.TestCase):
         self.assertIn("on", fields)
         self.assertEqual(note_problems("design-better", "canvas-events.schema.json", note()), [])
 
-    def test_an_architect_note_with_on_is_refused(self):
-        fields = [f for f, _ in note_problems("architect-better", "architect-events.schema.json", note(on=self.ON))]
-        self.assertIn("on", fields)
-        self.assertEqual(note_problems("architect-better", "architect-events.schema.json", note()), [])
-
     def test_the_slide_page_sends_the_slide_with_each_note(self):
         source = (SHOW / "scripts" / "show.js").read_text(encoding="utf-8")
         self.assertRegex(source, r"noteParams:\s*function \(\) \{ return \{ on: \{ slide: cur \+ 1, part: [^}]*null")
