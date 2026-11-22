@@ -563,7 +563,7 @@ class Add(Repo):
         self.assertTrue((unit / "logs" / "builder-1.card.json").is_file())
         again = call("code-better", "add", unit, "card", "--for", "builder-1", "--by", "coordinator", stdin=CARD)
         self.assertEqual(again[0], 1)
-        self.assertIn("--for builder-1", again[2])
+        self.assertIn("builder-1 exists already", again[2])
 
     def test_s31_other_refusals_name_the_unit_the_reason_and_the_next_command(self):
         unit = self.code_change()
@@ -981,8 +981,7 @@ class Examples(Repo):
         agent = {"logs/<agent>.card.json": ("card", "builder-1"), "logs/<agent>.jsonl": (None, "builder-1")}
         results = []
         for name, entries in data.items():
-            # next-steps.jsonl: its `step` type is the log's until the schemas rename it to `next_step` (D5, T6)
-            if name in ("code.json", "decisions.jsonl", "next-steps.jsonl") or name.startswith("audit/"):
+            if name in ("code.json", "decisions.jsonl") or name.startswith("audit/"):
                 continue
             for entry in entries:
                 record = json.loads(entry["line"])
@@ -997,7 +996,9 @@ class Examples(Repo):
                 results.append((name, entry["title"], done))
                 self.assertIn(done[0], (0, 1), (name, done))
                 if done[0] == 1:
-                    self.assertRegex(done[1] + done[2], r"new: |\.\. ", (name, done))
+                    self.assertRegex(
+                        done[1] + done[2], r"new: |\.\. |has no card", (name, done)
+                    )  # a log line needs its card (S24)
         accepted = {name for name, _, done in results if done[0] == 0}
         self.assertGreaterEqual(len(accepted), 1, [(n, t, d) for n, t, d in results if d[0]])
 

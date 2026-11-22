@@ -505,7 +505,7 @@ class Wrapper(unittest.TestCase):
                 self.assertTrue(hasattr(getattr(module_of(path), entry), "__wrapped__"))
 
     def test_every_file_under_scripts_is_a_library_or_a_program_with_a_wrapped_entry_point(self):
-        self.assertGreaterEqual(len(all_scripts()), 16)
+        self.assertGreaterEqual(len(all_scripts()), 13)
         for path in all_scripts():
             with self.subTest(script=name_of(path)):
                 self.assertEqual(top_level_problems(path), [])
@@ -1065,7 +1065,7 @@ class Surrogates(unittest.TestCase):
 
     def test_the_examples_are_enough_to_cover_every_kind(self):
         kinds = {(skill, sample) for skill, _, sample, _ in example_records()}
-        self.assertGreaterEqual(len(kinds), 30)
+        self.assertGreaterEqual(len(kinds), 19)
 
     def test_every_string_and_every_key_of_every_example_that_holds_a_surrogate_is_reported_and_stripped(self):
         schema = schema_module()

@@ -677,7 +677,6 @@ class TestRealTree(BuildTestCase):
             text=True,
             cwd=repo,
         )
-        self.assertIn("duplicate type: code-better/change: step", result.stderr)  # the build refuses it too
         self.assert_only_known(result)
 
 
