@@ -36,7 +36,7 @@ SET a task's `status` in `tasks.jsonl` at each event below, in an edit of its ow
 | You merge it into your main branch | `merged` |
 | It cannot go on until something else happens | `blocked` |
 
-WHEN a task is `blocked`, SET its `reason` to exactly one of: `task`, with `waits_on` holding the ID of the task it waits on; `user`, when it waits on the user's answer; or `repair limit`, when its verifier failed it twice for the same finding. A task that is not blocked holds neither `reason` nor `waits_on`: REMOVE them when the task moves on. WRITE the details as a `problem` in `progress.jsonl`, and a `resolved` record pointing to it when the task moves on.
+WHEN a task is `blocked`, SET its `reason` to exactly one of: `task`, with `waits_on` holding the ID of the task it waits on; `user`, when it waits on the user's answer; or `repair limit`, when its verifier failed it twice for the same finding, the last time after a whole-class brief. A task that is not blocked holds neither `reason` nor `waits_on`: REMOVE them when the task moves on. WRITE the details as a `problem` in `progress.jsonl`, and a `resolved` record pointing to it when the task moves on.
 
 ## 2. Start the builders
 
@@ -84,9 +84,9 @@ WHEN a builder hands back:
 
 AFTER each verifier report, WRITE a lesson for each finding that could recur in another task, in `.code/<change>/lessons.jsonl`: READ [../templates/lessons.md](../templates/lessons.md) and WRITE it in its format. WHEN a later finding is of a class a lesson already names, REWRITE that lesson's line in place, keeping `at` and `by`, with the task added to `found_in`; WRITE no second lesson.
 
-A finding of a class a lesson already names means the class has repeated: STOP fixing instances. START the task again with a brief for the whole class: the one place that closes it, such as one entry point every caller goes through or one helper every walk uses, and one test that finds every instance, including those added later. NAME the class and that place in `tried`, never only the field or the command the verifier hit. This is a standing decision: TAKE it yourself, RECORD it in `decisions.jsonl` and ANNOUNCE it on the page with its reason. ASK the user only WHEN the class fix changes what the user sees, or costs something the user has not agreed to.
+FOR each finding, CHECK whether it is one instance of a pattern with other likely instances, such as other entry points that can raise the same way, other fields of the same kind, or other callers of the same function. IF it is, or IF it is of a class a lesson already names, DO NOT brief the instance: START the task again with a brief for the whole class: the one place that closes it, such as one entry point every caller goes through or one helper every walk uses, and one test that finds every instance, including those added later. NAME the class and that place in `tried`, never only the field or the command the verifier hit. This is a standing decision: TAKE it yourself, RECORD it in `decisions.jsonl` and ANNOUNCE it on the page with its reason. ASK the user only WHEN the class fix changes what the user sees, or costs something the user has not agreed to.
 
-WHEN a verifier fails a task, SET it `changes needed`. IF it failed the same task twice for the same finding, and a whole-class brief has not cleared it, SET it `blocked` by `repair limit` and ASK the user; OTHERWISE START the task again with the findings in `tried`. WHEN it passes with unconfirmed blocking findings or parts it could not review, SET the task `blocked` by `user` and ASK the user about them before you merge.
+WHEN a verifier fails a task, SET it `changes needed`. IF it failed the same task twice for the same finding and no whole-class brief was tried, START it once more with one; IF a whole-class brief has not cleared it, SET it `blocked` by `repair limit` and ASK the user; OTHERWISE START the task again with the findings in `tried`. WHEN it passes with unconfirmed blocking findings or parts it could not review, SET the task `blocked` by `user` and ASK the user about them before you merge.
 
 ## 4. Merge and test the whole change
 
