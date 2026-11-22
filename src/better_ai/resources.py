@@ -64,6 +64,8 @@ def build_info(environ: Any = None) -> BuildInfo:
     cutoff = DEFAULT_CUTOFF
     if exists("skills.json"):
         cutoff = json.loads(read_text("skills.json")).get("format_cutoff", cutoff)
+    # Run from source (tests), a test may pin the cutoff; a built .pyz always uses the one the build wrote.
+    cutoff = os.environ.get("BETTER_AI_CUTOFF", cutoff)
     return BuildInfo(skill, skill.removesuffix("-better"), "source", cutoff)
 
 

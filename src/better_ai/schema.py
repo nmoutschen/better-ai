@@ -1027,6 +1027,10 @@ def check_paths(
                 needed: list[str] = []
                 for name in sorted(files):
                     file = Path(folder) / name
+                    if file.is_symlink():  # add, set and the pages refuse a symlink: check does not read through one
+                        matched = True
+                        errors.append(Error(str(file), 1, "(file)", "is a symlink: copy the file into the unit"))
+                        continue
                     found = _match(file, docs)
                     if found:
                         matched = True

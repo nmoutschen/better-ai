@@ -388,6 +388,21 @@ class Units(Repo):
 
 
 class Check(Repo):
+    def test_a_symlinked_record_file_is_an_error_in_check_as_add_refuses_it(self):
+        # L4: one rule in every reader. add and set refuse a symlinked record file; check must not read through it.
+        outside = self.repo / "elsewhere.jsonl"
+        outside.write_text(jsonl(decision()), encoding="utf-8")
+        (self.unit / "decisions.jsonl").symlink_to(outside)
+        result = self.check()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("decisions.jsonl:1: (file): is a symlink", result.stdout)
+
+    def test_a_reader_says_why_a_file_could_not_be_shown(self):
+        from better_ai import paths
+
+        self.assertEqual(paths.reason(paths.Refused("x.jsonl: is a symlink")), "x.jsonl: is a symlink")
+        self.assertEqual(paths.reason(ValueError("secret detail")), "ValueError")
+
     def test_s68_a_hand_written_valid_record_is_accepted(self):
         self.write("decisions.jsonl", jsonl(decision()))
         self.write("tasks.jsonl", "")

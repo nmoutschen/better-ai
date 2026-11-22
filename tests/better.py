@@ -9,7 +9,6 @@ skill (the hash is "source"). Tests that need a real `.pyz` build one with `tool
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -18,16 +17,11 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parents[1] / "src"
 
 
-def _after_cutoff() -> str:
-    """One minute after `format_cutoff` in skills.json: a time at which an old-format line is an error."""
-    from datetime import datetime, timedelta, timezone
-
-    cutoff = json.loads((SRC / "better_ai" / "skills.json").read_text())["format_cutoff"]
-    when = datetime.strptime(cutoff, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc) + timedelta(minutes=1)
-    return when.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-AFTER_CUTOFF = _after_cutoff()
+# The release's format_cutoff may lie ahead of the clock; tests pin a past one, so "after the cutoff" is never a future
+# time. Commands run from source, in this process or in a subprocess, read it from BETTER_AI_CUTOFF.
+TEST_CUTOFF = "2026-11-22T00:00:00Z"
+os.environ["BETTER_AI_CUTOFF"] = TEST_CUTOFF
+AFTER_CUTOFF = "2026-11-22T00:01:00Z"
 _BOOT = "import sys; sys.path.insert(0, sys.argv.pop(1)); from better_ai._entry import main; sys.exit(main())"
 
 

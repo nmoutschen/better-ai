@@ -65,7 +65,7 @@ class Reader:
                     "file": relative,
                     "line": 1,
                     "field": "(file)",
-                    "message": f"could not be shown: {type(error).__name__}",
+                    "message": f"could not be shown: {paths.reason(error)}",
                 }
             )
             return []
@@ -166,7 +166,7 @@ def collect(unit: Unit) -> dict:
     try:
         return _collect(unit)
     except Exception as error:
-        message = f"could not be shown: {type(error).__name__}"
+        message = f"could not be shown: {paths.reason(error)}"
         return {
             "name": unit.slug,
             "tasks": [],

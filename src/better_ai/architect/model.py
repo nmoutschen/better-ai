@@ -12,7 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from .. import resources, schema
+from .. import paths, resources, schema
 from ..paths import Unit
 from . import diagram
 
@@ -90,7 +90,7 @@ class Reader:
         try:
             return self._records(name, keep_invalid)
         except Exception as exc:
-            self.error(name, 1, "(file)", f"could not be shown: {type(exc).__name__}")
+            self.error(name, 1, "(file)", f"could not be shown: {paths.reason(exc)}")
             return []
 
     def _records(self, name: str, keep_invalid: bool = False) -> list:
@@ -384,7 +384,7 @@ def load(unit: Unit) -> dict:
     try:
         return model(read_folder(unit))
     except Exception as exc:  # for any reason: the page shows its errors band, not a failure
-        message = f"could not be shown: {type(exc).__name__}"
+        message = f"could not be shown: {paths.reason(exc)}"
         error = {"file": "(unit)", "line": 1, "field": "(unit)", "message": message}
         return empty_model(unit.slug, error)
 

@@ -167,7 +167,7 @@ def scan(unit: Unit) -> dict:
         try:
             scan_file(unit, name, data, cache, now)
         except Exception as error:  # for any reason: that file is an error entry and the rest of the board is shown
-            message = f"could not be shown: {type(error).__name__}"
+            message = f"could not be shown: {paths.reason(error)}"
             data["errors"].append({"file": name, "line": 1, "field": "(file)", "message": message})
     return data
 
@@ -193,7 +193,7 @@ def load(unit: Unit) -> dict:
     try:
         return _load(unit)
     except Exception as error:
-        message = f"could not be shown: {type(error).__name__}"
+        message = f"could not be shown: {paths.reason(error)}"
         errors = [{"file": "(board)", "line": 1, "field": "(board)", "message": message}]
         empty = {"brief": {}, "decisions": [], "conversation": [], "questions": [], "claims": [], "sources": []}
         return {**empty, "logs": {}, "errors": errors, "now": time.time()}

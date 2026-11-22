@@ -36,6 +36,11 @@ class NameRefused(Refused):
     verb that knows its unit puts the unit in front of the message."""
 
 
+def reason(error: BaseException) -> str:
+    """What a reader shows for a file it could not read: a refusal's own words, or only the kind of any other error."""
+    return str(error) if isinstance(error, Refused) else type(error).__name__
+
+
 def refusal(what: str, reason: str, then: str | None = None) -> Refused:
     return Refused(f"{what}: {reason}." + (f" {then}" if then else ""))
 
