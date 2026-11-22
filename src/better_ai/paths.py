@@ -31,6 +31,11 @@ class Refused(Exception):
     """The command refuses: nothing was written. The text is `<what>: <reason>. <next command>`."""
 
 
+class NameRefused(Refused):
+    """A value that becomes part of a path was refused (`check_slug`, `check_agent`, `check_by`, `check_pattern`). The
+    verb that knows its unit puts the unit in front of the message."""
+
+
 def refusal(what: str, reason: str, then: str | None = None) -> Refused:
     return Refused(f"{what}: {reason}." + (f" {then}" if then else ""))
 
@@ -38,10 +43,14 @@ def refusal(what: str, reason: str, then: str | None = None) -> Refused:
 # ---------------------------------------------------------------- names
 
 
+def _named(what: str, reason: str, then: str | None = None) -> NameRefused:
+    return NameRefused(f"{what}: {reason}." + (f" {then}" if then else ""))
+
+
 def check_slug(value: str, what: str = "slug") -> str:
     """A unit folder name: lower case letters, digits and hyphens, starting with a letter or digit."""
     if not isinstance(value, str) or not SLUG.fullmatch(value):
-        raise refusal(
+        raise _named(
             repr(value), f"not a valid {what} (use {SLUG.pattern})", "choose a name of lower case letters and hyphens"
         )
     return value
@@ -50,7 +59,7 @@ def check_slug(value: str, what: str = "slug") -> str:
 def check_agent(value: str, what: str = "agent name") -> str:
     """An agent's name, which becomes part of file names: `^[a-z][a-z0-9-]*$`. Checked before any path is built."""
     if not isinstance(value, str) or not AGENT.fullmatch(value):
-        raise refusal(repr(value), f"not a valid {what} (use {AGENT.pattern})", "use lower case letters and hyphens")
+        raise _named(repr(value), f"not a valid {what} (use {AGENT.pattern})", "use lower case letters and hyphens")
     return value
 
 
@@ -58,14 +67,14 @@ def check_by(value: str) -> str:
     """The `--by` name: an agent name, and never `user`, which only the page writes."""
     check_agent(value, "--by name")
     if value == "user":
-        raise refusal("user", "--by user is the page's name, not an agent's", "use your own agent name")
+        raise _named("user", "--by user is the page's name, not an agent's", "use your own agent name")
     return value
 
 
 def check_pattern(value: str, pattern: str, what: str) -> str:
     """A value that becomes part of a file name (a generated id, `--id`) must match its id pattern."""
     if not isinstance(value, str) or not re.fullmatch(pattern, value):
-        raise refusal(repr(value), f"not a valid {what} (use {pattern})")
+        raise _named(repr(value), f"not a valid {what} (use {pattern})")
     return value
 
 

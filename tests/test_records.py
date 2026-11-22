@@ -672,6 +672,111 @@ class Add(Repo):
         self.assertFalse((unit / "logs" / "b-1.jsonl").exists())
 
 
+class Follow(Repo):
+    """Follow-ups after the review of T2."""
+
+    def corrupt_first_line(self, path, **change):
+        records_ = lines_of(path)
+        records_[0].update(change)
+        Path(path).write_text(jsonl(*records_))
+
+    def test_a_pointer_to_a_line_that_fails_its_schema_in_the_same_file_blocks_the_write(self):
+        unit = self.code_change()
+        done = call(
+            "code-better", "add", unit, "problem", "--by", "c", stdin={"about": {"type": "change"}, "text": "CI"}
+        )
+        self.assertEqual(done[:2], (0, "P1\n"), done)
+        self.corrupt_first_line(unit / "progress.jsonl", nope=1)
+        before = snapshot(unit)
+        done = call("code-better", "add", unit, "resolved", "--by", "c", stdin={"to": "P1", "text": "fixed"})
+        self.assertEqual(done[0], 1, done)
+        self.assertRegex(
+            done[2],
+            r"^code-better: \.code/x: it points to P1, whose line fails its schema\. Fix that line, then run the command again\n$",
+        )
+        self.assertEqual(snapshot(unit), before)
+        # a record that does not point to it is still added, with the warning
+        done = call(
+            "code-better", "add", unit, "progress", "--by", "c", stdin={"about": {"type": "change"}, "text": "t"}
+        )
+        self.assertEqual(done[0], 0, done)
+
+    def test_a_pointer_to_a_line_that_fails_its_schema_in_another_file_blocks_add_and_set(self):
+        unit = self.code_change()
+        call("code-better", "add", unit, "task", "--by", "c", stdin=TASK)
+        self.corrupt_first_line(unit / "tasks.jsonl", status="bogus")
+        pointing = {**DECISION, "about": {"type": "task", "task": "T1"}}
+        before = snapshot(unit)
+        done = call("code-better", "add", unit, "decision", "--by", "c", stdin=pointing)
+        self.assertEqual(done[0], 1, done)
+        self.assertIn("it points to T1, whose line fails its schema", done[2])
+        self.assertEqual(snapshot(unit), before)
+        # the same through set: a good decision patched to point to the bad task
+        (unit / "tasks.jsonl").write_text(jsonl(*[{**r, "status": "todo"} for r in lines_of(unit / "tasks.jsonl")]))
+        self.assertEqual(call("code-better", "add", unit, "decision", "--by", "c", stdin=DECISION)[0], 0)
+        self.corrupt_first_line(unit / "tasks.jsonl", status="bogus")
+        done = call("code-better", "set", unit, "D1", stdin={"about": {"type": "task", "task": "T1"}})
+        self.assertEqual(done[0], 1, done)
+        self.assertIn("it points to T1, whose line fails its schema", done[2])
+
+    def test_a_pointer_to_an_old_format_line_does_not_block(self):
+        unit = self.code_change()
+        old = {"type": "decision", "at": "2026-11-01T10:00:00Z", "by": "board", "id": "D3", "asked": "q?"}
+        old.update({"default": "a", "deadline": "2026-11-01T10:00:00Z", "status": "pending"})
+        (unit / "decisions.jsonl").write_text(jsonl(old))
+        spec = {
+            **example("code-better-examples.json", "spec.jsonl", 1),
+            "source": {"type": "decision", "decision": "D3"},
+        }
+        done = call("code-better", "add", unit, "spec", "--by", "c", stdin=spec)
+        self.assertEqual(done[:2], (0, "S1\n"), done)
+        self.assertEqual(done[2], "")
+
+    def test_a_single_record_that_appears_after_the_check_is_never_overwritten(self):
+        unit = self.code_change()
+        self.task(unit)
+
+        def appears(unit_, relative, stat):
+            (unit_.path / "logs" / "b-1.card.json").write_text('{"other": "writer"}')
+
+        with mock.patch.object(records, "_still", appears):
+            done = call("code-better", "add", unit, "card", "--for", "b-1", "--by", "c", stdin=CARD)
+        self.assertEqual(done[0], 4, done)
+        self.assertIn("busy: the file changed while I worked", done[2])
+        self.assertEqual((unit / "logs" / "b-1.card.json").read_text(), '{"other": "writer"}')
+
+    def test_empty_stdin_is_accepted_only_by_set_with_unset(self):
+        unit = self.code_change()
+        call("code-better", "add", unit, "decision", "--by", "c", stdin={**WAITING, "default": "A"})
+        before = snapshot(unit)
+        for args in (("set", unit, "D1"), ("add", unit, "decision", "--by", "c")):
+            for text in ("", "  \n"):
+                done = call("code-better", *args, stdin=text)
+                self.assertEqual(done[0], 1, (args, done))
+                self.assertIn("pass the fields as one JSON object on stdin", done[2])
+        done = call("code-better", "create", self.unit(".code/e"), "--by", "c", stdin="")
+        self.assertEqual(done[0], 1)
+        self.assertIn("pass the fields as one JSON object on stdin", done[2])
+        self.assertFalse(self.unit(".code/e").exists())
+        self.assertEqual(snapshot(unit), before)
+        done = call("code-better", "set", unit, "D1", "--unset", "default", stdin="")
+        self.assertEqual(done[0], 1)  # a waiting decision needs its default: the unset is checked, not skipped
+        self.assertIn("default", done[1])
+
+    def test_a_refused_name_carries_the_unit_in_one_place(self):
+        unit = self.code_change()
+        for args in (
+            ("add", unit, "start", "--for", "../x"),
+            ("add", unit, "decision", "--by", "user"),
+            ("set", unit, "card", "--for", "A b"),
+        ):
+            done = call("code-better", *args, stdin=DECISION)
+            self.assertEqual(done[0], 1, args)
+            self.assertRegex(done[2], r"^code-better: \.code/x: ", args)
+        done = call("code-better", "create", self.unit(".code/y"), "--by", "Bad", stdin=CODE_HEAD)
+        self.assertRegex(done[2], r"^code-better: \.code/y: 'Bad'", done)
+
+
 class Set(Repo):
     def decided(self, unit, **fields):
         done = call("code-better", "add", unit, "decision", "--by", "coordinator", stdin={**DECISION, **fields})
