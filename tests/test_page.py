@@ -251,7 +251,8 @@ class Server(unittest.TestCase):
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}/"
         self.conv.address.write_text(self.url)
-        threading.Thread(target=self.server.serve_forever, args=(0.01,), daemon=True).start()  # a short poll, so shutdown takes no 0.5 s
+        # A short poll, so each shutdown does not wait half a second.
+        threading.Thread(target=self.server.serve_forever, args=(0.01,), daemon=True).start()
 
     def tearDown(self):
         self.server.shutdown()
@@ -456,7 +457,8 @@ class Pages(unittest.TestCase):
                 self.send_error(404)
 
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        threading.Thread(target=server.serve_forever, args=(0.01,), daemon=True).start()  # a short poll, so shutdown takes no 0.5 s
+        # A short poll, so each shutdown does not wait half a second.
+        threading.Thread(target=server.serve_forever, args=(0.01,), daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         return conv, f"http://127.0.0.1:{server.server_address[1]}"
