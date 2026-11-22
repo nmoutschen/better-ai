@@ -32,6 +32,7 @@ A skill package adds what is specific to its skill with three hooks, registered 
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import re
@@ -43,7 +44,7 @@ from pathlib import Path
 
 from . import cli, paths, resources, schema
 from .cli import Busy, Run, verb
-from .paths import Unit, refusal
+from .paths import Refused, Unit, refusal
 from .skill import OWNER_BY_HEAD
 
 STAMPED = ("at", "by", "id")  # fields the command sets, which stdin may not hold
@@ -220,10 +221,13 @@ def _form(unit: Unit, lay: Layout, label: str) -> Form:
 # ---------------------------------------------------------------- reading what the command is given
 
 
-def _fields(run: Run, unit: Unit) -> dict:
+def _fields(run: Run, unit: Unit, *, empty_ok: bool = False) -> dict:
+    """The JSON object on stdin. Empty stdin is `{}` only where `empty_ok` (`set` with `--unset`)."""
     text = run.stdin_text()
     if not text.strip():
-        return {}
+        if empty_ok:
+            return {}
+        raise refusal(unit.label, "stdin is empty", "pass the fields as one JSON object on stdin")
     try:
         value = json.loads(text)
     except (ValueError, RecursionError) as error:
@@ -278,6 +282,24 @@ def _stamp(run: Run, label: str, by: str, fields: dict, ident: str | None = None
     if ident is not None:
         record["id"] = ident
     return {**record, **fields}
+
+
+def _unit_named(function):
+    """Put the unit in front of a refused name (`--by`, `--for`, `--id`, the slug), in one place for the three verbs:
+    `<skill>: <unit>: <name>: <reason>. <next command>`."""
+
+    @functools.wraps(function)
+    def wrapper(args, run):
+        try:
+            return function(args, run)
+        except paths.NameRefused as error:
+            try:
+                label = paths.resolve_unit(args.unit, run.skill, creating=True).label
+            except Refused:
+                raise error from None
+            raise Refused(f"{label}: {error}") from None
+
+    return wrapper
 
 
 def _agent_arguments(parser: argparse.ArgumentParser) -> None:
@@ -355,7 +377,10 @@ def _check(
     docs = schema.load_schemas(*resources.schema_sources(run.info.package))
     path = unit.target(relative)
     notices: list[schema.Error] = []
-    found = schema.check_text(path, text, docs, {}, now=run.now(), cutoff=run.info.cutoff, notices=notices)
+    pointers: list[tuple[int, Path, str]] = []
+    found = schema.check_text(
+        path, text, docs, {}, now=run.now(), cutoff=run.info.cutoff, notices=notices, pointers=pointers
+    )
     shown = _shown(path)
     errors = [e._replace(file=shown) for e in found if e.line == line]
     if form is not None:
@@ -367,7 +392,42 @@ def _check(
             for e in errors
         ]
     warnings = [e._replace(file=shown) for e in found if e.line != line]
+    if not errors:
+        _gate(run, unit, docs, [(f, i) for n, f, i in pointers if n == line])
     return errors, warnings
+
+
+def _gate(run: Run, unit: Unit, docs: dict, pointed: list[tuple[Path, str]]) -> None:
+    """Refuse when a record the new one points to has a line that fails its schema (an old-format line before the
+    cutoff does not count): the pointer would rest on a record the unit does not hold as valid."""
+    for target, ident in pointed:
+        files = [target] if not target.is_dir() else sorted(target.glob("*.json"))
+        for file in files:
+            if file.is_symlink() or not file.is_file():
+                continue
+            text = file.read_bytes().decode("utf-8", "surrogateescape")
+            at = [
+                n
+                for n, piece in enumerate(schema._lines(text) if file.suffix == ".jsonl" else [text], 1)
+                if _id_of(piece) == ident
+            ]
+            if not at:
+                continue
+            found = schema.check_text(file, text, docs, {}, now=run.now(), cutoff=run.info.cutoff, notices=[])
+            if any(e.line in at for e in found):
+                raise refusal(
+                    unit.label,
+                    f"it points to {ident}, whose line fails its schema",
+                    "Fix that line, then run the command again",
+                )
+
+
+def _id_of(piece: str) -> str | None:
+    try:
+        value = json.loads(piece)
+    except (ValueError, RecursionError):
+        return None
+    return value.get("id") if isinstance(value, dict) and isinstance(value.get("id"), str) else None
 
 
 def _report(run: Run, errors: list[schema.Error], *, new: bool) -> int:
@@ -430,6 +490,7 @@ def _create_arguments(parser: argparse.ArgumentParser) -> None:
     help="make a unit: its head record (fields on stdin), its folders and the git exclusion",
     arguments=_create_arguments,
 )
+@_unit_named
 def create(args: argparse.Namespace, run: Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill, creating=True)
     by = paths.check_by(args.by)
@@ -525,6 +586,7 @@ def _chosen_id(args: argparse.Namespace, unit: Unit, form: Form, lay: Layout) ->
     help="write a new record of a type (fields on stdin) and print its id",
     arguments=_add_arguments,
 )
+@_unit_named
 def add(args: argparse.Namespace, run: Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
     docs = schema.load_schemas(*resources.schema_sources(run.info.package))
@@ -553,7 +615,10 @@ def add(args: argparse.Namespace, run: Run) -> int:
             return _report(run, errors, new=True)
         _make_parent(unit, relative)
         _still(unit, relative, stat)
-        paths.write_atomic(unit, relative, _encode(_json_file(record)))
+        try:
+            paths.create_exclusive(unit, relative, _encode(_json_file(record)))
+        except FileExistsError:
+            raise Busy(BUSY) from None
         return _done(run, relative, chosen)
     ident = chosen
     ids, bad = _ids_of(text)
@@ -747,6 +812,7 @@ def _merged(record: dict, patch: dict, unsets: list[str], keep_null: bool) -> di
     help="change fields of a record, by id or by type (fields on stdin); at, by and id stay",
     arguments=_set_arguments,
 )
+@_unit_named
 def set_(args: argparse.Namespace, run: Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
     docs = schema.load_schemas(*resources.schema_sources(run.info.package))
@@ -754,7 +820,7 @@ def set_(args: argparse.Namespace, run: Run) -> int:
     for_agent = paths.check_agent(args.for_agent, "--for name") if args.for_agent is not None else None
     found = _locate(unit, lay, args.ref, for_agent)
     label = found.record.get("type")
-    patch = _own_fields(_fields(run, unit), unit, label if isinstance(label, str) else "")
+    patch = _own_fields(_fields(run, unit, empty_ok=bool(args.unset)), unit, label if isinstance(label, str) else "")
     _deadline(patch, run, unit)
     first = _merged(found.record, patch, args.unset, keep_null=True)
     candidates = [first]

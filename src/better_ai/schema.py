@@ -190,6 +190,10 @@ class Context:
         self.directory = directory
         self.stem = name.removesuffix(".jsonl").removesuffix(".json")
         self.cache = cache
+        self.line = 0  # the line being checked, for `pointers`
+        self.pointers: list[tuple[int, Path, str]] | None = (
+            None  # (line, file or folder, id) of each pointer that resolved
+        )
 
     def path(self, relative: str) -> Path:
         return Path(os.path.normpath(self.directory / relative.replace("{stem}", self.stem)))
@@ -586,6 +590,8 @@ class Validator:
         if not known.get(value, set()) & set(wanted):
             kinds = " or ".join(wanted)
             return [Problem(at, f"dangling: {show(value)} is not a {kinds} record in {shown}", "cross")]
+        if self.context.pointers is not None:
+            self.context.pointers.append((self.context.line, self.context.path(relative), value))
         return []
 
     def _mode_sets(self, value: str, rule: dict, at: str) -> list[Problem]:
@@ -889,8 +895,10 @@ def check_text(
     now: datetime | None = None,
     cutoff: str | None = None,
     notices: list[Error] | None = None,
+    pointers: list[tuple[int, Path, str]] | None = None,
 ) -> list[Error]:
     """The errors of a file's text, which the caller has read once: it validates that text and shows the same lines.
+    With `pointers`, each pointer that resolves is added to it as (line, file or folder it names, id).
 
     With `now`, a record whose `at` is more than five minutes ahead of it is an error (a typed time, or a skewed
     clock). With `cutoff` (a UTC time like the `at`s) and `notices`, a record that fails its schema but has a shape the
@@ -901,6 +909,7 @@ def check_text(
     if not found:
         return [Error(where, 1, "(file)", "no schema describes this file")]
     context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
+    context.pointers = pointers
     errors: list[Error] = []
     seen: dict[str, int] = {}
     versioned = all(doc.get("x-versioned") for _, doc in found)
@@ -921,6 +930,7 @@ def check_text(
         if not isinstance(record, dict):
             errors.append(Error(where, number, ROOT, f"expected object, got {_type_name(record)}"))
             continue
+        context.line = number
         problems = validate_record(record, [schema for _, schema in found], docs, context)
         if (
             problems
