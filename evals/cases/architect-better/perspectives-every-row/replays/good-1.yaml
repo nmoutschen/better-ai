@@ -4,6 +4,7 @@ actions:
 - write: docs/designs/2026-11-order-export/perspectives.jsonl
   content: |
     {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "security", "name": "Security", "applies": true, "why": "New endpoint that returns personal data behind the session cookie.", "from": {"type": "built_in"}}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "failure-handling", "name": "Failure handling", "applies": true, "why": "The export job reads orders and sends the email through the outbox; a slow store or mail service must not lose or repeat an export.", "from": {"type": "built_in"}}
     {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "observability", "name": "Observability", "applies": true, "why": "A new export job whose failures must reach the customer and the owners (RQ6).", "from": {"type": "built_in"}}
     {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "api-standards", "name": "API standards", "applies": false, "why": "The repo's own API standard covers the new endpoint; checked under its own record.", "from": {"type": "built_in"}}
     {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "data-and-privacy", "name": "Data and privacy", "applies": true, "why": "The CSV holds names, addresses and order history.", "from": {"type": "built_in"}}

@@ -21,7 +21,8 @@ Being invoked does NOT mean you must design now. The work can end with questions
 4. A diagram does not keep why a decision was made or what it rejected, and decision records often leave out their drivers and alternatives.
 5. Links that a model draws between requirements and other documents often include false ones, more so on some kinds of document than others.
 6. Threat modelling with STRIDE reports many threats that are not real. Starting from the risks finds more of the threats that matter than applying STRIDE to each element in turn.
-7. The live page for debating the design, one layout shared by Before and After, the register of box kinds, Attribute-Driven Design iterations, STRIDE for security, one reviewer per applicable perspective once the user approves the design, and the spec in EARS are design choices.
+7. Reviewers who walk the project's most important scenarios through a design find more of its critical faults than reviewers who work through a generic checklist. Reviewers who look for some kinds of problem can miss others.
+8. The live page for debating the design, one layout shared by Before and After, the register of box kinds, Attribute-Driven Design iterations, STRIDE for security, LINDDUN for privacy, one reviewer per applicable perspective once the user approves the design, each with its own ranked rules, and the spec in EARS are design choices.
 
 ## Instructions
 
@@ -57,7 +58,7 @@ LEAD with the result, THEN report, USING `/write-better` for the wording if avai
 1. The deliverables, each linked: the design doc, the diagram JSON, the decision records and the spec; or, for an audit, the findings by perspective with their diagram references.
 2. Each requirement and scenario, and the part of the design that meets it, or that nothing does.
 3. The assumptions you made, the requirements still marked guessed, and the decisions and conflicts you asked the user about.
-4. Each review's result, as its report states it: the confirmed findings and whether each is handled, the unconfirmed findings, and what it could not check.
+4. Each review's result, as its report states it: the confirmed findings and whether each is handled, the unconfirmed findings, the checks it leaves to the built system, and what it could not check.
 5. Proposed next steps, such as `/code-better` with the design and the spec. LIST each with what goes wrong if nobody does it. IF there are none, SAY so.
 
 DISTINGUISH the design meeting its requirements, the reviews leaving no open finding, and the user approving the design. DO NOT claim one from another.

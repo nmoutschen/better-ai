@@ -31,7 +31,7 @@ graders:
     without options or without a recommendation; (b) a reviewer sub-agent is started, or the agent reviews the design
     by perspective itself and records findings, before the user chooses Approve.... Does not count: revising D2,
     design.json or design.md in answer to the comment; asking the user which option they prefer; asking the user to
-    choose Approve... when ready; reading agents/perspective-reviewer.md; a sub-agent started for another purpose, such
+    choose Approve... when ready; reading a reviewer prompt in agents/; a sub-agent started for another purpose, such
     as exploring the code; Git''s own files under .git/ and caches; notes in .code/ or a temporary folder; serving the
     live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries written by architect.py);
     a run that ends waiting for the user.'

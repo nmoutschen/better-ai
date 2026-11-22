@@ -19,15 +19,16 @@ CHECK the affected structure and responsibilities before inspecting individual p
 
 PICK the perspectives that apply, from what the audit touches and the applicable repo standards. STATE why each perspective applies or does not apply.
 
-| Perspective | What to check |
-|---|---|
-| Security | Use STRIDE on the assets, trust boundaries and flows where harm would be greatest, not on every part. Check the impact and the proposed mitigation. |
-| Observability | Check how operators detect and diagnose failures on the affected paths. |
-| API standards | Check contracts, failure responses and compatibility against the applicable standards. |
-| Data and privacy | Check what data moves, who can access it and what persists. |
-| Repo standards | Check each applicable repo standard where the change touches it. |
+| Perspective | Applies when the audited design or system has | Reviewer |
+|---|---|---|
+| Security | an entry point, a trust boundary, an identity or secret, a language model or agent, or a part tenants share | [../agents/security.md](../agents/security.md) |
+| Data and privacy | data about people that it collects, derives, moves, keeps, logs or deletes | [../agents/data-and-privacy.md](../agents/data-and-privacy.md) |
+| Failure handling | a call, message or write that crosses a process or network boundary | [../agents/failure-handling.md](../agents/failure-handling.md) |
+| Observability | a flow, job or part that someone must operate | [../agents/observability.md](../agents/observability.md) |
+| API standards | an interface others depend on: an API, a library, a CLI, an event or a file format | [../agents/api-standards.md](../agents/api-standards.md) |
+| Each repo standard | what the standard covers | [../agents/repo-standards.md](../agents/repo-standards.md), one reviewer per standard |
 
-READ and FOLLOW [../agents/perspective-reviewer.md](../agents/perspective-reviewer.md). FILL IN its inputs and START one fresh reviewer per applicable perspective. WRITE its `look_for` from that perspective's row of the table, the applicable standards and what the audit touches. WRITE its `decided` from the constraints the user or the design's recorded decisions set, without your own judgement of them. WAIT for every report and HOLD the hand-back while reviewers run.
+START one fresh reviewer per applicable perspective: READ and FOLLOW the perspective's reviewer from the table, and FILL IN its inputs. WRITE its `scenarios` from the scenarios named in step 1 that reach what the perspective covers, up to five, the most harmful first. WHEN fewer than three do, WRITE scenarios up to three and MARK each "(added)". GIVE a reviewer in `standards` only the standards that have no reviewer of their own. WRITE its `context` with the facts the review needs that the design does not show, such as where the system runs or which data is personal, not your verdict or the problems you expect. WRITE its `decided` from the constraints and preferences the user stated, without your own judgement of them, not from the design's own decisions. WAIT for every report and HOLD the hand-back while reviewers run.
 
 ## 3. Confirm findings and report
 
@@ -35,4 +36,4 @@ USE `/review-better` if available to confirm and rank the reviewers’ findings 
 
 ATTACH each finding to the affected box, arrow or flow step. NAME the scenario or standard, the evidence, the consequence and the proposed action.
 
-ORDER confirmed findings by their effect on the goal and scenarios, and GROUP them by perspective with their diagram references, for the hand-back. NAME what should be kept, what could not be checked and which decisions the user needs to make.
+ORDER confirmed findings by their effect on the goal and scenarios, and GROUP them by perspective with their diagram references, for the hand-back. NAME what should be kept, what could not be checked, the reviewers' checks once built, and which decisions the user needs to make.
