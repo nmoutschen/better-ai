@@ -26,7 +26,7 @@ A board is a directory of JSON files. Questions, claims and sources are one file
 {"type": "brief", "topic": "<TOPIC as the user stated it>", "title": "<the topic in at most eight plain words, for the page's heading>", "short": "<the topic in two or three words, for the centre of the map>", "meaning": "<the confirmed MEANING>", "goal": "<what the user must understand, learn, decide, or do>", "limit": "<a limit the user stated, or null>", "stop_at": "<high | medium | low>", "collections": ["<a COLLECTION to search, such as web, or the name of a wiki>"], "missing": ["<a COLLECTION the TOPIC needs that could not be searched>"], "changes": [], "status": "<running | checking | stopped>"}
 ```
 
-`changes` is `[]` while there is none. To record a change to the scope or method, `set` the brief with `{"changes": [{"text": "<the change>"}, <the earlier entries, as the brief shows them>]}`: the new entry comes first, and the command adds its time. `running`: workers research and verifiers check. `checking`: research has ended, workers stop, and verifiers check the remaining claims. `stopped`: all checks are done.
+`changes` is `[]` while there is none. To record a change to the scope or method, `set` the brief with `{"changes": [{"text": "<the change>"}, <every earlier entry, exactly as the brief shows it>]}`. WRITE the new entry without `at`. `running`: workers research and verifiers check. `checking`: research has ended, workers stop, and verifiers check the remaining claims. `stopped`: all checks are done.
 
 ## decisions.jsonl
 
