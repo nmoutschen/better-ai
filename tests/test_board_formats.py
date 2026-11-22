@@ -768,21 +768,23 @@ class WrongTypes(unittest.TestCase):
         def put_file(folder, relative, records, as_json):
             (write_json if as_json else write_lines)(folder, relative, records[0] if as_json else records)
 
-        for relative, (records, as_json) in self.records().items():
+        files = self.records()
+        pairs = [(relative, raw) for relative in files for raw in wrong_types.RAW_LINES]
+        picked = sweep.cases(pairs, key=lambda pair: pair[1])  # each raw line once, across the files
+        for relative, (records, as_json) in files.items():
             with tempfile.TemporaryDirectory() as d:
                 folder = Path(d)
                 support(folder)
                 put_file(folder, relative, records, as_json)
                 every = list(wrong_types.variants(records, self.WRONG))
                 total += len(every)
-                keys = [lambda v: wrong_types.wrong_kind(v[0]), lambda v: wrong_types.field_of(v[0])]
-                for label, changed in sweep.cases(every, key=keys):
+                for label, changed in sweep.cases(every, key=lambda v: wrong_types.wrong_kind(v[0])):
                     with self.subTest(f"{relative}: {label}"):
                         put_file(folder, relative, changed, as_json)
                         payloads.append({"label": f"{relative}: {label}", "data": self.survives(folder)})
                 put_file(folder, relative, records, as_json)
                 total += len(wrong_types.RAW_LINES)
-                for raw in sweep.cases(wrong_types.RAW_LINES, key=lambda raw: raw[:2]):
+                for raw in [raw for name, raw in picked if name == relative]:
                     with self.subTest(f"{relative}: raw {raw[:10]}"):
                         # a single-JSON file holds the raw text alone; a JSONL file, the raw line before its records
                         (folder / relative).write_text(

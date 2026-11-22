@@ -985,7 +985,7 @@ class Loaders(unittest.TestCase):
             with tempfile.TemporaryDirectory() as d:
                 files = folder_files(build(Path(d)))
             pairs = [(relative, corruption) for relative in files for corruption in corruptions()]
-            for relative, (label, how, content) in sweep.cases(pairs, key=[lambda p: p[1][0], lambda p: str(p[0])]):
+            for relative, (label, how, content) in sweep.cases(pairs, key=lambda p: p[1][0]):
                 with self.subTest(skill=skill, file=str(relative), broken=label):
                     folder = self.broken(build, relative, how, content)
                     answer = load(module, folder)

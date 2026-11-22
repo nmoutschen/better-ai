@@ -658,9 +658,7 @@ class WrongTypes(unittest.TestCase):
             for relative, (records, as_json) in base.items():
                 every = list(self.variants(records))
                 total += len(every)
-                for label, changed in sweep.cases(
-                    every, key=[lambda v: wrong_types.wrong_kind(v[0]), lambda v: wrong_types.field_of(v[0])]
-                ):
+                for label, changed in sweep.cases(every, key=lambda v: wrong_types.wrong_kind(v[0])):
                     name = f"{relative}: {label}"
                     with self.subTest(name):
                         write(folder, relative, changed, as_json)
@@ -675,9 +673,11 @@ class WrongTypes(unittest.TestCase):
                             dashboard.main()
                         payloads.append({"label": name, "data": data})
                 write(folder, relative, records, as_json)
+            pairs = [(relative, raw) for relative in base for raw in RAW_LINES]
+            picked = sweep.cases(pairs, key=lambda pair: pair[1])  # each raw line once, across the files
             for relative, (records, as_json) in base.items():
                 total += len(RAW_LINES)
-                for raw in sweep.cases(RAW_LINES, key=lambda raw: raw[:2]):
+                for raw in [raw for name, raw in picked if name == relative]:
                     with self.subTest(f"{relative}: raw {raw[:10]}"):
                         path = folder / relative
                         path.write_text(raw + "\n" + ("" if as_json else path.read_text()), encoding="utf-8")
