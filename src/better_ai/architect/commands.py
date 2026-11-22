@@ -230,7 +230,11 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
     paths.make_folder(unit, RENDER_FOLDER)
     for name, svg in files.items():
         paths.write_atomic(unit, f"{RENDER_FOLDER}/{name}", svg.encode("utf-8"))
-    paths.write_atomic(unit, f"{RENDER_FOLDER}/index.html", static_page(unit, run, payload).encode("utf-8"))
+    paths.write_atomic(
+        unit,
+        f"{RENDER_FOLDER}/index.html",
+        page.with_old_note(unit, static_page(unit, run, payload)).encode("utf-8"),
+    )
     if payload["errors"]:
         run.err(f"warning: {len(payload['errors'])} records are not valid: run check {unit.label}")
     run.out(f"Wrote {unit.label}/{RENDER_FOLDER}/index.html and {len(files)} SVGs.")

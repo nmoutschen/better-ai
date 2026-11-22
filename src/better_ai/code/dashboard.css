@@ -96,6 +96,3 @@
 .errors .by { color:var(--muted); }
 .what.invalid { color:var(--error); }
 
-/* Lines in the format before this change are one count, not one error each. */
-.notice { flex:none; margin:0; padding:var(--space-tight) var(--space-edge); font:var(--font-small); color:var(--muted); }
-.notice[hidden] { display:none; }

@@ -153,7 +153,7 @@ Padding is `--space-edge` at the sides of the header, the view and the side colu
 | Stats header | `header.bar--stats`: the title (and a goal line under it) on the left, `.stats` on the right | the agent works on its own, and the user comes back to see how far it is and what waits for them | research, code, architect |
 | Question header | `header`: `.ttl` with the title and `p.question` under it on the left, `.controls` on the right | the page asks the user one question, and the user works the page with modes and views | canvas, show |
 
-- The stats header never wraps: the title cuts off. The question header wraps its controls under the title on a narrow window.
+- In the stats header the title wraps to two lines at most, then cuts off with an ellipsis. The question header wraps its controls under the title on a narrow window.
 - In the question header, keep to the controls used on every visit. Put settings changed rarely in a menu, as the canvas's Display menu.
 - A board never has both: figures go in the stats header, a question goes in the question header.
 
@@ -207,7 +207,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 - Markup: `<header class="bar--stats"><div><h1>…</h1></div><div class="stats">` with a `.stat` per figure: `<b>` the figure, then its words. A total is `<span class="of"> / n</span>` inside `<b>`. A progress meter under a figure is `<span class="meter"><i style="width:…%"></i></span>`.
 - A figure that takes the user somewhere, such as to what waits for them, is a `<button class="stat">` and is underlined. A plain figure is a `<span>` and is not.
 - States: default; hover and focus thicken the underline of a button figure.
-- The header never wraps: the title cuts off with an ellipsis.
+- The title wraps to two lines at most, then cuts off with an ellipsis.
 - Correct: "2 open questions" as a button that scrolls to the first one. Wrong: an underlined figure that does nothing when clicked.
 
 ### Section label

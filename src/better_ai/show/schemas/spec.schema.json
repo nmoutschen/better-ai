@@ -409,7 +409,6 @@
         "overview": {"type": ["boolean", "null"]},
         "focus": {"type": ["string", "array", "null"], "items": {"type": "string"}}
       },
-      "not": {"anyOf": [{"required": ["note"]}, {"required": ["read"]}]},
       "allOf": [
         {
           "if": {"required": ["template"], "properties": {"template": {"const": "compare"}}},

@@ -268,7 +268,6 @@ function render(d) {
       : stat(0, "open questions")));
   const band = errorsHTML(d.errors);
   $("errors").hidden = !band; setHTML($("errors"), band);
-  $("notice").hidden = !d.old; $("notice").textContent = plural(d.old || 0, "record") + " written in the format before this change: kept as is, not converted.";
   drawAgents(d);
   drawTasks(d);
   syncBar();

@@ -462,6 +462,80 @@ class Create(unittest.TestCase):
                     self.assertEqual(done.returncode, 1)
                     self.assertFalse(folder.exists())
 
+    def test_create_refuses_a_stray_spec_when_there_is_no_code_json(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self.repo(d)
+            self.design_spec(root)
+            folder = root / ".code" / "c"
+            write(folder, "spec.jsonl", [spec("S1")])
+            done = run(folder, "create", str(folder), "--by", "coordinator", stdin=self.head(self.ARCHITECT))
+            self.assertEqual(done.returncode, 1, done.stderr)
+            self.assertIn(
+                "it holds a spec.jsonl and no code.json. move spec.jsonl away, then run create again", done.stderr
+            )
+            self.assertFalse((folder / "code.json").exists())
+
+    def test_create_refuses_a_design_folder_with_spaces_around_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self.repo(d)
+            self.design_spec(root)
+            folder = root / ".code" / "c"
+            for named in (" docs/designs/up", "docs/designs/up ", "\tdocs/designs/up\n"):
+                with self.subTest(repr(named)):
+                    head = self.head({"type": "architect", "folder": named})
+                    done = run(folder, "create", str(folder), "--by", "coordinator", stdin=head)
+                    self.assertEqual(done.returncode, 1, done.stderr)
+                    self.assertIn("design.folder", done.stderr)
+                    self.assertFalse(folder.exists())
+
+    def test_a_design_folder_that_leaves_the_repository_says_repository_with_one_stop(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self.repo(d)
+            folder = root / ".code" / "c"
+            done = run(
+                folder,
+                "create",
+                str(folder),
+                "--by",
+                "coordinator",
+                stdin=self.head({"type": "architect", "folder": "../x"}),
+            )
+            self.assertEqual(done.returncode, 1)
+            self.assertIn("not a path inside the repository", done.stderr)
+            self.assertNotIn("..", done.stderr.replace("../x", ""))
+
+    def test_a_started_changes_own_decisions_never_answer_a_pointer_of_the_copied_spec(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self.repo(d)
+            self.design_spec(root, [spec("S1", source={"type": "decision", "decision": "D1"})])
+            folder = root / ".code" / "c"
+            write(folder, "code.json", [code("coordinate", self.ARCHITECT)], as_json=True)
+            write(folder, "decisions.jsonl", [{"type": "decision", "at": AT, "by": "coordinator", "id": "D1"}])
+            done = run(folder, "create", str(folder), "--by", "coordinator")
+            self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+            self.assertIn("dangling", done.stderr)
+            self.assertFalse((folder / "spec.jsonl").exists())
+
+    def test_a_symlinked_design_folder_and_a_symlinked_spec_are_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = self.repo(d)
+            elsewhere = root / "elsewhere"
+            write(elsewhere, "spec.jsonl", [spec("S1")])
+            (root / "docs" / "designs").mkdir(parents=True)
+            os.symlink(elsewhere, root / "docs" / "designs" / "up")
+            folder = root / ".code" / "c"
+            done = run(folder, "create", str(folder), "--by", "coordinator", stdin=self.head(self.ARCHITECT))
+            self.assertEqual(done.returncode, 1, done.stderr)
+            self.assertIn("symlink", done.stderr)
+            self.assertFalse(folder.exists())
+            os.unlink(root / "docs" / "designs" / "up")
+            (root / "docs" / "designs" / "up").mkdir()
+            os.symlink(elsewhere / "spec.jsonl", root / "docs" / "designs" / "up" / "spec.jsonl")
+            done = run(folder, "create", str(folder), "--by", "coordinator", stdin=self.head(self.ARCHITECT))
+            self.assertEqual(done.returncode, 1, done.stderr)
+            self.assertIn("symlink", done.stderr)
+            self.assertFalse(folder.exists())
+
     def test_create_on_a_started_change_copies_only_the_spec(self):
         """An architect-led change that has code.json and no spec.jsonl gets that file, and nothing else is touched."""
         with tempfile.TemporaryDirectory() as d:

@@ -11,10 +11,12 @@ as absent, and no wrongly typed value crashes a check.
 
 import copy
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -22,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
+import better  # noqa: E402
 import sweep  # noqa: E402
 from better import run  # noqa: E402
 
@@ -39,14 +42,14 @@ def shape_problems(spec):
     return list(dict.fromkeys(show.spec_problems(spec)))
 
 
-def check_in_a_unit(content: str):
-    """`check` run as the agent runs it, on a unit in a new repository that holds `content` as its spec.json."""
+def check_in_a_unit(content: str, verb: str = "check"):
+    """`verb` (check) run as the agent runs it, on a unit in a new repository that holds `content` as its spec.json."""
     with tempfile.TemporaryDirectory() as d:
         subprocess.run(["git", "init", "-q", d], check=True)
         unit = Path(d, ".show", "deck")
         unit.mkdir(parents=True)
         (unit / "spec.json").write_text(content)
-        return run("show-better", "check", ".show/deck", cwd=d)
+        return run("show-better", verb, ".show/deck", cwd=d)
 
 
 HEAD = "The slide states one clear point."
@@ -681,6 +684,47 @@ class RenderingChecks(unittest.TestCase):
                 self.assertTrue(
                     errors[0].startswith(f"panels[0].{old}: '{old}' is no longer used: move it into 'source'")
                 )
+
+    def test_the_old_hint_is_shown_by_check_and_render_on_the_unit_file(self):
+        for old in ("note", "read"):
+            with self.subTest(old):
+                spec = edited(BASE, lambda s, old=old: s["panels"][0].__setitem__(old, "x"))
+                done = check_in_a_unit(json.dumps({**spec, "type": "slides", "at": "2026-11-22T10:00:00Z", "by": "x"}))
+                self.assertEqual(done.returncode, 1)
+                self.assertIn(f"panels[0].{old}: '{old}' is no longer used: move it into 'source'", done.stdout)
+                self.assertNotIn("not allowed", done.stdout)
+                self.assertIn("is no longer used", check_in_a_unit(json.dumps(spec), "render").stdout)
+
+    def test_serve_words_the_old_field_as_check_does(self):
+        spec = edited(BASE, lambda s: s["panels"][0].__setitem__("note", "x"))
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run(["git", "init", "-q", d], check=True)
+            unit = Path(d, ".show", "deck")
+            unit.mkdir(parents=True)
+            (unit / "spec.json").write_text(
+                json.dumps({**spec, "type": "slides", "at": "2026-11-22T10:00:00Z", "by": "x"})
+            )
+            env = {**os.environ, "BETTER_AI_SKILL": "show-better"}
+            server = subprocess.Popen(
+                better.command("serve", ".show/deck", "--no-browser"),
+                cwd=d,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+            for _ in range(100):
+                if (unit / ".server").exists():
+                    break
+                time.sleep(0.1)
+            server.terminate()
+            _, err = server.communicate(timeout=10)
+        self.assertIn("'note' is no longer used: move it into 'source'", err)
+
+    def test_an_old_spec_with_a_null_at_is_old_format_not_refused(self):
+        spec = {**BASE, "type": "slides", "at": None, "by": None}
+        done = check_in_a_unit(json.dumps(spec))
+        self.assertEqual(done.returncode, 0, done.stdout)
 
     def test_a_missing_template_is_worded_as_absent(self):
         spec = edited(BASE, lambda s: s["panels"][0].pop("kind"))

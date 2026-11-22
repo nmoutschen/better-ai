@@ -56,7 +56,7 @@ def _read_design_spec(unit: Unit, folder: str) -> bytes:
         ) from None
     except Refused as error:
         raise refusal(
-            unit.label, f"cannot read the design's {SPEC}: {error}", "fix design.folder in code.json"
+            unit.label, f"cannot read the design's {SPEC}: {str(error).rstrip('.')}", "fix design.folder in code.json"
         ) from None
 
 
@@ -89,6 +89,11 @@ def copy_spec_at_create(ctx: records.CreateContext):
     folder = design_folder(ctx.record) if ctx.unit.kind.head_type == "code" else None
     if folder is None:
         return None
+    named = ctx.record["design"]["folder"]
+    if named != named.strip():
+        raise refusal(ctx.unit.label, f"design.folder {named!r} has spaces around it", "write the folder without them")
+    if _has_spec(ctx.unit):  # create_exclusive would fail on it after the head was written
+        raise refusal(ctx.unit.label, f"it holds a {SPEC} and no code.json", f"move {SPEC} away, then run create again")
     data = _checked_copy(ctx.unit, folder, ctx.record)
 
     def copy() -> None:
@@ -146,7 +151,7 @@ def a_log_line_needs_the_card(ctx: records.AddContext) -> None:
         raise refusal(
             ctx.unit.label,
             f"{ctx.for_agent} has no card",
-            f"write it first: add {ctx.unit.label} card --for {ctx.for_agent}",
+            f"write it first: add {ctx.unit.label} card --for {ctx.for_agent} --by coordinator",
         )
 
 

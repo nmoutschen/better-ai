@@ -225,6 +225,9 @@ def read_repo_file(unit: Unit, relative: str) -> bytes:
     """A file elsewhere in the unit's repository (a design folder's `spec.jsonl`), by its repo-relative path, under the
     same rules as a file of the unit: no `..`, no symlink on the way, still inside the repository, opened with
     O_NOFOLLOW. FileNotFoundError if it is not there."""
+    pure = PurePosixPath(relative)
+    if pure.is_absolute() or not pure.parts or {"..", "."} & set(pure.parts) or "\0" in relative:
+        raise refusal(relative, "not a path inside the repository")
     return read_bytes(Unit(unit.root, unit.root, unit.kind, unit.skill), relative)
 
 

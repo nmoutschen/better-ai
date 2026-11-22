@@ -114,7 +114,7 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
         return cli.EXIT_REFUSED
     spec = seen.spec
     if args.format == "html":
-        paths.write_atomic(unit, PAGE, deck.render(spec).encode("utf-8"))
+        paths.write_atomic(unit, PAGE, page.with_old_note(unit, deck.render(spec)).encode("utf-8"))
         run.out(f"wrote {unit.path.resolve() / PAGE}")
         return cli.EXIT_DONE
     if args.screen_reader:
