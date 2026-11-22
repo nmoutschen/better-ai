@@ -4,7 +4,7 @@ source:
 - SKILL.md#5.3
 reads:
 - agents/worker.md
-- templates/board.md
+- formats/board.md
 situation: A board planted mid-run, with an answered high-priority question that has no challenge question yet. Every question
   added during the run records a title of at most six words, its origin, a kind, its stakes, a done_when field, a priority
   and a status from the board format. A script checks every new question file.

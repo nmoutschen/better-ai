@@ -72,11 +72,11 @@ STATE the scope of each rule: when it applies, and to what. Agents read rules li
 
 ### 6.2. Keep skills short and self-contained
 
-KEEP each skill self-contained: SKILL.md, its templates and its scripts DO NOT link to or depend on files outside the skill's directory, such as research reports. KEEP each SKILL.md well under 500 lines. KEEP common mistakes and their fixes in SKILL.md, not in a reference file the agent may not open.
+KEEP each skill self-contained: SKILL.md, its templates, formats and scripts DO NOT link to or depend on files outside the skill's directory, such as research reports. KEEP each SKILL.md well under 500 lines. KEEP common mistakes and their fixes in SKILL.md, not in a reference file the agent may not open.
 
 KEEP the number of rules low: agents follow fewer of them as rules are added, and keep earlier rules better. PUT the rules that matter most first in each section. BEFORE adding a rule or a Principles bullet to a SKILL.md, LOOK in that SKILL.md for one that covers the same case, and MERGE the new content into it instead. STATE each rule once in a SKILL.md. A template that an agent reads without SKILL.md, such as a worker brief, MAY restate it.
 
-PUT copyable formats in `templates/`, with placeholders only. DO NOT include example content in templates.
+PUT each document an agent writes in `templates/` and the shape of each record type in `formats/`, with placeholders only. DO NOT include example content in either. A format opens with the command that adds the record, never with a fill-in block or a heading that holds placeholders.
 
 ### 6.3. Say what invoking the skill means
 

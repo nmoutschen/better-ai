@@ -1,11 +1,11 @@
-# Proposed next steps: <short name of the change>
+# Next-step records
 
-<HOW TO FILL THIS IN — delete this block when done.
-- ADD them to `.code/<change>/next-steps.jsonl`, one line per piece of work outside the change.
-- Conventions: WRITE a missing value as `null`, a list as a JSON array, and a value that has a fixed set as one of its exact lowercase words. A field not shown below is an error. WRITE the record a pointer names before the pointer.
+ADD each with `python3 <skill dir>/scripts/better.pyz add <unit> next_step --by <your agent name>`, its fields as JSON on stdin, where `<unit>` is the change folder `.code/<change>`; one for each piece of work outside the change. CHANGE one with `python3 <skill dir>/scripts/better.pyz set <unit> <id>`. IF the command refuses a record, FIX the record and RUN it again.
+
+- GIVE a missing value as `null`, a list as a JSON array, and a value that has a fixed set as one of its exact lowercase words. A field not shown below is an error. ADD the record a pointer names before the pointer.
 - SET `priority` from `if_nobody` alone. DROP a step already in the tasks or an earlier hand-back.
 - `origin` says where the step came up: a file, a requirement of the spec, an audit finding, or a task.
-- IF a coordinator runs the change, it may admit a step that stays inside the design and asks the user about the rest. OTHERWISE, every step goes to the user in the hand-back.>
+- IF a coordinator runs the change, it may admit a step that stays inside the design and asks the user about the rest. OTHERWISE, every step goes to the user in the hand-back.
 
 One line per kind of origin:
 

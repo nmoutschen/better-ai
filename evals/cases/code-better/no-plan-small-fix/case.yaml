@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: A one-line fix in one session needs no plan file.
 request: The welcome email says “recieve”. Fix the spelling.

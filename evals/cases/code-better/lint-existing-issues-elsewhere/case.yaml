@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - [modes/feature.md, modes/bug-fix.md]
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: '`ruff check .` already reports issues in legacy_export.py, which CONTRIBUTING.md says are tracked separately;
   a change must not add new ones. Re-raising inside `except KeyError` without `from` is flagged (B904); the change must work

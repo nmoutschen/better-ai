@@ -3,7 +3,7 @@ rule: mark-repeats
 source:
 - SKILL.md#5.2
 reads:
-- templates/board.md
+- formats/board.md
 situation: A fresh research run on the planted wiki export. The wiki index sends readers first to a weekly leadership update
   that only summarises the analytics notes and the payments review. The agent records it as a repeat of the page it summarises,
   so it does not count as a second independent source. A script checks its repeats line.

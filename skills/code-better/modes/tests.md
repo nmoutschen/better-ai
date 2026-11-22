@@ -9,9 +9,9 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 ## 1. Update the spec
 
-KEEP a spec for every change, however small: a one-line change needs one requirement. MAKE the change folder with `python3 <skill dir>/scripts/better.pyz create .code/<change> --by <your agent name, such as builder>`, with the goal, the design and the mode as JSON on stdin. READ [../templates/spec.md](../templates/spec.md) and ADD each requirement to `spec.jsonl` in the template's format, always: from the existing spec when one covers the change. WRITE the behaviour the tests must cover in the spec. TAKE each expected value from the spec, the design or the documented behaviour, never from what the code does. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files from it. WHEN the design is an architect folder, the change's spec is the copy of its `spec.jsonl` in the change folder: EDIT it there.
+KEEP a spec for every change, however small: a one-line change needs one requirement. MAKE the change folder with `python3 <skill dir>/scripts/better.pyz create .code/<change> --by <your agent name, such as builder>`, with the goal, the design and the mode as JSON on stdin. READ [../formats/spec.md](../formats/spec.md) and ADD each requirement with `python3 <skill dir>/scripts/better.pyz add .code/<change> spec --by <your agent name>`, in the format's fields, always: from the existing spec when one covers the change. ADD the behaviour the tests must cover to the spec. TAKE each expected value from the spec, the design or the documented behaviour, never from what the code does. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files from it. WHEN the design is an architect folder, the change's spec is the copy of its spec in the change folder: CHANGE it there with `set`.
 
-WHEN the work spans several sessions, people or agents, ALSO ADD the tasks to `.code/<change>/tasks.jsonl` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE them in its format, with every task `todo`.
+WHEN the work spans several sessions, people or agents, ALSO ADD the tasks now: READ [../formats/tasks.md](../formats/tasks.md) and ADD each with `python3 <skill dir>/scripts/better.pyz add .code/<change> task --by <your agent name>`, with every task `todo`.
 
 ## 2. Protect the existing tests
 
@@ -35,4 +35,4 @@ FIX each test that fails for a reason of its own, THEN RUN the tests again. STOP
 
 DO NOT describe results you did not observe.
 
-IF there is a task list, SET the `status` of each task whose check you saw pass to `done` in `tasks.jsonl`, in an edit of its own.
+IF there is a task list, SET the `status` of each task whose check you saw pass to `done` with `python3 <skill dir>/scripts/better.pyz set .code/<change> <task id>`, in a command of its own.

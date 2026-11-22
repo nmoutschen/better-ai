@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: A request phrased as a migration is a one-line format change (plus its test) in one session; make it without a
   plan file.

@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: The project's linter is ruff, and CONTRIBUTING.md says `ruff check .` must pass; it passes today. Dropping the
   wrapping leaves `import textwrap` unused; the change must work and add no ruff issue.

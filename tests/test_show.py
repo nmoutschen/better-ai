@@ -347,7 +347,7 @@ class OnceAndRegistry(unittest.TestCase):
             self.assertTrue(resources.exists(name), name)
 
     def test_the_skill_text_names_the_head_type_set_takes(self):
-        for name in ("SKILL.md", "templates/spec.md"):
+        for name in ("SKILL.md", "formats/spec.md"):
             text = (ROOT / "skills" / "show-better" / name).read_text()
             self.assertIn("better.pyz set .show/", text)
             self.assertNotRegex(text, r"better\.pyz set \.show/\S+ spec\b")

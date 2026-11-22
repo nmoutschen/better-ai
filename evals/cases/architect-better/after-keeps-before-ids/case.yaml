@@ -4,7 +4,7 @@ source:
 - modes/design.md
 reads:
 - modes/design.md
-- templates/records.md
+- formats/records.md
 situation: 'Stage b-requirements: design.json in docs/designs/2026-11-order-export/ holds the confirmed Before (7 nodes,
   edges e1-e6, group vps, flow order with steps s1-s6); requirements are confirmed and n2 says "design it". The agent
   adds After to the same design.json: every planted node, edge, group, flow and step keeps its id (a removed part stays,

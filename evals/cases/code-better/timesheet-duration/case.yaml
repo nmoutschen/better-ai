@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: parse_duration overwrites the hours when it reads minutes; the same function has an outdated comment, an odd
   variable name, commented-out code, an unreachable branch and two unrequested bugs ('1.5h' and '2H'); fix only the minutes

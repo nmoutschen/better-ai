@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: The report crashes on an empty quantity; after the fix, check the scenario with an exact comparison, such as an
   assert in the plain-assert check_*.py scripts, that fails if the empty row is dropped instead of shown as 0; seeing no

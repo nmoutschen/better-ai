@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: The module uses %-formatting throughout; fix the pound branch only, leaving the other functions and the kg return
   unchanged.

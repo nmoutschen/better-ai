@@ -37,7 +37,7 @@ TEXTS = [
     RESEARCH / "SKILL.md",
     RESEARCH / "agents" / "worker.md",
     RESEARCH / "agents" / "verifier.md",
-    RESEARCH / "templates" / "board.md",
+    RESEARCH / "formats" / "board.md",
     ROOT / "docs" / "research-better.md",
 ]
 OLD_FILES = [
@@ -61,16 +61,16 @@ OLD_FIELDS = [
     r"\banswer line",
 ]
 RECORD_RULE = (
-    "WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, "
-    "with its fields as JSON on stdin, or edit it with `set`. WRITE a line of a log with `--for <the log's agent name>` instead of `--by`. "
+    "ADD each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, "
+    "with its fields as JSON on stdin, or CHANGE it with `set`. ADD a line of a log with `--for <the log's agent name>` instead of `--by`. "
     "IF it refuses the record, FIX the record and RUN it again. "
-    "IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal."
+    "IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand."
 )
 AGENT_RECORD_RULE = (
-    "WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <BOARD> <type> --by <YOUR NAME>`, "
-    "with its fields as JSON on stdin, or edit it with `set`. WRITE a line of your log with `--for <YOUR NAME>` instead of `--by`. "
+    "ADD each record of the board with `python3 <skill dir>/scripts/better.pyz add <BOARD> <type> --by <YOUR NAME>`, "
+    "with its fields as JSON on stdin, or CHANGE it with `set`. ADD a line of your log with `--for <YOUR NAME>` instead of `--by`. "
     "IF it refuses the record, FIX the record and RUN it again. "
-    "IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. "
+    "IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. "
     "IF you cannot run commands, STOP and SAY so in your hand-back."
 )
 # Fields the command stamps or assigns: a template line does not show them.
@@ -100,7 +100,7 @@ RECORD_FILES = {
 def template_records() -> list[dict]:
     """The JSON lines in the template's code blocks, with each `<placeholder>` left as text."""
     records = []
-    for line in (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8").splitlines():
+    for line in (RESEARCH / "formats" / "board.md").read_text(encoding="utf-8").splitlines():
         if line.startswith("{"):
             records.append(json.loads(line))
     return records
@@ -133,12 +133,12 @@ class ResearchBetterText(unittest.TestCase):
         """The skill text names the JSON board's files and the fields that replaced the old ones."""
         text = "\n".join(p.read_text(encoding="utf-8") for p in TEXTS[:4])
         for name in (
-            "brief.json",
-            "decisions.jsonl",
-            "questions/<id>.json",
-            "claims/<id>.json",
-            "sources/<id>.json",
-            "logs/<agent>.jsonl",
+            "`brief`",
+            "`decision`",
+            "`question`",
+            "`claim`",
+            "`source`",
+            "log lines",
             "done_when",
             "trust_reason",
             "stop_at",
@@ -168,9 +168,11 @@ class ResearchBetterText(unittest.TestCase):
                 self.assertIn("run commands", text.split("---")[1])
 
     def test_the_board_template_holds_no_record_rule_and_no_check_line(self) -> None:
-        """The board template states neither the record rule nor a check after every write."""
-        text = (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8")
-        self.assertNotIn("better.pyz", text)
+        """The board format opens with the add command and holds no record rule or check after every write."""
+        text = (RESEARCH / "formats" / "board.md").read_text(encoding="utf-8")
+        self.assertTrue(text.startswith("# Board records\n\nA board holds records of five types"))
+        self.assertIn("better.pyz add <board> <type> --by <your agent name>", text)
+        self.assertNotIn("IF it reports busy", text)
         self.assertNotIn("RUN `", text)
         self.assertNotIn("counter", text)
 
@@ -181,10 +183,10 @@ class ResearchBetterText(unittest.TestCase):
         self.assertIn(
             "A verifier's flag reaches you in the claim's `reason`, or in its `differs` for source fields.", skill
         )
-        template = (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8")
+        template = (RESEARCH / "formats" / "board.md").read_text(encoding="utf-8")
         self.assertIn("the `owner`, `status`, `summary`, `gist` and `note` of a question you own", template)
         verifier = (RESEARCH / "agents" / "verifier.md").read_text(encoding="utf-8")
-        self.assertIn("If you have a reason to write, the claim is `unverified`.", verifier)
+        self.assertIn("If you have a `reason`, the claim is `unverified`.", verifier)
 
     def test_eval_board_lib_none_treats_the_string_none_as_missing(self) -> None:
         """board_lib.none is true for None, "", "none" and [], and false for a real value."""
@@ -221,7 +223,7 @@ class ResearchBetterText(unittest.TestCase):
 
     def test_template_has_placeholders_only(self) -> None:
         """The template holds no example IDs, and its challenge question has a question as origin."""
-        text = (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8")
+        text = (RESEARCH / "formats" / "board.md").read_text(encoding="utf-8")
         self.assertIsNone(re.search(r"\b[QCS]-w\d", text), "an example ID")
         challenge = [r for r in template_records() if r["type"] == "question" and r["kind"] == "challenge"]
         self.assertTrue(challenge, "no challenge question line")
@@ -306,13 +308,13 @@ CODE_TEXT_FILES = sorted(
     [CODE_BETTER / "SKILL.md"]
     + list((CODE_BETTER / "modes").glob("*.md"))
     + list((CODE_BETTER / "agents").glob("*.md"))
-    + list((CODE_BETTER / "templates").glob("*.md"))
+    + list((CODE_BETTER / "formats").glob("*.md"))
     + [ROOT / "docs" / "code-better.md"]
 )
 
 # The files the skill no longer writes. A template may still be called tasks.md or next-steps.md.
 CODE_OLD_FILES = re.compile(
-    r"\b(?:specs|notes)\.md\b|(?<!templates/)\b(?:tasks|next-steps)\.md\b|\bdecisions/|\blogs/[\w<>. *-]*\.md\b"
+    r"\b(?:specs|notes)\.md\b|(?<!formats/)\b(?:tasks|next-steps)\.md\b|\bdecisions/|\blogs/[\w<>. *-]*\.md\b"
     r"|\blogs/<[^>]*>\.json\b|\baudit/[^\s`]*\.md\b|\b(?:findings|evidence)\.md\b|\bblocked_by\b|\bBlocked by\b"
 )
 
@@ -404,7 +406,7 @@ def holds(line, field: str, wanted: set) -> bool:
 
 def placeholder_lines(template: str) -> list[dict]:
     lines = []
-    for number, text in enumerate((CODE_BETTER / "templates" / template).read_text().splitlines(), 1):
+    for number, text in enumerate((CODE_BETTER / "formats" / template).read_text().splitlines(), 1):
         if text.startswith("{"):
             try:
                 lines.append(json.loads(text))
@@ -427,9 +429,9 @@ class CodeBetterTextTest(unittest.TestCase):
     def test_code_better_the_record_rule_is_in_skill_md_and_both_agents_only(self):
         """SKILL.md states the record rule once, the builder and the verifier restate it, and the modes do not."""
         rule = (
-            "WRITE each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`,"
-            " with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN"
-            " it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal."
+            "ADD each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`,"
+            " with its fields as JSON on stdin, or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN"
+            " it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand."
         )
         skill = (CODE_BETTER / "SKILL.md").read_text()
         self.assertEqual(skill.count(rule), 1)
@@ -443,7 +445,7 @@ class CodeBetterTextTest(unittest.TestCase):
             self.assertNotIn("check <file>", text, mode.name)
 
     def test_code_better_every_template_is_present(self):
-        names = sorted(path.name for path in (CODE_BETTER / "templates").glob("*.md"))
+        names = sorted(path.name for path in (CODE_BETTER / "formats").glob("*.md"))
         self.assertEqual(names, sorted(TEMPLATES))
 
     def test_code_better_templates_hold_a_line_for_every_record_type_and_shape(self):
@@ -477,7 +479,7 @@ class CodeBetterTextTest(unittest.TestCase):
     def test_code_better_templates_name_no_check_and_no_schema_folder(self):
         """A template names neither `schema.py` nor `schemas/`: the command checks, and the lines show the fields."""
         for template in TEMPLATES:
-            text = (CODE_BETTER / "templates" / template).read_text()
+            text = (CODE_BETTER / "formats" / template).read_text()
             self.assertNotIn("schema.py", text, template)
             self.assertNotIn("schemas/", text, template)
 
@@ -515,16 +517,15 @@ class CodeBetterTextTest(unittest.TestCase):
         """A solo run records its questions, and every mode writes spec.jsonl, which tasks and gaps point to."""
         skill = (CODE_BETTER / "SKILL.md").read_text()
         self.assertIn(
-            "RECORD each question you ask in `decisions.jsonl` with status `waiting` before the gap that points to it",
+            "ADD each question you ask as a `decision` record with status `waiting`, before the gap that points to it",
             skill,
         )
-        decision = (CODE_BETTER / "templates" / "decision.md").read_text()
-        self.assertIn("In coordinate mode only the coordinator writes it", decision)
-        self.assertNotIn("Only the coordinator writes it", decision)
+        decision = (CODE_BETTER / "formats" / "decision.md").read_text()
+        self.assertIn("In coordinate mode only the coordinator adds decisions", decision)
         for mode in ("feature", "bug-fix", "refactor", "tests", "coordinate"):
             text = (CODE_BETTER / "modes" / f"{mode}.md").read_text()
             self.assertIn("scripts/better.pyz create .code/<change>", text, mode)
-            self.assertIn("`spec.jsonl`", text, mode)
+            self.assertIn("scripts/better.pyz add .code/<change> spec", text, mode)
             self.assertNotIn("IF no existing spec covers the change, READ", text, mode)
             self.assertIn("UPDATE its files from it", text, mode)
 
@@ -583,33 +584,35 @@ class CodeBetterTextTest(unittest.TestCase):
                     self.assertNotEqual(record["cost"], record["problem"], record["id"])
 
     def test_code_better_template_instructions_are_capitalised_imperatives(self):
-        """The instructions in a template's fill-in block use verbs in capitals, as PRINCIPLES 6.1 asks."""
+        """The rules of a format use verbs in capitals, as PRINCIPLES 6.1 asks, and no format has a fill-in block."""
         weak = re.compile(
             r"(?:^- |[.:] )(?:Save|Add|Keep|Set|Give|Begin|Change|List|Put|Use|Write|Run|Read|Drop|Fix|Rewrite|Commit)\b"
         )
-        for path in sorted((CODE_BETTER / "templates").glob("*.md")):
-            block = path.read_text().split("<HOW TO FILL", 1)[1].split(">\n", 1)[0]
+        for path in sorted((CODE_BETTER / "formats").glob("*.md")):
+            text = path.read_text()
+            self.assertNotIn("<HOW TO FILL", text, path.name)
+            block = text.split("\n\n", 2)[1] if path.name == "log.md" else text.split("\n- ", 1)[1].split("\n\n", 1)[0]
             found = [line[:50] for line in block.splitlines() if weak.search(line)]
             self.assertEqual(found, [], path.name)
 
     def test_code_better_an_architect_spec_never_points_to_a_code_better_decision(self):
         """With an architect folder's spec, a question goes to decisions.jsonl and the answer becomes a request source."""
-        rule = "NEVER write a gap or a source in it that points to a decision"
+        rule = "NEVER add a gap or a source to it that points to a `decision` record of the change folder"
         for path in (
-            CODE_BETTER / "templates" / "spec.md",
+            CODE_BETTER / "formats" / "spec.md",
             CODE_BETTER / "SKILL.md",
             CODE_BETTER / "modes" / "coordinate.md",
         ):
             text = path.read_text()
-            self.assertIn("architect folder's `spec.jsonl`", text, path.name)
+            self.assertIn("architect folder's spec", text, path.name)
             self.assertIn(rule, text, path.name)
             self.assertIn("source `request`", text, path.name)
 
     def test_code_better_requirement_source_is_only_for_an_architect_folder_spec(self):
         """`requirements.jsonl` exists only in an architect folder, so the spec template limits that source to it."""
-        text = (CODE_BETTER / "templates" / "spec.md").read_text()
+        text = (CODE_BETTER / "formats" / "spec.md").read_text()
         self.assertIn(
-            "USE a source of type `requirement` only when the spec is a copy of an architect folder's `spec.jsonl`",
+            "USE a source of type `requirement` only when the spec is a copy of an architect folder's spec",
             text,
         )
 
@@ -618,15 +621,14 @@ class CodeBetterTextTest(unittest.TestCase):
         comment = read_schema("decisions")["$comment"]  # shared with research-better, so it names no mode
         self.assertIn("The coordinator writes it", comment)
         skill = (CODE_BETTER / "SKILL.md").read_text()
-        self.assertIn("EACH file below is typed JSON", skill)
-        self.assertIn("`.code/audit/<YYYY-MM-DD>/audit.json`, `evidence.jsonl` and `findings.jsonl`", skill)
-        tasks = (CODE_BETTER / "templates" / "tasks.md").read_text()
+        self.assertIn("EACH record type below has a format", skill)
+        self.assertIn("`audit`, `history`, `check`, `rule`, `finding`", skill)
+        tasks = (CODE_BETTER / "formats" / "tasks.md").read_text()
         self.assertIn(
-            "ADD the tasks to `.code/<change>/tasks.jsonl`; IF the repo's spec tool also keeps tasks, "
-            "UPDATE its tasks from it",
+            "IF the repo's spec tool also keeps tasks, UPDATE its tasks from the records",
             tasks,
         )
-        self.assertIn("EDIT the line with `set`", tasks)
+        self.assertIn("SET its status to `done` with `set`", tasks)
         self.assertIn("COMMIT after each task", tasks)
 
     def test_code_better_lessons_are_in_the_coordinate_text_and_both_agents(self):
@@ -634,15 +636,15 @@ class CodeBetterTextTest(unittest.TestCase):
         coordinate = (CODE_BETTER / "modes" / "coordinate.md").read_text()
         self.assertIn("lessons.jsonl", coordinate)
         self.assertNotIn("EXTEND its `found_in`", coordinate)
-        self.assertIn("EDIT that lesson with `set`, with the task added to `found_in`", coordinate)
-        self.assertIn("WRITE no second lesson", coordinate)
+        self.assertIn("CHANGE that lesson with `set`, with the task added to `found_in`", coordinate)
+        self.assertIn("ADD no second lesson", coordinate)
         self.assertIn(
             "SPLIT the task, GIVING each new task its own new `T<n>`, never a suffixed id such as `T5b`", coordinate
         )
         self.assertIn("found_in", coordinate)
         self.assertIn("`.code/<change>/lessons.jsonl` in every builder's and verifier's `lessons` input", coordinate)
         self.assertIn(
-            "only you write `tasks.jsonl`, `progress.jsonl`, `instructions.jsonl`, `decisions.jsonl` and `lessons.jsonl`",
+            "only you add `task`, `progress`, `problem`, `resolved`, `instruction`, `decision` and `lesson` records",
             coordinate,
         )
         builder = (CODE_BETTER / "agents" / "builder.md").read_text()
@@ -657,29 +659,29 @@ class CodeBetterTextTest(unittest.TestCase):
         lines = placeholder_lines("lessons.md")
         self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0]["type"], "lesson")
-        template = (CODE_BETTER / "templates" / "lessons.md").read_text()
+        template = (CODE_BETTER / "formats" / "lessons.md").read_text()
         self.assertNotIn("ADD its task", template)
         self.assertIn(
-            "EDIT that lesson with `set`, with the task added to `found_in`; WRITE no second lesson",
+            "CHANGE that lesson with `set`, with the task added to `found_in`; ADD no second lesson",
             template,
         )
-        self.assertIn("lessons.jsonl", (CODE_BETTER / "SKILL.md").read_text())
+        self.assertIn("`lesson`", (CODE_BETTER / "SKILL.md").read_text())
         docs = (ROOT / "docs" / "code-better.md").read_text()
         self.assertIn("`lessons.jsonl`", docs)
 
     def test_code_better_t4_text_fixes(self):
         """Decisions are named by their file, the builder does not write code.json or the spec, docs list decisions solo."""
-        phrase = "a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file"
+        phrase = "ADD the question as a `decision` record, and once the user has answered, ADD the requirement with source `request`"
         for path in (
             CODE_BETTER / "SKILL.md",
             CODE_BETTER / "modes" / "coordinate.md",
-            CODE_BETTER / "templates" / "spec.md",
+            CODE_BETTER / "formats" / "spec.md",
         ):
             text = path.read_text()
             self.assertIn(phrase, text, path.name)
             self.assertNotIn("a decision of `decisions.jsonl`", text, path.name)
         builder = (CODE_BETTER / "agents" / "builder.md").read_text()
-        self.assertIn("DO NOT write `code.json` or the spec: the coordinator holds them.", builder)
+        self.assertIn("DO NOT add or change the `code` record or the spec: the coordinator holds them.", builder)
         docs = (ROOT / "docs" / "code-better.md").read_text()
         self.assertIn("- **Decisions**: `decisions.jsonl` holds", docs)
 
@@ -705,7 +707,7 @@ class SkillTextCommands(unittest.TestCase):
 
     def files(self):
         for folder in self.FOLDERS:
-            for sub in ("", "modes", "agents", "templates"):
+            for sub in ("", "modes", "agents", "formats"):
                 yield from sorted((folder / sub).glob("*.md"))
 
     def test_no_file_names_an_old_script_or_the_schemas_folder(self):
@@ -720,7 +722,7 @@ class SkillTextCommands(unittest.TestCase):
     def test_no_template_example_line_holds_at_by_or_id(self):
         found = []
         for path in self.files():
-            if path.parent.name != "templates":
+            if path.parent.name != "formats":
                 continue
             for number, line in enumerate(path.read_text().splitlines(), 1):
                 if line.startswith("{") and re.search(r'"(?:at|by|id)":', line):
@@ -747,14 +749,14 @@ class SkillTextCommands(unittest.TestCase):
         self.assertIn("better.pyz create .research/<topic-slug>", (RESEARCH / "SKILL.md").read_text())
 
     def test_the_spec_copy_is_edited_in_the_change_folder(self):
-        for path in (*sorted((CODE_BETTER / "modes").glob("*.md")), CODE_BETTER / "templates" / "spec.md"):
+        for path in (*sorted((CODE_BETTER / "modes").glob("*.md")), CODE_BETTER / "formats" / "spec.md"):
             text = path.read_text()
             self.assertNotIn("WRITE no copy", text, path.name)
             self.assertNotIn("UPDATE it there", text, path.name)
 
     def test_the_record_rule_is_deleted_from_templates_and_modes(self):
         for path in self.files():
-            if path.parent.name in ("templates", "modes"):
+            if path.parent.name in ("formats", "modes"):
                 text = path.read_text()
                 self.assertNotIn("after every write", text.casefold(), path.name)
                 self.assertNotIn("START each record with", text, path.name)
@@ -779,18 +781,18 @@ class SkillTextCommands(unittest.TestCase):
             self.assertNotIn("`create` copies", text, path.name)
 
     def test_the_next_step_record_type_is_next_step(self):
-        text = (CODE_BETTER / "templates" / "next-steps.md").read_text()
+        text = (CODE_BETTER / "formats" / "next-steps.md").read_text()
         self.assertIn('{"type": "next_step"', text)
         self.assertNotIn('{"type": "step"', text)
 
     def test_the_decision_shape_is_the_shared_one(self):
-        for path in (CODE_BETTER / "templates" / "decision.md", RESEARCH / "templates" / "board.md"):
+        for path in (CODE_BETTER / "formats" / "decision.md", RESEARCH / "formats" / "board.md"):
             text = path.read_text()
             for status in ("waiting", "defaulted", "answered"):
                 self.assertIn(f'"status": "{status}"', text, path.name)
             self.assertNotIn('"status": "pending"', text, path.name)
             self.assertNotIn('"status": "changed"', text, path.name)
-        self.assertIn("`+<minutes>m`", (CODE_BETTER / "templates" / "decision.md").read_text())
+        self.assertIn("`+<minutes>m`", (CODE_BETTER / "formats" / "decision.md").read_text())
 
 
 class UnifiedCommandText(unittest.TestCase):
@@ -800,9 +802,9 @@ class UnifiedCommandText(unittest.TestCase):
     SKILLS = ("architect-better", "design-better", "show-better")
     OLD = re.compile(r"\b(architect|diagram|canvas|show|schema|page)\.py\b|schemas/")
     RULE = (
-        "WRITE each record of the unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, "
-        "or `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. "
-        "DO NOT write the record by hand to get past a refusal."
+        "ADD each record of the unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, "
+        "or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. "
+        "DO NOT get past a refusal by editing the records by hand."
     )
 
     def texts(self, *names):
@@ -829,7 +831,7 @@ class UnifiedCommandText(unittest.TestCase):
         """The record templates are architect-better's; show-better's spec template is one object, not lines."""
         lines = 0
         for path in self.texts("architect-better"):
-            if path.parent.name != "templates":
+            if path.parent.name != "formats":
                 continue
             for line in path.read_text().splitlines():
                 if line.startswith("{") and line.endswith("}"):
@@ -842,11 +844,11 @@ class UnifiedCommandText(unittest.TestCase):
         self.assertGreater(lines, 20)
 
     def test_show_better_names_commands_only_and_design_better_approves(self):
-        spec = (ROOT / "skills" / "show-better" / "templates" / "spec.md").read_text()
+        spec = (ROOT / "skills" / "show-better" / "formats" / "spec.md").read_text()
         for verb in ("create", "check", "render", "serve", "wait", "reply", "status", "pending"):
             self.assertIn(f"better.pyz {verb} ", spec)
         design = (ROOT / "skills" / "design-better" / "SKILL.md").read_text()
-        self.assertIn("`canvas.json`", design)
+        self.assertIn("type `canvas`", design)
         self.assertNotIn("Decide", design)
 
 

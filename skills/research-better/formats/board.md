@@ -1,47 +1,36 @@
-# Board files
+# Board records
 
-A board is a directory of JSON files. Questions, claims and sources are one file each, so several agents can write at the same time without overwriting each other. This file shows the fields of each record. Copy the lines below and replace the `<placeholders>`, and give each record as one line of JSON on stdin.
-
-```
-<board>/
-  brief.json              one record
-  decisions.jsonl         one line per decision; the coordinator writes it
-  questions/<id>.json     one file per question
-  claims/<id>.json        one file per claim
-  sources/<id>.json       one file per source
-  logs/<agent>.jsonl      one line per event; only that agent writes it
-  conversation.jsonl      the user's messages and your replies
-```
+A board holds records of five types, `brief`, `decision`, `question`, `claim` and `source`, and a log for each agent. ADD each with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, its fields as JSON on stdin; for a log line, use `--for <the log's agent name>` instead of `--by`. CHANGE one with `python3 <skill dir>/scripts/better.pyz set <board> <id>`, or `set <board> brief` for the brief. IF it refuses a record, FIX the record and RUN it again. This file shows the fields of each type: copy a line and replace the `<placeholders>`.
 
 ## Conventions
 
-- A field with no value is `null` where a field may be null (`limit`, `note`, `repeats`, `date` of a source, `replaced_by` of a claim) and left out everywhere else. Never write `"none"` or an empty string. A list is an array, `[]` when empty.
-- Write the target before the pointer: a source before a claim that cites it, a question before the claims and questions that name it. Every ID a record names must exist.
+- A field with no value is `null` where a field may be null (`limit`, `note`, `repeats`, `date` of a source, `replaced_by` of a claim) and left out everywhere else. Never give `"none"` or an empty string. A list is an array, `[]` when empty.
+- ADD the target before the pointer: a source before a claim that cites it, a question before the claims and questions that name it. Every ID a record names must exist.
 - Never delete a record others point to. Withdraw a claim (`status` `withdrawn`, `replaced_by` the claim that replaces it, or `null`), mark a source that copies another a duplicate (`status` `duplicate`, `replaced_by` the source to use), merge a question into another (`status` `merged`, `merged_into` the question that covers it).
-- Edit only the records you added, the `owner`, `status`, `summary`, `gist` and `note` of a question you own, and your own log. The coordinator may edit any file to verify, merge, withdraw or reprioritize.
+- CHANGE only the records you added, the `owner`, `status`, `summary`, `gist` and `note` of a question you own, and your own log. The coordinator may change any record to verify, merge, withdraw or reprioritize.
 
-## brief.json
+## brief (the coordinator adds it)
 
 ```
 {"type": "brief", "topic": "<TOPIC as the user stated it>", "title": "<the topic in at most eight plain words, for the page's heading>", "short": "<the topic in two or three words, for the centre of the map>", "meaning": "<the confirmed MEANING>", "goal": "<what the user must understand, learn, decide, or do>", "limit": "<a limit the user stated, or null>", "stop_at": "<high | medium | low>", "collections": ["<a COLLECTION to search, such as web, or the name of a wiki>"], "missing": ["<a COLLECTION the TOPIC needs that could not be searched>"], "changes": [], "status": "<running | checking | stopped>"}
 ```
 
-`changes` is `[]` while there is none. To record a change to the scope or method, `set` the brief with `{"changes": [{"text": "<the change>"}, <every earlier entry, exactly as the brief shows it>]}`. WRITE the new entry without `at`. `running`: workers research and verifiers check. `checking`: research has ended, workers stop, and verifiers check the remaining claims. `stopped`: all checks are done.
+`changes` is `[]` while there is none. To record a change to the scope or method, `set` the brief with `{"changes": [{"text": "<the change>"}, <every earlier entry, exactly as the brief shows it>]}`. GIVE the new entry without `at`. `running`: workers research and verifiers check. `checking`: research has ended, workers stop, and verifiers check the remaining claims. `stopped`: all checks are done.
 
-## decisions.jsonl
+## decision (the coordinator adds it)
 
-A choice only the user can make, asked during the run without stopping it. When its status changes, edit it with `set`.
+A choice only the user can make, asked during the run without stopping it. When its status changes, CHANGE it with `set`.
 
 ```
 {"type": "decision", "raised_by": "coordinator", "about": {"type": "board"}, "asked": "<what came up, in one short sentence>", "status": "waiting", "default": "<what you will do if the user does not answer, in one short sentence>", "deadline": "<+<minutes>m>"}
 {"type": "decision", "raised_by": "coordinator", "about": {"type": "board"}, "asked": "<...>", "status": "defaulted", "default": "<...>", "deadline": "<as in the waiting line>"}
-{"type": "decision", "raised_by": "coordinator", "about": {"type": "board"}, "asked": "<...>", "status": "answered", "default": "<...>", "deadline": "<as in the waiting line>", "answer": {"type": "page", "event": "<id of the user's answer in conversation.jsonl>"}}
+{"type": "decision", "raised_by": "coordinator", "about": {"type": "board"}, "asked": "<...>", "status": "answered", "default": "<...>", "deadline": "<as in the waiting line>", "answer": {"type": "page", "event": "<id of the user's answer on the page>"}}
 {"type": "decision", "raised_by": "coordinator", "about": {"type": "board"}, "asked": "<...>", "status": "answered", "default": "<...>", "deadline": "<as in the waiting line>", "answer": {"type": "chat", "text": "<the user's words>"}}
 ```
 
 `waiting`: waiting for the user until the deadline; the user can answer, or accept the default at once. `defaulted`: the deadline passed or the user accepted the default, and you applied it. `answered`: you applied the user's answer. The `answer` is the user's answer on the page, by the ID of its event, or their words from the chat.
 
-## questions/<id>.json
+## question
 
 The first line is a seed question that is proposed, open or out of scope, and the second a challenge question. The next lines change the first by status or by kind.
 
@@ -57,9 +46,9 @@ The first line is a seed question that is proposed, open or out of scope, and th
 
 `owner` is there from `in progress` on and left out before. `summary` and `gist` are there once the question is `answered`, `contested`, `not found` or `unclear`, and left out before. `merged_into` is only on `merged`. `raised_in` is only on `frontier`, `chain`, `conflict` and `gap` questions, and `lens` only on `frontier`. `origin` has the `type` shown and, for a question or a source, the ID under the key of the same name. A question's claims are the claims whose `question` names it.
 
-## claims/<id>.json
+## claim
 
-A verifier, not the agent that recorded the claim, sets everything after `status` `unchecked`.
+A verifier, not the agent that added the claim, sets everything after `status` `unchecked`.
 
 ```
 {"type": "claim", "claim": "<one sentence>", "question": "<Q-...>", "source": "<S-...>", "quote": "<verbatim passage from the source>", "status": "unchecked"}
@@ -71,7 +60,7 @@ A verifier, not the agent that recorded the claim, sets everything after `status
 
 `hard` and `blocked` are the JSON values `true` or `false`, not text. A `withdrawn` claim keeps only the fields shown: its checker, span and reason go.
 
-## sources/<id>.json
+## source
 
 ```
 {"type": "source", "author": "<people or organization, as the source names them>", "date": "<year, year-month, year-month-day, n.d. if the source has none, or null if you have not copied it yet>", "title": "<title>", "publisher": "<journal, publisher, or site name>", "url": "<URL>", "ids": [{"type": "<doi | arxiv | pmid | isbn>", "<doi | arxiv | pmid | isbn>": "<the identifier>"}], "category": "<peer-reviewed | preprint | working paper | dataset | government | news | book | documentation | blog | vendor | other>", "read": "<raw | extracted | abstract | snippet | blocked>", "trust": "<high | medium | low>", "trust_reason": "<one line>", "repeats": "<S-... if it cites, copies, or summarizes that source, or null>", "status": "kept"}
@@ -80,9 +69,9 @@ A verifier, not the agent that recorded the claim, sets everything after `status
 
 `ids` lists the identifiers a retraction check can look the work up by, one object per identifier, with the identifier under the key named by its `type`; it is `[]` for a page with none.
 
-## logs/<agent>.jsonl
+## log lines
 
-One line per event, added at the end. A line holds `type` and the fields of its kind.
+ADD one record per event, with `--for` the log's agent name; only that agent adds its own. A record holds `type` and the fields of its kind.
 
 ```
 {"type": "search", "query": "<the query>", "question": "<Q-...>", "new_terms": ["<a term the results revealed>"]}

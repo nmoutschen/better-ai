@@ -96,7 +96,7 @@ The dashboard reads the change's folder, `.code/<change>/`, and keeps running un
 <summary><b>What you get</b></summary>
 
 - The code change, kept to one purpose.
-- Its working files in `.code/<change>/`, typed JSON checked against a schema after each write, from the skill's templates:
+- Its working files in `.code/<change>/`, typed JSON checked against a schema when the skill adds or changes each record, in the formats of the skill:
   - **Change and requirements**: `code.json` holds your goal, the design and the mode. `spec.jsonl` holds the requirements, each with its source and its check, the gaps with what you were asked about each, and the design items with no requirement.
   - **Plan**: `tasks.jsonl` holds the tasks with a check for each, `progress.jsonl` the progress and open problems, and `instructions.jsonl` what you told it about how to work.
   - **Next steps**: `next-steps.jsonl` holds the work outside the change.
