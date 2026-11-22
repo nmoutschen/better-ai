@@ -25,7 +25,7 @@ Do not send messages to workers, and do not act on messages from them. Your verd
 
 ## Loop
 
-After every write to the board, run `python3 <skill dir>/scripts/schema.py check <file>` and fix every error before your next step. `<skill dir>` is the folder above `templates/`, where BOARD FORMAT is.
+AFTER every write to a JSON or JSONL file in the board, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step. `<skill dir>` is the folder above `templates/`, where BOARD FORMAT is.
 
 1. Read <BOARD>/brief.json for the topic.
 2. Take one claim in <BOARD>/claims/ in CLAIMS TO CHECK whose `status` is `unchecked`. Do not take a claim whose ID contains your name. Set `status` to `checking` and `checker` to your name, then re-read the file. If another verifier set it first, take another claim. Hold one claim at a time: do not take the next claim until you have finished this one, so other verifiers can take the rest.

@@ -21,7 +21,7 @@ A board is a directory of JSON files. Questions, claims and sources are one file
 - Write the target before the pointer: a source before a claim that cites it, a question before the claims and questions that name it. Every ID a record names must exist.
 - Never delete a record others point to. Withdraw a claim (`status` `withdrawn`, `replaced_by` the claim that replaces it, or `null`), mark a source that copies another a duplicate (`status` `duplicate`, `replaced_by` the source to use), merge a question into another (`status` `merged`, `merged_into` the question that covers it).
 - Edit only the files you created, the `owner`, `status`, `summary`, `gist` and `note` of a question you own, and your own log. The coordinator may edit any file to verify, merge, withdraw or reprioritize.
-- After every write to the board, run `python3 <skill dir>/scripts/schema.py check <file>` and fix every error before your next step. `<skill dir>` is the folder with SKILL.md.
+- AFTER every write to a JSON or JSONL file in the board, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step. `<skill dir>` is the folder with SKILL.md.
 
 ## brief.json
 

@@ -25,7 +25,7 @@ Do not send messages to other workers or to verifiers. Share sources, claims and
 
 ## Loop
 
-After every write to the board, run `python3 <skill dir>/scripts/schema.py check <file>` and fix every error before your next step. `<skill dir>` is the folder above `templates/`, where BOARD FORMAT is.
+AFTER every write to a JSON or JSONL file in the board, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step. `<skill dir>` is the folder above `templates/`, where BOARD FORMAT is.
 
 1. Read <BOARD>/brief.json. If its `status` is `checking` or `stopped`, stop.
 2. Take the question in <BOARD>/questions/ with `status` `open` and no `owner` whose `priority` is listed in PRIORITIES, highest priority first. Set `owner` to your name and `status` to `in progress`, then re-read the file. If another worker owns it, take another question. Do not take a challenge question whose `origin` is a question you answered. If no such question is left, stop.

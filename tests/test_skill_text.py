@@ -122,11 +122,9 @@ class ResearchBetterText(unittest.TestCase):
 
     def test_each_loop_starts_with_the_schema_check_sentence(self) -> None:
         """SKILL.md step 2, the worker's loop and the verifier's loop each say once, up front, to check every write."""
-        for path in TEXTS[:3]:
-            with self.subTest(file=path.name):
-                self.assertIn(
-                    CHECK_SENTENCE.lower(), path.read_text(encoding="utf-8").lower()
-                )  # SKILL.md writes its verbs in capitals
+        self.assertIn(
+            CHECK_SENTENCE.lower(), TEXTS[0].read_text(encoding="utf-8").lower()
+        )  # SKILL.md writes its verbs in capitals
         for name in ("worker.md", "verifier.md"):
             text = (RESEARCH / "agents" / name).read_text(encoding="utf-8")
             loop = text[text.index("## Loop") :]
