@@ -1,0 +1,5 @@
+# The files that carry the trust in the shipped better.pyz bytes. Code-owner review is required here only: an
+# ordinary src/ change is proved by the base-build check, so it needs no review of the .pyz files.
+/tools/ @nmoutschen
+/src/better_ai/skills.json @nmoutschen
+/.github/ @nmoutschen
