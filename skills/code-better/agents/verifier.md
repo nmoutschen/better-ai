@@ -35,7 +35,7 @@ None. PUT everything in the output.
 
 ## Log
 
-IF `log` is given and not none, a dashboard shows the user your work from it, on a card marked verifier for `task`. CREATE it, and ADD one JSON record at the end for each event as it happens, never editing earlier lines. READ `<skill dir>/templates/log.md` for the format, and WRITE `text` as one short sentence. ADD, by `type`:
+IF `log` is given and not none, a dashboard shows the user your work from it, on a card marked verifier for `task`. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/dashboard.py log <change folder> <agent name> <type> "<text>" [--result <result>]`, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. NEVER write a line by hand or type a time: the command stamps it, and it refuses a line that does not check. WRITE `text` as one short sentence. ADD, by `type`:
 
 - `start`: what you begin with, when you begin;
 - `step`: what you just checked or found, after each requirement you check and each finding you confirm;
@@ -47,10 +47,12 @@ IF `log` is given and not none, a dashboard shows the user your work from it, on
 - Each requirement in `requirements`: run or read its check, and report one it does not meet as a blocking finding. Check yourself the requirements marked "code review".
 - Wrong behaviour against the spec, broken callers, security problems, data loss, missing error handling. Style only where the project's rules require it.
 - Read beyond the diff: callers, configuration, tests.
+- WHEN the change accepts values, such as a check, a validator or a schema, RUN accepted values through the real reader or renderer that consumes them: a check that accepts what its consumer then fails on is blocking.
+- WHEN the change touches a page or another rendered output, RENDER it before and after the change and LOOK at both, such as in screenshots. IF you cannot render it, SAY so in what you could not run.
 - Compare the checks with `checks_before`. Report any difference the mode does not allow, such as a removed or skipped test, a loosened assertion, or a test input handled as a special case.
 - Confirm each finding with a failing test, a reproduction, or the exact lines and input that cause it, and write the fix as code in the report.
 - For a diff over about 150 changed lines, review it in parts by purpose. TREAT this as a guide, not a rule.
-- A finding is blocking IF it is wrong behaviour against a requirement, data loss, a security problem, a broken caller, or a blocking criterion of the user's review guide.
+- A finding is blocking IF it is wrong behaviour against a requirement, data loss or wrong data that real use can plausibly produce, a security problem, a broken caller or page, a check that accepts what its consumer then fails on, or a blocking criterion of the user's review guide. WEIGH each by how likely real use triggers it and the harm it does: a failure that needs an input no real caller, file or user produces is a note, not blocking, unless it loses or corrupts data.
 
 ## Output
 

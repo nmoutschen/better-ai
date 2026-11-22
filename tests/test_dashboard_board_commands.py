@@ -80,10 +80,21 @@ class Log(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             write(folder, "logs/verifier-t1.card.json", [card("verifier", "T1")], as_json=True)
-            write(folder, "logs/verifier-t1.jsonl", [{"type": "start", "at": "2026-11-21T10:00:00Z", "by": "verifier-t1", "text": "x"}])
+            write(
+                folder,
+                "logs/verifier-t1.jsonl",
+                [{"type": "start", "at": "2026-11-21T10:00:00Z", "by": "verifier-t1", "text": "x"}],
+            )
             done = run(
-                "log", str(folder), "verifier-t1", "handed_back", "Stopped by the user", "--result", "fails",
-                "--by", "coordinator",
+                "log",
+                str(folder),
+                "verifier-t1",
+                "handed_back",
+                "Stopped by the user",
+                "--result",
+                "fails",
+                "--by",
+                "coordinator",
             )
             self.assertEqual(done.returncode, 0, done.stderr)
             last = lines(folder / "logs" / "verifier-t1.jsonl")[-1]
@@ -93,7 +104,11 @@ class Log(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             write(folder, "logs/verifier-t1.card.json", [card("verifier", "T1")], as_json=True)
-            path = write(folder, "logs/verifier-t1.jsonl", [{"type": "start", "at": "2026-11-21T10:00:00Z", "by": "verifier-t1", "text": "x"}])
+            path = write(
+                folder,
+                "logs/verifier-t1.jsonl",
+                [{"type": "start", "at": "2026-11-21T10:00:00Z", "by": "verifier-t1", "text": "x"}],
+            )
             before = path.read_text()
             for args in (("asked", "Which type?"), ("handed_back", "ok", "--result", "done"), ("handed_back", "ok")):
                 with self.subTest(args=args):
@@ -114,7 +129,9 @@ class Log(unittest.TestCase):
             folder = change(Path(d))
             write(folder, "logs/builder-t1.card.json", [card("builder", "T1")], as_json=True)
             path = folder / "logs" / "builder-t1.jsonl"
-            path.write_text(json.dumps({"type": "start", "at": "2026-11-21T10:00:00Z", "by": "builder-t1", "text": "x"}))
+            path.write_text(
+                json.dumps({"type": "start", "at": "2026-11-21T10:00:00Z", "by": "builder-t1", "text": "x"})
+            )
             self.assertEqual(run("log", str(folder), "builder-t1", "step", "y").returncode, 0)
             self.assertEqual([line["type"] for line in lines(path)], ["start", "step"])
 

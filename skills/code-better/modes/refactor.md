@@ -13,7 +13,7 @@ KEEP a spec for every change, however small: a one-line change needs one require
 
 IF the design says some behaviour changes, that part is not this change: LIST it as a proposed next step, or, under a coordinator, as its own task.
 
-FOR a data migration, IF the design does not say what happens to records the old format allows and the new one does not, ASK the user.
+FOR a data migration, IF the design does not say what happens to records the old format allows and the new one does not, ASK the user. WHEN the new format needs a value the old data does not hold, FILL the weakest honest value, such as the lowest grade, `null` for not recorded, or unconfirmed, never a guess that claims more, and LIST every kind of fill with its count in the hand-back.
 
 WHEN the work spans several sessions, people or agents, ALSO WRITE `.code/<change>/tasks.jsonl` now: READ [../templates/tasks.md](../templates/tasks.md) and WRITE it in its format, with every task `todo`.
 

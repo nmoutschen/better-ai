@@ -7,10 +7,16 @@ Usage:
   python3 dashboard.py check CHANGE                             print the records that are not valid, one per line as
                                                                 file:line: field: message; exit 1 if there are any
   python3 dashboard.py wait CHANGE [--timeout S]                wait for the user's next actions on the served page
-  python3 dashboard.py reply CHANGE TEXT [--to ID]              show the coordinator's reply in the page
+  python3 dashboard.py reply CHANGE TEXT [--to ID [--state asked|working|done]]
+                                                                show the coordinator's reply in the page; a reply to
+                                                                an item also sets its status, done unless --state
   python3 dashboard.py status CHANGE seen|asked|working|done ID...
   python3 dashboard.py status CHANGE accepted ID... --text "the user's words"
   python3 dashboard.py pending CHANGE                           list the user's items that are not done or accepted
+  python3 dashboard.py card CHANGE AGENT --role builder|verifier --task T<n> --branch B
+                                                                write the agent's card before it starts
+  python3 dashboard.py log CHANGE AGENT TYPE TEXT [--result R] [--by NAME]
+                                                                add one line to the agent's log
 
 CHANGE is the change's folder, `.code/<change>/`, as code-better's coordinate mode writes it, in the formats of
 schemas/: code.json (the goal, the design and the mode), spec.jsonl (or the one in the architect folder code.json names),
@@ -22,6 +28,10 @@ coordinator, asks about an agent, answers a question or replies to a decision. E
 page; the script appends it to conversation.jsonl in the folder and prints it to stdout. `wait` is for harnesses that
 only notify when a command ends. `reply` and `status` work with or without a server, so a resumed run can answer what
 the user wrote while no agent was running.
+
+`card` and `log` are how cards and log lines are written: they stamp `at` with the current UTC time, so no agent types
+a time, and write nothing that fails its schema, such as a log line the agent's role cannot write. `log --by` lets the
+coordinator write the last line of an agent that stopped without one.
 
 Every record is checked against its schema on its own. The page shows each valid record; the invalid ones, with where
 they are, which field and why, are listed in an errors band, and `check` prints the same list: one bad record never
@@ -335,10 +345,72 @@ def watch(change: Path, port: int, open_browser: bool) -> None:
         conv.address.unlink(missing_ok=True)
 
 
+# ---------- Writing cards, log lines and replies ----------
+
+
+def refuse(path: Path, text: str, line: int) -> None:
+    """End the command, writing nothing, if line `line` of `text`, the file's text once written, fails its schema."""
+    errors = [e for e in schema.check_text(path, text, schema.load_schemas(SCHEMAS), {}) if e.line == line]
+    if errors:
+        sys.exit("error: " + "; ".join(f"{e.field}: {e.message}" for e in errors) + ". Nothing was written.")
+
+
+def write_card(change: Path, name: str, role: str, task: str, branch: str, by: str) -> None:
+    """Write logs/<name>.card.json, stamped now, unless another agent of the change has the name or it fails."""
+    path = change / "logs" / f"{name}.card.json"
+    if path.exists() or (change / "logs" / f"{name}.jsonl").exists():
+        sys.exit(f"error: an agent named {name} exists already. Give each agent a name of its own.")
+    record = {"type": "card", "at": page.now(), "by": by, "role": role, "task": task, "branch": branch}
+    text = json.dumps(record) + "\n"
+    refuse(path, text, 1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as f:
+        f.write(text)
+    print(f"Card written: {path.name}")
+
+
+def write_log(change: Path, name: str, kind: str, text: str, result: str | None, by: str | None) -> None:
+    """Add one line, stamped now, to logs/<name>.jsonl, unless the agent has no card or the line fails its schema."""
+    logs = change / "logs"
+    if not (logs / f"{name}.card.json").is_file():
+        sys.exit(f"error: {name} has no card. Write it with `card` before the agent starts. Nothing was written.")
+    path = logs / f"{name}.jsonl"
+    record = {"type": kind, "at": page.now(), "by": by or name, "text": text}
+    if result is not None:
+        record["result"] = result
+    old = path.read_text(encoding="utf-8") if path.exists() else ""
+    lead = "\n" if old and not old.endswith("\n") else ""
+    added = lead + json.dumps(record) + "\n"
+    whole = old + added
+    refuse(path, whole, len(lines_of(whole, True)))
+    with path.open("a", encoding="utf-8") as f:
+        f.write(added)
+    print(f"Logged: {kind}")
+
+
+def reply(change: Path, text: str, to: str | None, state: str) -> None:
+    """Show the reply in the page and, for a reply to one of the user's items, set that item's status in the same
+    write, so no answered item is left open. An answer under an item is part of it: the item takes the status."""
+    conv = conversation(change)
+    if to is None:
+        return conv.reply(text, None)
+    events = conv.events()
+    items = {e.get("id"): e for e in events if e.get("type") in ITEMS}
+    owned = {i for i, e in items.items() if not (e.get("type") == "note" and e.get("to"))}
+    target = items[to].get("to") if to in items and to not in owned and items[to].get("to") in owned else to
+    if target not in items:
+        sys.exit(f"error: no comment or message with id {page.terminal_text(to)}. Run `pending` to see the ids.")
+    conv.write(
+        {"type": "reply", "by": conv.agent, "id": "r-" + str(time.time_ns()), "text": text[:5000], "to": to},
+        {"type": "status", "by": conv.agent, "to": target, "status": state},
+    )
+    print("Reply shown in the page." if conv.answering() else "Reply saved; the page shows it when served.")
+
+
 # ---------- Command line ----------
 
 
-@schema.never_raise("change", {**page.VERBS, "watch": "served", "": "checked"})
+@schema.never_raise("change", {**page.VERBS, "card": "written", "log": "written", "watch": "served", "": "checked"})
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Show a coordinated change as a live page and collect the user's input."
@@ -356,7 +428,13 @@ def main() -> None:
     r = sub.add_parser("reply", help="show a reply from the coordinator in the page")
     r.add_argument("change")
     r.add_argument("text")
-    r.add_argument("--to", help="the id of the item it answers")
+    r.add_argument("--to", help="the id of the item it answers; the item's status is set in the same write")
+    r.add_argument(
+        "--state",
+        choices=("done", "asked", "working"),
+        default="done",
+        help="the status of the item it answers: done (default), asked when the reply asks the user back, or working",
+    )
     st = sub.add_parser("status", help="mark the user's items seen, asked, working, done or accepted")
     st.add_argument("change")
     st.add_argument("state", choices=page.STATES)
@@ -364,6 +442,20 @@ def main() -> None:
     st.add_argument("--text", help="the user's words, for accepted")
     p = sub.add_parser("pending", help="list the user's items that are not done or accepted")
     p.add_argument("change")
+    cd = sub.add_parser("card", help="write an agent's card, stamped now, before the agent starts")
+    cd.add_argument("change")
+    cd.add_argument("agent", help="the agent's name, which no other agent of the change has")
+    cd.add_argument("--role", required=True, choices=("builder", "verifier"))
+    cd.add_argument("--task", required=True, help="the task's ID as tasks.jsonl writes it, such as T3")
+    cd.add_argument("--branch", required=True, help="the branch the builder works on or the verifier reviews")
+    cd.add_argument("--by", default="coordinator", help="who writes the card (default: coordinator)")
+    lg = sub.add_parser("log", help="add one line, stamped now, to an agent's log")
+    lg.add_argument("change")
+    lg.add_argument("agent", help="the agent whose log it is")
+    lg.add_argument("type", choices=tuple(STATES))
+    lg.add_argument("text", help="one short sentence")
+    lg.add_argument("--result", help="for handed_back: done, partly done or blocked; passes or fails for a verifier")
+    lg.add_argument("--by", help="who writes the line, when not the agent: the coordinator, for an agent that stopped")
     args = parser.parse_args()
     change = Path(args.change).expanduser().resolve()
     if not change.is_dir():
@@ -378,7 +470,11 @@ def main() -> None:
     elif args.command == "wait":
         sys.exit(conversation(change).wait(args.timeout))
     elif args.command == "reply":
-        conversation(change).reply(args.text, args.to)
+        reply(change, args.text, args.to, args.state)
+    elif args.command == "card":
+        write_card(change, args.agent, args.role, args.task, args.branch, args.by)
+    elif args.command == "log":
+        write_log(change, args.agent, args.type, args.text, args.result, args.by)
     elif args.command == "status":
         conversation(change).set_status(args.state, args.ids, args.text)
     else:
