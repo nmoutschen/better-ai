@@ -621,19 +621,18 @@ test('delete, accept and reopen point at their item with to, and reopen carries 
 
 // The research board's page: its errors band and how it shapes the new record fields. Both are read out of board.js,
 // between marker comments and between `const has =` and the map's layout, so the test runs the shipped code.
-const boardJs = fs.readFileSync(path.join(__dirname, '..', 'skills', 'research-better', 'scripts', 'board.js'), 'utf8');
+const boardJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', 'research', 'board.js'), 'utf8');
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const { showLoaded, notValid } = new Function('esc', 'plural', boardJs.split('// errors:begin')[1].split('// errors:end')[0] + '; return {showLoaded, notValid};')(realEsc, plural);
 const { prepare } = new Function('const has =' + boardJs.split('const has =')[1].split('// ---------- Slices')[0] + '; return {prepare};')();
-const band = () => ({ offline: { hidden: false }, unwatched: { hidden: false }, errors: { hidden: true, innerHTML: '' } });
+const band = () => ({ errors: { hidden: true, innerHTML: '' }, old: { hidden: true, textContent: '' } });
 
-test('a board with invalid records shows its errors band and never the closed notice', () => {
+test('a board with invalid records shows its errors band', () => {
   const els = band();
   showLoaded({ listening: true, errors: [
     { file: 'claims/C-w2-9.json', line: 1, field: 'question', message: 'dangling: "Q-w9-1" is not a question record in ../questions/', by: 'w2' },
     { file: 'logs/w2.jsonl', line: 2, field: 'query', message: 'required' },
   ] }, els);
-  assert.equal(els.offline.hidden, true);
   assert.equal(els.errors.hidden, false);
   assert.match(els.errors.innerHTML, /2 problems/);
   assert.match(els.errors.innerHTML, /<code>claims\/C-w2-9\.json:1<\/code> question: dangling/);
@@ -644,10 +643,21 @@ test('a board with invalid records shows its errors band and never the closed no
 test('the errors band is hidden when the board has no errors, and shows a message as text, never as HTML', () => {
   const els = band();
   showLoaded({ listening: true, errors: [] }, els);
-  assert.deepEqual([els.errors.hidden, els.errors.innerHTML, els.offline.hidden], [true, '', true]);
+  assert.deepEqual([els.errors.hidden, els.errors.innerHTML, els.old.hidden], [true, '', true]);
   showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: '<u>', message: '<img src=x>' }] }, els);
   assert.ok(!els.errors.innerHTML.includes('<img'));
   assert.ok(!els.errors.innerHTML.includes('<u>'));
+});
+
+test('records in the format before this change are one count, not one error each', () => {
+  const els = band();
+  showLoaded({ listening: true, errors: [], old: 3 }, els);
+  assert.deepEqual([els.errors.hidden, els.old.hidden], [true, false]);
+  assert.equal(els.old.textContent, '3 records in the format before this change: kept as they are, not converted.');
+  showLoaded({ listening: true, errors: [], old: 1 }, els);
+  assert.match(els.old.textContent, /^1 record in the format before this change: kept as it is/);
+  showLoaded({ listening: true, errors: [], old: 0 }, els);
+  assert.equal(els.old.hidden, true);
 });
 
 test("the board's map reads the new fields: claims by question, merged and withdrawn records, where a question was raised", () => {
@@ -675,7 +685,7 @@ test('searches on a merged question count for the question it was merged into', 
 
 test('the errors band is written only when its text changes, so a screen reader is not read it every poll', () => {
   let writes = 0, html = '';
-  const els = { offline: { hidden: false }, unwatched: { hidden: false },
+  const els = { old: { hidden: true, textContent: '' },
     errors: { hidden: true, get innerHTML() { return html; }, set innerHTML(v) { writes++; html = v; } } };
   const d = { listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] };
   showLoaded(d, els); showLoaded(d, els); showLoaded({ ...d }, els);

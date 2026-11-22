@@ -1,4 +1,5 @@
-const SNAPSHOT = __SNAPSHOT__;
+// A page written by `render` carries its data in BOARD_SNAPSHOT and has no server; a served page reads /data.
+const SNAPSHOT = typeof BOARD_SNAPSHOT === "undefined" ? null : BOARD_SNAPSHOT;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const has = v => v && v !== "none";
@@ -175,23 +176,12 @@ addEventListener("pointermove", ev => { if (!drag) return; const r = svg.getBoun
   vb[0] = drag[2] - (ev.clientX - drag[0]) * s; vb[1] = drag[3] - (ev.clientY - drag[1]) * s; setView(); });
 addEventListener("pointerup", () => { drag = null; wrapEl.classList.remove("drag"); });
 
-// ---------- The conversation: page.js, shared with the canvas and the slides; the board adds decisions and workers ----------
-// A decision the coordinator took without the user is a message from it, placed where it happened. Its time is its `at`
-// line; the file's own time moves whenever the coordinator edits it, and may be in another time zone than the log. So
-// nothing comes before what it answers: an answer before its decision, a reply before the answer it replies to. The log
-// is in the order things happened, so what an event answers is already timed when the event is read.
-function events(d) {
-  const at = e => Date.parse(e.at) / 1000 || 0;
-  const decisions = (d.decisions || []).map(x => ({type: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || 0}));
-  const when = Object.fromEntries(decisions.map(e => [e.id, e._t]));
-  return (d.conversation || []).map(e => {
-    const _t = Math.max(at(e), when[e.type === "answer" ? e.decision : e.to] || 0);
-    if (e.id) when[e.id] = _t;
-    return {...e, _t}; })
-    .concat(decisions).sort((a, z) => a._t - z._t || (z.type === "decision") - (a.type === "decision"));
-}
-const decisionStatus = x => String(x.status || "pending").trim().toLowerCase();
-const answerOf = c => c.replies.filter(r => r.type === "answer").pop();
+// ---------- The conversation: page.js, shared with the other pages; the board adds the worker's closing messages ----------
+// A decision is one of the coordinator's messages, placed where it happened (pageDecisionEvents). One written before this
+// change has the old words; it is read as the new ones, and the page counts it.
+const OLD_STATUS = {pending: "waiting", default: "defaulted", changed: "answered"};
+const decisions = d => (d.decisions || []).map(x => x._old && OLD_STATUS[x.status] ? {...x, status: OLD_STATUS[x.status]} : x);
+const decisionStatus = x => String(x.status || "decided").trim().toLowerCase();
 const clock = at => pageTime(at);
 const headHTML = (who, at, extra) => `<div class="head"><span class="who">${who}</span><span class="when">${esc(extra || clock(at))}</span></div>`;
 function li(cls, html) { const x = document.createElement("li"); x.className = cls; x.innerHTML = html; return x; }
@@ -205,24 +195,6 @@ function closedItem(c) {
   return li("msg worker", `${headHTML(esc(e.by || "A worker"), e.at)}
     <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p>${q && has(q.gist) ? md(q.gist) : ""}${more}`);
 }
-// A decision waiting for the user: Use the default (the check) or Answer; once answered or decided, Reply.
-function decisionItem(c, state, actions) {
-  const x = c.e.x, status = decisionStatus(x), answer = answerOf(c), ast = answer && state[answer.id];
-  const def = x.default, left = (Date.parse(x.deadline) / 1000 || 0) - D.now;
-  const label = status === "changed" ? "changed by you" : status === "default" ? (answer ? "default, chosen by you" : "decided without you")
-    : answer ? (answer.default ? "default accepted, waiting for the coordinator" : "answered, waiting for the coordinator")
-    : left > 0 ? `default in ${left < 90 ? "under 2 min" : Math.round(left / 60) + " min"}` : "default due now";
-  const item = li(`msg decision ${status}`, `${headHTML("Coordinator", "", label)}${md(`${x.asked || ""}${def ? (status === "pending" ? "\n\nIf you don't answer: " : "\n\n") + def : ""}`)}`);
-  item.dataset.d = x.id;
-  if (!answer && status === "pending") item.classList.add("open-q");  // the top bar's figure takes the user to the first one
-  item.dataset.state = status === "changed" ? "done" : ast || (status === "pending" ? "asked" : "");
-  const foot = document.createElement("div"); foot.className = "foot";
-  if (answer) foot.append(conv.progress(ast)); else if (status === "pending") foot.append(conv.progress("asked"));
-  if (actions) foot.insertAdjacentHTML("beforeend", !answer && status === "pending"
-    ? `<button type="button" class="btn btn--sm answer" data-default="${esc(x.id)}" title="Use the default" aria-label="Use the default">✓</button><button type="button" class="btn btn--quiet btn--sm change">Answer</button>`
-    : `<button type="button" class="btn btn--quiet btn--sm answer change">Reply</button>`);
-  return [item, foot];
-}
 function crumb(e) {
   const x = document.createElement("span");
   if (e.on) { x.className = "crumb"; x.innerHTML = `<span class="path">on</span><span class="el"><button type="button" data-open="${esc(e.on.kind)}:${esc(e.on.id)}">${esc(e.on.title || e.on.id)}</button></span>`; }
@@ -230,19 +202,26 @@ function crumb(e) {
 }
 const md = text => pageMarkdown(text).outerHTML;  // Markdown, built as elements: safe to place as HTML
 function commentBody(e) { return pageMarkdown(e.text); }
+const kinds = {closed: closedItem};
 const conv = pageConversation({
   served: !SNAPSHOT, readOnly: !!SNAPSHOT, stream: false, name: "board", agent: "Coordinator", thread: $("thread"),
-  agentKinds: ["reply", "closed"], kinds: {decision: decisionItem, closed: closedItem}, crumb, commentBody,
+  agentKinds: ["reply", "closed"], kinds, crumb, commentBody,
   // No working or accept step on the board: the coordinator answers most messages from the board at once, and an
   // answered item is finished.
   steps: ["seen", "done"], labels: {done: "Answered"}, shown: st => st === "working" ? "seen" : st === "accepted" ? "done" : st,
   accept: false, filter: false,
   // A decision waiting for the user comes last, next to the message box, until they answer it; so does a message of
   // theirs that the coordinator asked about.
-  waiting: (c, state) => c.kind === "decision" ? !answerOf(c) && decisionStatus(c.e.x) === "pending" : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
+  waiting: (c, state) => c.kind === "decision" ? decision.waiting(c, state) : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
   afterSend: () => tick(),
 });
 const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+// The decision question is the shared one: default, deadline, Use the default, Answer.
+const decision = pageDecision({conversation: conv, now: () => D.now, md, esc, id: uid});
+kinds.decision = decision.item;
+// The decisions waiting for the user: asked, and not yet answered on the page.
+const waitingCount = d => { const answered = new Set((d.conversation || []).filter(e => e.type === "answer").map(e => e.decision));
+  return decisions(d).filter(x => decisionStatus(x) === "waiting" && !answered.has(x.id)).length; };
 
 // ---------- The right column ----------
 function drawAgents(d) {
@@ -352,10 +331,6 @@ document.addEventListener("click", ev => {
   const g = t.closest(".map .q"); if (g) return openPop("question", g.dataset.q, g);
   const a = t.closest("[data-a]"); if (a) return openPop("agent", a.dataset.a, a);
   const o = t.closest("[data-open]"); if (o) { const [kind, id] = o.dataset.open.split(/:(.*)/s); return openPop(kind, id, o); }
-  const ud = t.closest("[data-default]"); if (ud) { ud.disabled = true;  // the run applies its default now instead of at the deadline
-    return conv.send("answer", {id: uid("a"), decision: ud.dataset.default, text: "Use the default.", default: true}, "Answer", null, () => { ud.disabled = false; }); }
-  const ch = t.closest(".thread .change"); if (ch) { const d = ch.closest("li").dataset.d;  // hidden, not removed, so the state row does not move
-    return conv.box(ch.closest("li"), d, "What should the run do?", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text, default: false}, "Answer", done)); }
   if ($("pop") && !t.closest("form, .why")) closePop();
 });
 document.addEventListener("keydown", ev => {
@@ -371,15 +346,14 @@ function render(d) {
   $("title").textContent = has(b.title) ? b.title : b.topic || "Research board";
   $("title").title = b.topic || ""; document.title = `${$("title").textContent} · Research board`;
   $("briefbad").textContent = notValid(b); $("briefbad").hidden = !notValid(b);
-  $("goal").textContent = has(b.goal) ? b.goal : ""; $("goal").title = b.goal || "";
+  $("goal").textContent = has(b.goal) ? b.goal : ""; $("goal").title = b.goal || ""; $("goal").hidden = !has(b.goal);
   const start = Math.min(now, ...[...d.questions, ...d.claims, ...d.sources].map(e => e._born));
   const answered = qs.filter(q => CLOSED.has(q.view)).length, workers = qs.filter(q => q.view === "in progress").length;
   const left = qs.filter(q => ["open", "in progress", "proposed"].includes(q.view)).length;
   const rate = answered / Math.max(1, now - start), eta = answered >= 3 && left ? ` ${left / rate < 90 ? "Under 2 min" : "About " + Math.round(left / rate / 60) + " min"} left at this pace.` : "";
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   const leftText = left / rate < 90 ? "<2 min" : `~${Math.round(left / rate / 60)} min`;
-  const answeredIds = new Set((d.conversation || []).filter(e => e.type === "answer").map(e => e.decision));
-  const waitingN = (d.decisions || []).filter(x => String(x.status || "pending").trim().toLowerCase() === "pending" && !answeredIds.has(x.id)).length;
+  const waitingN = waitingCount(d);
   const phase = CLOSED_PAGE ? stat("Closed", `since ${new Date(now * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`)
     : b.status === "stopped" ? stat("Stopped", `after ${mins(now - start)}`, "done")
     : b.status === "checking" ? stat("Checking", "last claims") : stat(mins(now - start).replace(" min", "m").replace("under 2m", "<2m"), "running");
@@ -396,7 +370,7 @@ function render(d) {
   drawAgents(D);
   // Redraw when the log changes, when a question a worker's message names changes, and every half minute while a
   // decision counts down to its default.
-  conv.setLog(events(D), [waitingN ? Math.round(now / 30) : 0, D.qs.map(q => [q.id, q.label, q.parent])]);
+  conv.setLog(pageDecisionEvents(decisions(D), D.conversation), [waitingN ? Math.round(now / 30) : 0, D.qs.map(q => [q.id, q.label, q.parent])]);
   if (OPEN) fillPop();
 }
 
@@ -408,20 +382,23 @@ const notValid = r => r && r._errors && r._errors.length ? `not valid: ${r._erro
 const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))}</span>` : "";
 const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here.</p><ul>`
   + errors.map(e => `<li><code>${esc(e.file)}:${esc(e.line)}</code> ${esc(e.field)}: ${esc(e.message)}${e.by ? ` <span class="by">(by ${esc(e.by)})</span>` : ""}</li>`).join("") + "</ul>";
+// The band is written only when it changes: it is a live region, and a rewrite every poll would be read out every time.
+// Records in the format before this change are one count, not one error each.
 function showLoaded(d, els) {
   const errors = d.errors || [];
-  els.offline.hidden = true; els.unwatched.hidden = d.listening !== false;
-  // Written only when it changes: the band is a live region, and a rewrite every poll would be read out every time.
   const html = errors.length ? errorsHTML(errors) : "";
   els.errors.hidden = !errors.length; if (els.errors.innerHTML !== html) els.errors.innerHTML = html;
+  const old = d.old || 0, text = old ? `${plural(old, "record")} in the format before this change: kept as ${old === 1 ? "it is" : "they are"}, not converted.` : "";
+  els.old.hidden = !old; if (els.old.textContent !== text) els.old.textContent = text;
 }
 // errors:end
+const bands = () => ({errors: $("errors"), old: $("oldnote")});
 let fails = 0;
 function tick() {
-  return fetch("board.json", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(d => { fails = 0; CLOSED_PAGE = false; showLoaded(d, {offline: $("offline"), unwatched: $("unwatched"), errors: $("errors")}); render(d); },
-      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("offline").hidden = false; $("unwatched").hidden = true; $("errors").hidden = true; if (D) render(D); } });
+  return fetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(d => { fails = 0; CLOSED_PAGE = false; showLoaded(d, bands()); render(d); },
+      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
 }
-if (SNAPSHOT) { showLoaded(SNAPSHOT, {offline: $("offline"), unwatched: $("unwatched"), errors: $("errors")}); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
-else { tick(); setInterval(tick, 2000); }
+if (SNAPSHOT) { showLoaded(SNAPSHOT, bands()); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
+else { conv.start(); tick(); setInterval(tick, 2000); }
 setView();

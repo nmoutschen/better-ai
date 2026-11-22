@@ -738,9 +738,8 @@ function pageCommentPosition(x, y, pop) {
 }
 
 // The conversation between a served page and the agent: sending, the thread with its items, states and replies, the
-// message box, and the live updates. Each skill whose page talks to the agent carries an identical copy of this file,
-// as it does page.css and page.py, and the Scripts workflow fails if the copies differ: change it in one skill, then
-// copy it to the others. The page's own script calls pageConversation with what only that page has, such as its pins.
+// message box, and the live updates. This file is bundled once, from src/better_ai/page/, into every
+// skill's better.pyz, with page.css and the server. The page's own script calls pageConversation with what only that page has, such as its pins.
 //
 // Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the agent's
 // replies. The page sends only the fields of its own kind of event (the server sets `type`, `by` and `at`), and the
@@ -749,7 +748,7 @@ function pageCommentPosition(x, y, pop) {
 // new render loses nothing. State changes are also applied at once, and applying the same event twice changes nothing.
 //
 // o.served       the page is served over http; otherwise actions stay on the page (o.unsent says what to do with them)
-// o.name         what the page is called in errors, such as 'canvas'; o.agent what the agent is called (default Agent)
+// o.agent        what the agent is called in the thread (default: the page's role name from its config, capitalised)
 // o.apply(e, fresh)  apply one event to the page's own model, such as its pins; fresh when the user just sent it
 // o.reset()      empty that model and its pins; the page then replays the log through apply, to undo an event the server refused
 // o.byId(id)     the page's own model of a comment, which offers Show, Edit and Delete; nothing when it offers none
@@ -773,9 +772,10 @@ function pageCommentPosition(x, y, pop) {
 // o.rendered(state)  called after each redraw with every item's state, to sync the pins
 function pageConversation(o) {
   var rpcId = 0, log = [], state = {}, fed = null, itemKinds = o.itemKinds || ['comment', 'note'], kinds = o.kinds || {};
-  var agentKinds = o.agentKinds || ['reply'], agent = o.agent || 'Agent', accept = o.accept !== false, filtering = o.filter !== false;
+  var agentKinds = o.agentKinds || ['reply'], agent = o.agent || pageRole().replace(/^./, function (c) { return c.toUpperCase(); }), accept = o.accept !== false, filtering = o.filter !== false;
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
   function time(at) { return pageTime(at); }
+  if (!filtering) { var seg = document.querySelector('.notes-top .seg'); if (seg) seg.remove(); }
   var status = document.querySelector('.notes .status');
   function say(text, error) { if (!status) return; status.textContent = text; status.classList.toggle('error', !!error); }
   // Every action shows a toast at the bottom of the window: sending, then sent or failed.
@@ -806,8 +806,8 @@ function pageConversation(o) {
       }, function (error) {
         undo();
         var refused = error && error.refused;
-        flash('Not sent: ' + what.toLowerCase() + '. ' + (refused ? error.message : 'The ' + o.name + ' is closed.'), 'error');
-        say(refused ? 'Not sent: ' + error.message : 'Not sent: the ' + o.name + ' is closed. Ask the agent to restart it.', true);
+        flash('Not sent: ' + what.toLowerCase() + '. ' + (refused ? error.message : 'The page is closed.'), 'error');
+        say(refused ? 'Not sent: ' + error.message : 'Not sent: the page is closed. Ask the ' + pageRole() + ' to restart it.', true);
         if (fail) fail();
       });
   }
@@ -1016,11 +1016,12 @@ function pageConversation(o) {
   }
   function start() {
     renderThread();
-    if (!o.served || o.stream === false) return;
+    if (!o.served) return;
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
-    var offline = document.querySelector('.offline'), misses = 0;
+    // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
+    var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
     function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
-    (function stream(after) {
+    if (streaming) (function stream(after) {
       fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
@@ -1033,7 +1034,7 @@ function pageConversation(o) {
     // A new render from the agent loads by itself, as soon as the user is not typing: a comment, a message or an answer
     // in progress would be lost. The page keeps its place through o.beforeReload.
     var rev = null;
-    (function poll() {
+    if (streaming) (function poll() {
       fetch('/rev').then(function (r) { return r.text(); }).then(function (t) {
         if (rev === null) rev = t;
         else if (t !== rev && !busy()) {
@@ -1048,7 +1049,8 @@ function pageConversation(o) {
     (function watch() {
       fetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
         unwatched.hidden = on !== false;
-      }).catch(function () { unwatched.hidden = true; }).then(function () { setTimeout(watch, 2000); });
+        if (!streaming) connected(true);
+      }).catch(function () { unwatched.hidden = true; if (!streaming) connected(false); }).then(function () { setTimeout(watch, 2000); });
     })();
   }
 
@@ -1257,6 +1259,131 @@ function pageMarkdown(text) {
   var d = document.createElement('div'); d.className = 'body md'; d.dir = 'auto';
   pageMarkdownTree(text).forEach(function (n) { d.append(make(n)); });
   return d;
+}
+
+// ---------- The shared capabilities ----------
+// The server fills the shell with the page's config (see page/__init__.py, PageSpec): `{agent, title, capabilities}`.
+// A page uses a capability only when it declares it; the server refuses the events of one it does not declare.
+function pageConfig() {
+  var node = typeof document !== 'undefined' && document.getElementById && document.getElementById('page-config');
+  try { return node ? JSON.parse(node.textContent) : {}; } catch (e) { return {}; }
+}
+function pageRole() { return pageConfig().agent || 'agent'; }
+function pageCan(name) { return (pageConfig().capabilities || []).indexOf(name) >= 0; }
+
+// One decision question, for every page that shows the agent's decisions (the dashboard and the research board).
+// A `waiting` decision is a question to the user: its default and deadline show, with Use the default (the check) and
+// Answer. `defaulted`, `answered` and `decided` ones can be replied to. The page supplies the thread's pieces:
+//   o.conversation  the page's pageConversation()     o.now()  the page's clock in seconds (the server's)
+//   o.md(text)      Markdown to an HTML string        o.esc(text)  HTML-escaped text
+//   o.id(prefix)    a new event id
+// pageDecisionEvents(decisions, conversation) is the log the thread draws: each decision as an entry of type `decision`
+// (the record in `x`), among the conversation's events, in the order things happened. Nothing comes before what it
+// answers: an answer never shows above its decision, a reply never above the answer it replies to.
+function pageDecision(o) {
+  var conv = o.conversation;
+  function status(x) { return String(x.status || 'decided').trim().toLowerCase(); }
+  function answerOf(c) { return c.replies.filter(function (r) { return r.type === 'answer'; }).pop(); }
+  // 0: the user is up (Waiting for you); 1: the user answered, the agent has not applied it; 2: applied; -1: no steps.
+  function step(st, answer, state) {
+    if (st !== 'waiting' && st !== 'answered') return -1;
+    if (answer && state[answer.id] === 'asked') return 0;
+    if (st === 'answered') return 2;
+    return !answer ? 0 : (state[answer.id] === 'done' || state[answer.id] === 'accepted') ? 2 : 1;
+  }
+  function waiting(c, state) { return step(status(c.e.x), answerOf(c), state) === 0; }
+  function left(x) { var t = Date.parse(x.deadline); return isNaN(t) ? null : t / 1000 - o.now(); }
+  function deadlineWords(x) {
+    var s = left(x);
+    if (s === null) return '';
+    return s > 0 ? 'default in ' + (s < 90 ? 'under 2 min' : Math.round(s / 60) + ' min') : 'default due now';
+  }
+  function head(who, label) {
+    return '<div class="head"><span class="who">' + o.esc(who) + '</span><span class="when">' + o.esc(label) + '</span></div>';
+  }
+  function item(c, state, actions) {
+    var x = c.e.x, st = status(x), answer = answerOf(c), n = step(st, answer, state), asked = n === 0;
+    var steps = [['asked', 'Waiting for you'], ['replied', 'You answered'], ['done', 'Applied']], STEP = steps[n];
+    var label = asked ? (x.default ? deadlineWords(x) : '') : n === 1 ? 'answered, waiting for the ' + pageRole()
+      : n === 2 ? 'answered by you' : st === 'defaulted' ? 'decided by the default' : st === 'answered' ? 'answered by you' : 'decided';
+    var li = document.createElement('li');
+    li.className = 'msg decision ' + st + (asked ? ' open-q' : '');
+    // The default shows under an open question, as what happens without an answer; the answer the agent copied shows
+    // only when the user gave it in the chat: an answer from the page is in the thread.
+    var after = x.default && ((st === 'waiting' && n <= 0) || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? "If you don't answer: " : 'Default applied: ') + x.default
+      : st === 'answered' && x.answer && x.answer.type === 'chat' ? '\n\nYour answer:\n\n' + x.answer.text
+      : st === 'decided' && x.decision ? '\n\nDecided:\n\n' + x.decision : '';
+    li.innerHTML = head(pageRole().replace(/^./, function (ch) { return ch.toUpperCase(); }), label || pageTime(x.at)) + o.md(String(x.asked || '') + after);
+    li.dataset.d = x.id;
+    li.dataset.state = STEP ? STEP[0] : '';
+    var foot = document.createElement('div');
+    foot.className = 'foot';
+    if (STEP) foot.insertAdjacentHTML('beforeend', '<span class="progress ' + STEP[0] + '"><span class="bars" aria-hidden="true">' +
+      [0, 1, 2].map(function (i) { return '<i class="' + (i <= n ? 'on' : '') + '"></i>'; }).join('') + '</span><span>' + STEP[1] + '</span></span>');
+    else if (answer) foot.append(conv.progress(state[answer.id]));
+    if (actions) {
+      if (asked && x.default) {
+        var use = document.createElement('button');
+        use.type = 'button'; use.className = 'btn btn--sm answer'; use.textContent = 'Use the default';
+        use.addEventListener('click', function () {
+          use.disabled = true;
+          conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer', null, function () { use.disabled = false; });
+        });
+        foot.append(use);
+      }
+      var change = document.createElement('button');
+      change.type = 'button'; change.className = 'btn btn--sm answer change' + (asked ? '' : ' btn--quiet');
+      change.textContent = asked ? 'Answer' : 'Reply';
+      change.addEventListener('click', function () {
+        conv.box(li, x.id, asked ? 'Your answer' : 'Your reply', change, function (text, done) {
+          conv.send('answer', { id: o.id('a'), decision: x.id, text: text, default: false }, 'Answer', done);
+        });
+      });
+      foot.append(change);
+    }
+    return [li, foot];
+  }
+  return { item: item, waiting: waiting, status: status, answerOf: answerOf, step: step };
+}
+
+function pageDecisionEvents(decisions, conversation) {
+  var entries = (decisions || []).map(function (x) { return { type: 'decision', id: x.id, x: x, at: x.at, _t: Date.parse(x.at) / 1000 || 0 }; });
+  var when = {};
+  entries.forEach(function (e) { when[e.id] = e._t; });
+  var events = (conversation || []).map(function (e) {
+    var t = Math.max(Date.parse(e.at) / 1000 || 0, when[e.type === 'answer' ? e.decision : e.to] || 0);
+    if (e.id) when[e.id] = t;
+    return Object.assign({}, e, { _t: t });
+  });
+  return events.concat(entries).sort(function (a, z) { return a._t - z._t || (z.type === 'decision') - (a.type === 'decision'); });
+}
+
+// The approve panel, for a page that declares `approve`: a button opens a panel, and one button in it sends the event.
+//   o.button, o.panel  the elements       o.params()  the event's fields       o.label  what the toast calls it
+// The panel closes once the server has saved the event; a refusal leaves it open. Without the capability it does nothing.
+function pageApprove(o) {
+  if (!pageCan('approve')) return null;
+  var open = false;
+  function set(on) {
+    open = on; o.panel.hidden = !on; o.button.setAttribute('aria-expanded', String(on));
+    if (o.onToggle) o.onToggle(on);
+  }
+  o.button.addEventListener('click', function () { set(!open); });
+  return {
+    toggle: set,
+    send: function (conversation, done, fail) {
+      conversation.send('approve', Object.assign({ id: 'approval-' + Date.now().toString(36) }, o.params()), o.label || 'Approval',
+        function () { set(false); if (done) done(); }, fail);
+    }
+  };
+}
+
+// The user's confirmation of a requirement, in the wording shown. Only where the page declares `confirm`.
+function pageConfirm(conversation, requirement, wording, text, done, fail) {
+  if (!pageCan('confirm')) return false;
+  conversation.send('confirm', { id: 'confirm-' + Date.now().toString(36), requirement: requirement, wording: wording, text: text },
+    'Confirmation', done, fail);
+  return true;
 }
 </script>
 <script>

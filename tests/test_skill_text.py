@@ -15,6 +15,7 @@ Both skills: no text names an old script or `schemas/`, and no template line hol
 
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,9 +23,16 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import better  # noqa: E402
+
+from better_ai import research, resources  # noqa: E402,F401  (research registers the hooks the schemas name)
+from better_ai import schema as better_schema  # noqa: E402
+
 RESEARCH = ROOT / "skills" / "research-better"
-SCHEMAS = RESEARCH / "schemas"
-SCHEMA_PY = RESEARCH / "scripts" / "schema.py"
+SCHEMAS = ROOT / "src" / "better_ai" / "research" / "schemas"
+SHARED_SCHEMAS = ROOT / "src" / "better_ai" / "schemas"
 TEXTS = [
     RESEARCH / "SKILL.md",
     RESEARCH / "agents" / "worker.md",
@@ -54,12 +62,14 @@ OLD_FIELDS = [
 ]
 RECORD_RULE = (
     "WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, "
-    "with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. "
+    "with its fields as JSON on stdin, or edit it with `set`. WRITE a line of a log with `--for <the log's agent name>` instead of `--by`. "
+    "IF it refuses the record, FIX the record and RUN it again. "
     "IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal."
 )
 AGENT_RECORD_RULE = (
     "WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <BOARD> <type> --by <YOUR NAME>`, "
-    "with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. "
+    "with its fields as JSON on stdin, or edit it with `set`. WRITE a line of your log with `--for <YOUR NAME>` instead of `--by`. "
+    "IF it refuses the record, FIX the record and RUN it again. "
     "IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. "
     "IF you cannot run commands, STOP and SAY so in your hand-back."
 )
@@ -97,7 +107,9 @@ def template_records() -> list[dict]:
 
 
 def schema_json(name: str) -> dict:
-    return json.loads((SCHEMAS / name).read_text(encoding="utf-8"))
+    """A research schema, or the shared one of that name."""
+    path = SCHEMAS / name if (SCHEMAS / name).exists() else SHARED_SCHEMAS / name
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 class ResearchBetterText(unittest.TestCase):
@@ -225,10 +237,8 @@ class ResearchBetterText(unittest.TestCase):
             path = Path(tmp) / "sources" / "S-w2-2.json"
             path.parent.mkdir()
             path.write_text(json.dumps(record), encoding="utf-8")
-            done = subprocess.run(
-                [sys.executable, "-I", str(SCHEMA_PY), "check", str(path)], capture_output=True, text=True
-            )
-            self.assertEqual(done.returncode, 0, done.stdout)
+            docs = better_schema.load_schemas(*resources.schema_sources("research"))
+            self.assertEqual(better_schema.check_paths([path], docs=docs), [])
 
     def test_planted_challenge_questions_are_not_owned_by_the_answerer(self) -> None:
         """A planted challenge question is not owned by the agent that owns the question it challenges."""
@@ -273,9 +283,9 @@ class ResearchBetterText(unittest.TestCase):
         for board in boards:
             with self.subTest(board=str(board.relative_to(ROOT))):
                 self.assertTrue((board / "brief.json").is_file(), "no brief.json")
-                done = subprocess.run(
-                    [sys.executable, "-I", str(SCHEMA_PY), "check", str(board)], capture_output=True, text=True
-                )
+                with tempfile.TemporaryDirectory() as tmp:  # a unit sits at <root>/.research/<slug>
+                    shutil.copytree(board, Path(tmp) / ".research" / board.name)
+                    done = better.run("research-better", "check", f".research/{board.name}", cwd=tmp)
                 self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
 
@@ -288,7 +298,7 @@ CASES = ROOT / "evals" / "cases" / "code-better"
 
 sys.path.insert(0, str(SRC))
 import better_ai.code  # noqa: E402,F401  (registers its hooks)
-from better_ai import resources, schema  # noqa: E402
+from better_ai import schema  # noqa: E402
 
 CODE_DOCS = schema.load_schemas(*resources.schema_sources("code"))
 

@@ -27,6 +27,9 @@ A skill package adds what is specific to its skill with three hooks, registered 
 
     @records.add_guard("code-better", "start", "step")   # before add writes records of these types (none: every type)
     def needs_card(ctx: records.AddContext): ...         # raise paths.Refused to refuse
+
+    @records.set_step("research-better")             # before set merges a patch: change `ctx.patch`, such as to stamp a time
+    def stamp(ctx: records.SetContext): ...
 """
 
 from __future__ import annotations
@@ -82,7 +85,19 @@ class AddContext:
     for_agent: str | None = None
 
 
+@dataclass
+class SetContext:
+    """What a set step is given: the record as it is, and the fields `set` is about to merge into it (`patch`, which a
+    step may change, such as to stamp a time the agent does not type)."""
+
+    run: Run
+    unit: Unit
+    record: dict
+    patch: dict
+
+
 CREATE_STEPS: dict[str, list[Callable]] = {}
+SET_STEPS: dict[str, list[Callable]] = {}
 EXISTING_STEPS: dict[str, list[Callable]] = {}
 ADD_GUARDS: dict[str, list[tuple[tuple[str, ...], Callable]]] = {}
 
@@ -106,6 +121,17 @@ def add_guard(skill: str, *types: str):
 
     def register(function):
         ADD_GUARDS.setdefault(skill, []).append((types, function))
+        return function
+
+    return register
+
+
+def set_step(skill: str):
+    """Register a step of `set` for a skill: it runs on each patch before the patch is merged and validated, and may
+    change `ctx.patch` or raise `Refused`."""
+
+    def register(function):
+        SET_STEPS.setdefault(skill, []).append(function)
         return function
 
     return register
@@ -826,6 +852,8 @@ def set_(args: argparse.Namespace, run: Run) -> int:
         label = args.ref if args.ref in lay.forms else ""
     patch = _own_fields(_fields(run, unit, empty_ok=bool(args.unset)), unit, label)
     _deadline(patch, run, unit)
+    for step in SET_STEPS.get(run.skill.name, []):
+        step(SetContext(run, unit, found.record, patch))
     first = _merged(found.record, patch, args.unset, keep_null=True)
     candidates = [first]
     if any(v is None for v in patch.values()):

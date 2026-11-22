@@ -224,7 +224,7 @@ DO NOT carry internal information into an external COLLECTION. A COLLECTION is e
 
 ### Writing the board
 
-WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, MARK the research **not finished**, and NAME the records you did not write.
+WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, with its fields as JSON on stdin, or edit it with `set`. WRITE a line of a log with `--for <the log's agent name>` instead of `--by`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, MARK the research **not finished**, and NAME the records you did not write.
 
 ### Know what your retrieval tools return
 

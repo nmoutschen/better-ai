@@ -1,0 +1,78 @@
+{
+  "steps": [
+    {
+      "args": [
+        "create",
+        ".research/demo",
+        "--by",
+        "coordinator"
+      ],
+      "stdin": "{\"topic\": \"why did checkout conversion drop in October\", \"title\": \"Why checkout conversion dropped\", \"short\": \"Checkout drop\", \"meaning\": \"the share of visits that end in an order\", \"goal\": \"decide whether to roll back the new form\", \"limit\": null, \"stop_at\": \"medium\", \"collections\": [\"web\"], \"missing\": [], \"changes\": [], \"status\": \"running\"}"
+    },
+    {
+      "args": [
+        "add",
+        ".research/demo",
+        "question",
+        "--by",
+        "w1"
+      ],
+      "stdin": "{\"question\": \"Did the October release change the form?\", \"title\": \"October form change\", \"priority\": \"high\", \"status\": \"open\", \"origin\": {\"type\": \"user\"}, \"kind\": \"seed\", \"stakes\": \"whether a rollback could help\", \"done_when\": \"a release note or diff names the form\", \"note\": null}",
+      "stdout_matches": "^Q-w1-1"
+    },
+    {
+      "args": [
+        "set",
+        ".research/demo",
+        "Q-w1-1"
+      ],
+      "stdin": "{\"status\": \"in progress\", \"owner\": \"w1\"}"
+    },
+    {
+      "args": [
+        "add",
+        ".research/demo",
+        "decision",
+        "--by",
+        "coordinator"
+      ],
+      "stdin": "{\"raised_by\": \"coordinator\", \"about\": {\"type\": \"board\"}, \"asked\": \"Use the archive?\", \"status\": \"waiting\", \"default\": \"Skip it\", \"deadline\": \"+30m\"}",
+      "stdout_matches": "^D1"
+    },
+    {
+      "args": [
+        "check",
+        ".research/demo"
+      ]
+    },
+    {
+      "args": [
+        "render",
+        ".research/demo"
+      ],
+      "stdout_matches": "board.html"
+    },
+    {
+      "args": [
+        "serve",
+        ".research/demo",
+        "--no-browser",
+        "--once"
+      ],
+      "serve": true
+    }
+  ],
+  "worktree_steps": [
+    {
+      "args": [
+        "add",
+        "{repo}/.research/demo",
+        "question",
+        "--by",
+        "w2"
+      ],
+      "stdin": "{\"question\": \"Did the October release change the form?\", \"title\": \"October form change\", \"priority\": \"high\", \"status\": \"open\", \"origin\": {\"type\": \"user\"}, \"kind\": \"seed\", \"stakes\": \"whether a rollback could help\", \"done_when\": \"a release note or diff names the form\", \"note\": null}",
+      "stdout_matches": "^Q-w2-1"
+    }
+  ]
+}

@@ -39,14 +39,13 @@ svg.map { display:block; width:100%; height:100%; }
 .chip.now { color:var(--cream); background:var(--umber); padding:1px var(--space-control); }
 .muted { color:var(--muted); }
 
-/* The side column: the conversation, then the agents */
 /* A worker's message when it closes a question: white like the user's, with a sand edge, so the coordinator's stay distinct. */
 .thread > li.msg.worker { border-left:4px solid var(--sand); }
 .msg .qlink { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; text-align:left; }
 .msg .added { margin:var(--space-tight) 0 0; font-size:var(--text-small); color:var(--muted); }
-/* The agents at work, at the top of the side column: a run can have twenty, and a list there scrolls on its own
-   (at most 30% of the height) without taking room from the map. */
-.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-bottom:1px solid var(--line); padding:0 var(--space-edge) var(--space-item); margin-bottom:var(--space-section); }
+/* The agents at work, under the map: a run can have twenty, and a list there scrolls on its own (at most 30% of the
+   height) without taking room from the map. */
+.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-top:1px solid var(--line); padding:var(--space-item) 0 0; margin-top:var(--space-item); }
 .agentsec h2 { margin:0 0 var(--space-control); }
 .agents { list-style:none; margin:0; padding:0; }
 .agents button { display:block; width:100%; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
@@ -56,15 +55,16 @@ svg.map { display:block; width:100%; height:100%; }
 .agents .dry { display:block; font-style:normal; font-size:var(--text-small); color:var(--error); }
 .agents b { font-size:var(--text-small); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--space-control); }
 
-/* The records the board could not show: a band under the bar, in the error colour, so it is seen without taking the
+/* The records the board could not show: a band above the map, in the error colour, so it is seen without taking the
    page away from the user. */
-.errors { flex:none; margin:0; padding:var(--space-control) var(--space-edge); max-height:25vh; overflow-y:auto; background:var(--cream); color:var(--ink); border-left:4px solid var(--error); font:var(--font-message); }
+.errors { flex:none; margin:0 0 var(--space-item); padding:var(--space-control) var(--space-edge); max-height:25vh; overflow-y:auto; background:var(--cream); color:var(--ink); border-left:4px solid var(--error); font:var(--font-message); }
 .errors[hidden] { display:none; }
 .errors p { margin:0 0 var(--space-tight); font:var(--font-message-strong); color:var(--error); }
 .errors ul { margin:0; padding-left:var(--space-edge); }
 .errors .by { color:var(--muted); }
 .invalid { color:var(--error); font-weight:700; }
+.invalid[hidden] { display:none; }
 .map .bang { fill:var(--error); font-weight:700; font-size:calc(14px * var(--z, 1)); }
-/* In the bar, the brief's mark sits on cream so the error colour stays readable on the dark bar. */
-.bar--stats .invalid { display:inline-block; margin:var(--space-tight) 0 0; padding:0 var(--space-control); background:var(--cream); }
-.bar--stats .invalid[hidden] { display:none; }
+/* Records in the format before this change are counted, not listed: they are kept as they are. */
+.oldnote { flex:none; margin:0 0 var(--space-item); font:var(--font-message); color:var(--muted); }
+.oldnote[hidden] { display:none; }
