@@ -40,6 +40,7 @@ from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import sweep  # noqa: E402
 import test_architect_formats as architects  # noqa: E402
 import test_board_formats as boards  # noqa: E402
 import test_dashboard_formats as dashboards  # noqa: E402
@@ -550,21 +551,19 @@ class Injected(unittest.TestCase):
                 with tempfile.TemporaryDirectory() as d:
                     argv = commands_of(path, Path(d))[index]
                     targets = called(module, lambda module=module, argv=argv: invoke(module, argv))
-                for target in targets:
-                    for error in EXCEPTIONS:
-                        with self.subTest(
-                            script=name_of(path), command=str(argv[0]), at=target[1], error=error.__name__
-                        ):
-                            with tempfile.TemporaryDirectory() as d:
-                                argv = commands_of(path, Path(d))[index]
-                                with raising(target, error):
-                                    code, out, err, escaped = invoke(module, argv)
-                            self.assertIsNone(escaped, f"{type(escaped).__name__} escaped main")
-                            self.assertNotIn("Traceback", err)
-                            wrapper_lines = [line for line in err.splitlines() if WRAPPER_LINE.match(line)]
-                            if wrapper_lines:  # the exception reached the wrapper: that is one line and exit 1
-                                self.assertEqual(len(wrapper_lines), 1, err)
-                                self.assertEqual(code, 1)
+                pairs = [(target, error) for target in targets for error in EXCEPTIONS]
+                for target, error in sweep.cases(pairs, key=lambda p: p[1]):
+                    with self.subTest(script=name_of(path), command=str(argv[0]), at=target[1], error=error.__name__):
+                        with tempfile.TemporaryDirectory() as d:
+                            argv = commands_of(path, Path(d))[index]
+                            with raising(target, error):
+                                code, out, err, escaped = invoke(module, argv)
+                        self.assertIsNone(escaped, f"{type(escaped).__name__} escaped main")
+                        self.assertNotIn("Traceback", err)
+                        wrapper_lines = [line for line in err.splitlines() if WRAPPER_LINE.match(line)]
+                        if wrapper_lines:  # the exception reached the wrapper: that is one line and exit 1
+                            self.assertEqual(len(wrapper_lines), 1, err)
+                            self.assertEqual(code, 1)
 
 
 # ---------------------------------------------------------------- the page servers
@@ -736,12 +735,12 @@ class Serving(unittest.TestCase):
                         send = lambda served=served, one=one: self.answers(served, [one])  # noqa: E731
                         for target in called(served.module, send, served.extra()):
                             by_target.setdefault(target, []).append(one)
-                    for target, own in by_target.items():
-                        for error in EXCEPTIONS:
-                            with self.subTest(script=name_of(path), at=target[1], error=error.__name__):
-                                with raising(target, error), contextlib.redirect_stderr(io.StringIO()) as err:
-                                    answers = self.answers(served, own)
-                                self.check_answers(served, own, answers, err)
+                    pairs = [(target, own, error) for target, own in by_target.items() for error in EXCEPTIONS]
+                    for target, own, error in sweep.cases(pairs, key=lambda p: p[2]):
+                        with self.subTest(script=name_of(path), at=target[1], error=error.__name__):
+                            with raising(target, error), contextlib.redirect_stderr(io.StringIO()) as err:
+                                answers = self.answers(served, own)
+                            self.check_answers(served, own, answers, err)
                 finally:
                     served.close()
 
@@ -839,20 +838,20 @@ class ServedBrokenFiles(unittest.TestCase):
                 files = [f for f in folder_files(probe.folder) if f.suffix in (".json", ".jsonl")]
                 probe.close()
             sent = requests_of(HANDLERS[name_of(path)][2])
-            for relative in files:
-                for label, how, content in SERVED_CORRUPTIONS:
-                    with self.subTest(script=name_of(path), file=str(relative), broken=label):
-                        with tempfile.TemporaryDirectory() as d:
-                            served = ServedPage(path, Path(d), (relative, how, content))
-                            try:
-                                with contextlib.redirect_stderr(io.StringIO()) as err:
-                                    answers = self.answers_quietly(served, sent)
-                            finally:
-                                served.close()
-                        self.assertNotIn("Traceback", err.getvalue())
-                        self.assertEqual(
-                            [(m, p) for (m, p, _), (status, _) in zip(sent, answers, strict=True) if status >= 500], []
-                        )
+            pairs = [(relative, corruption) for relative in files for corruption in SERVED_CORRUPTIONS]
+            for relative, (label, how, content) in sweep.cases(pairs, key=[lambda p: p[1][0], lambda p: str(p[0])]):
+                with self.subTest(script=name_of(path), file=str(relative), broken=label):
+                    with tempfile.TemporaryDirectory() as d:
+                        served = ServedPage(path, Path(d), (relative, how, content))
+                        try:
+                            with contextlib.redirect_stderr(io.StringIO()) as err:
+                                answers = self.answers_quietly(served, sent)
+                        finally:
+                            served.close()
+                    self.assertNotIn("Traceback", err.getvalue())
+                    self.assertEqual(
+                        [(m, p) for (m, p, _), (status, _) in zip(sent, answers, strict=True) if status >= 500], []
+                    )
 
 
 # ---------------------------------------------------------------- the loaders, on files that are not what they should be
@@ -985,18 +984,18 @@ class Loaders(unittest.TestCase):
             module = module_of(SKILLS / skill / "scripts" / script)
             with tempfile.TemporaryDirectory() as d:
                 files = folder_files(build(Path(d)))
-            for relative in files:
-                for label, how, content in corruptions():
-                    with self.subTest(skill=skill, file=str(relative), broken=label):
-                        folder = self.broken(build, relative, how, content)
-                        answer = load(module, folder)
-                        self.assert_clean(answer)
-                        if how in ("surrogate", "unreadable") or (how == "bytes" and content):
-                            self.assertTrue(answer["errors"] or relative.name == "conversation.jsonl", "no error entry")
-                        code, out, err, escaped = invoke(module, ["check", folder])
-                        self.assertIsNone(escaped)
-                        self.assertNotIn("Traceback", err)
-                        self.assertFalse(any(WRAPPER_LINE.match(line) for line in err.splitlines()), err)
+            pairs = [(relative, corruption) for relative in files for corruption in corruptions()]
+            for relative, (label, how, content) in sweep.cases(pairs, key=[lambda p: p[1][0], lambda p: str(p[0])]):
+                with self.subTest(skill=skill, file=str(relative), broken=label):
+                    folder = self.broken(build, relative, how, content)
+                    answer = load(module, folder)
+                    self.assert_clean(answer)
+                    if how in ("surrogate", "unreadable") or (how == "bytes" and content):
+                        self.assertTrue(answer["errors"] or relative.name == "conversation.jsonl", "no error entry")
+                    code, out, err, escaped = invoke(module, ["check", folder])
+                    self.assertIsNone(escaped)
+                    self.assertNotIn("Traceback", err)
+                    self.assertFalse(any(WRAPPER_LINE.match(line) for line in err.splitlines()), err)
 
     def test_a_loader_never_raises_whatever_fails_inside_it(self):
         """Not only file content: an exception in any function a loader calls is an error entry, so the page shows
@@ -1006,17 +1005,20 @@ class Loaders(unittest.TestCase):
             with tempfile.TemporaryDirectory() as d:
                 folder = build(Path(d))
                 targets = called(module, lambda module=module, load=load, folder=folder: load(module, folder))
-            for target in targets:
-                if target[1] in ("load", "collect") or target[0] is not module and target[1] in ("loads", "dumps"):
-                    continue  # the loader itself; json is used by the answer's own encoding
-                for error in EXCEPTIONS:
-                    with self.subTest(skill=skill, at=target[1], error=error.__name__):
-                        with tempfile.TemporaryDirectory() as d:
-                            folder = build(Path(d))
-                            with raising(target, error):
-                                answer = load(module, folder)
-                        self.assert_clean(answer)
-                        self.assertTrue(answer["errors"] or target[1] in HARMLESS, "no error entry")
+            targets = [
+                t
+                for t in targets
+                if not (t[1] in ("load", "collect") or t[0] is not module and t[1] in ("loads", "dumps"))
+            ]  # not the loader itself; json is used by the answer's own encoding
+            pairs = [(target, error) for target in targets for error in EXCEPTIONS]
+            for target, error in sweep.cases(pairs, key=lambda p: p[1]):
+                with self.subTest(skill=skill, at=target[1], error=error.__name__):
+                    with tempfile.TemporaryDirectory() as d:
+                        folder = build(Path(d))
+                        with raising(target, error):
+                            answer = load(module, folder)
+                    self.assert_clean(answer)
+                    self.assertTrue(answer["errors"] or target[1] in HARMLESS, "no error entry")
 
     def test_the_conversation_log_never_raises_whatever_it_holds(self):
         for skill, (script, build) in CONVERSATIONS.items():
@@ -1098,24 +1100,28 @@ class Surrogates(unittest.TestCase):
     def test_every_string_and_every_key_of_every_example_that_holds_a_surrogate_is_reported_and_stripped(self):
         schema = schema_module()
         cache: dict = {}
-        for skill, label, sample, record in example_records():
+        examples = example_records()
+        for skill, _label, sample, _record in examples:
             docs = cache.setdefault(skill, self.docs(skill))
+            self.assertTrue(schema._match(Path("/folder") / sample, docs), f"{skill} {sample}: no schema")
+        every = [(*example, place) for example in examples for place in places(example[3])]
+        keys = [lambda c: (c[0], c[2]), lambda c: c[4][0]]  # each kind of file, and string or key
+        for skill, label, sample, record, place in sweep.cases(every, key=keys):
+            docs = cache[skill]
             found = schema._match(Path("/folder") / sample, docs)
-            self.assertTrue(found, f"{skill} {sample}: no schema")
-            for place in places(record):
-                changed, at = with_a_surrogate(record, place)
-                with self.subTest(skill=skill, example=label, place=schema._render(at)):
-                    problems = schema.validate_record(changed, [doc for _, doc in found], docs, None)
-                    self.assertIn(schema._render(at), {p.field for p in problems})
-                    errors = [schema.Error("f", 1, p.field, p.message) for p in problems]
-                    self.assertTrue(all(encodable(str(e)) for e in errors))
-                    shown = schema.strip_invalid(changed, errors)
-                    json.dumps(shown, ensure_ascii=False).encode("utf-8")
+            changed, at = with_a_surrogate(record, place)
+            with self.subTest(skill=skill, example=label, place=schema._render(at)):
+                problems = schema.validate_record(changed, [doc for _, doc in found], docs, None)
+                self.assertIn(schema._render(at), {p.field for p in problems})
+                errors = [schema.Error("f", 1, p.field, p.message) for p in problems]
+                self.assertTrue(all(encodable(str(e)) for e in errors))
+                shown = schema.strip_invalid(changed, errors)
+                json.dumps(shown, ensure_ascii=False).encode("utf-8")
 
     def test_a_file_holding_one_is_an_error_line_and_nothing_else(self):
         schema = schema_module()
         cache: dict = {}
-        for skill, label, sample, record in example_records():
+        for skill, label, sample, record in sweep.cases(example_records(), key=[lambda e: e[0], lambda e: e[2]]):
             docs = cache.setdefault(skill, self.docs(skill))
             for place in (places(record)[0], places(record)[-1]):
                 changed, at = with_a_surrogate(record, place)
@@ -1141,7 +1147,7 @@ class Surrogates(unittest.TestCase):
                     folder = build(Path(d))
                     text = (folder / relative).read_text(encoding="utf-8")
                     count = len(places(json.loads(text.splitlines()[0] if relative.suffix == ".jsonl" else text)))
-                for index in range(count):
+                for index in sweep.cases(range(count), key=lambda i: 0 if i == 0 else 2 if i == count - 1 else 1):
                     with self.subTest(skill=skill, file=str(relative), place=index), tempfile.TemporaryDirectory() as d:
                         folder = build(Path(d))
                         put_in(folder / relative, "surrogate", index)
@@ -1181,7 +1187,7 @@ class Surrogates(unittest.TestCase):
     def test_show_check_reports_one_in_any_part_of_a_spec_as_a_spec_error(self):
         module = module_of(SKILLS / "show-better" / "scripts" / "show.py")
         spec = shows.full_spec()
-        for place in places(spec):
+        for place in sweep.cases(places(spec), key=lambda p: p[0]):
             changed, at = with_a_surrogate(spec, place)
             with self.subTest(place=place[1:]), tempfile.TemporaryDirectory() as d:
                 path = Path(d) / "spec.json"
@@ -1251,12 +1257,12 @@ class DeepInput(unittest.TestCase):
         return commands
 
     def test_no_command_prints_a_traceback_for_a_deeply_nested_file(self):
-        for depth in (300, 950, *DEPTHS[1:]):
-            for kind in ("list", "dict"):
-                with self.subTest(depth=depth, kind=kind), tempfile.TemporaryDirectory() as d:
-                    commands = self.commands(Path(d), nest(kind, depth))
-                    problems = {label: traceback_of(*args) for label, args in commands.items()}
-                    self.assertEqual({k: v for k, v in problems.items() if v}, {})
+        pairs = [(depth, kind) for depth in (300, 950, *DEPTHS[1:]) for kind in ("list", "dict")]
+        for depth, kind in sweep.cases(pairs, key=[lambda p: p[0], lambda p: p[1]]):
+            with self.subTest(depth=depth, kind=kind), tempfile.TemporaryDirectory() as d:
+                commands = self.commands(Path(d), nest(kind, depth))
+                problems = {label: traceback_of(*args) for label, args in commands.items()}
+                self.assertEqual({k: v for k, v in problems.items() if v}, {})
 
 
 # ---------------------------------------------------------------- numbers a renderer cannot take

@@ -18,6 +18,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sweep  # noqa: E402
 import wrong_types  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -653,8 +654,13 @@ class WrongTypes(unittest.TestCase):
             base = self.files()
             for relative, (records, as_json) in base.items():
                 write(folder, relative, records, as_json)
+            total = 0
             for relative, (records, as_json) in base.items():
-                for label, changed in self.variants(records):
+                every = list(self.variants(records))
+                total += len(every)
+                for label, changed in sweep.cases(
+                    every, key=[lambda v: wrong_types.wrong_kind(v[0]), lambda v: wrong_types.field_of(v[0])]
+                ):
                     name = f"{relative}: {label}"
                     with self.subTest(name):
                         write(folder, relative, changed, as_json)
@@ -670,7 +676,8 @@ class WrongTypes(unittest.TestCase):
                         payloads.append({"label": name, "data": data})
                 write(folder, relative, records, as_json)
             for relative, (records, as_json) in base.items():
-                for raw in RAW_LINES:
+                total += len(RAW_LINES)
+                for raw in sweep.cases(RAW_LINES, key=lambda raw: raw[:2]):
                     with self.subTest(f"{relative}: raw {raw[:10]}"):
                         path = folder / relative
                         path.write_text(raw + "\n" + ("" if as_json else path.read_text()), encoding="utf-8")
@@ -678,7 +685,7 @@ class WrongTypes(unittest.TestCase):
                         json.dumps(data, allow_nan=False)
                         payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": data})
                 write(folder, relative, records, as_json)
-            self.assertGreater(len(payloads), 1000)
+            self.assertGreater(total, 1000)
             if node:
                 path = root / "payloads.json"
                 path.write_text(json.dumps(payloads))

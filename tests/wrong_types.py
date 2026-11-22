@@ -34,3 +34,13 @@ def variants(records, wrong=WRONG):
         extra = json.loads(json.dumps(records))
         extra[index]["extra"] = [1]
         yield f"extra[{index}]", extra
+
+
+def wrong_kind(label: str) -> str:
+    """The class of a variant's label for the sample: the wrong value it sets, or `del` or `extra`."""
+    return label.split("=", 1)[1] if "=" in label else label.split(" ")[0].split("[")[0]
+
+
+def field_of(label: str) -> str:
+    """The field a variant's label changes, without the record's index."""
+    return label.removeprefix("del ").split("[")[0]

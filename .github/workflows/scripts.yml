@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: "0 4 * * 1,4" # Monday and Thursday, 04:00 UTC: the full sweep
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -40,6 +43,9 @@ jobs:
       - name: Tests
         # tests/ checks page.py, the conversation the pages share, and runs each serving script as the agent would.
         run: python -I -m unittest discover tests
+        env:
+          # Pull requests and pushes run a sample of the exhaustive tests; the scheduled and manual runs run every case.
+          BETTER_AI_SWEEP: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'full' || '' }}
 
   pages:
     # The page files the scripts fill in: CSS with stylelint's recommended rules (errors such as invalid values,

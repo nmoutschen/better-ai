@@ -20,6 +20,10 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sweep  # noqa: E402
+import wrong_types  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "architect-better"
 SCRIPTS = SKILL / "scripts"
@@ -541,13 +545,18 @@ class WrongTypes(unittest.TestCase):
     def test_no_wrong_type_breaks_check_load_or_the_page(self):
         node = shutil.which("node")
         payloads = []
+        total = 0
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d))
             base_files = {name: read(folder, name) for name in KINDS}
             base_files["architect.json"] = [base_files["architect.json"]]
             base_files["design.json"] = [base_files["design.json"]]
             for name, records in base_files.items():
-                for label, changed in self.variants(records):
+                every = list(self.variants(records))
+                total += len(every)
+                for label, changed in sweep.cases(
+                    every, key=[lambda v: wrong_types.wrong_kind(v[0]), lambda v: wrong_types.field_of(v[0])]
+                ):
                     key = f"{name}: {label}"
                     with self.subTest(key):
                         write(folder, name, changed)
@@ -558,7 +567,7 @@ class WrongTypes(unittest.TestCase):
                         self.assertIn(code, (0, 1))
                         payloads.append({"label": key, "data": data})
                 write(folder, name, records)
-            self.assertGreater(len(payloads), 500)
+            self.assertGreater(total, 500)
             if node:
                 path = Path(d) / "payloads.json"
                 path.write_text(json.dumps(payloads))
@@ -610,7 +619,7 @@ class RawLines(unittest.TestCase):
             )
             for name in (*KINDS, "conversation.jsonl"):
                 original = (folder / name).read_text()
-                for line in self.LINES:
+                for line in sweep.cases(self.LINES, key=lambda line: line[:2]):
                     with self.subTest(name=name, line=line[:30]):
                         if name in JSON_FILES:
                             (folder / name).write_text(line + "\n")

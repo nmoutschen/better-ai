@@ -35,6 +35,7 @@ FILES = {
 }
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sweep  # noqa: E402
 import wrong_types  # noqa: E402
 
 
@@ -641,7 +642,7 @@ class MergeCycles(unittest.TestCase):
 
     def test_misnamed_copies_that_link_elsewhere_are_linear_too(self):
         """Each question has its own file, and a copy named otherwise that merges two further on."""
-        count = 2000
+        count = 2000 if sweep.full() else 500  # the bounds are in `count`; one of the slowest tests
         for loop in (False, True):
             with self.subTest(loop=loop), tempfile.TemporaryDirectory() as d:
                 folder = Path(d)
@@ -762,6 +763,7 @@ class WrongTypes(unittest.TestCase):
     def test_no_wrong_type_breaks_check_load_or_the_page(self):
         """Each file on a board of its own (the records its pointers need, and that file), so a scan reads few files."""
         payloads = []
+        total = 0
 
         def put_file(folder, relative, records, as_json):
             (write_json if as_json else write_lines)(folder, relative, records[0] if as_json else records)
@@ -771,19 +773,23 @@ class WrongTypes(unittest.TestCase):
                 folder = Path(d)
                 support(folder)
                 put_file(folder, relative, records, as_json)
-                for label, changed in wrong_types.variants(records, self.WRONG):
+                every = list(wrong_types.variants(records, self.WRONG))
+                total += len(every)
+                keys = [lambda v: wrong_types.wrong_kind(v[0]), lambda v: wrong_types.field_of(v[0])]
+                for label, changed in sweep.cases(every, key=keys):
                     with self.subTest(f"{relative}: {label}"):
                         put_file(folder, relative, changed, as_json)
                         payloads.append({"label": f"{relative}: {label}", "data": self.survives(folder)})
                 put_file(folder, relative, records, as_json)
-                for raw in wrong_types.RAW_LINES:
+                total += len(wrong_types.RAW_LINES)
+                for raw in sweep.cases(wrong_types.RAW_LINES, key=lambda raw: raw[:2]):
                     with self.subTest(f"{relative}: raw {raw[:10]}"):
                         # a single-JSON file holds the raw text alone; a JSONL file, the raw line before its records
                         (folder / relative).write_text(
                             raw + "\n" + ("" if as_json else "".join(json.dumps(r) + "\n" for r in records))
                         )
                         payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": self.survives(folder)})
-        self.assertGreater(len(payloads), 1000)
+        self.assertGreater(total, 1000)
         result = render(payloads)
         if result:
             self.assertEqual(result.returncode, 0, result.stderr[:3000])
@@ -832,7 +838,9 @@ class ConversationEvents(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
             support(folder)
-            for label, changed in wrong_types.variants(self.events()):
+            every = list(wrong_types.variants(self.events()))
+            keys = [lambda v: wrong_types.wrong_kind(v[0]), lambda v: wrong_types.field_of(v[0])]
+            for label, changed in sweep.cases(every, key=keys):
                 with self.subTest(label):
                     write_lines(folder, "conversation.jsonl", changed)
                     board.SCANS.clear()
@@ -841,7 +849,7 @@ class ConversationEvents(unittest.TestCase):
                     with contextlib.redirect_stdout(io.StringIO()):
                         board.check(folder)
                     payloads.append({"label": label, "data": data})
-        self.assertGreater(len(payloads), 500)
+        self.assertGreater(len(every), 500)
         node = shutil.which("node")
         if node:
             with tempfile.TemporaryDirectory() as d:

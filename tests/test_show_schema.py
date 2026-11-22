@@ -33,6 +33,9 @@ def load(path: Path, name: str):
 
 
 sys.path.insert(0, str(SHOW / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import sweep  # noqa: E402
+
 schema = load(SHOW / "scripts" / "schema.py", "show_schema_py")
 show = load(SHOW / "scripts" / "show.py", "show_py")
 SCHEMAS = SHOW / "schemas"
@@ -878,29 +881,29 @@ class WrongTypes(unittest.TestCase):
                     yield from leaves(v, (*path, i))
 
         bases = [spec_of(visual(k)) for k in KIND_OK] + [spec_of(copy.deepcopy(p)) for p in OTHER_PANELS.values()]
-        for base in bases:
-            for path in leaves(base):
-                if not path:
-                    continue
-                for value in [*values, "<delete>"]:
-                    spec = copy.deepcopy(base)
-                    target = spec
-                    for step in path[:-1]:
-                        target = target[step]
-                    if value == "<delete>":
-                        target.pop(path[-1])
-                    else:
-                        target[path[-1]] = copy.deepcopy(value)
-                    try:
-                        errors, _, _ = show.check(spec)
-                        shape_problems(spec)
-                        if not errors:
-                            clean = show.without_nulls(spec)
-                            show.render(clean)
-                            show.render_text(clean)
-                            show.render_screen_reader(clean)
-                    except Exception as error:
-                        self.fail(f"{path} = {value!r} in a {base['panels'][0].get('kind')} panel raised {error!r}")
+        every = [
+            (base, path, value) for base in bases for path in leaves(base) if path for value in [*values, "<delete>"]
+        ]
+        keys = [lambda t: panel_name(t[0]), lambda t: repr(t[2])]  # each kind of panel, each wrong value
+        for base, path, value in sweep.cases(every, key=keys):
+            spec = copy.deepcopy(base)
+            target = spec
+            for step in path[:-1]:
+                target = target[step]
+            if value == "<delete>":
+                target.pop(path[-1])
+            else:
+                target[path[-1]] = copy.deepcopy(value)
+            try:
+                errors, _, _ = show.check(spec)
+                shape_problems(spec)
+                if not errors:
+                    clean = show.without_nulls(spec)
+                    show.render(clean)
+                    show.render_text(clean)
+                    show.render_screen_reader(clean)
+            except Exception as error:
+                self.fail(f"{path} = {value!r} in a {base['panels'][0].get('kind')} panel raised {error!r}")
 
 
 # Optional fields: (kind of panel, path to the field in the panel, or "top" and a path in the spec).
@@ -1201,6 +1204,15 @@ class ChildrenAndRenderCrashes(unittest.TestCase):
             show.render_text(spec)
 
 
+def panel_name(spec) -> str:
+    return str(spec["panels"][0].get("kind", spec["panels"][0].get("template")))
+
+
+def sampled_variants(values):
+    """`spec_variants`, sampled: each kind of panel and each value is kept."""
+    return sweep.cases(spec_variants(values), key=[lambda v: v[0].split(" ")[0], lambda v: v[0].rsplit(" = ", 1)[1]])
+
+
 def spec_variants(values):
     """(label, spec) for every leaf of every valid spec set to each of `values`, and removed."""
 
@@ -1238,7 +1250,7 @@ class SchemaAndShowAgree(unittest.TestCase):
     one refuses for its shape the other does too; show.py adds only what the drawing cannot show."""
 
     def test_a_spec_the_schema_refuses_is_refused_by_show_py_check_too(self):
-        for label, spec in spec_variants([5, {}, ["x"]]):
+        for label, spec in sampled_variants([5, {}, ["x"]]):
             if shape_problems(spec) and not show.check(copy.deepcopy(spec))[0]:
                 self.fail(f"schema.py refuses {label} and show.py check accepts it")
 
@@ -1246,7 +1258,7 @@ class SchemaAndShowAgree(unittest.TestCase):
         """Only show.py strips nulls before it checks, so the two once differed on a null where a value was needed."""
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "spec.json"
-            for label, spec in spec_variants([None]):
+            for label, spec in sampled_variants([None]):
                 path.write_text(json.dumps(spec))
                 refused_by_schema = bool(schema.check_paths([path], SCHEMAS))
                 if refused_by_schema != bool(show.check(copy.deepcopy(spec))[0]):
