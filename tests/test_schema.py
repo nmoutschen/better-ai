@@ -490,6 +490,18 @@ class Keywords(unittest.TestCase):
         self.assertEqual(len(self.errors([1], {"const": [1, 2]})), 1)
         self.assertEqual(len(self.errors({"a": 1}, {"const": {"a": 1, "b": 2}})), 1)
 
+    def test_numbers_compare_as_json_numbers_and_a_boolean_is_not_one(self):
+        self.assertEqual(self.errors(1.0, {"const": 1}), [])
+        self.assertEqual(self.errors(1, {"const": 1.0}), [])
+        self.assertEqual(self.errors([1.0, {"a": 2}], {"enum": [[1, {"a": 2.0}]]}), [])
+        self.assertEqual(len(self.errors(1.5, {"const": 1})), 1)
+        self.assertEqual(len(self.errors(True, {"const": 1.0})), 1)
+        self.assertEqual(len(self.errors([True], {"const": [1.0]})), 1)
+        self.assertEqual(self.errors(3.0, {"type": "integer"}), [])
+        self.assertEqual(len(self.errors(3.5, {"type": "integer"})), 1)
+        self.assertEqual(len(self.errors(True, {"type": "integer"})), 1)
+        self.assertEqual(len(self.errors(float("nan"), {"type": "integer"})), 1)
+
     def test_a_string_or_a_key_with_a_lone_surrogate_is_not_text(self):
         bad = "a\ud800b"
         self.assertEqual(self.errors(bad, {"type": "string"}), [("(record)", "expected string, got non-text string")])

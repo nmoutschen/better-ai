@@ -16,6 +16,7 @@ script with are asked for by a test that fails until they are added). For each i
     reports it, and what a page shows from the record can be written as UTF-8.
 """
 
+import ast
 import contextlib
 import copy
 import http.client
@@ -26,10 +27,13 @@ import io
 import json
 import os
 import re
+import socket
+import struct
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -44,7 +48,7 @@ import test_show_schema as shows  # noqa: E402
 
 ROOT = HERE.parent
 SKILLS = ROOT / "skills"
-EXCEPTIONS = (RuntimeError, ZeroDivisionError, KeyError, RecursionError, MemoryError)
+EXCEPTIONS = (RuntimeError, KeyError, RecursionError, MemoryError)
 DEPTHS = (300, 2000, 50000)
 SURROGATE = "a\ud800b"
 # What every script calls from the standard library, where a script's own closures cannot be patched by name.
@@ -61,12 +65,69 @@ STDLIB = [
 # ---------------------------------------------------------------- discovery
 
 
+def all_scripts() -> list:
+    return sorted(SKILLS.glob("*/scripts/*.py"))
+
+
+def main_block(tree: ast.Module):
+    """The `if __name__ == "__main__":` block of a module, or None."""
+    for node in tree.body:
+        if isinstance(node, ast.If) and ast.unparse(node.test).replace("'", '"') == '__name__ == "__main__"':
+            return node
+    return None
+
+
+def entry_of(path: Path, tree: ast.Module | None = None) -> tuple:
+    """(the name of the function a script's `__main__` block calls, the problems with it): the block must do nothing
+    but call one module-level function, as `sys.exit(entry())` or `entry()`, and that function must be wrapped by
+    never_raise, whatever its name."""
+    tree = tree or ast.parse(path.read_text())
+    block = main_block(tree)
+    if block is None:
+        return None, []
+    problems, name = [], None
+    only = block.body[0] if len(block.body) == 1 else None
+    call = only.value if isinstance(only, ast.Expr) and isinstance(only.value, ast.Call) else None
+    if call is not None and ast.unparse(call.func) == "sys.exit" and len(call.args) == 1:
+        call = call.args[0] if isinstance(call.args[0], ast.Call) else None
+    if call is None or not isinstance(call.func, ast.Name) or call.args or call.keywords:
+        problems.append("its __main__ block is not just a call of one function (module-level script?)")
+    else:
+        name = call.func.id
+        defined = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name]
+        if not defined:
+            problems.append(f"{name} is not a module-level function")
+        elif not any("never_raise" in ast.unparse(d) for d in defined[0].decorator_list):
+            problems.append(f"{name} is not wrapped by never_raise")
+    return name, problems
+
+
 def scripts_with_main() -> list:
-    return [p for p in sorted(SKILLS.glob("*/scripts/*.py")) if re.search(r"^def main\(", p.read_text(), re.M)]
+    """Every script with a `__main__` block, whatever its entry point is called."""
+    return [p for p in all_scripts() if main_block(ast.parse(p.read_text())) is not None]
+
+
+def server_classes(path: Path) -> tuple:
+    """(the classes of a script that subclass page.Handler, the classes that are request handlers any other way)."""
+    tree = ast.parse(path.read_text())
+    classes = {n.name: [ast.unparse(b) for b in n.bases] for n in ast.walk(tree) if isinstance(n, ast.ClassDef)}
+    own = path.name == "page.py"
+    outside: set = set()
+    changed = True
+    while changed:  # a class deriving from one that is a handler another way is one too
+        changed = False
+        for name, bases in classes.items():
+            if name in outside or (own and name == "Handler"):
+                continue
+            if any(b.endswith("RequestHandler") or b in outside for b in bases):
+                outside.add(name)
+                changed = True
+    paged = [n for n, bases in classes.items() if "page.Handler" in bases and n not in outside]
+    return paged, sorted(outside)
 
 
 def scripts_with_a_handler() -> list:
-    return [p for p in sorted(SKILLS.glob("*/scripts/*.py")) if "(page.Handler)" in p.read_text()]
+    return [p for p in all_scripts() if server_classes(p)[0]]
 
 
 MODULES: dict = {}
@@ -81,6 +142,9 @@ def module_of(path: Path):
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
         spec.loader.exec_module(module)
+        entry, _ = entry_of(path)
+        if entry:
+            module.entry = getattr(module, entry)  # what the harness runs, whatever it is called
         MODULES[path] = module
     return MODULES[path]
 
@@ -233,11 +297,28 @@ def commands_of(path: Path, root: Path) -> list:
 # ---------------------------------------------------------------- running a command in process
 
 
+class Strict:
+    """A stream that refuses what a real one refuses: stdout is UTF-8 and strict, so a lone surrogate fails to print
+    as it does in a terminal (io.StringIO takes anything); stderr escapes what it cannot hold, as Python's does."""
+
+    def __init__(self, errors: str = "strict"):
+        self.raw = io.BytesIO()
+        self.stream = io.TextIOWrapper(self.raw, encoding="utf-8", errors=errors, write_through=True)
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+    def getvalue(self) -> str:
+        self.stream.flush()
+        return self.raw.getvalue().decode("utf-8")
+
+
 def invoke(module, argv: list):
-    """(exit code, stdout, stderr, the exception that escaped) of `module.main` on `argv`."""
-    out, err = io.StringIO(), io.StringIO()
+    """(exit code, stdout, stderr, the exception that escaped) of `module.main` on `argv`, on streams like a real
+    terminal's."""
+    out, err = Strict(), Strict("backslashreplace")
     escaped, code = None, 0
-    main = module.main
+    main = module.entry
     takes_argv = bool(inspect.signature(getattr(main, "__wrapped__", main)).parameters)
     arguments = [str(a) for a in argv]
     patched = mock.patch.object(sys, "argv", ["script", *arguments])
@@ -252,21 +333,21 @@ def invoke(module, argv: list):
 
 
 def watched(module) -> dict:
-    """code object -> (owner, name) of each function and method that can be patched by name: the script's, the
+    """id of a code object -> (owner, name) of each function and method that can be patched by name: the script's, the
     shared schema.py's and page.py's."""
-    page = sys.modules.get("page")
+    page = getattr(module, "page", None)  # the modules this script itself imported
     owners = [module, page]
     if "architect-better" in module.__name__:  # schema.py is identical in every skill: its functions are tried once
-        owners += [sys.modules.get("schema"), getattr(page, "schema", None)]
-    found = {getattr(o, n).__code__: (o, n) for o, n in STDLIB}
+        owners += [getattr(module, "schema", None), getattr(page, "schema", None)]
+    found = {id(getattr(o, n).__code__): (o, n) for o, n in STDLIB}  # by identity: equal code objects compare equal
     for owner in owners:
         for name, value in list(vars(owner).items()) if owner is not None else []:
             if inspect.isfunction(value) and value.__module__ == owner.__name__:
-                found[value.__code__] = (owner, name)
+                found[id(value.__code__)] = (owner, name)
             elif inspect.isclass(value) and value.__module__ == owner.__name__:
                 for attr, member in list(vars(value).items()):
                     if inspect.isfunction(member) and not attr.startswith(("__", "do_")):
-                        found[member.__code__] = (value, attr)
+                        found[id(member.__code__)] = (value, attr)
     return found
 
 
@@ -277,8 +358,8 @@ def called(module, run, extra: dict | None = None) -> list:
     seen = set()
 
     def profile(frame, event, arg):
-        if event == "call" and frame.f_code in table:
-            seen.add(table[frame.f_code])
+        if event == "call" and id(frame.f_code) in table:
+            seen.add(table[id(frame.f_code)])
 
     threading.setprofile(profile)
     sys.setprofile(profile)
@@ -291,11 +372,18 @@ def called(module, run, extra: dict | None = None) -> list:
 
 
 def raising(target, error):
+    """Patch `target` (owner, name) to raise `error`. A check hook is called through schema.HOOKS, so that is patched."""
     owner, name = target
+    hooks = getattr(owner, "HOOKS", None)
+    if isinstance(hooks, dict):
+        original = getattr(owner, name, None)
+        for hook_name, function in hooks.items():
+            if function is original:
+                return mock.patch.dict(hooks, {hook_name: mock.Mock(side_effect=error())})
     return mock.patch.object(owner, name, side_effect=error())
 
 
-WRAPPER_LINE = re.compile(r"^[\w. ]+: (?:could not be \w+: \w+|nested too deeply)$")
+WRAPPER_LINE = re.compile(r"^[\w. ]+: (?:could not be \w+: .+|nested too deeply)$")
 
 
 def one_stderr_line(text: str) -> bool:
@@ -323,20 +411,64 @@ class Wrapper(unittest.TestCase):
     def test_too_deep_says_so(self):
         self.assertEqual(self.wrapped(RecursionError()), (1, "thing: nested too deeply\n"))
 
+    def test_an_environment_error_keeps_its_reason_and_the_file_and_the_verb_is_the_commands(self):
+        schema = schema_module()
+
+        @schema.never_raise("thing", {"serve": "served", "": "checked"})
+        def entry(argv):
+            raise OSError(98, "Address already in use", "/some/where")
+
+        for argv, line in (
+            (["serve", "x"], "thing: could not be served: Address already in use (/some/where)\n"),
+            (["--flag", "other"], "thing: could not be checked: Address already in use (/some/where)\n"),
+        ):
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(entry(argv), 1)
+            self.assertEqual(err.getvalue(), line)
+
+    def test_a_server_that_cannot_listen_says_so_in_the_commands_own_words(self):
+        busy = socket.socket()
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        port = busy.getsockname()[1]
+        try:
+            for script, command, build in (
+                ("architect-better/architect.py", "serve", architect_serving),
+                ("code-better/dashboard.py", "watch", dashboard_serving),
+                ("research-better/board.py", "watch", board_serving),
+            ):
+                with self.subTest(script=script), tempfile.TemporaryDirectory() as d:
+                    folder = build(Path(d))[0][0]
+                    code, out, err, escaped = invoke(
+                        module_of(SKILLS / script.split("/")[0] / "scripts" / script.split("/")[1]),
+                        [command, folder, "--port", port, "--no-browser"],
+                    )
+                    self.assertIsNone(escaped)
+                    self.assertEqual(code, 1)
+                    self.assertRegex(err.strip(), r"^[\w ]+: could not be served: .*(in use|ddress)")
+                    self.assertEqual(len(err.strip().splitlines()), 1)
+        finally:
+            busy.close()
+
     def test_exit_codes_and_interrupts_pass_through(self):
         for raised in (SystemExit(2), SystemExit("x"), KeyboardInterrupt()):
             with self.subTest(raised=repr(raised)), self.assertRaises(type(raised)):
                 self.wrapped(raised)
 
-    def test_every_script_with_a_main_is_wrapped_by_the_shared_wrapper(self):
+    def test_every_script_that_runs_as_a_program_calls_one_wrapped_entry_point(self):
         scripts = scripts_with_main()
         self.assertGreaterEqual(len(scripts), 11)  # architect, diagram, dashboard, board, show, canvas, five schema
         for path in scripts:
             with self.subTest(script=name_of(path)):
-                self.assertTrue(hasattr(module_of(path).main, "__wrapped__"), "main is not wrapped by never_raise")
-                source = path.read_text()
-                self.assertRegex(source, r"@(?:\w+\.)*never_raise\(")
-                self.assertIn('if __name__ == "__main__":\n    sys.exit(main())', source)
+                entry, problems = entry_of(path)
+                self.assertEqual(problems, [])
+                self.assertTrue(hasattr(getattr(module_of(path), entry), "__wrapped__"))
+
+    def test_every_request_handler_is_a_page_handler(self):
+        for path in all_scripts():
+            with self.subTest(script=name_of(path)):
+                self.assertEqual(server_classes(path)[1], [], "subclass page.Handler, which guards every request")
 
     def test_every_script_with_a_main_has_commands_to_run_here(self):
         for path in scripts_with_main():
@@ -500,7 +632,7 @@ class ServedPage:
 
     def extra(self) -> dict:
         return {
-            m.__code__: (self.handler, n)
+            id(m.__code__): (self.handler, n)
             for n, m in vars(self.handler).items()
             if inspect.isfunction(m) and not n.startswith(("__", "do_"))
         }
@@ -509,7 +641,7 @@ class ServedPage:
 class Serving(unittest.TestCase):
     def answers(self, served: ServedPage, sent: list):
         """Each request's (status, body); a dropped connection fails the test."""
-        with contextlib.redirect_stdout(io.StringIO()):  # a page's event is printed for the agent
+        with contextlib.redirect_stdout(Strict()):  # a page's event is printed for the agent
             return [request(served.port, method, path, body) for method, path, body in sent]
 
     def check_answers(self, served, sent, answers, err, injected=False):
@@ -552,6 +684,79 @@ class Serving(unittest.TestCase):
                                 self.check_answers(served, own, answers, err)
                 finally:
                     served.close()
+
+
+def raw_exchange(port: int, data: bytes, how: str) -> bytes:
+    """Send bytes and then close the connection politely, or reset it; what the server sent back."""
+    sock = socket.create_connection(("127.0.0.1", port), timeout=10)
+    try:
+        sock.sendall(data)
+        if how == "reset":
+            time.sleep(0.05)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            return b""
+        sock.shutdown(socket.SHUT_WR)
+        chunks = []
+        while chunk := sock.recv(65536):
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        sock.close()
+
+
+CUT_OFF = [
+    b"GET /dash",
+    b"GET /events?after=0 HTTP/1.1\r\nHost: 127.0.0.1\r\n",
+    b"POST /rpc HTTP/1.1\r\nHost: 127.0.0.1\r\nOrigin: http://127.0.0.1\r\nContent-Type: application/json\r\n"
+    b"Content-Length: 100\r\n\r\n" + b'{"a"',
+    b"\x00\xff\r\n\r\n",
+]
+
+
+class RequestLifecycle(unittest.TestCase):
+    """What happens outside do_GET and do_POST: a client that is cut off or reset mid-request, and an answer that
+    fails after it has started. None prints a traceback, and the stream never holds a second status line."""
+
+    def test_a_client_cut_off_or_reset_mid_request_leaves_no_traceback_and_the_server_answers_on(self):
+        for path in scripts_with_a_handler():
+            with self.subTest(script=name_of(path)), tempfile.TemporaryDirectory() as d:
+                served = ServedPage(path, Path(d))
+                try:
+                    with contextlib.redirect_stderr(io.StringIO()) as err:
+                        for data in CUT_OFF:
+                            for how in ("close", "reset"):
+                                raw_exchange(served.port, data, how)
+                        time.sleep(0.3)  # the server's threads finish what they were doing
+                        status, _ = request(served.port, "GET", "/listening")
+                finally:
+                    served.close()
+                self.assertNotIn("Traceback", err.getvalue())
+                self.assertEqual(status, 200)
+
+    def test_an_answer_that_fails_after_its_headers_are_out_closes_the_stream_without_a_second_status_line(self):
+        for path in scripts_with_a_handler():
+            with self.subTest(script=name_of(path)), tempfile.TemporaryDirectory() as d:
+                served = ServedPage(path, Path(d))
+
+                class Late(served.handler):
+                    def do_GET(self):
+                        self.send(200, b"x" * 20, "text/plain")
+                        raise RuntimeError("after the body began")
+
+                server = REAL_SERVER(("127.0.0.1", 0), Late)
+                threading.Thread(target=server.serve_forever, args=(0.01,), daemon=True).start()
+                try:
+                    with contextlib.redirect_stderr(io.StringIO()) as err:
+                        got = raw_exchange(
+                            server.server_address[1], b"GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n", "close"
+                        )
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    served.close()
+                self.assertNotIn("Traceback", err.getvalue())
+                self.assertEqual(got.count(b"HTTP/1."), 1, got[:300])
+                self.assertTrue(got.endswith(b"x" * 20))
 
 
 SERVED_CORRUPTIONS = [
@@ -691,6 +896,10 @@ def corruptions(skip_unreadable: bool = os.geteuid() == 0) -> list:
     return found
 
 
+# Functions a loader calls whose failure leaves the folder's answer whole: they only add to it (a mtime, a clock).
+HARMLESS: set = set()
+
+
 class Loaders(unittest.TestCase):
     def broken(self, build, relative: Path, how: str, content, module=None):
         """A fresh folder with `relative` made into `how`; the folder. With `module`, the folder has a conversation
@@ -727,6 +936,27 @@ class Loaders(unittest.TestCase):
                         code, out, err, escaped = invoke(module, ["check", folder])
                         self.assertIsNone(escaped)
                         self.assertNotIn("Traceback", err)
+                        self.assertFalse(any(WRAPPER_LINE.match(line) for line in err.splitlines()), err)
+
+    def test_a_loader_never_raises_whatever_fails_inside_it(self):
+        """Not only file content: an exception in any function a loader calls is an error entry, so the page shows
+        its errors band and not a failure."""
+        for skill, (script, build, load) in LOADERS.items():
+            module = module_of(SKILLS / skill / "scripts" / script)
+            with tempfile.TemporaryDirectory() as d:
+                folder = build(Path(d))
+                targets = called(module, lambda module=module, load=load, folder=folder: load(module, folder))
+            for target in targets:
+                if target[1] in ("load", "collect") or target[0] is not module and target[1] in ("loads", "dumps"):
+                    continue  # the loader itself; json is used by the answer's own encoding
+                for error in EXCEPTIONS:
+                    with self.subTest(skill=skill, at=target[1], error=error.__name__):
+                        with tempfile.TemporaryDirectory() as d:
+                            folder = build(Path(d))
+                            with raising(target, error):
+                                answer = load(module, folder)
+                        self.assert_clean(answer)
+                        self.assertTrue(answer["errors"] or target[1] in HARMLESS, "no error entry")
 
     def test_the_conversation_log_never_raises_whatever_it_holds(self):
         for skill, (script, build) in CONVERSATIONS.items():
@@ -742,6 +972,12 @@ class Loaders(unittest.TestCase):
                         )
                         self.assertIsNone(escaped)
                         self.assertNotIn("Traceback", err)
+                        writing_to_a_file_that_cannot_be_written = command == "reply" and how in (
+                            "unreadable",
+                            "directory",
+                        )
+                        if not writing_to_a_file_that_cannot_be_written:  # that one's reason is the wrapper's line
+                            self.assertFalse(any(WRAPPER_LINE.match(line) for line in err.splitlines()), err)
 
 
 # ---------------------------------------------------------------- a lone surrogate in every string and key of every kind

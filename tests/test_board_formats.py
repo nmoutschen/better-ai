@@ -637,6 +637,30 @@ class MergeCycles(unittest.TestCase):
         self.assertEqual(loops, [])
         self.assertLess(took, 5)
 
+    def test_misnamed_copies_that_link_elsewhere_are_linear_too(self):
+        """Each question has its own file, and a copy named otherwise that merges two further on."""
+        count = 2000
+        for loop in (False, True):
+            with self.subTest(loop=loop), tempfile.TemporaryDirectory() as d:
+                folder = Path(d)
+                support(folder)
+                one = lambda k: f"Q-w2-{100 + k % count}"  # noqa: E731
+                for k in range(count):
+                    last = k == count - 1 and not loop
+                    write_entry(
+                        folder, seeded(one(k)) if last else seeded(one(k), status="merged", merged_into=one(k + 1))
+                    )
+                for k in range(count - (0 if loop else 2)):
+                    copy = seeded(one(k), status="merged", merged_into=one(k + 2))
+                    write_json(folder, f"questions/{one(k)}-copy.json", copy)
+                board.SCANS.clear()
+                started = time.monotonic()
+                data = board.load(folder)
+                took = time.monotonic() - started
+                loops = [e for e in data["errors"] if "merge loop" in e["message"]]
+            self.assertEqual(len(loops), 2 * count if loop else 0)
+            self.assertLess(took, 8)
+
     def test_two_questions_merged_into_each_other_are_both_reported_and_drawn_marked(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
