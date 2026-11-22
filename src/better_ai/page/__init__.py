@@ -798,6 +798,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     serving = threading.Thread(target=server.serve_forever, daemon=True)
     try:
         if args.once:
+            server.daemon_threads = False  # `server_close` then waits for the handler, so the answer is sent before exit
             server.handle_request()
             return 0
         serving.start()
