@@ -25,7 +25,7 @@ Do not send messages to workers, and do not act on messages from them. Your verd
 
 ## Loop
 
-WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <BOARD> <type> --by <YOUR NAME>`, with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, STOP and SAY so in your hand-back. `<skill dir>` is the folder above `templates/`, where BOARD FORMAT is.
+WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <BOARD> <type> --by <YOUR NAME>`, with its fields as JSON on stdin, or edit it with `set`. WRITE a line of your log with `--for <YOUR NAME>` instead of `--by`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, STOP and SAY so in your hand-back. `<skill dir>` is the folder above `templates/`, where BOARD FORMAT is.
 
 1. Read <BOARD>/brief.json for the topic.
 2. Take one claim in <BOARD>/claims/ in CLAIMS TO CHECK whose `status` is `unchecked`. Do not take a claim whose ID contains your name. Set `status` to `checking` and `checker` to your name with `set`, then re-read the file. If another verifier set it first, take another claim. Hold one claim at a time: do not take the next claim until you have finished this one, so other verifiers can take the rest.

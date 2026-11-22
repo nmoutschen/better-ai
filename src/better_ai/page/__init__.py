@@ -780,7 +780,9 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     unit = _unit(args, run)
     spec = spec_of(run.skill)
     docs = load_docs(run.skill)
-    for error in schema.check_paths([unit.path], docs=docs, now=run.now(), cutoff=run.info.cutoff):
+    for error in schema.check_paths(
+        [unit.path], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=[]
+    ):  # old format: not a warning
         run.err(f"warning: {error}")
     conv = Conversation(unit, spec, docs)
     server = make_server(unit, spec, conv, run.info, args.port)
@@ -788,7 +790,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     paths.write_state(unit, ADDRESS, url.encode())
     if not unit.target(SEEN).exists():  # a resumed run keeps its place, so it still sees what came in while it was away
         paths.write_state(unit, SEEN, b"0")
-    run.out(f"Serving {unit.label} at {url}. Each action the user takes is printed here as one JSON line.")
+    run.out(f"Serving {unit.label} at {url} (each action the user takes is printed here as one JSON line).")
     if args.open and not webbrowser.open(url):
         run.out(
             "Could not open a browser on this machine. If the user's browser runs on another machine, "
@@ -798,6 +800,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     serving = threading.Thread(target=server.serve_forever, daemon=True)
     try:
         if args.once:
+            server.daemon_threads = False  # server_close (in finally) waits for the request's thread to answer
             server.handle_request()
             return 0
         serving.start()

@@ -62,7 +62,7 @@ class Run:
     stderr: Any = field(default=None)
 
     def out(self, text: str = "") -> None:
-        print(text, file=self.stdout or sys.stdout)
+        print(text, file=self.stdout or sys.stdout, flush=True)  # a harness that streams the output sees it at once
 
     def err(self, text: str) -> None:
         print(text, file=self.stderr or sys.stderr)
