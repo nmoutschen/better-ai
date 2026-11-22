@@ -426,6 +426,22 @@ class ConversationTest(Fixture):
         conv.append({"type": "note", "by": "user", "id": "m1", "text": "  split?", "to": None})
         self.assertEqual(len(self.log()), 1)  # one line: U+2028 is escaped
 
+    def test_an_event_gets_the_time_in_utc_with_z_and_an_unreadable_line_keeps_its_position(self):
+        conv = page.Conversation(self.unit(), self.spec, self.docs)
+        conv.append({"type": "note", "by": "user", "id": "m1", "text": "hi", "to": None})
+        self.assertRegex(conv.events()[0]["at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        self.assertRegex(page.now(), r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        (self.unit_dir / "conversation.jsonl").write_text('{"type": "note"}\nnot json\n{"type": "reply"}\n')
+        self.assertEqual([e.get("type") for e in conv.events()], ["note", None, "reply"])
+
+    def test_clean_keeps_json_values_and_cuts_long_text_and_from_user_is_what_the_page_sent(self):
+        value = page.clean({"text": "x" * 6000, "n": 1, "ok": True, "list": list(range(60)), "obj": object()})
+        self.assertEqual(len(value["text"]), 5000)
+        self.assertEqual((value["n"], value["ok"], len(value["list"]), value["obj"]), (1, True, 50, None))
+        self.assertTrue(page.from_user({"type": "note", "by": "user"}))
+        for event in ({"type": "reply", "by": "agent"}, {"type": "closed", "by": "w2"}, {"type": "note"}, {}):
+            self.assertFalse(page.from_user(event), event)
+
     def test_concurrent_appends_never_interleave_inside_a_line_S62(self):
         conv = page.Conversation(self.unit(), self.spec, self.docs)
 
@@ -477,6 +493,19 @@ class VerbsTest(Fixture):
             ("reply", "coordinator", 'It\'s done, "quoted" and `ticked`', None),
         )
 
+    def test_reply_says_the_page_shows_it_only_while_a_server_answers(self):
+        server, host = self.serve()
+        code_, out, _ = self.cli("reply", self.unit_arg, "--to", "m1", stdin="ok")
+        self.assertEqual(code_, 1)  # no such item
+        self.seed({"type": "note", "by": "user", "id": "m1", "text": "q", "to": None})
+        self.assertIn("Reply shown in the page.", self.cli("reply", self.unit_arg, "--to", "m1", stdin="ok")[1])
+        server.shutdown()
+        server.server_close()  # the address file stays, as after a SIGKILL
+        self.assertTrue((self.unit_dir / ".server").exists())
+        out = self.cli("reply", self.unit_arg, stdin="later")[1]
+        self.assertIn("Reply saved; the page shows it when served.", out)
+        self.assertEqual([e["text"] for e in self.log() if e["type"] == "reply"], ["ok", "later"])
+
     def test_reply_without_text_is_refused_and_writes_nothing(self):
         code_, out, err = self.cli("reply", self.unit_arg, stdin="  \n")
         self.assertEqual(code_, 1)
@@ -521,6 +550,77 @@ class VerbsTest(Fixture):
         first = json.loads(lines[0])
         self.assertEqual((first["id"], first["status"], first["thread"][0]["text"]), ("m1", "new", "hm"))
 
+    def test_status_refuses_an_unknown_id_and_an_answer_under_an_item_and_marks_an_answer_to_the_agent(self):
+        self.seed(
+            {"type": "comment", "by": "user", "id": "c1", "n": 1, "text": "too big"},
+            {"type": "note", "by": "user", "id": "m1", "to": "c1", "text": "an answer"},
+            {"type": "reply", "by": "coordinator", "id": "r1", "to": None, "text": "a question"},
+            {"type": "note", "by": "user", "id": "m2", "to": "r1", "text": "answer to the agent"},
+        )
+        code_, _, err = self.cli("status", self.unit_arg, "done", "nope")
+        self.assertEqual(code_, 1)
+        self.assertIn("no comment or message with id nope", err)
+        code_, _, err = self.cli("status", self.unit_arg, "done", "m1")
+        self.assertEqual(code_, 1)
+        self.assertIn("m1 answers c1", err)
+        before = len(self.log())
+        self.assertEqual(self.cli("status", self.unit_arg, "working", "m2")[0], 0)
+        last = self.log()[before]
+        self.assertEqual(
+            (last["type"], last["to"], last["status"], last["by"]), ("status", "m2", "working", "coordinator")
+        )
+        self.assertEqual(self.cli("status", self.unit_arg, "accepted", "c1")[0], 1)  # the user's words are missing
+        self.assertEqual(len(self.log()), before + 1)
+
+    def test_pending_names_each_state_the_threads_and_what_a_worker_closed(self):
+        user, bot = {"by": "user"}, {"by": "coordinator"}
+        self.seed(
+            {"type": "comment", "id": "c1", "n": 1, "text": "first", **user},
+            {"type": "status", "to": "c1", "status": "done", **bot},
+            {"type": "comment", "id": "c1", "n": 1, "text": "edited after done", **user},
+            {"type": "note", "id": "m1", "text": "a question", "to": None, **user},
+            {"type": "status", "to": "m1", "status": "asked", **bot},
+            {"type": "reply", "id": "r1", "to": "m1", "text": "which?", **bot},
+            {"type": "note", "id": "m2", "to": "m1", "text": "this one", **user},
+            {"type": "note", "id": "m3", "text": "finished", "to": None, **user},
+            {"type": "status", "to": "m3", "status": "done", **bot},
+            {"type": "note", "id": "m4", "text": "followed up", "to": None, **user},
+            {"type": "accept", "to": "m4", **user},
+            {"type": "note", "id": "m5", "to": "m4", "text": "one more thing", **user},
+            {"type": "comment", "id": "c2", "n": 2, "text": "deleted", **user},
+            {"type": "delete", "to": "c2", **user},
+            {"type": "comment", "id": "c3", "n": 3, "text": "reopened", **user},
+            {"type": "status", "to": "c3", "status": "done", **bot},
+            {"type": "reopen", "to": "c3", "text": "still wrong", **user},
+            {"type": "closed", "id": "x1", "by": "worker-2", "question": "Q4", "status": "answered"},
+            {"type": "note", "id": "m6", "to": "x1", "text": "are you sure?", **user},
+        )
+        code_, out, _ = self.cli("pending", self.unit_arg)
+        lines = out.splitlines()
+        self.assertEqual((code_, lines[-1]), (0, "5 not done."))
+        items = {e["id"]: e for e in map(json.loads, lines[:-1])}
+        self.assertEqual(
+            {i: e["status"] for i, e in items.items()},
+            {
+                "c1": "edited",
+                "m1": "answered by the user",
+                "m4": "follow-up from the user",
+                "c3": "reopened",
+                "m6": "new",
+            },
+        )
+        self.assertEqual(items["c1"]["text"], "edited after done")
+        self.assertEqual([t["text"] for t in items["m1"]["thread"]], ["which?", "this one"])
+        self.assertEqual(items["c3"]["reopened_because"], "still wrong")
+        self.assertEqual(items["m6"]["about"], "worker-2 closed Q4 as answered")
+
+    def test_an_accepted_event_from_the_chat_ends_the_item(self):
+        self.seed(
+            {"type": "note", "id": "m1", "text": "ok?", "to": None, "by": "user"},
+            {"type": "accepted", "to": "m1", "by": "coordinator", "text": "yes"},
+        )
+        self.assertEqual(self.cli("pending", self.unit_arg)[1], "0 not done.\n")
+
     def test_wait_prints_the_users_events_saves_its_place_and_times_out_with_exit_3(self):
         _, host = self.serve()
         sender = threading.Timer(0.5, lambda: self.rpc(host, "note", {"id": "m1", "text": "hi", "to": None}))
@@ -546,6 +646,21 @@ class VerbsTest(Fixture):
         self.assertEqual(code_, 1)
         self.assertIn("no page is served", err)
         self.assertIn("run serve", err)
+
+    def test_a_corrupt_seen_or_address_file_is_a_one_line_refusal_naming_the_file(self):
+        for name, text, saying in (
+            (".conversation-seen", "x", "does not hold a number"),
+            (".server", "not an address", "does not hold an address"),
+        ):
+            with self.subTest(file=name):
+                (self.unit_dir / ".conversation-seen").write_text("0")
+                (self.unit_dir / ".server").write_text("http://127.0.0.1:1/")
+                (self.unit_dir / name).write_text(text)
+                code_, _, err = self.cli("wait", self.unit_arg, "--timeout", "1")
+                refusal = [line for line in err.splitlines() if not line.startswith("warning:")]
+                self.assertEqual(code_, 1, err)
+                self.assertEqual(len(refusal), 1, err)
+                self.assertIn(f"{name}: {saying}", refusal[0])
 
     def test_a_skill_without_a_page_refuses(self):
         with mock.patch.object(page, "PAGES", {}):
@@ -594,6 +709,20 @@ class ServeTest(Fixture):
         thread.join(15)
         self.opened.assert_called_once()
         self.assertEqual(self.opened.call_args.args[0], url)
+
+    def test_a_port_in_use_is_a_refusal_in_one_line_not_a_bug(self):
+        """S29, S30: an address that is taken is not an internal error, as it was not for the scripts before."""
+        busy = socket.socket()
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        self.addCleanup(busy.close)
+        code_, out, err = self.cli("serve", self.unit_arg, "--no-browser", "--port", str(busy.getsockname()[1]))
+        self.assertEqual(code_, 1)
+        self.assertNotIn("bug in better.pyz", err)
+        refusal = [line for line in err.splitlines() if not line.startswith("warning:")]
+        self.assertEqual(len(refusal), 1, err)
+        self.assertRegex(refusal[0], r"cannot be served on port \d+ \(.*(in use|ddress).*\)\. ")
+        self.assertFalse((self.unit_dir / ".server").exists())
 
     def test_open_and_no_browser_together_are_a_usage_error(self):
         self.assertEqual(self.cli("serve", self.unit_arg, "--open", "--no-browser")[0], 2)
