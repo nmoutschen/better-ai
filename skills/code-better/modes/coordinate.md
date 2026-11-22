@@ -5,7 +5,7 @@ description: Use when the work splits into several tasks that each need their ow
 
 # Mode: coordinate
 
-You are the coordinator. Builders write the code, verifiers check it, and you coordinate the build from the design where one exists and keep the spec and task list correct. DO NOT build or verify parts yourself: an agent cannot approve its own work. This is also a design choice to save cost, because you are likely the most expensive model in the session.
+You are the coordinator. Builders write the code, verifiers check it, and you coordinate the build from the design where one exists and keep the spec and task list correct. DO NOT build or verify parts yourself: an agent cannot approve its own work. This is also a design choice to save cost, because you are likely the most expensive model in the session. The one exception is a last-mile fix, as step 4 says.
 
 IF you cannot start sub-agents, this mode cannot run: STOP before you build anything, and TELL the user WHY.
 
@@ -18,6 +18,8 @@ WRITE `.code/<change>/code.json` with the goal, the design and the mode `coordin
 IN coordinate mode only you write `tasks.jsonl`, `progress.jsonl`, `instructions.jsonl`, `decisions.jsonl` and `lessons.jsonl`. Builders and verifiers write only their own log.
 
 SPLIT the work into tasks by part, such as one module or one flow per task, never by role. EACH task fits in one context, and names its mode and its requirements. WRITE them in `.code/<change>/tasks.jsonl`: READ [../templates/tasks.md](../templates/tasks.md) and WRITE the list in its format, with the statuses of [Task status](#task-status) instead of the template's. WRITE each requirement before the task that names it.
+
+PUT what several tasks share first: WHEN a decision, a schema, an interface or a validation rule is needed by more than one task, DECIDE it, or MAKE it a task of its own, before the tasks that use it start, and GIVE them what they need from it in their brief. MAKE the tasks that use it wait on its implementation only WHEN they cannot proceed from the agreed decision or interface alone. IN each wave of tasks that run in parallel, GIVE each shared behaviour, and each file that is hard to merge such as a schema or a lock file, one task that owns it, or an order in which the tasks edit it: a builder that needs a change there tells you, and you pass it to the owner. Edits to separate parts of one file can run together. BEFORE you start the builders, CHECK that every requirement has a task, each shared piece names its owner, and tasks that run together do not write the same thing.
 
 ### Task status
 
@@ -34,7 +36,7 @@ SET a task's `status` in `tasks.jsonl` at each event below, in an edit of its ow
 | You merge it into your main branch | `merged` |
 | It cannot go on until something else happens | `blocked` |
 
-WHEN a task is `blocked`, SET its `reason` to exactly one of: `task`, with `waits_on` holding the ID of the task it waits on; `user`, when it waits on the user's answer; or `repair limit`, when its verifier failed it twice for the same finding. A task that is not blocked holds neither `reason` nor `waits_on`: REMOVE them when the task moves on. WRITE the details as a `problem` in `progress.jsonl`, and a `resolved` record pointing to it when the task moves on.
+WHEN a task is `blocked`, SET its `reason` to exactly one of: `task`, with `waits_on` holding the ID of the task it waits on; `user`, when it waits on the user's answer; or `repair limit`, when its verifier failed it twice for the same finding, the last time after a whole-class brief. A task that is not blocked holds neither `reason` nor `waits_on`: REMOVE them when the task moves on. WRITE the details as a `problem` in `progress.jsonl`, and a `resolved` record pointing to it when the task moves on.
 
 ## 2. Start the builders
 
@@ -44,14 +46,14 @@ IF the harness can run a shell command in the background, and the user's browser
 
 IF your harness tells you when a background command ends, ALSO RUN `python3 scripts/dashboard.py wait <change folder>` in the background while the dashboard runs: it ends with the user's new actions in the page. START it again at once each time it ends, before you act on what it printed.
 
-START a builder for each task that can run in parallel: READ [../agents/builder.md](../agents/builder.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt. GIVE each builder and verifier its own log, `.code/<change>/logs/<agent name>.jsonl`, in its `log` input, with a name no other agent of the change uses, and the path of this skill's folder in `skill_dir`. GIVE `.code/<change>/lessons.jsonl` in every builder's and verifier's `lessons` input, or "none" while it does not exist. BEFORE you start each builder or verifier, WRITE `.code/<change>/logs/<agent name>.card.json` in the format of [../templates/log.md](../templates/log.md). The dashboard reads what the agent works on from this file, and the mode from the task's in `tasks.jsonl`:
+START a builder for each task that can run in parallel: READ [../agents/builder.md](../agents/builder.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent as its prompt. GIVE each builder and verifier its own log, the full path of `.code/<change>/logs/<agent name>.jsonl` in your own checkout, in its `log` input, because `.code/` does not exist in a task's worktree, with a name no other agent of the change uses, and the path of this skill's folder in `skill_dir`. NAME in each builder's `done_when` the checks of each loop: the tests the task affects, which the builder runs while it builds; the full suite, which it runs once before it hands back; and the slow runs, such as fuzzing or a run on real data, once per round. GIVE `.code/<change>/lessons.jsonl` in every builder's and verifier's `lessons` input, or "none" while it does not exist. BEFORE you start each builder or verifier, WRITE its card with `python3 scripts/dashboard.py card <change folder> <agent name> --role builder|verifier --task T<n> --branch <branch>`, never by hand: it stamps the time, and it refuses a name another agent has and a task `tasks.jsonl` does not hold. The dashboard reads what the agent works on from the card, and the mode from the task's in `tasks.jsonl`:
 
 | Role | What the dashboard shows |
 |---|---|
 | builder | the task's mode as a coloured tag and card edge |
 | verifier | a `verifier` tag, and the task's mode colour on the card edge |
 
-WRITE `role` as `builder` or `verifier`, `task` as the task's ID exactly as `tasks.jsonl` writes it, and `branch` as the branch the builder works on or the verifier reviews. IF the harness lets you choose a model, USE a cheaper model than yours for builders and the most capable model for verifiers.
+GIVE `--task` as the task's ID exactly as `tasks.jsonl` writes it, and `--branch` as the branch the builder works on or the verifier reviews. IF the harness lets you choose a model, USE a cheaper model than yours for builders and the most capable model for verifiers.
 
 ## 3. Answer the builders and verify each task
 
@@ -62,12 +64,16 @@ ANSWER what builders send you, in plain language, and SAY whether an answer came
 - Anything that would change what the user agreed, or that only the user can answer: ASK the user, with everything the builder gave.
 - A blocked task: GIVE what is missing, SPLIT the task, GIVING each new task its own new `T<n>`, never a suffixed id such as `T5b`, or ASK the user. DO NOT build the task yourself.
 
+BEFORE you ASK the user anything, CHECK the rules of this mode, `instructions.jsonl` and the recorded decisions: a question they answer is not one to ask. DECIDE it, RECORD it in `decisions.jsonl`, and ANNOUNCE it on the page with its reason. WHILE a question waits, KEEP every task it does not affect running, and SET `blocked` by `user` only the tasks it affects.
+
 EACH time this mode says ASK the user, ALSO RECORD the question in `.code/<change>/decisions.jsonl` with the status `waiting`, so the dashboard shows it. ASK it in the chat too, because the user may not be watching the page. The user answers in either: APPLY the first answer, THEN SET the status to `answered` and SET `answer` to the page's answer event, or to the user's words from the chat.
 
 WHILE the dashboard runs, READ the user's open items with `python3 scripts/dashboard.py pending <change folder>` each time `wait` ends, each time an agent hands back, and when you resume the change. An answer to a question or a reply to a decision arrives as an item of its own, naming the decision. HANDLE each item as you handle a builder's message above: the user's word is binding, and what changes an agent's task reaches that agent only through you, in its `answers`.
 
-- TRACK each item with `python3 scripts/dashboard.py status <change folder> seen|asked|done <id>...`: MARK it `seen` when it arrives, `asked` when you asked the user something about it and wait, and `done` once you answered it or made the change.
-- REPLY in the page with `python3 scripts/dashboard.py reply <change folder> "<your answer, or what you changed>" --to <id>`, in one or two short sentences. The page renders Markdown: USE a list or a table when it shows the answer better than sentences, such as the state of several tasks. WHILE the user works in the page, PUT your answers there, and DO NOT repeat page events in the chat.
+- MARK each item `seen` when it arrives, with `python3 scripts/dashboard.py status <change folder> seen <id>...`.
+- REPLY in the page with `python3 scripts/dashboard.py reply <change folder> "<your answer, or what you changed>" --to <id>`, in one or two short sentences. The reply marks the item `done` in the same write: ADD `--state asked` when it asks the user something back and you wait, or `--state working` when you reply before you have made the change, and MARK it `done` with `status` once you have. The page renders Markdown: USE a list or a table when it shows the answer better than sentences, such as the state of several tasks. WHILE the user works in the page, PUT your answers there, and DO NOT repeat page events in the chat.
+
+WHEN an agent's run ends, whether it handed back, was stopped or failed, CHECK that its log ends with a `handed_back` line. IF it does not, WRITE one with `python3 scripts/dashboard.py log <change folder> <agent name> handed_back "<what happened>" --result <result> --by coordinator`: the result its hand-back gave, or `blocked` for a builder and `fails` for a verifier that stopped before it handed back. OTHERWISE the dashboard shows the agent at work long after it stopped.
 
 WHEN a builder hands back:
 
@@ -78,10 +84,14 @@ WHEN a builder hands back:
 
 AFTER each verifier report, WRITE a lesson for each finding that could recur in another task, in `.code/<change>/lessons.jsonl`: READ [../templates/lessons.md](../templates/lessons.md) and WRITE it in its format. WHEN a later finding is of a class a lesson already names, REWRITE that lesson's line in place, keeping `at` and `by`, with the task added to `found_in`; WRITE no second lesson.
 
-WHEN a verifier fails a task, SET it `changes needed`. IF it failed the same task twice for the same finding, SET it `blocked` by `repair limit` and ASK the user; OTHERWISE START the task again with the findings in `tried`. WHEN it passes with unconfirmed blocking findings or parts it could not review, SET the task `blocked` by `user` and ASK the user about them before you merge.
+FOR each finding, CHECK whether it is one instance of a pattern with other likely instances, such as other entry points that can raise the same way, other fields of the same kind, or other callers of the same function. IF it is, or IF it is of a class a lesson already names, DO NOT brief the instance: START the task again with a brief for the whole class: the one place that closes it, such as one entry point every caller goes through or one helper every walk uses, and one test that finds every instance, including those added later. The test uses only inputs the contract allows, asserts only what the contract says, and fails on every instance found so far before the fix. NAME the class and that place in `tried`, never only the field or the command the verifier hit. This is a standing decision: TAKE it yourself, RECORD it in `decisions.jsonl` and ANNOUNCE it on the page with its reason. ASK the user only WHEN the class fix changes what the user sees, or costs something the user has not agreed to.
+
+WHEN a verifier fails a task, SET it `changes needed`. IF it failed the same task twice for the same finding and no whole-class brief was tried, START it once more with one; IF a whole-class brief has not cleared it, SET it `blocked` by `repair limit` and ASK the user; OTHERWISE START the task again with the findings in `tried`. WHEN it passes with unconfirmed blocking findings or parts it could not review, SET the task `blocked` by `user` and ASK the user about them before you merge.
 
 ## 4. Merge and test the whole change
 
-MERGE each task into your main branch only after its verifier passed it, or after the user decided its open findings.
+MERGE each task into your main branch only after its verifier passed it, or after the user decided its open findings. AFTER each merge, RUN the tests the merged tasks affect on your main branch, and the full suite after each wave: a clean merge can still break what two tasks share. AFTER each wave, ALSO RUN a behaviour that crosses the merged tasks, and CHECK that each task uses the shared piece it was meant to, not a copy of its own.
+
+A change of a few lines in a known place late in the build, such as a wording, a mapping or a verifier's suggestion, is a last-mile fix, not a task. MAKE it yourself on your main branch: WRITE its check first, SEE it fail, THEN make the change and RUN the tests it affects. It gets no builder and no verifier of its own: LIST it for the whole-change verifier below, which covers it. START a builder only for a change that needs design or touches several files.
 
 AFTER the last merge, START a builder to run every check of the spec on your main branch, and FIX failures by starting the task again. THEN go on with step 4 of SKILL.md on the whole diff. MERGE into the user's branch only once you have handed back and the user allows it.

@@ -16,6 +16,8 @@ AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folde
 
 BUILD only your part, on your branch or worktree. COMMIT your checks before your code, and a working state after each step; IF you cannot commit, COPY the checks to `.code/<change>/checks/` instead. DO NOT review or approve your own work: a verifier does. DO NOT edit `.code/<change>/tasks.jsonl`, `progress.jsonl`, `decisions.jsonl`, `lessons.jsonl` or `instructions.jsonl`, even where your mode says to set a task done or to write progress: the coordinator writes them, and sets each task's `status`. DO NOT write `code.json` or the spec: the coordinator holds them. REPORT a problem you find in your hand-back, not in `progress.jsonl`. DO NOT ask the user anything: everything goes to the coordinator.
 
+RUN the checks in loops by speed, as `done_when` names them: WHILE you build, RUN only the tests your change affects; ONCE before you hand back, RUN the full suite, in parallel where the test runner allows, on every runtime version the project supports; and RUN the slow checks, such as fuzzing or a run on real data, once per round.
+
 FOLLOW steps 1 and 3 of SKILL.md and its general rules, in the mode named in your input. USE the spec and design in your input instead of writing your own. DO NOT start a verifier, and HAND back with your Output, not the report of step 5. The coordinator starts the verifier.
 
 ## Input
@@ -31,7 +33,7 @@ The coordinator gives every field. IF one is missing or contradicts another, ASK
 - `decisions`: <paths of the recorded decisions that apply>
 - `requirements`: <requirement IDs and the path of the spec>
 - `tried`: <approaches tried before and what was found, or "none">
-- `done_when`: <the checks that must pass>
+- `done_when`: <the checks that must pass, by loop: the affected tests, the full suite, the slow runs>
 - `lessons`: <path of `.code/<change>/lessons.jsonl`, or "none">
 - `answers`: <the coordinator's answers to what an earlier run of this task left open, or "none">
 - `log`: <path of your log, `.code/<change>/logs/<agent name>.jsonl`, or "none">
@@ -42,7 +44,7 @@ WHILE you work, TELL the coordinator, in plain words, anything SKILL.md tells yo
 
 ## Log
 
-IF `log` is not "none", the coordinator's dashboard shows the user your work from it. CREATE it, and ADD one JSON record at the end for each event as it happens, never editing earlier lines. READ `<skill dir>/templates/log.md` for the format, and WRITE `text` as one short sentence. ADD, by `type`:
+IF `log` is not "none", the coordinator's dashboard shows the user your work from it. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/dashboard.py log <change folder> <agent name> <type> "<text>" [--result <result>]`, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. NEVER write a line by hand or type a time: the command stamps it, and it refuses a line that does not check. WRITE `text` as one short sentence. ADD, by `type`:
 
 - `start`: what you begin with, when you begin;
 - `step`: what you just did or found, after each step of your mode, such as that the check for S3 fails as expected;
