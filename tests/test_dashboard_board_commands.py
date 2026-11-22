@@ -319,6 +319,37 @@ class ServedPage(unittest.TestCase):
             self.assertEqual((answer["decision"], answer["status"]), ("D1", "new"))
             self.assertEqual(run(folder, "check", str(folder)).returncode, 0)
 
+    def test_a_line_in_the_format_before_this_change_is_a_notice_not_a_warning(self):
+        old = {
+            "type": "step",
+            "at": "2026-11-21T10:00:00Z",
+            "by": "coordinator",
+            "id": "N1",
+            "step": "x",
+            "origin": {"type": "spec", "spec": "S1"},
+            "if_nobody": "a",
+            "done_when": "b",
+            "priority": "low",
+            "status": "asked",
+        }
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            write(folder, "next-steps.jsonl", [old])
+            checked = run(folder, "check", str(folder))
+            self.assertEqual(checked.returncode, 0)
+            self.assertIn("written in the format before this change", checked.stdout)
+            env = {**os.environ, "BETTER_AI_SKILL": "code-better"}
+            cmd = better_module.command("serve", str(folder), "--no-browser")
+            server = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+            for _ in range(100):
+                if (folder / ".server").exists():
+                    break
+                time.sleep(0.1)
+            server.send_signal(signal.SIGTERM)
+            _, err = server.communicate(timeout=10)
+        self.assertIn("notice:", err)
+        self.assertNotIn("warning:", err)
+
     def test_render_writes_one_page_with_its_data_and_no_link_to_a_server(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
