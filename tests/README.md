@@ -16,3 +16,8 @@ BETTER_AI_SWEEP=full python3 -I -m unittest discover tests
 ```
 
 A test picks its cases with `sweep.cases(items, key=...)` from `tests/sweep.py`; `key` gives an item's class.
+
+`tests/test_build.py` and `tests/test_smoke.py` check `tools/build.py` and `tools/smoke.py` on fixture repositories in
+temporary folders. The build needs Python 3.12 or later, so on Python 3.10 the tests that build skip themselves (set
+`BETTER_AI_PYTHON310` to a Python 3.10 to run the refusal test from a newer one). `tests/pyz.py` has
+`build_into(tmp)`, for a test that needs the real `.pyz` files.
