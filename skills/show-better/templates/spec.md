@@ -1,23 +1,23 @@
 # Presentation spec
 
-`scripts/show.py` renders a spec, a JSON file, as a page of slides or as plain text. `schemas/spec.schema.json` describes its shape: `check` validates the spec against it, and names each wrong field as `panels[2].items[0].value: required`.
+```
+python3 <skill dir>/scripts/better.pyz create .show/SLUG --by AGENT
+python3 <skill dir>/scripts/better.pyz set .show/SLUG spec
+python3 <skill dir>/scripts/better.pyz check .show/SLUG
+python3 <skill dir>/scripts/better.pyz render .show/SLUG
+python3 <skill dir>/scripts/better.pyz render .show/SLUG --format text
+python3 <skill dir>/scripts/better.pyz render .show/SLUG --format md
+python3 <skill dir>/scripts/better.pyz serve .show/SLUG --open
+python3 <skill dir>/scripts/better.pyz wait .show/SLUG --timeout S
+python3 <skill dir>/scripts/better.pyz reply .show/SLUG --to ID
+python3 <skill dir>/scripts/better.pyz status .show/SLUG seen|asked|working|done ID...
+python3 <skill dir>/scripts/better.pyz status .show/SLUG accepted ID... --text
+python3 <skill dir>/scripts/better.pyz pending .show/SLUG
+```
 
-```
-python3 scripts/show.py check SPEC                                  # validate, print every value the slides will show
-python3 scripts/show.py render SPEC --out FILE [--open]             # check, then write the page
-python3 scripts/show.py render SPEC --out FILE --serve [--port N]   # write the page and serve it with the conversation
-python3 scripts/show.py render SPEC --format text                   # print it as plain text for a terminal
-python3 scripts/show.py render SPEC --format md                     # print it as Markdown, diagrams in code blocks
-python3 scripts/show.py wait DIR [--timeout S]                      # wait for the user's next actions on the served page
-python3 scripts/show.py reply DIR TEXT [--to ID]                    # show a reply in the page, under the item it answers
-python3 scripts/show.py status DIR seen|asked|working|done ID...
-python3 scripts/show.py status DIR accepted ID... --text "the user's words"
-python3 scripts/show.py pending DIR                                 # list the items not done or accepted
-```
+`create` and `set` take the spec on stdin, `reply` and `status --text` the words on stdin. `check` names each wrong field as `panels[2].items[0].value: required`.
 
 Text output takes `--width N` (default 72) and `--ascii` (ASCII characters only). `--format text --screen-reader` prints each slide as sentences and value lists, without box lines, bars, rules or symbols. In text output, an `svg` visual shows only its `alt`.
-
-`check` stops with an error when a slide cannot be drawn correctly, and prints a warning when a slide is likely hard to read. Both commands print a digest: every headline, value, label, detail and source, in order, for comparison with the document.
 
 The page shows the opening slide, then one slide per panel. Slide N is panel N âˆ’ 1.
 
@@ -37,7 +37,7 @@ The page shows the opening slide, then one slide per panel. Slide N is panel N â
 }
 ```
 
-A field that is optional may be `null`, which means the same as leaving it out. `type` is always `"slides"`. `at` and `by`, when the agent writes them, are the time in UTC with Z and the agent's name; they are optional.
+A field that is optional may be `null`, which means the same as leaving it out. `type` is always `"slides"`.
 
 `style` is optional: the project's look for the slides and their drawings. Its keys are `background`, `tint` (fills, detail boxes), `ink` (lines, text), `heading`, `muted`, `line` (rules), `point` (the highlight), `serif` (headlines) and `sans` (labels). Colours are CSS colours, such as `#1C1A17` or `rgb(28, 26, 23)`; fonts are font stacks, such as `"'Inter', sans-serif"`. The page around the slides keeps its own look.
 

@@ -851,15 +851,27 @@ class Templates(unittest.TestCase):
     @staticmethod
     def fill(line):
         line = line.replace("<UTC time>", AT).replace("<agent>", "architect").replace("<n>", "1")
+        line = line.replace("<before | after>", "before").replace("<request | response | async>", "request")
         line = re.sub(r"<SHA-256[^>]*>", DIGEST, line)
         return re.sub(r"<[^<>\"]+>", "text", line)
+
+    IDS = {"requirement": None, "finding": "V1", "decision": "D1", "spec": "S1", "gap": "G1", "perspective": "security"}
+    PREFIX = {"functional": "F1", "quality": "Q1", "constraint": "C1"}
+
+    def stamp(self, record):
+        """What the command adds to a template line: the time, the writer and the id."""
+        record = {"type": record["type"], "at": AT, "by": "architect", **record}
+        if record["type"] in self.IDS:
+            ident = self.IDS[record["type"]] or self.PREFIX[record["kind"]]
+            record = {"type": record["type"], "id": ident, **{k: v for k, v in record.items() if k != "type"}}
+        return record
 
     def test_every_template_line_is_a_valid_record_once_filled(self):
         found = self.lines()
         self.assertGreater(len(found), 20)
         for name, number, line in found:
             with self.subTest(template=name, line=number):
-                record = json.loads(self.fill(line))
+                record = self.stamp(json.loads(self.fill(line)))
                 self.assertEqual(
                     schema.check_record(record, [self.SCHEMA_OF[record["type"]]], SCHEMAS), [], self.fill(line)
                 )
@@ -899,12 +911,12 @@ class Templates(unittest.TestCase):
     def test_the_templates_state_the_conventions(self):
         text = "\n".join(p.read_text() for p in (SKILL / "templates").glob("*.md") if "{" in p.read_text())
         for convention in (
-            "`type`, `at` (UTC, ending in Z) and `by`",
             "`null`",
             "JSON array",
             "the record a pointer names before the pointer",
-            "A field the schema does not name is an error",
-            "schema.py check",
+            "A field the record does not name is an error",
+            "without `at`, `by` and `id`",
+            "leave out `at`, `by` and `id`",
         ):
             self.assertIn(convention, text)
 
@@ -1286,17 +1298,19 @@ class SpecRowsCheck(unittest.TestCase):
 class ModeText(unittest.TestCase):
     """The mode files, the example and the templates name the new files, and say once where to check every write."""
 
-    SENTENCE = (
-        "AFTER every write to a JSON or JSONL file in the change folder, RUN "
-        "`python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step."
+    RULE = (
+        "WRITE each record of the unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, "
+        "or `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. "
+        "DO NOT write the record by hand to get past a refusal."
     )
 
-    def test_each_mode_says_to_check_every_write_with_the_skill_dir_form(self):
+    def test_the_record_rule_is_stated_once_in_skill_md_and_not_in_the_modes(self):
+        self.assertEqual((SKILL / "SKILL.md").read_text().count(self.RULE), 1)
         for name in ("design.md", "audit.md"):
             with self.subTest(name):
                 text = (SKILL / "modes" / name).read_text()
-                self.assertEqual(text.count(self.SENTENCE), 1)
-                self.assertLess(text.index(self.SENTENCE), text.index("\n## "))
+                self.assertNotIn("AFTER every write", text)
+                self.assertNotIn("schema.py", text)
 
     def test_no_skill_text_names_the_old_files(self):
         self.assertNotIn("request.md", (SKILL / "SKILL.md").read_text())
