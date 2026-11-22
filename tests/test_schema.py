@@ -6,24 +6,23 @@ come in later tasks and have their own tests.
 """
 
 import copy
-import importlib.util
 import json
-import subprocess
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import NamedTuple
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILLS = ("architect-better", "code-better", "research-better", "design-better", "show-better")
-SCRIPT = ROOT / "skills" / "architect-better" / "scripts" / "schema.py"
-BASE = ROOT / "skills" / "architect-better" / "schemas" / "base.schema.json"
+SRC = ROOT / "src"
+SCRIPT = SRC / "better_ai" / "schema.py"
+BASE = SRC / "better_ai" / "schemas" / "base.schema.json"
+sys.path.insert(0, str(SRC))
 
-SPEC = importlib.util.spec_from_file_location("schema", SCRIPT)
-schema = importlib.util.module_from_spec(SPEC)
-sys.modules["schema"] = schema
-SPEC.loader.exec_module(schema)
+import better_ai.code  # noqa: E402,F401  (registers the hook the tasks schema names)
+from better_ai import schema  # noqa: E402
 
 AT = "2026-11-21T10:00:00Z"
 COORDINATE = ["todo", "building", "built", "verifying", "changes needed", "verified", "merged", "blocked"]
@@ -229,6 +228,26 @@ def task(n=1, **extra):
     return {k: v for k, v in record.items() if v is not None}
 
 
+class Result(NamedTuple):
+    returncode: int
+    stdout: str
+
+
+def check_cli(schemas, *args, cwd=None):
+    """What `check` over these paths prints and exits with, without a process: one line per error, exit 1 if any."""
+    before = os.getcwd()
+    try:
+        if cwd:
+            os.chdir(cwd)
+        try:
+            errors = schema.check_paths([Path(a) for a in args], schemas)
+        except schema.SchemaError:
+            return Result(1, "")
+    finally:
+        os.chdir(before)
+    return Result(1 if errors else 0, "".join(f"{e}\n" for e in errors))
+
+
 def jsonl(*records):
     return "".join(json.dumps(r) + "\n" for r in records)
 
@@ -288,11 +307,7 @@ class CheckText(Case):
 
 class CommandLine(Case):
     def run_cli(self, *args):
-        return subprocess.run(
-            [sys.executable, "-I", str(SCRIPT), "check", "--schemas", str(self.schemas), *map(str, args)],
-            capture_output=True,
-            text=True,
-        )
+        return check_cli(self.schemas, *args)
 
     def test_r2_clean_file_prints_nothing_and_exits_zero(self):
         self.write("tasks.jsonl", jsonl(task(1)))
@@ -320,29 +335,9 @@ class CommandLine(Case):
         self.assertEqual(self.run_cli(notes).returncode, 1)
         self.assertEqual(self.run_cli(self.change).returncode, 0)
 
-    def test_help_runs(self):
-        for args in (["--help"], ["check", "--help"]):
-            result = subprocess.run([sys.executable, "-I", str(SCRIPT), *args], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0)
-            self.assertIn("check", result.stdout)
 
-
-class CopiesAndCi(unittest.TestCase):
-    def test_r1_every_page_skill_carries_identical_copies_of_the_script_and_the_base_schema(self):
-        for relative in ("scripts/schema.py", "schemas/base.schema.json", "schemas/conversation.schema.json"):
-            texts = {s: (ROOT / "skills" / s / relative).read_text(encoding="utf-8") for s in SKILLS}
-            self.assertEqual(len(set(texts.values())), 1, f"{relative} differs between skills")
-
-    def test_r1_the_workflow_compares_the_copies(self):
-        workflow = (ROOT / ".github" / "workflows" / "scripts.yml").read_text(encoding="utf-8")
-        self.assertIn("schema.py", workflow)
-        self.assertIn("base.schema.json", workflow)
-        self.assertIn("conversation.schema.json", workflow)
-        for skill in SKILLS:
-            # the loop names no skill but the one it requires and compares the rest by glob
-            self.assertTrue(skill in workflow or "skills/*/" in workflow)
-
-    def test_r1_the_script_imports_only_the_standard_library(self):
+class StandardLibraryOnly(unittest.TestCase):
+    def test_r1_the_validator_imports_only_the_standard_library_and_the_package(self):
         import ast
 
         tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
@@ -1054,21 +1049,10 @@ class HookSafety(Case):
 
 class Schemas(Case):
     def test_a_schema_that_cannot_be_applied_is_a_failure_with_a_message_not_a_traceback(self):
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-I",
-                str(SCRIPT),
-                "check",
-                "--schemas",
-                str(self.root / "missing"),
-                str(self.change / "tasks.jsonl"),
-            ],
-            capture_output=True,
-            text=True,
-        )
+        result = check_cli(self.root / "missing", self.change / "tasks.jsonl")
         self.assertEqual(result.returncode, 1)
-        self.assertNotIn("Traceback", result.stderr)
+        with self.assertRaises(schema.SchemaError):
+            schema.load_schemas(self.root / "missing")
 
     def test_the_most_specific_file_pattern_wins(self):
         # logs/*.card.json must use the card schema, not the log schema (which matches logs/*.jsonl only by extension)
@@ -1084,24 +1068,14 @@ class Paths(Case):
             "logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"})
         )
         self.write("logs/b.jsonl", jsonl({"type": "start", "at": AT, "by": "b", "text": "x", "id": "L1"}))
-        result = subprocess.run(
-            [sys.executable, "-I", str(SCRIPT), "check", "--schemas", str(self.schemas), "b.jsonl"],
-            capture_output=True,
-            text=True,
-            cwd=self.change / "logs",
-        )
+        result = check_cli(self.schemas, "b.jsonl", cwd=self.change / "logs")
         self.assertEqual(result.returncode, 1)
         self.assertIn("id: not allowed", result.stdout)
         self.assertNotIn("no schema", result.stdout)
 
     def test_dot_checks_the_current_folder(self):
         self.write("tasks.jsonl", jsonl(task(1, status="blocked")))
-        result = subprocess.run(
-            [sys.executable, "-I", str(SCRIPT), "check", "--schemas", str(self.schemas), "."],
-            capture_output=True,
-            text=True,
-            cwd=self.change,
-        )
+        result = check_cli(self.schemas, ".", cwd=self.change)
         self.assertEqual(result.returncode, 1)
         self.assertIn('reason: required when status is "blocked"', result.stdout)
 

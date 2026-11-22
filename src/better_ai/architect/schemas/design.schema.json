@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "design.schema.json",
+  "title": "design.json: the containers and flows the page draws",
+  "$comment": "Only the diagrams. Every flow has an id, so a part key never depends on a flow's position. The design-references hook of schema.py checks what the shape cannot: that an edge, a group, a participant or a step names what exists, that an id is used once, and that a box kind is in the register (kinds.json).",
+  "x-files": [
+    "design.json"
+  ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "containers",
+    "flows"
+  ],
+  "properties": {
+    "type": {
+      "const": "design"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "containers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodes"
+      ],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "label",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[^\\s:+/]+$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "in": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "minItems": 1,
+                "items": {
+                  "enum": [
+                    "before",
+                    "after"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "from",
+              "to"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[^\\s:+/]+$"
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^[^\\s:+/]+$"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^[^\\s:+/]+$"
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "in": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "minItems": 1,
+                "items": {
+                  "enum": [
+                    "before",
+                    "after"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "groups": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "label",
+              "members"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[^\\s:+/]+$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                }
+              },
+              "in": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "minItems": 1,
+                "items": {
+                  "enum": [
+                    "before",
+                    "after"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "participants",
+          "steps"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[^\\s:+/]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "in": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "before",
+                "after"
+              ]
+            }
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "box"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "box": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "in": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "minItems": 1,
+                  "items": {
+                    "enum": [
+                      "before",
+                      "after"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "from",
+                "to"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "from": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^[^\\s:+/]+$"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "enum": [
+                    "request",
+                    "response",
+                    "async",
+                    null
+                  ]
+                },
+                "in": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "minItems": 1,
+                  "items": {
+                    "enum": [
+                      "before",
+                      "after"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "x-check": "design-flow-ids"
+    },
+    {
+      "x-check": "design-references"
+    }
+  ]
+}
