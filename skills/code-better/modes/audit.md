@@ -5,7 +5,7 @@ description: Use when the user asks for an audit of existing code, such as its t
 
 # Mode: audit
 
-FOLLOW these steps in order. The general rules of SKILL.md apply throughout. AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
+FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 An audit reports; it does not change the code. DO NOT edit, create or delete any file outside `.code/`, even for a one-line fix: PROPOSE each fix as a task instead.
 
@@ -25,7 +25,7 @@ COLLECT, for the scope:
 2. The result of the tests and of the static, type, lint and security checks the project uses.
 3. The rules the repository states for its code, in its documentation and in its linter and formatter settings.
 
-READ [../templates/audit.md](../templates/audit.md). WRITE these facts in `.code/audit/<YYYY-MM-DD>/evidence.jsonl`, in the template's format, one record for each, with the command that produced it.
+READ [../templates/audit.md](../templates/audit.md). MAKE the audit folder with `python3 <skill dir>/scripts/better.pyz create .code/audit/<YYYY-MM-DD> --by <your agent name, such as builder>`, with the GOAL, the commit and `not_read` set to `null` as JSON on stdin. ADD these facts to `.code/audit/<YYYY-MM-DD>/evidence.jsonl`, in the template's format, one record for each, with the command that produced it.
 
 TREAT a debt rating or a remediation-time estimate from a tool as a pointer, not as a cost: such tools disagree with each other, relate weakly to defects, and mostly overestimate the time. TREAT comments that admit debt, such as TODO, FIXME or HACK, as pointers too.
 
@@ -63,7 +63,7 @@ DO NOT rank by a tool's rating or by the number of findings in a file.
 
 ## 5. Write the full list
 
-READ [../templates/audit.md](../templates/audit.md). WRITE `.code/audit/<YYYY-MM-DD>/audit.json` with the GOAL, the commit and what you did not read or run. WRITE every finding, confirmed and unconfirmed, in `.code/audit/<YYYY-MM-DD>/findings.jsonl`, in the template's format and in the order of step 4, with `evidence_ids` pointing to the records of step 2. The file is for agents that pick up a finding later: LIST every finding, however small, each with its evidence and a proposed task.
+READ [../templates/audit.md](../templates/audit.md). SET `not_read` of the audit with `set` to what you did not read or run. ADD every finding, confirmed and unconfirmed, in `.code/audit/<YYYY-MM-DD>/findings.jsonl`, in the template's format and in the order of step 4, with `evidence_ids` pointing to the records of step 2. The file is for agents that pick up a finding later: LIST every finding, however small, each with its evidence and a proposed task.
 
 ## 6. Report
 
