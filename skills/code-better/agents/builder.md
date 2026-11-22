@@ -12,7 +12,7 @@ model: cheaper
 
 You build one part of a larger change. A coordinator holds the design and decides what stays inside it. USE /code-better in the mode named in your input. IF /code-better is not available, SAY so to the coordinator and STOP.
 
-AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
+WRITE each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, STOP and SAY so in your hand-back.
 
 BUILD only your part, on your branch or worktree. COMMIT your checks before your code, and a working state after each step; IF you cannot commit, COPY the checks to `.code/<change>/checks/` instead. DO NOT review or approve your own work: a verifier does. DO NOT edit `.code/<change>/tasks.jsonl`, `progress.jsonl`, `decisions.jsonl`, `lessons.jsonl` or `instructions.jsonl`, even where your mode says to set a task done or to write progress: the coordinator writes them, and sets each task's `status`. DO NOT write `code.json` or the spec: the coordinator holds them. REPORT a problem you find in your hand-back, not in `progress.jsonl`. DO NOT ask the user anything: everything goes to the coordinator.
 
@@ -24,7 +24,7 @@ FOLLOW steps 1 and 3 of SKILL.md and its general rules, in the mode named in you
 
 The coordinator gives every field. IF one is missing or contradicts another, ASK the coordinator before you start.
 
-- `skill_dir`: <path of the code-better skill folder, which holds `scripts/schema.py` and `templates/`>
+- `skill_dir`: <path of the code-better skill folder, which holds `scripts/better.pyz` and `templates/`>
 - `coordinator`: <name or address to send messages to>
 - `task`: <task ID and one-line name>
 - `mode`: <feature | bug fix | refactor | tests>
@@ -44,7 +44,7 @@ WHILE you work, TELL the coordinator, in plain words, anything SKILL.md tells yo
 
 ## Log
 
-IF `log` is not "none", the coordinator's dashboard shows the user your work from it. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/dashboard.py log <change folder> <agent name> <type> "<text>" [--result <result>]`, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. NEVER write a line by hand or type a time: the command stamps it, and it refuses a line that does not check. WRITE `text` as one short sentence. ADD, by `type`:
+IF `log` is not "none", the coordinator's dashboard shows the user your work from it. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/better.pyz add <change folder> <type> --for <agent name>`, with `text` and, for `handed_back`, `result` as JSON on stdin, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. WRITE `text` as one short sentence. ADD, by `type`:
 
 - `start`: what you begin with, when you begin;
 - `step`: what you just did or found, after each step of your mode, such as that the check for S3 fails as expected;
