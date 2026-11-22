@@ -146,7 +146,7 @@ def _plain(text: str) -> str:
 def _bug_line(skill: str, hash: str, error: BaseException) -> str:
     """The one line for an internal error: what failed, and the module or file a missing piece names."""
     what = f"{type(error).__name__}: {error}" if str(error) else type(error).__name__
-    missing = getattr(error, "name", None) if isinstance(error, ImportError) else None
+    missing = error.name if isinstance(error, ModuleNotFoundError) else None
     if missing is None and isinstance(error, FileNotFoundError) and error.filename:
         missing = error.filename
     named = f" (missing: {missing})" if missing else ""

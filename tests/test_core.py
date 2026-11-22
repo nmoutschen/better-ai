@@ -127,7 +127,7 @@ class Cli(unittest.TestCase):
         info = resources.BuildInfo("code-better", "code", "abc123", resources.DEFAULT_CUTOFF)
 
         def boom(args, run):
-            raise ImportError("No module named 'gone'", name="gone")
+            raise ModuleNotFoundError("No module named 'gone'", name="gone")
 
         err = mock.MagicMock()
         with (
@@ -137,8 +137,12 @@ class Cli(unittest.TestCase):
         ):
             self.assertEqual(cli.main(["boom"]), 5)
         line = "".join(call.args[0] for call in err.write.call_args_list if call.args).strip()
-        self.assertTrue(line.startswith("bug in better.pyz code-better abc123: ImportError"), line)
+        self.assertTrue(line.startswith("bug in better.pyz code-better abc123: ModuleNotFoundError"), line)
         self.assertIn("(missing: gone)", line)
+        parent = cli._bug_line(
+            "code-better", "h1", ImportError("cannot import name 'schema' from 'better_ai'", name="better_ai")
+        )
+        self.assertNotIn("(missing: better_ai)", parent)
         self.assertTrue(line.endswith("set BETTER_AI_TRACEBACK=1 for the full trace"), line)
 
     def test_s30_an_import_error_in_the_package_is_still_the_bug_line_and_the_trace_comes_on_request(self):
@@ -301,10 +305,13 @@ class Units(Repo):
         self.refused(str(self.repo / ".code" / "linked"), "symlink")
 
     def test_s22_names_that_become_paths_are_checked_before_a_path_is_built(self):
-        for bad in ("../x", "A", "a b", "", "a/b", "-a", "1a", "a_b"):
+        for bad in ("../x", "A", "a b", "", "a/b", "-a", "1a", "a_b", "a\n"):
             with self.subTest(bad=bad), self.assertRaises(paths.Refused):
                 paths.check_agent(bad)
-        for bad in ("../x", "user", "A", ""):
+        for bad in ("a\n", "x/y", ""):
+            with self.subTest(slug=bad), self.assertRaises(paths.Refused):
+                paths.check_slug(bad)
+        for bad in ("../x", "user", "user\n", "A", ""):
             with self.subTest(by=bad), self.assertRaises(paths.Refused):
                 paths.check_by(bad)
         self.assertEqual(paths.check_by("builder-t1"), "builder-t1")

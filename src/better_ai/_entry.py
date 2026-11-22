@@ -26,7 +26,7 @@ def main() -> int:
     except BaseException as error:  # an import error in the package itself: still the one bug line
         skill, hash = _build()
         what = f"{type(error).__name__}: {error}"
-        missing = getattr(error, "name", None) if isinstance(error, ImportError) else None
+        missing = error.name if isinstance(error, ModuleNotFoundError) else None
         named = f" (missing: {missing})" if missing else ""
         line = f"bug in better.pyz {skill} {hash}: {what}{named}; set BETTER_AI_TRACEBACK=1 for the full trace"
         print(" ".join(line.split()).encode("ascii", "backslashreplace").decode("ascii"), file=sys.stderr)

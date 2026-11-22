@@ -40,7 +40,7 @@ def refusal(what: str, reason: str, then: str | None = None) -> Refused:
 
 def check_slug(value: str, what: str = "slug") -> str:
     """A unit folder name: lower case letters, digits and hyphens, starting with a letter or digit."""
-    if not isinstance(value, str) or not SLUG.match(value):
+    if not isinstance(value, str) or not SLUG.fullmatch(value):
         raise refusal(
             repr(value), f"not a valid {what} (use {SLUG.pattern})", "choose a name of lower case letters and hyphens"
         )
@@ -49,7 +49,7 @@ def check_slug(value: str, what: str = "slug") -> str:
 
 def check_agent(value: str, what: str = "agent name") -> str:
     """An agent's name, which becomes part of file names: `^[a-z][a-z0-9-]*$`. Checked before any path is built."""
-    if not isinstance(value, str) or not AGENT.match(value):
+    if not isinstance(value, str) or not AGENT.fullmatch(value):
         raise refusal(repr(value), f"not a valid {what} (use {AGENT.pattern})", "use lower case letters and hyphens")
     return value
 
