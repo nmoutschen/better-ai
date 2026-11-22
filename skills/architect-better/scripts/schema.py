@@ -605,19 +605,61 @@ def validate_record(value: Any, schemas: list[dict], docs: dict[str, dict], cont
 @hook("merge-loop")
 def _merge_loop(record: dict, context: Context) -> list[tuple[str, str]]:
     """A question merged into another that is merged into it, directly or through others, is in a loop: each member
-    is an error on `merged_into`. A question's file is named for its id, so only the chain is read, one file a step.
-    A question merged into itself is left to `x-differs-from`."""
+    is an error on `merged_into`. A question's file is named for its id, so only the chain is read, one file a step,
+    and each question's result is worked out once per load. A question merged into itself is left to
+    `x-differs-from`."""
     start = record.get("id")
-    chain, seen = [start], {start}
     at = record.get("merged_into")
-    while isinstance(at, str) and at not in seen and "/" not in at and "\\" not in at:
+    if not isinstance(start, str) or not _linkable(at):
+        return []
+    key = f"merge-loops:{context.directory}"
+    results: dict[str, str | None] = context._cache.setdefault(key, {})
+    if start not in results:
+        _walk_merges(start, context, results)
+    own = context.read_json(f"{start}.json")
+    if isinstance(own, dict) and own.get("merged_into") == at and own.get("status") == "merged":
+        message = results[start]
+    else:  # a file named differently from its id: the record's own link starts the chain
+        message = _stray_loop(start, at, context)
+    return [("merged_into", message)] if message else []
+
+
+def _linkable(at: Any) -> bool:
+    return isinstance(at, str) and "/" not in at and "\\" not in at
+
+
+def _next_merge(at: str, context: Context) -> Any:
+    step = context.read_json(f"{at}.json")
+    return step.get("merged_into") if isinstance(step, dict) and step.get("status") == "merged" else None
+
+
+def _walk_merges(start: str, context: Context, results: dict[str, str | None]) -> None:
+    """Follow the chain from `start` to its end, a question already worked out, or a repeat; then store the loop
+    message of each member of a loop found, and None for every other question on the way."""
+    path, where = [start], {start: 0}
+    at = _next_merge(start, context)
+    while _linkable(at) and at not in results and at not in where:
+        where[at] = len(path)
+        path.append(at)
+        at = _next_merge(at, context)
+    loop = path[where[at] :] if isinstance(at, str) and at in where else []
+    for one in path:
+        results[one] = None
+    if len(loop) > 1:
+        for i, one in enumerate(loop):
+            turned = [*loop[i:], *loop[:i]]
+            results[one] = f"merge loop: {' → '.join([*turned, one])}"
+
+
+def _stray_loop(start: str, at: Any, context: Context) -> str | None:
+    chain, seen = [start], {start}
+    while _linkable(at) and at not in seen:
         chain.append(at)
         seen.add(at)
-        step = context.read_json(f"{at}.json")
-        at = step.get("merged_into") if isinstance(step, dict) and step.get("status") == "merged" else None
+        at = _next_merge(at, context)
     if at == start and len(chain) > 1:
-        return [("merged_into", f"merge loop: {' → '.join([*chain, start])}")]
-    return []
+        return f"merge loop: {' → '.join([*chain, start])}"
+    return None
 
 
 @hook("verified-needs-passing-verifier")
