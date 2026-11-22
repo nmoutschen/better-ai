@@ -86,21 +86,21 @@
   },
   {
    "title": "waiting",
-   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"waiting\"}"
+   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"waiting\", \"default\": \"25 MB\", \"deadline\": \"2026-11-21T10:30:00Z\"}"
   },
   {
    "title": "answered on the page",
-   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"answered\", \"answer\": {\"type\": \"page\", \"event\": \"a-lq3z\"}}"
+   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"answered\", \"answer\": {\"type\": \"page\", \"event\": \"a-lq3z\"}, \"default\": null, \"deadline\": null}"
   },
   {
    "title": "answered in the chat",
-   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"answered\", \"answer\": {\"type\": \"chat\", \"text\": \"50 MB, same as the API gateway\"}}"
+   "line": "{\"type\": \"decision\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"D2\", \"raised_by\": \"builder-t5\", \"about\": {\"type\": \"task\", \"task\": \"T5\"}, \"asked\": \"What size limit should uploads have?\", \"status\": \"answered\", \"answer\": {\"type\": \"chat\", \"text\": \"50 MB, same as the API gateway\"}, \"default\": null, \"deadline\": null}"
   }
  ],
  "next-steps.jsonl": [
   {
-   "title": "step",
-   "line": "{\"type\": \"step\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"N1\", \"step\": \"Add a size limit to the image resizer\", \"origin\": {\"type\": \"spec\", \"spec\": \"S7\"}, \"if_nobody\": \"a 2 GB image stalls the resizer for every user\", \"done_when\": \"an image over 50 MB is rejected with 413\", \"priority\": \"high\", \"status\": \"asked\"}"
+   "title": "next_step",
+   "line": "{\"type\": \"next_step\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"coordinator\", \"id\": \"N1\", \"step\": \"Add a size limit to the image resizer\", \"origin\": {\"type\": \"spec\", \"spec\": \"S7\"}, \"if_nobody\": \"a 2 GB image stalls the resizer for every user\", \"done_when\": \"an image over 50 MB is rejected with 413\", \"priority\": \"high\", \"status\": \"asked\"}"
   }
  ],
  "instructions.jsonl": [

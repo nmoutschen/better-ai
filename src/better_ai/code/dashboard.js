@@ -1,142 +1,3 @@
-<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Change dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-/*__PAGE_CSS__*/
-/* What only the dashboard shows; the shared look (bar, side column, conversation, buttons, toast) is page.css above. */
-
-/* The agents, on the untinted surround */
-/* The agents scroll; the task list stays pinned under them, five rows high, and scrolls on its own past five. */
-.view { min-height:0; display:flex; flex-direction:column; }
-.agents-pane { flex:1; min-height:0; overflow-y:auto; padding:var(--space-item) var(--space-edge); }
-.tasks-pane { flex:none; padding:var(--space-tight) var(--space-edge) var(--space-item); border-top:2px solid var(--line); }
-.tasks-pane[hidden] { display:none; }
-.view h2 { margin:var(--space-control) 0 var(--space-item); }
-.cards { list-style:none; margin:0 0 var(--space-group); padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(20rem, 1fr)); gap:var(--space-item); }
-/* A button centres its content vertically: a column keeps a short card's text at the top when its row is taller. */
-.card { display:flex; flex-direction:column; justify-content:flex-start; width:100%; height:100%; text-align:left; background:var(--cream); border:1px solid var(--line); border-left:4px solid var(--umber);
-  padding:var(--space-item) var(--space-item); font:var(--font-message); color:var(--ink); cursor:pointer; }
-.card:hover h3 { text-decoration:underline; }
-/* The card's edge is the mode of its task, in the mode tag's colour; the state is the chip's word. */
-.card.m-feature { border-left-color:var(--moss-dark); }
-.card.m-bugfix { border-left-color:var(--terracotta); }
-.card.m-refactor { border-left-color:var(--umber); }
-.card.m-tests { border-left-color:var(--sand); }
-.card.m-other { border-left-color:var(--line); }
-.card h3 { margin:var(--space-tight) 0 var(--space-control); font:var(--font-heading); color:var(--heading); }
-.card ol { list-style:none; margin:0; padding:0; }
-.card ol li { margin:var(--space-tight) 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.card ol li:last-child { white-space:normal; overflow-wrap:anywhere; }
-.meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-control); margin:0; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
-.chip { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
-.mode { display:inline-block; padding:1px var(--space-control); font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
-.mode.m-feature { background:var(--moss-dark); color:var(--cream); }
-.mode.m-bugfix { background:var(--terracotta); color:var(--heading); }
-.mode.m-refactor { background:var(--umber); color:var(--cream); }
-.mode.m-tests { background:var(--sand); color:var(--heading); }
-.mode.m-other { border:1px solid var(--muted); color:var(--ink); }
-.mode.r-verifier { background:var(--heading); color:var(--cream); }
-/* The state as an icon, named for screen readers and on hover; the key under the heading says what each means. */
-.state { display:inline-flex; align-items:center; gap:var(--space-tight); font:var(--font-small-strong); line-height:1; color:var(--ink); }
-.state svg { width:14px; height:14px; flex:none; }
-.state.blocked, .state.quiet { color:var(--error); }
-.legend { margin-bottom:var(--space-item); }
-.chip.finished { color:var(--moss-dark); }
-.ago { margin:var(--space-control) 0 0; font-size:var(--text-small); color:var(--muted); }
-.view .empty { color:var(--muted); font-style:italic; }
-/* What the agent must make true: the requirements of its task, one line each, in full in the pop-up and the task list. */
-.reqs { list-style:none; margin:0 0 var(--space-control); padding:0 0 var(--space-control); border-bottom:1px solid var(--line); font-size:var(--text-message); }
-.card .reqs li { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.card .reqs li:last-child { white-space:nowrap; }
-.reqs b, .req-list b { font:var(--font-label); letter-spacing:.06em; margin-right:var(--space-control); color:var(--umber); }
-.req-list { list-style:none; margin:var(--space-control) 0 var(--space-control); padding:0; }
-.req-list li { margin:var(--space-tight) 0; padding-left:3.2em; text-indent:-3.2em; overflow-wrap:anywhere; }
-.req-list .missing { color:var(--muted); font-style:italic; }
-.check { margin:var(--space-tight) 0 var(--space-control); font-size:var(--text-message); color:var(--ink); overflow-wrap:anywhere; }
-.check code { font:var(--font-code); }
-
-/* The task list: one folded row per task, opened to show its requirements, its check and its agents. */
-.tasks { list-style:none; margin:0; padding:0; border-top:1px solid var(--line); max-height:calc(5 * 37px); overflow-y:auto; }
-.tasks > li { border-bottom:1px solid var(--line); background:var(--cream); }
-.tasks summary { display:flex; align-items:center; gap:var(--space-item); padding:var(--space-control) var(--space-item); cursor:pointer; font:var(--font-message); color:var(--ink); }
-.tasks summary:hover .t { text-decoration:underline; }
-.tasks summary::-webkit-details-marker { display:none; }
-.tasks summary::before { content:"▸"; flex:none; width:1em; color:var(--muted); }
-.tasks details[open] summary::before { content:"▾"; }
-.tasks .n { flex:none; width:2em; font:var(--font-message-strong); color:var(--muted); }
-.tasks .t { flex:1; min-width:0; }
-.tasks .on { flex:none; font-size:var(--text-small); color:var(--muted); }
-.tasks .tstat { flex:none; width:11.5em; white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-tight); font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
-.tasks .tstat svg { width:13px; height:13px; flex:none; }
-.tasks .tstat .w { overflow:hidden; text-overflow:ellipsis; }
-.tasks .tstat.verified, .tasks .tstat.merged, .tasks .tstat.done { color:var(--moss-dark); }
-.tasks .tstat.changes { color:var(--terracotta-dark); }
-.tasks .tstat.blocked, .tasks .tstat.other { color:var(--error); }
-/* An unknown status is an error: its label takes the room it needs, so the status as written stays readable. */
-.tasks .tstat.other { width:auto; min-width:11.5em; max-width:50%; }
-/* Past five rows the list scrolls, with a scroll bar that stays visible. macOS hides scroll bars until you scroll,
-   and Firefox lets no page change that, so the page hides the browser's bar and draws its own track and thumb. */
-.tasks-box { display:flex; gap:var(--space-tight); }
-.tasks-box .tasks { flex:1; min-width:0; scrollbar-width:none; }
-.tasks-box .tasks::-webkit-scrollbar { display:none; }
-.sbar { flex:none; width:10px; position:relative; background:var(--linen); cursor:pointer; }
-.sbar[hidden] { display:none; }
-.sbar i { position:absolute; left:2px; right:2px; background:var(--muted); cursor:grab; }
-.sbar i:active { cursor:grabbing; }
-.tasks .body { padding:0 var(--space-item) var(--space-item) calc(var(--space-item) + 3em + var(--space-edge)); }
-.tasks .agents button { border:0; background:none; padding:0; margin-right:var(--space-item); font:var(--font-small-strong); color:var(--ink); text-decoration:underline; cursor:pointer; }
-
-/* The pop-up for an agent */
-.qpop { width:min(36rem, calc(100vw - 24px)); }
-.qpop .sec > ul.req-list { padding-left:0; }
-.qpop .steps li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
-
-/* The records that did not validate: listed above the work, never hiding the valid ones */
-.errors { flex:none; max-height:30vh; overflow-y:auto; padding:var(--space-control) var(--space-edge); background:var(--linen); border-left:4px solid var(--error); border-bottom:1px solid var(--line); font:var(--font-message); color:var(--ink); }
-.errors[hidden] { display:none; }
-.errors h2 { margin:0 0 var(--space-tight); font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; color:var(--error); }
-.errors ul { list-style:none; margin:0; padding:0; }
-.errors li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
-.errors code { font:var(--font-code); }
-.errors .by { color:var(--muted); }
-.what.invalid { color:var(--error); }
-</style></head><body>
-<div class="band"></div>
-<header class="bar--stats"><div><h1 id="title" dir="auto">Change dashboard</h1></div>
-  <div class="stats" id="status">Loading…</div></header>
-<p class="offline" id="offline" role="status" hidden>The dashboard is closed. Ask the agent to restart it.</p>
-<section class="errors" id="errors" aria-labelledby="errors-h" hidden></section>
-<div class="work">
-  <main class="view">
-   <div class="agents-pane">
-    <h2 class="section-h">Agents</h2>
-    <ul class="legend" id="key" title="Key"></ul>
-    <ul class="cards" id="cards"></ul>
-   </div>
-   <section class="tasks-pane" id="tasks-sec" aria-labelledby="tasks-h" hidden>
-    <h2 class="section-h" id="tasks-h">Tasks</h2>
-    <div class="tasks-box"><ul class="tasks" id="tasks"></ul><div class="sbar" id="sbar" aria-hidden="true" hidden><i id="sthumb"></i></div></div>
-   </section>
-  </main>
-  <aside class="notes" aria-labelledby="notes-h">
-    <div class="notes-top">
-      <h2 id="notes-h">Conversation</h2>
-    </div>
-    <p class="empty" id="empty">Nothing yet. Click an agent to ask about its work, or write to the coordinator below.</p>
-    <ol class="thread" id="thread"></ol>
-    <form class="composer" id="noteform">
-      <p class="unwatched" id="unwatched" role="status" hidden>The coordinator is not watching this page right now. What you send is saved, but it reads it only when it next looks: tell it in the chat.</p>
-      <label for="note">Message to the coordinator</label>
-      <textarea id="note"></textarea>
-      <div class="send"><button type="submit" class="btn">Send</button></div>
-    </form>
-  </aside>
-</div>
-<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-<script>
-/*__PAGE_JS__*/
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const has = v => v && v !== "none";
@@ -149,7 +10,8 @@ const QUIET = 15 * 60;
 const ORDER = {blocked: 0, quiet: 1, waiting: 2, working: 3};
 const stateOf = (a, now) => a.state === "working" && now - a._changed > QUIET ? "quiet" : a.state;
 const word = (a, now) => stateOf(a, now) === "quiet" ? `quiet ${Math.round((now - a._changed) / 60)} min` : STATEWORD[a.state];
-let D = null, OPEN = null, REPLIES = -1, CLOSED_PAGE = false;  // OPEN: the agent the pop-up shows, as {id, anchor}
+const STATIC = !!document.getElementById("page-data");  // a page written by `render`: its data is in it, and nothing is served
+let D = null, OPEN = null, REPLIES = -1;  // OPEN: the agent the pop-up shows, as {id, anchor}
 
 // An agent's log line as a person reads it: a step shows its text, any other line says what kind it is first.
 const LABEL = {start: "Start", asked: "Asked", blocked: "Blocked", handed_back: "Handed back"};
@@ -290,79 +152,35 @@ document.addEventListener("toggle", ev => { const t = ev.target.dataset && ev.ta
   if (t !== undefined) { ev.target.open ? OPENTASKS.add(t) : OPENTASKS.delete(t); syncBar(); } }, true);
 function setHTML(el, html) { if (el._html !== html) el.innerHTML = el._html = html; }
 
-// ---------- The conversation: page.js; the dashboard adds the coordinator's decisions and questions ----------
-// A decision or question is a message from the coordinator, placed at its `at` time. Nothing comes before what it
-// answers, so an answer never shows above its question.
-function events(d) {
-  const at = e => Date.parse(e.at) / 1000 || 0;
-  const decisions = (d.decisions || []).map(x => ({type: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || x._changed}));
-  const when = Object.fromEntries(decisions.map(e => [e.id, e._t]));
-  return (d.conversation || []).map(e => {
-    const _t = Math.max(at(e), when[e.type === "answer" ? e.decision : e.to] || 0);
-    if (e.id) when[e.id] = _t;
-    return {...e, _t}; })
-    .concat(decisions).sort((a, z) => a._t - z._t || (z.type === "decision") - (a.type === "decision"));
-}
-// step:begin
-// A question to the user moves forward only: 0 Waiting for you, 1 You answered, 2 Applied; a decision has none (-1).
-// The user's latest answer is an item with its own state: when the coordinator asked back (`asked`), the user is up again.
-// An `answered` file is Applied, unless the coordinator asked back in the thread since: then the user is up again.
-const decisionStep = (status, answer, st) => status !== "waiting" && status !== "answered" ? -1
-  : answer && st[answer.id] === "asked" ? 0 : status === "answered" ? 2
-  : !answer ? 0 : ["done", "accepted"].includes(st[answer.id]) ? 2 : 1;
-// step:end
-const decisionStatus = x => String(x.status || "decided").trim().toLowerCase();
-const answerOf = c => c.replies.filter(r => r.type === "answer").pop();
-const clock = at => pageTime(at);
-const headHTML = (who, at, extra) => `<div class="head"><span class="who">${who}</span><span class="when">${esc(extra || clock(at))}</span></div>`;
-function li(cls, html) { const x = document.createElement("li"); x.className = cls; x.innerHTML = html; return x; }
-// A question to the user waits until they answer it; a decision the coordinator took can be replied to, to change it.
+// ---------- The conversation: page.js; the decision question is the shared one ----------
+const md = text => pageMarkdown(text).outerHTML;  // Markdown, built as elements: safe to place as HTML
+const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+// The shared decision item, with what only this page shows: where the question is from, and that a record is not valid.
 function decisionItem(c, state, actions) {
-  const x = c.e.x, status = decisionStatus(x), answer = answerOf(c);
-  // A question to the user moves forward only: Waiting for you, You answered, Applied. A decision has no steps.
-  const step = decisionStep(status, answer, state);
-  const STEP = [["asked", "Waiting for you"], ["replied", "You answered"], ["done", "Applied"]][step];
-  // An unanswered question shows its time in the head: the state row under it already says it waits for the user.
-  const label = step === 1 ? "answered, waiting for the coordinator" : step === 0 ? ""
-    : step === 2 ? "answered by you" : "decided";
-  const from = [has(x.from) ? x.from : "", has(x.task) ? "task " + x.task : ""].filter(Boolean).join(", ");
-  // The answer the coordinator copied shows only when the user gave it in the chat: an answer from the page is in the thread.
-  const after = status === "answered" && has(x.answer) && !answer ? md(`Your answer:\n\n${x.answer}`)
-    : status === "decided" && has(x.decision) ? md(`Decided:\n\n${x.decision}`) : "";
-  const item = li(`msg decision ${status}`, `${headHTML("Coordinator", x.at, label)}${from ? `<p class="what">From ${esc(from)}</p>` : ""}${x._errors && x._errors.length ? `<p class="what invalid">not valid: ${esc(x._errors[0])}</p>` : ""}
-    ${md(String(x.asked || ""))}${after}`);
-  item.dataset.d = x.id;
-  if (step === 0) item.classList.add("open-q");  // the top bar's figure takes the user to the first one
-  item.dataset.state = STEP ? STEP[0] : "";
-  const foot = document.createElement("div"); foot.className = "foot";
-  // A reply to a decision the coordinator took shows its own state, like any item the user sends.
-  if (!STEP && answer) foot.append(conv.progress(state[answer.id]));
-  if (STEP) foot.insertAdjacentHTML("beforeend", `<span class="progress ${STEP[0]}"><span class="bars" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${i <= step ? "on" : ""}"></i>`).join("")}</span><span>${STEP[1]}</span></span>`);
-  if (actions) foot.insertAdjacentHTML("beforeend", step === 0
-    ? `<button type="button" class="btn btn--sm answer change">Answer</button>`
-    : `<button type="button" class="btn btn--quiet btn--sm answer change">Reply</button>`);
+  const [item, foot] = dec.item(c, state, actions), x = c.e.x;
+  const from = [has(x.raised_by) ? x.raised_by : "", has(x.task) ? "task " + x.task : ""].filter(Boolean).join(", ");
+  const extra = (from ? `<p class="what">From ${esc(from)}</p>` : "") + (x._errors && x._errors.length ? `<p class="what invalid">not valid: ${esc(x._errors[0])}</p>` : "");
+  if (extra) item.querySelector(".head").insertAdjacentHTML("afterend", extra);
   return [item, foot];
 }
-// item:end
 function crumb(e) {
   const x = document.createElement("span");
   if (e.on) { x.className = "crumb"; x.innerHTML = `<span class="path">on</span><span class="el"><button type="button" data-a="${esc(e.on.id)}">${esc(e.on.title || e.on.id)}</button></span>`; }
   return x;
 }
-const md = text => pageMarkdown(text).outerHTML;  // Markdown, built as elements: safe to place as HTML
 function commentBody(e) { return pageMarkdown(e.text); }
 const conv = pageConversation({
-  served: true, stream: false, name: "dashboard", agent: "Coordinator", thread: $("thread"),
+  served: !STATIC, stream: false, thread: $("thread"),
   kinds: {decision: decisionItem}, crumb, commentBody,
   // No accept step: the coordinator answers or acts, and an answered item is finished.
   steps: ["seen", "working", "done"], labels: {done: "Answered"}, shown: st => st === "accepted" ? "done" : st,
   accept: false, filter: false, latestLast: true,
   // A question waiting for the user, or a message of theirs the coordinator asked about, counts as open; it keeps its
   // place in time, so the newest message is always last.
-  waiting: (c, state) => c.kind === "decision" ? decisionStep(decisionStatus(c.e.x), answerOf(c), state) === 0 : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
+  waiting: (c, state) => c.kind === "decision" ? dec.waiting(c, state) : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
   afterSend: () => tick(),
 });
-const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const dec = pageDecision({conversation: conv, now: () => D.now, md, esc, id: uid});
 
 // ---------- The pop-up for an agent: its whole recent log, and a box to ask about its work ----------
 function openPop(id, anchor) {
@@ -417,9 +235,6 @@ document.addEventListener("click", ev => {
   if (t.closest(".qpop .x")) return closePop();
   if (t.closest(".qpop")) return;
   const a = t.closest("[data-a]"); if (a) return openPop(a.dataset.a, a);
-  const ch = t.closest(".thread .change"); if (ch) { const d = ch.closest("li").dataset.d;
-    const asked = decisionStatus((D.decisions.find(x => x.id === d) || {})) === "waiting";
-    return conv.box(ch.closest("li"), d, asked ? "Your answer" : "Your reply", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text, default: false}, "Answer", done)); }
   if ($("pop") && !t.closest("form, .why")) closePop();
 });
 document.addEventListener("keydown", ev => {
@@ -441,19 +256,19 @@ function render(d) {
   const working = d.agents.filter(a => a.state !== "finished").length;
   // A question the user answered in the page no longer waits for them, even before the coordinator applies the answer.
   // It waits again when the coordinator asked back about the answer.
-  conv.setLog(events(d), (d.decisions || []).map(x => [x.id, x.status, x.answer, x.decision, x._changed]));
+  conv.setLog(pageDecisionEvents(d.decisions, d.conversation), (d.decisions || []).map(x => [x.id, x.status, x.answer, x.decision, x._changed]));
   const st = conv.state(), last = {};
   (d.conversation || []).filter(e => e.type === "answer").forEach(e => { last[e.decision] = e; });
-  const waitingN = (d.decisions || []).filter(x => decisionStep(decisionStatus(x), last[x.id], st) === 0).length;
+  const waitingN = (d.decisions || []).filter(x => dec.step(dec.status(x), last[x.id], st) === 0).length;
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   setHTML($("status"), (tasks.length ? `<span class="stat"><b>${done}<span class="of"> / ${tasks.length}</span></b>tasks done
       <span class="meter" aria-hidden="true"><i style="width:${(100 * done / tasks.length).toFixed(0)}%"></i></span></span>` : "")
     + stat(working, working === 1 ? "agent at work" : "agents at work")
     + (waitingN ? `<button type="button" class="stat" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "open question" : "open questions"}</button>`
-      : stat(0, "open questions"))
-    + (CLOSED_PAGE ? stat("Closed", `since ${new Date(d.now * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`) : ""));
+      : stat(0, "open questions")));
   const band = errorsHTML(d.errors);
   $("errors").hidden = !band; setHTML($("errors"), band);
+  $("notice").hidden = !d.old; $("notice").textContent = plural(d.old || 0, "record") + " written in the format before this change: kept as is, not converted.";
   drawAgents(d);
   drawTasks(d);
   syncBar();
@@ -464,12 +279,11 @@ function render(d) {
 }
 
 // load:begin
-let fails = 0;
 function tick() {
-  return fetch("dashboard.json", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(d => { fails = 0; CLOSED_PAGE = false; $("offline").hidden = true; $("unwatched").hidden = d.listening !== false; render(d); },
-      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("offline").hidden = false; $("unwatched").hidden = true; if (D) render(D); } });
+  if (STATIC) return Promise.resolve();
+  return fetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(render, () => {});
 }
 // load:end
-tick(); setInterval(tick, 2000);
-</script></body></html>
+if (STATIC) render(JSON.parse($("page-data").textContent));
+else { tick(); setInterval(tick, 2000); }
+conv.start();

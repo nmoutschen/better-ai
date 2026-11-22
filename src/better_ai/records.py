@@ -603,6 +603,8 @@ def add(args: argparse.Namespace, run: Run) -> int:
     text, stat = _read(unit, relative, form.lines)
     if form.single:
         if text is not None:
+            # A guard sees a record whose file exists, so it can say more than "already exists" (a card for a taken name).
+            _guards(run, unit, form, _stamp(run, form.type, by, fields, chosen), relative, True, by, for_agent)
             raise refusal(
                 unit.label,
                 f"{relative} already exists",

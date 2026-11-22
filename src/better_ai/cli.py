@@ -84,6 +84,7 @@ class Verb:
 
 
 VERBS: list[Verb] = []
+SHARED_PACKAGES = {"page", "schemas"}  # packages under better_ai/ that every skill shares; every other one is a skill
 
 
 def verb(
@@ -96,6 +97,9 @@ def verb(
     """Register a verb. A name registered twice for the same skill is a bug in the source."""
 
     def register(function):
+        part = (getattr(function, "__module__", "") or "").split(".")
+        if skills is None and len(part) > 2 and part[0] == "better_ai" and part[1] not in SHARED_PACKAGES:
+            raise ValueError(f"verb {name!r} comes from the skill package {part[1]!r}: name its skill in skills=")
         for old in VERBS:
             if old.name == name and (old.skills is None or skills is None or set(old.skills) & set(skills)):
                 raise ValueError(f"verb {name!r} is registered twice")

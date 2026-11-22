@@ -783,15 +783,17 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     notices: list[schema.Error] = []
     for error in schema.check_paths([unit.path], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices):
         run.err(f"warning: {error}")
-    for notice in notices:  # a record in the format before this change is kept as is: a note, not a problem
-        run.err(str(notice))
+    for notice in notices:  # a line in the format before this change is reported, not a warning of a bad record
+        run.err(f"notice: {notice}")
     conv = Conversation(unit, spec, docs)
     server = make_server(unit, spec, conv, run.info, args.port)
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     paths.write_state(unit, ADDRESS, url.encode())
     if not unit.target(SEEN).exists():  # a resumed run keeps its place, so it still sees what came in while it was away
         paths.write_state(unit, SEEN, b"0")
-    run.out(f"Serving {unit.label} at {url}. Each action the user takes is printed here as one JSON line.")
+    run.out(
+        f"Each action the user takes is printed here as one JSON line. Serving {unit.label} at {url}"
+    )  # the address last: no full stop after it
     if args.open and not webbrowser.open(url):
         run.out(
             "Could not open a browser on this machine. If the user's browser runs on another machine, "

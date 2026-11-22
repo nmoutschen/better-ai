@@ -54,13 +54,10 @@ def board_css():
     for n, line in enumerate(board.read_text(encoding="utf-8").splitlines(), 1):
         if ".map" not in line:
             yield board, n, line
-    for name in ("code-better/scripts/dashboard.html",):
-        text = (scripts / name).read_text(encoding="utf-8")
-        first = text[: text.index("/*__PAGE_CSS__*/")].count("\n") + 1
-        last = text[: text.index("</style>")].count("\n") + 1
-        for n, line in enumerate(text.splitlines(), 1):
-            if first <= n <= last and ".map" not in line:
-                yield scripts / name, n, line
+    dashboard = ROOT / "src" / "better_ai" / "code" / "dashboard.css"
+    for n, line in enumerate(dashboard.read_text(encoding="utf-8").splitlines(), 1):
+        if ".map" not in line:
+            yield dashboard, n, line
     for name in ("design-better/scripts/canvas.css", "architect-better/scripts/architect.css"):
         for n, line in enumerate((scripts / name).read_text(encoding="utf-8").splitlines(), 1):
             yield scripts / name, n, line

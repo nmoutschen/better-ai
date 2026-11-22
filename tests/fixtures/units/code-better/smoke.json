@@ -1,0 +1,126 @@
+{
+  "steps": [
+    {
+      "args": [
+        "create",
+        ".code/demo",
+        "--by",
+        "coordinator"
+      ],
+      "stdin": "{\"goal\": \"Uploads fail loudly\", \"design\": {\"type\": \"request\", \"text\": \"empty uploads should fail loudly\"}, \"mode\": \"coordinate\"}",
+      "stdout_matches": "created"
+    },
+    {
+      "args": [
+        "add",
+        ".code/demo",
+        "spec",
+        "--by",
+        "coordinator"
+      ],
+      "stdin": "{\"statement\": \"The upload service shall reject empty files.\", \"source\": {\"type\": \"request\", \"sentence\": \"empty uploads should fail loudly\"}, \"checked_by\": \"code review\"}",
+      "stdout_matches": "S1"
+    },
+    {
+      "args": [
+        "add",
+        ".code/demo",
+        "task",
+        "--by",
+        "coordinator"
+      ],
+      "stdin": "{\"task\": \"Reject empty uploads\", \"mode\": \"feature\", \"requirements\": [\"S1\"], \"check\": \"run the tests\", \"status\": \"todo\"}",
+      "stdout_matches": "T1"
+    },
+    {
+      "args": [
+        "add",
+        ".code/demo",
+        "card",
+        "--for",
+        "builder-t1",
+        "--by",
+        "coordinator"
+      ],
+      "stdin": "{\"role\": \"builder\", \"task\": \"T1\", \"branch\": \"feat/t1\"}"
+    },
+    {
+      "args": [
+        "add",
+        ".code/demo",
+        "start",
+        "--for",
+        "builder-t1"
+      ],
+      "stdin": "{\"text\": \"Reading the task\"}"
+    },
+    {
+      "args": [
+        "add",
+        ".code/demo",
+        "start",
+        "--for",
+        "nobody"
+      ],
+      "stdin": "{\"text\": \"x\"}",
+      "exit": 1
+    },
+    {
+      "args": [
+        "set",
+        ".code/demo",
+        "T1"
+      ],
+      "stdin": "{\"status\": \"building\"}"
+    },
+    {
+      "args": [
+        "check",
+        ".code/demo"
+      ]
+    },
+    {
+      "args": [
+        "render",
+        ".code/demo"
+      ],
+      "stdout_matches": "dashboard.html"
+    },
+    {
+      "args": [
+        "serve",
+        ".code/demo",
+        "--no-browser",
+        "--once"
+      ],
+      "serve": true
+    },
+    {
+      "args": [
+        "create",
+        ".code/audit/2026-11-22",
+        "--by",
+        "builder"
+      ],
+      "stdin": "{\"goal\": \"Review uploads\", \"commit\": \"abc1234\", \"not_read\": null}"
+    },
+    {
+      "args": [
+        "check",
+        ".code/audit/2026-11-22"
+      ]
+    }
+  ],
+  "worktree_steps": [
+    {
+      "args": [
+        "add",
+        "{repo}/.code/demo",
+        "step",
+        "--for",
+        "builder-t1"
+      ],
+      "stdin": "{\"text\": \"From a task worktree\"}"
+    }
+  ]
+}

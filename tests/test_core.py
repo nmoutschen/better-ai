@@ -183,6 +183,26 @@ class Cli(unittest.TestCase):
             self.assertEqual([v.name for v in cli._verbs_of(show.SKILL)], ["one", "two"])
             self.assertEqual([v.name for v in cli._verbs_of(code.SKILL)], ["one"])
 
+    def test_every_verb_a_skill_package_defines_is_registered_for_that_skill_only(self):
+        # Importing every skill package in one process must not clash, and none of their verbs may leak to other skills.
+        import importlib
+
+        for one in SKILLS.values():
+            importlib.import_module(f"better_ai.{one.package}")
+        for v in cli.VERBS:
+            module = getattr(v.run, "__module__", "")
+            parts = module.split(".")
+            if len(parts) > 1 and parts[1] in {s.package for s in SKILLS.values()}:
+                owner = next(s.name for s in SKILLS.values() if s.package == parts[1])
+                with self.subTest(verb=v.name, module=module):
+                    self.assertEqual(v.skills, (owner,))
+
+    def test_a_verb_from_a_skill_package_without_skills_is_refused(self):
+        fn = lambda a, r: None  # noqa: E731
+        fn.__module__ = "better_ai.code.somewhere"
+        with mock.patch.object(cli, "VERBS", []), self.assertRaises(ValueError):
+            cli.verb("x", help="x")(fn)
+
 
 class Resources(unittest.TestCase):
     def test_every_skill_loads_its_schemas_and_names_only_registered_hooks(self):

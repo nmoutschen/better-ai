@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "tasks.schema.json",
   "title": "one line of tasks.jsonl: a task of a change",
-  "$comment": "In coordinate mode only the coordinator writes it. A status must belong to the set for code.json's mode; requirements resolve in spec.jsonl, or in the architect folder code.json names.",
+  "$comment": "In coordinate mode only the coordinator writes it. A status must belong to the set for code.json's mode; requirements resolve in the change folder's own spec.jsonl.",
   "x-files": [
     "tasks.jsonl"
   ],
@@ -54,12 +54,7 @@
         "type": "string",
         "pattern": "^S\\d+$",
         "x-points-to": {
-          "file": {
-            "from": "code.json",
-            "field": "design.folder",
-            "name": "spec.jsonl",
-            "else": "spec.jsonl"
-          },
+          "file": "spec.jsonl",
           "type": "spec"
         }
       }
