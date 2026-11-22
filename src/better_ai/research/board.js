@@ -383,16 +383,13 @@ const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))
 const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here.</p><ul>`
   + errors.map(e => `<li><code>${esc(e.file)}:${esc(e.line)}</code> ${esc(e.field)}: ${esc(e.message)}${e.by ? ` <span class="by">(by ${esc(e.by)})</span>` : ""}</li>`).join("") + "</ul>";
 // The band is written only when it changes: it is a live region, and a rewrite every poll would be read out every time.
-// Records in the format before this change are one count, not one error each.
 function showLoaded(d, els) {
   const errors = d.errors || [];
   const html = errors.length ? errorsHTML(errors) : "";
   els.errors.hidden = !errors.length; if (els.errors.innerHTML !== html) els.errors.innerHTML = html;
-  const old = d.old || 0, text = old ? `${plural(old, "record")} in the format before this change: kept as ${old === 1 ? "it is" : "they are"}, not converted.` : "";
-  els.old.hidden = !old; if (els.old.textContent !== text) els.old.textContent = text;
 }
 // errors:end
-const bands = () => ({errors: $("errors"), old: $("oldnote")});
+const bands = () => ({errors: $("errors")});
 let fails = 0;
 function tick() {
   return fetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })

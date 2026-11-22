@@ -873,8 +873,8 @@ def _meets_old_format(record: dict, found: list[tuple[str, dict]], docs: dict, c
     """True when the record is from before the cutoff and has the shape the schemas kept as `x-old-format`: every
     schema it fails lists an old shape it meets in full."""
     at = record.get("at")
-    # Times in UTC with Z sort as text. A record with no `at` at all was written before records had one.
-    if "at" in record and (not isinstance(at, str) or not at < cutoff):
+    # Times in UTC with Z sort as text. A record with no `at`, or a null one, was written before records had one.
+    if at is not None and (not isinstance(at, str) or not at < cutoff):
         return False
     for _, schema in found:
         if not validate_record(record, [schema], docs, context):

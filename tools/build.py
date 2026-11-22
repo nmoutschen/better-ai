@@ -377,6 +377,31 @@ def schemas_by_unit_kind(skill: str, package: str, files: dict[str, bytes]) -> d
     return out
 
 
+REQUIRED_DATA = {"architect": ("kinds.json", "icons.json")}  # data a package reads that is not a schema
+
+
+def bundled_file_failures(skill: str, package: str, files: dict[str, bytes], tree: dict[str, bytes]) -> list[tuple]:
+    """Every schema of the shared folder and of the skill's package, and the data files the package needs, must be in
+    the skill's .pyz: a schema that is missing is not an error at run time, its check is just not made."""
+    wanted = {
+        name
+        for name in tree
+        if name.endswith(".schema.json")
+        and (name.startswith(f"{PACKAGE}/schemas/") or name.startswith(f"{PACKAGE}/{package}/schemas/"))
+    }
+    failures = []
+    for name in (f"{PACKAGE}/{package}/{n}" for n in REQUIRED_DATA.get(package, ())):
+        if name in tree:
+            wanted.add(name)
+        else:
+            failures.append(("bundled file", f"{skill}: {name}", "is needed by the package but is not under src/"))
+    for name in sorted(wanted - set(files)):
+        failures.append(
+            ("bundled file", f"{skill}: {name}", "is in src/ but not in this skill's .pyz: add its path to skills.json")
+        )
+    return failures
+
+
 def unit_kind_failures(unit_kind: str, schemas: dict[str, dict]) -> list[tuple[str, str, str]]:
     """S58, per unit kind: a record type is described for one file, and two record types that live in different
     files do not share an id prefix (types that share a file share its id sequence, as evidence's three types do)."""
@@ -691,6 +716,9 @@ def run_check(args, source: Source, skills: Path, root: Path | None) -> list[tup
         failures += base_field_failures(every)
         for skill, files in source.files.items():
             failures += import_failures(skill, files, source.tree)
+            with zipfile.ZipFile(first[skill]) as archive:
+                held = {name: b"" for name in archive.namelist()}
+            failures += bundled_file_failures(skill, source.cfg["skills"][skill]["package"], held, source.tree)
         text = summary_text(source, first, Path(__file__))
     target = os.environ.get("GITHUB_STEP_SUMMARY")
     if target:

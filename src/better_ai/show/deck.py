@@ -60,17 +60,22 @@ def spec_problems(spec) -> list[tuple[str, str]]:
     return [(p.field, p.message) for p in schema.validate_instance(spec, docs["spec.schema.json"], docs, context)]
 
 
+def worded(field: str, message: str) -> str:
+    """The message for a field, with an old `note` or `read` on a panel saying where its text goes now."""
+    old = re.fullmatch(r"panels\[\d+\]\.(note|read)", field)
+    if not old:
+        return message
+    return (
+        f"'{old[1]}' is no longer used: move it into 'source', the one line at the foot of each slide "
+        "that says what the slide rests on and where to read it"
+    )
+
+
 def shape_errors(spec) -> list[str]:
     """What the schema finds wrong with the spec's shape, one line each, the field first."""
     found = []
     for field, message in dict.fromkeys(spec_problems(spec)):
-        old = re.fullmatch(r"panels\[\d+\]\.(note|read)", field)
-        if old:  # a spec from before: say where the text goes now
-            message = (
-                f"'{old[1]}' is no longer used: move it into 'source', the one line at the foot of each slide "
-                "that says what the slide rests on and where to read it"
-            )
-        found.append(f"{field}: {message}")
+        found.append(f"{field}: {worded(field, message)}")
     return found
 
 

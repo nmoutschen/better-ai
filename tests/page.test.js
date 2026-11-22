@@ -625,7 +625,7 @@ const boardJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', '
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const { showLoaded, notValid } = new Function('esc', 'plural', boardJs.split('// errors:begin')[1].split('// errors:end')[0] + '; return {showLoaded, notValid};')(realEsc, plural);
 const { prepare } = new Function('const has =' + boardJs.split('const has =')[1].split('// ---------- Slices')[0] + '; return {prepare};')();
-const band = () => ({ errors: { hidden: true, innerHTML: '' }, old: { hidden: true, textContent: '' } });
+const band = () => ({ errors: { hidden: true, innerHTML: '' } });
 
 test('a board with invalid records shows its errors band', () => {
   const els = band();
@@ -643,21 +643,10 @@ test('a board with invalid records shows its errors band', () => {
 test('the errors band is hidden when the board has no errors, and shows a message as text, never as HTML', () => {
   const els = band();
   showLoaded({ listening: true, errors: [] }, els);
-  assert.deepEqual([els.errors.hidden, els.errors.innerHTML, els.old.hidden], [true, '', true]);
+  assert.deepEqual([els.errors.hidden, els.errors.innerHTML], [true, '']);
   showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: '<u>', message: '<img src=x>' }] }, els);
   assert.ok(!els.errors.innerHTML.includes('<img'));
   assert.ok(!els.errors.innerHTML.includes('<u>'));
-});
-
-test('records in the format before this change are one count, not one error each', () => {
-  const els = band();
-  showLoaded({ listening: true, errors: [], old: 3 }, els);
-  assert.deepEqual([els.errors.hidden, els.old.hidden], [true, false]);
-  assert.equal(els.old.textContent, '3 records in the format before this change: kept as they are, not converted.');
-  showLoaded({ listening: true, errors: [], old: 1 }, els);
-  assert.match(els.old.textContent, /^1 record in the format before this change: kept as it is/);
-  showLoaded({ listening: true, errors: [], old: 0 }, els);
-  assert.equal(els.old.hidden, true);
 });
 
 test("the board's map reads the new fields: claims by question, merged and withdrawn records, where a question was raised", () => {

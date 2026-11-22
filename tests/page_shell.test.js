@@ -198,7 +198,7 @@ test('a page without actions shows the decision without buttons', () => {
 
 // ---- the strips, on every served page
 
-function stripsOn(extra, fetchAnswer) {
+function stripsOn(extra, fetchAnswer, ids = {}) {
   const el = (more) => Object.assign({
     value: '', textContent: '', className: '', hidden: false, dataset: {}, style: {},
     classList: { toggle() {}, add() {}, remove() {} }, addEventListener() {}, querySelector() { return el(); },
@@ -208,7 +208,7 @@ function stripsOn(extra, fetchAnswer) {
     '.toast': el({ hidden: true }), '.notes .status': el() };
   const timers = [];
   const context = {
-    document: { querySelector: s => els[s] || el(), querySelectorAll: () => [], getElementById: () => null, contains: () => true },
+    document: { querySelector: s => els[s] || el(), querySelectorAll: () => [], getElementById: id => ids[id] || null, contains: () => true },
     Date, JSON, Object, Math, String, Array, isNaN, fetch: url => fetchAnswer(url),
     setTimeout: f => timers.push(f), clearTimeout() {}, requestAnimationFrame: f => f(),
   };
@@ -254,4 +254,21 @@ test('an answered decision the agent applied says answered by you and hides the 
   assert.match(li.innerHTML, /answered by you/);
   assert.doesNotMatch(li.innerHTML, /decided/);
   assert.doesNotMatch(li.innerHTML, /If you don't answer/);
+});
+
+test('the shared count says how many records are in the format before this change, and hides when there are none', async () => {
+  const note = { hidden: true, textContent: '' };
+  let count = 3;
+  const page = stripsOn({}, url => url === '/old' ? Promise.resolve({ json: () => Promise.resolve(count) })
+    : url.startsWith('/events') ? new Promise(() => {}) : Promise.resolve({ json: () => Promise.resolve(null), text: () => Promise.resolve('0') }), { oldnote: note });
+  await page.flush();
+  assert.equal(note.hidden, false);
+  assert.equal(note.textContent, '3 records in the format before this change: kept as is, not converted.');
+  count = 1;
+  await page.round();
+  assert.equal(note.textContent, '1 record in the format before this change: kept as is, not converted.');
+  count = 0;
+  await page.round();
+  assert.equal(note.hidden, true);
+  assert.equal(note.textContent, '');
 });

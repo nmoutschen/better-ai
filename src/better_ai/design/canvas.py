@@ -19,7 +19,7 @@ from typing import Any
 from .. import cli, page, paths, resources
 from ..paths import Refused, Unit
 from ..skill import Skill
-from .checks import is_page, version_path
+from .checks import is_page, page_reason, version_path
 
 SIZE = re.compile(r"^(\d{3,4})(?:x(\d{3,4}))?$")
 # `src` of any element, and `href` of a <link> (a style sheet, an icon): files that a version needs to look right. A link
@@ -255,10 +255,9 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
     data, warnings = data_of(unit)
     listed = read_head(unit).get("versions")
     for version in listed if isinstance(listed, list) else []:
-        if isinstance(version, dict) and is_page(version_path(version.get("file"))):
-            raise Refused(
-                f"{unit.label}: index.html is the compare page render writes: rename the version. set {unit.label} canvas"
-            )
+        named = version_path(version.get("file")) if isinstance(version, dict) else None
+        if is_page(named):
+            raise Refused(f"{unit.label}: {page_reason(named)}. set {unit.label} canvas")
     paths.write_atomic(unit, "index.html", static_page(data).encode("utf-8"))
     for warning in warnings:
         run.err(f"warning: {warning}")

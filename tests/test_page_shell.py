@@ -10,6 +10,8 @@ import http.client
 import io
 import json
 import os
+import socket
+import struct
 import sys
 import tempfile
 import threading
@@ -277,6 +279,26 @@ class ServerTest(Fixture):
         self.assertEqual(answer["result"], "saved")
         self.assertEqual(len(self.log()), 1)
 
+    def test_a_client_that_closes_mid_request_leaves_no_traceback(self):
+        server, host = self.serve()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            for _ in range(3):
+                client = socket.create_connection(server.server_address)
+                client.sendall(f"GET /data HTTP/1.1\r\nHost: {host}\r\n\r\n".encode())
+                client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))  # close with a reset
+                client.close()
+            with (
+                mock.patch.object(page.Handler, "send_json", side_effect=BrokenPipeError(32, "Broken pipe")),
+                mock.patch.object(page.Handler, "send", side_effect=ConnectionResetError(54, "reset")),
+            ):
+                for path in ("/data", "/rev"):
+                    with contextlib.suppress(http.client.RemoteDisconnected):
+                        self.get(host, path)
+            time.sleep(0.3)
+        self.assertNotIn("Traceback", err.getvalue())
+        self.assertNotIn("page server", err.getvalue())
+
     def test_a_post_from_another_origin_is_refused(self):
         _, host = self.serve()
         connection = http.client.HTTPConnection(host, timeout=10)
@@ -348,6 +370,27 @@ class ServerTest(Fixture):
 
 
 class ConversationTest(Fixture):
+    def test_a_log_that_is_a_folder_or_unreadable_is_a_file_error_not_a_bug(self):
+        log = self.unit_dir / "conversation.jsonl"
+        log.mkdir()
+        for argv in (("pending", self.unit_arg), ("wait", self.unit_arg, "--timeout", "1"), ("reply", self.unit_arg)):
+            with self.subTest(argv[0]):
+                code_, _, err = self.cli(*argv, stdin="hi")
+                self.assertEqual(code_, 1, err)
+                if argv[0] != "wait":  # wait finds no served page first
+                    self.assertIn("conversation.jsonl", err)
+                self.assertNotIn("bug in", err)
+        log.rmdir()
+        log.write_text("")
+        log.chmod(0)
+        self.addCleanup(log.chmod, 0o644)
+        if os.access(log, os.R_OK):  # running as root: nothing is unreadable
+            return
+        code_, _, err = self.cli("pending", self.unit_arg)
+        self.assertEqual(code_, 1, err)
+        self.assertIn("conversation.jsonl", err)
+        self.assertNotIn("bug in", err)
+
     def test_events_are_checked_against_the_shared_and_the_page_schema_before_a_write(self):
         conv = page.Conversation(self.unit(), self.spec, self.docs)
         with self.assertRaises(page.EventError):

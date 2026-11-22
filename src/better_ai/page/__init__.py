@@ -236,7 +236,14 @@ class Conversation:
             text = paths.read_bytes(self.unit, LOG).decode("utf-8", errors="replace")
         except FileNotFoundError:
             return []
+        except OSError as error:
+            raise self.file_error(error) from None
         return text.split("\n")[:-1]
+
+    def file_error(self, error: OSError) -> Refused:
+        """What a log that cannot be read or written (a folder, no permission) is: a refusal that names the file."""
+        reason = error.strerror or type(error).__name__
+        return paths.refusal(f"{self.unit.label}/{LOG}", f"cannot be used ({reason.lower()})", f"fix or remove {LOG}")
 
     def events(self) -> list:
         events = []
@@ -270,7 +277,10 @@ class Conversation:
             for record in records:
                 self.check(record)
             lines = [json.dumps(record) for record in records]
-            paths.append_line(self.unit, LOG, "".join(line + "\n" for line in lines).encode("ascii"))
+            try:
+                paths.append_line(self.unit, LOG, "".join(line + "\n" for line in lines).encode("ascii"))
+            except OSError as error:
+                raise self.file_error(error) from None
         return lines
 
     # ---------- The server's side ----------
@@ -599,6 +609,9 @@ def answers_any_failure(handle):
         self.answer_started = False
         try:
             return handle(self)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            self.close_connection = True  # the client went away mid-request (a closed tab): nothing to answer, no trace
+            return None
         except Exception as error:
             with contextlib.suppress(Exception):
                 print(f"page server: {self.bug_prefix}: {self.command} {self.path} failed", file=sys.stderr)
@@ -632,7 +645,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     methods: tuple = ()
     assets: dict
     bug_prefix = "bug"
+    cutoff: str | None = None
     answer_started = False
+    old_cache: tuple[float, int] = (0.0, 0)
 
     def flush_headers(self) -> None:
         super().flush_headers()
@@ -673,6 +688,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def send_json(self, value) -> None:
         self.send(200, json.dumps(value).encode(), "application/json")
 
+    def old_format_count(self) -> int:
+        """How many lines of the unit are in the format before this change (kept as is), for the count every page
+        shows. Counted again at most every two seconds; a unit that cannot be read counts none."""
+        when, count = self.old_cache
+        if time.time() - when < 2:
+            return count
+        notices: list[schema.Error] = []
+        with contextlib.suppress(Exception):
+            schema.check_paths(
+                [self.unit.path], docs=self.conversation.docs, now=None, cutoff=self.cutoff, notices=notices
+            )
+        type(self).old_cache = (time.time(), len(notices))
+        return len(notices)
+
     def after(self, query: str) -> int:
         value = urllib.parse.parse_qs(query).get("after", ["0"])[0]
         return int(value) if value.isdigit() and len(value) <= 12 else 0  # a count, not a number past any log
@@ -690,6 +719,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send(200, resources.read_bytes(self.assets[path]), kind)
         if path == "/data":
             return self.send_json({**self.spec.load(self.unit), "listening": c.listening(), "now": time.time()})
+        if path == "/old":
+            return self.send_json(self.old_format_count())
         if path == "/rev":
             rev = self.spec.revision(self.unit) if self.spec.revision else "0"
             return self.send(200, str(rev).encode(), "text/plain")
@@ -756,6 +787,7 @@ def make_server(unit: Unit, spec: PageSpec, conv: Conversation, info: resources.
     PageHandler.unit, PageHandler.spec, PageHandler.conversation = unit, spec, conv
     PageHandler.methods, PageHandler.assets = spec.sendable(), spec.table()
     PageHandler.bug_prefix = f"{unit.skill.name} {info.hash}"
+    PageHandler.cutoff = info.cutoff
     return http.server.ThreadingHTTPServer(("127.0.0.1", port), PageHandler)
 
 
@@ -782,7 +814,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     docs = load_docs(run.skill)
     notices: list[schema.Error] = []
     for error in schema.check_paths([unit.path], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices):
-        run.err(f"warning: {error}")
+        run.err(f"warning: {cli.ERROR_WORDS.get(run.skill.name, lambda e: e)(error)}")
     for notice in notices:  # a line in the format before this change is reported, not a warning of a bad record
         run.err(f"notice: {notice}")
     conv = Conversation(unit, spec, docs)

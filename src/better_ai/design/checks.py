@@ -9,11 +9,20 @@ from .. import paths
 from ..schema import Context, hook
 
 PAGE = "index.html"  # what `render` writes in the unit: no version may be this file
+STATE = ("conversation.jsonl", ".server", ".conversation-seen")  # the live page's own files
 
 
 def is_page(path: str | None) -> bool:
-    """True when `path` is, or on a case-insensitive file system may be, the index.html that `render` writes."""
-    return isinstance(path, str) and path.casefold() == PAGE
+    """True when `path` is, or on a case-insensitive file system may be, a file the page owns: the index.html that
+    `render` writes, or the page's state files."""
+    return isinstance(path, str) and path.casefold() in (PAGE, *STATE)
+
+
+def page_reason(path: str) -> str:
+    """Why a version may not be `path`, for a file `is_page` names."""
+    if path.casefold() == PAGE:
+        return f"{PAGE} is the compare page render writes: rename the version"
+    return f"{path} is one of the live page's own files: rename the version"
 
 
 def version_path(file: Any) -> str | None:
@@ -41,7 +50,7 @@ def unit_of(directory) -> paths.Unit:
 def version_problem(unit: paths.Unit, path: str) -> str | None:
     """Why a version's file cannot be read as `render` reads it (the same `paths.read_bytes`), or None."""
     if is_page(path):
-        return f"{PAGE} is the compare page render writes: rename the version"
+        return page_reason(path)
     try:
         paths.read_bytes(unit, path)
     except paths.Refused as error:

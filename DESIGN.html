@@ -62,10 +62,10 @@ header { flex:none; display:flex; flex-wrap:wrap; gap:var(--space-item) var(--sp
   padding:var(--space-item) var(--space-edge); background:var(--umber); color:var(--cream); }
 h1 { font:var(--font-title); color:var(--cream); margin:0; }
 
-/* The stats header: the page's title on the left, its figures on the right. It never wraps; the title cuts off. */
+/* The stats header: the page's title on the left, its figures on the right. The title wraps to two lines at most, then cuts off. */
 header.bar--stats { flex-wrap:nowrap; align-items:flex-end; }
 header.bar--stats > div { min-width:0; }
-header.bar--stats h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+header.bar--stats h1 { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
 .stats { flex:none; display:flex; gap:var(--space-group); align-items:flex-end; margin:0; font-size:var(--text-small); }
 .stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
 .stat b { font:var(--font-figure); }
@@ -305,6 +305,9 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 /* Under the bar when the agent's server stops answering, so a quiet page is not mistaken for a quiet agent. */
 .offline { flex:none; margin:0; padding:var(--space-control) var(--space-edge); background:var(--error); color:var(--cream); font:var(--font-message-strong); }
 .offline[hidden] { display:none; }
+/* Lines in the format before this change are one count under the header, not one error each: kept as they are. */
+.oldnote { flex:none; margin:0; padding:var(--space-tight) var(--space-edge); font:var(--font-small); color:var(--muted); }
+.oldnote[hidden] { display:none; }
 </style>
 <style>
 /* Only the layout of this reference page; every colour, type size and component comes from page.css. */
@@ -1014,9 +1017,23 @@ function pageConversation(o) {
     return !!noteBox.value.trim() || (o.busy && o.busy()) ||
       Array.prototype.some.call(document.querySelectorAll('.why textarea'), function (t) { return !!t.value.trim(); });
   }
+  // Lines in the format before this change are one count under the header, the same on every page: kept as they are.
+  function oldNote(count) {
+    var note = document.getElementById('oldnote');
+    if (!note) return;
+    var text = count ? count + (count === 1 ? ' record' : ' records') + ' in the format before this change: kept as is, not converted.' : '';
+    note.hidden = !count;
+    if (note.textContent !== text) note.textContent = text;
+  }
   function start() {
     renderThread();
+    var carried = document.getElementById('page-data');  // a page written by `render` carries its data, and its count
+    if (carried) { try { oldNote(Number(JSON.parse(carried.textContent).old) || 0); } catch (e) {} }
     if (!o.served) return;
+    (function count() {
+      fetch('/old').then(function (r) { return r.json(); }).then(function (n) { oldNote(Number(n) || 0); })
+        .catch(function () {}).then(function () { setTimeout(count, 5000); });
+    })();
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
     // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;

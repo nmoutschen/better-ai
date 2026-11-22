@@ -399,6 +399,30 @@ class TestCheck(BuildTestCase):
         self.built_repo()
         self.assertEqual(self.check(), (0, ""))
 
+    def test_a_bundled_schema_missing_from_the_pyz_is_reported(self):
+        shared = json.loads((self.repo.root / "src/better_ai/skills.json").read_text())
+        shared["shared"].remove("better_ai/schemas/")
+        shared["shared"].append("better_ai/schemas/base.schema.json")  # decisions.schema.json is left out
+        self.repo.write("src/better_ai/skills.json", json.dumps(shared))
+        self.built_repo()
+        code, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("bundled file: alpha-better: better_ai/schemas/decisions.schema.json", err)
+        self.assertIn("beta-better: better_ai/schemas/decisions.schema.json", err)
+        self.assertNotIn("base.schema.json", err)
+
+    def test_architects_kinds_and_icons_must_be_in_its_pyz(self):
+        config = json.loads((self.repo.root / "src/better_ai/skills.json").read_text())
+        config["skills"]["architect-better"] = {"package": "architect"}
+        self.repo.write("src/better_ai/skills.json", json.dumps(config))
+        self.repo.write("src/better_ai/architect/__init__.py", BETA_INIT.replace("beta", "architect"))
+        self.repo.write("src/better_ai/architect/kinds.json", "{}")
+        self.built_repo()
+        code, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("bundled file: architect-better: better_ai/architect/icons.json", err)
+        self.assertNotIn("kinds.json", err)
+
     def test_a_third_party_import_names_the_skill_and_the_module(self):
         self.repo.write("src/better_ai/alpha/__init__.py", "import requests\nfrom yaml import safe_load\n" + ALPHA_INIT)
         self.built_repo()

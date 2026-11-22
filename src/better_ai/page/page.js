@@ -391,9 +391,23 @@ function pageConversation(o) {
     return !!noteBox.value.trim() || (o.busy && o.busy()) ||
       Array.prototype.some.call(document.querySelectorAll('.why textarea'), function (t) { return !!t.value.trim(); });
   }
+  // Lines in the format before this change are one count under the header, the same on every page: kept as they are.
+  function oldNote(count) {
+    var note = document.getElementById('oldnote');
+    if (!note) return;
+    var text = count ? count + (count === 1 ? ' record' : ' records') + ' in the format before this change: kept as is, not converted.' : '';
+    note.hidden = !count;
+    if (note.textContent !== text) note.textContent = text;
+  }
   function start() {
     renderThread();
+    var carried = document.getElementById('page-data');  // a page written by `render` carries its data, and its count
+    if (carried) { try { oldNote(Number(JSON.parse(carried.textContent).old) || 0); } catch (e) {} }
     if (!o.served) return;
+    (function count() {
+      fetch('/old').then(function (r) { return r.json(); }).then(function (n) { oldNote(Number(n) || 0); })
+        .catch(function () {}).then(function () { setTimeout(count, 5000); });
+    })();
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
     // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
