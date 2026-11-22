@@ -55,6 +55,10 @@ CHECK_SENTENCE = (
     "After every write to the board, run `python3 <skill dir>/scripts/schema.py check <file>` "
     "and fix every error before your next step."
 )
+AGENT_CHECK_SENTENCE = (
+    "AFTER every write to a JSON or JSONL file in the board, RUN `python3 <skill dir>/scripts/schema.py check <file>` "
+    "and FIX every error before your next step."
+)
 RECORD_FILES = {
     "brief": "brief.schema.json",
     "question": "questions.schema.json",
@@ -128,7 +132,7 @@ class ResearchBetterText(unittest.TestCase):
             loop = text[text.index("## Loop") :]
             with self.subTest(file=name):
                 self.assertTrue(
-                    loop[len("## Loop") :].lstrip().startswith(CHECK_SENTENCE), "not at the head of the loop"
+                    loop[len("## Loop") :].lstrip().startswith(AGENT_CHECK_SENTENCE), "not at the head of the loop"
                 )
         skill = (RESEARCH / "SKILL.md").read_text(encoding="utf-8")
         self.assertNotIn("schema.py check <file>` from this skill's directory", skill)
@@ -136,7 +140,7 @@ class ResearchBetterText(unittest.TestCase):
     def test_the_board_template_has_the_schema_check_sentence(self) -> None:
         """The conventions in templates/board.md carry the check sentence."""
         text = (RESEARCH / "templates" / "board.md").read_text(encoding="utf-8")
-        self.assertIn(CHECK_SENTENCE, text)
+        self.assertIn(AGENT_CHECK_SENTENCE, text)
 
     def test_text_fixes_from_the_verifier(self) -> None:
         """A verifier's flag goes in reason or differs, a question's owner may edit its note, the verifier's reason keeps unverified."""

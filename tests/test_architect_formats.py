@@ -1278,8 +1278,8 @@ class ModeText(unittest.TestCase):
     """The mode files, the example and the templates name the new files, and say once where to check every write."""
 
     SENTENCE = (
-        "After every write to a file in the change folder, run `python3 <skill dir>/scripts/schema.py check <file>` "
-        "and fix every error before your next step."
+        "AFTER every write to a JSON or JSONL file in the change folder, RUN "
+        "`python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step."
     )
 
     def test_each_mode_says_to_check_every_write_with_the_skill_dir_form(self):
