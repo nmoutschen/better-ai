@@ -10,6 +10,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests"))
 from better import run  # noqa: E402
+
 CASES = ROOT / "evals" / "cases" / "research-better"
 REPLAYS = sorted(CASES.glob("*/replays/good-*.yaml"))
 
