@@ -25,7 +25,7 @@ COLLECT, for the scope:
 2. The result of the tests and of the static, type, lint and security checks the project uses.
 3. The rules the repository states for its code, in its documentation and in its linter and formatter settings.
 
-READ [../templates/audit.md](../templates/audit.md). MAKE the audit folder with `python3 <skill dir>/scripts/better.pyz create .code/audit/<YYYY-MM-DD> --by <your name>`, with the GOAL, the commit and `not_read` set to `null` as JSON on stdin. ADD these facts to `.code/audit/<YYYY-MM-DD>/evidence.jsonl`, in the template's format, one record for each, with the command that produced it.
+READ [../templates/audit.md](../templates/audit.md). MAKE the audit folder with `python3 <skill dir>/scripts/better.pyz create .code/audit/<YYYY-MM-DD> --by <your agent name, such as builder>`, with the GOAL, the commit and `not_read` set to `null` as JSON on stdin. ADD these facts to `.code/audit/<YYYY-MM-DD>/evidence.jsonl`, in the template's format, one record for each, with the command that produced it.
 
 TREAT a debt rating or a remediation-time estimate from a tool as a pointer, not as a cost: such tools disagree with each other, relate weakly to defects, and mostly overestimate the time. TREAT comments that admit debt, such as TODO, FIXME or HACK, as pointers too.
 

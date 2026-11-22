@@ -100,7 +100,7 @@ IF the change adds a module, a data model, a dependency or a migration and no de
 
 ### Working notes
 
-KEEP your working files in `.code/<change>/`: MAKE the folder with `python3 <skill dir>/scripts/better.pyz create .code/<change> --by <your name>`, with the goal, the design and the mode as JSON on stdin, and the folder of an audit, `.code/audit/<YYYY-MM-DD>/`, the same way. EACH file below is typed JSON: READ the template before you first write a file, and WRITE the record a pointer names before the pointer.
+KEEP your working files in `.code/<change>/`: MAKE the folder with `python3 <skill dir>/scripts/better.pyz create .code/<change> --by <your agent name, such as builder>`, with the goal, the design and the mode as JSON on stdin, and the folder of an audit, `.code/audit/<YYYY-MM-DD>/`, the same way. EACH file below is typed JSON: READ the template before you first write a file, and WRITE the record a pointer names before the pointer.
 
 | File | Holds | Template |
 |---|---|---|
@@ -113,7 +113,7 @@ KEEP your working files in `.code/<change>/`: MAKE the folder with `python3 <ski
 | `logs/<agent>.card.json`, `logs/<agent>.jsonl` | what an agent works on; its steps | [templates/log.md](templates/log.md) |
 | `.code/audit/<YYYY-MM-DD>/audit.json`, `evidence.jsonl` and `findings.jsonl` | one audit | [templates/audit.md](templates/audit.md) |
 
-WRITE each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, the rule of Missing capabilities applies: MARK the change **not finished**, and NAME the records you did not write.
+WRITE each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`, with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, the rule of Missing capabilities applies: MARK the change **not finished**, and NAME the records you did not write.
 
 IN a session the harness may compact, WRITE each instruction the user gives on how to work to `instructions.jsonl`, with their words, and each constraint on what the code does into the spec, and READ both again after each compaction.
 

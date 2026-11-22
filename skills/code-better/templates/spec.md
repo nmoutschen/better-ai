@@ -1,7 +1,7 @@
 # Spec: <short name of the change>
 
 <HOW TO FILL THIS IN — delete this block when done.
-- `create` makes `.code/<change>/code.json`, one JSON record, from the fields of the change below, and you ADD the records of `spec.jsonl`. IF `design` is an architect folder, `create` copies that folder's `spec.jsonl` into the change folder: EDIT the copy there.
+- The change folder holds `.code/<change>/code.json`, one JSON record with the fields of the change below, and `spec.jsonl`: ADD its records. IF `design` is an architect folder, the spec is the copy of that folder's `spec.jsonl` in the change folder: EDIT it there.
 - Conventions: WRITE a missing value as `null`, a list as a JSON array, and a value that has a fixed set as one of its exact lowercase words. A field not shown below is an error. WRITE the record a pointer names before the pointer.
 - One `spec` record per requirement. LIST every MUST and MUST NOT the design states or implies, or the request where there is no design, including the error and edge cases it leaves open. WRITE `statement` as one EARS statement, with concrete values: "When <trigger>, the <system> shall <response>", "If <unwanted condition>, then the <system> shall <response>", "While <state>, …", "Where <feature>, …" or "The <system> shall <response>".
 - Most costly to miss first. No reasons in `statement`: `source` carries them. A MUST NOT in positive form where one exists, and every MUST NOT with a check. KEEP a requirement only if its absence would change what is built or checked.

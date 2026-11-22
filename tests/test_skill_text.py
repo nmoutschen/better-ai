@@ -54,7 +54,7 @@ OLD_FIELDS = [
     r"\banswer line",
 ]
 RECORD_RULE = (
-    "WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your name>`, "
+    "WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, "
     "with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. "
     "IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal."
 )
@@ -254,7 +254,7 @@ class ResearchBetterText(unittest.TestCase):
             kind = record["type"]
             doc = schemas[kind] if kind in schemas else defs[shared.get(kind, kind)]
             allowed = DECISION_FIELDS if kind == "decision" else set(doc["properties"])
-            required = {"type", "asked", "status"} if kind == "decision" else set(doc["required"])
+            required = {"type", "raised_by", "about", "asked", "status"} if kind == "decision" else set(doc["required"])
             with self.subTest(type=kind, status=record.get("status")):
                 self.assertLessEqual(set(record), allowed)
                 self.assertLessEqual(required - STAMPED, set(record))
@@ -405,7 +405,7 @@ class CodeBetterTextTest(unittest.TestCase):
     def test_code_better_the_record_rule_is_in_skill_md_and_both_agents_only(self):
         """SKILL.md states the record rule once, the builder and the verifier restate it, and the modes do not."""
         rule = (
-            "WRITE each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`,"
+            "WRITE each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`,"
             " with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN"
             " it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal."
         )
@@ -732,6 +732,25 @@ class SkillTextCommands(unittest.TestCase):
                 text = path.read_text()
                 self.assertNotIn("after every write", text.casefold(), path.name)
                 self.assertNotIn("START each record with", text, path.name)
+
+    def test_serve_opens_the_browser_only_with_open_and_reply_takes_its_words_on_stdin(self):
+        for path in self.files():
+            text = path.read_text()
+            for line in re.findall(r"better\.pyz serve [^`]*`", text):
+                self.assertIn("--open", line, path.name)
+            for line in re.findall(r"better\.pyz reply [^`]*`", text):
+                self.assertNotIn('"', line, path.name)
+
+    def test_the_text_does_not_say_what_a_command_writes(self):
+        coordinate = (CODE_BETTER / "modes" / "coordinate.md").read_text()
+        self.assertNotIn("The reply marks the item", coordinate)
+        self.assertNotIn("it refuses a name another agent has", coordinate)
+        self.assertNotIn("opens the user's browser", coordinate)
+        self.assertNotIn("exits by itself", (RESEARCH / "SKILL.md").read_text())
+        for path in self.files():
+            text = path.read_text()
+            self.assertNotIn("`create` makes", text, path.name)
+            self.assertNotIn("`create` copies", text, path.name)
 
     def test_the_next_step_record_type_is_next_step(self):
         text = (CODE_BETTER / "templates" / "next-steps.md").read_text()

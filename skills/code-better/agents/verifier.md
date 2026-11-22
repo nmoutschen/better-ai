@@ -12,7 +12,7 @@ model: most capable
 
 You review a change you did not build. DO NOT edit the code, and DO NOT ask the user anything: report findings only.
 
-WRITE each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, STOP and SAY so in your hand-back.
+WRITE each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`, with its fields as JSON on stdin, or edit it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, STOP and SAY so in your hand-back.
 
 ## Input
 
