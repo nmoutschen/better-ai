@@ -739,7 +739,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             (line,) = self.conversation.append({"type": msg["method"], "by": "user", **params})
         except EventError as error:
             return self.send_json(rpc_error(rid, -32602, str(error)))
-        print(line, flush=True)
+        with contextlib.suppress(OSError):  # a closed stdout is not a failed save
+            print(line, flush=True)
         return self.send_json({"jsonrpc": "2.0", "id": rid, "result": "saved"})
 
     def log_message(self, *args):

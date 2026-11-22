@@ -195,3 +195,63 @@ test('a page without actions shows the decision without buttons', () => {
   const t = decision(load({ capabilities: ['decisions'] }));
   assert.deepEqual(buttons(t.render({}, false)[1]), []);
 });
+
+// ---- the strips, on every served page
+
+function stripsOn(extra, fetchAnswer) {
+  const el = (more) => Object.assign({
+    value: '', textContent: '', className: '', hidden: false, dataset: {}, style: {},
+    classList: { toggle() {}, add() {}, remove() {} }, addEventListener() {}, querySelector() { return el(); },
+    querySelectorAll() { return []; }, replaceChildren() {}, append() {}, appendChild() {}, focus() {}, setAttribute() {},
+  }, more);
+  const els = { '.offline': el({ hidden: true }), '.unwatched': el({ hidden: true }), '#note': el(), '.thread': el(), '.notes .empty': el(),
+    '.toast': el({ hidden: true }), '.notes .status': el() };
+  const timers = [];
+  const context = {
+    document: { querySelector: s => els[s] || el(), querySelectorAll: () => [], getElementById: () => null, contains: () => true },
+    Date, JSON, Object, Math, String, Array, isNaN, fetch: url => fetchAnswer(url),
+    setTimeout: f => timers.push(f), clearTimeout() {}, requestAnimationFrame: f => f(),
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  context.pageConversation(Object.assign({ served: true, thread: els['.thread'] }, extra)).start();
+  const flush = () => new Promise(resolve => setImmediate(resolve));
+  const round = async () => { await flush(); await flush(); const due = timers.splice(0); due.forEach(f => f()); await flush(); await flush(); };
+  return { els, round, flush: async () => { await flush(); await flush(); await flush(); } };
+}
+
+test('a page that does not stream shows the not-watching strip when /listening says false', async () => {
+  const page = stripsOn({ stream: false }, url => url === '/listening' ? Promise.resolve({ json: () => Promise.resolve(false) }) : Promise.reject(new Error('unexpected ' + url)));
+  await page.round();
+  assert.equal(page.els['.unwatched'].hidden, false);
+  assert.equal(page.els['.offline'].hidden, true);
+});
+
+test('a page that does not stream shows the closed strip after two failed fetches, not one', async () => {
+  const page = stripsOn({ stream: false }, () => Promise.reject(new Error('down')));
+  await page.flush();
+  assert.equal(page.els['.offline'].hidden, true);  // once is a blip
+  await page.round();
+  assert.equal(page.els['.offline'].hidden, false);
+});
+
+test('a page that does not stream hides the closed strip again once the server answers', async () => {
+  let up = false;
+  const page = stripsOn({ stream: false }, () => up ? Promise.resolve({ json: () => Promise.resolve(true) }) : Promise.reject(new Error('down')));
+  await page.round(); await page.round();
+  assert.equal(page.els['.offline'].hidden, false);
+  up = true;
+  await page.round();
+  assert.equal(page.els['.offline'].hidden, true);
+  assert.equal(page.els['.unwatched'].hidden, true);
+});
+
+test('an answered decision the agent applied says answered by you and hides the default line', () => {
+  const t = decision(load({ agent: 'coordinator', capabilities: ['decisions'] }));
+  t.entry.replies = [{ type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false }];
+  const [li, foot] = t.render({ a1: 'done' });
+  assert.match(foot.innerHTML, /Applied/);
+  assert.match(li.innerHTML, /answered by you/);
+  assert.doesNotMatch(li.innerHTML, /decided/);
+  assert.doesNotMatch(li.innerHTML, /If you don't answer/);
+});

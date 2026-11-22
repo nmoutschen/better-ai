@@ -262,6 +262,21 @@ class ServerTest(Fixture):
             self.rpc(host, "note", {"id": "m2", "text": "x", "to": None, "by": "coordinator"})["error"]["code"], -32602
         )
 
+    def test_a_saved_event_is_not_a_bug_when_stdout_is_closed(self):
+        _, host = self.serve()
+
+        class Closed:
+            def write(self, text):
+                raise OSError(9, "Bad file descriptor")
+
+            def flush(self):
+                raise OSError(9, "Bad file descriptor")
+
+        with mock.patch.object(sys, "stdout", Closed()):
+            answer = self.rpc(host, "note", {"id": "m1", "text": "kept", "to": None})
+        self.assertEqual(answer["result"], "saved")
+        self.assertEqual(len(self.log()), 1)
+
     def test_a_post_from_another_origin_is_refused(self):
         _, host = self.serve()
         connection = http.client.HTTPConnection(host, timeout=10)

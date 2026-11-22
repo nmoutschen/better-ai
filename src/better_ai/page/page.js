@@ -115,9 +115,8 @@ function pageCommentPosition(x, y, pop) {
 }
 
 // The conversation between a served page and the agent: sending, the thread with its items, states and replies, the
-// message box, and the live updates. Each skill whose page talks to the agent carries an identical copy of this file,
-// as it does page.css and page.py, and the Scripts workflow fails if the copies differ: change it in one skill, then
-// copy it to the others. The page's own script calls pageConversation with what only that page has, such as its pins.
+// message box, and the live updates. This file is bundled once, from src/better_ai/page/, into every
+// skill's better.pyz, with page.css and the server. The page's own script calls pageConversation with what only that page has, such as its pins.
 //
 // Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the agent's
 // replies. The page sends only the fields of its own kind of event (the server sets `type`, `by` and `at`), and the
@@ -394,11 +393,12 @@ function pageConversation(o) {
   }
   function start() {
     renderThread();
-    if (!o.served || o.stream === false) return;
+    if (!o.served) return;
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
-    var offline = document.querySelector('.offline'), misses = 0;
+    // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
+    var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
     function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
-    (function stream(after) {
+    if (streaming) (function stream(after) {
       fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
@@ -411,7 +411,7 @@ function pageConversation(o) {
     // A new render from the agent loads by itself, as soon as the user is not typing: a comment, a message or an answer
     // in progress would be lost. The page keeps its place through o.beforeReload.
     var rev = null;
-    (function poll() {
+    if (streaming) (function poll() {
       fetch('/rev').then(function (r) { return r.text(); }).then(function (t) {
         if (rev === null) rev = t;
         else if (t !== rev && !busy()) {
@@ -426,7 +426,8 @@ function pageConversation(o) {
     (function watch() {
       fetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
         unwatched.hidden = on !== false;
-      }).catch(function () { unwatched.hidden = true; }).then(function () { setTimeout(watch, 2000); });
+        if (!streaming) connected(true);
+      }).catch(function () { unwatched.hidden = true; if (!streaming) connected(false); }).then(function () { setTimeout(watch, 2000); });
     })();
   }
 
@@ -681,12 +682,12 @@ function pageDecision(o) {
     var x = c.e.x, st = status(x), answer = answerOf(c), n = step(st, answer, state), asked = n === 0;
     var steps = [['asked', 'Waiting for you'], ['replied', 'You answered'], ['done', 'Applied']], STEP = steps[n];
     var label = asked ? (x.default ? deadlineWords(x) : '') : n === 1 ? 'answered, waiting for the ' + pageRole()
-      : st === 'defaulted' ? 'decided by the default' : st === 'answered' ? 'answered by you' : 'decided';
+      : n === 2 ? 'answered by you' : st === 'defaulted' ? 'decided by the default' : st === 'answered' ? 'answered by you' : 'decided';
     var li = document.createElement('li');
     li.className = 'msg decision ' + st + (asked ? ' open-q' : '');
     // The default shows under an open question, as what happens without an answer; the answer the agent copied shows
     // only when the user gave it in the chat: an answer from the page is in the thread.
-    var after = x.default && (st === 'waiting' || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? "If you don't answer: " : 'Default applied: ') + x.default
+    var after = x.default && ((st === 'waiting' && n <= 0) || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? "If you don't answer: " : 'Default applied: ') + x.default
       : st === 'answered' && x.answer && x.answer.type === 'chat' ? '\n\nYour answer:\n\n' + x.answer.text
       : st === 'decided' && x.decision ? '\n\nDecided:\n\n' + x.decision : '';
     li.innerHTML = head(pageRole().replace(/^./, function (ch) { return ch.toUpperCase(); }), label || pageTime(x.at)) + o.md(String(x.asked || '') + after);
