@@ -24,6 +24,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
+import better  # noqa: E402
 from better import run  # noqa: E402
 
 from better_ai import page, resources  # noqa: E402
@@ -34,7 +35,7 @@ SKILL = "show-better"
 UNIT = ".show/deck"
 SPEC = json.loads((GOLD / "all-kinds.spec.json").read_text())
 FIELDS = {k: v for k, v in SPEC.items() if k not in ("at", "by")}  # what `create` is given: it stamps `at` and `by`
-AT = "2026-11-22T10:00:00Z"
+AT = better.AFTER_CUTOFF
 SMALL = {
     "type": "slides",
     "title": "The answer is yes.",
@@ -188,7 +189,7 @@ class Commands(unittest.TestCase):
         (unit / "spec.json").write_text(json.dumps({**SMALL, "at": "2999-01-01T00:00:00Z", "by": "a"}))
         done = better(self.cwd, "check", UNIT)
         self.assertEqual(done.returncode, 1)  # a time ahead of the clock
-        (unit / "spec.json").write_text(json.dumps({**SMALL, "at": "2026-11-22T10:00:00Z"}))
+        (unit / "spec.json").write_text(json.dumps({**SMALL, "at": AT}))
         done = better(self.cwd, "check", UNIT)
         self.assertEqual(done.returncode, 1)
         self.assertIn("by: required", done.stdout)

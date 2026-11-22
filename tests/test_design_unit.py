@@ -100,7 +100,7 @@ class Unit(unittest.TestCase):
         done = run(self.root, "set", ".design/pay", "canvas", stdin=json.dumps({"versions": head["versions"]}))
         self.assertEqual(done.returncode, 1)
         (self.folder / "canvas.json").write_text(
-            json.dumps({"type": "canvas", "at": "2026-11-22T10:00:00Z", "by": "x", **head})
+            json.dumps({"type": "canvas", "at": better.AFTER_CUTOFF, "by": "x", **head})
         )
         self.assertEqual(run(self.root, "check", ".design/pay").returncode, 1)
         done = run(self.root, "render", ".design/pay")
@@ -134,7 +134,7 @@ class Unit(unittest.TestCase):
         self.assertIn("is a symlink: copy the file into the unit", done.stdout + done.stderr)
         self.create()
         (self.folder / "canvas.json").write_text(
-            json.dumps({"type": "canvas", "at": "2026-11-22T10:00:00Z", "by": "x", **head})
+            json.dumps({"type": "canvas", "at": better.AFTER_CUTOFF, "by": "x", **head})
         )
         self.assertEqual(run(self.root, "check", ".design/pay").returncode, 1)
 
@@ -419,10 +419,10 @@ class Events(unittest.TestCase):
         self.assertIn("format", done.stdout)
 
     def test_a_new_decide_is_refused(self):
-        self.assertEqual(self.log({**self.DECIDE, "at": "2026-11-22T10:00:00Z"}).returncode, 1)
+        self.assertEqual(self.log({**self.DECIDE, "at": better.AFTER_CUTOFF}).returncode, 1)
 
     def test_an_approve_is_accepted(self):
-        event = {**self.DECIDE, "type": "approve", "at": "2026-11-22T10:00:00Z"}
+        event = {**self.DECIDE, "type": "approve", "at": better.AFTER_CUTOFF}
         self.assertEqual(self.log(event).returncode, 0)
 
 

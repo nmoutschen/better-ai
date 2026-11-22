@@ -689,7 +689,7 @@ class RenderingChecks(unittest.TestCase):
         for old in ("note", "read"):
             with self.subTest(old):
                 spec = edited(BASE, lambda s, old=old: s["panels"][0].__setitem__(old, "x"))
-                done = check_in_a_unit(json.dumps({**spec, "type": "slides", "at": "2026-11-22T10:00:00Z", "by": "x"}))
+                done = check_in_a_unit(json.dumps({**spec, "type": "slides", "at": better.AFTER_CUTOFF, "by": "x"}))
                 self.assertEqual(done.returncode, 1)
                 self.assertIn(f"panels[0].{old}: '{old}' is no longer used: move it into 'source'", done.stdout)
                 self.assertNotIn("not allowed", done.stdout)
@@ -702,7 +702,7 @@ class RenderingChecks(unittest.TestCase):
             unit = Path(d, ".show", "deck")
             unit.mkdir(parents=True)
             (unit / "spec.json").write_text(
-                json.dumps({**spec, "type": "slides", "at": "2026-11-22T10:00:00Z", "by": "x"})
+                json.dumps({**spec, "type": "slides", "at": better.AFTER_CUTOFF, "by": "x"})
             )
             env = {**os.environ, "BETTER_AI_SKILL": "show-better"}
             server = subprocess.Popen(

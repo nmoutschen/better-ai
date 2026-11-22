@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>better-ai design language</title>
 <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<!-- A copy of skills/*/scripts/page.css, so this page shows what the boards show and works as a single file.
+<!-- A copy of src/better_ai/page/page.css, so this page shows what the boards show and works as a single file.
      tests/test_design.py fails when it differs; paste page.css again between the style tags after changing it. -->
 <style id="page-css">
 /* The shared look of the skills' live pages (boards): research-better's board, code-better's dashboard,
@@ -622,7 +622,7 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 </aside>
 </div>
 <div class="toast" role="status" aria-live="polite" hidden></div>
-<!-- A copy of skills/*/scripts/page.js, kept identical by tests/test_design.py, as page.css above. -->
+<!-- A copy of src/better_ai/page/page.js, kept identical by tests/test_design.py, as page.css above. -->
 <script id="page-js">
 // The element-comment layer. A page supplies its target metadata, pin coordinates and navigation;
 // this owns the editor, the numbered pins and their actions.
@@ -1027,8 +1027,6 @@ function pageConversation(o) {
   }
   function start() {
     renderThread();
-    var carried = document.getElementById('page-data');  // a page written by `render` carries its data, and its count
-    if (carried) { try { oldNote(Number(JSON.parse(carried.textContent).old) || 0); } catch (e) {} }
     if (!o.served) return;
     (function count() {
       fetch('/old').then(function (r) { return r.json(); }).then(function (n) { oldNote(Number(n) || 0); })

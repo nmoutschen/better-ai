@@ -157,9 +157,7 @@ async def test_judge_asked_once_for_every_alternative_of_each_missing_entry(monk
         expected=[["modes/bug-fix.md", "modes/feature.md"], "agents/verifier.md", "formats/specs.md"],
     )
     assert len(stub.prompts) == 1 and "agents/verifier.md" not in stub.prompts[0].split("Transcript")[0]
-    assert result.metadata["missing"] == ["formats/specs.md"] and result.metadata["judge_read"] == [
-        "modes/feature.md"
-    ]
+    assert result.metadata["missing"] == ["formats/specs.md"] and result.metadata["judge_read"] == ["modes/feature.md"]
 
 
 async def test_judge_that_cannot_run_is_a_sample_error(monkeypatch: pytest.MonkeyPatch) -> None:
