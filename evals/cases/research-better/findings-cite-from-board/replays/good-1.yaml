@@ -1,6 +1,6 @@
 reply: 'Findings in .research/checkout-drop/findings.md: 3-D Secure challenges are the likeliest cause.'
 actions:
-- read: .research/checkout-drop/sources/S-w2-3.md
+- read: .research/checkout-drop/sources/S-w2-3.json
 - write: .research/checkout-drop/findings.md
   content: '# Findings
 

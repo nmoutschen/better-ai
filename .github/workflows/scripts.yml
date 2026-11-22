@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: "0 4 * * 1,4" # Monday and Thursday, 04:00 UTC: the full sweep
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -40,6 +43,9 @@ jobs:
       - name: Tests
         # tests/ checks page.py, the conversation the pages share, and runs each serving script as the agent would.
         run: python -I -m unittest discover tests
+        env:
+          # Pull requests and pushes run a sample of the exhaustive tests; the scheduled and manual runs run every case.
+          BETTER_AI_SWEEP: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'full' || '' }}
 
   pages:
     # The page files the scripts fill in: CSS with stylelint's recommended rules (errors such as invalid values,
@@ -67,7 +73,7 @@ jobs:
       - name: JavaScript tests
         # page.js's thread model: each item's state and what Open lists, with Node's own test runner.
         run: node --test tests/*.test.js
-      - name: Shared page files are identical in every skill
+      - name: Shared page files and the schema validator are identical in every skill
         run: |
           # The skills' pages that talk to the agent share page.css (the look), page.py (the log, the server's
           # conversation endpoints, and wait, reply, status and pending) and page.js (the conversation on the page);
@@ -77,3 +83,12 @@ jobs:
             test -f "skills/architect-better/scripts/$name" || exit 1
             for f in "$@"; do cmp "$1" "$f"; done
           done
+          # schema.py, the validator of every agent file, the base schema its schemas build on, and the conversation
+          # schema every page's log shares, are in all five page skills and identical.
+          for name in scripts/schema.py schemas/base.schema.json schemas/conversation.schema.json; do
+            for skill in architect-better code-better research-better design-better show-better; do
+              cmp "skills/architect-better/$name" "skills/$skill/$name" || exit 1
+            done
+          done
+          # spec.schema.json, the spec format, is in code-better and architect-better and identical.
+          cmp skills/architect-better/schemas/spec.schema.json skills/code-better/schemas/spec.schema.json || exit 1

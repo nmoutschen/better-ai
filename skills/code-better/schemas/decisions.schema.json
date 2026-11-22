@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "decisions.schema.json",
+  "title": "one line of decisions.jsonl: a decision or a question to the user, with its state",
+  "$comment": "In coordinate mode only the coordinator writes it; otherwise the agent does. The user's answer from the page is pointed to, not copied.",
+  "x-files": [
+    "decisions.jsonl"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "id",
+    "raised_by",
+    "about",
+    "asked",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "decision"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "id": {
+      "$ref": "base.schema.json#/$defs/id",
+      "pattern": "^D\\d+$"
+    },
+    "raised_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "about": {
+      "description": "what the record is about: a task, or the whole change",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "task",
+            "change"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "task"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "task"
+            ],
+            "properties": {
+              "type": {
+                "const": "task"
+              },
+              "task": {
+                "type": "string",
+                "pattern": "^T\\d+$",
+                "x-points-to": {
+                  "file": "tasks.jsonl",
+                  "type": "task"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "change"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "change"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "asked": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "decided",
+        "waiting",
+        "answered"
+      ]
+    },
+    "decision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "answer": {
+      "description": "the user's answer: the answer event the page logged, or their words in the chat",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "page",
+            "chat"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "page"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "event"
+            ],
+            "properties": {
+              "type": {
+                "const": "page"
+              },
+              "event": {
+                "type": "string",
+                "minLength": 1,
+                "x-points-to": {
+                  "file": "conversation.jsonl",
+                  "type": "answer"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "chat"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "text"
+            ],
+            "properties": {
+              "type": {
+                "const": "chat"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "decided"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "decision"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "answer"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "waiting"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "decision"
+              ]
+            },
+            {
+              "required": [
+                "answer"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "answered"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "answer"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "decision"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

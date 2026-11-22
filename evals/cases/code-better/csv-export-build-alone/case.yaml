@@ -5,7 +5,7 @@ source:
 - SKILL.md#2
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: A CSV export the request calls three pieces of work (writer, CLI command, tests) fits in one small package and one
   context; the agent builds it itself and uses sub-agents, if any, only for reading or review.

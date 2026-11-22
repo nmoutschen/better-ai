@@ -2,7 +2,6 @@
 as a repeat of one of them."""
 
 import os
-import re
 import sys
 
 sys.path.insert(0, os.environ["GRADE_FILES"])
@@ -19,7 +18,6 @@ if not update:
     fail("the leadership update is not a source on the board")
 originals = set(by_page.get("checkout-conversion-march", []) + by_page.get("3ds-rollout-review", []))
 for sid in update:
-    marked = set(re.split(r"[\s,;()]+", sources[sid].get("repeats", "")))
-    if not marked & originals:
+    if sources[sid].get("repeats") not in originals:
         fail(f"{sid} (leadership update) repeats {sources[sid].get('repeats')!r}, not the source it summarises")
 print("leadership update marked as a repeat")

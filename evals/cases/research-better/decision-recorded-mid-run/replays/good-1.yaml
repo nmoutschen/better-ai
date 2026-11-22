@@ -1,19 +1,9 @@
 reply: provider/ is missing; I recorded a decision and continued with the wiki alone, noting the gap.
 actions:
 - bash: ls provider
-- write: .research/checkout-drop/decisions/D-coordinator-1.md
-  content: 'id: D-coordinator-1
-
-    at: 2026-11-21T10:00:00
-
-    asked: The provider''s dashboard export in provider/ is not in the repository.
-
-    default: Continue with the wiki alone and record the gap in the brief and the findings.
-
-    deadline: 2026-11-21T10:10:00
-
-    status: default
-
-    answer: none
+- write: .research/checkout-drop/decisions.jsonl
+  content: '{"type": "decision", "at": "2026-11-21T10:00:00Z", "by": "coordinator", "id": "D1", "asked": "The provider''s
+    dashboard export in provider/ is not in the repository.", "default": "Continue with the wiki alone and record the gap
+    in the brief and the findings.", "deadline": "2026-11-21T10:10:00Z", "status": "default"}
 
     '

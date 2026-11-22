@@ -1,0 +1,18 @@
+{
+ "type": "architect",
+ "at": "2026-11-20T10:00:00Z",
+ "by": "architect",
+ "request": {
+  "text": "Show each agent's task, mode and state.\nShow the questions and decisions that wait for you.\nAn answer you give in the page reaches the coordinator.\nThe coordinator's reply appears under the item it answers.",
+  "from": {
+   "type": "chat"
+  }
+ },
+ "title": "Live dashboard for coordinate mode",
+ "summary": "See what the agents are doing and answer their questions in one page.",
+ "scope": "code-better coordinate mode: the coordinator, its builders and verifiers, and a new local page. Out of scope: other modes and remote access.",
+ "accepted": [
+  "requirements",
+  "containers"
+ ]
+}

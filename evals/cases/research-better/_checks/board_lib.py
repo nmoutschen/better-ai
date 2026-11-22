@@ -1,5 +1,6 @@
-"""Read a research board in the format of skills/research-better/templates/board.md, for the hidden checks."""
+"""Read a research board in the format of skills/research-better/schemas/, for the hidden checks."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -10,40 +11,41 @@ def fail(message: str) -> None:
 
 
 def entry(path: Path) -> dict:
-    """One board file: the first value of each `key: value` line."""
-    data = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        key, sep, value = line.partition(":")
-        if sep and key.strip() and " " not in key.strip():
-            data.setdefault(key.strip(), value.strip())
-    return data
+    """One board record: a whole JSON file, which may span lines, or the first line of a JSONL file."""
+    if not path.is_file():
+        fail(f"{path} is not on the board")
+    try:
+        text = path.read_text(encoding="utf-8")
+        return json.loads(text if path.suffix == ".json" else text.splitlines()[0])
+    except (ValueError, IndexError):
+        fail(f"{path} is not a JSON record")
+        return {}
 
 
 def the_board() -> Path:
     """The one board in .research/; fails unless there is exactly one."""
-    found = sorted(p.parent for p in Path(".research").glob("*/brief.md"))
+    found = sorted(p.parent for p in Path(".research").glob("*/brief.json"))
     if len(found) != 1:
-        fail(f"expected one board with a brief.md in .research/, found {len(found)}")
+        fail(f"expected one board with a brief.json in .research/, found {len(found)}")
     return found[0]
 
 
 def entries(board: Path, kind: str) -> dict:
-    """The board's files of one kind (questions, claims, sources, decisions), by id or file name."""
+    """The board's records of one kind (questions, claims, sources, decisions), by id."""
     out = {}
-    for path in sorted((board / kind).glob("*.md")):
+    if kind == "decisions":
+        path = board / "decisions.jsonl"
+        for line in path.read_text(encoding="utf-8").splitlines() if path.is_file() else []:
+            if line.strip():
+                record = json.loads(line)
+                out[record["id"]] = record  # a later line for the same id replaces the earlier one
+        return out
+    for path in sorted((board / kind).glob("*.json")):
         data = entry(path)
         out[data.get("id") or path.stem] = data
     return out
 
 
-def unquote(value: str) -> str:
-    """The value without its outer straight, curly or single quotes."""
-    value = value.strip()
-    for left, right in (('"', '"'), ("“", "”"), ("'", "'")):
-        if len(value) >= 2 and value.startswith(left) and value.endswith(right):
-            return value[1:-1]
-    return value
-
-
 def none(value) -> bool:
-    return value is None or value.strip() in ("", "none")
+    """True for a missing value, null, an empty string, the string "none" or an empty list."""
+    return value is None or value in ("", "none", [])

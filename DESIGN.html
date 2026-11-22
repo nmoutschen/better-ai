@@ -630,7 +630,7 @@ function pageElementComments(o) {
   function open(data, item, from, position) {
     draft = data;
     pop.querySelector('.target').replaceChildren(o.crumb(data));
-    input.value = item ? item.comment || '' : '';
+    input.value = item ? item.text || '' : '';
     if (o.prepare) o.prepare(data);
     del.hidden = !item;
     ok.textContent = item ? 'Update' : 'Send';
@@ -647,16 +647,18 @@ function pageElementComments(o) {
     if (opener && document.contains(opener)) opener.focus();
     opener = null;
   }
-  function remove(it) { o.send('delete', { id: it.id, n: it.n }, 'Deletion of comment ' + it.n); }
+  function remove(it) { o.send('delete', { to: it.id }, 'Deletion of comment ' + it.n); }
   function submit() {
     var text = input.value.trim();
     if (!draft || (!text && !(o.allowEmpty && o.allowEmpty(draft)))) { input.focus(); return; }
     var it = draft.item, n = it ? it.n : o.nextNumber();
     var id = it ? it.id : 'c' + n + '-' + Date.now().toString(36);
     var params = Object.assign({ id: id, n: n }, o.params(draft, text));
-    close();
+    // The box stays open, with its text, until the server has saved the comment: a refusal leaves it to fix.
     // An update reuses the comment's id, so the agent replaces the earlier version.
-    o.send('comment', params, 'Comment ' + n + (it ? ' (updated)' : ''));
+    ok.disabled = true;
+    o.send('comment', params, 'Comment ' + n + (it ? ' (updated)' : ''),
+      function () { ok.disabled = false; close(); }, function () { ok.disabled = false; input.focus(); });
   }
   pop.querySelector('.cancel').addEventListener('click', close);
   del.addEventListener('click', function () { var it = draft && draft.item; close(); if (it) remove(it); });
@@ -741,14 +743,17 @@ function pageCommentPosition(x, y, pop) {
 // copy it to the others. The page's own script calls pageConversation with what only that page has, such as its pins.
 //
 // Every action is sent as it happens, as one JSON-RPC call, and the server keeps a log of them with the agent's
-// replies. The page streams that log, or feeds it with setLog, and rebuilds the conversation from it, so a reload or a
+// replies. The page sends only the fields of its own kind of event (the server sets `type`, `by` and `at`), and the
+// server checks them against the page's schemas: what it refuses stays in the box, with its reason, and is undone on
+// the page. The page streams the log, or feeds it with setLog, and rebuilds the conversation from it, so a reload or a
 // new render loses nothing. State changes are also applied at once, and applying the same event twice changes nothing.
 //
 // o.served       the page is served over http; otherwise actions stay on the page (o.unsent says what to do with them)
 // o.name         what the page is called in errors, such as 'canvas'; o.agent what the agent is called (default Agent)
 // o.apply(e, fresh)  apply one event to the page's own model, such as its pins; fresh when the user just sent it
+// o.reset()      empty that model and its pins; the page then replays the log through apply, to undo an event the server refused
 // o.byId(id)     the page's own model of a comment, which offers Show, Edit and Delete; nothing when it offers none
-// o.crumb(e)     where a comment was made; o.commentBody(e) what it says
+// o.crumb(e)     where a comment was made; o.commentBody(e) what it says (its text)
 // o.reveal(e), o.edit(it, button), o.remove(it), o.showLabel(n)   the comment's Show, Edit and Delete
 // o.kinds        renderers for the page's own kinds of event: function (c, state) returning the item, or [item, foot]
 // o.itemKinds    the user's actions the agent tracks with a state (default comment and note)
@@ -761,7 +766,7 @@ function pageCommentPosition(x, y, pop) {
 // o.readOnly     a copy of the page to read: no actions
 // o.stream       read the log from the server's /events (default true); otherwise the page calls setLog
 // o.afterSend()  called once the server saved an action
-// o.noteParams() what a message carries besides its words, such as the current slide
+// o.noteParams() what a message carries besides its words, such as the current slide; the page's events schema must allow it
 // o.sendMode()   a function to run instead of sending a message when the Send button is pressed, or null
 // o.busy()       the page has something open the user would lose on a reload
 // o.beforeReload()  keep the page's place before a new render loads
@@ -770,7 +775,7 @@ function pageConversation(o) {
   var rpcId = 0, log = [], state = {}, fed = null, itemKinds = o.itemKinds || ['comment', 'note'], kinds = o.kinds || {};
   var agentKinds = o.agentKinds || ['reply'], agent = o.agent || 'Agent', accept = o.accept !== false, filtering = o.filter !== false;
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
-  function time(at) { return (at || '').slice(11, 16); }
+  function time(at) { return pageTime(at); }
   var status = document.querySelector('.notes .status');
   function say(text, error) { if (!status) return; status.textContent = text; status.classList.toggle('error', !!error); }
   // Every action shows a toast at the bottom of the window: sending, then sent or failed.
@@ -780,20 +785,38 @@ function pageConversation(o) {
     toast.textContent = text; toast.className = 'toast ' + (kind || ''); toast.hidden = false;
     if (kind !== 'error' && kind !== 'busy') toastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
   }
-  // DONE runs once the server saved the action; FAIL when it could not, such as to enable a button again.
+  // DONE runs once the server saved the action; FAIL when it did not, such as to enable a button again. The user's text
+  // stays where it was typed: DONE is what clears it. A refusal by the server, such as an event its schema rejects, shows
+  // the server's reason; only an unreachable server is shown as closed.
   function send(method, params, what, done, fail) {
     if (o.readOnly) return;
-    var event = Object.assign({ action: method, at: new Date().toISOString().slice(0, 19) }, params);
+    var event = Object.assign({ type: method, at: new Date().toISOString().slice(0, 19) + 'Z', by: 'user' }, params);
     if (o.apply) o.apply(event, true);
     if (!o.served) { log.push(event); renderThread(); flash(what + ' saved on this page. ' + (o.unsent || ''), 'ok'); if (done) done(); return; }
     flash('Sending ' + what.toLowerCase() + '…', 'busy');
     fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
       .then(function (r) { return r.json(); })
-      .then(function (r) { if (r.error) throw new Error(r.error.message);
-        flash('✓ ' + what + ' sent to the ' + agent.toLowerCase(), 'ok'); say(''); if (done) done(); if (o.afterSend) o.afterSend(); })
-      .catch(function () { flash('Not sent: ' + what.toLowerCase() + '. The ' + o.name + ' is closed.', 'error');
-        say('Not sent: the ' + o.name + ' is closed. Ask the agent to restart it.', true); if (fail) fail(); });
+      .then(function (r) {
+        if (r.error) { var refused = new Error(r.error.message); refused.refused = true; throw refused; }
+        return r;
+      })
+      .then(function () {
+        flash('✓ ' + what + ' sent to the ' + agent.toLowerCase(), 'ok'); say(''); if (done) done(); if (o.afterSend) o.afterSend();
+      }, function (error) {
+        undo();
+        var refused = error && error.refused;
+        flash('Not sent: ' + what.toLowerCase() + '. ' + (refused ? error.message : 'The ' + o.name + ' is closed.'), 'error');
+        say(refused ? 'Not sent: ' + error.message : 'Not sent: the ' + o.name + ' is closed. Ask the agent to restart it.', true);
+        if (fail) fail();
+      });
+  }
+  // An event that was applied at once but not saved goes: the page's model is rebuilt from the log, which it never reached.
+  function undo() {
+    if (!o.reset) return;
+    o.reset();
+    log.forEach(function (e) { if (o.apply) o.apply(e, false); });
+    renderThread();
   }
 
   // ---------- The thread: everything sent and every reply, in order; a comment shows once, in its latest state ----------
@@ -802,9 +825,9 @@ function pageConversation(o) {
   function head(who, at) { var h = el('div', 'head'); h.append(el('span', 'who', who), el('span', 'when', time(at))); return h; }
   // A reply that names the message it answers is shown under that message, so the user sees what was answered.
   function replyBlock(e) {
-    var mine = e.action !== 'reply', r = el('div', mine ? 'reply mine' : 'reply'), h = head(mine ? 'You' : agent, e.at);
-    if (e.action === 'reopen') h.append(el('span', 'progress reopened', 'Reopened'));
-    r.append(h, body(e.action === 'reopen' ? e.reason : pageWords(e)));
+    var mine = e.type !== 'reply', r = el('div', mine ? 'reply mine' : 'reply'), h = head(mine ? 'You' : agent, e.at);
+    if (e.type === 'reopen') h.append(el('span', 'progress reopened', 'Reopened'));
+    r.append(h, body(e.text));
     return r;
   }
   var filter = filtering ? 'open' : 'all', scrolledOnce = false;
@@ -840,7 +863,7 @@ function pageConversation(o) {
       var r = ta.value.trim(); if (!r) return ta.focus();
       var done = function () { close(); li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); };
       if (onSend) return onSend(r, done);
-      send('note', { id: 'm-' + Date.now().toString(36), to: id, note: r }, label === 'Your answer' ? 'Answer' : 'Reply', done);
+      send('note', { id: 'm-' + Date.now().toString(36), to: id, text: r }, label === 'Your answer' ? 'Answer' : 'Reply', done);
     }
     ok.addEventListener('click', sendIt); no.addEventListener('click', close);
     ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); sendIt(); } if (k.key === 'Escape') close(); });
@@ -876,7 +899,7 @@ function pageConversation(o) {
       }
       li.append(h, o.crumb(e), c.deleted ? el('p', 'body', 'Deleted') : o.commentBody(e));
     } else if (c.kind === 'note') {
-      li = el('li', 'msg me'); li.append(head('You', e.at), body(pageWords(e)));
+      li = el('li', 'msg me'); li.append(head('You', e.at), body(e.text));
     } else if (c.kind === 'reply') {
       li = el('li', 'msg agent'); li.append(replyBlock(e));
     } else if (kinds[c.kind]) {
@@ -886,7 +909,7 @@ function pageConversation(o) {
     c.replies.forEach(function (r) { li.append(replyBlock(r)); });
     if (foot) li.append(foot);
     if (agentKinds.indexOf(c.kind) >= 0 && e.id && actions) {  // the agent's own messages can be answered too; the state row closes them
-      var rf = el('div', 'foot'), mine = c.replies.filter(function (r) { return r.action === 'note'; }), last = mine[mine.length - 1];
+      var rf = el('div', 'foot'), mine = c.replies.filter(function (r) { return r.type === 'note'; }), last = mine[mine.length - 1];
       if (last) rf.append(progressChip(state[last.id]));
       var rb = el('button', 'btn btn--quiet btn--sm answer', 'Reply'); rb.type = 'button';
       rb.addEventListener('click', function () { reasonBox(li, e.id, 'Your reply', rb); });
@@ -930,7 +953,7 @@ function pageConversation(o) {
     if (filter === 'open') entries = entries.filter(function (c) { return open.indexOf(c) >= 0 || (c.e.id && kept[c.e.id]); });
     thread.replaceChildren();
     // Before anything is sent, both views say how to start; after, Open says when nothing is left.
-    var started = log.some(function (x) { return x.action && x.action !== 'status'; });
+    var started = log.some(function (x) { return x.type && x.type !== 'status'; });
     document.querySelector('.notes .empty').hidden = started;
     entries.forEach(function (c) {
       var li = entryNode(c, !o.readOnly); if (!li) return;
@@ -978,7 +1001,7 @@ function pageConversation(o) {
   function sendNote() {
     var note = noteBox.value.trim();
     if (!note) { noteBox.focus(); return; }
-    send('note', Object.assign({ id: 'm-' + Date.now().toString(36), note: note }, o.noteParams ? o.noteParams() : {}), 'Message', function () { noteBox.value = ''; });
+    send('note', Object.assign({ id: 'm-' + Date.now().toString(36), text: note, to: null }, o.noteParams ? o.noteParams() : {}), 'Message', function () { noteBox.value = ''; });
   }
   function mode() { return o.sendMode ? o.sendMode() : null; }
   if (noteBox && !o.readOnly) {
@@ -1002,7 +1025,7 @@ function pageConversation(o) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
         // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
-        if (after > 0) r.events.forEach(function (e) { if (e.action === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
+        if (after > 0) r.events.forEach(function (e) { if (e.type === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
         if (r.events.length) renderThread();
         stream(r.total);
       }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
@@ -1036,8 +1059,12 @@ function pageConversation(o) {
   };
 }
 
-// A message's words: the canvas and the slides send them as "note", the research board as "text" before it shared this.
-function pageWords(e) { return e.note != null ? e.note : e.text; }
+// The time of an event for the user: its UTC time (Z) as their own clock reads it, hours and minutes.
+function pageTime(at) {
+  if (!/Z$/.test(at || '')) return (at || '').slice(11, 16);
+  var d = new Date(at);
+  return isNaN(d) ? '' : ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+}
 
 // The thread as the log makes it, without the page: each item's state, the entries in the order they show, with the
 // replies under them, and the entries Open lists. Kept apart from the drawing so it can be tested without a browser.
@@ -1047,31 +1074,31 @@ function pageWords(e) { return e.note != null ? e.note : e.text; }
 function pageThread(log, itemKinds, waiting, latestLast) {
   var entries = [], byKey = {}, state = {};
   log.forEach(function (e) {
-    if (e.action === 'status') state[e.to] = e.status;
-    else if (e.action === 'accept') state[e.to] = 'accepted';
-    else if (e.action === 'reopen') state[e.to] = 'reopened';
+    if (e.type === 'status') state[e.to] = e.status;
+    else if (e.type === 'accept' || e.type === 'accepted') state[e.to] = 'accepted';
+    else if (e.type === 'reopen') state[e.to] = 'reopened';
     // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
-    else if (e.action === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
+    else if (e.type === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
     // A reply under a finished item is a follow-up: the item goes back to the agent.
-    else if (e.action === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
+    else if (e.type === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
   });
   log.forEach(function (e, i) {
     // What an event answers: an answer to a decision names the decision; the rest name it in `to`.
-    var to = e.action === 'answer' ? e.decision : e.to;
-    if (e.action === 'comment' || e.action === 'delete') {
-      var c = byKey[e.id];
-      if (!c) { if (e.action === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [], last: i }; entries.push(c); }
-      else if (e.action === 'delete') c.deleted = true;
+    var to = e.type === 'answer' ? e.decision : e.to;
+    if (e.type === 'comment' || e.type === 'delete') {
+      var c = byKey[e.type === 'delete' ? e.to : e.id];
+      if (!c) { if (e.type === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [], last: i }; entries.push(c); }
+      else if (e.type === 'delete') c.deleted = true;
       else { c.e = e; c.edited = true; c.deleted = false; }
-    } else if ((e.action === 'reply' || e.action === 'answer' || (e.action === 'reopen' && e.reason) || (e.action === 'note' && to)) && to && byKey[to]) { byKey[to].replies.push(e); byKey[to].last = i; if (e.id) byKey[e.id] = byKey[to]; }
-    else if (e.action === 'accept' || e.action === 'reopen' || e.action === 'status') return;
-    else { var n = { kind: e.action, e: e, replies: [], last: i }; if (e.id) byKey[e.id] = n; entries.push(n); }
+    } else if ((e.type === 'reply' || e.type === 'answer' || e.type === 'reopen' || (e.type === 'note' && to)) && to && byKey[to]) { byKey[to].replies.push(e); byKey[to].last = i; if (e.id) byKey[e.id] = byKey[to]; }
+    else if (e.type === 'accept' || e.type === 'accepted' || e.type === 'reopen' || e.type === 'status') return;
+    else { var n = { kind: e.type, e: e, replies: [], last: i }; if (e.id) byKey[e.id] = n; entries.push(n); }
   });
   // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
   // comes last, next to the message box.
   if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
   var waits = waiting ? function (c) { return waiting(c, state); }
-    : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.action === 'note'; }); };
+    : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.type === 'note'; }); };
   entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
   // Open: the user's items not yet accepted, with what was said under them, and the entries waiting for the user.
   var open = entries.filter(function (c) {

@@ -92,7 +92,7 @@ ASK the user, USING `/ask-better` if available, in these cases:
 - **Decisions.** ASK about a decision that changes behaviour, cost, risk or how the code is maintained, and anything that contradicts a decision the design records, with your recommendation, its main reason and its main drawback. USE `/decide-better` if available. IF the user does not read code, DESCRIBE each option by what they would observe or pay.
 - **Conflicts.** ASK about a test that contradicts a requirement, two requirements that conflict, and a requirement that cannot or should not hold as written, with the change you propose and what the user would see differently. DO NOT build to your own version until it is agreed. ONCE agreed, REVISE the requirement in place.
 
-TREAT a constraint the user set as a requirement. ADD each answer to the spec; your own proposals are not answers. KEEP building the parts your questions do not affect.
+TREAT a constraint the user set as a requirement. ADD each answer to the spec; your own proposals are not answers. RECORD each question you ask in `decisions.jsonl` with status `waiting` before the gap that points to it, in the format of [templates/decision.md](templates/decision.md); in coordinate mode the coordinator records it. WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file, and once the user has answered, WRITE the requirement with source `request` holding the user's words. KEEP building the parts your questions do not affect.
 
 ### Design for structural changes
 
@@ -100,7 +100,22 @@ IF the change adds a module, a data model, a dependency or a migration and no de
 
 ### Working notes
 
-KEEP your working files in `.code/<change>/`, and ADD `.code/` to `.git/info/exclude`. KEEP `.code/conventions.md` as a short list of facts about the repo, each with its source. IN a session the harness may compact, WRITE each constraint the user gives to `.code/<change>/notes.md`, and READ it again after each compaction.
+KEEP your working files in `.code/<change>/`, and ADD `.code/` to `.git/info/exclude`. EACH file below is typed JSON, and its schema in `schemas/` is the authority: READ the template before you first write a file, and WRITE the record a pointer names before the pointer.
+
+| File | Holds | Template |
+|---|---|---|
+| `code.json`, `spec.jsonl` | the goal, the design and the mode; the requirements, gaps and design items with no requirement | [templates/spec.md](templates/spec.md) |
+| `tasks.jsonl`, `progress.jsonl` | the tasks and their status; progress, problems and their resolution | [templates/tasks.md](templates/tasks.md) |
+| `decisions.jsonl` | decisions taken and questions to the user | [templates/decision.md](templates/decision.md) |
+| `next-steps.jsonl` | the proposed next steps | [templates/next-steps.md](templates/next-steps.md) |
+| `lessons.jsonl` | the bug classes verifiers found, each with its rule (coordinate mode) | [templates/lessons.md](templates/lessons.md) |
+| `instructions.jsonl` | the user's instructions on how to work | [templates/instructions.md](templates/instructions.md) |
+| `logs/<agent>.card.json`, `logs/<agent>.jsonl` | what an agent works on; its steps | [templates/log.md](templates/log.md) |
+| `.code/audit/<YYYY-MM-DD>/audit.json`, `evidence.jsonl` and `findings.jsonl` | one audit | [templates/audit.md](templates/audit.md) |
+
+AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step. IN a session the harness may compact, WRITE each instruction the user gives on how to work to `instructions.jsonl`, with their words, and each constraint on what the code does into the spec, and READ both again after each compaction.
+
+KEEP `.code/conventions.md` as a short list of facts about the repo, each with its source.
 
 ### Missing capabilities
 

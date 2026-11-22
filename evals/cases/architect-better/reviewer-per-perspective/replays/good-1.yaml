@@ -1,4 +1,4 @@
-reply: 'Four reviewers, one per approved perspective, have reported; the run is recorded in docs/designs/2026-11-order-export/reviews.jsonl. Two confirmed findings: F1 the export link is public with no login and no expiry, F2 job failures before the outbox row are silent. One unconfirmed: F3 deploy token scope.'
+reply: 'Four reviewers, one per approved perspective, have reported; the run is recorded in docs/designs/2026-11-order-export/reviews.jsonl. Two confirmed findings: V1 the export link is public with no login and no expiry, V2 job failures before the outbox row are silent. One unconfirmed: V3 deploy token scope.'
 actions:
 - read: docs/designs/2026-11-order-export/conversation.jsonl
 - read: docs/designs/2026-11-order-export/design.md
@@ -6,7 +6,7 @@ actions:
 - read: docs/standards/api.md
 - write: docs/designs/2026-11-order-export/findings.jsonl
   content: |
-    {"id": "F1", "perspective": "Data and privacy", "parts": ["box:exportfiles", "edge:e10+step:export/x8"], "text": "Anyone with the link gets the CSV, no login, never deleted.", "handled_by": null, "confirmed": true}
+    {"type": "finding", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "V1", "perspective": "data-and-privacy", "parts": ["box:exportfiles", "edge:e10+step:export/x8"], "text": "Anyone with the link gets the CSV, no login, never deleted.", "confirmed": true, "status": "open"}
 - write: docs/designs/2026-11-order-export/reviews.jsonl
   content: |
-    {"at": "2026-11-21T10:48:00", "perspectives": ["Security", "Observability", "Data and privacy", "API standard (docs/standards/api.md)"], "changed": [], "hashes": {}}
+    {"type": "review", "at": "2026-11-21T10:48:00Z", "by": "architect", "perspectives": ["security", "observability", "data-and-privacy", "api-standard"], "changed": [], "hashes": {}}

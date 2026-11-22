@@ -1,6 +1,6 @@
 # Design: order history export
 
-Request: [request.md](request.md)
+Request: [architect.json](architect.json)
 Requirements: RQ1–RQ6 in [requirements.jsonl](requirements.jsonl), all confirmed by the user on 2026-11-21.
 Diagrams: [design.json](design.json)
 

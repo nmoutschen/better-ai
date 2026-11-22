@@ -4,7 +4,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const has = v => v && v !== "none";
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const mins = s => s < 90 ? "under 2 min" : `${Math.round(s / 60)} min`;
-// Agents write statuses by hand: anything unknown counts as to do, so a typo never breaks the page.
+// A question's status is one of the schema's words; one this table lacks still counts as to do.
 const STATE = { "answered": ["answered", "ok"], "in progress": ["working", "now"], "open": ["to do", "todo"], "proposed": ["proposed", "todo"],
   "contested": ["contested", "bad"], "not found": ["not found", "bad"], "unclear": ["unclear", "bad"] };
 const FILL = { ok: "#6B7F5E", now: "#5C4033", todo: "#C4B69C", bad: "#E8725C" };
@@ -14,20 +14,31 @@ let D = null, LAYOUT = "", OPEN = null, REPLIES = -1, SCROLLED = false, CLOSED_P
 
 // ---------- Shape the board ----------
 function prepare(d) {
-  const qs = d.questions.filter(q => String(q.status || "").trim().toLowerCase() !== "out of scope");
+  // A valid merged question is shown by the one it was merged into; a valid withdrawn claim and a valid question out
+  // of scope are not shown. An invalid one is shown, marked, so that nothing a broken file names vanishes.
+  const all = new Set(d.questions.map(q => q.id));
+  const merged = Object.fromEntries(d.questions.filter(q => q.status === "merged" && !q._errors && all.has(q.merged_into)).map(q => [q.id, q.merged_into]));
+  // A merge counts only when following it ends on a question that is not merged: questions merged into themselves or
+  // into each other stay on the board, with their claims.
+  const steps = Object.keys(merged).length;
+  Object.keys(merged).filter(id => { let at = merged[id]; for (let i = 0; i < steps && at !== id && at in merged; i++) at = merged[at]; return at === id; })
+    .forEach(id => delete merged[id]);
+  const into = id => { for (let i = 0; merged[id] && i <= steps; i++) id = merged[id]; return id; };
+  const qs = d.questions.filter(q => (q.status !== "out of scope" || q._errors) && !merged[q.id]);
   const ids = new Set(qs.map(q => q.id)), qOfSource = {};
-  d.claims.forEach(c => { if (c.source && !qOfSource[c.source]) qOfSource[c.source] = c.question; });
+  d.claims = d.claims.filter(c => c.status !== "withdrawn" || c._errors);
+  d.claims.forEach(c => { if (!qOfSource[c.source]) qOfSource[c.source] = c.question; });
   const searches = {};
-  Object.values(d.logs || {}).forEach(l => (l.searches || []).forEach(line => {
-    const m = line.match(/ for (Q-[\w-]+)/); if (m) searches[m[1]] = (searches[m[1]] || 0) + 1; }));
+  Object.values(d.logs || {}).forEach(l => (l.searches || []).forEach(r => { const id = into(r.question); searches[id] = (searches[id] || 0) + 1; }));
   qs.forEach(q => {
-    q.view = String(q.status || "open").trim().toLowerCase(); if (!STATE[q.view]) q.view = "open";
+    q.view = STATE[q.status] ? q.status : "open";
     q.label = has(q.title) ? q.title : shorten(q.question || q.id);
-    q.claimsList = d.claims.filter(c => c.question === q.id);
+    q.claimsList = d.claims.filter(c => into(c.question) === q.id);
     q.searches = searches[q.id] || 0;
-    const pr = String(q.priority || "").trim().toLowerCase(); q.prio = ["high", "medium", "low"].includes(pr) ? pr : "";
-    let o = String(q.origin || "").split(/[ ,;(]/)[0];
-    if (o.startsWith("S-")) o = qOfSource[o];
+    q.prio = ["high", "medium", "low"].includes(q.priority) ? q.priority : "";
+    // Where it was raised: the question it came after, else the question its origin is or the source's claim belongs to.
+    const origin = q.origin || {};  // an invalid record may lack it
+    const o = into(q.raised_in || (origin.type === "question" ? origin.question : origin.type === "source" ? qOfSource[origin.source] : null));
     q.parent = ids.has(o) && o !== q.id ? o : null;
   });
   // A loop in the origins would hang the layout: cut it at the question that closes it.
@@ -82,9 +93,10 @@ function drawMap(d) {
     const dot = q.view === "proposed" ? hollow("#78736B") : q.view === "not found" ? hollow("#9A3B2A") : q.view === "unclear" ? hollow("#9A3B2A", true)
       : `<circle class="dot filled" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r}" fill="${FILL[cls]}"/>`;
     const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#5C4033" stroke-dasharray="3 2"/>` : "";
+    const mark = q._errors ? `<text class="bang" x="${(x + r + 3).toFixed(0)}" y="${(y - r).toFixed(0)}">!</text>` : "";
     const right = x >= CX, far = dp > 1 ? `<text class="far" x="${(x + (r + 4) * (right ? 1 : -1)).toFixed(0)}" y="${(y + 4).toFixed(0)}" text-anchor="${right ? "start" : "end"}">${esc(q.label)}</text>` : "";
     const who = q.view === "in progress" && has(q.owner) ? `, ${q.owner} on it` : "";
-    out.push(`<g class="q${OPEN && OPEN.id === q.id ? " sel" : ""}" data-q="${esc(q.id)}" tabindex="0" role="button" aria-label="${esc(q.label)}: ${word}${q.prio ? ", " + q.prio + " priority" : ""}${esc(who)}"><title>${esc(q.label)}${q.prio ? ` (${q.prio} priority)` : ""}</title>${ring}${dot}${far}</g>`);
+    out.push(`<g class="q${OPEN && OPEN.id === q.id ? " sel" : ""}" data-q="${esc(q.id)}" tabindex="0" role="button" aria-label="${esc(q.label)}: ${word}${q.prio ? ", " + q.prio + " priority" : ""}${esc(who)}${q._errors ? ", " + esc(notValid(q)) : ""}"><title>${esc(q.label)}${q.prio ? ` (${q.prio} priority)` : ""}${q._errors ? ` - ${esc(notValid(q))}` : ""}</title>${ring}${dot}${mark}${far}</g>`);
   });
   seeds.forEach(s => {  // each slice's name, at the edge, outside every dot
     const a = pos[s.id][2], lx = CX + (RMAX + 26) * Math.cos(a), ly = CY + (RMAX + 26) * Math.sin(a);
@@ -170,33 +182,33 @@ addEventListener("pointerup", () => { drag = null; wrapEl.classList.remove("drag
 // is in the order things happened, so what an event answers is already timed when the event is read.
 function events(d) {
   const at = e => Date.parse(e.at) / 1000 || 0;
-  const decisions = (d.decisions || []).map(x => ({action: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || x._born}));
+  const decisions = (d.decisions || []).map(x => ({type: "decision", id: x.id, x, at: x.at, _t: Date.parse(x.at) / 1000 || 0}));
   const when = Object.fromEntries(decisions.map(e => [e.id, e._t]));
   return (d.conversation || []).map(e => {
-    const _t = Math.max(at(e), when[e.action === "answer" ? e.decision : e.to] || 0);
+    const _t = Math.max(at(e), when[e.type === "answer" ? e.decision : e.to] || 0);
     if (e.id) when[e.id] = _t;
     return {...e, _t}; })
-    .concat(decisions).sort((a, z) => a._t - z._t || (z.action === "decision") - (a.action === "decision"));
+    .concat(decisions).sort((a, z) => a._t - z._t || (z.type === "decision") - (a.type === "decision"));
 }
 const decisionStatus = x => String(x.status || "pending").trim().toLowerCase();
-const answerOf = c => c.replies.filter(r => r.action === "answer").pop();
-const clock = at => String(at || "").slice(11, 16);
+const answerOf = c => c.replies.filter(r => r.type === "answer").pop();
+const clock = at => pageTime(at);
 const headHTML = (who, at, extra) => `<div class="head"><span class="who">${who}</span><span class="when">${esc(extra || clock(at))}</span></div>`;
 function li(cls, html) { const x = document.createElement("li"); x.className = cls; x.innerHTML = html; return x; }
 // A worker's message when it closes a question. The title and the count of new questions are read from the board now,
-// so a later rewrite or a question added after the close shows; the answer is the gist as the worker wrote it.
+// so a later rewrite or a question added after the close shows; the answer is the question's gist as the worker wrote it.
 const CLOSEWORD = {answered: "Answered", contested: "Contested", "not found": "Not found", unclear: "Unclear"};
 function closedItem(c) {
-  const e = c.e, q = D.byId[e.q], n = D.qs.filter(x => x.parent === e.q).length;
-  const title = q ? `<button type="button" class="qlink" data-open="question:${esc(e.q)}">${esc(q.label)}</button>` : esc(e.q);
+  const e = c.e, q = D.byId[e.question], n = D.qs.filter(x => x.parent === e.question).length;
+  const title = q ? `<button type="button" class="qlink" data-open="question:${esc(e.question)}">${esc(q.label)}</button>` : esc(e.question);
   const more = n ? `<p class="added">Raised ${plural(n, "new question")}.</p>` : "";
   return li("msg worker", `${headHTML(esc(e.by || "A worker"), e.at)}
-    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p>${md(e.text)}${more}`);
+    <p class="what">${esc(CLOSEWORD[e.status] || e.status)}: ${title}</p>${q && has(q.gist) ? md(q.gist) : ""}${more}`);
 }
 // A decision waiting for the user: Use the default (the check) or Answer; once answered or decided, Reply.
 function decisionItem(c, state, actions) {
   const x = c.e.x, status = decisionStatus(x), answer = answerOf(c), ast = answer && state[answer.id];
-  const def = has(x.default) ? x.default : x.chose || "", left = (Date.parse(x.deadline) / 1000 || 0) - D.now;
+  const def = x.default, left = (Date.parse(x.deadline) / 1000 || 0) - D.now;
   const label = status === "changed" ? "changed by you" : status === "default" ? (answer ? "default, chosen by you" : "decided without you")
     : answer ? (answer.default ? "default accepted, waiting for the coordinator" : "answered, waiting for the coordinator")
     : left > 0 ? `default in ${left < 90 ? "under 2 min" : Math.round(left / 60) + " min"}` : "default due now";
@@ -235,9 +247,9 @@ const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).
 // ---------- The right column ----------
 function drawAgents(d) {
   const working = d.qs.filter(q => q.view === "in progress");
-  const checkers = {}; d.claims.forEach(c => { if (has(c.checker) && !/^(un)?verified$/i.test(String(c.verified || "").trim())) checkers[c.checker] = c; });
+  const checkers = {}; d.claims.forEach(c => { if (c.status === "checking") checkers[c.checker] = c; });
   const dry = name => { const l = ((d.logs || {})[name] || {}).searches || []; let n = 0;  // searches in a row that found no new term
-    for (let i = l.length - 1; i >= 0 && /new terms: none/.test(l[i]); i--) n++; return n; };
+    for (let i = l.length - 1; i >= 0 && !(l[i].new_terms || []).length; i--) n++; return n; };
   const rows = working.map(q => { const who = has(q.owner) ? q.owner : "unassigned", n = dry(who);
     return `<li><button type="button" data-a="${esc(who)}" data-for="${esc(q.id)}"><b>${esc(who)}</b><span dir="auto">${esc(q.label)}</span>${n >= 5 ? `<em class="dry">${n} searches with nothing new</em>` : ""}</button></li>`; })
     .concat(Object.keys(checkers).sort().map(v => `<li><button type="button" class="verifier" data-a="${esc(v)}"><b>${esc(v)}</b><span>Checking claims</span></button></li>`));
@@ -272,36 +284,37 @@ function fillPop() {
   let html, match;
   if (kind === "question") {
     const q = D.byId[id]; if (!q) return closePop();
-    const [word, cls] = stateOf(q), n = q.claimsList.length, ver = q.claimsList.filter(c => /^verified$/i.test(String(c.verified || "").trim())).length;
-    const failed = q.claimsList.filter(c => /^unverified$/i.test(String(c.verified || "").trim())).length;
+    const [word, cls] = stateOf(q), n = q.claimsList.length, ver = q.claimsList.filter(c => c.status === "verified").length;
+    const failed = q.claimsList.filter(c => c.status === "unverified").length;
     const parent = q.parent ? D.byId[q.parent] : null, srcs = new Set(q.claimsList.map(c => c.source)).size;
     const gist = has(q.gist) ? q.gist : has(q.summary) ? q.summary : "";
     const checked = !n ? "" : ver === n ? ", all verified" : ver || failed ? `, ${ver} verified${failed ? `, ${failed} failed` : ""}` : ", none checked yet";
     // The header says what it is, its title and the full question; the answer, the claims and the conversation follow.
     html = `<div class="hd"><p class="kind">Question, <span class="chip ${cls}">${word}</span>${q.view === "in progress" && has(q.owner) ? " by " + esc(q.owner) : ""}${q.prio ? `, ${q.prio} priority` : ""}</p>
-      <h3 dir="auto">${esc(q.label)}</h3>${has(q.question) ? `<p class="full" dir="auto">${esc(q.question)}</p>` : ""}</div>
+      <h3 dir="auto">${esc(q.label)}</h3>${has(q.question) ? `<p class="full" dir="auto">${esc(q.question)}</p>` : ""}${q._errors ? `<p>${invalidHTML(q)}</p>` : ""}</div>
       <div class="bd">${has(q.summary) ? `<p dir="auto">${esc(q.summary)}</p>` : gist ? `<p dir="auto">${esc(gist)}</p>` : ""}
       ${parent ? `<p class="muted" dir="auto">Raised by: ${esc(parent.label)}</p>` : ""}
       <div class="sec"><h4 class="section-h">${n ? `${plural(n, "claim")} from ${plural(srcs, "source")}${checked}` : "No claims yet"}</h4>
       ${n ? `<ul class="claims">${q.claimsList.map(c => { const s = (D.sources.find(x => x.id === c.source) || {});
-        const v = String(c.verified || "").trim().toLowerCase(), mark = v === "verified" ? "✓" : v === "unverified" ? "✗" : "○";
-        return `<li dir="auto"><span aria-label="${v === "verified" ? "verified" : v === "unverified" ? "failed" : "not checked yet"}">${mark}</span> ${esc(c.claim)} <span class="muted">${esc(s.author || s.publisher || c.source)}${has(s.date) ? ` (${esc(s.date)})` : ""}</span></li>`; }).join("")}</ul>` : ""}</div>
+        const v = c.status, mark = v === "verified" ? "✓" : v === "unverified" ? "✗" : "○";
+        const cited = has(s.date) || s.category ? ` (${[s.date, s.category].filter(has).map(esc).join(", ")})` : "";
+        return `<li dir="auto"><span aria-label="${v === "verified" ? "verified" : v === "unverified" ? "failed" : "not checked yet"}">${mark}</span> ${esc(c.claim)} <span class="muted">${esc(s.author || s.publisher || c.source)}${cited}</span> ${invalidHTML(c)}${s._errors ? " " + invalidHTML({_errors: ["source " + s.id + ": " + s._errors[0]]}) : ""}</li>`; }).join("")}</ul>` : ""}</div>
       <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>`;
     match = e => e.on && e.on.kind === "question" && e.on.id === id;
   } else if (D.claims.some(c => c.checker === id)) {
-    const mine = D.claims.filter(c => c.checker === id), v = x => String(x.verified || "").trim().toLowerCase();
-    const holding = mine.filter(c => !["verified", "unverified"].includes(v(c))), failed = mine.filter(c => v(c) === "unverified");
+    const mine = D.claims.filter(c => c.checker === id), v = x => x.status;
+    const holding = mine.filter(c => v(c) === "checking"), failed = mine.filter(c => v(c) === "unverified");
     html = `<div class="hd"><p class="kind">Verifier, <span class="chip now">checking</span></p><h3>${esc(id)}</h3></div>
       <div class="bd"><p>Checked ${plural(mine.length - holding.length, "claim")}: ${mine.filter(c => v(c) === "verified").length} verified, ${failed.length} failed.</p>
       ${holding.length ? `<div class="sec"><h4 class="section-h">Checking now</h4><ul>${holding.map(c => `<li dir="auto">${esc(c.claim)}</li>`).join("")}</ul></div>` : ""}
-      ${failed.length ? `<div class="sec"><h4 class="section-h">Failed</h4><ul>${failed.map(c => `<li dir="auto">${esc(c.claim)} <span class="muted">${esc(has(c.reason) ? c.reason : "")}</span></li>`).join("")}</ul></div>` : ""}
+      ${failed.length ? `<div class="sec"><h4 class="section-h">Failed</h4><ul>${failed.map(c => `<li dir="auto">${esc(c.claim)} <span class="muted">${esc(c.reason)}</span></li>`).join("")}</ul></div>` : ""}
       <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>`;
     match = e => e.on && e.on.kind === "agent" && e.on.id === id;
   } else {
     const log = (D.logs || {})[id] || {}, q = D.byId[(D.qs.find(x => x.view === "in progress" && x.owner === id) || {}).id];
     // Repeated searches collapse into one line with a count, so an agent going in circles shows at a glance.
     const counts = new Map();
-    (log.searches || []).slice().reverse().forEach(l => { const q = (l.match(/^search "([^"]+)"/) || [])[1]; if (q) counts.set(q, (counts.get(q) || 0) + 1); });
+    (log.searches || []).slice().reverse().forEach(r => counts.set(r.query, (counts.get(r.query) || 0) + 1));
     const s = [...counts].slice(0, 5).map(([q, n]) => n > 1 ? `${q} (${n} times)` : q);
     html = `<div class="hd"><p class="kind">Agent, <span class="chip now">working</span></p><h3>${esc(id)}${q ? " on " + esc(q.label) : ""}</h3></div>
       <div class="bd"><div class="sec"><h4 class="section-h">Latest searches</h4>
@@ -342,7 +355,7 @@ document.addEventListener("click", ev => {
   const ud = t.closest("[data-default]"); if (ud) { ud.disabled = true;  // the run applies its default now instead of at the deadline
     return conv.send("answer", {id: uid("a"), decision: ud.dataset.default, text: "Use the default.", default: true}, "Answer", null, () => { ud.disabled = false; }); }
   const ch = t.closest(".thread .change"); if (ch) { const d = ch.closest("li").dataset.d;  // hidden, not removed, so the state row does not move
-    return conv.box(ch.closest("li"), d, "What should the run do?", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text}, "Answer", done)); }
+    return conv.box(ch.closest("li"), d, "What should the run do?", ch, (text, done) => conv.send("answer", {id: uid("a"), decision: d, text, default: false}, "Answer", done)); }
   if ($("pop") && !t.closest("form, .why")) closePop();
 });
 document.addEventListener("keydown", ev => {
@@ -357,6 +370,7 @@ function render(d) {
   const b = d.brief || {}, qs = D.qs, now = d.now;
   $("title").textContent = has(b.title) ? b.title : b.topic || "Research board";
   $("title").title = b.topic || ""; document.title = `${$("title").textContent} · Research board`;
+  $("briefbad").textContent = notValid(b); $("briefbad").hidden = !notValid(b);
   $("goal").textContent = has(b.goal) ? b.goal : ""; $("goal").title = b.goal || "";
   const start = Math.min(now, ...[...d.questions, ...d.claims, ...d.sources].map(e => e._born));
   const answered = qs.filter(q => CLOSED.has(q.view)).length, workers = qs.filter(q => q.view === "in progress").length;
@@ -364,7 +378,7 @@ function render(d) {
   const rate = answered / Math.max(1, now - start), eta = answered >= 3 && left ? ` ${left / rate < 90 ? "Under 2 min" : "About " + Math.round(left / rate / 60) + " min"} left at this pace.` : "";
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   const leftText = left / rate < 90 ? "<2 min" : `~${Math.round(left / rate / 60)} min`;
-  const answeredIds = new Set((d.conversation || []).filter(e => e.action === "answer").map(e => e.decision));
+  const answeredIds = new Set((d.conversation || []).filter(e => e.type === "answer").map(e => e.decision));
   const waitingN = (d.decisions || []).filter(x => String(x.status || "pending").trim().toLowerCase() === "pending" && !answeredIds.has(x.id)).length;
   const phase = CLOSED_PAGE ? stat("Closed", `since ${new Date(now * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`)
     : b.status === "stopped" ? stat("Stopped", `after ${mins(now - start)}`, "done")
@@ -374,9 +388,9 @@ function render(d) {
       <span class="meter" aria-hidden="true"><i style="width:${qs.length ? (100 * answered / qs.length).toFixed(0) : 0}%"></i></span></span>`
     + (live ? stat(workers, workers === 1 ? "worker on questions" : "workers on questions") + (answered >= 3 && left ? stat(leftText, "left at this pace") : "") : "")
     + (waitingN && !CLOSED_PAGE ? `<button type="button" class="stat" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "decision waiting for you" : "decisions waiting for you"}</button>` : "") + phase);
-  const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, OPEN && OPEN.id === q.id]).concat([b.short]));
+  const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, q._errors && q._errors[0], OPEN && OPEN.id === q.id]).concat([b.short]));
   if (key !== LAYOUT) { LAYOUT = key; drawMap(D); if (FITTED) fit(); }
-  const replies = (d.conversation || []).filter(e => e.action === "reply");
+  const replies = (d.conversation || []).filter(e => e.type === "reply");
   if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + pageMarkdownText(replies[replies.length - 1].text).slice(0, 120), "ok");
   REPLIES = replies.length;
   drawAgents(D);
@@ -386,12 +400,28 @@ function render(d) {
   if (OPEN) fillPop();
 }
 
+// errors:begin
+// The records the board could not show, each with where it is and what is wrong. The rest of the board is drawn anyway,
+// and the page is reachable, so this band and the closed notice never go together.
+// A record the board still shows although it broke the schema says so, in the error colour, with its first message.
+const notValid = r => r && r._errors && r._errors.length ? `not valid: ${r._errors[0]}` : "";
+const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))}</span>` : "";
+const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here.</p><ul>`
+  + errors.map(e => `<li><code>${esc(e.file)}:${esc(e.line)}</code> ${esc(e.field)}: ${esc(e.message)}${e.by ? ` <span class="by">(by ${esc(e.by)})</span>` : ""}</li>`).join("") + "</ul>";
+function showLoaded(d, els) {
+  const errors = d.errors || [];
+  els.offline.hidden = true; els.unwatched.hidden = d.listening !== false;
+  // Written only when it changes: the band is a live region, and a rewrite every poll would be read out every time.
+  const html = errors.length ? errorsHTML(errors) : "";
+  els.errors.hidden = !errors.length; if (els.errors.innerHTML !== html) els.errors.innerHTML = html;
+}
+// errors:end
 let fails = 0;
 function tick() {
   return fetch("board.json", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(d => { fails = 0; CLOSED_PAGE = false; $("offline").hidden = true; $("unwatched").hidden = d.listening !== false; render(d); },
-      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("offline").hidden = false; $("unwatched").hidden = true; if (D) render(D); } });
+    .then(d => { fails = 0; CLOSED_PAGE = false; showLoaded(d, {offline: $("offline"), unwatched: $("unwatched"), errors: $("errors")}); render(d); },
+      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("offline").hidden = false; $("unwatched").hidden = true; $("errors").hidden = true; if (D) render(D); } });
 }
-if (SNAPSHOT) { render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
+if (SNAPSHOT) { showLoaded(SNAPSHOT, {offline: $("offline"), unwatched: $("unwatched"), errors: $("errors")}); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
 else { tick(); setInterval(tick, 2000); }
 setView();

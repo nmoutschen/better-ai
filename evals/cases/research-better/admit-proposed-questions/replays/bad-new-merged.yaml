@@ -1,0 +1,18 @@
+reply: Merged the duplicate release question and opened the autocomplete question.
+actions:
+- write: .research/checkout-drop/questions/Q-w2-6.json
+  content: '{"type": "question", "at": "2026-11-21T10:00:00Z", "by": "w2", "id": "Q-w2-6", "question": "Which checkout changes
+    shipped in release 26.3?", "title": "Release 26.3 checkout changes", "priority": "high", "status": "merged", "merged_into":
+    "Q-coordinator-1", "origin": {"type": "source", "source": "S-w1-3"}, "kind": "frontier", "raised_in": "Q-coordinator-1",
+    "lens": "origin", "stakes": "which changes are candidates to roll back", "done_when": "the release notes list the checkout
+    changes", "note": null}
+
+    '
+- write: .research/checkout-drop/questions/Q-w1-7.json
+  content: '{"type": "question", "at": "2026-11-21T10:00:00Z", "by": "w1", "id": "Q-w1-7", "question": "Did the address autocomplete
+    in release 26.3 change checkout conversion?", "title": "Autocomplete effect on conversion", "priority": "high", "status":
+    "merged", "origin": {"type": "source", "source": "S-w1-1"}, "kind": "frontier", "raised_in": "Q-coordinator-1", "lens":
+    "critics", "stakes": "whether autocomplete is a candidate to roll back", "done_when": "a test or analysis gives autocomplete''s
+    effect on conversion", "note": null, "merged_into": "Q-coordinator-1"}
+
+    '

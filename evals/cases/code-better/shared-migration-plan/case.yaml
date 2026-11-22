@@ -5,7 +5,7 @@ source:
 - templates/tasks.md
 reads:
 - [modes/refactor.md, modes/coordinate.md]
-- templates/specs.md
+- templates/spec.md
 - templates/tasks.md
 - agents/verifier.md
 situation: The work is shared with a teammate who continues next week; write a plan with one task per module, a concrete check

@@ -4,12 +4,20 @@
 Each skill whose page talks to the agent carries an identical copy of this file next to its script, as it does
 page.css and page.js, and the Scripts workflow fails if the copies differ: change it in one skill, then copy it to the
 others. The script that serves the page supplies what differs: the log's file names, what the page may send, which
-events are items the agent tracks, and what the agent is called on the page.
+events are items the agent tracks, what the agent is called on the page, and the page's own events schema.
+
+Every event, whether the page sends it or the agent writes it, is checked through schema.py against
+`conversation.schema.json` and the page's `<page>-events.schema.json` before it is written to the log; one that fails
+is not written. A page event answers with the JSON-RPC error -32602 and the validator's message.
 """
 
 from __future__ import annotations
 
+import contextlib
+import errno
+import functools
 import http.server
+import importlib.util
 import json
 import signal
 import sys
@@ -18,14 +26,47 @@ import time
 import urllib.request
 from pathlib import Path
 
+
+def _load_schema():
+    """schema.py from the folder of this file: each skill carries its own identical copy."""
+    spec = importlib.util.spec_from_file_location("page_schema", Path(__file__).resolve().with_name("schema.py"))
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["page_schema"] = module  # the module's own typing needs to find itself by name
+    spec.loader.exec_module(module)
+    return module
+
+
+schema = _load_schema()
+COMMON = "conversation.schema.json"
+VERBS = {"wait": "read", "pending": "read", "reply": "written", "status": "written"}  # what the agent's commands do
 MAX_BODY = 200_000
 LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the agent is not watching
-STATES = ("seen", "asked", "working", "done", "accepted")
-AGENT_ACTIONS = ("reply", "status", "closed")  # events the agent's side writes; "closed" is a research worker's message
+STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is written as its own event, `accepted`
+
+
+class EventError(ValueError):
+    """An event that fails its schema: the message is the validator's, `field: message` for each problem."""
+
+
+def terminal_json(value) -> str:
+    """JSON for a terminal: readable, and escaped where UTF-8 cannot hold a character (a lone surrogate), so printing
+    it never fails."""
+    text = json.dumps(value, ensure_ascii=False)
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return json.dumps(value)
+    return text
+
+
+def terminal_text(text: str) -> str:
+    """Text a person gave (an id on the command line) as it can be printed: bytes UTF-8 cannot hold are escaped."""
+    return text.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
 def now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%S")
+    """The time as an event records it: UTC, with Z."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def clean(value, depth=0):
@@ -43,7 +84,7 @@ def clean(value, depth=0):
 
 def from_user(event: dict) -> bool:
     """An event the user made in the page, as opposed to the agent's replies, statuses and recorded acceptances."""
-    return bool(event) and event.get("action") not in AGENT_ACTIONS and "by" not in event
+    return bool(event) and event.get("by") == "user"
 
 
 def stop_like_ctrl_c() -> None:
@@ -64,11 +105,25 @@ def rpc_error(rid, code: int, message: str) -> dict:
 
 class Conversation:
     """One page's log, LOG in FOLDER, one ASCII JSON event per line, and the files that say where it is served (ADDRESS)
-    and how far the agent has read (SEEN). ITEMS are the actions the agent tracks with a status. AGENT is what the page
-    calls the agent, such as "coordinator". START says how to serve the page, for the error when it is not served."""
+    and how far the agent has read (SEEN). ITEMS are the event types the agent tracks with a status. AGENT is what the
+    page calls the agent, such as "coordinator", and the `by` of what the agent writes. START says how to serve the
+    page, for the error when it is not served. SCHEMAS is the folder of the skill's schemas and EVENTS the file name of
+    the page's own events schema in it."""
 
-    def __init__(self, folder: Path, log: str, seen: str, address: str, items: tuple, agent: str, start: str):
+    def __init__(
+        self,
+        folder: Path,
+        log: str,
+        seen: str,
+        address: str,
+        items: tuple,
+        agent: str,
+        start: str,
+        schemas: Path,
+        events: str | None = None,
+    ):
         self.folder, self.items, self.agent, self.start = folder, items, agent, start
+        self.schemas, self.events_schema = schemas, events
         self.log, self.seen, self.address = folder / log, folder / seen, folder / address
         self.lock = threading.Lock()
         # Whether a `wait` is listening: None until one first connects (the agent may stream the server's output
@@ -80,20 +135,38 @@ class Conversation:
 
     def lines(self) -> list:
         """The log's lines. Only "\\n" ends a line: events are ASCII JSON, so no other character can split one."""
-        return self.log.read_text(encoding="utf-8").split("\n")[:-1] if self.log.exists() else []
+        try:
+            return self.log.read_text(encoding="utf-8", errors="replace").split("\n")[:-1]
+        except OSError:  # no log yet, or one that cannot be read
+            return []
 
     def events(self) -> list:
         events = []
         for line in self.lines():
             try:
-                events.append(json.loads(line))
-            except ValueError:
-                events.append({})  # keep the position, so indexes into the log stay right
+                event = json.loads(line)
+            except (ValueError, RecursionError):
+                event = None
+            events.append(
+                event if isinstance(event, dict) else {}
+            )  # keep the position, so indexes into the log stay right
         return events
 
+    def check(self, event: dict) -> None:
+        """Raise EventError, with the validator's message, unless the event meets the shared conversation schema and
+        the page's own."""
+        names = [COMMON, *([self.events_schema] if self.events_schema else [])]
+        problems = schema.check_record(event, names, self.schemas)
+        if problems:
+            raise EventError("; ".join(f"{field}: {message}" for field, message in problems))
+
     def append(self, *events: dict) -> list:
-        """Write events to the log as ASCII JSON, so a character such as U+2028 in a message cannot split a line."""
-        lines = [json.dumps({"at": now(), **e}) for e in events]
+        """Check events, then write them to the log as ASCII JSON, so a character such as U+2028 in a message cannot
+        split a line. None is written if one fails."""
+        records = [{"type": e.get("type"), "at": now(), **e} for e in events]
+        for record in records:
+            self.check(record)
+        lines = [json.dumps(record) for record in records]
         with self.log.open("a", encoding="utf-8") as f:
             f.write("".join(line + "\n" for line in lines))
         return lines
@@ -130,7 +203,7 @@ class Conversation:
         try:
             with urllib.request.urlopen(f"{self.address.read_text().strip()}listening", timeout=2):
                 return True
-        except OSError:
+        except (OSError, ValueError):  # no server there, or an address file that holds no address
             return False
 
     # ---------- The agent's side: wait, reply, status, pending ----------
@@ -139,7 +212,10 @@ class Conversation:
         """Print the user's actions the agent has not seen yet, waiting for the served page to receive one."""
         if not self.address.exists():
             sys.exit(f"error: no page is served from {self.folder}. Start it with `{self.start}` first.")
-        seen = int(self.seen.read_text() or 0) if self.seen.exists() else 0
+        try:
+            seen = int(self.seen.read_text() or 0) if self.seen.exists() else 0
+        except ValueError:  # a file's content is not what it should be: that is the file's error, not a usage error
+            raise OSError(errno.EINVAL, "does not hold a number", str(self.seen)) from None
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
@@ -147,6 +223,8 @@ class Conversation:
                     total = int(r.read())
             except OSError:
                 sys.exit("error: the page's server is not answering. Is it still running?")
+            except ValueError:  # the address file holds something that is not an address
+                raise OSError(errno.EINVAL, "does not hold an address", str(self.address)) from None
             if total <= seen:
                 continue
             lines = self.lines()[seen:total]
@@ -159,24 +237,31 @@ class Conversation:
         print("No new action before the timeout.", flush=True)
         return 2
 
+    def write(self, *events: dict) -> list:
+        """Append the agent's own events; one that fails its schema ends the command with the validator's message."""
+        try:
+            return self.append(*events)
+        except EventError as error:
+            sys.exit(f"error: {error}")
+
     def reply(self, text: str, to: str | None) -> None:
         """Show the agent's reply in the page's conversation, under the item it answers. It works without a server, so
         a resumed run can answer what the user wrote while no agent was running."""
         # Each reply has an id, so the user can answer any message, the agent's own included.
-        self.append({"action": "reply", "id": "r-" + str(time.time_ns()), "text": text[:5000], "to": to})
+        self.write({"type": "reply", "by": self.agent, "id": "r-" + str(time.time_ns()), "text": text[:5000], "to": to})
         print("Reply shown in the page." if self.answering() else "Reply saved; the page shows it when served.")
 
-    def set_status(self, state: str, ids: list) -> None:
+    def set_status(self, state: str, ids: list, text: str | None = None) -> None:
         """Mark the user's items as seen, asked, working or done. Accepted records an acceptance the user gave in
-        words, the same as the page's Accept button."""
+        words, the same as the page's Accept button, as an `accepted` event with those words in TEXT."""
+        if state == "accepted" and not (text or "").strip():
+            sys.exit("error: accepted needs the user's words that accept it: pass them with --text.")
         events = self.events()
         owned = {
-            e.get("id")
-            for e in events
-            if e.get("action") in self.items and not (e.get("action") == "note" and e.get("to"))
+            e.get("id") for e in events if e.get("type") in self.items and not (e.get("type") == "note" and e.get("to"))
         }
         # An answer under one of the user's items is part of it; an answer to the agent's own message is an item.
-        answers = {e.get("id"): e.get("to") for e in events if e.get("action") == "note" and e.get("to") in owned}
+        answers = {e.get("id"): e.get("to") for e in events if e.get("type") == "note" and e.get("to") in owned}
         misplaced = [i for i in ids if i in answers]
         if misplaced:  # an answer is part of the item it answers, which carries the state
             sys.exit(
@@ -184,19 +269,19 @@ class Conversation:
                 + ", ".join(f"{i} answers {answers[i]}" for i in misplaced)
                 + ". Mark the item it answers instead."
             )
-        known = {e.get("id") for e in events if e.get("action") in self.items}
+        known = {e.get("id") for e in events if e.get("type") in self.items}
         unknown = [i for i in ids if i not in known]
         if unknown:
             sys.exit(f"error: no comment or message with id {', '.join(unknown)}. Run `pending` to see the ids.")
-        self.append(
+        self.write(
             *(
-                {"action": "accept", "to": i, "by": f"{self.agent}, from the user's words"}
+                {"type": "accepted", "by": self.agent, "to": i, "text": text}
                 if state == "accepted"
-                else {"action": "status", "to": i, "status": state}
+                else {"type": "status", "by": self.agent, "to": i, "status": state}
                 for i in ids
             ),
         )
-        print(f"Marked {state}: {', '.join(ids)}")
+        print(f"Marked {state}: {terminal_text(', '.join(ids))}")
 
     def pending(self) -> None:
         """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so
@@ -204,7 +289,7 @@ class Conversation:
         follow-up from the user under it, is work again."""
         items, order, state, reasons, thread, closes = {}, [], {}, {}, {}, {}
         for e in self.events():
-            a, i, to = e.get("action"), e.get("id"), e.get("to")
+            a, i, to = e.get("type"), e.get("id"), e.get("to")
             if a == "closed":  # a worker's message: the user can reply to it, and the reply goes to the agent
                 closes[i] = e
             elif a == "note" and to and to not in items:  # an answer to the agent's own message is a new item
@@ -212,15 +297,9 @@ class Conversation:
                 items[i] = e
                 if to in closes:  # the worker cannot read the page: say which question the user replied about
                     c = closes[to]
-                    items[i] = {
-                        **e,
-                        "about": f"{c.get('by')} closed {c.get('q')} as {c.get('status')}: {c.get('text')}",
-                    }
+                    items[i] = {**e, "about": f"{c.get('by')} closed {c.get('question')} as {c.get('status')}"}
             elif a == "note" and to:  # the user's answer belongs to the item it answers
-                # The canvas and the slides send a note's words as "note"; the research board sends them as "text".
-                thread.setdefault(to, []).append(
-                    {"from": "user", "at": e.get("at"), "text": e.get("note", e.get("text"))}
-                )
+                thread.setdefault(to, []).append({"from": "user", "at": e.get("at"), "text": e.get("text")})
                 if state.get(to) == "asked":  # the answer ends the wait: the item is the agent's again
                     state[to] = "answered by the user"
                 elif state.get(to) in ("done", "accepted"):  # a follow-up under a finished item is work again
@@ -233,14 +312,14 @@ class Conversation:
                 if i not in items:
                     order.append(i)
                 items[i] = e
-            elif a == "delete" and i in items:
-                items[i] = None
+            elif a == "delete" and to in items:
+                items[to] = None
             elif a == "status":
                 state[to] = e.get("status")
-            elif a == "accept":
+            elif a in ("accept", "accepted"):
                 state[to] = "accepted"
             elif a == "reopen":
-                state[to], reasons[to] = "reopened", e.get("reason")
+                state[to], reasons[to] = "reopened", e.get("text")
         open_items = [items[i] for i in order if items.get(i) and state.get(i) not in ("done", "accepted")]
         for e in open_items:
             extra = {}
@@ -248,16 +327,79 @@ class Conversation:
                 extra["reopened_because"] = reasons[e["id"]]
             if thread.get(e["id"]):
                 extra["thread"] = thread[e["id"]]
-            print(json.dumps({**e, "status": state.get(e["id"], "new"), **extra}, ensure_ascii=False))
+            print(terminal_json({**e, "status": state.get(e["id"], "new"), **extra}))
         print(f"{len(open_items)} not done.")
+
+
+def answers_any_failure(handle):
+    """A request handler that never raises: whatever the request makes it raise, the answer is one line, with the status
+    500 (for a JSON-RPC request, the error object -32603), never a dropped request or a traceback in the server's log."""
+
+    @functools.wraps(handle)
+    def run(self):
+        self.answer_started = False
+        try:
+            return handle(self)
+        except Exception as error:
+            if self.answer_started:  # the status line and headers are out: a second answer would corrupt the stream
+                self.close_connection = True
+                return None
+            self._headers_buffer = []
+            what = "nested too deeply" if isinstance(error, RecursionError) else f"failed: {type(error).__name__}"
+            if self.path == "/rpc":
+                answer = '{"jsonrpc": "2.0", "id": null, "error": {"code": -32603, "message": "internal error: %s"}}'
+                body, kind, code = (answer % what).encode(), "application/json", 200
+            else:
+                body, kind, code = f"{what}\n".encode(), "text/plain; charset=utf-8", 500
+            status = "200 OK" if code == 200 else "500 Internal Server Error"
+            head = f"HTTP/1.0 {status}\r\nContent-Type: {kind}\r\nContent-Length: {len(body)}\r\n\r\n"
+            # written whole, without send_response or self.send, which may be what failed; if the connection is gone
+            # there is nothing more to answer
+            with contextlib.suppress(Exception):
+                self.wfile.write(head.encode("ascii") + body)
+
+    return run
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
     """The requests every page that talks to the agent makes. A script subclasses it, sets `conversation` and
-    `methods`, the actions its page may send, and answers its own paths in do_GET after `conversation_get`."""
+    `methods`, the events its page may send, and answers its own paths in do_GET after `conversation_get`. The
+    do_GET and do_POST a subclass defines answer any failure with a 500, as the ones here do."""
 
     conversation: Conversation
     methods: tuple = ()
+
+    answer_started = False
+
+    def flush_headers(self) -> None:
+        super().flush_headers()
+        self.answer_started = True
+
+    def guarded(self, step) -> None:
+        """Run a step of the request's life that is outside do_GET and do_POST (setup, handle, finish). A client that
+        has gone, a reset or a closed socket, is not worth a word; anything else is one line, never a traceback."""
+        try:
+            step()
+        except OSError:
+            pass
+        except Exception as error:
+            with contextlib.suppress(Exception):
+                print(f"page server: a request failed: {type(error).__name__}", file=sys.stderr)
+
+    def setup(self) -> None:
+        self.guarded(super().setup)
+
+    def handle(self) -> None:
+        self.guarded(super().handle)
+
+    def finish(self) -> None:
+        self.guarded(super().finish)
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for name in ("do_GET", "do_POST", "do_HEAD", "do_PUT", "do_DELETE"):
+            if name in vars(cls):
+                setattr(cls, name, answers_any_failure(vars(cls)[name]))
 
     def local(self) -> bool:
         # Only answer requests addressed to this machine, so a web page cannot reach it via DNS rebinding.
@@ -276,7 +418,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def after(self) -> int:
         value = self.path.split("=", 1)[1]
-        return int(value) if value.isdigit() else 0
+        return int(value) if value.isdigit() and len(value) <= 12 else 0  # a count, not a number past any log
 
     def conversation_get(self) -> bool:
         """Answer the conversation's own GET paths; False when the path is the page's. A request addressed to another
@@ -297,6 +439,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return False
         return True
 
+    @answers_any_failure
     def do_POST(self):
         # Only this page may send: the same host and origin, and a JSON body that a cross-site form cannot send.
         origin = self.headers.get("Origin", "")
@@ -319,11 +462,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             or not isinstance(msg.get("params"), dict)
         ):
             return self.send_json(rpc_error(rid, -32601, "Unknown method"))
-        # The page sets only its own fields: the action is the method, the time is the server's, and "by" marks the
-        # agent's events, so a page cannot write an event as the agent's or hide one from `wait`.
-        params = {k: v for k, v in clean(msg["params"]).items() if k not in ("action", "at", "by")}
+        # The page sets only its own fields: the type is the method, the time is the server's, and "by" is the user's,
+        # so a page cannot write an event as the agent's or hide one from `wait`.
+        params = clean(msg["params"])
+        if "by" in params:
+            return self.send_json(rpc_error(rid, -32602, "by: not allowed in what a page sends; the server sets it"))
+        params = {k: v for k, v in params.items() if k not in ("type", "at")}
         with self.conversation.lock:
-            (line,) = self.conversation.append({"action": msg["method"], **params})
+            try:
+                (line,) = self.conversation.append({"type": msg["method"], "by": "user", **params})
+            except EventError as error:
+                return self.send_json(rpc_error(rid, -32602, str(error)))
             print(line, flush=True)
         self.send_json({"jsonrpc": "2.0", "id": rid, "result": "saved"})
 

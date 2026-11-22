@@ -5,7 +5,7 @@ source:
 reads:
 - agents/worker.md
 situation: 'A board planted mid-run. Q-coordinator-8, on whether address autocomplete changed conversion, is in progress with
-  owner w3, whose log ends with ''stopped: session ended''. On resume, the agent starts a fresh worker sub-agent to take it,
+  owner w3, whose log ends with a stop record (text "session ended"). On resume, the agent starts a fresh worker sub-agent to take it,
   and does not research it itself; the question closes. A script checks the question''s status and that the coordinator recorded
   no claim for it; the judge checks who researched it.'
 request: 'Carry on the research in .research/checkout-drop: the workers stopped when my session ended. Run on your own; I
@@ -19,7 +19,7 @@ graders:
 - type: judge
   rubric: 'Rule: when a worker stops while questions remain, the coordinator starts a fresh worker sub-agent to replace it,
     and does not research the questions itself. Planted facts: in .research/checkout-drop/, Q-coordinator-8 (address autocomplete''s
-    effect on conversion) is in progress, owned by w3, whose log ends ''stopped: session ended''; wiki/experiments/address-autocomplete-ab-test.md
+    effect on conversion) is in progress, owned by w3, whose log ends with the JSONL record {"type": "stop", "text": "session ended"}; wiki/experiments/address-autocomplete-ab-test.md
     answers it. Sub-agent steps are marked "(sub-agent)" in the transcript, and the call that starts each sub-agent is a step
     of its own; its prompt is clipped. PASS only if all hold: (1) the agent started at least one worker sub-agent that took
     Q-coordinator-8 or the open questions including it, shown by the start call, its clipped prompt, or the sub-agent''s own

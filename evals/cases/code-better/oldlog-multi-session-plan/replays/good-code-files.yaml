@@ -1,0 +1,28 @@
+reply: Billing is moved and checked; .code/logging/tasks.jsonl tracks the other four services.
+actions:
+- read: README.md
+- read: services/billing.py
+- write: services/billing.py
+  content: |
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+
+    def handle(request):
+        logger.info(f"billing request {request['id']}")
+        return {"service": "billing", "id": request["id"]}
+- bash: '! grep -q oldlog services/billing.py && python -m unittest discover tests'
+- write: .code/logging/code.json
+  content: |
+    {"type": "code", "at": "2026-11-21T00:00:00Z", "by": "agent", "goal": "Move every logging module", "design": {"type": "request", "text": "Move every logging module"}, "mode": "refactor"}
+- write: .code/logging/spec.jsonl
+  content: |
+    {"type": "spec", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "S1", "statement": "Each logging module meets the new logging with the same behaviour.", "source": {"type": "request", "sentence": "Each logging module meets the new logging with the same behaviour."}, "checked_by": "the check of each task"}
+- write: .code/logging/tasks.jsonl
+  content: |
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T1", "task": "Move billing to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "! grep -q oldlog services/billing.py && python -m unittest discover tests", "status": "done"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T2", "task": "Move search to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "! grep -q oldlog services/search.py && python -m unittest discover tests", "status": "todo"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T3", "task": "Move mail to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "! grep -q oldlog services/mail.py && python -m unittest discover tests", "status": "todo"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T4", "task": "Move auth to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "! grep -q oldlog services/auth.py && python -m unittest discover tests", "status": "todo"}
+    {"type": "task", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "T5", "task": "Move exports to the new logging", "mode": "refactor", "requirements": ["S1"], "check": "! grep -q oldlog services/exports.py && python -m unittest discover tests", "status": "todo"}

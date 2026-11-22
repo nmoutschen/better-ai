@@ -1,6 +1,6 @@
 """Pass when perspectives.jsonl exists in the change folder, every record has a boolean `applies` and a non-empty
 `why`, and one record names the repo standard docs/standards/api.md in `from` or `name`
-(`from` is free text in the skill's format, such as "repo: docs/standards/api.md")."""
+(`from` is a record of type `standard` with the standard's `file`, such as docs/standards/api.md)."""
 
 import json
 import sys
@@ -24,7 +24,7 @@ for record in records:
         problems.append(f"{record.get('name')!r}: applies is not a boolean")
     if not isinstance(record.get("why"), str) or not record["why"].strip():
         problems.append(f"{record.get('name')!r}: why is empty")
-if not any("standards/api.md" in f"{record.get('from')} {record.get('name')}" for record in records):
+if not any("standards/api.md" in f"{json.dumps(record.get('from'))} {record.get('name')}" for record in records):
     problems.append("no record names the repo standard docs/standards/api.md in its from or name")
 if not records:
     problems.append("no records")

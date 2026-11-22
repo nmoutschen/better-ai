@@ -4,7 +4,7 @@ source:
 - SKILL.md#1
 reads:
 - modes/bug-fix.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: The published behavior is specified in the tree; read the implementation, caller, check and project instructions
   before editing.

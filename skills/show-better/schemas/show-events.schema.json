@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "show-events.schema.json",
+  "title": "what the show-better slides adds to conversation.jsonl: its own events, and what a comment's and a note's `on` hold",
+  "$comment": "A line must meet this schema and conversation.schema.json. `type` lists every event this page's log may hold; the page's own events are described here in full.",
+  "x-files": ["conversation.jsonl"],
+  "x-versioned": true,
+  "type": "object",
+  "properties": {
+    "type": {"enum": ["comment", "note", "delete", "accept", "reopen", "reply", "status", "accepted"]}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["type"], "properties": {"type": {"const": "comment"}}},
+      "then": {
+        "required": ["on"],
+        "properties": {
+          "on": {"$ref": "#/$defs/on"},
+          "text": {"type": "string", "minLength": 1}
+        },
+        "not": {"required": ["verdict"]}
+      }
+    },
+    {
+      "if": {"required": ["type"], "properties": {"type": {"const": "note"}}},
+      "then": {"required": ["on"], "properties": {"on": {"$ref": "#/$defs/noteOn"}}}
+    }
+  ],
+  "$defs": {
+    "noteOn": {
+      "description": "the slide a message was written on, and its part, null when the slide has none",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slide", "part"],
+      "properties": {
+        "slide": {"type": "integer"},
+        "part": {"type": ["string", "null"]}
+      }
+    },
+    "on": {
+      "description": "where on a slide a comment was made",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slide", "part", "headline", "target", "spot"],
+      "properties": {
+        "slide": {"type": "integer"},
+        "part": {"type": "string"},
+        "headline": {"type": "string"},
+        "target": {"type": "object"},
+        "spot": {"type": "object"}
+      }
+    }
+  }
+}

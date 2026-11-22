@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "findings.schema.json",
+  "title": "one line of findings.jsonl: a finding of a review, on the parts of the design it affects",
+  "$comment": "A part key is box:<id>, edge:<id> or step:<flow id>/<step id>, joined with + for the views of one exchange; the schema checks the grammar, and the finding-parts hook of schema.py checks that each key names a part of design.json (or one a review once recorded).",
+  "x-files": [
+    "findings.jsonl"
+  ],
+  "x-required-files": [
+    "architect.json",
+    "design.json"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "id",
+    "perspective",
+    "parts",
+    "text",
+    "confirmed",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "finding"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "id": {
+      "$ref": "base.schema.json#/$defs/id",
+      "pattern": "^V\\d+$"
+    },
+    "perspective": {
+      "type": "string",
+      "minLength": 1,
+      "x-points-to": {
+        "file": "perspectives.jsonl",
+        "type": "perspective"
+      }
+    },
+    "parts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:(?:box|edge):[^\\s:+/]+|step:[^\\s:+/]+/[^\\s:+/]+)(?:\\+(?:(?:box|edge):[^\\s:+/]+|step:[^\\s:+/]+/[^\\s:+/]+))*$"
+      }
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "confirmed": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "open",
+        "handled"
+      ]
+    },
+    "handled_by": {
+      "description": "what addresses the finding; only when status is handled"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "handled"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "handled_by"
+        ],
+        "properties": {
+          "handled_by": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "handled_by"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "x-check": "finding-parts"
+    },
+    {
+      "x-check": "finding-perspective-applies"
+    }
+  ]
+}

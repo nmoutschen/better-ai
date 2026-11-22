@@ -98,6 +98,8 @@ PREFER linking another skill at the end of a workflow, and PUT the steps the res
 
 ADD a script only when a step must produce the same form whatever the content, such as rendering a page. The agent supplies the content and the script supplies the form, so the agent never sees or reproduces the style. For example, `/show-better` writes a spec and `show.py` renders it. DO NOT add a script for a step the agent can do from instructions.
 
+A script MAY also check what agents get wrong when they write by hand. `schema.py` checks every file an agent writes against its schema (section 6.10), so the rules live in one place and a skill's instructions only say when to run it.
+
 WRITE scripts with the Python standard library only, so they run with `python3` and need no installs or network access.
 
 SUPPORT Python 3.10 and newer. KEEP each script passing `ruff check` and `ruff format --check` with the settings in `pyproject.toml`: the Scripts workflow runs them, and runs every script with `--help` on the oldest and newest supported Python. Ruff is a development tool only: DO NOT make a script import it or anything else outside the standard library.
@@ -123,7 +125,7 @@ WHEN a skill serves a page where the user writes to the agent, such as design-be
 - The conversation SITS in a right-hand column of the same width, `minmax(20rem, 24rem)`, with the message box at its foot.
 - Live updates NEVER take what the user is typing: a box with text keeps its text and cursor through a redraw, and a new page version loads by itself only while the user is not typing.
 - The script GIVES the agent the same subcommands to read and answer: `wait`, `reply --to`, `status`, `pending`.
-- The pages SHARE one stylesheet, `page.css`, for the bar, the side column, the conversation, the buttons and the toast. They SHARE the conversation's code too: `page.py` for the log, the server's conversation endpoints and the agent's subcommands, and `page.js` for the conversation on the page; `tests/` tests both. EACH skill carries identical copies of the files it uses, and the Scripts workflow fails if they differ: change one in one skill, then copy it to the others. A page's own files add only what that page alone shows, such as its pins, through the hooks the shared files offer.
+- The pages SHARE one stylesheet, `page.css`, for the bar, the side column, the conversation, the buttons and the toast. They SHARE the conversation's code too: `page.py` for the log, the server's conversation endpoints and the agent's subcommands, and `page.js` for the conversation on the page, and `conversation.schema.json` for the shape of a conversation line; `tests/` tests them. `schema.py`, the validator that checks those lines and every other agent file, and `schemas/base.schema.json`, the fields every record starts with, are shared the same way. EACH skill carries identical copies of the files it uses, and the Scripts workflow fails if they differ: change one in one skill, then copy it to the others. A page's own files add only what that page alone shows, such as its pins, through the hooks the shared files offer.
 
 The skill TELLS the agent the same rules for its side, in the same words: reply in the page, in one or two short sentences; mark `working` only what it is changing now; and once an answer leads to a change, mark the item done and ask the next question as a new message.
 
@@ -190,3 +192,29 @@ model: <cheaper | same | most capable — relative to the agent that starts it>
 ```
 
 AFTER the frontmatter, an agent file HAS these sections, in this order: `## Input`, the named fields the starting agent fills in, each required; `## Messages`, what it tells the starting agent while it works, in plain words, or "None"; `## Output`, what its one hand-back must contain. The input is strict, because the agent sees nothing else. Messages and output are plain language, because how agents talk depends on the harness: the starting agent's skill or mode SAYS how it acts on each kind of message and each outcome.
+
+### 6.10. Store agent files as typed JSON
+
+APPLY this to every file a skill writes for agent bookkeeping, for the conversation between a page and an agent, or for agents to read each other's work. A document a person reads as a deliverable stays Markdown: a design, a brief, a research report, an interview guide, an agent's prompt.
+
+CHOOSE the container by who edits it:
+
+1. ONE agent edits it and it holds many records: a JSONL file.
+2. SEVERAL agents edit it at once and it holds many records: a folder of `<id>.json` files, one record each.
+3. It holds one group of information: a single JSON file.
+4. A page and ONE agent append to it, one line per write, through one script: a JSONL file. A page is not an agent, so this is not a rule 2 case.
+
+GIVE every kind of file a JSON Schema, `schemas/<name>.schema.json` in its skill, that lists every field and its type, the allowed values, and the fields that depend on a status. A missing required field is an error, and so is a field the schema does not list: agents invent fields otherwise. RUN `python3 scripts/schema.py check <path>` after each write, and CALL `schema.py` from the script that serves a page. KEEP in a script only the checks that need its own knowledge, such as whether a slide can be drawn.
+
+START every record with `type`, `at` (ISO 8601 UTC with Z, when it was first written, never changed), `by` (the agent's name, or `user` for what a page sends for the user; the creator, never changed) and, only on a kind another record points to, `id`. A kind that nothing points to has no `id`. An `id` is unique in its file or folder; in a folder of `<id>.json` files, the file is named after it.
+
+FOLLOW these conventions in every kind:
+
+- WRITE a missing value as `null`, and a list as an array. WRITE allowed values as exact lowercase strings that keep their words (`"bug fix"`), and field and type names in `snake_case`.
+- LET a status drive the record's shape. Keep `status` a flat string, and put a field that exists only in some states at the top level: required in those states and rejected in the others. NEVER make a field null only because of the status.
+- WRITE a field that takes different shapes, and is not a status, as an object tagged by `type`, never as a string that mixes an ID with fixed words.
+- WRITE each fact once, and store a link on one side only. A pointer names the other record's `id` in a field of its own, never in free text.
+- WRITE the record a pointer names before the pointer, and CHECK that every pointer resolves. NEVER delete a record that others point to: give it a final status, such as withdrawn, with a pointer to what replaces it.
+- WRITE one record per line, as ASCII JSON, and rewrite a record edited in place as a whole line. In a page conversation, a line that reuses an item's `id` is a new version of that item, and the latest wins; elsewhere an `id` is never reused.
+- CREATE a folder entry exclusively: never overwrite an existing `<id>.json`, and continue the counter from the highest existing ID.
+- SHOW a record that fails its schema, with its file and line, and the records that pass; one bad record never hides the rest. A reader RETRIES once before it reports a parse error, in case it read a file mid-write. A page event the script rejects KEEPS the user's text on the page and SHOWS the reason, never "closed".

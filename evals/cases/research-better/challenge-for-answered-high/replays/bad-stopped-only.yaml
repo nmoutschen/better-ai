@@ -1,27 +1,10 @@
 reply: Nothing left to research. Board stopped.
 actions:
-- write: .research/checkout-drop/brief.md
-  content: 'topic: Why did checkout conversion drop after the March 2026 release, and what should we roll back first?
-
-    title: Checkout conversion drop after release 26.3
-
-    short: Checkout drop
-
-    meaning: The fall in the web shop''s checkout conversion after release 26.3 (2026-03-04), and which of its changes caused
-    it
-
-    goal: Decide which change of release 26.3 to roll back first
-
-    limit: none
-
-    stop-at: high
-
-    collections: the wiki export in wiki/
-
-    missing: none
-
-    changes: none
-
-    status: stopped
+- write: .research/checkout-drop/brief.json
+  content: '{"type": "brief", "at": "2026-11-21T10:00:00Z", "by": "coordinator", "topic": "Why did checkout conversion drop
+    after the March 2026 release, and what should we roll back first?", "title": "Checkout conversion drop after release 26.3",
+    "short": "Checkout drop", "meaning": "The fall in the web shop''s checkout conversion after release 26.3 (2026-03-04),
+    and which of its changes caused it", "goal": "Decide which change of release 26.3 to roll back first", "limit": null,
+    "stop_at": "high", "collections": ["the wiki export in wiki/"], "missing": [], "changes": [], "status": "stopped"}
 
     '

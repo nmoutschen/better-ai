@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: A one-line fix in one session needs no plan file.
 request: The welcome email says “recieve”. Fix the spelling.
@@ -17,7 +17,7 @@ graders:
   files:
     check.py: checks/command_passes/check.py
 - type: judge
-  rubric: 'This work fits one session, so it needs no plan. FAIL if any Markdown file the agent added or changed is a plan:
+  rubric: 'This work fits one session, so it needs no plan. FAIL if any Markdown note or `.code/` working file the agent added or changed is a plan:
     it orders implementation tasks or tracks their completion, such as a list of steps with done or todo marks. Notes that
     only state requirements, scenarios or a summary of the change are not plans. PASS if no such file exists, including when
-    no Markdown file was written.'
+    no such file was written.'

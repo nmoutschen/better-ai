@@ -10,5 +10,5 @@
 "SKILL.md#7": "Present findings that state where sources disagree, what each main claim's challenge found and which questions remain open, with APA citations and a reference list built only from the board's sources, with missing fields copied from the source itself, never from memory."
 "SKILL.md#tools-and-collections": "If a collection the topic needs cannot be searched, tell me which one before the research runs and ask whether to wait, continue without it, or get the sources from me."
 "agents/worker.md": "When you research a question from the board, copy each claim's quote word for word from the page you read."
-"SKILL.md#5.3": "Give every question you add a title of at most six words, its origin, kind, stakes, a done-when line and a priority from its own stakes."
+"SKILL.md#5.3": "Give every question you add a title of at most six words, its origin, kind, stakes, a done_when field and a priority from its own stakes."
 "SKILL.md#know-what-your-retrieval-tools-return": "If you cannot read a source, mark it blocked and do not use it as evidence."

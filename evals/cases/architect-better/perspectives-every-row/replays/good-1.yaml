@@ -3,9 +3,9 @@ actions:
 - read: docs/standards/api.md
 - write: docs/designs/2026-11-order-export/perspectives.jsonl
   content: |
-    {"name": "Security", "applies": true, "why": "New endpoint that returns personal data behind the session cookie.", "from": "built in"}
-    {"name": "Observability", "applies": true, "why": "A new export job whose failures must reach the customer and the owners (RQ6).", "from": "built in"}
-    {"name": "API standards", "applies": false, "why": "The repo's own API standard covers the new endpoint; checked under its own record.", "from": "built in"}
-    {"name": "Data and privacy", "applies": true, "why": "The CSV holds names, addresses and order history.", "from": "built in"}
-    {"name": "Repo standards", "applies": true, "why": "The new endpoint falls under docs/standards/api.md, the repo's one standard.", "from": "built in"}
-    {"name": "API standard (docs/standards/api.md)", "applies": true, "why": "Rules 1-4 cover the new endpoint: version, errors, own data only, rate limit.", "from": "docs/standards/api.md"}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "security", "name": "Security", "applies": true, "why": "New endpoint that returns personal data behind the session cookie.", "from": {"type": "built_in"}}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "observability", "name": "Observability", "applies": true, "why": "A new export job whose failures must reach the customer and the owners (RQ6).", "from": {"type": "built_in"}}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "api-standards", "name": "API standards", "applies": false, "why": "The repo's own API standard covers the new endpoint; checked under its own record.", "from": {"type": "built_in"}}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "data-and-privacy", "name": "Data and privacy", "applies": true, "why": "The CSV holds names, addresses and order history.", "from": {"type": "built_in"}}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "repo-standards", "name": "Repo standards", "applies": true, "why": "The new endpoint falls under docs/standards/api.md, the repo's one standard.", "from": {"type": "built_in"}}
+    {"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "api-standard", "name": "API standard (docs/standards/api.md)", "applies": true, "why": "Rules 1-4 cover the new endpoint: version, errors, own data only, rate limit.", "from": {"type": "standard", "file": "docs/standards/api.md"}}

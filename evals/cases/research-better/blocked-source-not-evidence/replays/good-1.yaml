@@ -1,57 +1,19 @@
 reply: 'The provider''s incident report is not in the export: marked blocked, question not found.'
 actions:
 - read: wiki/payments/provider-incident.md
-- write: .research/checkout-drop/sources/S-w3-1.md
-  content: 'id: S-w3-1
-
-    author: Payments team
-
-    date: 2026-03-12
-
-    title: Provider incident report (attachment)
-
-    publisher: Tallow wiki
-
-    url: wiki/payments/provider-incident-2026-03.pdf
-
-    type: other
-
-    read: blocked
-
-    trust: low
-
-    trust-reason: the attachment is not in the export
-
-    repeats: none
+- write: .research/checkout-drop/sources/S-w3-1.json
+  content: '{"type": "source", "at": "2026-11-21T10:00:00Z", "by": "w3", "id": "S-w3-1", "author": "Payments team", "date":
+    "2026-03-12", "title": "Provider incident report (attachment)", "publisher": "Tallow wiki", "url": "wiki/payments/provider-incident-2026-03.pdf",
+    "ids": [], "category": "other", "read": "blocked", "trust": "low", "trust_reason": "the attachment is not in the export",
+    "repeats": null, "status": "kept"}
 
     '
-- write: .research/checkout-drop/questions/Q-coordinator-8.md
-  content: 'id: Q-coordinator-8
-
-    question: What does the payment provider''s March incident report say caused 3-D Secure failures?
-
-    title: Provider incident report
-
-    priority: high
-
-    status: not found
-
-    owner: none
-
-    origin: Q-coordinator-3
-
-    kind: frontier
-
-    stakes: whether a provider fault, not our release, explains the challenge failures
-
-    done-when: the provider''s incident report states the cause and the dates
-
-    answer: none
-
-    summary: none
-
-    gist: none
-
-    note: none
+- write: .research/checkout-drop/questions/Q-coordinator-8.json
+  content: '{"type": "question", "at": "2026-11-21T10:00:00Z", "by": "coordinator", "id": "Q-coordinator-8", "question": "What
+    does the payment provider''s March incident report say caused 3-D Secure failures?", "title": "Provider incident report",
+    "priority": "high", "status": "not found", "owner": "w1", "summary": "The sources searched do not answer this question.",
+    "gist": "Not found in the sources searched.", "origin": {"type": "question", "question": "Q-coordinator-3"}, "kind": "frontier",
+    "raised_in": "Q-coordinator-3", "lens": "critics", "stakes": "whether a provider fault, not our release, explains the
+    challenge failures", "done_when": "the provider''s incident report states the cause and the dates", "note": null}
 
     '

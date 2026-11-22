@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "next-steps.schema.json",
+  "title": "one line of next-steps.jsonl: one piece of work outside the change",
+  "$comment": "",
+  "x-files": [
+    "next-steps.jsonl"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "id",
+    "step",
+    "origin",
+    "if_nobody",
+    "done_when",
+    "priority",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "step"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "id": {
+      "$ref": "base.schema.json#/$defs/id",
+      "pattern": "^N\\d+$"
+    },
+    "step": {
+      "type": "string",
+      "minLength": 1
+    },
+    "origin": {
+      "description": "where the step comes from",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "file",
+            "spec",
+            "finding",
+            "task"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "file"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "path"
+            ],
+            "properties": {
+              "type": {
+                "const": "file"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "spec"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "spec"
+            ],
+            "properties": {
+              "type": {
+                "const": "spec"
+              },
+              "spec": {
+                "type": "string",
+                "pattern": "^S\\d+$",
+                "x-points-to": {
+                  "file": {
+                    "from": "code.json",
+                    "field": "design.folder",
+                    "name": "spec.jsonl",
+                    "else": "spec.jsonl"
+                  },
+                  "type": "spec"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "finding"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "finding"
+            ],
+            "properties": {
+              "type": {
+                "const": "finding"
+              },
+              "finding": {
+                "type": "string",
+                "pattern": "^A\\d+$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "task"
+              }
+            }
+          },
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "task"
+            ],
+            "properties": {
+              "type": {
+                "const": "task"
+              },
+              "task": {
+                "type": "string",
+                "pattern": "^T\\d+$",
+                "x-points-to": {
+                  "file": "tasks.jsonl",
+                  "type": "task"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "if_nobody": {
+      "type": "string",
+      "minLength": 1
+    },
+    "done_when": {
+      "type": "string",
+      "minLength": 1
+    },
+    "priority": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "admitted",
+        "asked",
+        "dropped"
+      ]
+    }
+  }
+}

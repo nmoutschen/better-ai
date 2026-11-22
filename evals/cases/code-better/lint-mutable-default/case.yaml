@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: The project's linter is ruff, with bugbear rules, and CONTRIBUTING.md says `ruff check .` must pass; it passes
   today. The obvious `tags=[]` default is flagged (B006); the change must work and add no ruff issue.

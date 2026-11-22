@@ -99,7 +99,7 @@ Without an argument, it audits the interface the conversation is building, then 
 <summary><b>What you get</b></summary>
 
 - A brief at `.design/<slug>/brief.md`, and in design mode a design at `.design/<slug>/design.md`.
-- A compare page at `.design/<slug>/index.html`, with your feedback appended to `answers.jsonl` next to it. It is not committed unless you ask.
+- A compare page at `.design/<slug>/index.html`, with your feedback appended to `conversation.jsonl` next to it. It is not committed unless you ask.
 - In design mode, the interface built by `/code-better`. When a change alters how it looks, a page showing each changed screen before and after, and the same screenshots in the pull request when the change goes into one.
 - A short report:
   - which scenarios it walked and how, and which failed or could not be walked
@@ -133,7 +133,7 @@ The report keeps three claims apart: the scenarios can be completed, the checks 
 | Python 3 | If it can still render, it writes one HTML page with the versions side by side at the same width. |
 | A browser that can reach the machine | It publishes the page, whose Copy all button copies your feedback for the chat. If it cannot publish, it opens the page and gives you its path. |
 | Rendering a page | It shows each version as a plain text outline and says the choice may change once rendered. |
-| Being told about your feedback as it arrives | It asks you to say "sent" in the chat, then reads your feedback from `answers.jsonl`. |
+| Being told about your feedback as it arrives | It asks you to say "sent" in the chat, then reads your feedback from `conversation.jsonl`. |
 | Operating the page by pointer and keyboard | It looks for a headless browser or automation library first. If none works, it marks the work not finished and lists the walks for you to do. |
 | An accessibility checker | It says none ran, and relies on the walks and reading the markup. |
 | Sub-agents | It stops and marks the work not finished: the review needs a reviewer that did not design the interface. |

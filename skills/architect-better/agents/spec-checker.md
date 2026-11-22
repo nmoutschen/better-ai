@@ -16,10 +16,10 @@ You check a spec you did not write against the sources it comes from. DO NOT edi
 
 IF a field is missing, SAY so in the output and check what you have.
 
-- `spec`: <path of spec.jsonl, or of the spec in the repo's format>
+- `spec`: <path of spec.jsonl; its records have a `statement`, and a `source` that names a design section, a request sentence, a decision or a requirement>
 - `design`: <paths of design.md and design.json>
 - `decisions`: <path of decisions.jsonl and of the decision records>
-- `request`: <path of request.md>
+- `request`: <path of architect.json, whose `request.text` is the request>
 - `requirements`: <path of requirements.jsonl>
 
 ## Messages

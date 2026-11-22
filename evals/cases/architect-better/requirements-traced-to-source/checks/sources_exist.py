@@ -1,5 +1,5 @@
 """Pass when docs/designs/2026-11-order-export/requirements.jsonl holds at least one record, every record has a source
-of a known type, every `request` source quotes a sentence of the planted request.md word for word (whitespace
+of a known type, every `request` source quotes a sentence of the request of the planted architect.json word for word (whitespace
 normalised), and every `file` source names a file that exists in the repository."""
 
 import json
@@ -19,9 +19,14 @@ def normalise(text: str) -> str:
 
 
 request = normalise(
-    subprocess.run(
-        ["git", "show", f"{os.environ['START_COMMIT']}:{FOLDER}/request.md"], capture_output=True, text=True, check=True
-    ).stdout
+    json.loads(
+        subprocess.run(
+            ["git", "show", f"{os.environ['START_COMMIT']}:{FOLDER}/architect.json"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )["request"]["text"]
 )
 path = Path(FOLDER) / "requirements.jsonl"
 if not path.exists():
@@ -41,7 +46,7 @@ for record in records:
     if kind not in TYPES:
         sys.exit(f"{record.get('id')}: source type {kind!r} is not one of {sorted(TYPES)}")
     if kind == "request" and (not source.get("sentence") or normalise(source["sentence"]) not in request):
-        sys.exit(f"{record.get('id')}: request sentence is not in request.md word for word: {source.get('sentence')!r}")
+        sys.exit(f"{record.get('id')}: request sentence is not in the request word for word: {source.get('sentence')!r}")
     if kind == "file":
         named = re.split(r"[:#]", str(source.get("file") or ""), maxsplit=1)[0].removeprefix("./")
         if not named or not Path(named).is_file():

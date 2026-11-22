@@ -17,8 +17,7 @@ graders:
 - type: judge
   rubric: 'Rule: work that spans several sessions or people gets a plan with one task per step, a check per task, and a task
     marked done only after its check passes. Planted facts: services/ has five modules (billing, search, mail, auth, exports)
-    that call oldlog.write; README.md says to use logging.getLogger(__name__) with the same messages and levels. Look at the
-    Markdown files the agent added or changed. PASS only if all of: (1) a plan file has one task for each of the five services;
+    that call oldlog.write; README.md says to use logging.getLogger(__name__) with the same messages and levels. Look at the Markdown notes or `.code/` working files the agent added or changed. PASS only if all of: (1) a plan file has one task for each of the five services;
     (2) each task has a concrete check that shows that service is done, such as a grep that services/<name>.py no longer
     imports oldlog plus the tests passing, or an assertion on the logged record; one generic "run the tests" line for every
     task counts only if it is paired with a per-service condition; (3) each task has a status, and a service is marked done

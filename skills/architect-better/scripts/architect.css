@@ -68,3 +68,13 @@ code { font:var(--font-code); background:var(--linen); padding:1px var(--space-t
 .pin[data-state="done"] { background:var(--moss-dark); color:var(--cream); }
 .pin[data-state="accepted"] { display:none; }
 .btn:disabled { opacity:.45; cursor:default; }
+
+/* The records that did not validate, above the work: where, which field, why. The valid records stay on the page. */
+.errors { flex:none; max-height:30vh; overflow-y:auto; padding:var(--space-control) var(--space-edge); background:var(--linen); border-left:4px solid var(--error); border-bottom:1px solid var(--line); font:var(--font-message); color:var(--ink); }
+.errors[hidden] { display:none; }
+.errors h2 { margin:0 0 var(--space-tight); font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; color:var(--error); }
+.errors ul { list-style:none; margin:0; padding:0; }
+.errors li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
+.errors code { font:var(--font-code); }
+.errors .by { color:var(--muted); }
+.invalid { margin:var(--space-tight) 0 0; color:var(--error); font:var(--font-message); }

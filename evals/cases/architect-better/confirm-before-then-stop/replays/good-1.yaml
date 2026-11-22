@@ -3,19 +3,63 @@ reply: 'Before is drawn in docs/designs/2026-11-admin-posting/ from shop/, jobs/
 actions:
 - read: shop/api.py
 - read: docs/architecture.md
-- write: docs/designs/2026-11-admin-posting/request.md
+- write: docs/designs/2026-11-admin-posting/architect.json
   content: |
-    Design a small admin page where the two of us see the orders still to pack and mark each one as posted. Only we can use it, behind one shared password kept in the server's environment; it reads and updates the orders in shop.db and stores nothing else new. If it can't load, it says so. No new paid service. Decide any other gaps in this request yourself and list them as assumptions.
+    {
+     "type": "architect",
+     "at": "2026-11-20T10:00:00Z",
+     "by": "architect",
+     "request": {
+      "text": "Design a small admin page where the two of us see the orders still to pack and mark each one as posted. Only we can use it, behind one shared password kept in the server's environment; it reads and updates the orders in shop.db and stores nothing else new. If it can't load, it says so. No new paid service. Decide any other gaps in this request yourself and list them as assumptions.",
+      "from": {
+       "type": "chat"
+      }
+     },
+     "title": "Admin page for posting",
+     "summary": "",
+     "scope": "",
+     "accepted": []
+    }
 - write: docs/designs/2026-11-admin-posting/design.json
   content: |
-    {"title": "Admin page for posting",
+    {
+     "type": "design",
+     "at": "2026-11-20T10:00:00Z",
+     "by": "architect",
      "containers": {
-       "nodes": [
-         {"id": "website", "label": "Website", "kind": "page"},
-         {"id": "api", "label": "shop API", "kind": "service", "detail": "GET /v1/orders/<id> only; no list"},
-         {"id": "db", "label": "shop.db", "kind": "store"}],
-       "edges": [
-         {"id": "e1", "from": "website", "to": "api", "label": "HTTPS, session cookie"},
-         {"id": "e2", "from": "api", "to": "db", "label": "orders"}],
-       "groups": []},
-     "flows": []}
+      "nodes": [
+       {
+        "id": "website",
+        "label": "Website",
+        "kind": "page"
+       },
+       {
+        "id": "api",
+        "label": "shop API",
+        "kind": "service",
+        "detail": "GET /v1/orders/<id> only; no list"
+       },
+       {
+        "id": "db",
+        "label": "shop.db",
+        "kind": "store"
+       }
+      ],
+      "edges": [
+       {
+        "id": "e1",
+        "from": "website",
+        "to": "api",
+        "label": "HTTPS, session cookie"
+       },
+       {
+        "id": "e2",
+        "from": "api",
+        "to": "db",
+        "label": "orders"
+       }
+      ],
+      "groups": []
+     },
+     "flows": []
+    }

@@ -7,7 +7,7 @@ reads:
 - agents/reviewer.md
 situation: 'The Kade Street shifts app has a brief in .design/shift-swap/brief.md with two scenarios (Lena Vos offers
   her Saturday 12 December 07:00 shift; Ruben Claes approves Tom Peeters taking Sam Okafor''s Sunday 13 December 08:00
-  shift), the rough directions A.html and B.html, and answers.jsonl recording the user''s decision for B. The brief
+  shift), the rough directions A.html and B.html, and conversation.jsonl recording the user''s decision for B. The brief
   records no review of B. In B.html, the manager''s approval item reads only "Swap request #4471" next to "Approve
   swap": it names no shift, date or people, so Ruben cannot tell what he approves. The agent has a separate reviewer
   check B before building, confirms that finding, shows it to the user with the step of the scenario where Ruben is

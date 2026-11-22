@@ -1,4 +1,4 @@
-"""Every question added during the run has a short title, an origin, a kind, stakes, a done-when line, a priority and
+"""Every question added during the run has a short title, an origin, a kind, stakes, a done_when, a priority and
 a status from the board format."""
 
 import os
@@ -12,13 +12,13 @@ board = the_board()
 planted = subprocess.run(["git", "ls-tree", "-r", "--name-only", os.environ["START_COMMIT"]],
                          capture_output=True, text=True).stdout.split()
 new = {qid: q for qid, q in entries(board, "questions").items()
-       if f"{board}/questions/{qid}.md" not in planted}
+       if f"{board}/questions/{qid}.json" not in planted}
 if not new:
     fail("no question was added during the run")
 KINDS = ("seed", "frontier", "challenge", "chain", "conflict", "gap")
-STATUSES = ("proposed", "open", "in progress", "answered", "contested", "not found", "unclear", "out of scope")
+STATUSES = ("proposed", "open", "in progress", "answered", "contested", "not found", "unclear", "out of scope", "merged")
 for qid, q in new.items():
-    for key in ("question", "title", "origin", "stakes", "done-when"):
+    for key in ("question", "title", "origin", "stakes", "done_when"):
         if none(q.get(key)) and not (key == "stakes" and q.get("priority") == "low"):
             fail(f"{qid} has no {key}")
     if len(q["title"].split()) > 6:

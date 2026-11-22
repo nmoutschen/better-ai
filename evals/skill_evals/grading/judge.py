@@ -3,7 +3,7 @@
 The judge is `claude -p` with no tools, run as a separate sandbox user with an empty home, on a model
 chosen with `-T judge_model=...` (by default a different model from the agent under test). It reads a
 compact record: the request, the transcript with each command, result and exit code, the final reply,
-the Git diff, the Markdown notes the agent wrote, and an optional observed output. Its last line must
+the Git diff, the Markdown notes and .code/ working files the agent wrote, and an optional observed output. Its last line must
 be exactly `VERDICT: PASS` or `VERDICT: FAIL`; a reply whose last line is anything else scores 0 and is noted as
 malformed. A judge that times out, reports an error or prints no reply gives no verdict (None): the caller raises,
 so the sample is an Inspect sample error that `inspect eval-retry` reruns, instead of scoring 0.
@@ -112,7 +112,7 @@ async def record(state: TaskState, repo: Checkout, spec: dict[str, Any]) -> str:
             "Changes against the planted commit (git diff)",
             clip(diff.stdout if diff else "(unavailable)", DIFF_CHARS, 0),
         ),
-        ("Markdown notes the agent wrote or changed", "\n\n".join(notes) or "(none)"),
+        ("Markdown notes and .code/ working files the agent wrote or changed", "\n\n".join(notes) or "(none)"),
     ]
     if spec.get("observe"):
         observed = await repo.snapshot_run(spec["observe"]["cmd"])

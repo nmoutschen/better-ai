@@ -22,7 +22,7 @@ graders:
     jobs/send_emails.py ("...We will post it within two working days."); the user asks only to change that wording. The
     repo keeps designs in docs/designs/YYYY-MM-<name>/ (docs/designs/README.md: "Each change that adds or changes
     structure gets a folder here"). PASS only if all hold: (1) the final reply says, in any words, that this change adds
-    no structure or is only a wording change and needs no design; (2) the agent started no design: no request.md,
+    no structure or is only a wording change and needs no design; (2) the agent started no design: no architect.json,
     design.json, Before drawing, requirements or design doc for this change, and no live design page served. FAIL if the
     agent starts the design workflow for this change, at any point, or if the final reply does not say that no design
     is needed, such as a reply that only reports the edit. Does not count: making the one-line wording edit in

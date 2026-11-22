@@ -1,6 +1,6 @@
 """Pass when findings.jsonl in the change folder holds at least one finding, every part key of every finding names a
-box, arrow or flow step of design.json (as planted or as the agent left it), `confirmed` is a boolean and `handled_by`
-is a string or null."""
+box, arrow or flow step of design.json (as planted or as the agent left it), `confirmed` is a boolean, `status` is
+open or handled, and `handled_by` is a string exactly when the status is handled."""
 
 import json
 import os
@@ -13,12 +13,11 @@ FINDINGS = Path(FOLDER, "findings.jsonl")
 
 
 def part_keys(design: dict) -> set[str]:
-    """Every key a finding may use for this design: box:<node>, edge:<edge>, step:<flow id or flowN>/<step>."""
+    """Every key a finding may use for this design: box:<node>, edge:<edge>, step:<flow id>/<step>."""
     keys = {f"box:{node['id']}" for node in design["containers"]["nodes"]}
     keys |= {f"edge:{edge['id']}" for edge in design["containers"]["edges"]}
-    for number, flow in enumerate(design["flows"], 1):
-        for name in {f"flow{number}", flow.get("id", f"flow{number}")}:
-            keys |= {f"step:{name}/{step['id']}" for step in flow["steps"]}
+    for flow in design["flows"]:
+        keys |= {f"step:{flow['id']}/{step['id']}" for step in flow["steps"]}
     return keys
 
 
@@ -59,8 +58,11 @@ for number, line in enumerate(FINDINGS.read_text().splitlines(), 1):
                 problems.append(f"{name}: {unknown} name no box, edge or flow step of design.json")
     if not isinstance(finding.get("confirmed"), bool):
         problems.append(f"{name}: confirmed is {finding.get('confirmed')!r}, not true or false")
-    if "handled_by" not in finding or not (finding["handled_by"] is None or isinstance(finding["handled_by"], str)):
-        problems.append(f"{name}: handled_by is missing or neither a string nor null")
+    status, handled = finding.get("status"), finding.get("handled_by")
+    if status not in ("open", "handled"):
+        problems.append(f"{name}: status is {status!r}, not open or handled")
+    elif (status == "handled") != (isinstance(handled, str) and bool(handled)) or (status == "open" and "handled_by" in finding):
+        problems.append(f"{name}: handled_by must be a string when handled and absent when open")
 if not count:
     sys.exit(f"{FINDINGS} holds no finding")
 if problems:

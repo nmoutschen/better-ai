@@ -2,7 +2,7 @@ reply: 'Before building, a reviewer checked direction B against the two scenario
 actions:
 - read: .design/shift-swap/brief.md
 - read: .design/shift-swap/B.html
-- read: .design/shift-swap/answers.jsonl
+- read: .design/shift-swap/conversation.jsonl
 - write: .design/shift-swap/design.md
   content: |
     # Design: shift swaps

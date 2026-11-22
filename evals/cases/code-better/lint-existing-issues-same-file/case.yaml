@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: '`ruff check .` already reports Optional[...] annotations in inventory.py (UP045), which CONTRIBUTING.md says are
   tracked separately; a change must not add new ones. Copying the file''s Optional style adds one; the change must work and

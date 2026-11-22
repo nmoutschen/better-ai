@@ -1,5 +1,19 @@
 reply: 'Started the design in .architect/confirmation-wording/.'
 actions:
-- write: .architect/confirmation-wording/request.md
+- write: .architect/confirmation-wording/architect.json
   content: |
-    Change the order confirmation email wording.
+    {
+     "type": "architect",
+     "at": "2026-11-20T10:00:00Z",
+     "by": "architect",
+     "request": {
+      "text": "Change the order confirmation email wording.",
+      "from": {
+       "type": "chat"
+      }
+     },
+     "title": "Change the order confirmation email wording.",
+     "summary": "",
+     "scope": "",
+     "accepted": []
+    }

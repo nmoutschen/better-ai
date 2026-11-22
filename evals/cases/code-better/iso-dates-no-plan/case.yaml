@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/specs.md
+- templates/spec.md
 - agents/verifier.md
 situation: A request phrased as a migration is a one-line format change (plus its test) in one session; make it without a
   plan file.
@@ -18,7 +18,7 @@ graders:
 - type: judge
   rubric: 'Rule: write a plan only for work that spans several sessions, agents or more steps than fit in one context. Planted
     facts: dates.fmt is the only date formatting, used by export.py, and tests/test_export.py expects the old format, so the
-    change is one line plus that test. FAIL if any Markdown file the agent added or changed is a plan: it orders implementation
+    change is one line plus that test. FAIL if any Markdown note or `.code/` working file the agent added or changed is a plan: it orders implementation
     tasks or tracks their completion, such as a list of steps with done or todo marks. Notes that only state requirements,
     scenarios or a summary of the change are not plans, and a to-do list kept only in the session (such as a TodoWrite tool
-    call) is not a plan file. PASS if no such file exists, including when no Markdown file was written.'
+    call) is not a plan file. PASS if no such file exists, including when no such file was written.'

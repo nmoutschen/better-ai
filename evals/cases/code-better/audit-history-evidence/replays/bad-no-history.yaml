@@ -1,15 +1,11 @@
-reply: 'The quote total is written twice, in pricing.py and quote_pdf.py. The history shows they change together, and in December 2025 a rounding fix reached the PDF a week before pricing, so invoices disagreed with signed quotes. Proposed: one price function both call. Full list of 3 findings in .code/audit/findings.md.'
+reply: 'The quote total is written twice, in pricing.py and quote_pdf.py. The history shows they change together, and in December 2025 a rounding fix reached the PDF a week before pricing, so invoices disagreed with signed quotes. Proposed: one price function both call. Full list of 3 findings in .code/audit/2026-11-21/findings.jsonl.'
 actions:
 - read: README.md
 - read: pricing.py
 - read: quote_pdf.py
 - read: emails.py
-- write: .code/audit/findings.md
+- write: .code/audit/2026-11-21/findings.jsonl
   content: |
-    # Audit
-
-    1. The quote total is computed in pricing.py and again in quote_pdf.py. git log shows the two changed together on
-       2025-09-10, 2026-03-15 and 2026-07-20, and the rounding fix reached the PDF on 2025-12-01 but pricing only on
-       2025-12-09, when invoices disagreed with signed quotes. Proposed task: refactor, quote_pdf.py calls pricing.price.
-    2. quote_pdf.py has no tests. Proposed task: tests.
-    3. fmt_date is written twice (quote_pdf.py, emails.py); unchanged since 2025-06, low cost.
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A1", "where": [{"file": "pricing.py", "lines": "whole file"}, {"file": "quote_pdf.py", "lines": "whole file"}], "problem": "The quote total is computed in pricing.py and again in quote_pdf.py. git log shows the two changed together on 2025-09-10, 2026-03-15 and 2026-07-20, and the rounding fix reached the PDF on 2025-12-01 but pricing only on 2025-12-09, when invoices disagreed with signed quotes.", "cost": "The quote total is computed in pricing.py and again in quote_pdf.py. git log shows the two changed together on 2025-09-10, 2026-03-15 and 2026-07-20, and the rounding fix reached the PDF on 2025-12-01 but pricing only on 2025-12-09, when invoices disagreed with signed quotes.", "change_frequency": null, "evidence": "the Git history and the code read in this run", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "refactor, quote_pdf.py calls pricing.price"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A2", "where": [{"file": "quote_pdf.py", "lines": "whole file"}], "problem": "quote_pdf.py has no tests.", "cost": "quote_pdf.py has no tests.", "change_frequency": null, "evidence": "the Git history and the code read in this run", "evidence_ids": [], "status": "confirmed", "task": {"mode": "tests", "requirement": "tests"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A3", "where": [{"file": "quote_pdf.py", "lines": "whole file"}, {"file": "emails.py", "lines": "whole file"}], "problem": "fmt_date is written twice (quote_pdf.py, emails.py); unchanged since 2025-06, low cost.", "cost": "fmt_date is written twice (quote_pdf.py, emails.py); unchanged since 2025-06, low cost.", "change_frequency": null, "evidence": "the Git history and the code read in this run", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "Address: fmt_date is written twice (quote_pdf.py, emails.py); unchanged since 2025-06, low cost."}}

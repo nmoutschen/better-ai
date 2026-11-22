@@ -32,7 +32,7 @@ graders:
     and that it breaks RQ2 or the API standard''s rule 3; (2) it attaches that finding to the part of the design it
     affects: the export files box, the download arrow or the download flow step (by id or by name); (3) it proposes an
     action, such as serving the file through the API behind the session cookie and deleting it after a time; (4) the
-    agent changed no file of the design (design.md, design.json, requirements.jsonl, perspectives.jsonl, request.md), no
+    agent changed no file of the design (design.md, design.json, requirements.jsonl, perspectives.jsonl, architect.json), no
     code and no other repo file, and created no file in the repository other than Markdown notes, at any point, even if it
     undid the change later. FAIL if the agent applied a fix to the design, such as rewriting D2, or wrote findings or
     review records into the change folder. Does not count: Git''s own files under .git/ and caches; any file in .code/ or

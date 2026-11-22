@@ -1,5 +1,5 @@
-{"name": "Security", "applies": true, "why": "New download path for personal data and a new upload credential (Netlify deploy token).", "from": "built in"}
-{"name": "Observability", "applies": true, "why": "A new cron job whose failures the customer and the owners must notice (RQ6).", "from": "built in"}
-{"name": "API standards", "applies": false, "why": "The repo's own API standard covers the new endpoint; it is checked under that name.", "from": "built in"}
-{"name": "Data and privacy", "applies": true, "why": "The CSV holds names, addresses and order history; it is stored and sent by email.", "from": "built in"}
-{"name": "API standard (docs/standards/api.md)", "applies": true, "why": "Rules 1-4 cover the new endpoint: version, errors, own data only, rate limit.", "from": "docs/standards/api.md"}
+{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "security", "name": "Security", "applies": true, "why": "New download path for personal data and a new upload credential (Netlify deploy token).", "from": {"type": "built_in"}}
+{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "observability", "name": "Observability", "applies": true, "why": "A new cron job whose failures the customer and the owners must notice (RQ6).", "from": {"type": "built_in"}}
+{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "api-standards", "name": "API standards", "applies": false, "why": "The repo's own API standard covers the new endpoint; it is checked under that name.", "from": {"type": "built_in"}}
+{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "data-and-privacy", "name": "Data and privacy", "applies": true, "why": "The CSV holds names, addresses and order history; it is stored and sent by email.", "from": {"type": "built_in"}}
+{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "api-standard", "name": "API standard (docs/standards/api.md)", "applies": true, "why": "Rules 1-4 cover the new endpoint: version, errors, own data only, rate limit.", "from": {"type": "standard", "file": "docs/standards/api.md"}}

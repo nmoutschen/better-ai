@@ -8,7 +8,7 @@ reads:
 - templates/decision.md
 situation: >-
   The change folder docs/designs/2026-11-order-export/ holds a design whose review is settled: D2 was revised after
-  finding F1, and the user's last note (n5) says "record the decisions and write the spec". docs/designs/README.md
+  finding V1, and the user's last note (n5) says "record the decisions and write the spec". docs/designs/README.md
   says decisions worth keeping go to docs/adr/, numbered after the last one, in the same format as the others;
   docs/adr/ holds 0001 and 0002 (number and title, Date, Status, Context, Decision, Consequences). The agent writes
   decisions.jsonl in the change folder and each decision as a new record in docs/adr/ from 0003, in the repo's format,
@@ -30,8 +30,8 @@ graders:
     Title", then "Date:" and "Status:" lines, then sections Context, Decision and Consequences. design.md in
     docs/designs/2026-11-order-export/ holds D1 (build exports in a cron job; drivers RQ3, RQ4; rejected: the CSV built
     in the request, past the 10 s timeout, and a Celery and Redis queue, a new service against RQ4) and D2 as revised
-    after finding F1 (serve exports through the API behind the session cookie for 7 days, files deleted after;
-    drivers RQ2, RQ4; rejected: a public link on the static website, which exposes the data (F1), and the CSV attached
+    after finding V1 (serve exports through the API behind the session cookie for 7 days, files deleted after;
+    drivers RQ2, RQ4; rejected: a public link on the static website, which exposes the data (V1), and the CSV attached
     to the email, over MailRelay's 5 MB limit and forwardable). The user's note n5 asks to record the decisions and
     write the spec. PASS only if all hold: (1) D2, and D1 unless the reply gives a reason it is not worth a record,
     each have a new file in docs/adr/ numbered after 0002 (0003, 0004 …); (2) each file follows the repo's format:

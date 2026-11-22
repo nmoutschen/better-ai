@@ -1,1 +1,0 @@
-Customers should be able to download their order history from their account page, as a CSV file. We get a few GDPR access requests a month and answer them by hand today, which takes an hour each.

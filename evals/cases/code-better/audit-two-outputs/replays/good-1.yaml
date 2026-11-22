@@ -1,4 +1,4 @@
-reply: 'Two problems cost money now: (1) invoices use 20% VAT while checkout charges 21% since January, and (2) failed card charges still mark orders as paid. Next: (3) invoice.py has no tests and computes VAT a second time, (4) shipping.py has no tests, (5) shop.py prints every order to the log. The full list of 12 findings, with a proposed task for each, is in .code/audit/findings.md.'
+reply: 'Two problems cost money now: (1) invoices use 20% VAT while checkout charges 21% since January, and (2) failed card charges still mark orders as paid. Next: (3) invoice.py has no tests and computes VAT a second time, (4) shipping.py has no tests, (5) shop.py prints every order to the log. The full list of 12 findings, with a proposed task for each, is in .code/audit/2026-11-21/findings.jsonl.'
 actions:
 - bash: 'git log --name-only --format=''%h %ad %s'' --since=12.months'
 - read: README.md
@@ -7,21 +7,25 @@ actions:
 - read: payments.py
 - read: shipping.py
 - read: exporters.py
-- write: .code/audit/findings.md
+- write: .code/audit/2026-11-21/audit.json
   content: |
-    # Audit
-
-    1. invoice.py charges VAT 0.20; checkout.py and the README use 21% since 2026. The 2026-01-05 commit changed
-       checkout.py only, so invoices show less than was charged. Proposed task: bug fix, one VAT constant, test the invoice.
-    2. payments.charge returns True after 5 failures and swallows every exception: orders are marked paid with no money
-       taken. Proposed task: bug fix, return False or raise on failure.
-    3. invoice.py has no tests and computes VAT a second time. Proposed task: tests, then refactor to one VAT function.
-    4. shipping.py has no tests. Proposed task: tests.
-    5. shipping_cost(legacy_mode=...) has no caller. Proposed task: refactor, remove it.
-    6. exporters.py is imported nowhere. Proposed task: refactor, remove it.
-    7. shop.py prints every order with print("DEBUG", ...). Proposed task: remove it.
-    8. calcWeight is camelCase in a snake_case codebase.
-    9. checkout.py keeps commented-out coupon code.
-    10. The retry count 5 in payments.py has no name and retries errors that will not pass on retry.
-    11. checkout.py imports json and never uses it.
-    12. Shipping prices 495, 895 and 700 have no names.
+    {"type": "audit", "at": "2026-11-21T00:00:00Z", "by": "agent", "goal": "keep the shop's invoices and payments correct as features are added", "commit": "a1b2c3d", "not_read": null}
+- write: .code/audit/2026-11-21/evidence.jsonl
+  content: |
+    {"type": "history", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "E1", "fact": "The 2026-01-05 commit changed checkout.py to 0.21 and did not change invoice.py.", "command": "git log --since=12.months --name-only --format='%h %ad %s'"}
+    {"type": "rule", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "E2", "fact": "The README says VAT is 21% since 1 January 2026.", "command": "grep -n VAT README.md"}
+    {"type": "check", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "E3", "fact": "ruff reports an unused import of json in checkout.py.", "command": "ruff check checkout.py"}
+- write: .code/audit/2026-11-21/findings.jsonl
+  content: |
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A1", "where": [{"file": "invoice.py", "lines": "VAT"}], "problem": "invoice.py charges VAT 0.20; checkout.py and the README use 21% since 2026.", "cost": "Every invoice since 2026-01-05 shows less VAT and a lower total than the amount charged.", "change_frequency": "checkout.py changed on 2026-01-05, invoice.py did not", "evidence": "The 2026-01-05 commit changed checkout.py only.", "evidence_ids": ["E1", "E2"], "status": "confirmed", "task": {"mode": "bug fix", "requirement": "invoice.py uses the VAT rate checkout.py charges, and a test shows the invoice total equals the charge"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A2", "where": [{"file": "payments.py", "lines": "charge"}], "problem": "payments.charge returns True after 5 failures and swallows every exception.", "cost": "An order is marked paid when no money was taken.", "change_frequency": null, "evidence": "payments.py read in this run.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "bug fix", "requirement": "payments.charge returns False or raises when the charge fails, and a test shows the order is not marked paid"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A3", "where": [{"file": "invoice.py", "lines": "VAT"}, {"file": "checkout.py", "lines": "VAT"}], "problem": "invoice.py has no tests and computes VAT a second time.", "cost": "A rate change must be made in two files, and the copies already differ (A1).", "change_frequency": "checkout.py changed on 2026-01-05, invoice.py did not", "evidence": "The copies differ today.", "evidence_ids": ["E1"], "status": "confirmed", "task": {"mode": "tests", "requirement": "tests for the invoice total, then one VAT function used by both files"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A4", "where": [{"file": "shipping.py", "lines": "whole file"}], "problem": "shipping.py has no tests.", "cost": "A change to a shipping price cannot be checked.", "change_frequency": null, "evidence": "No test imports shipping.py.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "tests", "requirement": "tests for each shipping price"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A5", "where": [{"file": "shipping.py", "lines": "shipping_cost"}], "problem": "shipping_cost(legacy_mode=...) has no caller.", "cost": "A branch nobody runs must be read and kept working when shipping_cost changes.", "change_frequency": null, "evidence": "No caller passes legacy_mode.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "remove legacy_mode and its branch"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A6", "where": [{"file": "exporters.py", "lines": "whole file"}], "problem": "exporters.py is imported nowhere.", "cost": "A registry nobody uses must be kept working.", "change_frequency": null, "evidence": "No file imports exporters.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "remove exporters.py"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A7", "where": [{"file": "shop.py", "lines": "print"}], "problem": "shop.py prints every order with print(\"DEBUG\", ...).", "cost": "Every order is written to the log.", "change_frequency": null, "evidence": "shop.py read in this run.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "remove the debug print"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A8", "where": [{"file": "shipping.py", "lines": "calcWeight"}], "problem": "calcWeight is camelCase in a snake_case codebase.", "cost": "One name breaks the convention readers expect.", "change_frequency": null, "evidence": "shipping.py read in this run.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "rename calcWeight to calc_weight"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A9", "where": [{"file": "checkout.py", "lines": "coupon"}], "problem": "checkout.py keeps commented-out coupon code.", "cost": "Readers must work out whether it is still needed.", "change_frequency": null, "evidence": "checkout.py read in this run.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "remove the commented-out coupon code"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A10", "where": [{"file": "payments.py", "lines": "retry"}], "problem": "The retry count 5 in payments.py has no name and retries errors that will not pass on retry.", "cost": "A reader cannot tell why five, and a permanent error is retried five times.", "change_frequency": null, "evidence": "payments.py read in this run.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "name the retry count and retry only errors that can pass on retry"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A11", "where": [{"file": "checkout.py", "lines": "import json"}], "problem": "checkout.py imports json and never uses it.", "cost": "Lint output carries a warning nobody acts on.", "change_frequency": null, "evidence": "ruff reports it.", "evidence_ids": ["E3"], "status": "confirmed", "task": {"mode": "refactor", "requirement": "remove the import"}}
+    {"type": "finding", "at": "2026-11-21T00:00:00Z", "by": "agent", "id": "A12", "where": [{"file": "shipping.py", "lines": "prices"}], "problem": "Shipping prices 495, 895 and 700 have no names.", "cost": "A price change means finding the number in the code.", "change_frequency": null, "evidence": "shipping.py read in this run.", "evidence_ids": [], "status": "confirmed", "task": {"mode": "refactor", "requirement": "give each shipping price a name"}}
