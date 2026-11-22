@@ -1,0 +1,134 @@
+Slide 1 of 27.
+Question: Why?
+The answer.
+
+Slide 2 of 27: The slide states one clear point.
+1. Intro: why
+Highlighted: Intro.
+Source: test
+
+Slide 3 of 27: The slide states one clear point.
+- A causes B
+Highlighted: A.
+Source: test
+
+Slide 4 of 27: The slide states one clear point.
+1. One — n
+2. Two
+Source: test
+
+Slide 5 of 27: The slide states one clear point.
+- G: x, y
+Highlighted: G.
+Source: test
+
+Slide 6 of 27: The slide states one clear point.
+All. Value (people): 5
+All / A. Value (people): 3
+All / B. Value (people): 2
+Source: test
+
+Slide 7 of 27: The slide states one clear point.
+both. In sets: P & Q; Count: 3
+Source: test
+
+Slide 8 of 27: The slide states one clear point.
+r. c1: not measured; c2: higher
+s. c1: yes; c2: no
+Source: test
+
+Slide 9 of 27: The slide states one clear point.
+- g: f on o: raises
+Source: test
+
+Slide 10 of 27: The slide states one clear point.
+r. a: x (raises); b: y
+Source: test
+
+Slide 11 of 27: The slide states one clear point.
+judgment
+o. Effort (0–1): 0.20; Value (0–1): 0.80
+Source: test
+
+Slide 12 of 27: The slide states one clear point.
+12%: of users
+4: x
+Source: test
+
+Slide 13 of 27: The slide states one clear point.
+p. Count (q): 3
+q. Count (q): 2
+Total. Count (q): 5
+Source: test
+
+Slide 14 of 27: The slide states one clear point.
+a. Value (ms): 3
+b. Value (ms): 2.5
+Source: test
+
+Slide 15 of 27: The slide states one clear point.
+a. 2020: 1; 2021: 2
+Source: test
+
+Slide 16 of 27: The slide states one clear point.
+g. n: 3; Min: 1; Max: 3.5
+Source: test
+
+Slide 17 of 27: The slide states one clear point.
+p. x (u): 1; y (u): 2
+x (u): 2; y (u): 3
+Source: test
+
+Slide 18 of 27: The slide states one clear point.
+2020. s: 1
+2021. s: 2
+Source: test
+
+Slide 19 of 27: The slide states one clear point.
+- 2020: start
+Source: test
+
+Slide 20 of 27: The slide states one clear point.
+a. n (ms): 1 (highlighted)
+b. n (ms): 2
+Source: test
+
+Slide 21 of 27: The slide states one clear point.
+One short paragraph.
+Source: test
+
+Slide 22 of 27: The slide states one clear point.
+a box
+Source: test
+
+Slide 23 of 27: The slide states one clear point.
+1. A: one
+2. B: two
+Highlighted: two.
+Source: test
+
+Slide 24 of 27: The slide states one clear point.
+in, depending on who:
+- x: helps
+- y: never — n
+Source: test
+
+Slide 25 of 27: The slide states one clear point.
+First, Before:
+a. Value (ms): 3
+b. Value (ms): 2.5
+Second, After:
+a. Value (ms): 3
+b. Value (ms): 2.5
+Source: test Read: Results.
+
+Slide 26 of 27: The slide states one clear point.
+12%: of users left.
+against 4% before
+Source: test
+
+Slide 27 of 27, Next: The slide states one clear point.
+A short paragraph.
+1. Read it, slide 2.
+Source: test
+

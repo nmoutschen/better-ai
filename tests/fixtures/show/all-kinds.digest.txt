@@ -1,0 +1,129 @@
+TITLE: The answer.
+QUESTION: Why?
+
+[1] VISUAL MAP: The slide states one clear point.
+    s1 Intro — why  [highlight]
+    source: test
+
+[2] VISUAL CONCEPT: The slide states one clear point.
+    A —causes→ B
+    source: test
+
+[3] VISUAL FLOW: The slide states one clear point.
+    → One (n)
+    → Two
+    source: test
+
+[4] VISUAL GROUPS: The slide states one clear point.
+    G: x, y  [highlight]
+    source: test
+
+[5] VISUAL TREE: The slide states one clear point.
+    All
+      A = 3
+      B = 2
+    source: test
+
+[6] VISUAL SETS: The slide states one clear point.
+    in P & Q: both (3)
+    source: test
+
+[7] VISUAL MATRIX: The slide states one clear point.
+    r: c1=–, c2=up
+    s: c1=yes, c2=no
+    source: test
+
+[8] VISUAL EFFECTS: The slide states one clear point.
+    g / f on o: raises
+    source: test
+
+[9] VISUAL PAIRS: The slide states one clear point.
+    columns: a | b
+    r: x [raises] | y
+    source: test
+
+[10] VISUAL QUADRANT: The slide states one clear point.
+    o: x=0.2, y=0.8
+    basis: judgment
+    source: test
+
+[11] VISUAL NUMBERS: The slide states one clear point.
+    12% — of users
+    4 — x
+    source: test
+
+[12] VISUAL UNITS: The slide states one clear point.
+    3 p
+    2 q
+    total: 5 q
+    source: test
+
+[13] VISUAL BARS: The slide states one clear point.
+    a: 3 ms
+    b: 2.5 ms
+    source: test
+
+[14] VISUAL SLOPE: The slide states one clear point.
+    a: 1 → 2 %
+    source: test
+
+[15] VISUAL DOTS: The slide states one clear point.
+    g: n=3, min 1, median 2, max 3.5
+    source: test
+
+[16] VISUAL SCATTER: The slide states one clear point.
+    2 points; x = x (u), y = y (u)
+    p: x=1, y=2
+    source: test
+
+[17] VISUAL LINE: The slide states one clear point.
+    s: 2020=1, 2021=2
+    source: test
+
+[18] VISUAL TIMELINE: The slide states one clear point.
+    2020: start
+    source: test
+
+[19] VISUAL TABLE: The slide states one clear point.
+    a | 1
+    b | 2
+    source: test
+
+[20] VISUAL TEXT: The slide states one clear point.
+    3 words
+    source: test
+
+[21] VISUAL SVG: The slide states one clear point.
+    custom svg; alt: a box
+    source: test
+
+[22] VISUAL LANES: The slide states one clear point.
+    A: one
+    B: two  (hand-off from A)  [highlight]
+    source: test
+
+[23] VISUAL FORK: The slide states one clear point.
+    in → who
+      x: helps
+      y: never (n)
+    source: test
+
+[24] COMPARE: The slide states one clear point.
+    A: Before (bars)
+    a: 3 ms
+    b: 2.5 ms
+    B: After (bars)
+    a: 3 ms
+    b: 2.5 ms
+    both sides drawn on one scale
+    source: test [read: Results]
+
+[25] STATEMENT: The slide states one clear point.
+    12% of users left. (against 4% before)
+    source: test
+
+[26] TITLE: The slide states one clear point.
+    part: Next
+    A short paragraph.
+    1. Read it → panel 1 (slide 2)
+    source: test

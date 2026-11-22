@@ -73,31 +73,47 @@
   }
 
   // ---------- The page: the strip and one slide at a time ----------
-  var body = document.body, served = location.protocol === 'http:';
-  if (served) body.classList.add('live');
-  var slides = Array.prototype.slice.call(document.querySelectorAll('.stage > .slide')), cur = 0;
-  slides.forEach(attachDetails);
-  var strip = document.querySelector('.strip'), groups = [];
-  slides.forEach(function (s, i) {
-    var g = groups[groups.length - 1], part = s.dataset.part || '';
-    if (g && g.part === part) g.idx.push(i); else groups.push({ part: part, idx: [i] });
-  });
-  groups.forEach(function (g) {
-    var li = el('li', 'grp'), segs = el('span', 'segs');
-    li.style.flexGrow = g.idx.length;
-    li.append(el('span', 'pname', g.part), segs);
-    g.idx.forEach(function (i) {
-      var b = el('button', '', String(i + 1)); b.type = 'button';
-      b.title = slides[i].dataset.headline;
-      b.setAttribute('aria-label', 'Slide ' + (i + 1) + ': ' + slides[i].dataset.headline);
-      b.addEventListener('click', function () { go(i); });
-      segs.append(b);
+  // Served, the page is the shared shell and the slides come from /data; opened as a file, they are in the page and
+  // there is no conversation.
+  var served = !!document.getElementById('page-config');
+  if (!served) document.body.classList.add('static');
+  var slides = [], cur = 0, commenting = false, comments = null, conv = null, items = [], seq = 0;
+  var stage = document.querySelector('.stage'), pop = document.querySelector('.pop');
+  var strip = document.querySelector('.strip'), prev = document.querySelector('.route .prev'), next = document.querySelector('.route .next');
+  var count = document.querySelector('.route .count'), segButtons = [], groups = [];
+  function popOpen() { return !!pop && !pop.hidden; }
+  function say(text, kind) { if (conv) conv.flash(text, kind); else showToast(text); }
+  function showToast(text) {
+    var toast = document.querySelector('.toast'); if (!toast) return;
+    toast.textContent = text; toast.className = 'toast ok'; toast.hidden = false;
+    setTimeout(function () { toast.hidden = true; }, 2500);
+  }
+
+  function build() {
+    slides = Array.prototype.slice.call(document.querySelectorAll('.stage > .slide'));
+    slides.forEach(attachDetails);
+    strip.replaceChildren(); groups = [];
+    slides.forEach(function (s, i) {
+      var g = groups[groups.length - 1], part = s.dataset.part || '';
+      if (g && g.part === part) g.idx.push(i); else groups.push({ part: part, idx: [i] });
     });
-    g.el = li; strip.append(li);
-  });
-  var segButtons = strip.querySelectorAll('.segs button'), prev = document.querySelector('.route .prev'), next = document.querySelector('.route .next');
-  var count = document.querySelector('.route .count'), stage = document.querySelector('.stage');
+    groups.forEach(function (g) {
+      var li = el('li', 'grp'), segs = el('span', 'segs');
+      li.style.flexGrow = g.idx.length;
+      li.append(el('span', 'pname', g.part), segs);
+      g.idx.forEach(function (i) {
+        var b = el('button', '', String(i + 1)); b.type = 'button';
+        b.title = slides[i].dataset.headline;
+        b.setAttribute('aria-label', 'Slide ' + (i + 1) + ': ' + slides[i].dataset.headline);
+        b.addEventListener('click', function () { go(i); });
+        segs.append(b);
+      });
+      g.el = li; strip.append(li);
+    });
+    segButtons = strip.querySelectorAll('.segs button');
+  }
   function go(i) {
+    if (!slides.length) return;
     cur = Math.max(0, Math.min(slides.length - 1, i));
     slides.forEach(function (s, j) { s.classList.toggle('current', j === cur); });
     segButtons.forEach(function (b, j) { if (j === cur) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
@@ -112,7 +128,7 @@
   next.addEventListener('click', function () { go(cur + 1); });
   function typing(t) { return t.closest && t.closest('input, textarea, select, [contenteditable]'); }
   document.addEventListener('keydown', function (e) {
-    if (typing(e.target) || !pop.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (typing(e.target) || popOpen() || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); go(cur + 1); }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(cur - 1); }
     else if (e.key === 'Home') { e.preventDefault(); go(0); }
@@ -121,9 +137,28 @@
   });
   detailKeys(stage, function () { return slides[cur]; });
 
+  // The controls in the bar: Read and Comment when served, and Export.
+  var controls = el('div', 'controls'), status = document.getElementById('status');
+  if (served) {
+    var seg = el('div', 'seg cycle'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Mode');
+    seg.innerHTML =
+      '<button type="button" class="ico" data-mode="read" aria-pressed="true" title="Click a label or a mark to see its detail (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg><span>Read</span></button>' +
+      '<button type="button" class="ico" data-mode="comment" aria-pressed="false" title="Click any part of a slide to comment on it (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z"/></svg><span>Comment</span></button>';
+    controls.append(seg);
+  }
+  var exportButton = el('button', 'tool export');
+  exportButton.type = 'button'; exportButton.title = 'Download the slides alone as one presentation';
+  exportButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span>';
+  controls.append(exportButton);
+  if (status) { status.className = 'controls'; status.replaceChildren.apply(status, controls.childNodes); }
+
   // Export: the slides alone as one HTML presentation, with this page's styles and script, so it works offline
-  // apart from the fonts.
-  document.querySelector('.export').addEventListener('click', function () {
+  // apart from the fonts. A served page links its styles and script, so they are fetched first.
+  function textOf(node) {
+    if (node.tagName === 'STYLE' || (node.tagName === 'SCRIPT' && !node.src)) return Promise.resolve(node.textContent);
+    return fetch(node.href || node.src).then(function (r) { return r.text(); });
+  }
+  exportButton.addEventListener('click', function () {
     var copies = slides.map(function (s) {
       var c = s.cloneNode(true);
       c.querySelectorAll('.pin').forEach(function (p) { p.remove(); });
@@ -132,52 +167,35 @@
       c.classList.remove('current');
       return c.outerHTML;
     }).join('');
-    var font = document.querySelector('link[rel="stylesheet"]'), title = document.title;
-    var page = '<!DOCTYPE html>\n<html lang="' + document.documentElement.lang + '"><head><meta charset="utf-8">' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1"><title></title>' + (font ? font.outerHTML : '') +
-      '<style>' + document.querySelector('style').textContent + '</style></head><body class="present"><main class="deck">' + copies +
-      '</main><p class="pcount" aria-live="polite"></p><script>' + document.querySelector('script').textContent + '<\/script></body></html>';
-    var doc = new DOMParser().parseFromString(page, 'text/html');
-    doc.title = title;
-    var blob = new Blob(['<!DOCTYPE html>\n' + doc.documentElement.outerHTML], { type: 'text/html' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = (title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'slides') + '.html';
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-    flash('Slides downloaded as one presentation', 'ok');
+    var font = document.querySelector('link[rel="stylesheet"][href^="https://fonts"]'), title = document.title;
+    var styles = Array.prototype.slice.call(document.querySelectorAll('style, link[rel="stylesheet"][href^="/"]'));
+    var mine = document.getElementById('show-js') || document.querySelector('script[src="/show.js"]');
+    Promise.all(styles.map(textOf).concat([textOf(mine)])).then(function (texts) {
+      var code = texts.pop();
+      var page = '<!DOCTYPE html>\n<html lang="' + document.documentElement.lang + '"><head><meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1"><title></title>' + (font ? font.outerHTML : '') +
+        '<style>' + texts.join('\n') + '</style></head><body class="present"><main class="deck">' + copies +
+        '</main><p class="pcount" aria-live="polite"></p><script>' + code + '<\/script></body></html>';
+      var doc = new DOMParser().parseFromString(page, 'text/html');
+      doc.title = title;
+      var blob = new Blob(['<!DOCTYPE html>\n' + doc.documentElement.outerHTML], { type: 'text/html' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'slides') + '.html';
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      say('Slides downloaded as one presentation', 'ok');
+    }, function () { say('The slides could not be exported', 'error'); });
   });
 
-  // ---------- Read and Comment ----------
-  var commenting = false, pop = document.querySelector('.pop');
-  var comments = pageElementComments({
-    pop: pop, pinClass: 'pin', byId: byId, send: send, crumb: crumb,
-    commenting: function () { return commenting; },
-    reopen: function (id) { conv.reopen(id); },
-    nextNumber: function () { return seq + 1; },
-    params: function (data, text) {
-      return { on: { slide: data.slide, part: data.part, headline: data.headline, target: data.target, spot: data.spot }, text: text };
-    }
-  });
+  // ---------- Read and Comment (served only) ----------
   function choose(attr, value) {
     document.querySelectorAll('button[' + attr + ']').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value)); });
   }
-  // In the bar, a two-option setting shows only its current option; clicking it picks the other one.
-  document.querySelectorAll('.controls > .seg.cycle').forEach(function (seg) {
-    seg.addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (!b || b.getAttribute('aria-pressed') !== 'true' || seg.dataset.cycling) return;
-      var other = Array.prototype.filter.call(seg.querySelectorAll('button'), function (x) { return x !== b; })[0];
-      if (!other) return;
-      e.stopImmediatePropagation(); seg.dataset.cycling = '1'; other.click(); delete seg.dataset.cycling; other.focus();
-    }, true);
-  });
-  function setMode(on) { commenting = on; choose('data-mode', on ? 'comment' : 'read'); body.classList.toggle('commenting', on); }
-  document.querySelectorAll('button[data-mode]').forEach(function (b) {
-    b.addEventListener('click', function () { setMode(b.dataset.mode === 'comment'); });
-  });
+  function setMode(on) { commenting = on; choose('data-mode', on ? 'comment' : 'read'); document.body.classList.toggle('commenting', on); }
   stage.addEventListener('click', function (e) {
     var slide = e.target.closest('.slide'); if (!slide) return;
-    if (comments.click(e, function () { openPop(slide, e.target, e.clientX, e.clientY); }, openEdit)) return;
+    if (comments && comments.click(e, function () { openPop(slide, e.target, e.clientX, e.clientY); }, openEdit)) return;
     var goto = e.target.closest('[data-go]');
     if (goto) { e.preventDefault(); return go(+goto.dataset.go - 1); }
     var h = e.target.closest('[data-dk]');
@@ -211,8 +229,8 @@
   // Two lines: where the comment is, small and muted, then what was clicked.
   function crumb(event) {
     var c = event.on || event, box = el('span', 'crumb'), t = c.target || {}, said = t.item || t.text || c.headline || '';
-    box.append(el('span', 'path', 'Slide ' + c.slide + (c.part ? ' › ' + c.part : '')),
-               el('span', 'el', said ? '“' + said.slice(0, 90) + (said.length > 90 ? '…' : '') + '”' : 'the slide'));
+    box.append(el('span', 'path', 'Slide ' + c.slide + (c.part ? ' \u203a ' + c.part : '')),
+               el('span', 'el', said ? '\u201c' + said.slice(0, 90) + (said.length > 90 ? '\u2026' : '') + '\u201d' : 'the slide'));
     return box;
   }
   function openPop(slide, target, x, y) {
@@ -224,11 +242,8 @@
     var data = { item: it, slide: it.slide, part: it.part, headline: it.headline, target: it.target, spot: it.spot };
     comments.open(data, it, from, function () { return pageCommentPosition(r.left, r.bottom, pop); });
   }
-  document.addEventListener('mousedown', function (e) { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('.slide')) comments.close(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pop.hidden) comments.close(); });
 
-  // ---------- The conversation: page.js, shared with design-better's canvas; this page adds its pins and slides ----------
-  var seq = 0, items = [];
+  // ---------- The conversation: page.js; this page adds its pins and slides ----------
   function byId(id) { return items.filter(function (x) { return x.id === id; })[0]; }
   function apply(e, fresh) {
     if (e.type === 'comment') {
@@ -261,20 +276,70 @@
     comments.flashPin(pin, 'flash');
     pin.scrollIntoView({ block: 'nearest' });
   }
-  var KEY = 'show-mode:' + location.pathname;
-  var conv = pageConversation({
-    served: served, name: 'page', apply: apply, reset: reset, byId: byId, reveal: reveal, edit: openEdit, remove: comments.remove,
-    showLabel: function (n) { return 'Show comment ' + n + ' on its slide'; },
-    crumb: crumb, commentBody: function (e) { return el('p', 'body', e.text); },
-    noteParams: function () { return { on: { slide: cur + 1, part: slides[cur].dataset.part || null } }; },
-    busy: function () { return !pop.hidden; },
-    beforeReload: function () { sessionStorage.setItem(KEY, commenting ? 'comment' : 'read'); },
-    rendered: function (state) { comments.state(state); items.forEach(function (it) { placePin(it, false); }); }
-  });
   function send(method, params, what, done, fail) { conv.send(method, params, what, done, fail); }
-  function flash(text, kind) { conv.flash(text, kind); }
+  var KEY = 'show-mode:' + location.pathname;
+  function converse() {
+    comments = pageElementComments({
+      pop: pop, pinClass: 'pin', byId: byId, send: send, crumb: crumb,
+      commenting: function () { return commenting; },
+      reopen: function (id) { conv.reopen(id); },
+      nextNumber: function () { return seq + 1; },
+      params: function (data, text) {
+        return { on: { slide: data.slide, part: data.part, headline: data.headline, target: data.target, spot: data.spot }, text: text };
+      }
+    });
+    document.querySelectorAll('button[data-mode]').forEach(function (b) {
+      b.addEventListener('click', function () { setMode(b.dataset.mode === 'comment'); });
+    });
+    // In the bar, a two-option setting shows only its current option; clicking it picks the other one.
+    document.querySelectorAll('.controls > .seg.cycle').forEach(function (group) {
+      group.addEventListener('click', function (e) {
+        var b = e.target.closest('button'); if (!b || b.getAttribute('aria-pressed') !== 'true' || group.dataset.cycling) return;
+        var other = Array.prototype.filter.call(group.querySelectorAll('button'), function (x) { return x !== b; })[0];
+        if (!other) return;
+        e.stopImmediatePropagation(); group.dataset.cycling = '1'; other.click(); delete group.dataset.cycling; other.focus();
+      }, true);
+    });
+    document.addEventListener('mousedown', function (e) { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('.slide')) comments.close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pop.hidden) comments.close(); });
+    conv = pageConversation({
+      served: true, name: 'page', apply: apply, reset: reset, byId: byId, reveal: reveal, edit: openEdit, remove: comments.remove,
+      showLabel: function (n) { return 'Show comment ' + n + ' on its slide'; },
+      crumb: crumb, commentBody: function (e) { return el('p', 'body', e.text); },
+      noteParams: function () { return { on: { slide: cur + 1, part: slides[cur] ? slides[cur].dataset.part || null : null } }; },
+      busy: function () { return popOpen(); },
+      beforeReload: function () { sessionStorage.setItem(KEY, commenting ? 'comment' : 'read'); },
+      rendered: function (state) { comments.state(state); items.forEach(function (it) { placePin(it, false); }); }
+    });
+    try { if (sessionStorage.getItem(KEY) === 'comment') setMode(true); sessionStorage.removeItem(KEY); } catch (e) {}
+    conv.start();
+  }
 
-  try { if (sessionStorage.getItem(KEY) === 'comment' && served) setMode(true); sessionStorage.removeItem(KEY); } catch (e) {}
-  go((parseInt(location.hash.slice(1), 10) || 1) - 1);
-  if (served) conv.start();
+  function start() {
+    build();
+    go((parseInt(location.hash.slice(1), 10) || 1) - 1);
+    if (served) converse();
+  }
+  if (!served) return start();
+
+  // Served: the slides come from the server, drawn from the unit's spec each time the page loads.
+  function fill(data) {
+    document.documentElement.lang = data.lang || 'en';
+    document.title = data.title || document.title;
+    var title = document.getElementById('title'), goal = document.getElementById('goal');
+    if (title) title.textContent = data.title || '';
+    if (goal && data.question) { goal.className = 'question'; goal.textContent = data.question; goal.hidden = false; }
+    if (data.style) { var st = el('style'); st.textContent = data.style; document.head.append(st); }
+    stage.innerHTML = data.slides;
+  }
+  fetch('/data').then(function (r) { return r.json(); }).then(function (data) {
+    if (data.errors) {
+      // A spec that fails its checks has no slides; the page still carries the conversation, so the user can say so.
+      var box = el('div', 'bad'); box.append(el('p', '', 'The spec has errors. The agent fixes them; this page then loads the slides.'));
+      var ul = el('ul'); data.errors.forEach(function (line) { ul.append(el('li', '', line)); }); box.append(ul);
+      stage.append(box); prev.disabled = next.disabled = true;
+      return converse();
+    }
+    fill(data); start();
+  });
 })();

@@ -143,7 +143,7 @@ USE the `svg` kind only when no other kind fits. KEEP one direction of flow, und
 ## 5. Build, check and show
 
 1. **Extract.** WRITE the extract in section 2.
-2. **Write the spec.** WRITE a JSON spec in the format in [templates/spec.md](templates/spec.md). RUN `python3 <skill dir>/scripts/better.pyz create .show/<slug> --by <your name>` at the repo root, with the spec on stdin. DO NOT commit it unless the user asks. WRITE each later change to the spec with `python3 <skill dir>/scripts/better.pyz set .show/<slug> spec`. IF a command refuses the spec, FIX the spec and RUN it again. IF it reports busy, RUN it again. DO NOT write the spec by hand to get past a refusal.
+2. **Write the spec.** WRITE a JSON spec in the format in [templates/spec.md](templates/spec.md). RUN `python3 <skill dir>/scripts/better.pyz create .show/<slug> --by <your name>` at the repo root, with the spec on stdin. DO NOT commit it unless the user asks. WRITE each later change to the spec with `python3 <skill dir>/scripts/better.pyz set .show/<slug> slides`. IF a command refuses the spec, FIX the spec and RUN it again. IF it reports busy, RUN it again. DO NOT write the spec by hand to get past a refusal.
 3. **Check the spec.** RUN `python3 <skill dir>/scripts/better.pyz check .show/<slug>`. FIX every error. TREAT each warning as a reason to split or simplify the slide, unless you can say why it does not apply.
 4. **Compare the digest with the document.** The check prints every headline, value, label, detail and source. CHECK each against the extract and the document, and CHECK that each headline matches its visual and that nothing the GOAL needs is missing.
 5. **Render and show.** CHOOSE the first route the user can read:

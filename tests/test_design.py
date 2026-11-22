@@ -64,7 +64,7 @@ def board_css():
     for name in ("design-better/scripts/canvas.css", "architect-better/scripts/architect.css"):
         for n, line in enumerate((scripts / name).read_text(encoding="utf-8").splitlines(), 1):
             yield scripts / name, n, line
-    show = scripts / "show-better/scripts/show.css"
+    show = ROOT / "src" / "better_ai" / "show" / "show.css"
     for n, line in enumerate(show.read_text(encoding="utf-8").splitlines(), 1):
         if line.startswith("/* ---------- A slide"):
             break

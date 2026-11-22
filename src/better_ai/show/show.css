@@ -6,8 +6,9 @@
 .tool { border:1px solid var(--cream); background:transparent; color:var(--cream); cursor:pointer; }
 .tool:hover { background:var(--cream); color:var(--umber); }
 /* Opened as a file, the page is the copy to read or publish: no conversation and no Comment mode. */
-body:not(.live) .live-only { display:none !important; }
-body:not(.live) .work { grid-template-columns:minmax(0, 1fr); }
+body.static .work { grid-template-columns:minmax(0, 1fr); }
+.stage .bad { margin:auto; max-width:46rem; padding:var(--space-section); border-left:4px solid var(--error); background:var(--linen); font:var(--font-message); }
+.stage .bad li { margin:var(--space-tight) 0; }
 .status { margin:0; font-size:var(--text-message); }
 .status.error { color:var(--error); font-weight:700; }
 

@@ -2,7 +2,7 @@
 
 ```
 python3 <skill dir>/scripts/better.pyz create .show/SLUG --by AGENT
-python3 <skill dir>/scripts/better.pyz set .show/SLUG spec
+python3 <skill dir>/scripts/better.pyz set .show/SLUG slides
 python3 <skill dir>/scripts/better.pyz check .show/SLUG
 python3 <skill dir>/scripts/better.pyz render .show/SLUG
 python3 <skill dir>/scripts/better.pyz render .show/SLUG --format text
