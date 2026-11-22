@@ -551,6 +551,13 @@ class CodeBetterTextTest(unittest.TestCase):
             self.assertIn(rule, text, path.name)
             self.assertIn("source `request`", text, path.name)
 
+    def test_code_better_requirement_source_is_only_for_an_architect_folder_spec(self):
+        """`requirements.jsonl` exists only in an architect folder, so the spec template limits that source to it."""
+        text = (CODE_BETTER / "templates" / "spec.md").read_text()
+        self.assertIn(
+            "USE a source of type `requirement` only when the spec is an architect folder's `spec.jsonl`", text
+        )
+
     def test_code_better_small_text_fixes_of_round_three(self):
         """The decisions schema names its writers as the text does; the notes table and the tasks template are exact."""
         comment = json.loads((CODE_SCHEMAS / "decisions.schema.json").read_text())["$comment"]
