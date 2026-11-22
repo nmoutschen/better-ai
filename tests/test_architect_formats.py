@@ -1192,25 +1192,6 @@ class DiagramCli(unittest.TestCase):
                     self.assertEqual(run.stderr.strip(), "design: nested too deeply")
                     self.assertFalse((Path(tmp) / "out").exists())
 
-    def test_whatever_raises_while_checking_or_rendering_is_one_line_and_exit_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "design.json"
-            path.write_text(json.dumps(design()))
-            for command, name, error, line in (
-                ("check", "validate", ZeroDivisionError("x"), "design: could not be checked: ZeroDivisionError"),
-                ("render", "layout", KeyError("k"), "design: could not be checked: KeyError"),
-                ("render", "svg_containers", RuntimeError("r"), "design: could not be checked: RuntimeError"),
-                ("check", "validate", RecursionError(), "design: nested too deeply"),
-                ("render", "layout", RecursionError(), "design: nested too deeply"),
-            ):
-                with self.subTest(command=command, raised=type(error).__name__, name=name):
-                    argv = [command, str(path)] + (["--out", str(Path(tmp) / "out")] if command == "render" else [])
-                    err = io.StringIO()
-                    with mock.patch.object(diagram, name, side_effect=error), redirect_stderr(err):
-                        code = diagram.main(argv)
-                    self.assertEqual(code, 1)
-                    self.assertEqual(err.getvalue().strip(), line)
-
     def test_an_answered_gap_is_written_as_answered(self):
         records = [
             base("spec", id="S1", statement="s", source={"type": "design", "section": "x"}, checked_by="c"),

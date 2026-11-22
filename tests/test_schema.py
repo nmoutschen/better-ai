@@ -478,6 +478,36 @@ class Keywords(unittest.TestCase):
         self.assertEqual(self.errors(True, {"const": True}), [])
         self.assertEqual(len(self.errors(True, {"type": "number"})), 1)
 
+    def test_a_list_or_object_const_and_enum_compare_as_json_values(self):
+        """[true] is not [1] and {"a": false} is not {"a": 0}, at any depth, though Python's == says they are."""
+        self.assertEqual(len(self.errors([1], {"const": [True]})), 1)
+        self.assertEqual(len(self.errors([True], {"const": [1]})), 1)
+        self.assertEqual(len(self.errors({"a": 0}, {"const": {"a": False}})), 1)
+        self.assertEqual(len(self.errors([[1]], {"enum": [[[True]], [[2]]]})), 1)
+        self.assertEqual(len(self.errors([1.0], {"const": [True]})), 1)
+        self.assertEqual(self.errors([True, {"a": [None]}], {"const": [True, {"a": [None]}]}), [])
+        self.assertEqual(self.errors([[1], 2], {"enum": [[[1], 2]]}), [])
+        self.assertEqual(len(self.errors([1], {"const": [1, 2]})), 1)
+        self.assertEqual(len(self.errors({"a": 1}, {"const": {"a": 1, "b": 2}})), 1)
+
+    def test_a_string_or_a_key_with_a_lone_surrogate_is_not_text(self):
+        bad = "a\ud800b"
+        self.assertEqual(self.errors(bad, {"type": "string"}), [("(record)", "expected string, got non-text string")])
+        self.assertEqual(self.errors("a\u00e9b", {"type": "string"}), [])
+        self.assertEqual(self.errors("\U0001f600", {"type": "string"}), [])  # a pair is one character, valid
+        self.assertEqual(self.errors({"a": bad}, {"properties": {"a": {"type": "string"}}})[0][0], "a")
+        keyed = self.errors({bad: 1}, {"type": "object"})
+        self.assertEqual(keyed, [("a\\ud800b", "key is not text (it holds a lone surrogate)")])
+        # in a part the schema says nothing about, at any depth
+        free = self.errors({"x": [{"y": bad}]}, {"type": "object"})
+        self.assertEqual([f for f, _ in free], ["x[0].y"])
+        self.assertEqual(self.errors(bad, {"const": bad})[0][0], "(record)")
+
+    def test_what_a_surrogate_makes_of_a_message_can_be_written(self):
+        for problem in self.errors({"a\ud800": "b\ud800"}, {"const": {"a\ud800": "b\ud800"}}):
+            problem[0].encode("utf-8")
+            problem[1].encode("utf-8")
+
     def test_pattern_and_min_length(self):
         self.assertEqual(self.errors("T1", {"pattern": r"^T\d+$"}), [])
         self.assertEqual(self.errors("x", {"pattern": r"^T\d+$"}), [("(record)", r"must match ^T\d+$")])
