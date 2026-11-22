@@ -211,6 +211,20 @@ def load_docs(skill: Skill) -> dict[str, dict]:
     return schema.load_schemas(*resources.schema_sources(skill.package))
 
 
+def old_format_count(unit: Unit, docs: dict[str, dict], cutoff: str | None) -> int:
+    """How many lines of the unit are in the format before this change (kept as is): the one count a served page and a
+    rendered page show. A unit that cannot be read counts none."""
+    notices: list[schema.Error] = []
+    with contextlib.suppress(Exception):
+        schema.check_paths([unit.path], docs=docs, now=None, cutoff=cutoff, notices=notices)
+    return len(notices)
+
+
+def old_count_of(unit: Unit) -> int:
+    """`old_format_count` for a unit's own skill and this build's cutoff, for a page written by `render`."""
+    return old_format_count(unit, load_docs(unit.skill), resources.build_info().cutoff)
+
+
 # ---------------------------------------------------------------- the conversation
 
 
@@ -612,25 +626,14 @@ def answers_any_failure(handle):
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             self.close_connection = True  # the client went away mid-request (a closed tab): nothing to answer, no trace
             return None
+        except Refused as error:  # a file the page cannot use (a log that is a folder): the refusal's own words
+            self.answer_failure(str(error), "500 Internal Server Error")
         except Exception as error:
             with contextlib.suppress(Exception):
                 print(f"page server: {self.bug_prefix}: {self.command} {self.path} failed", file=sys.stderr)
                 traceback.print_exception(error, file=sys.stderr)
                 sys.stderr.flush()
-            if self.answer_started:  # the status line and headers are out: a second answer would corrupt the stream
-                self.close_connection = True
-                return None
-            self._headers_buffer = []
-            if self.path == "/rpc":
-                body = json.dumps(rpc_error(None, -32603, BUG_TEXT)).encode()
-                kind, status = "application/json", "200 OK"
-            else:
-                body, kind, status = f"{BUG_TEXT}\n".encode(), "text/plain; charset=utf-8", "500 Internal Server Error"
-            head = f"HTTP/1.0 {status}\r\nContent-Type: {kind}\r\nContent-Length: {len(body)}\r\n\r\n"
-            # written whole, without send_response or self.send, which may be what failed; if the connection is gone
-            # there is nothing more to answer
-            with contextlib.suppress(Exception):
-                self.wfile.write(head.encode("ascii") + body)
+            self.answer_failure(BUG_TEXT, "500 Internal Server Error")
         return None
 
     return run
@@ -648,6 +651,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
     cutoff: str | None = None
     answer_started = False
     old_cache: tuple[float, int] = (0.0, 0)
+
+    def answer_failure(self, text: str, status: str) -> None:
+        """Answer a failed request with one line, `text`: for a JSON-RPC request the error object -32603, else plain
+        text with `status`. Written whole, without send_response or self.send, which may be what failed; if the
+        connection is gone there is nothing more to answer."""
+        if self.answer_started:  # the status line and headers are out: a second answer would corrupt the stream
+            self.close_connection = True
+            return
+        self._headers_buffer = []
+        if self.path == "/rpc":
+            body = json.dumps(rpc_error(None, -32603, text)).encode()
+            kind, status = "application/json", "200 OK"
+        else:
+            body, kind = f"{text}\n".encode(), "text/plain; charset=utf-8"
+        head = f"HTTP/1.0 {status}\r\nContent-Type: {kind}\r\nContent-Length: {len(body)}\r\n\r\n"
+        with contextlib.suppress(Exception):
+            self.wfile.write(head.encode("ascii") + body)
 
     def flush_headers(self) -> None:
         super().flush_headers()
@@ -689,18 +709,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send(200, json.dumps(value).encode(), "application/json")
 
     def old_format_count(self) -> int:
-        """How many lines of the unit are in the format before this change (kept as is), for the count every page
-        shows. Counted again at most every two seconds; a unit that cannot be read counts none."""
+        """The count every page shows, counted again at most every two seconds."""
         when, count = self.old_cache
         if time.time() - when < 2:
             return count
-        notices: list[schema.Error] = []
-        with contextlib.suppress(Exception):
-            schema.check_paths(
-                [self.unit.path], docs=self.conversation.docs, now=None, cutoff=self.cutoff, notices=notices
-            )
-        type(self).old_cache = (time.time(), len(notices))
-        return len(notices)
+        count = old_format_count(self.unit, self.conversation.docs, self.cutoff)
+        type(self).old_cache = (time.time(), count)
+        return count
 
     def after(self, query: str) -> int:
         value = urllib.parse.parse_qs(query).get("after", ["0"])[0]
@@ -814,10 +829,11 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     docs = load_docs(run.skill)
     notices: list[schema.Error] = []
     for error in schema.check_paths([unit.path], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices):
-        run.err(f"warning: {cli.ERROR_WORDS.get(run.skill.name, lambda e: e)(error)}")
+        run.err(f"warning: {error}")
     for notice in notices:  # a line in the format before this change is reported, not a warning of a bad record
         run.err(f"notice: {notice}")
     conv = Conversation(unit, spec, docs)
+    conv.lines()  # a log that cannot be read is refused here, not found by the first request
     server = make_server(unit, spec, conv, run.info, args.port)
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     paths.write_state(unit, ADDRESS, url.encode())
@@ -878,6 +894,8 @@ __all__ = [
     "EventError",
     "PageSpec",
     "make_server",
+    "old_count_of",
+    "old_format_count",
     "register",
     "revision_of",
     "shell",

@@ -48,11 +48,10 @@ def _cutoff() -> str:
 
 class Reader:
     """Reads the files of one change record by record through the schemas: the valid records come back, and each invalid
-    one goes to `errors` with its file, line, field, reason and, if it parsed, its `by`. Lines in the format before this
-    change are counted in `old`."""
+    one goes to `errors` with its file, line, field, reason and, if it parsed, its `by`."""
 
     def __init__(self, unit: Unit):
-        self.unit, self.errors, self.old, self.cache = unit, [], 0, {}
+        self.unit, self.errors, self.cache = unit, [], {}
         self.docs = schema.load_schemas(*resources.schema_sources("code"))
         self.cutoff = _cutoff()
 
@@ -87,7 +86,6 @@ class Reader:
             return []
         notices: list = []
         found = schema.check_text(path, text, self.docs, self.cache, cutoff=self.cutoff, notices=notices)
-        self.old += len(notices)
         parsed = {}
         for number, piece in enumerate(lines_of(text, jsonl), 1):
             try:
@@ -176,7 +174,6 @@ def collect(unit: Unit) -> dict:
             "agents": [],
             "decisions": [],
             "conversation": [],
-            "old": 0,
             "errors": [{"file": "(folder)", "line": 1, "field": "(folder)", "message": message}],
         }
 
@@ -192,7 +189,6 @@ def _collect(unit: Unit) -> dict:
             "agents": [],
             "decisions": [],
             "conversation": [],
-            "old": 0,
             "errors": [{"file": "schemas", "line": 1, "field": "(schemas)", "message": str(error)}],
         }
     head = reader.records(unit.kind.head)  # its errors are shown; the tasks carry their own mode
@@ -220,7 +216,6 @@ def _collect(unit: Unit) -> dict:
         "agents": agents,
         "decisions": decisions,
         "conversation": conversation_events,
-        "old": reader.old,
         "errors": reader.errors,
     }
 
@@ -257,7 +252,7 @@ def static_page(unit: Unit) -> str:
         if url.endswith(".css"):
             text = text.replace(f'<link href="{url}" rel="stylesheet">', "<style>\n" + asset + "\n</style>")
         elif url == "/page.js":
-            data = page._json_for_html({**load(unit), "now": time.time()})
+            data = page._json_for_html({**load(unit), "now": time.time(), "old": page.old_count_of(unit)})
             text = text.replace(
                 f'<script src="{url}"></script>',
                 f'<script type="application/json" id="page-data">{data}</script>\n<script>\n'

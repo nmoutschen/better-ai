@@ -299,6 +299,31 @@ class ServerTest(Fixture):
         self.assertNotIn("Traceback", err.getvalue())
         self.assertNotIn("page server", err.getvalue())
 
+    def test_a_log_that_is_a_folder_is_answered_as_the_file_error_in_every_reader(self):
+        server, host = self.serve()
+        (self.unit_dir / "conversation.jsonl").mkdir()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            status, body = self.get(host, "/events?after=0")
+            self.assertEqual(status, 500)
+            self.assertIn("conversation.jsonl", body.decode())
+            self.assertNotIn("hit a bug", body.decode())
+            status, body = self.get(host, "/wait?after=0&seconds=1")
+            self.assertEqual(status, 500)
+            self.assertIn("conversation.jsonl", body.decode())
+            sent = self.rpc(host, "note", {"id": "m1", "text": "hi", "to": None})
+            self.assertIn("conversation.jsonl", sent["error"]["message"])
+            self.assertNotIn("hit a bug", sent["error"]["message"])
+        self.assertNotIn("Traceback", err.getvalue())
+        self.assertNotIn("bug", err.getvalue())
+
+    def test_serve_refuses_to_start_on_a_log_that_is_a_folder(self):
+        (self.unit_dir / "conversation.jsonl").mkdir()
+        code_, _, err = self.cli("serve", self.unit_arg, "--no-browser", "--once")
+        self.assertEqual(code_, 1, err)
+        self.assertIn("conversation.jsonl", err)
+        self.assertFalse((self.unit_dir / ".server").exists())
+
     def test_a_post_from_another_origin_is_refused(self):
         _, host = self.serve()
         connection = http.client.HTTPConnection(host, timeout=10)

@@ -220,20 +220,6 @@ def check_step(skill: str):
     return register
 
 
-ERROR_WORDS: dict[str, Callable[[schema.Error], schema.Error]] = {}
-
-
-def error_words(skill: str):
-    """Register `fn(error) -> error` that rewords a skill's schema error before `check` prints it, such as a field
-    from before this change that says where its text goes now."""
-
-    def register(function):
-        ERROR_WORDS[skill] = function
-        return function
-
-    return register
-
-
 def _check_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("unit", help="the unit to check, such as .code/my-change")
 
@@ -253,9 +239,8 @@ def check(args: argparse.Namespace, run: Run) -> int:
     root = Path(shown if not shown.startswith("..") else unit.path)
     notices: list[schema.Error] = []
     errors = schema.check_paths([root], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices)
-    reword = ERROR_WORDS.get(run.skill.name, lambda error: error)
     for error in errors:
-        run.out(str(reword(error)))
+        run.out(str(error))
     for notice in notices:
         run.out(str(notice))
     if errors:

@@ -6,10 +6,11 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from .. import paths
+from ..page import ADDRESS, LOG, SEEN
 from ..schema import Context, hook
 
 PAGE = "index.html"  # what `render` writes in the unit: no version may be this file
-STATE = ("conversation.jsonl", ".server", ".conversation-seen")  # the live page's own files
+STATE = (LOG, ADDRESS, SEEN)  # the live page's own files
 
 
 def is_page(path: str | None) -> bool:

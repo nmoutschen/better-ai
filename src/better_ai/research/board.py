@@ -89,7 +89,6 @@ def scan_file(unit: Unit, name: str, data: dict, cache: dict, now: datetime) -> 
     if [(e.field, e.message) for e in found] == [("(file)", "no schema describes this file")]:
         data["errors"].append({"file": name, "line": 1, "field": "(file)", "message": found[0].message})
         return  # a file of another shape, such as an old Markdown one: listed, nothing to show from it
-    data["old"] += len(old)
     old_lines = {e.line for e in old}
     pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
     if path.suffix != ".jsonl":
@@ -146,8 +145,7 @@ def scan(unit: Unit) -> dict:
     hold the valid records. `brief`, `questions`, `claims`, `sources` and `conversation` hold every record that parsed
     as an object, each invalid one without the fields that failed and with its messages in `_errors`
     (schema.strip_invalid), so the page shows it marked and meets only well-typed fields. `errors` lists every problem as
-    {file, line, field, message, by}, `by` only where the record could be read. `old` counts the records in the format
-    before this change, which are kept as they are."""
+    {file, line, field, message, by}, `by` only where the record could be read."""
     data: dict = {
         "brief": {},
         "decisions": [],
@@ -157,7 +155,6 @@ def scan(unit: Unit) -> dict:
         "sources": [],
         "logs": {},
         "errors": [],
-        "old": 0,
     }
     try:
         docs()
@@ -199,7 +196,7 @@ def load(unit: Unit) -> dict:
         message = f"could not be shown: {type(error).__name__}"
         errors = [{"file": "(board)", "line": 1, "field": "(board)", "message": message}]
         empty = {"brief": {}, "decisions": [], "conversation": [], "questions": [], "claims": [], "sources": []}
-        return {**empty, "logs": {}, "errors": errors, "old": 0, "now": time.time()}
+        return {**empty, "logs": {}, "errors": errors, "now": time.time()}
 
 
 def _load(unit: Unit) -> dict:
@@ -309,7 +306,11 @@ def static_page(data: dict) -> str:
         tag = f'<script src="{html.escape(url)}"></script>'
         script = "<script>\n" + resources.read_text(table[url]).replace("</script", "<\\/script") + "\n</script>"
         if url == "/page.js":
-            script = f"<script>var BOARD_SNAPSHOT = {embedded};</script>\n" + script
+            count = json.dumps({"old": data.get("old", 0)})  # the shared page reads the count from page-data
+            script = (
+                f'<script type="application/json" id="page-data">{count}</script>\n'
+                f"<script>var BOARD_SNAPSHOT = {embedded};</script>\n" + script
+            )
         text = text.replace(tag, script, 1)
     return text
 
@@ -328,6 +329,6 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
     if not unit.exists():
         raise paths.refusal(unit.label, "it holds no board", f"run create {unit.label} first")
-    paths.write_atomic(unit, RENDERED, static_page(load(unit)).encode("utf-8"))
+    paths.write_atomic(unit, RENDERED, static_page({**load(unit), "old": page.old_count_of(unit)}).encode("utf-8"))
     run.out(f"wrote {Path(unit.label) / RENDERED}")
     return cli.EXIT_DONE

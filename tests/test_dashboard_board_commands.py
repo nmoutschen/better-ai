@@ -471,7 +471,7 @@ class Create(unittest.TestCase):
             done = run(folder, "create", str(folder), "--by", "coordinator", stdin=self.head(self.ARCHITECT))
             self.assertEqual(done.returncode, 1, done.stderr)
             self.assertIn(
-                "it holds a spec.jsonl and no code.json. Move spec.jsonl away, then run create again", done.stderr
+                "it holds a spec.jsonl and no code.json. move spec.jsonl away, then run create again", done.stderr
             )
             self.assertFalse((folder / "code.json").exists())
 

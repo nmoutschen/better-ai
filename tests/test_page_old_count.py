@@ -125,6 +125,25 @@ class OldFormatCountTest(unittest.TestCase):
                     server.terminate()
                     server.communicate(timeout=10)
 
+    def test_a_rendered_page_carries_the_same_count_as_the_served_one(self):
+        outputs = {"code-better": "dashboard.html", "research-better": "board.html", "design-better": "index.html"}
+        for skill, name in outputs.items():
+            unit, setup, make_old, expected = CASES[skill]
+            with self.subTest(skill), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+                if skill == "design-better":
+                    (repo / unit).mkdir(parents=True)
+                    for n in ("a.html", "b.html"):
+                        (repo / unit / n).write_text((UNITS / skill / n).read_text())
+                for args, stdin in steps(skill, setup):
+                    better.run(skill, *args, stdin=stdin, cwd=repo)
+                make_old(repo / unit)
+                done = better.run(skill, "render", unit, cwd=repo)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                text = (repo / unit / name).read_text()
+                self.assertRegex(text, r'id="page-data">.*"old": ?1')
+
     def test_no_skill_draws_a_count_of_its_own(self):
         for path in SRC.glob("*/*"):
             if path.suffix in (".js", ".html", ".css") and path.parent.name != "page":

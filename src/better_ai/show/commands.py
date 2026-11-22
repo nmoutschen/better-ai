@@ -36,12 +36,6 @@ def _shown(unit: Unit) -> Path:
     return Path(shown if not shown.startswith("..") else unit.path) / HEAD
 
 
-@cli.error_words("show-better")
-def reworded(error: schema.Error) -> schema.Error:
-    """A schema error with an old `note` or `read` on a panel saying where its text goes now."""
-    return error._replace(message=deck.worded(error.field, error.message))
-
-
 def examine(unit: Unit, now: datetime, cutoff: str) -> Examined:
     """Read `spec.json` and check it: its schema (a spec from before `at` and `by` is the old format, kept as is), and
     what the drawing knows. Whatever the file holds, the answer is lines, never a traceback."""
@@ -54,7 +48,7 @@ def examine(unit: Unit, now: datetime, cutoff: str) -> Examined:
         return Examined([f"{where}:1: (record): is not UTF-8 text"], None, [], [])
     found = schema.check_text(where, text, deck.schemas(), {}, now=now, cutoff=cutoff, notices=[])
     if found:
-        return Examined([str(reworded(e)) for e in found], None, [], [])
+        return Examined([str(e) for e in found], None, [], [])
     spec = deck.without_nulls(json.loads(text))
     # A spec in the old format is not an error for what it lacks, but the checks across its panels still apply to it:
     # they run on the spec with the fields it lacks filled in.

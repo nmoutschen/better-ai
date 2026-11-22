@@ -93,7 +93,7 @@ def copy_spec_at_create(ctx: records.CreateContext):
     if named != named.strip():
         raise refusal(ctx.unit.label, f"design.folder {named!r} has spaces around it", "write the folder without them")
     if _has_spec(ctx.unit):  # create_exclusive would fail on it after the head was written
-        raise refusal(ctx.unit.label, f"it holds a {SPEC} and no code.json", f"Move {SPEC} away, then run create again")
+        raise refusal(ctx.unit.label, f"it holds a {SPEC} and no code.json", f"move {SPEC} away, then run create again")
     data = _checked_copy(ctx.unit, folder, ctx.record)
 
     def copy() -> None:

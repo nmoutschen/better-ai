@@ -32,7 +32,7 @@ import better  # noqa: E402
 import sweep  # noqa: E402
 import wrong_types  # noqa: E402
 
-from better_ai import cli, paths, research, resources, schema  # noqa: E402
+from better_ai import cli, page, paths, research, resources, schema  # noqa: E402
 from better_ai.research import board  # noqa: E402
 
 EXAMPLES = json.loads((Path(__file__).parent / "fixtures" / "research_board_examples.json").read_text())
@@ -1034,7 +1034,7 @@ class Verbs(unittest.TestCase):
         (shown,) = data["decisions"]
         self.assertEqual((shown["status"], shown["default"]), ("waiting", "Skip it"))
         self.assertRegex(shown["deadline"], self.UTC)
-        self.assertEqual((data["errors"], data["old"]), ([], 0))
+        self.assertEqual(data["errors"], [])
 
     def test_decisions_in_the_old_format_are_counted_not_listed_and_the_board_still_loads(self):
         old = {"type": "decision", "at": "2026-11-19T17:12:37Z", "by": "coordinator", "asked": "Login?"}
@@ -1049,8 +1049,10 @@ class Verbs(unittest.TestCase):
             support(folder)
             write_lines(folder, "decisions.jsonl", lines)
             data = board.load(unit(folder))
+            with mock.patch.dict(os.environ, {"BETTER_AI_SKILL": "research-better"}):
+                counted = page.old_count_of(unit(folder))
             checked = check(folder)
-        self.assertEqual((data["errors"], data["old"]), ([], 3))
+        self.assertEqual((data["errors"], counted), ([], 3))
         self.assertEqual([x["id"] for x in data["decisions"]], ["D1", "D2", "D3"])
         self.assertTrue(all(x["_old"] for x in data["decisions"]))
         self.assertEqual(checked.returncode, 0)

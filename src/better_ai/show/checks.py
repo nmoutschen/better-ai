@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..schema import Context, hook, show
+from . import deck
 
 
 def _is_num(value: Any) -> bool:
@@ -103,6 +104,7 @@ def _show_spec(record: dict, context: Context) -> list[tuple[str, str]]:
         if not isinstance(panel, dict):
             continue
         at = f"panels[{i}]"
+        problems += [(f"{at}.{old}", deck.worded(f"{at}.{old}", "")) for old in ("note", "read") if old in panel]
         template = panel.get("template") or "visual"
         if template == "visual":
             problems += _show_visual(panel, at, sections)
