@@ -638,6 +638,7 @@ def register():
     return template.substitute(css=(HERE / "register.css").read_text(encoding="utf-8"), sections=sections)
 
 
+@schema.never_raise("design")
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
@@ -672,16 +673,8 @@ def main(argv=None):
         args.out.mkdir(parents=True, exist_ok=True)
         for name, svg in files.items():
             (args.out / name).write_text(svg + "\n", encoding="utf-8")
-    except RecursionError:
-        print("design: nested too deeply", file=sys.stderr)
-        return 1
     except (OSError, ValueError) as error:  # a file that cannot be read, a JSON error, what validate found
         print(error, file=sys.stderr)
-        return 1
-    except (
-        Exception
-    ) as error:  # whatever else one design makes the check or the drawing raise is its error, not a traceback
-        print(f"design: could not be checked: {type(error).__name__}", file=sys.stderr)
         return 1
     return 0
 

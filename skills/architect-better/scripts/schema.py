@@ -62,8 +62,10 @@ a name no hook has is an error in the schema.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import copy
 import fnmatch
+import functools
 import json
 import math
 import os
@@ -112,6 +114,31 @@ TYPE_NAMES = {"string", "integer", "number", "boolean", "null", "object", "array
 PAUSE = 0.05  # seconds before a file that failed to parse is read once more
 ROOT = "(record)"
 SKIPPED_FOLDERS = {"__pycache__", "node_modules"}
+
+
+def never_raise(what: str, verb: str = "checked"):
+    """For a script's entry point: whatever the files it reads make it raise is one line on stderr and exit code 1,
+    never a traceback. SystemExit (argparse's own exit codes, `sys.exit`) and KeyboardInterrupt pass through. The line
+    is `<what>: nested too deeply` for RecursionError, else `<what>: could not be <verb>: <ExceptionType>`."""
+
+    def decorate(entry):
+        @functools.wraps(entry)
+        def run(*args, **kwargs):
+            try:
+                return entry(*args, **kwargs)
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except RecursionError:
+                line = f"{what}: nested too deeply"
+            except Exception as error:
+                line = f"{what}: could not be {verb}: {type(error).__name__}"
+            with contextlib.suppress(Exception):  # stderr is closed: the exit code still says it
+                print(line, file=sys.stderr)
+            return 1
+
+        return run
+
+    return decorate
 
 
 class SchemaError(Exception):
@@ -280,6 +307,18 @@ def _loads(text: str) -> Any:
 # ---------------------------------------------------------------- the validator
 
 
+def _is_text(value: str) -> bool:
+    """False for a string holding a lone surrogate (JSON `\\ud800`): it cannot be written as UTF-8, so no file, page
+    or terminal can show it."""
+    if value.isascii():
+        return True
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def _type_name(value: Any) -> str:
     if value is None:
         return "null"
@@ -292,7 +331,7 @@ def _type_name(value: Any) -> str:
     if isinstance(value, float):
         return "number"
     if isinstance(value, str):
-        return "string"
+        return "string" if _is_text(value) else "non-text string"
     if isinstance(value, list):
         return "array"
     return "object"
@@ -304,11 +343,19 @@ def _is_type(value: Any, name: str) -> bool:
 
 
 def _equal(a: Any, b: Any) -> bool:
-    return _type_name(a) == _type_name(b) and a == b
+    """Equal as JSON values: `true` is not 1 and `[true]` is not `[1]`, at any depth of what the schema holds."""
+    if _type_name(a) != _type_name(b):
+        return False
+    if isinstance(a, list):
+        return len(a) == len(b) and all(_equal(x, y) for x, y in zip(a, b, strict=True))
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(_equal(a[k], b[k]) for k in a)
+    return a == b
 
 
 def _show(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False)
+    shown = json.dumps(value, ensure_ascii=False)
+    return shown if shown.isascii() or _is_text(shown) else json.dumps(value)
 
 
 def _join(path: tuple, part: str | int) -> tuple:
@@ -318,6 +365,8 @@ def _join(path: tuple, part: str | int) -> tuple:
 def _render(path: tuple) -> str:
     out = ""
     for part in path:
+        if isinstance(part, str) and not _is_text(part):
+            part = part.encode("utf-8", "backslashreplace").decode("ascii")  # a key that is not text, shown escaped
         if isinstance(part, int):
             out += f"[{part}]"
         else:
@@ -582,11 +631,41 @@ def validate_instance(value: Any, schema: dict, docs: dict[str, dict], context: 
     return validate_record(value, [schema], docs, context)
 
 
+def _not_text(value: Any) -> list[Problem]:
+    """A problem for each string and each object key, at any depth, that holds a lone surrogate. It walks the value
+    without recursion, so any nesting is read."""
+    found: list[Problem] = []
+    pending: list[tuple[Any, Any]] = [(value, None)]  # a value, and the chain (parent chain, part) leading to it
+
+    def where(chain: Any) -> tuple:
+        parts = []
+        while chain is not None:
+            chain, part = chain
+            parts.append(part)
+        return tuple(reversed(parts))
+
+    while pending:
+        item, chain = pending.pop()
+        if isinstance(item, str):
+            if not _is_text(item):
+                found.append(Problem(_render(where(chain)), "is not text (it holds a lone surrogate)"))
+        elif isinstance(item, dict):
+            for key, child in item.items():
+                if not _is_text(key):
+                    found.append(Problem(_render(where((chain, key))), "key is not text (it holds a lone surrogate)"))
+                pending.append((child, (chain, key)))
+        elif isinstance(item, list):
+            pending.extend((child, (chain, i)) for i, child in enumerate(item))
+    return found
+
+
 def validate_record(value: Any, schemas: list[dict], docs: dict[str, dict], context: Context | None) -> list[Problem]:
     """The problems of one record against each of its schemas: first everything but the hooks, then, if the record has
     no shape error, the hooks, whose findings come last."""
     try:
         first = [p for schema in schemas for p in Validator(docs, context, "off").validate(value, schema, (), schema)]
+        named = {p.field for p in first}
+        first += [p for p in _not_text(value) if p.field not in named]
         if context is None or any(p.kind != "cross" for p in first):
             return first
         hooked = [p for schema in schemas for p in Validator(docs, context, "only").validate(value, schema, (), schema)]
@@ -1213,7 +1292,11 @@ def strip_invalid(record: dict, errors: list[Error]) -> dict:
     or missing. `errors` are the record's own; the copy lists them in `_errors` as `field: message`."""
     names = {re.match(r"[^.\[]*", error.field).group(0) for error in errors}
     try:
-        stripped = {key: copy.deepcopy(value) for key, value in record.items() if key not in names}
+        stripped = {
+            key: copy.deepcopy(value)
+            for key, value in record.items()
+            if key not in names and (not isinstance(key, str) or _is_text(key))
+        }
     except RecursionError:  # too deeply nested to copy: the page shows it marked, with its errors and a plain id
         stripped = {"id": record["id"]} if isinstance(record.get("id"), str) else {}
     if errors:
@@ -1270,6 +1353,7 @@ def check_paths(paths: list[Path], schemas: Path | None = None) -> list[Error]:
     return errors
 
 
+@never_raise("schema.py")
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check agent files against their JSON Schemas.")
     commands = parser.add_subparsers(dest="command", required=True)

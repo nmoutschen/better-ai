@@ -608,6 +608,7 @@ def serve(folder: Path, port: int, open_browser: bool) -> None:
             conv.address.unlink(missing_ok=True)
 
 
+@schema.never_raise("change folder")
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)

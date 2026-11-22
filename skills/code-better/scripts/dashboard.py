@@ -306,6 +306,7 @@ def watch(change: Path, port: int, open_browser: bool) -> None:
 # ---------- Command line ----------
 
 
+@schema.never_raise("change")
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Show a coordinated change as a live page and collect the user's input."
@@ -353,4 +354,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

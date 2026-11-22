@@ -337,6 +337,7 @@ def check(board: Path) -> int:
 # ---------- Command line ----------
 
 
+@schema.never_raise("board")
 def main() -> None:
     parser = argparse.ArgumentParser(description="Show a research board as a live page and collect the user's input.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -386,4 +387,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

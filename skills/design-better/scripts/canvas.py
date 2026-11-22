@@ -344,6 +344,7 @@ def show(args) -> None:
         print("Could not open a browser on this machine. Give the user the path instead.")
 
 
+@page.schema.never_raise("page")
 def main() -> None:
     parser = argparse.ArgumentParser(description="Show versions of a screen on a page and collect the user's feedback.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -397,4 +398,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

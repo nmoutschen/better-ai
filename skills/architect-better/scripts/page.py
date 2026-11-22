@@ -13,6 +13,8 @@ is not written. A page event answers with the JSON-RPC error -32602 and the vali
 
 from __future__ import annotations
 
+import contextlib
+import functools
 import http.server
 import importlib.util
 import json
@@ -115,14 +117,17 @@ class Conversation:
 
     def lines(self) -> list:
         """The log's lines. Only "\\n" ends a line: events are ASCII JSON, so no other character can split one."""
-        return self.log.read_text(encoding="utf-8").split("\n")[:-1] if self.log.exists() else []
+        try:
+            return self.log.read_text(encoding="utf-8", errors="replace").split("\n")[:-1]
+        except OSError:  # no log yet, or one that cannot be read
+            return []
 
     def events(self) -> list:
         events = []
         for line in self.lines():
             try:
                 events.append(json.loads(line))
-            except ValueError:
+            except (ValueError, RecursionError):
                 events.append({})  # keep the position, so indexes into the log stay right
         return events
 
@@ -300,12 +305,44 @@ class Conversation:
         print(f"{len(open_items)} not done.")
 
 
+def answers_any_failure(handle):
+    """A request handler that never raises: whatever the request makes it raise, the answer is one line, with the status
+    500 (for a JSON-RPC request, the error object -32603), never a dropped request or a traceback in the server's log."""
+
+    @functools.wraps(handle)
+    def run(self):
+        try:
+            return handle(self)
+        except Exception as error:
+            what = "nested too deeply" if isinstance(error, RecursionError) else f"failed: {type(error).__name__}"
+            if self.path == "/rpc":
+                answer = '{"jsonrpc": "2.0", "id": null, "error": {"code": -32603, "message": "internal error: %s"}}'
+                body, kind, code = (answer % what).encode(), "application/json", 200
+            else:
+                body, kind, code = f"{what}\n".encode(), "text/plain; charset=utf-8", 500
+            status = "200 OK" if code == 200 else "500 Internal Server Error"
+            head = f"HTTP/1.0 {status}\r\nContent-Type: {kind}\r\nContent-Length: {len(body)}\r\n\r\n"
+            # written whole, without send_response or self.send, which may be what failed; if the connection is gone
+            # there is nothing more to answer
+            with contextlib.suppress(Exception):
+                self.wfile.write(head.encode("ascii") + body)
+
+    return run
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     """The requests every page that talks to the agent makes. A script subclasses it, sets `conversation` and
-    `methods`, the events its page may send, and answers its own paths in do_GET after `conversation_get`."""
+    `methods`, the events its page may send, and answers its own paths in do_GET after `conversation_get`. The
+    do_GET and do_POST a subclass defines answer any failure with a 500, as the ones here do."""
 
     conversation: Conversation
     methods: tuple = ()
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for name in ("do_GET", "do_POST", "do_HEAD", "do_PUT", "do_DELETE"):
+            if name in vars(cls):
+                setattr(cls, name, answers_any_failure(vars(cls)[name]))
 
     def local(self) -> bool:
         # Only answer requests addressed to this machine, so a web page cannot reach it via DNS rebinding.
@@ -345,6 +382,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return False
         return True
 
+    @answers_any_failure
     def do_POST(self):
         # Only this page may send: the same host and origin, and a JSON body that a cross-site form cannot send.
         origin = self.headers.get("Origin", "")

@@ -3835,6 +3835,7 @@ def render_command(args) -> None:
         )
 
 
+@schema.never_raise("spec")
 def main() -> None:
     parser = argparse.ArgumentParser(description="Render a short visual introduction to a document from a JSON spec.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -3893,4 +3894,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
