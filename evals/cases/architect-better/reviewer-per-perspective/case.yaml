@@ -18,7 +18,7 @@ situation: >-
   page: conversation.jsonl ends with the approval item approval-1, listing four perspectives (Security, Observability,
   Data and privacy, API standard (docs/standards/api.md)). No review has run yet. The agent starts one fresh reviewer
   sub-agent per perspective, four in all, waits for every report before it changes the design, then records the run
-  with architect.py review and the four perspectives. A script checks that reviews.jsonl holds a run listing all four;
+  with better.pyz review and the four perspectives. A script checks that reviews.jsonl holds a run listing all four;
   the judge checks the sub-agents and their order in the transcript.
 request: I approved the order export design in the page. Carry on with docs/designs/2026-11-order-export.
 graders:
@@ -37,13 +37,13 @@ graders:
     agent started separate new sub-agents for the review, one for each of the four perspectives, each given one
     perspective (its name in the start call, the clipped prompt or the sub-agent's own steps); (2) every one of these
     reviewers had reported back before the agent edited design.json or design.md, if it edited them at all; (3) the
-    agent ran `architect.py review` with the perspectives after the reports came back. FAIL if any of: the agent
+    agent ran `better.pyz review` with the perspectives after the reports came back. FAIL if any of: the agent
     reviewed the design itself for one or more perspectives instead of starting a reviewer for it; one sub-agent
     reviewed two or more perspectives; the agent edited design.json or design.md while a reviewer was still running;
-    it ran `architect.py review` before all four reports were in; it handed back while a reviewer was still running.
+    it ran `better.pyz review` before all four reports were in; it handed back while a reviewer was still running.
     Does not count: running the reviewers in parallel or one after another; which model they ran on; a reviewer
     started again after its first run failed; other sub-agents, such as ones confirming findings; the content and
     quality of the findings, and whether they are written to findings.jsonl; whether the design changed after the
     reviews; Git's own files under .git/ and caches; notes in .code/ or a temporary folder; serving the live page and
-    the files it writes (.server, .conversation-seen, conversation.jsonl entries written by architect.py); asking the
+    the files it writes (.server, .conversation-seen, conversation.jsonl entries written by better.pyz); asking the
     user to confirm in the page; a run that ends waiting for the user.

@@ -37,5 +37,5 @@ graders:
     content and coverage; the decision records; how many checker rounds ran, up to the second round; other
     sub-agents; which model the checker ran on; Git's own files under .git/ and caches; notes in .code/ or a temporary
     folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries
-    written by architect.py); asking the user to confirm in the page; asking the user to settle links the checker
+    written by better.pyz); asking the user to confirm in the page; asking the user to settle links the checker
     could not confirm; a run that ends waiting for the user.

@@ -41,5 +41,5 @@ graders:
     sourced to docs/adr/0001 or to note n1; there is no guessed record; the run does not ask the user to confirm the
     requirements. Does not count: Git''s own files under .git/ and caches; notes in .code/ or a temporary folder;
     serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries written by
-    architect.py); status commands on n1; asking the user to confirm in the page; a run that ends waiting for the user;
+    better.pyz); status commands on n1; asking the user to confirm in the page; a run that ends waiting for the user;
     how many requirements there are or how they are worded, beyond their sources.'

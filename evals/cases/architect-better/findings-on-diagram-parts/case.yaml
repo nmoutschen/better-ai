@@ -38,5 +38,5 @@ graders:
     or box:db alone. Does not count: other findings and their parts; whether the exposure finding is marked confirmed;
     whether reviewers ran as sub-agents; whether the design was changed after the review; Git's own files under .git/
     and caches; notes in .code/ or a temporary folder; serving the live page and the files it writes (.server,
-    .conversation-seen, conversation.jsonl entries written by architect.py); asking the user to confirm in the page; a
+    .conversation-seen, conversation.jsonl entries written by better.pyz); asking the user to confirm in the page; a
     run that ends waiting for the user.
