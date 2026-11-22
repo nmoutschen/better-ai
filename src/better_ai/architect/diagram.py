@@ -1,29 +1,27 @@
 """Render and validate architecture diagrams from a design JSON.
 
-A design can carry findings as a mapping from node IDs, edge:<id>, and
+`layout` and `svg_containers`/`svg_flow` draw a design; `validate` says what stops one from being drawn; `register`
+builds the page of box kinds. A design can carry findings as a mapping from node IDs, edge:<id>, and
 <view>:step:<id> (or step:<id> for a design-wide unique step ID) to lists of [badge ID, tooltip, perspective] entries. One finding
 can be attached to multiple parts by listing it under each target.
 """
 
 from __future__ import annotations
 
-import argparse
+import functools
 import html
 import json
-import sys
 import textwrap
 from collections import Counter
 from itertools import pairwise
-from pathlib import Path
 from string import Template
 from urllib.parse import quote
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))  # schema.py, which checks a design's references, is next to this script
-import schema  # noqa: E402
+from .. import resources, schema
+from .checks import design_problems
 
-KINDS = {kind["name"]: kind for kind in json.loads((HERE / "kinds.json").read_text(encoding="utf-8"))}
-ICONS = json.loads((HERE / "icons.json").read_text(encoding="utf-8"))
+KINDS = {kind["name"]: kind for kind in json.loads(resources.read_text("architect/kinds.json"))}
+ICONS = json.loads(resources.read_text("architect/icons.json"))
 
 STATES = ("before", "after")
 INK, HEAD, SEC = "#33302B", "#1C1A17", "#78736B"
@@ -51,18 +49,23 @@ def without_nulls(value):
     return value
 
 
+@functools.lru_cache(maxsize=1)
+def _docs() -> dict:
+    return schema.load_schemas(*resources.schema_sources("architect"))
+
+
 def shape_problems(design: dict) -> list[str]:
     """What is wrong with the shape of a design, by design.schema.json; the fields the page adds (`findings`), a `title` and the
-    base fields a design.json carries are not part of what diagram.py is given."""
-    candidate = {"type": "design", "at": "2026-01-01T00:00:00Z", "by": "diagram.py", "flows": []}
+    base fields a design.json carries are not part of what the drawing is given."""
+    candidate = {"type": "design", "at": "2026-01-01T00:00:00Z", "by": "diagram", "flows": []}
     candidate.update({key: value for key, value in design.items() if key not in ("findings", "flow", "title")})
-    found = schema.check_record(candidate, ["design.schema.json"], HERE.parent / "schemas")
-    return [f"{field}: {message}" for field, message in found]
+    found = schema.validate_instance(candidate, _docs()["design.schema.json"], _docs())
+    return [f"{p.field}: {p.message}" for p in dict.fromkeys(found)]
 
 
 def validate(design: dict) -> list[str]:
     """Report what stops a design from being laid out. The shape is design.schema.json's, and the references inside a
-    well-shaped design, and its box kinds, are schema.py's (`design_problems`); this keeps the one check that needs
+    well-shaped design, and its box kinds, are `checks.design_problems`; this keeps the one check that needs
     the layout: a finding that names no part of it."""
     if not isinstance(design, dict):
         return ["design: expected an object"]
@@ -70,7 +73,7 @@ def validate(design: dict) -> list[str]:
     errors = shape_problems(design)
     if errors:
         return errors
-    errors = [message for _, message in schema.design_problems(design)]
+    errors = [message for _, message in design_problems(design)]
     if "flow" in design:
         errors.append("Use a flows list instead of flow")
     targets = {node["id"] for node in design["containers"]["nodes"]}
@@ -624,60 +627,28 @@ def svg_flow(flow: dict, state: str, layout: dict, view: str) -> str:
     return finish_svg(out, marks)
 
 
-def register():
+def register() -> str:
     """Build the register from the same kind and icon data used in both diagrams."""
-    template = Template((HERE / "register.html").read_text(encoding="utf-8"))
-    section = Template((HERE / "register-section.html").read_text(encoding="utf-8"))
-    card = Template((HERE / "register-card.html").read_text(encoding="utf-8"))
+    template = Template(resources.read_text("architect/register.html"))
+    section = Template(resources.read_text("architect/register-section.html"))
+    card = Template(resources.read_text("architect/register-card.html"))
     grouped = {}
     for name, kind in KINDS.items():
         grouped.setdefault(kind["group"], []).append(
             card.substitute(name=esc(name), label=esc(kind["label"]), use=esc(kind["use"]), icon=glyph(name))
         )
     sections = "".join(section.substitute(title=esc(title), cards="".join(cards)) for title, cards in grouped.items())
-    return template.substitute(css=(HERE / "register.css").read_text(encoding="utf-8"), sections=sections)
+    return template.substitute(css=resources.read_text("architect/register.css"), sections=sections)
 
 
-@schema.never_raise("design", {"render": "rendered", "register": "written", "": "checked"})
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    commands = parser.add_subparsers(dest="command", required=True)
-    render = commands.add_parser("render", help="write Before and After SVGs")
-    render.add_argument("design", type=Path)
-    render.add_argument("--out", type=Path, required=True)
-    check = commands.add_parser("check", help="validate a design")
-    check.add_argument("design", type=Path)
-    index = commands.add_parser("register", help="write the kind register as HTML")
-    index.add_argument("--out", type=Path, required=True)
-    args = parser.parse_args(argv)
-    try:
-        if args.command == "register":
-            args.out.write_text(register(), encoding="utf-8")
-            return 0
-        design = json.loads(args.design.read_text(encoding="utf-8"))
-        if not isinstance(design, dict):
-            raise ValueError("design: expected an object")
-        design = without_nulls(design)  # an optional field that is null is absent: no render path sees one
-        if args.command == "check":
-            errors = validate(design)
-            if errors:
-                raise ValueError("\n".join(errors))
-            return 0
-        positions = layout(design)
-        files = {}
-        for state in STATES:
-            files[f"containers-{state}.svg"] = svg_containers(positions, state)
-            for i, flow in enumerate(design.get("flows", []), 1):
-                view = f"flow{i}"
-                files[f"{view}-{state}.svg"] = svg_flow(flow, state, positions, view)
-        args.out.mkdir(parents=True, exist_ok=True)
-        for name, svg in files.items():
-            (args.out / name).write_text(svg + "\n", encoding="utf-8")
-    except (OSError, ValueError) as error:  # a file that cannot be read, a JSON error, what validate found
-        print(error, file=sys.stderr)
-        return 1
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+def drawings(design: dict) -> dict[str, str]:
+    """The Before and After SVGs of a design: `containers-<state>.svg`, and `flow<N>-<state>.svg` for each flow."""
+    design = without_nulls(design)
+    positions = layout(design)
+    files = {}
+    for state in STATES:
+        files[f"containers-{state}.svg"] = svg_containers(positions, state)
+        for i, flow in enumerate(design.get("flows", []), 1):
+            view = f"flow{i}"
+            files[f"{view}-{state}.svg"] = svg_flow(flow, state, positions, view)
+    return files

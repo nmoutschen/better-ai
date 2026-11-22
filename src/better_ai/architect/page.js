@@ -37,10 +37,7 @@ function sourceLink(source) {
   if (source.type === 'guessed') return chip('guessed', 'guess');
   if (source.type === 'user') return 'You, on this page<br>' + text(String(source.at).slice(11, 16));
   if (source.type !== 'request' && source.type !== 'file') return chip('no valid source', 'guess');
-  const query = new URLSearchParams({file: source.type === 'request' ? 'request' : source.file});
-  return '<a class="src" href="/source?' + text(query) + '" target="_blank" rel="noopener">' +
-    (source.sentence ? text(source.sentence) : text(source.file) +
-      (source.symbol ? '<br>' + text(source.symbol) : '')) + '</a>';
+  return source.sentence ? text(source.sentence) : text(source.file) + (source.symbol ? '<br>' + text(source.symbol) : '');
 }
 
 function requirementRows(requirements) {
@@ -157,12 +154,30 @@ function threadComment(log, id) {
 
 function start(data) {
   const view = $('.view');
+  const readOnly = !!data.static;  // a copy written by `render`: nothing can be sent
+  byId('status').innerHTML = '<span class="stat"><b id="accepted-count"></b>sections accepted</span>' +
+    '<span class="stat"><b id="comment-count">0</b>open comments</span>' +
+    '<button type="button" class="stat" id="questions"><b id="question-count">0</b>open questions</button>';
   const tabs = all('.tabs [role="tab"]');
   const panel = key => byId('panel-' + key);
   const pop = $('.pop');
-  const reviewMenu = $('#review-menu');
-  const reviewToggle = $('#review-toggle');
-  const runReview = $('#run-review');
+  const reviewMenu = document.createElement('div');
+  reviewMenu.className = 'decide';
+  reviewMenu.id = 'review-menu';
+  reviewMenu.hidden = true;
+  reviewMenu.innerHTML = '<p class="menu-h"></p><p class="review-summary"></p><button type="button" class="btn" id="run-review"></button>';
+  const reviewToggle = document.createElement('button');
+  reviewToggle.type = 'button';
+  reviewToggle.className = 'btn btn--quiet';
+  reviewToggle.id = 'review-toggle';
+  reviewToggle.setAttribute('aria-controls', 'review-menu');
+  const runReview = $('#run-review', reviewMenu);
+  if (!readOnly) {
+    $('#noteform').prepend(reviewMenu);
+    $('.notes .send .btn').after(reviewToggle);
+  } else {
+    $('.composer').hidden = true;
+  }
   const {perspectives} = data;
   const review = data.reviews.at(-1);
   const applicable = perspectives.filter(p => p.applies);
@@ -333,7 +348,7 @@ function start(data) {
   }
 
   const conversation = pageConversation({
-    served: true, name: 'design page', agent: 'Architect', itemKinds: items, latestLast: true, waiting,
+    served: !readOnly, readOnly, itemKinds: items, latestLast: true, waiting,
     kinds: {approve: logItem, confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.text),
     byId: id => threadComment(conversation.log(), id),
     reveal, edit: editComment, remove: event => commentLayer.remove(event), showLabel: n => 'Show comment ' + n,
@@ -378,7 +393,7 @@ function start(data) {
     }
   });
   const commentLayer = pageElementComments({
-    pop, pinClass: 'pin', commenting: () => true, crumb,
+    pop, pinClass: 'pin', commenting: () => !readOnly, crumb,
     params: (draft, text) => ({on: draft.on, text}),
     nextNumber: () => 1 + Math.max(0, ...conversation.log().map(event => event.n || 0)),
     send: conversation.send, byId: id => commentsById.get(id), reopen: conversation.reopen
@@ -463,7 +478,7 @@ function start(data) {
         Home: 0, End: tabs.length - 1}[event.key];
       if (next !== undefined) { event.preventDefault(); tabs[next].click(); tabs[next].focus(); }
     }
-    if (partByElement.has(element) && ['Enter', ' '].includes(event.key)) {
+    if (!readOnly && partByElement.has(element) && ['Enter', ' '].includes(event.key)) {
       event.preventDefault();
       const rect = element.getBoundingClientRect();
       commentOn(element, element, rect.left, rect.bottom);
@@ -482,53 +497,55 @@ function start(data) {
   $('.menu-h', reviewMenu).textContent = review ? 'Review the changes' : 'Approve the design';
   runReview.textContent = review ? 'Run the review again' : 'Approve and run the review';
   runReview.disabled = !!review && !reviewNames.length;
-  function toggleReview(open) {
-    reviewMenu.hidden = !open;
-    reviewToggle.setAttribute('aria-expanded', String(open));
+  const approval = readOnly ? null : pageApprove({
+    button: reviewToggle, panel: reviewMenu, label: 'Review request',
+    params: () => ({again: !!review, perspectives: reviewIds, changes: data.since,
+      text: (review ? 'Review requested again' : 'Design approved') + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')}),
+    onToggle: open => {
+      if (!open) return;
+      const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
+      const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
+      const removedKeys = data.removed || [];
+      const changed = data.since.filter(key => !removedKeys.includes(key)).map(key => data.change_labels[key]);
+      const removed = removedKeys.map(key => data.change_labels[key]);
+      $('.review-summary', reviewMenu).textContent = review ? reviewSummary(changed, reviewNames, removed) : stats + scope;
+    }
+  });
+  if (approval) {
+    runReview.addEventListener('click', () => {
+      runReview.disabled = true;
+      approval.send(conversation, () => { runReview.disabled = false; }, () => { runReview.disabled = false; });
+    });
   }
-  reviewToggle.addEventListener('click', () => {
-    const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
-    const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
-    const removedKeys = data.removed || [];
-    const changed = data.since.filter(key => !removedKeys.includes(key)).map(key => data.change_labels[key]);
-    const removed = removedKeys.map(key => data.change_labels[key]);
-    $('.review-summary').textContent = review ? reviewSummary(changed, reviewNames, removed) : stats + scope;
-    toggleReview(reviewMenu.hidden);
-  });
-  runReview.addEventListener('click', () => {
-    runReview.disabled = true;
-    const label = review ? 'Review requested again' : 'Design approved';
-    conversation.send('approve', {id: 'approval-' + Date.now().toString(36), again: !!review, perspectives: reviewIds,
-      changes: data.since, text: label + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')},
-    'Review request', () => { toggleReview(false); runReview.disabled = false; },
-    () => { runReview.disabled = false; });
-  });
 
   showTab(saved.tab || 'overview');
   setVersion(saved.version);
   setFindings(saved.findings);
   view.scrollTop = saved.scroll || 0;
+  if (readOnly) conversation.setLog(data.events || []);
   conversation.start();
 }
 
+// The page's data: embedded in a copy written by `render`, else served at /data.
+function embeddedData() {
+  const node = byId('page-data');
+  try { return node ? JSON.parse(node.textContent) : null; } catch (error) { return null; }
+}
+
 async function loadDesign() {
-  const message = $('.offline');
-  let data;
-  try {
-    const response = await fetch('/design.json');
-    if (!response.ok) throw new Error(await response.text());
-    data = await response.json();
-  } catch (error) {
-    const original = message.textContent;
-    message.textContent = 'Could not load the design. ' + error.message;
-    message.hidden = false;
-    setTimeout(() => {
-      message.textContent = original;
-      loadDesign();
-    }, 2000);
-    return;
+  const status = byId('status');
+  let data = embeddedData();
+  if (!data) {
+    try {
+      const response = await fetch('/data');
+      if (!response.ok) throw new Error(await response.text());
+      data = await response.json();
+    } catch (error) {
+      status.textContent = 'Could not load the design. ' + error.message;
+      setTimeout(loadDesign, 2000);
+      return;
+    }
   }
-  message.hidden = true;
   start(data);
 }
 

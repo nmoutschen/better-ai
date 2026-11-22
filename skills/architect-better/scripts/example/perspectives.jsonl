@@ -1,4 +1,0 @@
-{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "security", "name": "Security", "applies": true, "why": "The change adds a local server that takes input.", "from": {"type": "built_in", "method": "STRIDE"}}
-{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "observability", "name": "Observability", "applies": true, "why": "Agents and the server write logs the page reads.", "from": {"type": "built_in"}}
-{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "api-standards", "name": "API standards", "applies": false, "why": "No public API changes.", "from": {"type": "built_in"}}
-{"type": "perspective", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "data-and-privacy", "name": "Data and privacy", "applies": false, "why": "No personal data is stored or sent.", "from": {"type": "built_in"}}
