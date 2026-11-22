@@ -111,6 +111,14 @@ class Reader:
         self.errors.append({**entry, "by": by} if isinstance(by, str) and by else entry)
 
     def records(self, name: str, keep_invalid: bool = False) -> list:
+        """What `_records` reads; whatever else goes wrong with one file, for any reason, is that file's error."""
+        try:
+            return self._records(name, keep_invalid)
+        except Exception as exc:
+            self.error(name, 1, "(file)", f"could not be shown: {type(exc).__name__}")
+            return []
+
+    def _records(self, name: str, keep_invalid: bool = False) -> list:
         """The records of one file, in line order; none if it does not exist. The file is read once and that text is
         validated and shown, so a write in between is in neither. A record with errors is left out, unless
         `keep_invalid`: then it stays without the fields that failed, and its messages in `_errors`, so the page can
@@ -422,7 +430,37 @@ def model(data):
 
 def load(folder: Path) -> dict:
     """The page's payload for a folder. It never raises for a bad file: what is wrong is in `errors`."""
-    return model(read_folder(folder))
+    try:
+        return model(read_folder(folder))
+    except Exception as exc:  # for any reason: the page shows its errors band, not a failure
+        message = f"could not be shown: {type(exc).__name__}"
+        error = {"file": "(folder)", "line": 1, "field": "(folder)", "message": message}
+        return empty_model(folder, error)
+
+
+def empty_model(folder: Path, error: dict) -> dict:
+    """What `model` makes of a folder with nothing readable, written out so that no failure can reach it."""
+    return {
+        "errors": [error],
+        "title": folder.name,
+        "summary": "",
+        "scope": "",
+        "accepted": [],
+        "requirements": [],
+        "perspectives": [],
+        "findings": [],
+        "reviews": [],
+        "decisions": [],
+        "spec": [],
+        "parts": {},
+        "since": [],
+        "removed": [],
+        "change_labels": {},
+        "removed_labels": {},
+        "rerun": [],
+        "containers": {state: "" for state in ("before", "after")},
+        "flows": [],
+    }
 
 
 def record_review(folder, perspectives):
@@ -608,7 +646,9 @@ def serve(folder: Path, port: int, open_browser: bool) -> None:
             conv.address.unlink(missing_ok=True)
 
 
-@schema.never_raise("change folder")
+@schema.never_raise(
+    "change folder", {**page.VERBS, "serve": "served", "review": "written", "specs": "written", "": "checked"}
+)
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -666,7 +706,7 @@ def main(argv=None):
             conv.set_status(args.state, args.ids, args.text)
         else:
             conv.pending()
-    except (ValueError, OSError, KeyError, TypeError) as exc:
+    except ValueError as exc:  # what the user can fix; any other failure is the wrapper's one line
         parser.error(str(exc))
     return 0
 

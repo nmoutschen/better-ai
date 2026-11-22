@@ -638,7 +638,7 @@ def register():
     return template.substitute(css=(HERE / "register.css").read_text(encoding="utf-8"), sections=sections)
 
 
-@schema.never_raise("design")
+@schema.never_raise("design", {"render": "rendered", "register": "written", "": "checked"})
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)

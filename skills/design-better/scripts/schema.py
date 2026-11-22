@@ -116,10 +116,13 @@ ROOT = "(record)"
 SKIPPED_FOLDERS = {"__pycache__", "node_modules"}
 
 
-def never_raise(what: str, verb: str = "checked"):
+def never_raise(what: str, verb: str | dict[str, str] = "checked"):
     """For a script's entry point: whatever the files it reads make it raise is one line on stderr and exit code 1,
     never a traceback. SystemExit (argparse's own exit codes, `sys.exit`) and KeyboardInterrupt pass through. The line
-    is `<what>: nested too deeply` for RecursionError, else `<what>: could not be <verb>: <ExceptionType>`."""
+    is `<what>: nested too deeply` for RecursionError, `<what>: could not be <verb>: <reason> (<file>)` for an OSError
+    (the system's reason, such as "Address already in use", and the file it names), else
+    `<what>: could not be <verb>: <ExceptionType>`. `verb` is what the command does (checked, served, written,
+    rendered, read), or a dict of it by the command, the first word of the arguments, with "" for the others."""
 
     def decorate(entry):
         @functools.wraps(entry)
@@ -131,14 +134,28 @@ def never_raise(what: str, verb: str = "checked"):
             except RecursionError:
                 line = f"{what}: nested too deeply"
             except Exception as error:
-                line = f"{what}: could not be {verb}: {type(error).__name__}"
+                words = _verb(verb, args)
+                if isinstance(error, OSError) and error.strerror:
+                    named = f" ({error.filename})" if error.filename else ""
+                    line = f"{what}: could not be {words}: {error.strerror}{named}"
+                else:
+                    line = f"{what}: could not be {words}: {type(error).__name__}"
+                line = " ".join(line.split())  # one line, whatever the file's name holds
             with contextlib.suppress(Exception):  # stderr is closed: the exit code still says it
-                print(line, file=sys.stderr)
+                print(line.encode("ascii", "backslashreplace").decode("ascii"), file=sys.stderr)
             return 1
 
         return run
 
     return decorate
+
+
+def _verb(verb: str | dict[str, str], args: tuple) -> str:
+    if isinstance(verb, str):
+        return verb
+    argv = args[0] if args and isinstance(args[0], list) else sys.argv[1:]
+    command = next((str(a) for a in argv if not str(a).startswith("-")), "")
+    return verb.get(command, verb.get("", "checked"))
 
 
 class SchemaError(Exception):
@@ -339,12 +356,17 @@ def _type_name(value: Any) -> str:
 
 def _is_type(value: Any, name: str) -> bool:
     actual = _type_name(value)
+    if name == "integer" and actual == "number":  # JSON has one kind of number: 1.0 is the integer 1
+        return value.is_integer()
     return actual == name or (name == "number" and actual == "integer")
 
 
 def _equal(a: Any, b: Any) -> bool:
     """Equal as JSON values: `true` is not 1 and `[true]` is not `[1]`, at any depth of what the schema holds."""
-    if _type_name(a) != _type_name(b):
+    names = {_type_name(a), _type_name(b)}
+    if names == {"integer", "number"}:  # 1 and 1.0 are the same JSON number
+        return bool(a == b)
+    if len(names) != 1:
         return False
     if isinstance(a, list):
         return len(a) == len(b) and all(_equal(x, y) for x, y in zip(a, b, strict=True))
@@ -730,15 +752,89 @@ def _walk_merges(start: str, context: Context, results: dict[str, str | None]) -
             results[one] = f"merge loop: {' → '.join([*turned, one])}"
 
 
+def _merge_reach(context: Context) -> tuple[dict[str, str | None], Callable[[str, str], bool]]:
+    """The merge links of every question file in the folder, and `reaches(x, y)`: whether following the links from x
+    arrives at y. Worked out once per load: the links form a forest hanging off ends and loops, and a walk of it
+    numbers each node on the way down, so x reaches y when y is an ancestor of x (or, for a loop, in x's component)."""
+    key = f"merge-reach:{context.directory}"
+    if key not in context._cache:
+        links: dict[str, str | None] = {}
+        for path in sorted(context.directory.glob("*.json")):
+            link = _next_merge(path.stem, context)
+            links[path.stem] = link if _linkable(link) else None
+        nodes = set(links) | {t for t in links.values() if t is not None}
+        below: dict[str, list[str]] = {}
+        for node, link in links.items():
+            if link is not None:
+                below.setdefault(link, []).append(node)
+        tin: dict[str, int] = {}
+        tout: dict[str, int] = {}
+        group: dict[str, str] = {}
+        on_loop: set[str] = set()
+        clock = 0
+
+        def descend(root: str, name: str) -> None:
+            nonlocal clock
+            stack = [(root, False)]
+            while stack:
+                node, done = stack.pop()
+                if done:
+                    tout[node] = clock
+                    continue
+                tin[node] = clock = clock + 1
+                group[node] = name
+                stack.append((node, True))
+                stack.extend((n, False) for n in below.get(node, []) if n not in on_loop)
+
+        for node in sorted(nodes):  # ends first: a node that links nowhere
+            if links.get(node) is None:
+                descend(node, node)
+        for node in sorted(nodes):  # what is left is on a loop or hangs off one
+            if node in group:
+                continue
+            walk, seen_at = [], {}
+            at: str | None = node
+            while at is not None and at not in group and at not in seen_at:
+                seen_at[at] = len(walk)
+                walk.append(at)
+                at = links.get(at)
+            if at is not None and at in seen_at:
+                loop = walk[seen_at[at] :]
+                on_loop.update(loop)
+                for member in loop:
+                    group[member] = loop[0]
+                for member in loop:
+                    descend(member, loop[0])
+                for member in loop:
+                    tin.pop(member, None)
+            # a tail of nodes that hang off the loop (or off a node already placed) is placed by its descend
+        context._cache[key] = (links, tin, tout, group, on_loop)
+    links, tin, tout, group, on_loop = context._cache[key]
+
+    def reaches(x: str, y: str) -> bool:
+        if x == y or x not in group or y not in group:
+            return False
+        if y in on_loop:
+            return group[x] == group[y]
+        return y in tin and x in tin and tin[y] < tin[x] <= tout[y]
+
+    return links, reaches
+
+
 def _stray_loop(start: str, at: Any, context: Context) -> str | None:
+    """The loop of a record whose own link is not the one its file holds: it loops if the chain from `at` comes back
+    to it. The chain is only built, one file a step, when there is a loop to report."""
+    if at == start:
+        return None
+    links, reaches = _merge_reach(context)
+    if not reaches(at, start):
+        return None
     chain, seen = [start], {start}
-    while _linkable(at) and at not in seen:
+    while isinstance(at, str) and at not in seen:
         chain.append(at)
         seen.add(at)
-        at = _next_merge(at, context)
-    if at == start and len(chain) > 1:
-        return f"merge loop: {' → '.join([*chain, start])}"
-    return None
+        at = links.get(at)
+    return f"merge loop: {' → '.join([*chain, start])}" if at == start else None
 
 
 @hook("verified-needs-passing-verifier")

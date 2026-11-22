@@ -88,6 +88,17 @@ class Reader:
         return str(path)
 
     def records(self, path: Path, keep_invalid: bool = False) -> list:
+        """What `_records` reads; whatever else goes wrong with one file, for any reason, is that file's error."""
+        try:
+            return self._records(path, keep_invalid)
+        except Exception as error:
+            name = path.name
+            self.errors.append(
+                {"file": name, "line": 1, "field": "(file)", "message": f"could not be shown: {type(error).__name__}"}
+            )
+            return []
+
+    def _records(self, path: Path, keep_invalid: bool = False) -> list:
         """The records of one file, in line order; none if it does not exist. The file is read once and that text is
         validated and shown, so a write in between is in neither. A record with errors is left out, unless
         `keep_invalid`: then it stays, with its messages in `_errors`, so the page can show what it can of it. A line
@@ -188,7 +199,24 @@ def decision(record: dict, answers: dict, changed: float) -> dict:
 
 
 def collect(change: Path) -> dict:
-    """Everything the page shows from the folder's files, and `errors`, the records that are not valid."""
+    """Everything the page shows from the folder's files, and `errors`, the records that are not valid. It never
+    raises, whatever the reason: a failure is an error entry."""
+    try:
+        return _collect(change)
+    except Exception as error:
+        message = f"could not be shown: {type(error).__name__}"
+        return {
+            "name": change.name,
+            "tasks": [],
+            "requirements": {},
+            "agents": [],
+            "decisions": [],
+            "conversation": [],
+            "errors": [{"file": "(folder)", "line": 1, "field": "(folder)", "message": message}],
+        }
+
+
+def _collect(change: Path) -> dict:
     try:
         reader = Reader(change)
     except schema.SchemaError as error:
@@ -306,7 +334,7 @@ def watch(change: Path, port: int, open_browser: bool) -> None:
 # ---------- Command line ----------
 
 
-@schema.never_raise("change")
+@schema.never_raise("change", {**page.VERBS, "watch": "served", "": "checked"})
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Show a coordinated change as a live page and collect the user's input."

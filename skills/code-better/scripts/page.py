@@ -37,6 +37,7 @@ def _load_schema():
 
 schema = _load_schema()
 COMMON = "conversation.schema.json"
+VERBS = {"wait": "read", "pending": "read", "reply": "written", "status": "written"}  # what the agent's commands do
 MAX_BODY = 200_000
 LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the agent is not watching
 STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is written as its own event, `accepted`
@@ -44,6 +45,22 @@ STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is writt
 
 class EventError(ValueError):
     """An event that fails its schema: the message is the validator's, `field: message` for each problem."""
+
+
+def terminal_json(value) -> str:
+    """JSON for a terminal: readable, and escaped where UTF-8 cannot hold a character (a lone surrogate), so printing
+    it never fails."""
+    text = json.dumps(value, ensure_ascii=False)
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return json.dumps(value)
+    return text
+
+
+def terminal_text(text: str) -> str:
+    """Text a person gave (an id on the command line) as it can be printed: bytes UTF-8 cannot hold are escaped."""
+    return text.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
 def now() -> str:
@@ -126,9 +143,12 @@ class Conversation:
         events = []
         for line in self.lines():
             try:
-                events.append(json.loads(line))
+                event = json.loads(line)
             except (ValueError, RecursionError):
-                events.append({})  # keep the position, so indexes into the log stay right
+                event = None
+            events.append(
+                event if isinstance(event, dict) else {}
+            )  # keep the position, so indexes into the log stay right
         return events
 
     def check(self, event: dict) -> None:
@@ -255,7 +275,7 @@ class Conversation:
                 for i in ids
             ),
         )
-        print(f"Marked {state}: {', '.join(ids)}")
+        print(f"Marked {state}: {terminal_text(', '.join(ids))}")
 
     def pending(self) -> None:
         """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so
@@ -301,7 +321,7 @@ class Conversation:
                 extra["reopened_because"] = reasons[e["id"]]
             if thread.get(e["id"]):
                 extra["thread"] = thread[e["id"]]
-            print(json.dumps({**e, "status": state.get(e["id"], "new"), **extra}, ensure_ascii=False))
+            print(terminal_json({**e, "status": state.get(e["id"], "new"), **extra}))
         print(f"{len(open_items)} not done.")
 
 
@@ -311,9 +331,14 @@ def answers_any_failure(handle):
 
     @functools.wraps(handle)
     def run(self):
+        self.answer_started = False
         try:
             return handle(self)
         except Exception as error:
+            if self.answer_started:  # the status line and headers are out: a second answer would corrupt the stream
+                self.close_connection = True
+                return None
+            self._headers_buffer = []
             what = "nested too deeply" if isinstance(error, RecursionError) else f"failed: {type(error).__name__}"
             if self.path == "/rpc":
                 answer = '{"jsonrpc": "2.0", "id": null, "error": {"code": -32603, "message": "internal error: %s"}}'
@@ -337,6 +362,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     conversation: Conversation
     methods: tuple = ()
+
+    answer_started = False
+
+    def flush_headers(self) -> None:
+        super().flush_headers()
+        self.answer_started = True
+
+    def guarded(self, step) -> None:
+        """Run a step of the request's life that is outside do_GET and do_POST (setup, handle, finish). A client that
+        has gone, a reset or a closed socket, is not worth a word; anything else is one line, never a traceback."""
+        try:
+            step()
+        except OSError:
+            pass
+        except Exception as error:
+            with contextlib.suppress(Exception):
+                print(f"page server: a request failed: {type(error).__name__}", file=sys.stderr)
+
+    def setup(self) -> None:
+        self.guarded(super().setup)
+
+    def handle(self) -> None:
+        self.guarded(super().handle)
+
+    def finish(self) -> None:
+        self.guarded(super().finish)
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

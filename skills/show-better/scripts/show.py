@@ -3835,7 +3835,7 @@ def render_command(args) -> None:
         )
 
 
-@schema.never_raise("spec")
+@schema.never_raise("spec", {**page.VERBS, "render": "rendered", "": "checked"})
 def main() -> None:
     parser = argparse.ArgumentParser(description="Render a short visual introduction to a document from a JSON spec.")
     sub = parser.add_subparsers(dest="command", required=True)

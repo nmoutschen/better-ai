@@ -72,6 +72,67 @@ def board_files(board: Path) -> list:
     return files
 
 
+def scan_file(path: Path, board: Path, docs: dict, cache: dict, data: dict) -> None:
+    """One file of the board into `data`: its records, and what is wrong with them."""
+    shown = path.relative_to(board).as_posix()
+    try:
+        text = schema.read_checked(path, path.suffix == ".jsonl")
+    except (OSError, UnicodeDecodeError) as error:
+        data["errors"].append({"file": shown, "line": 1, "field": "(file)", "message": f"cannot be read: {error}"})
+        return
+    # What is shown below is built from this text, the text that was checked.
+    found = schema.check_text(path, text, docs, cache)
+    if [(e.field, e.message) for e in found] == [("(file)", "no schema describes this file")]:
+        data["errors"].append({"file": shown, "line": 1, "field": "(file)", "message": found[0].message})
+        return  # a file of another shape, such as an old Markdown one: listed, nothing to show from it
+    pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
+    if path.suffix != ".jsonl":
+        pieces = [text]
+    elif pieces[-1] == "":
+        pieces.pop()
+    records = {}
+    for number, piece in enumerate(pieces, 1):
+        with contextlib.suppress(ValueError, RecursionError):
+            records[number] = json.loads(piece)
+    messages: dict = {}  # line -> its errors, the first of each field
+    reported: set = set()
+    for error in found:
+        if (error.line, error.field) in reported:  # one error per field of a line, the first
+            continue
+        reported.add((error.line, error.field))
+        entry = {"file": shown, "line": error.line, "field": error.field, "message": error.message}
+        record = records.get(error.line)
+        if isinstance(record, dict) and isinstance(record.get("by"), str):
+            entry["by"] = record["by"]
+        data["errors"].append(entry)
+        messages.setdefault(error.line, []).append(error)
+    kept = {n: r for n, r in records.items() if isinstance(r, dict)}
+    valid = [r for n, r in kept.items() if n not in messages]
+    parent = path.parent.name
+    if path.name == "brief.json":
+        data["brief"] = next(iter(kept.values()), {})  # an invalid brief is kept, marked like a question
+        if data["brief"] and 1 in messages:
+            data["brief"] = schema.strip_invalid(data["brief"], messages[1])
+    elif path.name == "decisions.jsonl":
+        data["decisions"] += valid
+    elif path.name == LOG:
+        # An invalid event still shows, without the fields that failed. Without a valid `type` no branch of the
+        # schema checked its other fields, so it is only listed.
+        stripped = [schema.strip_invalid(r, messages[n]) if n in messages else r for n, r in kept.items()]
+        data["conversation"] += [r for r in stripped if "_errors" not in r or isinstance(r.get("type"), str)]
+    elif parent in FOLDERS:
+        for number, record in kept.items():
+            born = at_time(record)
+            if number in messages:
+                record = schema.strip_invalid(record, messages[number])
+            record["_born"] = born
+            if not isinstance(record.get("id"), str):
+                record["id"] = path.stem  # the file is named for its id
+            data[parent].append(record)
+    elif parent == "logs":
+        data["logs"][path.stem] = valid
+
+
 def scan(board: Path) -> dict:
     """Every record of the board, each file read once and checked on its own. `decisions` and `logs` (agent ->
     records) hold the valid records. `brief`, `questions`, `claims`, `sources` and `conversation` hold every record
@@ -95,63 +156,12 @@ def scan(board: Path) -> dict:
         return data
     cache: dict = {}
     for path in board_files(board):
-        shown = path.relative_to(board).as_posix()
         try:
-            text = schema.read_checked(path, path.suffix == ".jsonl")
-        except (OSError, UnicodeDecodeError) as error:
-            data["errors"].append({"file": shown, "line": 1, "field": "(file)", "message": f"cannot be read: {error}"})
-            continue
-        # What is shown below is built from this text, the text that was checked.
-        found = schema.check_text(path, text, docs, cache)
-        if [(e.field, e.message) for e in found] == [("(file)", "no schema describes this file")]:
-            data["errors"].append({"file": shown, "line": 1, "field": "(file)", "message": found[0].message})
-            continue  # a file of another shape, such as an old Markdown one: listed, nothing to show from it
-        pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
-        if path.suffix != ".jsonl":
-            pieces = [text]
-        elif pieces[-1] == "":
-            pieces.pop()
-        records = {}
-        for number, piece in enumerate(pieces, 1):
-            with contextlib.suppress(ValueError, RecursionError):
-                records[number] = json.loads(piece)
-        messages: dict = {}  # line -> its errors, the first of each field
-        reported: set = set()
-        for error in found:
-            if (error.line, error.field) in reported:  # one error per field of a line, the first
-                continue
-            reported.add((error.line, error.field))
-            entry = {"file": shown, "line": error.line, "field": error.field, "message": error.message}
-            record = records.get(error.line)
-            if isinstance(record, dict) and isinstance(record.get("by"), str):
-                entry["by"] = record["by"]
-            data["errors"].append(entry)
-            messages.setdefault(error.line, []).append(error)
-        kept = {n: r for n, r in records.items() if isinstance(r, dict)}
-        valid = [r for n, r in kept.items() if n not in messages]
-        parent = path.parent.name
-        if path.name == "brief.json":
-            data["brief"] = next(iter(kept.values()), {})  # an invalid brief is kept, marked like a question
-            if data["brief"] and 1 in messages:
-                data["brief"] = schema.strip_invalid(data["brief"], messages[1])
-        elif path.name == "decisions.jsonl":
-            data["decisions"] += valid
-        elif path.name == LOG:
-            # An invalid event still shows, without the fields that failed. Without a valid `type` no branch of the
-            # schema checked its other fields, so it is only listed.
-            stripped = [schema.strip_invalid(r, messages[n]) if n in messages else r for n, r in kept.items()]
-            data["conversation"] += [r for r in stripped if "_errors" not in r or isinstance(r.get("type"), str)]
-        elif parent in FOLDERS:
-            for number, record in kept.items():
-                born = at_time(record)
-                if number in messages:
-                    record = schema.strip_invalid(record, messages[number])
-                record["_born"] = born
-                if not isinstance(record.get("id"), str):
-                    record["id"] = path.stem  # the file is named for its id
-                data[parent].append(record)
-        elif parent == "logs":
-            data["logs"][path.stem] = valid
+            scan_file(path, board, docs, cache, data)
+        except Exception as error:  # for any reason: that file is an error entry and the rest of the board is shown
+            shown = path.relative_to(board).as_posix()
+            message = f"could not be shown: {type(error).__name__}"
+            data["errors"].append({"file": shown, "line": 1, "field": "(file)", "message": message})
     return data
 
 
@@ -172,6 +182,17 @@ def scan_cached(board: Path) -> dict:
 
 
 def load(board: Path) -> dict:
+    """The page's payload. It never raises, whatever the reason: a failure is an error entry."""
+    try:
+        return _load(board)
+    except Exception as error:
+        message = f"could not be shown: {type(error).__name__}"
+        errors = [{"file": "(board)", "line": 1, "field": "(board)", "message": message}]
+        empty = {"brief": {}, "decisions": [], "conversation": [], "questions": [], "claims": [], "sources": []}
+        return {**empty, "logs": {}, "errors": errors, "now": time.time()}
+
+
+def _load(board: Path) -> dict:
     data = scan_cached(board)
     logs = {}
     for agent, records in data["logs"].items():
@@ -337,7 +358,7 @@ def check(board: Path) -> int:
 # ---------- Command line ----------
 
 
-@schema.never_raise("board")
+@schema.never_raise("board", {**page.VERBS, "watch": "served", "snapshot": "written", "": "checked"})
 def main() -> None:
     parser = argparse.ArgumentParser(description="Show a research board as a live page and collect the user's input.")
     sub = parser.add_subparsers(dest="command", required=True)
