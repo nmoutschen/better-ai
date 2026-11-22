@@ -562,6 +562,25 @@ class TestUnitKindInvariants(BuildTestCase):
         self.repo.write("src/better_ai/beta/schemas/claims2.schema.json", json.dumps(other))
         self.expect("overlapping prefix", "beta-better/board: C")
 
+    def test_a_prefix_by_map_counts_each_mapped_prefix(self):
+        # architect's requirements map kind to F, Q or C; a mapped prefix another type's file uses overlaps
+        req = snapshot("requirements.schema.json")
+        req["properties"]["id"]["x-id"]["map"]["quality"] = "T"  # tasks' prefix
+        self.repo.write("src/better_ai/alpha/schemas/requirements.schema.json", json.dumps(req))
+        self.expect("overlapping prefix", "alpha-better/change: T")
+
+    def test_a_shared_path_inside_a_skill_package_is_refused(self):
+        for bad in ("better_ai/", "better_ai/beta/", "better_ai/beta/x.py"):
+            with self.subTest(bad):
+                cfg = json.loads((self.repo.root / "src/better_ai/skills.json").read_text())
+                cfg["shared"].append(bad)
+                self.repo.write("src/better_ai/skills.json", json.dumps(cfg))
+                result = self.repo.run()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("skills.json", result.stderr)
+                cfg["shared"].remove(bad)
+                self.repo.write("src/better_ai/skills.json", json.dumps(cfg))
+
     def test_the_same_type_in_the_same_file_by_two_schemas_is_fine(self):
         self.repo.write("src/better_ai/alpha/schemas/tasks2.schema.json", snapshot_text("tasks.schema.json"))
         self.assertEqual(self.repo.run().returncode, 0)

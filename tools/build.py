@@ -129,6 +129,10 @@ def parse_config(raw: bytes) -> dict:
             parts = entry.split("/")
             if entry.startswith("/") or ".." in parts or not entry.startswith(f"{PACKAGE}/") or "" in parts[:-1]:
                 problem = f"path {entry!r} must be relative, under {PACKAGE}/, without .."
+        packages = [f"{PACKAGE}/{s['package']}/" for s in cfg["skills"].values()]
+        for entry in cfg["shared"]:
+            if entry == f"{PACKAGE}/" or any(entry.startswith(p) for p in packages):
+                problem = f"shared path {entry!r} is a skill package or holds one: list it under its skill"
     if problem:
         raise BuildError(f"{PACKAGE}/skills.json: {problem}")
     return cfg
