@@ -65,6 +65,7 @@ def problems(skill: str, text: str):
     verb = text.split()[0]
     if verb not in VERBS[skill]:
         return [f"verb {verb!r} is not one of {sorted(VERBS[skill])}"]
+    text = re.sub(r"\s*<<-?\s*'?\w+'?\s*$", "", text)  # a heredoc's opener is stdin, not an argument
     if verb in ("reply", "status") and re.search(r"[\"']", text):
         return ["the words of reply and status come on stdin, not as a quoted argument"]
     cleaned = re.sub(r"<[^<>]*>", "<X>", text)
@@ -99,10 +100,14 @@ def problems(skill: str, text: str):
     if not low <= len(positional) <= high:
         out.append(f"{len(positional)} positional arguments, the verb takes {low} to {high}")
     out += [f"flag {flag} is required" for flag in sorted(required - found)]
+    if verb == "add" and not found & {"--by", "--for"}:
+        out.append("flag --by is required, unless --for names the agent")
+    if verb == "status" and "--text" in found and tokens[-1] != "--text":
+        out.append("--text takes no value: the user's words come on stdin")
     if verb == "status" and positional[1:2] and not all(s in STATES or s == "<X>" for s in positional[1].split("|")):
         out.append(f"state {positional[1]!r} is not one of {sorted(STATES)}")
     if verb == "render" and "--format" in found_values:
-        out += [f"format {v!r}" for v in found_values["--format"] if v.split("|")[0] not in FORMATS and v != "<X>"]
+        out += [f"format {v!r}" for v in found_values["--format"] if v != "<X>" and not all(p in FORMATS for p in v.split("|"))]
     if verb == "reply" and "--state" in found_values:
         out += [f"state {v!r}" for v in found_values["--state"] if v not in ("asked", "working", "<X>")]
     return out
@@ -145,6 +150,9 @@ class CommandLines(unittest.TestCase):
             "card <unit>": "verb",
             "render <unit> --format pdf": "format",
             "wait <unit> --timeout": "value",
+            "status <unit> accepted <id>... --text <words>": "stdin",
+            "add <unit> <type>": "--by",
+            "render <unit> --format text|pdf": "format",
         }
         for text, word in bad.items():
             with self.subTest(text):
@@ -158,6 +166,10 @@ class CommandLines(unittest.TestCase):
             "status <unit> accepted <id>... --text",
             "render <unit> --format text --screen-reader",
             "serve <unit> --open",
+            "add <unit> log --for <agent>",
+            "reply <unit> --to <id> <<'EOF'",
+            "add <unit> spec --by me <<'EOF'",
+            "render <unit> --format text|md",
         ]
         for text in good:
             with self.subTest(text):
