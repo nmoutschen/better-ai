@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "canvas.schema.json",
+  "title": "canvas.json: the versions of a screen to compare, and the screen sizes to show them at",
+  "$comment": "The head of a design-better unit. `widths` lists the sizes most used first: the page opens on the first. Each version has a label and exactly one of `file` (an HTML file in the unit's folder, relative to it) or `address` (an http(s) address the user's browser can reach).",
+  "x-files": ["canvas.json"],
+  "x-check": "canvas-versions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "title", "question", "widths", "versions"],
+  "properties": {
+    "type": {"const": "canvas"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "title": {"description": "the page heading", "type": "string", "minLength": 1},
+    "question": {"description": "what the user decides, shown under the heading; empty when there is none", "type": "string"},
+    "widths": {
+      "description": "screen sizes in pixels, WIDTH or WIDTHxHEIGHT, such as 375 or 1280x800; a height is 800 for a width of 768 or more, otherwise 700",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {"type": "string", "pattern": "^\\d{3,4}(x\\d{3,4})?$"}
+    },
+    "versions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 26,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label"],
+        "properties": {
+          "label": {"type": "string", "minLength": 1},
+          "file": {"description": "an HTML file in the unit's folder, relative to it", "type": "string", "minLength": 1},
+          "address": {"description": "an http(s) address, loaded when the page is viewed", "type": "string", "pattern": "^https?://\\S+$"}
+        },
+        "anyOf": [{"required": ["file"]}, {"required": ["address"]}],
+        "not": {"required": ["file", "address"]}
+      }
+    }
+  }
+}

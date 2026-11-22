@@ -1,0 +1,258 @@
+"""design-better as a unit: `create`, `check`, `set`, `render`, `serve` and the page's events, from src/better_ai/design/.
+
+Run with `python3 -m unittest tests.test_design_unit`. No test opens a browser.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import better  # noqa: E402
+
+SKILL = "design-better"
+HEAD = {
+    "title": "Pay screen",
+    "question": "Which one?",
+    "widths": ["1280x800", "375"],
+    "versions": [{"label": "A", "file": "a.html"}, {"label": "B", "file": "b.html"}],
+}
+
+
+def run(repo, *args, stdin=None):
+    return better.run(SKILL, *args, stdin=stdin, cwd=repo, env={"PYTHONUNBUFFERED": "1"})
+
+
+def make_repo(root: Path) -> Path:
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    folder = root / ".design" / "pay"
+    folder.mkdir(parents=True)
+    (folder / "a.html").write_text('<h1 id="a">A</h1><img src="p.png"><link rel="stylesheet" href="s.css">')
+    (folder / "b.html").write_text("<h1>B</h1><a href='other.html'>x</a>")
+    (folder / "s.css").write_text("body{background:url(p.png)}")
+    (folder / "p.png").write_bytes(b"\x89PNG-not-really")
+    (folder / "brief.md").write_text("# Brief\n")
+    return folder
+
+
+class Unit(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.folder = make_repo(self.root)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def create(self, head=None):
+        return run(self.root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(head or HEAD))
+
+    def test_create_writes_the_head_and_keeps_the_agents_files(self):
+        before = {p.name: p.read_bytes() for p in self.folder.iterdir()}
+        done = self.create()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        head = json.loads((self.folder / "canvas.json").read_text())
+        self.assertEqual((head["type"], head["by"], head["title"]), ("canvas", "designer", "Pay screen"))
+        self.assertRegex(head["at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        for name, data in before.items():
+            self.assertEqual((self.folder / name).read_bytes(), data)
+        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
+
+    def test_create_refuses_a_second_time_and_a_bad_head(self):
+        self.assertEqual(self.create().returncode, 0)
+        self.assertEqual(self.create().returncode, 1)
+
+    def test_check_names_each_problem_of_the_versions(self):
+        cases = {
+            "versions/1/label": {"versions": [{"label": "A", "file": "a.html"}, {"label": "A", "file": "b.html"}]},
+            "versions/0/file": {"versions": [{"label": "A", "file": "nope.html"}]},
+            "widths[0]": {"widths": ["wide"]},
+            "versions": {"versions": []},
+        }
+        for field, change in cases.items():
+            with self.subTest(field=field):
+                done = self.create({**HEAD, **change})
+                self.assertEqual(done.returncode, 1)
+                self.assertIn(field, done.stdout + done.stderr)
+                self.assertFalse((self.folder / "canvas.json").exists())
+        both = {"versions": [{"label": "A", "file": "a.html", "address": "https://example.com/"}]}
+        self.assertEqual(self.create({**HEAD, **both}).returncode, 1)
+        outside = {"versions": [{"label": "A", "file": "../x.html"}]}
+        self.assertEqual(self.create({**HEAD, **outside}).returncode, 1)
+
+    def test_set_canvas_changes_the_versions(self):
+        self.create()
+        (self.folder / "c.html").write_text("<p>C</p>")
+        versions = [*HEAD["versions"], {"label": "C", "file": "c.html"}]
+        done = run(self.root, "set", ".design/pay", "canvas", stdin=json.dumps({"versions": versions}))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(len(json.loads((self.folder / "canvas.json").read_text())["versions"]), 3)
+
+    def test_render_writes_one_file_with_the_data_and_prints_its_path(self):
+        self.create()
+        done = run(self.root, "render", ".design/pay")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        page = self.folder / "index.html"
+        self.assertEqual(Path(done.stdout.strip()).resolve(), page.resolve())
+        text = page.read_text()
+        data = json.loads(re.search(r'id="page-data">(.*?)</script>', text, re.S).group(1))
+        self.assertEqual([v["label"] for v in data["versions"]], ["A", "B"])
+        self.assertEqual([(s["w"], s["h"], s["name"]) for s in data["sizes"]], [(1280, 800, "Desktop"), (375, 700, "Mobile")])
+        self.assertIn("data:image/png;base64,", data["versions"][0]["srcdoc"])  # p.png is embedded
+        self.assertIn("data:text/css", data["versions"][0]["srcdoc"])
+        self.assertIn("href='other.html'", data["versions"][1]["srcdoc"])  # a link to another page stays
+        self.assertNotIn('src="/', text)  # no served path: the file stands alone
+        self.assertNotIn('href="/page.css"', text)
+
+    def test_render_warns_about_an_address_and_a_link_it_cannot_embed(self):
+        (self.folder / "a.html").write_text('<img src="missing.png">')
+        self.create({**HEAD, "versions": [{"label": "A", "file": "a.html"}, {"label": "B", "address": "https://example.com/x"}]})
+        done = run(self.root, "render", ".design/pay")
+        self.assertEqual(done.returncode, 0)
+        self.assertIn("missing.png", done.stderr)
+        self.assertIn("example.com", done.stderr)
+
+    def test_a_script_in_a_version_cannot_end_the_page_data(self):
+        (self.folder / "a.html").write_text("<script>alert(1)</script><p>&amp;</p>")
+        self.create()
+        run(self.root, "render", ".design/pay")
+        text = (self.folder / "index.html").read_text()
+        data = text.split('id="page-data">', 1)[1].split("</script>", 1)[0]
+        self.assertNotIn("<", data)
+
+    def test_render_without_a_head_says_how_to_make_one(self):
+        done = run(self.root, "render", ".design/pay")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("create", done.stderr)
+
+    def test_the_skill_has_render_and_the_shared_verbs_only(self):
+        done = run(self.root, "--help")
+        for verb in ("create", "add", "set", "check", "serve", "wait", "reply", "status", "pending", "render"):
+            self.assertIn(verb, done.stdout)
+        self.assertNotRegex(done.stdout, r"(?m)^    show\b")
+
+
+class Served(unittest.TestCase):
+    """`serve` on a real unit: the page, its data and revision, what the page may send, and the conversation verbs."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.folder = make_repo(self.root)
+        done = run(self.root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(HEAD))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        env = {**os.environ, "BETTER_AI_SKILL": SKILL, "PYTHONUNBUFFERED": "1"}
+        self.server = subprocess.Popen(
+            better.command("serve", ".design/pay", "--no-browser"),
+            cwd=self.root, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True,
+        )
+        address = self.folder / ".server"  # the first line of stdout is buffered on a pipe (python -I ignores PYTHONUNBUFFERED)
+        for _ in range(100):
+            if address.exists() and address.read_text().strip():
+                break
+            time.sleep(0.1)
+        self.url = address.read_text().strip()
+
+    def tearDown(self):
+        self.server.terminate()
+        self.server.wait(timeout=20)
+        self.tmp.cleanup()
+
+    def get(self, path):
+        with urllib.request.urlopen(self.url + path, timeout=10) as r:
+            return r.read().decode()
+
+    def send(self, method, params):
+        body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+        headers = {"Content-Type": "application/json", "Origin": self.url.rstrip("/")}
+        request = urllib.request.Request(self.url + "rpc", data=json.dumps(body).encode(), headers=headers)
+        with urllib.request.urlopen(request, timeout=10) as r:
+            return json.loads(r.read())
+
+    def test_the_page_its_data_and_its_assets(self):
+        page = self.get("")
+        self.assertIn('src="/canvas.js"', page)
+        self.assertIn('"approve"', page)
+        self.assertNotIn("Pay screen", page)  # the unit's words are data, never markup
+        data = json.loads(self.get("data"))
+        self.assertEqual(data["title"], "Pay screen")
+        self.assertEqual(data["versions"][0]["label"], "A")
+        self.assertIn("function boot", self.get("canvas.js"))
+        self.assertIn(".approval", self.get("canvas.css"))
+        with self.assertRaises(urllib.error.HTTPError) as refused:
+            self.get("a.html")  # a version's file is not served: only the fixed table is
+        refused.exception.close()
+
+    def test_the_revision_follows_the_head_and_the_version_files(self):
+        first = self.get("rev")
+        self.assertEqual(self.get("rev"), first)
+        (self.folder / "a.html").write_text("<p>changed</p>")
+        second = self.get("rev")
+        self.assertNotEqual(second, first)
+        head = {**HEAD, "title": "New"}
+        os.unlink(self.folder / "canvas.json")
+        run(self.root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(head))
+        self.assertNotEqual(self.get("rev"), second)
+
+    def test_what_the_page_may_send(self):
+        on = {"version": "A", "screen": "1280x800", "target": {"selector": "#a"}, "spot": {"fx": 0.5, "fy": 0.5}}
+        self.assertEqual(self.send("comment", {"id": "c1", "n": 1, "text": "bigger", "on": on})["result"], "saved")
+        self.assertEqual(self.send("verdict", {"version": "A", "verdict": "up"})["result"], "saved")
+        approval = {"id": "ap1", "option": "A", "label": "Build A", "carries": ["c1"], "text": None}
+        self.assertEqual(self.send("approve", approval)["result"], "saved")
+        self.assertEqual(self.send("decide", {**approval, "id": "d1"})["error"]["code"], -32601)  # decide is gone
+        self.assertEqual(self.send("approve", {"id": "ap2", "option": "A"})["error"]["code"], -32602)
+
+    def test_the_agent_answers_and_tracks_with_the_shared_verbs(self):
+        self.send("note", {"id": "m1", "text": "hello", "to": None})
+        waited = run(self.root, "wait", ".design/pay", "--timeout", "10")
+        self.assertEqual(json.loads(waited.stdout.splitlines()[0])["id"], "m1")
+        self.assertEqual(run(self.root, "reply", ".design/pay", "--to", "m1", stdin="done it").returncode, 0)
+        self.assertEqual(run(self.root, "status", ".design/pay", "done", "m1").returncode, 0)
+        self.assertEqual(run(self.root, "pending", ".design/pay").returncode, 0)
+        done = run(self.root, "status", ".design/pay", "accepted", "m1", "--text", stdin="good")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
+
+    def test_a_head_that_is_gone_is_an_error_the_page_shows(self):
+        os.unlink(self.folder / "canvas.json")
+        data = json.loads(self.get("data"))
+        self.assertIn("create", data["error"])
+
+
+class Events(unittest.TestCase):
+    """The page's log: an `approve` is checked; a `decide` from before the cutoff is old format, one after it is wrong."""
+
+    def log(self, event):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = make_repo(root)
+            run(root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(HEAD))
+            (folder / "conversation.jsonl").write_text(json.dumps(event) + "\n")
+            return run(root, "check", ".design/pay")
+
+    DECIDE = {"type": "decide", "by": "user", "id": "d1", "option": "A", "label": "Build A", "carries": [], "text": None}
+
+    def test_an_old_decide_is_a_notice_not_an_error(self):
+        done = self.log({**self.DECIDE, "at": "2026-11-01T10:00:00Z"})
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("format", done.stdout)
+
+    def test_a_new_decide_is_refused(self):
+        self.assertEqual(self.log({**self.DECIDE, "at": "2026-11-23T10:00:00Z"}).returncode, 1)
+
+    def test_an_approve_is_accepted(self):
+        event = {**self.DECIDE, "type": "approve", "at": "2026-11-22T10:00:00Z"}
+        self.assertEqual(self.log(event).returncode, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,27 @@
+<!-- The canvas's main section. The controls sit in the page's header (canvas.js moves them there); the versions are
+     built from /data (or from the data a rendered page carries), so nothing here depends on a unit. -->
+<div class="controls" id="controls" hidden>
+  <div class="seg cycle" role="group" aria-label="Mode">
+    <button type="button" class="ico" data-mode="comment" aria-pressed="true" title="Click a version to comment on it (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z"/></svg><span>Comment</span></button>
+    <button type="button" class="ico" data-mode="use" aria-pressed="false" title="Use the versions as pages (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg><span>Use</span></button>
+  </div>
+  <!-- Settings changed rarely sit in a Display menu, so the bar keeps to what is used on every visit. -->
+  <div class="more">
+    <button type="button" class="morebtn" aria-expanded="false" aria-haspopup="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Display</span></button>
+    <div class="menu" hidden>
+      <div class="scroll-setting">
+        <p class="menu-h">Scroll</p>
+        <div class="seg" role="group" aria-label="Scroll">
+          <button type="button" class="ico" data-scroll="linked" aria-pressed="true" title="Versions scroll together"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4M7 12h10"/></svg><span>Linked</span></button>
+          <button type="button" class="ico" data-scroll="free" aria-pressed="false" title="Each version scrolls on its own"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M17 3v18M4 7l3-4 3 4M14 17l3 4 3-4"/></svg><span>Free</span></button>
+        </div>
+      </div>
+      <p class="menu-h">Background</p>
+      <div class="seg" role="group" aria-label="Background">
+        <button type="button" class="ico sw" data-bg="#F5F5F5" aria-pressed="true" title="Light background" aria-label="Light background"><span class="chip chip--light"></span><span>Light</span></button>
+        <button type="button" class="ico sw" data-bg="#1E1E1E" aria-pressed="false" title="Dark background" aria-label="Dark background"><span class="chip chip--dark"></span><span>Dark</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="problem" id="canvas-problem" role="alert" hidden></p>
