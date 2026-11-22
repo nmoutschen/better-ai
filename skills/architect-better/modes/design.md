@@ -26,7 +26,7 @@ REPLY in the page, in one or two short sentences. MARK each item `seen` when it 
 
 ### Box kinds
 
-RUN `python3 <skill dir>/scripts/better.pyz register <unit>` to see the available box kinds. USE only kinds from that register.
+RUN `python3 <skill dir>/scripts/better.pyz register <unit>`, then READ `register.html` in the unit for the available box kinds. USE only kinds from that register.
 
 ## 1. Save the request
 

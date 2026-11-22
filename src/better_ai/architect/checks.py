@@ -128,7 +128,7 @@ def _box_kinds() -> set[str] | None:
 def design_problems(design: dict) -> list[tuple[str, str]]:
     """What is wrong with the references inside a design that has the right shape: an id used twice, a box kind that is
     not in the register, an edge, a group, a participant or a step that names what does not exist, a box in two groups.
-    The messages are the ones diagram.py has always given."""
+    The messages are the ones the diagram has always given."""
     problems: list[tuple[str, str]] = []
 
     def index(items, scope, field):
@@ -177,7 +177,7 @@ def design_problems(design: dict) -> list[tuple[str, str]]:
         for at, participant in enumerate(flow["participants"]):
             if isinstance(participant, dict):
                 participants.append(participant)
-            else:  # the schema refuses it; diagram.py may be given a design that never met the schema
+            else:  # the schema refuses it; the drawing may be given a design that never met the schema
                 message = f"{where} participant {participant!r}: expected an object with id and box"
                 problems.append((f"flows[{number}].participants[{at}]", message))
         participant_ids = index(participants, f"{where} participants", f"flows[{number}].participants")
@@ -194,6 +194,22 @@ def design_problems(design: dict) -> list[tuple[str, str]]:
 def _design_references(record: dict, context: Context) -> list[tuple[str, str]]:
     """The references inside design.json resolve: see design_problems."""
     return design_problems(record)
+
+
+@hook("design-renders")
+def _design_renders(record: dict, context: Context) -> list[tuple[str, str]]:
+    """A design that is well shaped and whose references resolve can be laid out and drawn: what stops the drawing is
+    an error of design.json, so `check` says it as the page would."""
+    from . import diagram  # not at the top: the diagram imports this module for design_problems
+
+    candidate = diagram.without_nulls({key: value for key, value in record.items() if key in ("containers", "flows")})
+    try:
+        if diagram.shape_problems(candidate) or design_problems(candidate):
+            return []  # reported by the schema and design-references
+        diagram.layout(candidate)
+    except (AttributeError, IndexError, KeyError, TypeError, ValueError) as error:
+        return [("(diagram)", str(error))]
+    return []
 
 
 @hook("source-file-exists")

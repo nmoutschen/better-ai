@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "reviews.schema.json",
   "title": "one line of reviews.jsonl: a review run and a fingerprint of each part it looked at",
-  "$comment": "architect.py review writes it. A part key is as in findings.jsonl; the review-parts hook of schema.py checks them.",
+  "$comment": "`better.pyz review` writes it; `add` refuses a review. A part key is as in findings.jsonl; the review-parts hook of the architect package checks them.",
   "x-files": [
     "reviews.jsonl"
   ],

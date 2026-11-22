@@ -4,7 +4,7 @@ source:
 - modes/design.md
 reads:
 - modes/design.md
-- scripts/example/README.md
+- templates/records.md
 situation: 'The order-export change folder docs/designs/2026-11-order-export/ is planted at the a-before stage, with the
   user''s note n1 confirming Before, but the request in its architect.json ends with a vague quality wish: "It has to be quick, and safe,
   because it''s personal data." The user repeats it when asking to continue, so the run is at step 3. The agent drafts

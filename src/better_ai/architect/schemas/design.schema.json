@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "design.schema.json",
   "title": "design.json: the containers and flows the page draws",
-  "$comment": "Only the diagrams. Every flow has an id, so a part key never depends on a flow's position. The design-references hook of schema.py checks what the shape cannot: that an edge, a group, a participant or a step names what exists, that an id is used once, and that a box kind is in the register (kinds.json).",
+  "$comment": "Only the diagrams. Every flow has an id, so a part key never depends on a flow's position. The design-references hook of the architect package checks what the shape cannot: that an edge, a group, a participant or a step names what exists, that an id is used once, and that a box kind is in the register (kinds.json).",
   "x-files": [
     "design.json"
   ],
@@ -306,6 +306,9 @@
     },
     {
       "x-check": "design-references"
+    },
+    {
+      "x-check": "design-renders"
     }
   ]
 }

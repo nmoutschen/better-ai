@@ -58,7 +58,10 @@ def board_css():
     for n, line in enumerate(dashboard.read_text(encoding="utf-8").splitlines(), 1):
         if ".map" not in line:
             yield dashboard, n, line
-    for name in ("design-better/scripts/canvas.css", "architect-better/scripts/architect.css"):
+    architect = ROOT / "src" / "better_ai" / "architect" / "page.css"
+    for n, line in enumerate(architect.read_text(encoding="utf-8").splitlines(), 1):
+        yield architect, n, line
+    for name in ("design-better/scripts/canvas.css",):
         for n, line in enumerate((scripts / name).read_text(encoding="utf-8").splitlines(), 1):
             yield scripts / name, n, line
     show = ROOT / "src" / "better_ai" / "show" / "show.css"

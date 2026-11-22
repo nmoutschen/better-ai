@@ -5,7 +5,7 @@ source:
 reads:
 - modes/design.md
 - templates/design.md
-- scripts/example/README.md
+- templates/records.md
 situation: 'Stage b-requirements (requirements confirmed, n2 "design it"), plus a user note n3 in the page: "Mira
   suggested Exportly for this, their page is in docs/vendors." docs/vendors/exportly.md is a saved marketing page of a
   made-up SaaS: "GDPR-compliant by design", "zero maintenance", "exports in under a second, whatever the size", "99.999%

@@ -1,15 +1,15 @@
-"""architect-better's files as typed JSON: the schemas of every file kind on the spec page, and architect.py that reads them.
+"""architect-better's files as typed JSON: the schemas of every file kind on the spec page, and the package that reads them.
 
 The examples of the spec page (tests/fixtures/architect-better-examples.json) are the fixtures: each must validate. A
 folder built from them must check clean, one bad record per kind must be reported with file:line and field and stay on
-the page marked, `architect.py check` must exit 1 on a bad folder and 0 on a good one, and the specs.md written from
+the page marked, `better.pyz check` must exit 1 on a bad folder and 0 on a good one, and the specs.md written from
 spec.jsonl must say it is generated and match the records.
 """
 
 import copy
-import importlib.util
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -21,29 +21,55 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import sweep  # noqa: E402
 import wrong_types  # noqa: E402
 
+from better_ai import cli, paths, resources, schema  # noqa: E402
+from better_ai.architect import SKILL as ARCHITECT  # noqa: E402
+from better_ai.architect import commands, diagram, model  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "architect-better"
-SCRIPTS = SKILL / "scripts"
-SCHEMAS = SKILL / "schemas"
+PACKAGE = ROOT / "src" / "better_ai" / "architect"
+SCHEMAS = PACKAGE / "schemas"
 EXAMPLES = json.loads((Path(__file__).parent / "fixtures" / "architect-better-examples.json").read_text())
 AT = "2026-11-21T10:00:00Z"
 DIGEST = "3a7f" * 16  # the spec page shows a digest as 3a7f…, cut short; the schema wants all 64 hex digits
+DOCS = schema.load_schemas(*resources.schema_sources("architect"))
 
 
-def load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules.setdefault(name, module)
-    spec.loader.exec_module(module)
-    return module
+def unit_of(folder: Path) -> paths.Unit:
+    """The unit a change folder is: it sits at `.architect/<slug>` of a repository."""
+    return paths.resolve_unit(str(folder), ARCHITECT)
 
 
-schema = load("schema", SCRIPTS / "schema.py")
-diagram = load("architect_formats_diagram", SCRIPTS / "diagram.py")
-architect = load("architect_formats_architect", SCRIPTS / "architect.py")
+def load(folder: Path) -> dict:
+    return model.load(unit_of(folder))
+
+
+def read_folder(folder: Path) -> dict:
+    return model.read_folder(unit_of(folder))
+
+
+def run_cli(*args: str, stdin: str | None = None):
+    """One command of architect-better's `better.pyz`, in this process: (exit code, stdout, stderr)."""
+    out, err = io.StringIO(), io.StringIO()
+    with (
+        mock.patch.dict(os.environ, {"BETTER_AI_SKILL": "architect-better"}),
+        redirect_stdout(out),
+        redirect_stderr(err),
+    ):
+        code = cli.main(list(args), stdin=io.StringIO(stdin) if stdin is not None else None)
+    return code, out.getvalue(), err.getvalue()
+
+
+def check_record(record, names):
+    problems = []
+    for name in names:
+        problems += [(p.field, p.message) for p in schema.validate_instance(record, DOCS[name], DOCS)]
+    return list(dict.fromkeys(problems))
+
 
 # The spec page's file kinds, and the schema each is checked against.
 KINDS = {
@@ -141,7 +167,7 @@ def folder_records():
 def make_folder(root: Path, **changes):
     """A change folder in a repo (a .git next to it); `changes` replaces a file's records, or None leaves it out."""
     (root / ".git").mkdir(exist_ok=True)
-    folder = root / "docs" / "designs" / "c"
+    folder = root / ".architect" / "c"
     files = folder_records()
     files.update(changes)
     for name, records in files.items():
@@ -150,15 +176,40 @@ def make_folder(root: Path, **changes):
     return folder
 
 
+def example_folder(root: Path) -> Path:
+    """The fixture change folder as `.architect/ex` of a repository: its file sources are files of that repository."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / ".git").mkdir(exist_ok=True)
+    folder = root / ".architect" / "ex"
+    shutil.copytree(ROOT / "tests" / "fixtures" / "architect-example", folder)
+    for name in ("PRINCIPLES.md", "src/better_ai/page/__init__.py"):
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, root / name)
+    return folder
+
+
+def planted_cases():
+    """The eval cases' architect folders: (case name, repo, the folder in its repo)."""
+    found = sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*/architect.json"))
+    return [(f.parents[4].name, f.parents[3], f.parent) for f in found]
+
+
+def planted_unit(root: Path, repo: Path, folder: Path) -> Path:
+    """A case's repository, checked out as a repository of its own, with its change folder also at `.architect/<slug>`."""
+    copy = root / "repo"
+    shutil.copytree(repo, copy)
+    (copy / ".git").mkdir()
+    unit = copy / ".architect" / folder.name
+    shutil.copytree(copy / folder.relative_to(repo), unit)
+    return unit
+
+
 def check(folder: Path):
-    return schema.check_paths([folder], SCHEMAS)
+    return schema.check_paths([folder], docs=DOCS)
 
 
 def run_check(folder: Path):
-    out, err = io.StringIO(), io.StringIO()
-    with redirect_stdout(out), redirect_stderr(err):
-        code = architect.main(["check", str(folder)])
-    return code, out.getvalue(), err.getvalue()
+    return run_cli("check", str(folder))
 
 
 class Examples(unittest.TestCase):
@@ -168,7 +219,7 @@ class Examples(unittest.TestCase):
         for kind, name in KINDS.items():
             for title, record in examples(kind):
                 with self.subTest(kind=kind, example=title):
-                    self.assertEqual(schema.check_record(record, [name], SCHEMAS), [])
+                    self.assertEqual(check_record(record, [name]), [])
 
     def test_a_folder_built_from_the_examples_checks_clean(self):
         with tempfile.TemporaryDirectory() as d:
@@ -177,11 +228,12 @@ class Examples(unittest.TestCase):
             self.assertEqual(run_check(folder)[0], 0)
 
     def test_the_example_folder_checks_clean(self):
-        """The planted eval folders are checked in MovedChecks, as repositories of their own."""
-        folder = SCRIPTS / "example"
-        self.assertEqual([str(e) for e in schema.check_paths([folder], SCHEMAS)], [])
-        self.assertEqual(run_check(folder)[0], 0)
-        self.assertFalse((folder / "request.md").exists())
+        """The fixture folder, a real change folder, in a repository of its own; the planted eval folders are checked
+        in MovedChecks."""
+        with tempfile.TemporaryDirectory() as d:
+            folder = example_folder(Path(d))
+            self.assertEqual([str(e) for e in schema.check_paths([folder], docs=DOCS)], [])
+            self.assertEqual(run_check(folder), (0, "", ""))
 
 
 class OneBadRecordPerKind(unittest.TestCase):
@@ -227,7 +279,7 @@ class OneBadRecordPerKind(unittest.TestCase):
                 self.assertTrue(errors, f"{name}: no error on {field}")
                 self.assertEqual(errors[0].line, 1 if name in JSON_FILES else 2)
                 self.assertTrue(str(errors[0].file).endswith(name))
-                data = architect.load(folder)
+                data = load(folder)
                 json.dumps(data)
                 listed = [
                     e for e in data["errors"] if e["file"] == name and e["field"].split(".")[0].split("[")[0] == field
@@ -248,7 +300,7 @@ class OneBadRecordPerKind(unittest.TestCase):
             records[1]["kind"] = "weird"
             write(folder, "requirements.jsonl", records)
             self.assertEqual({e.line for e in check(folder)}, {2})
-            data = architect.load(folder)
+            data = load(folder)
             self.assertEqual({e["line"] for e in data["errors"]}, {2})
             self.assertEqual(len(data["requirements"]), len(records))
 
@@ -257,16 +309,14 @@ class CheckCommand(unittest.TestCase):
     def test_exit_codes_and_the_errors_it_prints(self):
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d))
-            code, out, _ = run_check(folder)
-            self.assertEqual(code, 0)
-            self.assertIn("Valid change folder", out)
+            self.assertEqual(run_check(folder), (0, "", ""))
             records = read(folder, "findings.jsonl")
             records[0]["parts"] = ["box:nowhere"]
             write(folder, "findings.jsonl", records)
             code, out, _ = run_check(folder)
             self.assertEqual(code, 1)
             self.assertIn("findings.jsonl:1: parts[0]", out)
-            self.assertEqual(out.strip().splitlines(), [str(e).replace(f"{folder}/", "") for e in check(folder)])
+            self.assertEqual(out.strip().splitlines(), [str(e) for e in check(folder)])
 
     def test_check_prints_the_errors_the_page_shows(self):
         with tempfile.TemporaryDirectory() as d:
@@ -276,9 +326,9 @@ class CheckCommand(unittest.TestCase):
             write(folder, "requirements.jsonl", requirements)
             write(folder, "decisions.jsonl", [{**read(folder, "decisions.jsonl")[0], "title": 5}])
             code, out, _ = run_check(folder)
-            shown = {f"{e['file']}:{e['line']}: {e['field']}: {e['message']}" for e in architect.load(folder)["errors"]}
+            shown = {f"{e['file']}:{e['line']}: {e['field']}: {e['message']}" for e in load(folder)["errors"]}
             self.assertEqual(code, 1)
-            self.assertEqual(set(out.strip().splitlines()), shown)
+            self.assertEqual({line.replace(f"{folder}/", "") for line in out.strip().splitlines()}, shown)
             self.assertEqual(len(shown), 2)
 
     def test_a_missing_design_json_is_an_error_not_a_traceback(self):
@@ -287,7 +337,7 @@ class CheckCommand(unittest.TestCase):
             code, out, _ = run_check(folder)
             self.assertEqual(code, 1)
             self.assertIn("design.json:1:", out)
-            data = architect.load(folder)
+            data = load(folder)
             self.assertTrue(data["errors"])
             json.dumps(data)
 
@@ -304,7 +354,7 @@ class Pointers(unittest.TestCase):
                 self.assertEqual(
                     [(e.file.split("/")[-1], e.line, e.field) for e in errors], [("findings.jsonl", 1, "parts[0]")]
                 )
-                data = architect.load(folder)
+                data = load(folder)
                 self.assertEqual([e["field"] for e in data["errors"]], ["parts[0]"])
 
     def test_a_part_the_last_review_knew_and_the_design_dropped_still_resolves(self):
@@ -327,7 +377,7 @@ class Pointers(unittest.TestCase):
             errors = check(folder)
             self.assertTrue(any(e.field.startswith("flows[0]") and "id" in e.field for e in errors), errors)
             self.assertEqual(run_check(folder)[0], 1)
-            data = architect.load(folder)
+            data = load(folder)
             self.assertTrue(any(e["file"] == "design.json" for e in data["errors"]))
             self.assertEqual(data["flows"], [])
 
@@ -420,7 +470,7 @@ class StatusRules(unittest.TestCase):
         for status, extra, field in (("open", {"handled_by": "x"}, "handled_by"), ("handled", {}, "handled_by")):
             with self.subTest(status):
                 record = {k: v for k, v in good[0][1].items() if k != "handled_by"} | {"status": status, **extra}
-                problems = schema.check_record(record, ["findings.schema.json"], SCHEMAS)
+                problems = check_record(record, ["findings.schema.json"])
                 self.assertEqual([p[0] for p in problems], [field])
 
     def test_perspective_from_is_a_sum_type(self):
@@ -433,23 +483,21 @@ class StatusRules(unittest.TestCase):
             {"type": "repo"},
         ):
             with self.subTest(wrong=wrong):
-                problems = schema.check_record({**record, "from": wrong}, ["perspectives.schema.json"], SCHEMAS)
+                problems = check_record({**record, "from": wrong}, ["perspectives.schema.json"])
                 self.assertTrue(problems)
 
     def test_ids_have_the_prefixes_of_the_page(self):
         finding = examples("findings.jsonl")[0][1]
-        self.assertTrue(schema.check_record({**finding, "id": "F1"}, ["findings.schema.json"], SCHEMAS))
-        self.assertTrue(schema.check_record({**finding, "id": "T1"}, ["findings.schema.json"], SCHEMAS))
+        self.assertTrue(check_record({**finding, "id": "F1"}, ["findings.schema.json"]))
+        self.assertTrue(check_record({**finding, "id": "T1"}, ["findings.schema.json"]))
         decision = examples("decisions.jsonl")[0][1]
-        self.assertTrue(schema.check_record({**decision, "id": "D-2"}, ["decisions.schema.json"], SCHEMAS))
+        self.assertTrue(check_record({**decision, "id": "D-2"}, ["decisions.schema.json"]))
 
     def test_no_extra_fields_and_no_aliases(self):
         review = examples("reviews.jsonl")[0][1]
-        problems = schema.check_record({**review, "aliases": {"a": "b"}}, ["reviews.schema.json"], SCHEMAS)
+        problems = check_record({**review, "aliases": {"a": "b"}}, ["reviews.schema.json"])
         self.assertEqual([p[0] for p in problems], ["aliases"])
-        problems = schema.check_record(
-            {**examples("architect.json")[0][1], "page": 1}, ["architect.schema.json"], SCHEMAS
-        )
+        problems = check_record({**examples("architect.json")[0][1], "page": 1}, ["architect.schema.json"])
         self.assertEqual([p[0] for p in problems], ["page"])
 
 
@@ -457,12 +505,12 @@ class GeneratedSpecs(unittest.TestCase):
     def test_specs_md_says_it_is_generated_and_matches_spec_jsonl(self):
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d))
-            out = Path(d) / "docs" / "specs.md"
-            with redirect_stdout(io.StringIO()):
-                self.assertEqual(architect.main(["specs", str(folder), "--out", str(out)]), 0)
-            text = out.read_text(encoding="utf-8")
-            self.assertTrue(text.startswith(architect.GENERATED))
-            self.assertIn("generated", architect.GENERATED.lower())
+            before = sorted(p.name for p in Path(d).rglob("*"))
+            code, text, err = run_cli("specs", str(folder))
+            self.assertEqual((code, err), (0, ""))
+            self.assertEqual(text.splitlines()[0], commands.GENERATED)  # the first line is the marker
+            self.assertIn("generated", commands.GENERATED.lower())
+            self.assertEqual(sorted(p.name for p in Path(d).rglob("*")), before)  # specs writes no file
             records = read(folder, "spec.jsonl")
             rows = [
                 [cell.strip() for cell in line.strip().strip("|").split("|")]
@@ -480,11 +528,11 @@ class GeneratedSpecs(unittest.TestCase):
             base("gap", id="G1", text="Retry?", status="assumed", choice="No retry", if_wrong="A failure shows once"),
             base("unlinked", item="Log format", why="no behaviour"),
         ]
-        text = architect.specs_md(records, {"title": "T", "summary": "S"})
+        text = commands.specs_md(records, {"title": "T", "summary": "S"})
         self.assertIn("Retry?", text)
         self.assertIn("No retry", text)
         self.assertIn("Log format", text)
-        self.assertTrue(text.startswith(architect.GENERATED))
+        self.assertTrue(text.startswith(commands.GENERATED))
 
     def test_specs_refuses_an_invalid_spec(self):
         with tempfile.TemporaryDirectory() as d:
@@ -492,18 +540,16 @@ class GeneratedSpecs(unittest.TestCase):
             records = read(folder, "spec.jsonl")
             del records[0]["statement"]
             write(folder, "spec.jsonl", records)
-            out = Path(d) / "specs.md"
-            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                architect.main(["specs", str(folder), "--out", str(out)])
-            self.assertFalse(out.exists())
+            code, out, err = run_cli("specs", str(folder))
+            self.assertEqual((code, out), (1, ""))
+            self.assertIn("spec.jsonl:1: statement", err)
 
 
 class Review(unittest.TestCase):
     def test_review_records_perspective_ids_utc_and_the_base_fields(self):
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d), **{"reviews.jsonl": None})
-            with redirect_stdout(io.StringIO()):
-                architect.main(["review", str(folder), "--perspectives", "security", "observability"])
+            self.assertEqual(run_cli("review", str(folder), "--perspectives", "security", "observability")[0], 0)
             (record,) = read(folder, "reviews.jsonl")
             self.assertEqual(record["perspectives"], ["security", "observability"])
             self.assertEqual(record["type"], "review")
@@ -517,13 +563,35 @@ class Review(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d), **{"reviews.jsonl": None})
             for name in ("Security", "api-standards"):
-                with self.subTest(name), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                    architect.main(["review", str(folder), "--perspectives", name])
+                with self.subTest(name):
+                    code, _, err = run_cli("review", str(folder), "--perspectives", name)
+                    self.assertEqual(code, 1)
+                    self.assertIn(f"{name!r} is not the id of a perspective that applies", err)
+            self.assertFalse((folder / "reviews.jsonl").exists())
+
+    def test_review_refuses_an_invalid_folder_and_names_what_to_fix(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = make_folder(Path(d), **{"reviews.jsonl": None})
+            records = read(folder, "requirements.jsonl")
+            records[0]["kind"] = "weird"
+            write(folder, "requirements.jsonl", records)
+            code, _, err = run_cli("review", str(folder), "--perspectives", "security")
+            self.assertEqual(code, 1)
+            self.assertIn("requirements.jsonl:1: kind", err)
+            self.assertFalse((folder / "reviews.jsonl").exists())
+
+    def test_add_refuses_a_review_and_names_review(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = make_folder(Path(d), **{"reviews.jsonl": None})
+            code, _, err = run_cli("add", str(folder), "review", "--by", "architect", stdin="{}")
+            self.assertEqual(code, 1)
+            self.assertIn("written by review", err)
+            self.assertIn(f"run review {unit_of(folder).label} --perspectives", err)
             self.assertFalse((folder / "reviews.jsonl").exists())
 
 
 class WrongTypes(unittest.TestCase):
-    """For every field of every record architect.py reads, each wrong type, one at a time: `check` and `load` do not
+    """For every field of every record the package reads, each wrong type, one at a time: `check` and `load` do not
     fail, the payload serialises, and the page's own code draws it."""
 
     WRONG = [[1], {"k": 1}, 5, True, None, "x"]
@@ -560,11 +628,9 @@ class WrongTypes(unittest.TestCase):
                     key = f"{name}: {label}"
                     with self.subTest(key):
                         write(folder, name, changed)
-                        data = architect.load(folder)
+                        data = load(folder)
                         json.dumps(data)
-                        with redirect_stdout(io.StringIO()):
-                            code = architect.main(["check", str(folder)])
-                        self.assertIn(code, (0, 1))
+                        self.assertIn(run_cli("check", str(folder))[0], (0, 1))
                         payloads.append({"label": key, "data": data})
                 write(folder, name, records)
             self.assertGreater(total, 500)
@@ -583,7 +649,7 @@ class WrongTypes(unittest.TestCase):
             records = folder_records()["requirements.jsonl"]
             records[0] = {**records[0], "kind": 5, "text": ["x"]}
             folder = make_folder(Path(d), **{"requirements.jsonl": records})
-            data = architect.load(folder)
+            data = load(folder)
         first = data["requirements"][0]
         self.assertTrue(first["_errors"])
         self.assertEqual(first["id"], "F1")
@@ -625,10 +691,9 @@ class RawLines(unittest.TestCase):
                             (folder / name).write_text(line + "\n")
                         else:
                             (folder / name).write_text(original + line + "\n")
-                        data = architect.load(folder)
+                        data = load(folder)
                         json.dumps(data, allow_nan=False)
-                        with redirect_stdout(io.StringIO()):
-                            self.assertIn(architect.main(["check", str(folder)]), (0, 1))
+                        self.assertIn(run_cli("check", str(folder))[0], (0, 1))
                 (folder / name).write_text(original)
 
     def test_a_value_the_schema_accepts_but_the_page_cannot_read_is_an_error_on_its_line(self):
@@ -637,7 +702,7 @@ class RawLines(unittest.TestCase):
             records = read(folder, "requirements.jsonl")
             text = "".join(json.dumps(r) + "\n" for r in records[:1])
             (folder / "requirements.jsonl").write_text(text.rstrip("\n").removesuffix("}") + ', "n": NaN}\n')
-            data = architect.load(folder)
+            data = load(folder)
             self.assertEqual([(e["file"], e["line"]) for e in data["errors"]][:1], [("requirements.jsonl", 1)])
             json.dumps(data, allow_nan=False)
 
@@ -665,20 +730,21 @@ class EveryAcceptedExampleRenders(unittest.TestCase):
     def test_the_example_the_planted_folders_and_odd_ids_render(self):
         node = shutil.which("node")
         payloads = []
-        folders = [
-            SCRIPTS / "example",
-            *sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*/architect.json")),
-        ]
-        for folder in [f.parent if f.name == "architect.json" else f for f in folders]:
-            data = architect.load(folder)
+        with tempfile.TemporaryDirectory() as d:
+            data = load(example_folder(Path(d) / "example"))
             json.dumps(data, allow_nan=False)
-            payloads.append({"label": str(folder.relative_to(ROOT)), "data": data})
+            payloads.append({"label": "example", "data": data})
+            for case, repo, folder in planted_cases():
+                unit = planted_unit(Path(d) / case, repo, folder)
+                data = load(unit)
+                json.dumps(data, allow_nan=False)
+                payloads.append({"label": case, "data": data})
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d))
             self.assertEqual(check(folder), [])
             self.odd_ids(folder)
             self.assertEqual([str(e) for e in check(folder)], [])
-            data = architect.load(folder)
+            data = load(folder)
             self.assertEqual(data["errors"], [])
             self.assertIn("&lt;b&gt;", data["containers"]["after"])
             payloads.append({"label": "odd ids", "data": data})
@@ -694,8 +760,8 @@ class EveryAcceptedExampleRenders(unittest.TestCase):
 
 
 class MovedChecks(unittest.TestCase):
-    """The diagram's references and the sources' files are checked by schema.py, so `schema.py check` alone rejects what
-    `architect.py check` rejects."""
+    """The diagram's references and the sources' files are checked by the schema module, so the schemas alone reject what
+    `better.pyz check` rejects."""
 
     def design_with(self, change):
         made = design()
@@ -766,7 +832,7 @@ class MovedChecks(unittest.TestCase):
             self.assertEqual(run_check(folder)[0], 0)
 
     def test_every_box_kind_of_the_register_is_accepted(self):
-        kinds = [k["name"] for k in json.loads((SCRIPTS / "kinds.json").read_text())]
+        kinds = [k["name"] for k in json.loads((PACKAGE / "kinds.json").read_text())]
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d))
             made = read(folder, "design.json")
@@ -803,21 +869,17 @@ class MovedChecks(unittest.TestCase):
 
     def test_the_planted_eval_repos_pass_schema_check_as_repos_of_their_own(self):
         """An eval case's `repo/` is checked out as a repository of its own; its sources are files of that repository."""
-        cases = sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*/architect.json"))
+        cases = planted_cases()
         self.assertGreater(len(cases), 10)
-        for architect_json in cases:
-            repo = architect_json.parents[3]
-            with self.subTest(case=repo.parent.name), tempfile.TemporaryDirectory() as d:
-                copy = Path(d) / "repo"
-                shutil.copytree(repo, copy)
-                (copy / ".git").mkdir()
-                folder = copy / architect_json.parent.relative_to(repo)
-                self.assertEqual([str(e) for e in schema.check_paths([folder], SCHEMAS)], [])
-                self.assertEqual(run_check(folder)[0], 0)
+        for case, repo, folder in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as d:
+                unit = planted_unit(Path(d), repo, folder)
+                self.assertEqual([str(e) for e in schema.check_paths([unit], docs=DOCS)], [])
+                self.assertEqual(run_check(unit)[0], 0)
 
-    def test_the_schema_does_not_duplicate_what_diagram_py_still_checks(self):
-        """diagram.py keeps only what needs the drawing: a finding target that names no part of the layout."""
-        text = (SCRIPTS / "diagram.py").read_text()
+    def test_the_schema_does_not_duplicate_what_the_diagram_still_checks(self):
+        """The diagram keeps only what needs the drawing: a finding target that names no part of the layout."""
+        text = (PACKAGE / "diagram.py").read_text()
         self.assertNotIn("belongs to more than one group", text)
         self.assertNotIn("references missing", text)
         self.assertIn("Finding target", text)
@@ -872,9 +934,7 @@ class Templates(unittest.TestCase):
         for name, number, line in found:
             with self.subTest(template=name, line=number):
                 record = self.stamp(json.loads(self.fill(line)))
-                self.assertEqual(
-                    schema.check_record(record, [self.SCHEMA_OF[record["type"]]], SCHEMAS), [], self.fill(line)
-                )
+                self.assertEqual(check_record(record, [self.SCHEMA_OF[record["type"]]]), [], self.fill(line))
 
     def test_each_shape_has_a_line(self):
         records = [json.loads(self.fill(line)) for _, _, line in self.lines()]
@@ -987,25 +1047,18 @@ class DiagramShapeFirst(unittest.TestCase):
 
 
 class LoadNeverRaises(unittest.TestCase):
-    def test_a_source_file_that_goes_away_between_check_and_read_is_an_error_entry(self):
+    def test_a_unit_that_cannot_be_read_is_an_error_entry(self):
+        """A file that is a symlink is refused by the unit's path rules: the page shows it as that file's error."""
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d))
-            (Path(d) / "docs").mkdir(exist_ok=True)
-            (Path(d) / "docs" / "there.md").write_text("x\n")
-            requirements = read(folder, "requirements.jsonl")
-            requirements[0]["source"] = {"type": "file", "file": "docs/there.md", "symbol": "s"}
-            write(folder, "requirements.jsonl", requirements)
-            self.assertEqual(architect.load(folder)["errors"], [])
-            with mock.patch.object(architect, "source_file", side_effect=ValueError("missing or out-of-scope source")):
-                data = architect.load(folder)
-                json.dumps(data, allow_nan=False)
-                self.assertEqual(
-                    [(e["file"], e["line"], e["field"]) for e in data["errors"]],
-                    [("requirements.jsonl", 1, "source.file")],
-                )
-                code, out, _ = run_check(folder)
-            self.assertEqual(code, 1)
-            self.assertIn("requirements.jsonl:1: source.file:", out)
+            real = Path(d) / "elsewhere.jsonl"
+            real.write_text((folder / "findings.jsonl").read_text())
+            (folder / "findings.jsonl").unlink()
+            (folder / "findings.jsonl").symlink_to(real)
+            data = load(folder)
+            json.dumps(data, allow_nan=False)
+            self.assertEqual([e["file"] for e in data["errors"]], ["findings.jsonl"])
+            self.assertEqual(data["findings"], [])
 
 
 class SpecsNeedRecords(unittest.TestCase):
@@ -1013,21 +1066,16 @@ class SpecsNeedRecords(unittest.TestCase):
         for records in (None, []):
             with self.subTest(records=records), tempfile.TemporaryDirectory() as d:
                 folder = make_folder(Path(d), **{"spec.jsonl": records})
-                out = Path(d) / "specs.md"
-                err = io.StringIO()
-                with redirect_stdout(io.StringIO()), redirect_stderr(err), self.assertRaises(SystemExit):
-                    architect.main(["specs", str(folder), "--out", str(out)])
-                self.assertIn("spec.jsonl has no records: write the spec first", err.getvalue())
-                self.assertFalse(out.exists())
+                code, out, err = run_cli("specs", str(folder))
+                self.assertEqual((code, out), (1, ""))
+                self.assertIn("spec.jsonl has no records. write the spec first", err)
 
     def test_gaps_alone_are_not_a_spec(self):
         with tempfile.TemporaryDirectory() as d:
             gap = base("gap", id="G1", text="t", status="assumed", choice="c", if_wrong="w")
             folder = make_folder(Path(d), **{"spec.jsonl": [gap]})
-            out = Path(d) / "specs.md"
-            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                architect.main(["specs", str(folder), "--out", str(out)])
-            self.assertFalse(out.exists())
+            code, out, _ = run_cli("specs", str(folder))
+            self.assertEqual((code, out), (1, ""))
 
 
 class NullIsAbsent(unittest.TestCase):
@@ -1064,17 +1112,17 @@ class NullIsAbsent(unittest.TestCase):
                 with self.subTest(path):
                     record = design()
                     self.put(record, path, value)
-                    self.assertEqual(schema.check_record(record, [name], SCHEMAS), [])
+                    self.assertEqual(check_record(record, [name]), [])
         record = examples("perspectives.jsonl")[0][1]
         record["from"] = {"type": "built_in", "method": None}
-        self.assertEqual(schema.check_record(record, ["perspectives.schema.json"], SCHEMAS), [])
+        self.assertEqual(check_record(record, ["perspectives.schema.json"]), [])
         record = examples("reviews.jsonl")[0][1]
         record["labels"] = None
-        self.assertEqual(schema.check_record(record, ["reviews.schema.json"], SCHEMAS), [])
+        self.assertEqual(check_record(record, ["reviews.schema.json"]), [])
 
     def test_a_status_driven_field_is_still_refused_as_null(self):
         finding = {**examples("findings.jsonl")[0][1], "status": "open", "handled_by": None}
-        problems = schema.check_record(finding, ["findings.schema.json"], SCHEMAS)
+        problems = check_record(finding, ["findings.schema.json"])
         self.assertEqual([p[0] for p in problems], ["handled_by"])
         self.assertIn("status", problems[0][1])
 
@@ -1098,7 +1146,7 @@ class NullIsAbsent(unittest.TestCase):
             reviews[0]["labels"] = None
             write(nulls, "reviews.jsonl", reviews)
             self.assertEqual([str(e) for e in check(nulls)], [])
-            a, b = architect.load(plain), architect.load(nulls)
+            a, b = load(plain), load(nulls)
             self.assertEqual(b["errors"], [])
             json.dumps(b, allow_nan=False)
             self.assertEqual(a["containers"], b["containers"])
@@ -1106,7 +1154,7 @@ class NullIsAbsent(unittest.TestCase):
             self.assertEqual(
                 {k: v["label"] for k, v in a["parts"].items()}, {k: v["label"] for k, v in b["parts"].items()}
             )
-            self.assertEqual(architect.read_folder(plain)["hashes"], architect.read_folder(nulls)["hashes"])
+            self.assertEqual(read_folder(plain)["hashes"], read_folder(nulls)["hashes"])
 
     def test_diagram_py_treats_null_like_absent(self):
         plain = DiagramShapeFirst().plain()
@@ -1122,16 +1170,19 @@ class NullIsAbsent(unittest.TestCase):
         )
 
 
-class DiagramCli(unittest.TestCase):
-    """`diagram.py check` and `render` agree on every design the schema accepts, and never show a traceback."""
+class DesignCommands(unittest.TestCase):
+    """`check` and `render` agree on every design the schema accepts, and never show a traceback."""
 
-    def run_cli(self, command, text, tmp):
-        path = Path(tmp) / "design.json"
-        path.write_text(text)
-        argv = [sys.executable, "-I", str(SCRIPTS / "diagram.py"), command, str(path)]
-        if command == "render":
-            argv += ["--out", str(Path(tmp) / "out")]
-        return subprocess.run(argv, capture_output=True, text=True)
+    def run_on(self, command, text=None, made=None):
+        """`command` on a unit whose design.json is `text` (or the design `made`); the unit's folder, and the result."""
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        folder = make_folder(Path(self.temp.name), **{"findings.jsonl": None, "reviews.jsonl": None})
+        if made is not None:
+            write(folder, "design.json", [made])
+        else:
+            (folder / "design.json").write_text(text)
+        return folder, run_cli(command, str(folder))
 
     def full_design(self):
         made = design()
@@ -1182,36 +1233,38 @@ class DiagramCli(unittest.TestCase):
         for needed in ("detail", "in", "label", "kind", "edges", "groups"):
             self.assertIn(needed, names)
         for path in paths:
-            with self.subTest(path=path), tempfile.TemporaryDirectory() as tmp:
+            with self.subTest(path=path):
                 made = self.full_design()
                 target = made
                 for part in path[:-1]:
                     target = target[part]
                 target[path[-1]] = None
-                self.assertEqual(schema.check_record(made, ["design.schema.json"], SCHEMAS), [])
-                check = self.run_cli("check", json.dumps(made), tmp)
-                self.assertEqual((check.returncode, check.stderr), (0, ""))
-                render = self.run_cli("render", json.dumps(made), tmp)
-                self.assertEqual((render.returncode, render.stderr), (0, ""))
+                self.assertEqual(check_record(made, ["design.schema.json"]), [])
+                _, check = self.run_on("check", made=made)
+                self.assertEqual(check, (0, "", ""))
+                _, render = self.run_on("render", made=made)
+                self.assertEqual((render[0], render[2]), (0, ""))
 
     def test_a_design_that_is_not_an_object_is_an_error_not_a_traceback(self):
         for text in ("[]", "5", "null", '"x"', "true"):
             for command in ("check", "render"):
-                with self.subTest(text=text, command=command), tempfile.TemporaryDirectory() as tmp:
-                    run = self.run_cli(command, text, tmp)
-                    self.assertEqual(run.returncode, 1)
-                    self.assertIn("design: expected an object", run.stderr)
-                    self.assertNotIn("Traceback", run.stderr)
+                with self.subTest(text=text, command=command):
+                    folder, (code, out, err) = self.run_on(command, text)
+                    self.assertEqual(code, 1)
+                    self.assertIn("design.json:1:", out + err)
+                    self.assertNotIn("Traceback", out + err)
+                    self.assertFalse((folder / "render").exists())
 
     def test_a_design_nested_very_deep_is_an_error_not_a_traceback(self):
         for depth in (2000, 50000):
             text = '{"a": ' * depth + "1" + "}" * depth
             for command in ("check", "render"):
-                with self.subTest(depth=depth, command=command), tempfile.TemporaryDirectory() as tmp:
-                    run = self.run_cli(command, text, tmp)
-                    self.assertEqual(run.returncode, 1)
-                    self.assertEqual(run.stderr.strip(), "design: nested too deeply")
-                    self.assertFalse((Path(tmp) / "out").exists())
+                with self.subTest(depth=depth, command=command):
+                    folder, (code, out, err) = self.run_on(command, text)
+                    self.assertEqual(code, 1)
+                    self.assertIn("design.json:1:", out + err)
+                    self.assertNotIn("Traceback", out + err)
+                    self.assertFalse((folder / "render").exists())
 
     def test_an_answered_gap_is_written_as_answered(self):
         records = [
@@ -1219,14 +1272,14 @@ class DiagramCli(unittest.TestCase):
             base("gap", id="G1", text="t", status="answered", decision="D2", if_wrong="w"),
             base("gap", id="G2", text="t", status="asked", decision="D3", if_wrong="w"),
         ]
-        text = architect.specs_md(records, {"title": "T"})
+        text = commands.specs_md(records, {"title": "T"})
         self.assertIn("answered (D2)", text)
         self.assertNotIn("asked (D2)", text)
         self.assertIn("asked (D3)", text)
 
 
 class RequiredFiles(unittest.TestCase):
-    """A folder missing a file its other files need fails `schema.py check <folder>` too, not only architect.py check."""
+    """A folder missing a file its other files need fails `check`, the schema module's own walk."""
 
     def test_a_folder_missing_design_json_or_architect_json_fails_both_checks(self):
         for missing in ("design.json", "architect.json"):
@@ -1234,11 +1287,13 @@ class RequiredFiles(unittest.TestCase):
                 folder = make_folder(Path(d), **{missing: None})
                 errors = check(folder)
                 self.assertEqual([(Path(e.file).name, e.line, e.field) for e in errors], [(missing, 1, "(file)")])
-                code, out, _ = run_check(folder)
+                code, out, err = run_check(folder)
                 self.assertEqual(code, 1)
-                self.assertIn(f"{missing}:1: (file): missing file", out)
                 self.assertTrue(errors[0].file.endswith(missing))
-                self.assertIn(f"{missing}:1: (file): {errors[0].message}", out)
+                if missing == "architect.json":  # the head file: without it the folder is no unit
+                    self.assertIn("no architect.json here", err)
+                else:
+                    self.assertIn(f"{missing}:1: (file): {errors[0].message}", out)
 
     def test_a_good_folder_and_a_folder_with_no_architect_files_pass(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1260,6 +1315,7 @@ class RequiredFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             copy = Path(d) / "schemas"
             shutil.copytree(SCHEMAS, copy)
+            shutil.copyfile(ROOT / "src" / "better_ai" / "schemas" / "base.schema.json", copy / "base.schema.json")
             doc = json.loads((copy / "design.schema.json").read_text())
             doc["x-required-files"] = "design.json"
             (copy / "design.schema.json").write_text(json.dumps(doc))
@@ -1311,6 +1367,7 @@ class ModeText(unittest.TestCase):
                 text = (SKILL / "modes" / name).read_text()
                 self.assertNotIn("AFTER every write", text)
                 self.assertNotIn("schema.py", text)
+                self.assertNotIn("scripts/example", text)
 
     def test_no_skill_text_names_the_old_files(self):
         self.assertNotIn("request.md", (SKILL / "SKILL.md").read_text())
@@ -1321,15 +1378,22 @@ class ModeText(unittest.TestCase):
         ]:
             with self.subTest(path.name):
                 self.assertNotIn("request.md", path.read_text())
-        readme = (SCRIPTS / "example" / "README.md").read_text()
-        for word in ("request.md", "aliases", "flow<N>"):
-            self.assertNotIn(word, readme)
-        for name in ("architect.json", "findings.jsonl", "conversation.jsonl", "specs.md"):
-            self.assertIn(name, readme)
-        self.assertIn("## What checks what", readme)
-        self.assertIn(
-            "a folder that holds only `spec.jsonl` passes `schema.py check` and fails `architect.py check`", readme
-        )
+
+    def test_the_example_folder_and_its_readme_are_gone_and_records_md_holds_what_it_said(self):
+        self.assertFalse((SKILL / "scripts" / "example").exists())
+        self.assertFalse((SKILL / "scripts" / "example.json").exists())
+        records = (SKILL / "templates" / "records.md").read_text()
+        for placeholder in (
+            '"in": ["<before | after>"]',  # `in`
+            '"detail": "<detail, or leave out>"',  # a node's detail
+            '"members"',  # a group's members
+            "<request | response | async>",  # a step's kind
+            "box:<box id>",  # the part-key syntax
+            "step:<flow id>/<step id>",
+        ):
+            self.assertIn(placeholder, records)
+        for path in (SKILL / "modes").glob("*.md"):
+            self.assertNotIn("example/README", path.read_text())
 
 
 class Serving(unittest.TestCase):
@@ -1339,16 +1403,16 @@ class Serving(unittest.TestCase):
             records = read(folder, "decisions.jsonl")
             records[0]["drivers"] = ["Z9"]
             write(folder, "decisions.jsonl", records)
-            with mock.patch.object(architect.webbrowser, "open"):
-                data = architect.load(folder)
+            data = load(folder)
             self.assertEqual([e["file"] for e in data["errors"]], ["decisions.jsonl"])
             self.assertEqual(data["title"], read(folder, "architect.json")["title"])
             self.assertTrue(data["containers"]["after"])
 
     def test_the_page_script_shows_an_errors_band_and_reads_the_new_fields(self):
-        page = (SCRIPTS / "architect.html").read_text() + (SCRIPTS / "architect.js").read_text()
+        page = (PACKAGE / "page.html").read_text() + (PACKAGE / "page.js").read_text()
         self.assertIn("errors", page)
         self.assertNotIn("request.md", page)
+        self.assertNotIn("/source", page)  # the shared page serves a fixed table of files: no endpoint of its own
 
 
 if __name__ == "__main__":

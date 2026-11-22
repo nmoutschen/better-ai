@@ -357,14 +357,6 @@ class Server(unittest.TestCase):
 # What each page sends, by method, as its own script and page.js send it (the page adds type, by and at).
 ANCHOR = {"kind": "question", "id": "Q1", "title": "Why did it drop?"}
 VALID = {
-    "architect": {
-        "comment": {"id": "c1-x", "n": 1, "text": "unclear", "on": {"id": "req-F1", "title": "F1", "key": "k"}},
-        "note": {"id": "m-x", "text": "hi", "to": None},
-        "approve": {"id": "approval-x", "again": False, "perspectives": ["security"], "changes": [], "text": "ok"},
-        "confirm": {"id": "confirm-x", "requirement": "F1", "wording": "abc", "text": "Confirmed requirement F1."},
-        "delete": {"to": "c1-x"},
-        "accept": {"to": "c1-x"},
-    },
     "canvas": {
         "comment": {
             "id": "c1-x",
@@ -385,42 +377,19 @@ VALID = {
         "answer": {"id": "a-x", "decision": "D1", "text": "Use the default.", "default": True},
     },
 }
-# The records of the architect folder the architect page's events point to, by id.
-_BASE = {"at": "2026-11-21T10:00:00Z", "by": "architect"}
-ARCHITECT_FILES = {
-    "perspectives.jsonl": {
-        "type": "perspective",
-        **_BASE,
-        "id": "security",
-        "name": "Security",
-        "applies": True,
-        "why": "A local server takes input.",
-        "from": {"type": "built_in"},
-    },
-    "requirements.jsonl": {
-        "type": "requirement",
-        **_BASE,
-        "id": "F1",
-        "kind": "functional",
-        "text": "Show the agents.",
-        "source": {"type": "guessed"},
-    },
-}
 # One event per page the schemas must refuse, and the field the answer names.
 INVALID = {
-    "architect": ("confirm", {"id": "confirm-x", "requirement": "F1", "text": "t"}, "wording"),
     "canvas": ("comment", {**VALID["canvas"]["comment"], "text": None}, "verdict"),
     "board": ("answer", {"id": "a-x", "text": "t", "default": False}, "decision"),
 }
 
 
 class Pages(unittest.TestCase):
-    """Each of the five pages, through its own serving script's conversation: what its methods send is accepted, what
+    """Each of the four pages (architect-better's is in test_architect), through its own serving script's conversation: what its methods send is accepted, what
     its schema forbids is answered with invalid params, and the log is conversation.jsonl, valid as a file."""
 
     def modules(self):
         return {
-            "architect": load("architect-better", "architect.py"),
             "canvas": load("design-better", "canvas.py"),
             "board": load("research-better", "board.py"),
         }
@@ -478,9 +447,6 @@ class Pages(unittest.TestCase):
         for name, module in self.modules().items():
             with self.subTest(page=name), tempfile.TemporaryDirectory() as d:
                 conv, base = self.serve(module, Path(d))
-                if name == "architect":  # the approve event names a perspective, the confirmation a requirement
-                    Path(d, "perspectives.jsonl").write_text(json.dumps(ARCHITECT_FILES["perspectives.jsonl"]) + "\n")
-                    Path(d, "requirements.jsonl").write_text(json.dumps(ARCHITECT_FILES["requirements.jsonl"]) + "\n")
                 for method, params in VALID[name].items():
                     self.send(base, method, params)
                 conv.reply("seen it", None)

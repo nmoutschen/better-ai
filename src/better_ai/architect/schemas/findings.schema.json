@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "findings.schema.json",
   "title": "one line of findings.jsonl: a finding of a review, on the parts of the design it affects",
-  "$comment": "A part key is box:<id>, edge:<id> or step:<flow id>/<step id>, joined with + for the views of one exchange; the schema checks the grammar, and the finding-parts hook of schema.py checks that each key names a part of design.json (or one a review once recorded).",
+  "$comment": "A part key is box:<id>, edge:<id> or step:<flow id>/<step id>, joined with + for the views of one exchange; the schema checks the grammar, and the finding-parts hook of the architect package checks that each key names a part of design.json (or one a review once recorded).",
   "x-files": [
     "findings.jsonl"
   ],
