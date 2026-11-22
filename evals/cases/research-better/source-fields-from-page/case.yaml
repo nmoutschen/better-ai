@@ -3,7 +3,7 @@ rule: copy-source-fields
 source:
 - SKILL.md#5.2
 reads:
-- templates/board.md
+- formats/board.md
 situation: A fresh research run on the planted wiki export. The wiki index lists the analytics page as by the analytics team,
   18 March; the page itself says Priya Raman, 2026-03-20. The support page has no date. Each source's author and date are
   copied from the page itself, not from the index or from memory, with n.d. for the undated page. A script compares each source

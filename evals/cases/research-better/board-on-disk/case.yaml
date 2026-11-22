@@ -3,7 +3,7 @@ rule: keep-board-on-disk
 source:
 - SKILL.md#2
 reads:
-- templates/board.md
+- formats/board.md
 situation: 'A fresh research run on a planted wiki export (wiki/, eight pages on a checkout conversion drop after release
   26.3). The agent keeps the research board on disk in .research/<slug>/ in the JSON board format: a brief with the topic, goal,
   stop level, collections and status, and questions that each say what evidence would answer them (done_when). It does not

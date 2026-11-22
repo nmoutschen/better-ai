@@ -904,7 +904,7 @@ class Templates(unittest.TestCase):
 
     def lines(self):
         found = []
-        for path in sorted((SKILL / "templates").glob("*.md")):
+        for path in sorted((SKILL / "formats").glob("*.md")):
             for number, line in enumerate(path.read_text().splitlines(), 1):
                 if line.startswith("{") and line.endswith("}"):
                     found.append((path.name, number, line))
@@ -969,14 +969,13 @@ class Templates(unittest.TestCase):
         self.assertEqual(shapes - seen, set())
 
     def test_the_templates_state_the_conventions(self):
-        text = "\n".join(p.read_text() for p in (SKILL / "templates").glob("*.md") if "{" in p.read_text())
+        text = "\n".join(p.read_text() for p in (SKILL / "formats").glob("*.md") if "{" in p.read_text())
         for convention in (
             "`null`",
             "JSON array",
             "the record a pointer names before the pointer",
             "A field the record does not name is an error",
-            "without `at`, `by` and `id`",
-            "leave out `at`, `by` and `id`",
+            "Leave out `at`, `by` and `id`",
         ):
             self.assertIn(convention, text)
 
@@ -1355,9 +1354,9 @@ class ModeText(unittest.TestCase):
     """The mode files, the example and the templates name the new files, and say once where to check every write."""
 
     RULE = (
-        "WRITE each record of the unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, "
-        "or `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. "
-        "DO NOT write the record by hand to get past a refusal."
+        "ADD each record of the unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, "
+        "or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. "
+        "DO NOT get past a refusal by editing the records by hand."
     )
 
     def test_the_record_rule_is_stated_once_in_skill_md_and_not_in_the_modes(self):
@@ -1375,6 +1374,7 @@ class ModeText(unittest.TestCase):
             *(SKILL / "modes").glob("*.md"),
             *(SKILL / "agents").glob("*.md"),
             *(SKILL / "templates").glob("*.md"),
+            *(SKILL / "formats").glob("*.md"),
         ]:
             with self.subTest(path.name):
                 self.assertNotIn("request.md", path.read_text())
@@ -1382,7 +1382,7 @@ class ModeText(unittest.TestCase):
     def test_the_example_folder_and_its_readme_are_gone_and_records_md_holds_what_it_said(self):
         self.assertFalse((SKILL / "scripts" / "example").exists())
         self.assertFalse((SKILL / "scripts" / "example.json").exists())
-        records = (SKILL / "templates" / "records.md").read_text()
+        records = (SKILL / "formats" / "records.md").read_text()
         for placeholder in (
             '"in": ["<before | after>"]',  # `in`
             '"detail": "<detail, or leave out>"',  # a node's detail

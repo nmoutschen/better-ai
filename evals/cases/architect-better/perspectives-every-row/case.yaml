@@ -4,7 +4,7 @@ source:
 - modes/design.md
 reads:
 - modes/design.md
-- templates/records.md
+- formats/records.md
 situation: 'Stage b-requirements (requirements confirmed, n2 "design it"). The repo has one standard,
   docs/standards/api.md, which applies to any new endpoint. The agent designs the export and writes perspectives.jsonl
   with a record for each perspective of the design mode''s table (Security, Observability, API standards, Data and

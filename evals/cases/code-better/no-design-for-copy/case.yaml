@@ -4,7 +4,7 @@ source:
 - modes/feature.md
 reads:
 - modes/feature.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: A text change adds no structure; make it without a design document.
 request: Change the submit button text from “Submit” to “Send message”.

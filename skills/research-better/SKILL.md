@@ -47,9 +47,9 @@ IF you chose the MEANING, the GOAL or the stop level without the user stating it
 
 ### 2. Keep a research board
 
-The board is the shared record of the research. Every agent reads it and writes to it as it works.
+The board is the shared record of the research. Every agent reads it and adds records to it as it works.
 
-MAKE the board with `python3 <skill dir>/scripts/better.pyz create .research/<topic-slug> --by coordinator`, at the repository's top level, with the brief as JSON on stdin, so it survives the session and the research can resume. DO NOT use a temporary or session scratch directory. DO NOT commit the board unless the user asks. FOLLOW the file formats in [templates/board.md](templates/board.md): its JSON files are the board.
+MAKE the board with `python3 <skill dir>/scripts/better.pyz create .research/<topic-slug> --by coordinator`, at the repository's top level, with the brief as JSON on stdin, so it survives the session and the research can resume. DO NOT use a temporary or session scratch directory. DO NOT commit the board unless the user asks. FOLLOW the record formats in [formats/board.md](formats/board.md): its records are the board.
 
 TELL the user the board's path once.
 
@@ -57,7 +57,7 @@ IF the harness can run a shell command in the background, and the user's browser
 
 IF your harness tells you when a background command ends, ALSO RUN `python3 <skill dir>/scripts/better.pyz wait <board-path>` in the background while the live view runs: it ends with the user's new actions, so a message wakes you even when you are waiting for workers. START it again at once each time it ends, before you act on what it printed. WHILE no `wait` runs, the page tells the user that you are not watching.
 
-The live view shows the board as a map of the questions, the agents at work, and the decisions waiting for the user or taken without them. The user asks about a question or an agent, writes to you, and changes your decisions there.
+The live view shows the board as a map of the questions, the agents at work, and the decisions waiting for the user or taken without them. The user asks about a question or an agent, messages you, and changes your decisions there.
 
 - READ the user's open items with `python3 <skill dir>/scripts/better.pyz pending <board-path>` each time you re-read the board (step 6.2), and when you resume a board. ACT on each one as the user's instruction for the GOAL, unless it asks for an answer you expect: steering by the user is not a prior to avoid, but a question the user adds goes through the same review as a worker's (step 6.2, item 1).
 - TRACK each item with `python3 <skill dir>/scripts/better.pyz status <board-path> seen|asked|done <id>...`: MARK it `seen` when it arrives, `asked` when you asked the user something and wait for the answer, and `done` once you answered it or the change is on the board. READ a note the user adds under an item as part of that item's thread, ordered by the `at` time on each entry, the user's and yours (`pending` prints the thread with its times): it may answer your question, clarify what they asked, or react to your last reply. DO NOT take it as the answer to your question unless it answers it; IF you cannot tell, ASK in one sentence. WHEN the user's answer leads to a change, MARK the item `done` once the change is on the board, and PUT your next question in a new message. An item is finished once you answered it or made the change: the user does not approve your work here. A follow-up from the user under it is work again.
@@ -65,11 +65,11 @@ The live view shows the board as a map of the questions, the agents at work, and
 - The page posts a message from the worker each time a question is closed, with its one-line answer. A reply the user writes under it comes to you, and `pending` names the question it is about: ACT on it yourself, because workers do not read the page.
 - POST an update with `reply` and no `--to` each time your review of the board (step 6.2) changes something the workers' messages do not show: you opened, merged or dropped proposed questions, added a challenge, conflict or gap question, corrected or withdrawn claims after verification, or set the board to checking or stopped. PUT the changes from one review in one update of one or two sentences, and NAME questions by their title, not their ID.
 
-DO NOT stop the research to wait for the user: the user often leaves a run alone. WHEN something only the user can decide comes up during the run, such as a COLLECTION that asks for a login, CHOOSE the default that keeps the research honest, such as continuing without that COLLECTION and recording the gap, and RECORD the decision in `decisions.jsonl` with `status` `waiting`, your `default` and a `deadline` of `+10m`, or sooner if the research will likely end before then, so a decision never delays the end of the run (see the board format). WHEN the stop rules apply while a decision is waiting, APPLY its default and CONTINUE to stop. WORK on other questions meanwhile. EACH time you re-read the board, APPLY the user's answer if one came (`status` `answered`, with its `answer`), the default if the user accepted it (an answer with `default: true`) or once the deadline has passed (`status` `defaulted`). EACH time, REPLY under the decision, with `--to` the id of the user's answer or, if none came, the decision's own id, so the page shows what happened in the same thread. WHEN the user changes a decision after that, APPLY the change, SET the `status` to `answered` with the new `answer`, and SET the brief's `status` back to `running` if it had stopped.
+DO NOT stop the research to wait for the user: the user often leaves a run alone. WHEN something only the user can decide comes up during the run, such as a COLLECTION that asks for a login, CHOOSE the default that keeps the research honest, such as continuing without that COLLECTION and recording the gap, and ADD the decision with `python3 <skill dir>/scripts/better.pyz add <board> decision --by coordinator`, with `status` `waiting`, your `default` and a `deadline` of `+10m`, or sooner if the research will likely end before then, so a decision never delays the end of the run (see the board format). WHEN the stop rules apply while a decision is waiting, APPLY its default and CONTINUE to stop. WORK on other questions meanwhile. EACH time you re-read the board, APPLY the user's answer if one came (`status` `answered`, with its `answer`), the default if the user accepted it (an answer with `default: true`) or once the deadline has passed (`status` `defaulted`). EACH time, REPLY under the decision, with `--to` the id of the user's answer or, if none came, the decision's own id, so the page shows what happened in the same thread. WHEN the user changes a decision after that, APPLY the change, SET the `status` to `answered` with the new `answer`, and SET the brief's `status` back to `running` if it had stopped.
 
 IF the user has no live view, REPORT progress in the chat each time a question is closed: one line with the question, its status, and how many questions remain open.
 
-IF you cannot write files, KEEP the board in your working notes and RESTATE it in full after every few results.
+IF you cannot run commands, KEEP the board in your working notes and RESTATE it in full after every few results.
 
 ### 3. Broaden the searches
 
@@ -99,7 +99,7 @@ IF the harness has sub-agents, the research loop is the workers' job (step 6). O
 
 RE-READ the board. TAKE the open, unowned question with the highest priority. PREFER questions that sources raised over questions from your own expectations. IF other agents work on the board, DO NOT take a challenge question about an answer you wrote, because an agent tends to dismiss evidence against its own answer. SET yourself as its `owner` and its `status` to `in progress` with `set`, then RE-READ it. IF another agent owns it, TAKE another question.
 
-WRITE queries from the question and from terms found in sources, not from the answer you expect. CHECK the `search` lines in the logs in `logs/` and DO NOT repeat a logged query.
+WRITE queries from the question and from terms found in sources, not from the answer you expect. CHECK the `search` records in the agents' logs and DO NOT repeat a logged query.
 
 FOR a challenge question, SEARCH for critiques of the method, failed replications, negative or unpublished results (such as trial registers, theses and conference abstracts), and the conditions where the claim does not hold. WRITE these as queries about the method and the conditions, not as the claim with "not" added.
 
@@ -107,14 +107,14 @@ FOR a chain question, READ the reference list of the source (backward), and FIND
 
 #### 5.2. Record as you go
 
-After each search or page read, WRITE to the board before the next step:
+After each search or page read, ADD to the board before the next step:
 
-- The query, as a `search` line in your log, `logs/<agent>.jsonl`.
-- New sources, each a file in `sources/`, with `author`, `date`, `title`, `publisher`, `url`, `category`, how you read it (`read`), and a trust assessment (`trust`, `trust_reason`). COPY the author, date, title, and publisher from the page itself, not from memory or the search result. LIST in `ids` the DOI, arXiv ID, PMID or ISBN the page gives. CHECK the board for the URL first. MARK a source that cites, copies, or summarizes another source as a repeat of it in `repeats`: the two are not independent.
-- New claims, each a file in `claims/` with its `source`, a verbatim `quote` and `status` `unchecked`. That a source does not report something is not a claim, because no quote can show it: WRITE it in the question's summary or as a `gap` line in your log. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
+- The query, as a `search` record in your log (`add <board> search --for <your agent name>`).
+- New sources, each a `source` record, with `author`, `date`, `title`, `publisher`, `url`, `category`, how you read it (`read`), and a trust assessment (`trust`, `trust_reason`). COPY the author, date, title, and publisher from the page itself, not from memory or the search result. LIST in `ids` the DOI, arXiv ID, PMID or ISBN the page gives. CHECK the board for the URL first. MARK a source that cites, copies, or summarizes another source as a repeat of it in `repeats`: the two are not independent.
+- New claims, each a `claim` record with its `source`, a verbatim `quote` and `status` `unchecked`. That a source does not report something is not a claim, because no quote can show it: GIVE it in the question's summary or add it as a `gap` record in your log. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
 - New terms, and new questions (step 5.3).
 
-WHEN the question's `done_when` holds, STOP searching it, even if more searches are possible. SET its status and WRITE its summary: two or three sentences that answer the question from the evidence, including where sources disagree or evidence is thin. WHEN sources give different sizes for the same effect, REPORT the size from a preregistered replication or a multi-lab study, not the original's. IF only the original study reports a size, SAY that a repeat may find it smaller: repeats often find effects about half as large. ALSO WRITE its `gist`: the answer in one plain sentence of at most 20 words, for a person glancing at the board.
+WHEN the question's `done_when` holds, STOP searching it, even if more searches are possible. SET its status and GIVE its summary: two or three sentences that answer the question from the evidence, including where sources disagree or evidence is thin. WHEN sources give different sizes for the same effect, REPORT the size from a preregistered replication or a multi-lab study, not the original's. IF only the original study reports a size, SAY that a repeat may find it smaller: repeats often find effects about half as large. ALSO GIVE its `gist`: the answer in one plain sentence of at most 20 words, for a person glancing at the board.
 
 #### 5.3. Add questions
 
@@ -177,7 +177,7 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 1. **Admit proposed questions**: REVIEW questions with the status `proposed` each time you re-read the board, so workers do not run out of open questions. COMPARE each with the GOAL and with the questions closest to it, not with the whole list. THEN do one:
    - OPEN it (`status` `open`), and SET its priority from its own stakes.
    - MERGE it into the question that already covers it: SET its `status` to `merged` and `merged_into` to that question, so a wrong merge can be undone.
-   - SET it out of scope, and WRITE the reason in its `note`.
+   - SET it out of scope, and GIVE the reason in its `note`.
 
    DO NOT reject a question because you expect its answer.
 2. **Review verification**: DO NOT open source pages to verify claims yourself; verifiers do it (step 6.1).
@@ -194,7 +194,7 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 9. **Review gaps**: EACH time a few questions close, COMPARE the board with the GOAL. ADD a question, kind `gap`, for each part of the GOAL that no question covers, with `goal` as `origin` and `raised_in` the closest question.
 10. **Check the three checks**: CHECK that each answered high-priority question that is not of kind `challenge` has a challenge question, and that its primary sources have a chain question. ADD the missing ones. IF a worker's log has no `frontier` line after a closed question, ADD the frontier questions its sources point to.
 
-WHEN the user's item, a decision or your review changes what running workers or verifiers do, such as a narrower MEANING, a dropped COLLECTION, or a question set out of scope while a worker owns it, WRITE the change to the board first: in the brief's `changes` list, as an entry with `text`, newest first, or in the question. Workers re-read the brief and their question before each write. IF the harness can send a message to a running agent, ALSO SEND each agent the change affects one line that names the change, says it is on the board, and says it is verified and replaces their earlier instructions. A notice that does not say this is followed less often. DO NOT send agents anything else, and DO NOT pass messages between workers, or between a verifier and the worker whose claim it checks: agents that hear each other's conclusions or rebuttals move toward them. A verifier's flag reaches you in the claim's `reason`, or in its `differs` for source fields.
+WHEN the user's item, a decision or your review changes what running workers or verifiers do, such as a narrower MEANING, a dropped COLLECTION, or a question set out of scope while a worker owns it, ADD the change to the board first: in the brief's `changes` list, with `set`, as an entry with `text`, newest first, or in the question. Workers re-read the brief and their question before each write. IF the harness can send a message to a running agent, ALSO SEND each agent the change affects one line that names the change, says it is on the board, and says it is verified and replaces their earlier instructions. A notice that does not say this is followed less often. DO NOT send agents anything else, and DO NOT pass messages between workers, or between a verifier and the worker whose claim it checks: agents that hear each other's conclusions or rebuttals move toward them. A verifier's flag reaches you in the claim's `reason`, or in its `differs` for source fields.
 
 APPLY the stop rules in step 5.5 to the whole board. WHEN they apply, SET the brief's `status` to `checking`. Workers then stop, and verifiers check the remaining claims and stop. WAIT for them, THEN SET the brief's `status` to `stopped`, before you present the findings.
 
@@ -224,7 +224,7 @@ DO NOT carry internal information into an external COLLECTION. A COLLECTION is e
 
 ### Writing the board
 
-WRITE each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, with its fields as JSON on stdin, or edit it with `set`. WRITE a line of a log with `--for <the log's agent name>` instead of `--by`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT write the record by hand to get past a refusal. IF you cannot run commands, MARK the research **not finished**, and NAME the records you did not write.
+ADD each record of the board with `python3 <skill dir>/scripts/better.pyz add <board> <type> --by <your agent name>`, with its fields as JSON on stdin, or CHANGE it with `set`. ADD a line of a log with `--for <the log's agent name>` instead of `--by`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, MARK the research **not finished**, and NAME the records you did not add.
 
 ### Know what your retrieval tools return
 

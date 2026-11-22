@@ -2,10 +2,10 @@ id: continue-plan
 rule: long-runs-on-track
 source:
 - modes/feature.md
-- templates/tasks.md
+- formats/tasks.md
 reads:
 - modes/feature.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: A later session continues a plan; read the requirements and the plan first, do task 3 without changing the public
   signatures the requirements protect, and mark it done only after its check passes.

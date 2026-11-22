@@ -25,5 +25,5 @@ def test_reading_skill_md_loads_it() -> None:
     """Reading or printing the installed SKILL.md counts; another file of the skill or the repository does not."""
     assert loaded.loaded([assistant("Read", {"file_path": f"{SKILL_DIR}/SKILL.md"})], "write-better")
     assert loaded.loaded([assistant("Bash", {"command": f"cat {SKILL_DIR}/SKILL.md"})], "write-better")
-    assert not loaded.loaded([assistant("Read", {"file_path": f"{SKILL_DIR}/templates/x.md"})], "write-better")
+    assert not loaded.loaded([assistant("Read", {"file_path": f"{SKILL_DIR}/formats/x.md"})], "write-better")
     assert not loaded.loaded([assistant("Read", {"file_path": "/work/SKILL.md"})], "write-better")

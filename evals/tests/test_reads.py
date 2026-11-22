@@ -29,7 +29,7 @@ def test_files_read_counts_only_read_tool_calls_that_did_not_fail() -> None:
         assistant(
             ("Read", {"file_path": f"{SKILL_DIR}/modes/feature.md"}),
             ("Read", {"file_path": f"{SKILL_DIR}/SKILL.md"}),
-            ("Bash", {"command": f"cat {SKILL_DIR}/templates/specs.md"}),
+            ("Bash", {"command": f"cat {SKILL_DIR}/formats/specs.md"}),
             ("Read", {"file_path": "/work/README.md"}),
             ("Read", {"file_path": "/home/agent/.claude/skills/other/modes/bug-fix.md"}),
             ("Read", {"file_path": f"{SKILL_DIR}/modes/refactor.md"}),
@@ -48,14 +48,14 @@ def test_files_read_counts_only_read_tool_calls_that_did_not_fail() -> None:
 
 def test_track_accepts_any_alternative() -> None:
     """An entry with alternatives is met by any one of them; missing entries are listed by label."""
-    expected = [["modes/feature.md", "modes/bug-fix.md"], "agents/verifier.md", "templates/next-steps.md"]
+    expected = [["modes/feature.md", "modes/bug-fix.md"], "agents/verifier.md", "formats/next-steps.md"]
     tracked = reads.track(expected, {"modes/bug-fix.md": reads.MAIN, "agents/verifier.md": reads.SUB_AGENT})
     assert tracked["expected"] == [
         "modes/feature.md or modes/bug-fix.md",
         "agents/verifier.md",
-        "templates/next-steps.md",
+        "formats/next-steps.md",
     ]
-    assert tracked["missing"] == ["templates/next-steps.md"]
+    assert tracked["missing"] == ["formats/next-steps.md"]
 
 
 READ_CALL = ToolCall(id="1", function="Read", arguments={"file_path": f"{SKILL_DIR}/modes/bug-fix.md"})
@@ -145,7 +145,7 @@ async def test_judge_says_not_read(monkeypatch: pytest.MonkeyPatch) -> None:
 
 async def test_judge_asked_once_for_every_alternative_of_each_missing_entry(monkeypatch: pytest.MonkeyPatch) -> None:
     """One call per sample: it lists the alternatives of each missing entry, not the entries the script found."""
-    stub = StubJudge("modes/bug-fix.md: NOT READ\nmodes/feature.md: READ\ntemplates/specs.md: NOT READ")
+    stub = StubJudge("modes/bug-fix.md: NOT READ\nmodes/feature.md: READ\nformats/specs.md: NOT READ")
     found = ChatMessageAssistant(
         content="",
         tool_calls=[ToolCall(id="9", function="Read", arguments={"file_path": f"{SKILL_DIR}/agents/verifier.md"})],
@@ -154,10 +154,10 @@ async def test_judge_asked_once_for_every_alternative_of_each_missing_entry(monk
         [found],
         stub=stub,
         monkeypatch=monkeypatch,
-        expected=[["modes/bug-fix.md", "modes/feature.md"], "agents/verifier.md", "templates/specs.md"],
+        expected=[["modes/bug-fix.md", "modes/feature.md"], "agents/verifier.md", "formats/specs.md"],
     )
     assert len(stub.prompts) == 1 and "agents/verifier.md" not in stub.prompts[0].split("Transcript")[0]
-    assert result.metadata["missing"] == ["templates/specs.md"] and result.metadata["judge_read"] == [
+    assert result.metadata["missing"] == ["formats/specs.md"] and result.metadata["judge_read"] == [
         "modes/feature.md"
     ]
 

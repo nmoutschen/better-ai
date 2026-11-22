@@ -4,7 +4,7 @@ source:
 - SKILL.md#6.1
 reads:
 - agents/worker.md
-- templates/board.md
+- formats/board.md
 situation: 'A fresh research run on the planted wiki export, in a harness with sub-agents. The agent coordinates: it seeds
   the questions, then starts worker sub-agents with the filled-in agents/worker.md, and does not research the questions itself.
   A script checks that claims are on the board and that none has a coordinator ID; the judge checks in the transcript who

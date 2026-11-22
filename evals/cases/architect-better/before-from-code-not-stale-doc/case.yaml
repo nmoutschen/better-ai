@@ -4,7 +4,7 @@ source:
 - modes/design.md
 reads:
 - modes/design.md
-- templates/records.md
+- formats/records.md
 situation: 'docs/architecture.md is out of date: it says the shop API sends the order confirmation email straight to
   MailRelay before it answers, with no outbox and no email job. The code says otherwise: shop/api.py calls
   outbox.enqueue in the order transaction, shop/outbox.py writes an outbox row, jobs/send_emails.py (cron, every minute)

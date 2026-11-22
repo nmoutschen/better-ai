@@ -4,7 +4,7 @@ source:
 - modes/design.md
 reads:
 - modes/design.md
-- templates/records.md
+- formats/records.md
 situation: 'A fresh design request on the base shop: a staff admin page to mark orders as posted (a new page, a new kind of user, a new
   flow, so it adds structure). The request answers the
   costly gaps (who sees what, nothing new stored, what the user sees on failure, no new paid service), so a run reaches

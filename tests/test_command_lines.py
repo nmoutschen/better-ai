@@ -137,7 +137,7 @@ class CommandLines(unittest.TestCase):
                     self.assertIsNone(re.search(r"--text\s+[\"']", line))
 
     def test_the_command_table_of_show_better_names_commands_only(self):
-        text = (SKILLS / "show-better" / "templates" / "spec.md").read_text()
+        text = (SKILLS / "show-better" / "formats" / "spec.md").read_text()
         block = text.split("```")[1]
         self.assertIn("better.pyz create", block)
         self.assertNotIn("#", block)

@@ -1,4 +1,6 @@
-# Presentation spec
+# Slides spec
+
+The spec is one record, type `slides`. MAKE the unit with `create`, which takes the spec on stdin, and CHANGE it with `set`; the commands below are the ones you use on it.
 
 ```
 python3 <skill dir>/scripts/better.pyz create .show/SLUG --by AGENT
