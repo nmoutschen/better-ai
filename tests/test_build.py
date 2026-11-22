@@ -226,9 +226,9 @@ class TestBuild(BuildTestCase):
     def test_the_pyz_runs_with_python_dash_i_from_a_copy_of_its_skill_folder_alone(self):
         # S67: built on 3.12+, run on every Python we have
         self.repo.build()
-        interpreters = [sys.executable, *([PY310] if Path(PY310).exists() else [])]
+        interpreters = list(dict.fromkeys([sys.executable, *([PY310] if Path(PY310).exists() else [])]))
         for python in interpreters:
-            copy = self.tmp / "copy" / Path(python).name
+            copy = self.tmp / "copy" / str(interpreters.index(python))
             shutil.copytree(self.repo.root / "skills" / "alpha-better", copy)
             result = subprocess.run(
                 [python, "-I", str(copy / "scripts" / "better.pyz"), "--help"], capture_output=True, text=True, cwd=copy
@@ -290,6 +290,8 @@ class TestCheck(BuildTestCase):
         self.assertNotIn("stale", err)
 
     def test_two_builds_that_differ_are_not_reproducible(self):
+        if sys.version_info < (3, 12):
+            self.skipTest("imports tools/build.py, which needs Python 3.12 or later")
         self.built_repo()
         spec = importlib.util.spec_from_file_location("build_under_test", BUILD)
         build = importlib.util.module_from_spec(spec)

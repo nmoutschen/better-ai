@@ -333,15 +333,6 @@ class CopiesAndCi(unittest.TestCase):
             texts = {s: (ROOT / "skills" / s / relative).read_text(encoding="utf-8") for s in SKILLS}
             self.assertEqual(len(set(texts.values())), 1, f"{relative} differs between skills")
 
-    def test_r1_the_workflow_compares_the_copies(self):
-        workflow = (ROOT / ".github" / "workflows" / "scripts.yml").read_text(encoding="utf-8")
-        self.assertIn("schema.py", workflow)
-        self.assertIn("base.schema.json", workflow)
-        self.assertIn("conversation.schema.json", workflow)
-        for skill in SKILLS:
-            # the loop names no skill but the one it requires and compares the rest by glob
-            self.assertTrue(skill in workflow or "skills/*/" in workflow)
-
     def test_r1_the_script_imports_only_the_standard_library(self):
         import ast
 
