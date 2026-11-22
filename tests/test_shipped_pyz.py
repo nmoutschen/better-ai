@@ -37,7 +37,10 @@ class ShippedPyz(unittest.TestCase):
     def test_each_skill_ships_one_pyz_and_it_lists_exactly_its_verbs(self):
         for skill, verbs in VERBS.items():
             with self.subTest(skill=skill):
-                self.assertEqual([p.name for p in (ROOT / "skills" / skill / "scripts").iterdir()], ["better.pyz"])
+                tracked = subprocess.run(
+                    ["git", "ls-files", f"skills/{skill}/scripts"], cwd=ROOT, capture_output=True, text=True, check=True
+                ).stdout.split()
+                self.assertEqual(tracked, [f"skills/{skill}/scripts/better.pyz"])  # untracked caches do not ship
                 done = self.help_of(sys.executable, skill)
                 self.assertEqual(done.returncode, 0, done.stderr)
                 self.assertRegex(done.stdout.splitlines()[0], rf"^better\.pyz {skill} [0-9a-f]{{16}}$")
