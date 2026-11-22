@@ -24,10 +24,6 @@ IF a field is missing, SAY so in the output and review what you have.
 - `decided`: <each decision the user has made about the interface or its design language, one per line>
 - `review`: <interface, design language, or both>
 
-## Messages
-
-None. PUT everything in the output.
-
 ## What to do
 
 1. READ the brief. REVIEW against it, not against your own idea of what the interface should do.

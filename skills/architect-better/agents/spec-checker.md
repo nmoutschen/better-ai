@@ -22,10 +22,6 @@ IF a field is missing, SAY so in the output and check what you have.
 - `request`: <path of architect.json, whose `request.text` is the request>
 - `requirements`: <path of requirements.jsonl>
 
-## Messages
-
-None. PUT everything in the output.
-
 ## What to look for
 
 - From the sources to the spec: every MUST or MUST NOT that the design, the decisions, the request or the requirements state or imply, including the error and edge cases they leave open, has a requirement. A design item that needs none has a reason why.

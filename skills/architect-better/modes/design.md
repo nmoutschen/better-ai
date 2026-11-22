@@ -67,15 +67,16 @@ READ and FOLLOW [../templates/design.md](../templates/design.md) for the convent
 
 PICK the perspectives that apply, from what the change touches and the applicable repo standards:
 
-| Perspective | What to check |
-|---|---|
-| Security | Use STRIDE on the assets, trust boundaries and flows where harm would be greatest, not on every part. Check the impact and the proposed mitigation. |
-| Observability | Check how operators detect and diagnose failures on the affected paths. |
-| API standards | Check contracts, failure responses and compatibility against the applicable standards. |
-| Data and privacy | Check what data moves, who can access it and what persists. |
-| Repo standards | Check each applicable repo standard where the change touches it. |
+| Perspective (`id`) | Applies when the change | Reviewer |
+|---|---|---|
+| Security (`security`, method STRIDE) | adds or changes an entry point, a trust boundary, an identity or secret, a language model or agent, or a part tenants share | [../agents/security.md](../agents/security.md) |
+| Data and privacy (`data-and-privacy`, method LINDDUN) | collects, derives, moves, keeps, logs or deletes data about people | [../agents/data-and-privacy.md](../agents/data-and-privacy.md) |
+| Failure handling (`failure-handling`) | adds or changes a call, message or write that crosses a process or network boundary | [../agents/failure-handling.md](../agents/failure-handling.md) |
+| Observability (`observability`) | adds or changes a flow, job or part that someone must operate | [../agents/observability.md](../agents/observability.md) |
+| API standards (`api-standards`) | adds or changes an interface others depend on: an API, a library, a CLI, an event or a file format | [../agents/api-standards.md](../agents/api-standards.md) |
+| Each repo standard (its own `id`) | touches what the standard covers | [../agents/repo-standards.md](../agents/repo-standards.md), one reviewer per standard |
 
-WRITE every perspective of the table and every applicable repo standard as a record of `perspectives.jsonl`, with an `id` such as `security`, whether it applies and why, and where it comes from: `built_in` (with its `method`, such as STRIDE, if it has one), or `standard` with the standard's `file`. KEEP unresolved questions in the design and conversation.
+WRITE every perspective of the table and every applicable repo standard as a record of `perspectives.jsonl`, with its `id`, whether it applies and why, and where it comes from: `built_in` (with its `method`, such as STRIDE, if it has one), or `standard` with the standard's `file`. KEEP unresolved questions in the design and conversation.
 
 ## 5. Debate and iterate in the page
 
@@ -85,7 +86,7 @@ UPDATE the files and rendered views as the user corrects the design. WHEN the us
 
 ## 6. Review the approved design
 
-WHEN the user chooses Approve…, READ and FOLLOW [../agents/perspective-reviewer.md](../agents/perspective-reviewer.md). FILL IN its inputs and START one fresh reviewer per applicable perspective on the approved design. WRITE its `look_for` from that perspective's row of the table in step 4, the applicable standards and what the change touches. WRITE its `decided` from the constraints and preferences the user stated, such as the records of `requirements.jsonl` with source `user`, not from the design's own decisions.
+WHEN the user chooses Approve…, START one fresh reviewer per applicable perspective on the approved design: READ and FOLLOW the perspective's reviewer from the table in step 4, and FILL IN its inputs. WRITE its `scenarios` from the scenarios of `requirements.jsonl` that reach what the perspective covers, up to five, the most harmful first. WHEN fewer than three do, WRITE scenarios up to three and MARK each "(added)". GIVE a reviewer in `standards` only the standards that have no reviewer of their own. WRITE its `context` with the facts the review needs that the design does not show, such as where the system runs or which data is personal, not your verdict on the design or the problems you expect. WRITE its `decided` from the constraints and preferences the user stated, such as the records of `requirements.jsonl` with source `user`, not from the design's own decisions.
 
 WAIT for every report. HOLD changes and user replies about the reviewed design while the reviewers run. THEN RUN `python3 scripts/architect.py review <folder> --perspectives <id>...` with the ids of the perspectives run.
 
@@ -97,6 +98,6 @@ DEBATE findings in the page and UPDATE the design where needed. WHEN the user di
 
 WHEN the approved design and its review are settled, WRITE each decision of `design.md` worth recording as a record of `decisions.jsonl`. WRITE each of these decisions in the decision record location, in the repo's decision record format when it has one: NAME the file as the repo names its records, KEEP its sections and PUT the drivers, rejected alternatives and main drawback within them. OTHERWISE, READ and FOLLOW [../templates/decision.md](../templates/decision.md) and NAME the file `<id>.md`.
 
-READ and FOLLOW [../templates/specs.md](../templates/specs.md) to extract the spec from the design and decisions. WRITE each requirement as a record of `spec.jsonl`, with the `S<n>` as its `id`, its `statement` and its source: the `section` of the design, a request `sentence`, a `decision` id or a `requirement` id. WHEN the repo keeps its specs in a spec format or tool, WRITE the spec there too, in its format. OTHERWISE RUN `python3 scripts/architect.py specs <folder> --out <spec location>/specs.md`: it writes `specs.md` from `spec.jsonl`, marked as generated. NEVER edit that file by hand; change `spec.jsonl` and run the command again.
+READ and FOLLOW [../templates/specs.md](../templates/specs.md) to extract the spec from the design and decisions. INCLUDE each check the reviewers listed under "Checks once built" for behaviour the design states, with that design `section` as its source. WRITE each requirement as a record of `spec.jsonl`, with the `S<n>` as its `id`, its `statement` and its source: the `section` of the design, a request `sentence`, a `decision` id or a `requirement` id. WHEN the repo keeps its specs in a spec format or tool, WRITE the spec there too, in its format. OTHERWISE RUN `python3 scripts/architect.py specs <folder> --out <spec location>/specs.md`: it writes `specs.md` from `spec.jsonl`, marked as generated. NEVER edit that file by hand; change `spec.jsonl` and run the command again.
 
 READ and FOLLOW [../agents/spec-checker.md](../agents/spec-checker.md). FILL IN its inputs and START a separate checker. WAIT for its report. HOLD spec edits and hand-back while it runs. FIX each confirmed blocking finding, THEN START a new checker on the revised spec. DO this at most twice. STOP and CARRY the open findings into the hand-back WHEN the same finding comes back. ASK the user to settle each link the checker lists as unconfirmed. CARRY unresolved links into the hand-back.

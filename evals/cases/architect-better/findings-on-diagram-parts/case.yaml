@@ -2,10 +2,10 @@ id: findings-on-diagram-parts
 rule: attach-findings-to-parts
 source:
 - modes/design.md
-- agents/perspective-reviewer.md
+- agents/security.md
 reads:
 - modes/design.md
-- agents/perspective-reviewer.md
+- agents/security.md
 - scripts/example/README.md
 situation: >-
   The change folder docs/designs/2026-11-order-export/ holds an order-history export design the user approved in the

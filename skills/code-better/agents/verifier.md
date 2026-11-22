@@ -29,10 +29,6 @@ IF a field is missing, SAY so in the output and review what you have.
 - `lessons`: <path of `.code/<change>/lessons.jsonl`, or "none">
 - `log`: <path of your log, `.code/<change>/logs/<agent name>.jsonl`, or none>
 
-## Messages
-
-None. PUT everything in the output.
-
 ## Log
 
 IF `log` is given and not none, a dashboard shows the user your work from it, on a card marked verifier for `task`. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/dashboard.py log <change folder> <agent name> <type> "<text>" [--result <result>]`, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. NEVER write a line by hand or type a time: the command stamps it, and it refuses a line that does not check. WRITE `text` as one short sentence. ADD, by `type`:

@@ -4,7 +4,7 @@ source:
 - modes/audit.md
 reads:
 - modes/audit.md
-- agents/perspective-reviewer.md
+- agents/security.md
 situation: 'docs/designs/2026-03-gift-cards/design.md (status built) says gift card codes are 16 random characters from
   secrets.token_urlsafe and the code is emailed through the outbox. The code diverges: shop/giftcards.py new_code() uses
   random.choices over 36 characters with k=8, and shop/api.py buy_gift_card() returns the code in the 201 response of

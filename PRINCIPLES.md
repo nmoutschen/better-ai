@@ -191,7 +191,7 @@ edits: <true | false — whether it may change the work it is given>
 model: <cheaper | same | most capable — relative to the agent that starts it>
 ```
 
-AFTER the frontmatter, an agent file HAS these sections, in this order: `## Input`, the named fields the starting agent fills in, each required; `## Messages`, what it tells the starting agent while it works, in plain words, or "None"; `## Output`, what its one hand-back must contain. The input is strict, because the agent sees nothing else. Messages and output are plain language, because how agents talk depends on the harness: the starting agent's skill or mode SAYS how it acts on each kind of message and each outcome.
+AFTER the frontmatter, an agent file HAS these sections, in this order: `## Input`, the named fields the starting agent fills in, each required; `## Messages`, only when the agent sends messages while it works or is limited in the messages it may send or act on: what it tells the starting agent, in plain words; `## Output`, what its one hand-back must contain. The input is strict, because the agent sees nothing else. Messages and output are plain language, because how agents talk depends on the harness: the starting agent's skill or mode SAYS how it acts on each kind of message and each outcome.
 
 ### 6.10. Store agent files as typed JSON
 
