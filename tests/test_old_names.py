@@ -7,9 +7,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OLD = re.compile(r"(?<![\w])(architect|dashboard|board|canvas|show|diagram|page|schema)\.py\b")
 # Planted project files that the eval cases ask an agent to edit; they are not the skills' scripts.
-PLANTED = ("evals/cases/code-better/reuse-http-helper/", "evals/cases/code-better/shared-formatter/")
+PLANTED = ("evals/cases/code-better/reuse-http-helper/",)
 SKIP = {".venv", "__pycache__", "node_modules", ".git"}
-TEXT = {".md", ".yaml", ".yml", ".py", ".json", ".jsonl", ".txt", ".toml"}
+TEXT = {".md", ".yaml", ".yml", ".py", ".json", ".jsonl", ".txt", ".toml", ".html", ".css", ".js", ".csv", ".sh"}
 
 
 def files():

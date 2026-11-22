@@ -12,7 +12,7 @@ if not decisions:
     fail("no decision in decisions.jsonl")
 for did, d in decisions.items():
     if all(not none(d.get(k)) for k in ("asked", "default", "deadline")) and d.get("status") in (
-            "waiting", "defaulted", "answered", "decided"):
+            "waiting", "defaulted", "answered"):
         print(f"{did}: {d['asked'][:60]}")
         break
 else:
