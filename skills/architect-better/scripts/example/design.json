@@ -50,13 +50,13 @@
     "id": "change",
     "label": ".code/<change>/",
     "kind": "files",
-    "detail": "specs.md, tasks.md, decisions/"
+    "detail": "spec.jsonl, tasks.jsonl, decisions.jsonl"
    },
    {
     "id": "logs",
     "label": "Agent logs",
     "kind": "files",
-    "detail": "logs/<agent>.md and .json",
+    "detail": "logs/<agent>.jsonl and .card.json",
     "in": [
      "after"
     ]
@@ -69,7 +69,7 @@
    },
    {
     "id": "notes",
-    "label": "progress.md",
+    "label": "progress.jsonl",
     "kind": "file",
     "detail": "status for you to read (invented for this demo)",
     "in": [
@@ -259,7 +259,7 @@
      "id": "s2",
      "from": "coord",
      "to": "dec",
-     "label": "write decisions/D-3.md, status waiting",
+     "label": "write D-3 to decisions.jsonl, status waiting",
      "in": [
       "after"
      ],
@@ -404,7 +404,7 @@
      "id": "f2s3",
      "from": "server",
      "to": "logs",
-     "label": "read logs/<agent>.json",
+     "label": "read logs/<agent>.card.json",
      "kind": "request",
      "in": [
       "after"
@@ -414,7 +414,7 @@
      "id": "f2s4",
      "from": "server",
      "to": "change",
-     "label": "read tasks.md, decisions/",
+     "label": "read tasks.jsonl, decisions.jsonl",
      "kind": "request",
      "in": [
       "after"

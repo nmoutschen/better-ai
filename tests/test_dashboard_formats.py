@@ -345,6 +345,19 @@ class StatusRules(unittest.TestCase):
 
 
 class Dashboard(unittest.TestCase):
+    def test_the_page_is_named_by_the_goal_of_code_json_else_by_the_folder(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            self.assertEqual(dashboard.load(folder)["name"], "Uploads fail loudly")
+            write(folder, "code.json", [{**code(), "goal": "  Export invoices as CSV  \nand more"}], as_json=True)
+            self.assertEqual(dashboard.load(folder)["name"], "Export invoices as CSV")
+            write(folder, "code.json", [{**code(), "mode": "nonsense"}], as_json=True)  # invalid
+            self.assertEqual(dashboard.load(folder)["name"], "c")
+            (folder / "code.json").write_text("{not json", encoding="utf-8")
+            self.assertEqual(dashboard.load(folder)["name"], "c")
+            (folder / "code.json").unlink()
+            self.assertEqual(dashboard.load(folder)["name"], "c")
+
     def test_a_folder_with_one_bad_task_still_shows_every_other_task(self):
         with tempfile.TemporaryDirectory() as d:
             tasks = [task("T1"), task("T2", status="in review"), task("T3", status="built")]
