@@ -11,6 +11,11 @@ from ..schema import Context, hook
 PAGE = "index.html"  # what `render` writes in the unit: no version may be this file
 
 
+def is_page(path: str | None) -> bool:
+    """True when `path` is, or on a case-insensitive file system may be, the index.html that `render` writes."""
+    return isinstance(path, str) and path.casefold() == PAGE
+
+
 def version_path(file: Any) -> str | None:
     """The unit-relative path a version's `file` names, or None when it does not name a path inside the unit."""
     if not isinstance(file, str) or not file or "\0" in file or "\\" in file:
@@ -35,7 +40,7 @@ def unit_of(directory) -> paths.Unit:
 
 def version_problem(unit: paths.Unit, path: str) -> str | None:
     """Why a version's file cannot be read as `render` reads it (the same `paths.read_bytes`), or None."""
-    if path == PAGE:
+    if is_page(path):
         return f"{PAGE} is the compare page render writes: rename the version"
     try:
         paths.read_bytes(unit, path)

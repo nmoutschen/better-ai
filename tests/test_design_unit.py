@@ -108,6 +108,15 @@ class Unit(unittest.TestCase):
         self.assertIn("index.html", done.stderr)
         self.assertEqual((self.folder / "index.html").read_text(), "<p>my own page</p>")
 
+    def test_a_version_whose_name_differs_from_index_html_only_by_case_is_refused(self):
+        # On a case-insensitive file system (macOS by default) Index.html and index.html are one file.
+        for name in ("Index.html", "INDEX.HTML"):
+            with self.subTest(name=name):
+                head = {**HEAD, "versions": [{"label": "A", "file": name}, {"label": "B", "file": "b.html"}]}
+                done = self.create(head)
+                self.assertEqual(done.returncode, 1)
+                self.assertIn("index.html is the compare page render writes", done.stdout + done.stderr)
+
     def test_a_symlinked_version_is_refused_by_check_as_render_refuses_it(self):
         (self.folder / "link.html").symlink_to(self.folder / "a.html")
         head = {**HEAD, "versions": [{"label": "A", "file": "link.html"}, {"label": "B", "file": "b.html"}]}
