@@ -43,7 +43,6 @@ sys.path.insert(0, str(HERE))
 import sweep  # noqa: E402
 import test_architect_formats as architects  # noqa: E402
 import test_board_formats as boards  # noqa: E402
-import test_dashboard_formats as dashboards  # noqa: E402
 import test_page as pages  # noqa: E402
 import test_show_schema as shows  # noqa: E402
 
@@ -217,17 +216,6 @@ def diagram_commands(root: Path) -> list:
     ]
 
 
-def dashboard_commands(root: Path) -> list:
-    folder = dashboards.change(root)
-    return [
-        ["check", folder],
-        ["pending", folder],
-        ["reply", folder, "hello"],
-        ["status", folder, "seen", "m-1"],
-        ["wait", folder, "--timeout", "0.1"],
-    ]
-
-
 def board_folder(root: Path) -> Path:
     folder = root / "board"
     folder.mkdir()
@@ -300,14 +288,12 @@ def folder_with_a_reply(skill: str, root: Path) -> Path:
 
 PROGRAMS = {
     "architect-better": "architect.py",
-    "code-better": "dashboard.py",
     "research-better": "board.py",
     "show-better": "show.py",
     "design-better": "canvas.py",
 }
 SCHEMA_FOLDERS = {
     "architect-better": lambda root: architects.make_folder(root),
-    "code-better": lambda root: dashboards.change(root),
     "research-better": board_folder,
     "show-better": lambda root: folder_with_a_reply("show-better", root),
     "design-better": lambda root: folder_with_a_reply("design-better", root),
@@ -321,7 +307,6 @@ def schema_commands(skill: str, root: Path) -> list:
 COMMANDS = {
     "architect-better/architect.py": architect_commands,
     "architect-better/diagram.py": diagram_commands,
-    "code-better/dashboard.py": dashboard_commands,
     "research-better/board.py": board_commands,
     "show-better/show.py": show_commands,
     "design-better/canvas.py": canvas_commands,
@@ -475,7 +460,6 @@ class Wrapper(unittest.TestCase):
         try:
             for script, command, build in (
                 ("architect-better/architect.py", "serve", architect_serving),
-                ("code-better/dashboard.py", "watch", dashboard_serving),
                 ("research-better/board.py", "watch", board_serving),
             ):
                 with self.subTest(script=script), tempfile.TemporaryDirectory() as d:
@@ -513,7 +497,7 @@ class Wrapper(unittest.TestCase):
 
     def test_every_script_that_runs_as_a_program_calls_one_wrapped_entry_point(self):
         scripts = scripts_with_main()
-        self.assertGreaterEqual(len(scripts), 11)  # architect, diagram, dashboard, board, show, canvas, five schema
+        self.assertGreaterEqual(len(scripts), 9)  # architect, diagram, board, show, canvas, four schema
         for path in scripts:
             with self.subTest(script=name_of(path)):
                 entry, problems = entry_of(path)
@@ -587,11 +571,6 @@ def architect_serving(root: Path) -> tuple:
     return (folder, 0, False), folder
 
 
-def dashboard_serving(root: Path) -> tuple:
-    folder = dashboards.change(root)
-    return (folder, 0, False), folder
-
-
 def board_serving(root: Path) -> tuple:
     folder = board_folder(root)
     return (folder, 0, False, 0.0), folder
@@ -610,7 +589,6 @@ def canvas_serving(root: Path) -> tuple:
 # script -> (the function that starts the server, what it is given on a fresh folder, the events the page sends)
 HANDLERS = {
     "architect-better/architect.py": ("serve", architect_serving, "architect"),
-    "code-better/dashboard.py": ("watch", dashboard_serving, "dashboard"),
     "research-better/board.py": ("watch", board_serving, "board"),
     "show-better/show.py": ("serve", show_serving, "show"),
     "design-better/canvas.py": ("serve", canvas_serving, "canvas"),
@@ -621,7 +599,6 @@ PATHS = [
     "/listening",
     "/events?after=0",
     "/wait?after=0",
-    "/dashboard.json",
     "/board.json",
     "/design.json",
     "/rev",
@@ -859,12 +836,10 @@ class ServedBrokenFiles(unittest.TestCase):
 # skill -> (script, how to build a folder, the loader's answer for a folder)
 LOADERS = {
     "architect-better": ("architect.py", lambda root: architects.make_folder(root), lambda m, f: m.load(f)),
-    "code-better": ("dashboard.py", lambda root: dashboards.change(root), lambda m, f: m.load(f)),
     "research-better": ("board.py", board_folder, lambda m, f: m.load(f)),
 }
 CONVERSATIONS = {
     "architect-better": ("architect.py", lambda root: architects.make_folder(root)),
-    "code-better": ("dashboard.py", lambda root: dashboards.change(root)),
     "research-better": ("board.py", board_folder),
     "show-better": ("show.py", lambda root: folder_with_a_reply("show-better", root)),
     "design-better": ("canvas.py", lambda root: folder_with_a_reply("design-better", root)),
@@ -1049,7 +1024,6 @@ PAGE_SKILLS = {
     "canvas": "design-better",
     "show": "show-better",
     "board": "research-better",
-    "dashboard": "code-better",
 }
 AT = "2026-11-21T10:00:00Z"
 
@@ -1060,10 +1034,6 @@ def example_records() -> list:
     for kind in architects.KINDS:
         for title, record in architects.examples(kind):
             found.append(("architect-better", f"{kind}: {title}", kind, record))
-    for kind, (_, relative) in dashboards.KINDS.items():
-        for title, record in dashboards.examples(kind):
-            found.append(("code-better", f"{kind}: {title}", relative, record))
-    found.append(("code-better", "audit header", dashboards.AUDIT[1], dashboards.audit_header()))
     for kind, items in boards.EXAMPLES.items():
         sample = kind.replace("<id>", "X-1").replace("<agent>", "agent")
         for item in items:
@@ -1169,9 +1139,7 @@ class Surrogates(unittest.TestCase):
                 files = [p for p in folder_files(folder) if p.suffix in (".json", ".jsonl")]
                 target = next((p for p in files if p.name != "conversation.jsonl"), files[0])
                 put_in(folder / target, "surrogate", 0)
-                for script in ("schema.py", "dashboard.py" if skill == "code-better" else None):
-                    if script is None:
-                        continue
+                for script in ("schema.py",):
                     run = subprocess.run(
                         [sys.executable, "-I", str(SKILLS / skill / "scripts" / script), "check", str(folder)],
                         capture_output=True,
@@ -1226,7 +1194,6 @@ class DeepInput(unittest.TestCase):
     def commands(self, root: Path, nested: str) -> dict:
         """The commands to run, by label, each on a file or folder that holds `nested` in one place."""
         show = SKILLS / "show-better" / "scripts"
-        code = SKILLS / "code-better" / "scripts"
         research = SKILLS / "research-better" / "scripts"
         commands = {}
         for where, in_panel in (("document", False), ("body", True)):
@@ -1239,13 +1206,6 @@ class DeepInput(unittest.TestCase):
         slides.mkdir()
         (slides / "conversation.jsonl").write_text('{"type":"note","id":"m-1","text":' + nested + "}\n")
         commands["show pending"] = [show / "show.py", "pending", slides]
-
-        folder = dashboards.change(root / "dash")
-        with (folder / "tasks.jsonl").open("a") as f:
-            f.write('{"type":"task","id":"T9","x":' + nested + "}\n")
-        commands["dashboard check"] = [code / "dashboard.py", "check", folder]
-        commands["dashboard pending"] = [code / "dashboard.py", "pending", folder]
-        commands["schema check dashboard"] = [code / "schema.py", "check", folder]
 
         board = root / "board"
         board.mkdir()

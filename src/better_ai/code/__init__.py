@@ -1,7 +1,8 @@
 """code-better: units are `.code/<change>/` (headed by `code.json`) and `.code/audit/<date>/` (`audit.json`)."""
 
+from .. import page
 from ..skill import Skill, UnitKind
-from . import checks  # noqa: F401  (registers the hooks the schemas name)
+from . import checks, hooks  # noqa: F401  (register the hooks the schemas and the commands name)
 
 SKILL = Skill(
     name="code-better",
@@ -12,3 +13,7 @@ SKILL = Skill(
     ),
     exclude=".code/",
 )
+
+from . import dashboard  # noqa: E402  (registers `render`)
+
+page.register(SKILL, dashboard.SPEC)

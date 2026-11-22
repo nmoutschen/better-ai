@@ -193,7 +193,30 @@ def resolve_unit(argument: str, skill: Skill, *, creating: bool = False) -> Unit
         if owner and owner != skill.name:
             raise refusal(shown, f"it belongs to {owner}, not to {skill.name}", f"run it with {owner}'s better.pyz")
         raise refusal(shown, f"no {kind.head} here", f"run create {shown} --by <your name>")
+    for guard in UNIT_GUARDS.get(skill.name, []):
+        guard(unit)
     return unit
+
+
+UNIT_GUARDS: dict[str, list] = {}
+
+
+def unit_guard(skill: str):
+    """Register a check a skill makes on every unit a verb other than `create` resolves (code-better: a change that
+    names a design folder but holds no copy of its spec). The function takes the `Unit` and raises `Refused`."""
+
+    def register(function):
+        UNIT_GUARDS.setdefault(skill, []).append(function)
+        return function
+
+    return register
+
+
+def read_repo_file(unit: Unit, relative: str) -> bytes:
+    """A file elsewhere in the unit's repository (a design folder's `spec.jsonl`), by its repo-relative path, under the
+    same rules as a file of the unit: no `..`, no symlink on the way, still inside the repository, opened with
+    O_NOFOLLOW. FileNotFoundError if it is not there."""
+    return read_bytes(Unit(unit.root, unit.root, unit.kind, unit.skill), relative)
 
 
 def _owner_by_location(parts: tuple[str, ...]) -> str | None:

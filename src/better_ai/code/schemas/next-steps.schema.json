@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "next-steps.schema.json",
   "title": "one line of next-steps.jsonl: one piece of work outside the change",
-  "$comment": "",
+  "$comment": "The record type was `step` before this change; those lines stay readable (x-old-format), and add resolves `step` only to agent logs.",
   "x-files": [
     "next-steps.jsonl"
   ],
@@ -22,7 +22,7 @@
   ],
   "properties": {
     "type": {
-      "const": "step"
+      "const": "next_step"
     },
     "at": {
       "$ref": "base.schema.json#/$defs/at"
@@ -113,12 +113,7 @@
                 "type": "string",
                 "pattern": "^S\\d+$",
                 "x-points-to": {
-                  "file": {
-                    "from": "code.json",
-                    "field": "design.folder",
-                    "name": "spec.jsonl",
-                    "else": "spec.jsonl"
-                  },
+                  "file": "spec.jsonl",
                   "type": "spec"
                 }
               }
@@ -211,6 +206,62 @@
         "asked",
         "dropped"
       ]
+    }
+  },
+  "x-old-format": [
+    {
+      "$ref": "#/$defs/old_step"
+    }
+  ],
+  "$defs": {
+    "old_step": {
+      "description": "before this change the record type was `step`",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "step",
+        "origin",
+        "if_nobody",
+        "done_when",
+        "priority",
+        "status"
+      ],
+      "properties": {
+        "type": {
+          "const": "step"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
+        "by": {
+          "$ref": "#/properties/by"
+        },
+        "id": {
+          "$ref": "#/properties/id"
+        },
+        "step": {
+          "$ref": "#/properties/step"
+        },
+        "origin": {
+          "$ref": "#/properties/origin"
+        },
+        "if_nobody": {
+          "$ref": "#/properties/if_nobody"
+        },
+        "done_when": {
+          "$ref": "#/properties/done_when"
+        },
+        "priority": {
+          "$ref": "#/properties/priority"
+        },
+        "status": {
+          "$ref": "#/properties/status"
+        }
+      }
     }
   }
 }

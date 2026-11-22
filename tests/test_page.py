@@ -396,11 +396,6 @@ VALID = {
         "note": {"id": "m-x", "text": "hi", "to": None},
         "answer": {"id": "a-x", "decision": "D1", "text": "Use the default.", "default": True},
     },
-    "dashboard": {
-        "comment": {"id": "c-x", "text": "why this agent?", "on": {"kind": "agent", "id": "b1", "title": "b1"}},
-        "note": {"id": "m-x", "text": "hi", "to": None},
-        "answer": {"id": "a-x", "decision": "D1", "text": "Business days.", "default": False},
-    },
 }
 # The records of the architect folder the architect page's events point to, by id.
 _BASE = {"at": "2026-11-21T10:00:00Z", "by": "architect"}
@@ -429,7 +424,6 @@ INVALID = {
     "canvas": ("comment", {**VALID["canvas"]["comment"], "text": None}, "verdict"),
     "show": ("comment", {**VALID["show"]["comment"], "on": {"part": "headline"}}, "slide"),
     "board": ("answer", {"id": "a-x", "text": "t", "default": False}, "decision"),
-    "dashboard": ("answer", {"id": "a-x", "decision": "D1", "text": "", "default": False}, "text"),
 }
 
 
@@ -443,7 +437,6 @@ class Pages(unittest.TestCase):
             "canvas": load("design-better", "canvas.py"),
             "show": load("show-better", "show.py"),
             "board": load("research-better", "board.py"),
-            "dashboard": load("code-better", "dashboard.py"),
         }
 
     def serve(self, module, folder):
@@ -653,57 +646,6 @@ class Scripts(unittest.TestCase):
             self.serve_and_talk(
                 [sys.executable, "-I", script, "watch", str(folder), "--no-browser"], folder, "board.json"
             )
-
-    def test_code_better_dashboard(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = Path(d)
-            script = str(ROOT / "skills" / "code-better" / "scripts" / "dashboard.py")
-            self.serve_and_talk(
-                [sys.executable, "-I", script, "watch", str(folder), "--no-browser"], folder, "dashboard.json"
-            )
-
-    def test_code_better_dashboard_page_and_answers(self):
-        """The dashboard serves its own page, and an answer to a question reaches `pending` with the decision it answers."""
-        with tempfile.TemporaryDirectory() as d:
-            folder = Path(d)
-            decision = {
-                "type": "decision",
-                "at": "2026-11-21T10:00:00Z",
-                "by": "coordinator",
-                "id": "D1",
-                "raised_by": "coordinator",
-                "about": {"type": "change"},
-                "asked": "Count weekends?",
-                "status": "waiting",
-            }
-            (folder / "decisions.jsonl").write_text(json.dumps(decision) + "\n")
-            script = str(ROOT / "skills" / "code-better" / "scripts" / "dashboard.py")
-            cmd = [sys.executable, "-I", script, "watch", str(folder), "--no-browser"]
-            server = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            try:
-                for _ in range(80):
-                    if (folder / ".server").exists():
-                        break
-                    time.sleep(0.1)
-                url = (folder / ".server").read_text().strip()
-                with urllib.request.urlopen(url, timeout=5) as r:
-                    self.assertIn("dashboard.json", r.read().decode())
-                with urllib.request.urlopen(url + "dashboard.json", timeout=5) as r:
-                    self.assertEqual(json.loads(r.read())["decisions"][0]["status"], "waiting")
-                params = {"id": "a1", "decision": "D1", "text": "Business days only.", "default": False}
-                body = {"jsonrpc": "2.0", "id": 1, "method": "answer", "params": params}
-                headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
-                request = urllib.request.Request(url + "rpc", data=json.dumps(body).encode(), headers=headers)
-                with urllib.request.urlopen(request, timeout=5) as r:
-                    self.assertEqual(json.loads(r.read())["result"], "saved")
-                out = subprocess.run(
-                    [sys.executable, "-I", script, "pending", str(folder)], capture_output=True, text=True
-                )
-                item = json.loads(out.stdout.splitlines()[0])
-                self.assertEqual((item["type"], item["decision"], item["status"]), ("answer", "D1", "new"))
-            finally:
-                server.send_signal(signal.SIGTERM)
-                server.communicate(timeout=10)
 
 
 if __name__ == "__main__":

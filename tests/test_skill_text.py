@@ -13,7 +13,6 @@ the schema check.
 Both skills: no text names an old script or `schemas/`, and no template line holds `at`, `by` or `id`.
 """
 
-import importlib.util
 import json
 import re
 import subprocess
@@ -281,19 +280,17 @@ class ResearchBetterText(unittest.TestCase):
 
 
 CODE_BETTER = ROOT / "skills" / "code-better"
-CODE_SCHEMAS = CODE_BETTER / "schemas"
+SRC = ROOT / "src"
+CODE_SCHEMAS = SRC / "better_ai" / "code" / "schemas"
+SHARED_SCHEMAS = SRC / "better_ai" / "schemas"
 CASES = ROOT / "evals" / "cases" / "code-better"
 
 
-def load_schema_module():
-    spec = importlib.util.spec_from_file_location("code_better_schema", CODE_BETTER / "scripts" / "schema.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules.setdefault("code_better_schema", module)
-    spec.loader.exec_module(module)
-    return module
+sys.path.insert(0, str(SRC))
+import better_ai.code  # noqa: E402,F401  (registers its hooks)
+from better_ai import resources, schema  # noqa: E402
 
-
-schema = load_schema_module()
+CODE_DOCS = schema.load_schemas(*resources.schema_sources("code"))
 
 CODE_TEXT_FILES = sorted(
     [CODE_BETTER / "SKILL.md"]
@@ -323,15 +320,16 @@ TEMPLATES = {
 
 # A shape a schema does not name with an if/then, but that a template must still show.
 EXTRA_SHAPES = {"tasks": [("reason", {"user"}), ("reason", {"repair limit"})]}
-
-
-# Until the schemas move into the command, the old ones name `step`, and no `default` or `deadline` on a decision.
-TYPE_ALIASES = {"next_step": "step"}
-NEW_FIELDS = {"default", "deadline"}
+# A shape of the shared decisions schema that only research-better's boards use.
+OTHER_SKILLS_SHAPES = {"decisions": [("type", {"board"})]}
 
 
 def read_schema(name: str) -> dict:
-    return json.loads((CODE_SCHEMAS / f"{name}.schema.json").read_text())
+    """The schema of code-better's own folder, or the shared one (decisions)."""
+    for folder in (CODE_SCHEMAS, SHARED_SCHEMAS):
+        if (folder / f"{name}.schema.json").is_file():
+            return json.loads((folder / f"{name}.schema.json").read_text())
+    raise FileNotFoundError(name)
 
 
 def walk(node):
@@ -351,11 +349,17 @@ def values_of(condition: dict) -> set:
     return set(condition.get("enum", []))
 
 
+def without_old_formats(doc: dict) -> dict:
+    """The schema without the shapes it keeps readable from before this change (`$defs` named `old_*`)."""
+    kept = {name: node for name, node in doc.get("$defs", {}).items() if not name.startswith("old_")}
+    return {**doc, "$defs": kept}
+
+
 def shapes(doc: dict) -> list[tuple[str, set]]:
     """The (field, values) a record's shape depends on: a field an if/then in the schema tests, whose then adds or
     forbids fields, with the values that give the same shape together; and each value of the top-level type."""
     found: list[tuple[str, set]] = []
-    for node in walk(doc):
+    for node in walk(without_old_formats(doc)):
         for item in node.get("allOf", []) if isinstance(node.get("allOf"), list) else []:
             then = item.get("then")
             if not isinstance(item, dict) or "if" not in item or not isinstance(then, dict):
@@ -436,12 +440,11 @@ class CodeBetterTextTest(unittest.TestCase):
         """One placeholder line per record type and status shape of each schema, as JSON, with only schema fields."""
         problems = []
         for template, names in TEMPLATES.items():
-            lines = [
-                dict(line, type=TYPE_ALIASES.get(line["type"], line["type"])) for line in placeholder_lines(template)
-            ]
+            lines = placeholder_lines(template)
             for name in names:
                 doc = read_schema(name)
-                wanted = shapes(doc) + EXTRA_SHAPES.get(name, [])
+                wanted = [w for w in shapes(doc) if w not in OTHER_SKILLS_SHAPES.get(name, [])]
+                wanted += EXTRA_SHAPES.get(name, [])
                 for field, values in wanted:
                     if not any(holds(line, field, values) for line in lines):
                         problems.append(f"templates/{template}: no line with {field} {sorted(values)} for {name}")
@@ -449,7 +452,7 @@ class CodeBetterTextTest(unittest.TestCase):
                 if not own:
                     problems.append(f"templates/{template}: no line of type {sorted(type_values(doc))}")
                 for line in own:
-                    extra = [key for node in walk(line) for key in node if key not in names_in(doc) | NEW_FIELDS]
+                    extra = [key for node in walk(line) for key in node if key not in names_in(doc)]
                     if extra:
                         problems.append(f"templates/{template}: {line['type']} line has fields {extra} not in {name}")
                     kind = doc.get("$defs", {}).get(line["type"], doc)
@@ -495,7 +498,7 @@ class CodeBetterTextTest(unittest.TestCase):
                     path = Path(temp) / relative
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(text)
-                problems += [f"{run}: {error}" for error in schema.check_paths([Path(temp) / ".code"], CODE_SCHEMAS)]
+                problems += [f"{run}: {error}" for error in schema.check_paths([Path(temp) / ".code"], docs=CODE_DOCS)]
         self.assertEqual(problems, [])
 
     def test_code_better_a_solo_mode_can_record_a_question_and_the_spec_always_exists(self):
@@ -602,8 +605,8 @@ class CodeBetterTextTest(unittest.TestCase):
 
     def test_code_better_small_text_fixes_of_round_three(self):
         """The decisions schema names its writers as the text does; the notes table and the tasks template are exact."""
-        comment = json.loads((CODE_SCHEMAS / "decisions.schema.json").read_text())["$comment"]
-        self.assertIn("In coordinate mode only the coordinator writes it", comment)
+        comment = read_schema("decisions")["$comment"]  # shared with research-better, so it names no mode
+        self.assertIn("The coordinator writes it", comment)
         skill = (CODE_BETTER / "SKILL.md").read_text()
         self.assertIn("EACH file below is typed JSON", skill)
         self.assertIn("`.code/audit/<YYYY-MM-DD>/audit.json`, `evidence.jsonl` and `findings.jsonl`", skill)

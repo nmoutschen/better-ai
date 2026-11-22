@@ -2,41 +2,43 @@
 
 The examples of the spec page (tests/fixtures/code-better-examples.json) are the fixtures: each must validate. A change
 folder built from them must check clean, one bad record per kind must be reported with file:line and field, and
-dashboard.py must show every valid record next to the errors of the invalid ones.
+the dashboard must show every valid record next to the errors of the invalid ones.
 """
 
-import importlib.util
-import io
 import json
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout, suppress
 from pathlib import Path
-from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import sweep  # noqa: E402
 import wrong_types  # noqa: E402
+from better import run as better  # noqa: E402
+
+from better_ai import paths, resources, schema  # noqa: E402
+from better_ai.code import SKILL, dashboard  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / "skills" / "code-better" / "scripts"
-SCHEMAS = ROOT / "skills" / "code-better" / "schemas"
+DOCS = schema.load_schemas(*resources.schema_sources("code"))
 EXAMPLES = json.loads((Path(__file__).parent / "fixtures" / "code-better-examples.json").read_text())
 
 
-def load(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules.setdefault(name, module)
-    spec.loader.exec_module(module)
-    return module
+def check_record(record, names):
+    """The problems of one record against the named schemas of code-better, as (field, message)."""
+    found = []
+    for name in names:
+        found += [(p.field, p.message) for p in schema.validate_instance(record, DOCS[name], DOCS)]
+    return list(dict.fromkeys(found))
 
 
-schema = load("schema", SCRIPTS / "schema.py")
-dashboard = load("dashboard_formats_dashboard", SCRIPTS / "dashboard.py")
+def load(folder: Path) -> dict:
+    """What the dashboard shows of a change folder."""
+    return dashboard.load(paths.resolve_unit(str(folder), SKILL))
+
 
 # The spec page's file kinds, the schema each is checked against, and where the file sits in a change folder.
 KINDS = {
@@ -135,7 +137,7 @@ def change(root: Path, mode="coordinate", tasks=None, specs=None, design=None) -
 
 
 def check(folder: Path):
-    return schema.check_paths([folder], SCHEMAS)
+    return schema.check_paths([folder], docs=DOCS)
 
 
 class Examples(unittest.TestCase):
@@ -145,9 +147,9 @@ class Examples(unittest.TestCase):
         for kind, (name, _) in KINDS.items():
             for title, record in examples(kind):
                 with self.subTest(kind=kind, example=title):
-                    self.assertEqual(schema.check_record(record, [name], SCHEMAS), [])
+                    self.assertEqual(check_record(record, [name]), [])
         with self.subTest(kind="audit.json"):
-            self.assertEqual(schema.check_record(audit_header(), [AUDIT[0]], SCHEMAS), [])
+            self.assertEqual(check_record(audit_header(), [AUDIT[0]]), [])
 
     def test_a_folder_built_from_the_examples_checks_clean(self):
         """Pointers resolve across the files: tasks to spec records, a block to its task, an answer to a page event."""
@@ -230,7 +232,7 @@ class OneBadRecordPerKind(unittest.TestCase):
                     write(folder, "logs/builder-t3.card.json", [card("builder", "T3")], as_json=True)
                 records = [mutate(good)] if kind in ("code.json", "logs/<agent>.card.json") else [good, mutate(good)]
                 path = write(folder, relative, records, as_json=kind.endswith(".json"))
-                errors = [e for e in schema.check_paths([path], SCHEMAS) if e.field.split(".")[0] == field]
+                errors = [e for e in schema.check_paths([path], docs=DOCS) if e.field.split(".")[0] == field]
                 self.assertTrue(errors, f"{kind}: no error on {field} for {title}")
                 self.assertEqual(errors[0].line, 1 if kind.endswith(".json") else 2)
                 self.assertTrue(errors[0].file.endswith(relative))
@@ -239,7 +241,7 @@ class OneBadRecordPerKind(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             record = {k: v for k, v in audit_header().items() if k != "goal"}
             path = write(Path(d), AUDIT[1], [record], as_json=True)
-            self.assertEqual([e.field for e in schema.check_paths([path], SCHEMAS)], ["goal"])
+            self.assertEqual([e.field for e in schema.check_paths([path], docs=DOCS)], ["goal"])
 
 
 class StatusRules(unittest.TestCase):
@@ -311,6 +313,8 @@ class StatusRules(unittest.TestCase):
             "about": {"type": "change"},
             "asked": "Which?",
             "status": "answered",
+            "default": None,
+            "deadline": None,
             "answer": {"type": "page", "event": "a-1"},
         }
         with tempfile.TemporaryDirectory() as d:
@@ -334,36 +338,54 @@ class StatusRules(unittest.TestCase):
             )
             self.assertEqual(check(folder), [])
 
-    def test_a_task_in_the_architect_folder_resolves_its_requirements_there(self):
+    def test_a_task_points_to_the_changes_own_spec_not_the_architect_folders(self):
         design = {"type": "architect", "folder": "docs/designs/up/"}
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".git").mkdir()
-            folder = change(root, specs=False, design=design, tasks=[task("T1", requirements=["S3"])])
-            self.assertIn("dangling", check(folder)[0].message)
             write(root / "docs" / "designs" / "up", "spec.jsonl", [spec("S3")])
+            folder = change(root, specs=[spec("S1")], design=design, tasks=[task("T1", requirements=["S3"])])
+            self.assertIn("dangling", check(folder)[0].message)
+            write(folder, "spec.jsonl", [spec("S1"), spec("S3")])
             self.assertEqual(check(folder), [])
+
+    def test_the_copied_spec_resolves_its_sources_in_the_architect_folder(self):
+        design = {"type": "architect", "folder": "docs/designs/up/"}
+        decision = {"type": "decision", "at": AT, "by": "architect", "id": "D1"}
+        source = {"type": "decision", "decision": "D1"}
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".git").mkdir()
+            folder = change(root, specs=[spec("S1", source=source)], design=design)
+            self.assertIn("dangling", check(folder)[0].message)
+            write(root / "docs" / "designs" / "up", "decisions.jsonl", [decision])
+            self.assertEqual(check(folder), [])
+            # the change's own decisions.jsonl never answers a design pointer
+            (root / "docs" / "designs" / "up" / "decisions.jsonl").unlink()
+            own = {**decision, "raised_by": "coordinator", "about": {"type": "change"}, "asked": "Which?"}
+            write(folder, "decisions.jsonl", [{**own, "status": "decided", "decision": "A"}])
+            self.assertEqual(
+                [e.message for e in check(folder)], ["dangling: docs/designs/up/decisions.jsonl does not exist"]
+            )
 
 
 class Dashboard(unittest.TestCase):
     def test_the_page_is_named_by_the_goal_of_code_json_else_by_the_folder(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
-            self.assertEqual(dashboard.load(folder)["name"], "Uploads fail loudly")
+            self.assertEqual(load(folder)["name"], "Uploads fail loudly")
             write(folder, "code.json", [{**code(), "goal": "  Export invoices as CSV  \nand more"}], as_json=True)
-            self.assertEqual(dashboard.load(folder)["name"], "Export invoices as CSV")
+            self.assertEqual(load(folder)["name"], "Export invoices as CSV")
             write(folder, "code.json", [{**code(), "mode": "nonsense"}], as_json=True)  # invalid
-            self.assertEqual(dashboard.load(folder)["name"], "c")
+            self.assertEqual(load(folder)["name"], "c")
             (folder / "code.json").write_text("{not json", encoding="utf-8")
-            self.assertEqual(dashboard.load(folder)["name"], "c")
-            (folder / "code.json").unlink()
-            self.assertEqual(dashboard.load(folder)["name"], "c")
+            self.assertEqual(load(folder)["name"], "c")
 
     def test_a_folder_with_one_bad_task_still_shows_every_other_task(self):
         with tempfile.TemporaryDirectory() as d:
             tasks = [task("T1"), task("T2", status="in review"), task("T3", status="built")]
             folder = change(Path(d), tasks=tasks)
-            data = dashboard.load(folder)
+            data = load(folder)
         # the bad task stays on the page, marked, so the page can show its status as written
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T2", "T3"])
         self.assertEqual([bool(t.get("_errors")) for t in data["tasks"]], [False, True, False])
@@ -378,14 +400,10 @@ class Dashboard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             write(folder, "lessons.jsonl", [{"type": "lesson", "at": AT, "by": "coordinator", "id": "L1"}])
-            errors = dashboard.load(folder)["errors"]
+            errors = load(folder)["errors"]
             self.assertTrue(errors)
             self.assertEqual({e["file"] for e in errors}, {"lessons.jsonl"})
-            done = subprocess.run(
-                [sys.executable, "-I", str(SCRIPTS / "dashboard.py"), "check", str(folder)],
-                capture_output=True,
-                text=True,
-            )
+            done = better("code-better", "check", str(folder), cwd=d)
         self.assertEqual(done.returncode, 1)
         self.assertIn("lessons.jsonl", done.stdout)
 
@@ -394,7 +412,7 @@ class Dashboard(unittest.TestCase):
             folder = change(Path(d))
             with (folder / "tasks.jsonl").open("a") as f:
                 f.write("{not json\n")
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
         self.assertEqual([(e["file"], e["line"]) for e in data["errors"]], [("tasks.jsonl", 2)])
         self.assertNotIn("by", data["errors"][0])
@@ -404,7 +422,7 @@ class Dashboard(unittest.TestCase):
             folder = change(Path(d))
             with (folder / "tasks.jsonl").open("a") as f:
                 f.write('{"type": "task", "x": ' + "[" * 50000 + "]" * 50000 + "}\n")
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]][:1], ["T1"])
         self.assertTrue(any(e["line"] == 2 for e in data["errors"]))
 
@@ -431,7 +449,7 @@ class Dashboard(unittest.TestCase):
                 "asked": "Which limit?",
             }
             write(folder, "decisions.jsonl", [{**decision, **chat}, {**decision, "id": "D2", "status": "waiting"}])
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual(data["errors"], [])
         self.assertEqual(data["name"], "Uploads fail loudly")
         self.assertEqual(data["requirements"], {"S1": "The upload service shall reject empty files."})
@@ -446,11 +464,12 @@ class Dashboard(unittest.TestCase):
         self.assertEqual((agents["b2"]["task"], agents["b2"]["state"]), ("T1", "working"))
         decisions = {x["id"]: x for x in data["decisions"]}
         self.assertEqual(
-            (decisions["D1"]["status"], decisions["D1"]["answer"], decisions["D1"]["from"]), ("answered", "50 MB", "b1")
+            (decisions["D1"]["status"], decisions["D1"]["answer"], decisions["D1"]["raised_by"]),
+            ("answered", {"type": "chat", "text": "50 MB"}, "b1"),
         )
         self.assertEqual((decisions["D1"]["task"], decisions["D2"]["status"]), ("T2", "waiting"))
 
-    def test_a_decision_answered_on_the_page_shows_the_event_text(self):
+    def test_a_decision_answered_on_the_page_points_to_the_event_that_holds_the_text(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             event = {
@@ -475,29 +494,34 @@ class Dashboard(unittest.TestCase):
                 "answer": {"type": "page", "event": "a-1"},
             }
             write(folder, "decisions.jsonl", [decision])
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual(data["errors"], [])
-        self.assertEqual(data["decisions"][0]["answer"], "Business days.")
+        self.assertEqual(data["decisions"][0]["answer"], {"type": "page", "event": "a-1"})
+        self.assertEqual([e["text"] for e in data["conversation"] if e["id"] == "a-1"], ["Business days."])
 
     def test_a_task_pointing_at_a_missing_spec_record_is_listed_as_dangling(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[task("T1"), task("T2", requirements=["S4"])])
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T2"])
         self.assertIn("dangling", data["errors"][0]["message"])
         self.assertEqual(data["errors"][0]["field"], "requirements[0]")
 
-    def test_requirements_resolve_through_the_architect_folder(self):
+    def test_requirements_come_from_the_changes_own_spec_even_when_it_names_an_architect_folder(self):
         design = {"type": "architect", "folder": "docs/designs/up/"}
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".git").mkdir()
-            write(root / "docs" / "designs" / "up", "spec.jsonl", [spec("S3", "The page shall show errors.")])
-            folder = change(root, specs=False, design=design, tasks=[task("T1", requirements=["S3"])])
-            data = dashboard.load(folder)
+            write(root / "docs" / "designs" / "up", "spec.jsonl", [spec("S3", "Only in the design folder.")])
+            folder = change(
+                root,
+                specs=[spec("S3", "The page shall show errors.")],
+                design=design,
+                tasks=[task("T1", requirements=["S3"])],
+            )
+            data = load(folder)
         self.assertEqual(data["errors"], [])
         self.assertEqual(data["requirements"], {"S3": "The page shall show errors."})
-        self.assertEqual(data["tasks"][0]["requirements"], ["S3"])
 
     def test_the_old_markdown_files_are_not_read(self):
         with tempfile.TemporaryDirectory() as d:
@@ -509,27 +533,29 @@ class Dashboard(unittest.TestCase):
             (folder / "logs").mkdir()
             (folder / "logs" / "old.md").write_text("start: x\n")
             (folder / "logs" / "old.json").write_text('{"role": "builder"}')
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual(
             ([t["id"] for t in data["tasks"]], data["decisions"], data["agents"], data["errors"]), (["T1"], [], [], [])
         )
 
-    def test_an_empty_folder_loads_without_error(self):
+    def test_a_change_with_only_its_head_loads_without_error(self):
         with tempfile.TemporaryDirectory() as d:
-            data = dashboard.load(Path(d))
-        self.assertEqual((data["tasks"], data["agents"], data["decisions"]), ([], [], []))
+            folder = Path(d) / ".code" / "c"
+            write(folder, "code.json", [code()], as_json=True)
+            data = load(folder)
+        self.assertEqual((data["tasks"], data["agents"], data["decisions"], data["errors"]), ([], [], [], []))
 
     def test_verified_without_a_passing_verifier_is_listed(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[task("T1", status="verified")])
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
         self.assertIn("verifier", data["tasks"][0]["_errors"][0])
         self.assertIn("verifier", data["errors"][0]["message"])
 
     def test_a_coordinate_task_with_status_done_is_listed(self):
         with tempfile.TemporaryDirectory() as d:
-            data = dashboard.load(change(Path(d), tasks=[task("T1", status="done")]))
+            data = load(change(Path(d), tasks=[task("T1", status="done")]))
         self.assertEqual([(e["file"], e["field"]) for e in data["errors"]], [("tasks.jsonl", "status")])
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
 
@@ -537,7 +563,7 @@ class Dashboard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[task("T1"), task("T2", status="built")])
             (folder / "code.json").write_text("{broken")
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T2"])
         messages = [e["message"] for e in data["errors"]]
         self.assertTrue(any("not valid JSON" in m for m in messages), messages)
@@ -557,7 +583,7 @@ class Dashboard(unittest.TestCase):
                 "status": "waiting",
             }
             write(folder, "decisions.jsonl", [bad])
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual(
             [(x["id"], x["status"], x["asked"]) for x in data["decisions"]], [("D1", "waiting", "Which limit?")]
         )
@@ -572,7 +598,7 @@ class Dashboard(unittest.TestCase):
                 "decisions.jsonl",
                 [{"type": "decision", "at": AT, "by": "coordinator", "id": "D1", "status": "waiting"}],
             )
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual([x["id"] for x in data["decisions"]], ["D1"])
         self.assertTrue(data["errors"])
 
@@ -582,15 +608,15 @@ class Dashboard(unittest.TestCase):
             folder = change(Path(d))
             real = dashboard.schema.check_text
 
-            def late(path, text, docs, cache=None):
+            def late(path, text, docs, cache=None, **options):
                 if path.name == "tasks.jsonl":
                     with path.open("a") as f:
                         f.write(json.dumps(task("T2", status="in review")) + "\n")
-                return real(path, text, docs, cache)
+                return real(path, text, docs, cache, **options)
 
             dashboard.schema.check_text = late
             try:
-                data = dashboard.load(folder)
+                data = load(folder)
             finally:
                 dashboard.schema.check_text = real
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
@@ -600,7 +626,7 @@ class Dashboard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             write(folder, "audit/2026-11-21/findings.jsonl", [{"type": "finding"}])
-            self.assertEqual(dashboard.load(folder)["errors"], [])
+            self.assertEqual(load(folder)["errors"], [])
 
 
 WRONG, RAW_LINES = wrong_types.WRONG, wrong_types.RAW_LINES
@@ -662,15 +688,10 @@ class WrongTypes(unittest.TestCase):
                     name = f"{relative}: {label}"
                     with self.subTest(name):
                         write(folder, relative, changed, as_json)
-                        data = dashboard.load(folder)
+                        data = load(folder)
                         json.dumps(data, allow_nan=False)
-                        out = io.StringIO()
-                        with (
-                            mock.patch.object(sys, "argv", ["dashboard.py", "check", str(folder)]),
-                            redirect_stdout(out),
-                            suppress(SystemExit),
-                        ):
-                            dashboard.main()
+                        for error in schema.check_paths([folder], docs=DOCS):  # `check` does not raise either
+                            str(error)
                         payloads.append({"label": name, "data": data})
                 write(folder, relative, records, as_json)
             pairs = [(relative, raw) for relative in base for raw in RAW_LINES]
@@ -681,7 +702,7 @@ class WrongTypes(unittest.TestCase):
                     with self.subTest(f"{relative}: raw {raw[:10]}"):
                         path = folder / relative
                         path.write_text(raw + "\n" + ("" if as_json else path.read_text()), encoding="utf-8")
-                        data = dashboard.load(folder)
+                        data = load(folder)
                         json.dumps(data, allow_nan=False)
                         payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": data})
                 write(folder, relative, records, as_json)
@@ -697,7 +718,7 @@ class WrongTypes(unittest.TestCase):
     def test_an_invalid_record_shows_without_the_fields_that_failed(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[{**task("T1"), "id": ["T1"], "requirements": "S1", "mode": 5}, task("T2")])
-            data = dashboard.load(folder)
+            data = load(folder)
         first, second = data["tasks"]
         self.assertEqual(first["id"], "(line 1)")
         self.assertNotIn("requirements", first)
@@ -710,7 +731,7 @@ class WrongTypes(unittest.TestCase):
     def test_a_status_that_failed_stays_as_written_text(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[task("T1", status="in review"), {**task("T2"), "status": ["x"]}])
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual(data["tasks"][0]["status"], "in review")
         self.assertNotIn("status", data["tasks"][1])
 
@@ -726,7 +747,7 @@ class BaseFieldsOfEveryKind(unittest.TestCase):
         yield "audit header", AUDIT[0], audit_header()
 
     def problems(self, name, record):
-        return schema.check_record(record, [name], SCHEMAS)
+        return check_record(record, [name])
 
     def test_a_record_without_type_at_or_by_is_refused(self):
         for label, name, record in self.kinds():
@@ -750,6 +771,74 @@ class BaseFieldsOfEveryKind(unittest.TestCase):
                     self.assertTrue(self.problems(name, {**record, "id": "X1"}))
 
 
+class LoneSurrogates(unittest.TestCase):
+    """A lone surrogate (JSON `\\ud800`) in any string or key of any record of any kind: `check` and `load` do not fail,
+    and what they answer can be printed and sent as UTF-8."""
+
+    @staticmethod
+    def places(value):
+        """Each string value and each key of a JSON value, as (kind, path to the object holding it, its key or index)."""
+        found, pending = [], [(value, ())]
+        while pending:
+            item, path = pending.pop()
+            if isinstance(item, dict):
+                for key, child in item.items():
+                    found.append(("key", path, key))
+                    pending.append((child, (*path, key)))
+            elif isinstance(item, list):
+                pending.extend((child, (*path, i)) for i, child in enumerate(item))
+            elif isinstance(item, str) and path:
+                found.append(("value", path[:-1], path[-1]))
+        return found
+
+    @staticmethod
+    def with_a_surrogate(record, place):
+        record = json.loads(json.dumps(record))
+        kind, path, key = place
+        holder = record
+        for step in path:
+            holder = holder[step]
+        if kind == "value":
+            holder[key] = "\ud800"
+        else:
+            renamed = {(key + "\ud800" if k == key else k): v for k, v in holder.items()}
+            holder.clear()
+            holder.update(renamed)
+        return record
+
+    def cases(self):
+        for kind, (_, relative) in KINDS.items():
+            for title, record in examples(kind):
+                yield f"{kind}: {title}", relative, record
+        yield "audit header", AUDIT[1], audit_header()
+
+    def test_every_string_and_key_of_every_example(self):
+        every = [
+            (label, relative, record, place)
+            for label, relative, record in self.cases()
+            if not relative.startswith("audit/")  # an audit is not shown by the dashboard; `check` reads it below
+            for place in self.places(record)
+        ]
+        for label, relative, record, place in sweep.cases(every, key=[lambda e: e[0], lambda e: e[3][0]]):
+            with self.subTest(label, place=place[1:]), tempfile.TemporaryDirectory() as d:
+                folder = change(Path(d))
+                changed = self.with_a_surrogate(record, place)
+                write(folder, relative, [changed], relative.endswith(".json"))
+                for error in schema.check_paths([folder], docs=DOCS):
+                    str(error).encode("utf-8", "backslashreplace")
+                    self.assertTrue(error.message.isprintable() or "\n" in error.message)
+                json.dumps(load(folder), ensure_ascii=False, allow_nan=False).encode("utf-8")
+
+    def test_check_names_the_surrogate_without_a_traceback(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            write(folder, "tasks.jsonl", [task("T1", task="a\ud800b")])
+            done = better("code-better", "check", str(folder), cwd=d)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
+        self.assertRegex(done.stdout, r"non-text|ud800")
+
+
 class OneBadRecordKeepsTheRest(unittest.TestCase):
     """What the verifiers found by loading a folder with one bad record in it (each used to hide something)."""
 
@@ -760,7 +849,7 @@ class OneBadRecordKeepsTheRest(unittest.TestCase):
             (folder / "logs" / "b1.card.json").write_text(
                 json.dumps({**card("builder", "T1"), "role": "boss"}, indent=2), encoding="utf-8"
             )
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertIn(("logs/b1.card.json", "role"), [(e["file"], e["field"]) for e in data["errors"]])
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
         self.assertIn("b2", [a["name"] for a in data["agents"]])
@@ -769,7 +858,7 @@ class OneBadRecordKeepsTheRest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d), tasks=[task("T1", status="building")])
             write(folder, "code.json", [{**code(), "mode": "weird"}], as_json=True)
-            data = dashboard.load(folder)
+            data = load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
         self.assertIn("mode", [e["field"] for e in data["errors"] if e["file"] == "code.json"])
 
@@ -782,7 +871,7 @@ class OneBadRecordKeepsTheRest(unittest.TestCase):
                 task("T4", status="blocked", reason="task", waits_on="T2"),
                 task("T5", requirements=["S9"]),
             ]
-            data = dashboard.load(change(Path(d), tasks=tasks))
+            data = load(change(Path(d), tasks=tasks))
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1", "T2", "T3", "T4", "T5"])
         self.assertTrue(data["errors"])
 
@@ -808,15 +897,14 @@ class LessonsWrongTypes(unittest.TestCase):
             folder = change(Path(d))
             path = folder / "lessons.jsonl"
             path.write_bytes(text if isinstance(text, bytes) else text.encode("utf-8"))
-            data = dashboard.load(folder)
+            data = load(folder)
             json.dumps(data, allow_nan=False)
-            out = io.StringIO()
-            argv = mock.patch.object(sys, "argv", ["dashboard.py", "check", str(folder)])
-            with argv, redirect_stdout(out), self.assertRaises(SystemExit) as raised:
-                dashboard.main()
+            done = better("code-better", "check", str(folder), cwd=d)
+            self.assertNotEqual(done.returncode, 5, done.stderr)
+            self.assertNotIn("Traceback", done.stderr)
             lessons = [(e["line"], e["field"]) for e in data["errors"] if e["file"] == "lessons.jsonl"]
             self.assertEqual([e for e in data["errors"] if e["file"] != "lessons.jsonl"], [])
-            return data, lessons, raised.exception.code, out.getvalue()
+            return data, lessons, done.returncode, done.stdout
 
     def test_a_valid_lesson_is_clean(self):
         _, lessons, code_, out = self.run_all(json.dumps(GOOD_LESSON) + "\n")
@@ -905,8 +993,7 @@ class LessonsWrongTypes(unittest.TestCase):
 
 class Check(unittest.TestCase):
     def run_check(self, folder):
-        cmd = [sys.executable, "-I", str(SCRIPTS / "dashboard.py"), "check", str(folder)]
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return better("code-better", "check", str(folder), cwd=folder.parent.parent.parent)
 
     def test_check_exits_one_on_a_bad_folder_and_zero_on_a_good_one(self):
         with tempfile.TemporaryDirectory() as d:
@@ -920,8 +1007,11 @@ class Check(unittest.TestCase):
             lines = bad.stdout.strip().splitlines()
             self.assertEqual(len(lines), 1)
             self.assertRegex(lines[0], r"tasks\.jsonl:2: status: must be one of")
-            data = dashboard.load(folder)
-            self.assertEqual(lines, [f"{e['file']}:{e['line']}: {e['field']}: {e['message']}" for e in data["errors"]])
+            data = load(folder)
+            self.assertEqual(
+                [line.split("/")[-1] for line in lines],
+                [f"{e['file']}:{e['line']}: {e['field']}: {e['message']}" for e in data["errors"]],
+            )
 
     def test_check_reads_the_files_the_page_does_not_show(self):
         with tempfile.TemporaryDirectory() as d:
@@ -931,23 +1021,19 @@ class Check(unittest.TestCase):
 
 
 class Usage(unittest.TestCase):
-    def test_the_usage_line_for_accepted_shows_the_users_words(self):
-        doc = dashboard.__doc__
-        self.assertIn('accepted ID... --text "the user\'s words"', doc)
-
     def test_a_note_on_the_dashboard_cannot_carry_an_on_field(self):
         note = {"type": "note", "at": AT, "by": "user", "id": "m-1", "text": "hi", "to": None}
         names = ["dashboard-events.schema.json"]
-        self.assertEqual(schema.check_record(note, names, SCHEMAS), [])
-        problems = schema.check_record({**note, "on": {"kind": "agent", "id": "b1", "title": "b1"}}, names, SCHEMAS)
+        self.assertEqual(check_record(note, names), [])
+        problems = check_record({**note, "on": {"kind": "agent", "id": "b1", "title": "b1"}}, names)
         self.assertEqual([field for field, _ in problems], ["on"])
 
 
 class NoOldFiles(unittest.TestCase):
-    """No code-better instruction or script writes the old Markdown files."""
+    """No code-better instruction or module writes the old Markdown files."""
 
-    def test_no_script_reads_or_writes_them(self):
-        text = (SCRIPTS / "dashboard.py").read_text()
+    def test_no_module_reads_or_writes_them(self):
+        text = (ROOT / "src" / "better_ai" / "code" / "dashboard.py").read_text()
         for old in ("tasks.md", "specs.md", "decisions/", "logs/*.md", "read_tasks", "read_requirements", "read_entry"):
             self.assertNotIn(old, text)
 

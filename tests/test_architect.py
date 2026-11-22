@@ -30,7 +30,7 @@ class Architect(unittest.TestCase):
         self.folder = Path(temp.name) / "change"
         shutil.copytree(SCRIPTS / "example", self.folder)
         shutil.copyfile(ROOT / "PRINCIPLES.md", self.folder / "PRINCIPLES.md")
-        source = Path("skills/code-better/scripts/page.py")
+        source = Path("skills/architect-better/scripts/page.py")
         (self.folder / source.parent).mkdir(parents=True)
         shutil.copyfile(ROOT / source, self.folder / source)
         browser = patch.object(architect.webbrowser, "open")
