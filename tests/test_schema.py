@@ -497,7 +497,7 @@ class Keywords(unittest.TestCase):
         self.assertEqual(len(self.errors(1.5, {"const": 1})), 1)
         self.assertEqual(len(self.errors(True, {"const": 1.0})), 1)
         self.assertEqual(len(self.errors([True], {"const": [1.0]})), 1)
-        self.assertEqual(self.errors(3.0, {"type": "integer"}), [])
+        self.assertEqual(len(self.errors(3.0, {"type": "integer"})), 1)  # a renderer's range(3.0) would fail
         self.assertEqual(len(self.errors(3.5, {"type": "integer"})), 1)
         self.assertEqual(len(self.errors(True, {"type": "integer"})), 1)
         self.assertEqual(len(self.errors(float("nan"), {"type": "integer"})), 1)

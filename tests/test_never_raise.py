@@ -52,7 +52,17 @@ EXCEPTIONS = (RuntimeError, KeyError, RecursionError, MemoryError)
 DEPTHS = (300, 2000, 50000)
 SURROGATE = "a\ud800b"
 # The steps of a request that page.Handler's guard is made of: patching one to fail takes the guard itself away.
-GUARDS = {"guarded", "setup", "handle", "finish"}
+GUARDS = ("guarded", "setup", "handle", "finish")
+
+
+def is_guard(owner, name: str) -> bool:
+    """Whether `owner.name` is page.Handler's own guard step, by identity: a class of a script that has a method of
+    the same name is not."""
+    page = sys.modules.get("page")
+    handler = getattr(page, "Handler", None)
+    return name in GUARDS and owner is handler
+
+
 # What every script calls from the standard library, where a script's own closures cannot be patched by name.
 STDLIB = [
     (Path, "read_text"),
@@ -68,7 +78,27 @@ STDLIB = [
 
 
 def all_scripts() -> list:
-    return sorted(SKILLS.glob("*/scripts/*.py"))
+    return sorted(SKILLS.glob("*/scripts/**/*.py"))
+
+
+def top_level_problems(path: Path) -> list:
+    """Why a script is neither a library nor a program. A library's top level only imports, defines and assigns (and
+    may put its own folder on sys.path). A program has, besides that, one `if __name__ == "__main__":` block that calls
+    one wrapped entry point. Any other top-level statement runs code with no guard."""
+    tree = ast.parse(path.read_text())
+    block = main_block(tree)
+    problems = []
+    for node in tree.body:
+        if node is block or isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.ClassDef)):
+            continue
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AsyncFunctionDef)):
+            continue
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+            continue  # a docstring
+        if isinstance(node, ast.Expr) and ast.unparse(node.value).startswith("sys.path.insert("):
+            continue
+        problems.append(f"line {node.lineno}: top-level code outside a guarded program: {ast.unparse(node)[:60]}")
+    return [*problems, *(entry_of(path, tree)[1] if block is not None else [])]
 
 
 def main_block(tree: ast.Module):
@@ -267,6 +297,13 @@ def folder_with_a_reply(skill: str, root: Path) -> Path:
     return folder
 
 
+PROGRAMS = {
+    "architect-better": "architect.py",
+    "code-better": "dashboard.py",
+    "research-better": "board.py",
+    "show-better": "show.py",
+    "design-better": "canvas.py",
+}
 SCHEMA_FOLDERS = {
     "architect-better": lambda root: architects.make_folder(root),
     "code-better": lambda root: dashboards.change(root),
@@ -348,7 +385,7 @@ def watched(module) -> dict:
                 found[id(value.__code__)] = (owner, name)
             elif inspect.isclass(value) and value.__module__ == owner.__name__:
                 for attr, member in list(vars(value).items()):
-                    if inspect.isfunction(member) and not attr.startswith(("__", "do_")) and attr not in GUARDS:
+                    if inspect.isfunction(member) and not attr.startswith(("__", "do_")) and not is_guard(value, attr):
                         found[id(member.__code__)] = (value, attr)
     return found
 
@@ -453,6 +490,21 @@ class Wrapper(unittest.TestCase):
         finally:
             busy.close()
 
+    def test_a_corrupt_seen_or_address_file_is_a_file_error_with_the_wrappers_line_not_a_usage_error(self):
+        for path in scripts_with_a_handler():
+            for broken in ("seen", "address"):
+                with self.subTest(script=name_of(path), broken=broken), tempfile.TemporaryDirectory() as d:
+                    module = module_of(path)
+                    args, folder = HANDLERS[name_of(path)][1](Path(d))
+                    conv = module.conversation(folder)
+                    conv.address.write_text("not an address" if broken == "address" else "http://127.0.0.1:1/")
+                    conv.seen.write_text("x" if broken == "seen" else "0")
+                    code, out, err, escaped = invoke(module, ["wait", folder, "--timeout", "0.2"])
+                    self.assertIsNone(escaped)
+                    self.assertEqual(code, 1)
+                    self.assertNotIn("usage", err)
+                    self.assertTrue(any(WRAPPER_LINE.match(line) for line in err.splitlines()), err)
+
     def test_exit_codes_and_interrupts_pass_through(self):
         for raised in (SystemExit(2), SystemExit("x"), KeyboardInterrupt()):
             with self.subTest(raised=repr(raised)), self.assertRaises(type(raised)):
@@ -466,6 +518,12 @@ class Wrapper(unittest.TestCase):
                 entry, problems = entry_of(path)
                 self.assertEqual(problems, [])
                 self.assertTrue(hasattr(getattr(module_of(path), entry), "__wrapped__"))
+
+    def test_every_file_under_scripts_is_a_library_or_a_program_with_a_wrapped_entry_point(self):
+        self.assertGreaterEqual(len(all_scripts()), 16)
+        for path in all_scripts():
+            with self.subTest(script=name_of(path)):
+                self.assertEqual(top_level_problems(path), [])
 
     def test_every_request_handler_is_a_page_handler(self):
         for path in all_scripts():
@@ -636,7 +694,7 @@ class ServedPage:
         return {
             id(m.__code__): (self.handler, n)
             for n, m in vars(self.handler).items()
-            if inspect.isfunction(m) and not n.startswith(("__", "do_")) and n not in GUARDS
+            if inspect.isfunction(m) and not n.startswith(("__", "do_"))
         }
 
 
@@ -1069,6 +1127,35 @@ class Surrogates(unittest.TestCase):
                     self.assertTrue(any(schema._render(at) == e.field for e in errors), [str(e) for e in errors])
                     self.assertTrue(all(encodable(str(e)) for e in errors))
 
+    def test_a_surrogate_at_every_place_of_the_first_record_of_every_file_is_a_clean_exit_for_check_pending_and_load(
+        self,
+    ):
+        for skill, build in SCHEMA_FOLDERS.items():
+            script = PROGRAMS[skill]
+            module = module_of(SKILLS / skill / "scripts" / script)
+            checker = module_of(SKILLS / skill / "scripts" / "schema.py")
+            with tempfile.TemporaryDirectory() as d:
+                files = [f for f in folder_files(build(Path(d))) if f.suffix in (".json", ".jsonl")]
+            for relative in files:
+                with tempfile.TemporaryDirectory() as d:
+                    folder = build(Path(d))
+                    text = (folder / relative).read_text(encoding="utf-8")
+                    count = len(places(json.loads(text.splitlines()[0] if relative.suffix == ".jsonl" else text)))
+                for index in range(count):
+                    with self.subTest(skill=skill, file=str(relative), place=index), tempfile.TemporaryDirectory() as d:
+                        folder = build(Path(d))
+                        put_in(folder / relative, "surrogate", index)
+                        for runner, command in ((module, "check"), (module, "pending"), (checker, "check")):
+                            code, out, err, escaped = invoke(runner, [command, folder])
+                            self.assertIsNone(escaped)
+                            self.assertFalse(any(WRAPPER_LINE.match(line) for line in err.splitlines()), err)
+                        if skill in LOADERS:
+                            load = LOADERS[skill][2]
+                            self.assert_clean(load(module, folder))
+
+    def assert_clean(self, answer):
+        json.dumps(answer, ensure_ascii=False, allow_nan=False).encode("utf-8")
+
     def test_each_scripts_check_command_reports_one_in_a_folder_without_a_traceback(self):
         for skill, build in SCHEMA_FOLDERS.items():
             with tempfile.TemporaryDirectory() as d:
@@ -1170,6 +1257,62 @@ class DeepInput(unittest.TestCase):
                     commands = self.commands(Path(d), nest(kind, depth))
                     problems = {label: traceback_of(*args) for label, args in commands.items()}
                     self.assertEqual({k: v for k, v in problems.items() if v}, {})
+
+
+# ---------------------------------------------------------------- numbers a renderer cannot take
+
+
+class IntegerTyping(unittest.TestCase):
+    """An integral float is not an integer: a renderer's range(3.0) fails, so a field the schemas call an integer
+    refuses 3.0 and the check, not the renderer, says so."""
+
+    def test_every_integer_the_schemas_name_refuses_an_integral_float(self):
+        schema = schema_module()
+        found = 0
+        for path in sorted(SKILLS.glob("*/schemas/*.schema.json")):
+            docs = schema.load_schemas(path.parent)
+            pending = [json.loads(path.read_text(encoding="utf-8"))]
+            while pending:
+                node = pending.pop()
+                if isinstance(node, dict):
+                    kind = node.get("type")
+                    if kind == "integer" or (isinstance(kind, list) and "integer" in kind):
+                        found += 1
+                        with self.subTest(schema=path.name, node=str(node)[:60]):
+                            problems = schema.validate_instance(3.0, {**node, "type": kind}, docs)
+                            self.assertTrue(problems, "3.0 passes as an integer")
+                    pending.extend(node.values())
+                elif isinstance(node, list):
+                    pending.extend(node)
+        self.assertGreater(found, 5)
+
+    def test_a_spec_that_check_accepts_with_an_integer_made_a_float_renders(self):
+        module = module_of(SKILLS / "show-better" / "scripts" / "show.py")
+        spec = shows.full_spec()
+        whole, pending = [], [(spec, ())]
+        while pending:  # each place that holds a whole number, as (the path to its holder, its key)
+            item, path = pending.pop()
+            pairs = item.items() if isinstance(item, dict) else enumerate(item) if isinstance(item, list) else ()
+            for key, child in pairs:
+                if isinstance(child, int) and not isinstance(child, bool):
+                    whole.append((path, key))
+                else:
+                    pending.append((child, (*path, key)))
+        self.assertTrue(whole)
+        for path, key in whole:
+            changed = copy.deepcopy(spec)
+            holder = changed
+            for step in path:
+                holder = holder[step]
+            holder[key] = float(holder[key])
+            with self.subTest(place=(*path, key)), tempfile.TemporaryDirectory() as d:
+                target = Path(d) / "spec.json"
+                target.write_text(json.dumps(changed), encoding="utf-8")
+                code, out, err, escaped = invoke(module, ["check", target])
+                if not code:  # check accepts it: the renderer must take it
+                    code, out, err, escaped = invoke(module, ["render", target, "--out", Path(d) / "o.html"])
+                    self.assertFalse(code, err)
+                    self.assertFalse(any(WRAPPER_LINE.match(line) for line in err.splitlines()), err)
 
 
 if __name__ == "__main__":

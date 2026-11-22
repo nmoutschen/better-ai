@@ -613,29 +613,31 @@ class MergeCycles(unittest.TestCase):
         board.SCANS.clear()
         return board.load(folder)
 
-    def test_a_loop_of_2000_questions_is_reported_for_each_member_in_good_time(self):
+    def counting(self):
+        """Patch the merge hook's one-file-a-step read, keeping it, and count the calls."""
+        return mock.patch.object(board.schema, "_next_merge", wraps=board.schema._next_merge)
+
+    def test_a_loop_of_2000_questions_is_reported_for_each_member_in_linear_work(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
             count = 2000
             links = {f"Q-w2-{100 + k}": f"Q-w2-{100 + (k + 1) % count}" for k in range(count)}
-            started = time.monotonic()
-            data = self.merged(folder, links)
-            took = time.monotonic() - started
+            with self.counting() as steps:
+                data = self.merged(folder, links)
             loops = [e for e in data["errors"] if "merge loop" in e["message"]]
         self.assertEqual(len(loops), count)
-        self.assertLess(took, 5)
+        self.assertLess(steps.call_count, 4 * count)  # one read a question, not one a question a step
 
-    def test_a_chain_of_2000_questions_reports_nothing_in_good_time(self):
+    def test_a_chain_of_2000_questions_reports_nothing_in_linear_work(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
             count = 2000
             links = {f"Q-w2-{100 + k}": f"Q-w2-{100 + k + 1}" for k in range(count)}
-            started = time.monotonic()
-            data = self.merged(folder, links)
-            took = time.monotonic() - started
+            with self.counting() as steps:
+                data = self.merged(folder, links)
             loops = [e for e in data["errors"] if "merge loop" in e["message"]]
         self.assertEqual(loops, [])
-        self.assertLess(took, 5)
+        self.assertLess(steps.call_count, 4 * count)
 
     def test_misnamed_copies_that_link_elsewhere_are_linear_too(self):
         """Each question has its own file, and a copy named otherwise that merges two further on."""
@@ -654,12 +656,11 @@ class MergeCycles(unittest.TestCase):
                     copy = seeded(one(k), status="merged", merged_into=one(k + 2))
                     write_json(folder, f"questions/{one(k)}-copy.json", copy)
                 board.SCANS.clear()
-                started = time.monotonic()
-                data = board.load(folder)
-                took = time.monotonic() - started
+                with self.counting() as steps:
+                    data = board.load(folder)
                 loops = [e for e in data["errors"] if "merge loop" in e["message"]]
             self.assertEqual(len(loops), 2 * count if loop else 0)
-            self.assertLess(took, 8)
+            self.assertLess(steps.call_count, 8 * count)
 
     def test_two_questions_merged_into_each_other_are_both_reported_and_drawn_marked(self):
         with tempfile.TemporaryDirectory() as d:
@@ -718,11 +719,10 @@ class MergeCycles(unittest.TestCase):
             for n in range(100, 2100):
                 write_entry(folder, seeded(f"Q-w2-{n}", status="merged", merged_into="Q-w2-4"))
             board.SCANS.clear()
-            started = time.monotonic()
-            errors = board.load(folder)["errors"]
-            took = time.monotonic() - started
+            with self.counting() as steps:
+                errors = board.load(folder)["errors"]
         self.assertEqual(errors, [])
-        self.assertLess(took, 10)
+        self.assertLess(steps.call_count, 4 * 2000)
 
     def test_a_long_chain_that_ends_is_not_a_loop(self):
         with tempfile.TemporaryDirectory() as d:
