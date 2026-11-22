@@ -1,0 +1,7 @@
+{
+  "title": "The answer is yes.",
+  "question": "Why?",
+  "panels": [
+    {"headline": "The slide states one clear point.", "source": "test", "kind": "text", "body": ["One."]}
+  ]
+}

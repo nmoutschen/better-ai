@@ -45,7 +45,6 @@ import test_architect_formats as architects  # noqa: E402
 import test_board_formats as boards  # noqa: E402
 import test_dashboard_formats as dashboards  # noqa: E402
 import test_page as pages  # noqa: E402
-import test_show_schema as shows  # noqa: E402
 
 ROOT = HERE.parent
 SKILLS = ROOT / "skills"
@@ -247,29 +246,6 @@ def board_commands(root: Path) -> list:
     ]
 
 
-def show_folder(root: Path) -> Path:
-    folder = root / "slides"
-    folder.mkdir()
-    (folder / "spec.json").write_text(json.dumps(shows.full_spec()), encoding="utf-8")
-    return folder
-
-
-def show_commands(root: Path) -> list:
-    folder = show_folder(root)
-    spec = folder / "spec.json"
-    return [
-        ["check", spec],
-        ["render", spec, "--out", root / "o.html"],
-        ["render", spec, "--format", "text"],
-        ["render", spec, "--format", "md", "--ascii"],
-        ["render", spec, "--format", "text", "--screen-reader"],
-        ["pending", folder],
-        ["reply", folder, "hello"],
-        ["status", folder, "seen", "m-1"],
-        ["wait", folder, "--timeout", "0.1"],
-    ]
-
-
 def canvas_folder(root: Path) -> Path:
     folder = root / "versions"
     folder.mkdir()
@@ -291,8 +267,8 @@ def canvas_commands(root: Path) -> list:
 
 def folder_with_a_reply(skill: str, root: Path) -> Path:
     """A folder holding a conversation log with one agent reply, written the way the skill's own script writes it."""
-    folder = {"show-better": show_folder, "design-better": canvas_folder}[skill](root)
-    module = module_of(SKILLS / skill / "scripts" / {"show-better": "show.py", "design-better": "canvas.py"}[skill])
+    folder = {"design-better": canvas_folder}[skill](root)
+    module = module_of(SKILLS / skill / "scripts" / {"design-better": "canvas.py"}[skill])
     with contextlib.redirect_stdout(io.StringIO()):
         module.conversation(folder).reply("hello", None)
     return folder
@@ -302,14 +278,12 @@ PROGRAMS = {
     "architect-better": "architect.py",
     "code-better": "dashboard.py",
     "research-better": "board.py",
-    "show-better": "show.py",
     "design-better": "canvas.py",
 }
 SCHEMA_FOLDERS = {
     "architect-better": lambda root: architects.make_folder(root),
     "code-better": lambda root: dashboards.change(root),
     "research-better": board_folder,
-    "show-better": lambda root: folder_with_a_reply("show-better", root),
     "design-better": lambda root: folder_with_a_reply("design-better", root),
 }
 
@@ -323,7 +297,6 @@ COMMANDS = {
     "architect-better/diagram.py": diagram_commands,
     "code-better/dashboard.py": dashboard_commands,
     "research-better/board.py": board_commands,
-    "show-better/show.py": show_commands,
     "design-better/canvas.py": canvas_commands,
 }
 
@@ -513,7 +486,7 @@ class Wrapper(unittest.TestCase):
 
     def test_every_script_that_runs_as_a_program_calls_one_wrapped_entry_point(self):
         scripts = scripts_with_main()
-        self.assertGreaterEqual(len(scripts), 11)  # architect, diagram, dashboard, board, show, canvas, five schema
+        self.assertGreaterEqual(len(scripts), 9)  # architect, diagram, dashboard, board, canvas, four schema
         for path in scripts:
             with self.subTest(script=name_of(path)):
                 entry, problems = entry_of(path)
@@ -521,7 +494,7 @@ class Wrapper(unittest.TestCase):
                 self.assertTrue(hasattr(getattr(module_of(path), entry), "__wrapped__"))
 
     def test_every_file_under_scripts_is_a_library_or_a_program_with_a_wrapped_entry_point(self):
-        self.assertGreaterEqual(len(all_scripts()), 16)
+        self.assertGreaterEqual(len(all_scripts()), 13)
         for path in all_scripts():
             with self.subTest(script=name_of(path)):
                 self.assertEqual(top_level_problems(path), [])
@@ -597,11 +570,6 @@ def board_serving(root: Path) -> tuple:
     return (folder, 0, False, 0.0), folder
 
 
-def show_serving(root: Path) -> tuple:
-    folder = show_folder(root)
-    return (served_page(folder), 0, False), folder
-
-
 def canvas_serving(root: Path) -> tuple:
     folder = canvas_folder(root)
     return (served_page(folder), 0, False), folder
@@ -612,7 +580,6 @@ HANDLERS = {
     "architect-better/architect.py": ("serve", architect_serving, "architect"),
     "code-better/dashboard.py": ("watch", dashboard_serving, "dashboard"),
     "research-better/board.py": ("watch", board_serving, "board"),
-    "show-better/show.py": ("serve", show_serving, "show"),
     "design-better/canvas.py": ("serve", canvas_serving, "canvas"),
 }
 PATHS = [
@@ -866,7 +833,6 @@ CONVERSATIONS = {
     "architect-better": ("architect.py", lambda root: architects.make_folder(root)),
     "code-better": ("dashboard.py", lambda root: dashboards.change(root)),
     "research-better": ("board.py", board_folder),
-    "show-better": ("show.py", lambda root: folder_with_a_reply("show-better", root)),
     "design-better": ("canvas.py", lambda root: folder_with_a_reply("design-better", root)),
 }
 
@@ -1047,7 +1013,6 @@ class Loaders(unittest.TestCase):
 PAGE_SKILLS = {
     "architect": "architect-better",
     "canvas": "design-better",
-    "show": "show-better",
     "board": "research-better",
     "dashboard": "code-better",
 }
@@ -1068,9 +1033,6 @@ def example_records() -> list:
         sample = kind.replace("<id>", "X-1").replace("<agent>", "agent")
         for item in items:
             found.append(("research-better", f"{kind}: {item['label']}", sample, item["record"]))
-    found.append(("show-better", "a spec of every kind of slide", "spec.json", shows.full_spec()))
-    for kind in shows.KIND_OK:
-        found.append(("show-better", f"a {kind} slide", "spec.json", shows.spec_of(shows.visual(kind))))
     for page_name, events in pages.VALID.items():
         for method, params in events.items():
             record = {"type": method, "at": AT, "by": "user", **params}
@@ -1184,20 +1146,6 @@ class Surrogates(unittest.TestCase):
                         self.assertNotIn("could not be", run.stderr)
                         self.assertRegex(run.stdout, r"not text|ud800")
 
-    def test_show_check_reports_one_in_any_part_of_a_spec_as_a_spec_error(self):
-        module = module_of(SKILLS / "show-better" / "scripts" / "show.py")
-        spec = shows.full_spec()
-        for place in sweep.cases(places(spec), key=lambda p: p[0]):
-            changed, at = with_a_surrogate(spec, place)
-            with self.subTest(place=place[1:]), tempfile.TemporaryDirectory() as d:
-                path = Path(d) / "spec.json"
-                path.write_text(json.dumps(changed), encoding="utf-8")
-                code, out, err, escaped = invoke(module, ["check", path])
-                self.assertIsNone(escaped)
-                self.assertEqual(code, 1)
-                self.assertTrue(encodable(out + err))
-                self.assertNotRegex(err, WRAPPER_LINE.pattern.replace("^", "(?m)^"))
-
 
 # ---------------------------------------------------------------- nesting far past the recursion limit, by command
 
@@ -1212,33 +1160,13 @@ def traceback_of(*args) -> str:
     return done.stderr.strip().splitlines()[-1] if "Traceback" in done.stderr else ""
 
 
-def spec_with(field_in_panel: bool, nested: str) -> str:
-    """A slides spec holding `nested` in the free `document` field, or as the body of a text panel."""
-    panel = {"headline": "A clear point here.", "kind": "text", "body": ["x"]}
-    text = json.dumps({"type": "slides", "title": "T", "document": "@@", "panels": [panel]})
-    if field_in_panel:
-        panel["body"] = "@@"
-        text = json.dumps({"type": "slides", "title": "T", "panels": [panel]})
-    return text.replace('"@@"', nested)
-
-
 class DeepInput(unittest.TestCase):
     def commands(self, root: Path, nested: str) -> dict:
         """The commands to run, by label, each on a file or folder that holds `nested` in one place."""
-        show = SKILLS / "show-better" / "scripts"
         code = SKILLS / "code-better" / "scripts"
         research = SKILLS / "research-better" / "scripts"
         commands = {}
-        for where, in_panel in (("document", False), ("body", True)):
-            path = root / f"{where}.json"
-            path.write_text(spec_with(in_panel, nested))
-            commands[f"show check {where}"] = [show / "show.py", "check", path]
-            commands[f"show render {where}"] = [show / "show.py", "render", path, "--out", root / "o.html"]
-            commands[f"schema check {where}"] = [show / "schema.py", "check", path]
-        slides = root / "slides"
-        slides.mkdir()
-        (slides / "conversation.jsonl").write_text('{"type":"note","id":"m-1","text":' + nested + "}\n")
-        commands["show pending"] = [show / "show.py", "pending", slides]
+        # show-better's own commands on a deeply nested spec and conversation are in tests/test_show.py
 
         folder = dashboards.change(root / "dash")
         with (folder / "tasks.jsonl").open("a") as f:
@@ -1273,10 +1201,19 @@ class IntegerTyping(unittest.TestCase):
     refuses 3.0 and the check, not the renderer, says so."""
 
     def test_every_integer_the_schemas_name_refuses_an_integral_float(self):
+        sys.path.insert(0, str(ROOT / "src"))
+        from better_ai import architect, code, design, research, show  # noqa: F401  (register their hooks)
+        from better_ai import schema as new_schema
+
         schema = schema_module()
         found = 0
-        for path in sorted(SKILLS.glob("*/schemas/*.schema.json")):
-            docs = schema.load_schemas(path.parent)
+        package = ROOT / "src" / "better_ai"
+        old = [(p, schema, [p.parent]) for p in sorted(SKILLS.glob("*/schemas/*.schema.json"))]
+        moved = [
+            (p, new_schema, [package / "schemas", p.parent]) for p in sorted(package.glob("*/schemas/*.schema.json"))
+        ]
+        for path, schema, folders in old + moved:
+            docs = schema.load_schemas(*folders)
             pending = [json.loads(path.read_text(encoding="utf-8"))]
             while pending:
                 node = pending.pop()
@@ -1291,34 +1228,6 @@ class IntegerTyping(unittest.TestCase):
                 elif isinstance(node, list):
                     pending.extend(node)
         self.assertGreater(found, 5)
-
-    def test_a_spec_that_check_accepts_with_an_integer_made_a_float_renders(self):
-        module = module_of(SKILLS / "show-better" / "scripts" / "show.py")
-        spec = shows.full_spec()
-        whole, pending = [], [(spec, ())]
-        while pending:  # each place that holds a whole number, as (the path to its holder, its key)
-            item, path = pending.pop()
-            pairs = item.items() if isinstance(item, dict) else enumerate(item) if isinstance(item, list) else ()
-            for key, child in pairs:
-                if isinstance(child, int) and not isinstance(child, bool):
-                    whole.append((path, key))
-                else:
-                    pending.append((child, (*path, key)))
-        self.assertTrue(whole)
-        for path, key in whole:
-            changed = copy.deepcopy(spec)
-            holder = changed
-            for step in path:
-                holder = holder[step]
-            holder[key] = float(holder[key])
-            with self.subTest(place=(*path, key)), tempfile.TemporaryDirectory() as d:
-                target = Path(d) / "spec.json"
-                target.write_text(json.dumps(changed), encoding="utf-8")
-                code, out, err, escaped = invoke(module, ["check", target])
-                if not code:  # check accepts it: the renderer must take it
-                    code, out, err, escaped = invoke(module, ["render", target, "--out", Path(d) / "o.html"])
-                    self.assertFalse(code, err)
-                    self.assertFalse(any(WRAPPER_LINE.match(line) for line in err.splitlines()), err)
 
 
 if __name__ == "__main__":

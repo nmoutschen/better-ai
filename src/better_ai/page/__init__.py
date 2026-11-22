@@ -780,8 +780,11 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     unit = _unit(args, run)
     spec = spec_of(run.skill)
     docs = load_docs(run.skill)
-    for error in schema.check_paths([unit.path], docs=docs, now=run.now(), cutoff=run.info.cutoff):
+    notices: list[schema.Error] = []
+    for error in schema.check_paths([unit.path], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices):
         run.err(f"warning: {error}")
+    for notice in notices:  # a record in the format before this change is kept as is: a note, not a problem
+        run.err(str(notice))
     conv = Conversation(unit, spec, docs)
     server = make_server(unit, spec, conv, run.info, args.port)
     url = f"http://127.0.0.1:{server.server_address[1]}/"
@@ -798,6 +801,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     serving = threading.Thread(target=server.serve_forever, daemon=True)
     try:
         if args.once:
+            server.daemon_threads = False  # server_close then waits for the thread that answers, so the answer is sent
             server.handle_request()
             return 0
         serving.start()

@@ -754,7 +754,9 @@ def set_(args: argparse.Namespace, run: Run) -> int:
     for_agent = paths.check_agent(args.for_agent, "--for name") if args.for_agent is not None else None
     found = _locate(unit, lay, args.ref, for_agent)
     label = found.record.get("type")
-    patch = _own_fields(_fields(run, unit), unit, label if isinstance(label, str) else "")
+    if not isinstance(label, str):  # a record from before `type` existed is the type its place says
+        label = args.ref if args.ref in lay.forms else ""
+    patch = _own_fields(_fields(run, unit), unit, label)
     _deadline(patch, run, unit)
     first = _merged(found.record, patch, args.unset, keep_null=True)
     candidates = [first]

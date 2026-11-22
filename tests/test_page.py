@@ -379,18 +379,6 @@ VALID = {
         "accept": {"to": "c1-x"},
         "reopen": {"to": "c1-x", "text": "still wrong"},
     },
-    "show": {
-        "comment": {
-            "id": "c1-x",
-            "n": 1,
-            "text": "which source?",
-            "on": {"slide": 2, "part": "headline", "headline": "H", "target": {}, "spot": {"fx": 0.1, "fy": 0.2}},
-        },
-        "note": {"id": "m-x", "text": "hi", "to": None, "on": {"slide": 2, "part": "Does it arrive?"}},
-        "delete": {"to": "c1-x"},
-        "accept": {"to": "c1-x"},
-        "reopen": {"to": "c1-x", "text": "still wrong"},
-    },
     "board": {
         "comment": {"id": "c-x", "text": "check this", "on": ANCHOR},
         "note": {"id": "m-x", "text": "hi", "to": None},
@@ -427,7 +415,6 @@ ARCHITECT_FILES = {
 INVALID = {
     "architect": ("confirm", {"id": "confirm-x", "requirement": "F1", "text": "t"}, "wording"),
     "canvas": ("comment", {**VALID["canvas"]["comment"], "text": None}, "verdict"),
-    "show": ("comment", {**VALID["show"]["comment"], "on": {"part": "headline"}}, "slide"),
     "board": ("answer", {"id": "a-x", "text": "t", "default": False}, "decision"),
     "dashboard": ("answer", {"id": "a-x", "decision": "D1", "text": "", "default": False}, "text"),
 }
@@ -441,7 +428,6 @@ class Pages(unittest.TestCase):
         return {
             "architect": load("architect-better", "architect.py"),
             "canvas": load("design-better", "canvas.py"),
-            "show": load("show-better", "show.py"),
             "board": load("research-better", "board.py"),
             "dashboard": load("code-better", "dashboard.py"),
         }
@@ -550,7 +536,7 @@ class Pages(unittest.TestCase):
             conv, base = self.serve(load("design-better", "canvas.py"), Path(d))
             thumbs = {**VALID["canvas"]["comment"], "id": "c2-x", "text": None, "verdict": "up"}
             self.assertEqual(self.send(base, "comment", thumbs).get("result"), "saved")
-        for name in ("show", "board"):
+        for name in ("board",):
             with tempfile.TemporaryDirectory() as d:
                 conv, base = self.serve(self.modules()[name], Path(d))
                 thumbs = {**VALID[name]["comment"], "text": None, "verdict": "up"}
@@ -626,25 +612,6 @@ class Scripts(unittest.TestCase):
             script = str(ROOT / "skills" / "design-better" / "scripts" / "canvas.py")
             cmd = [sys.executable, "-I", script, "show", str(folder / "a.html"), "--out", str(folder / "page.html")]
             self.serve_and_talk([*cmd, "--serve"], folder, "rev")
-
-    def test_show_better_slides(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = Path(d)
-            panel = {"kind": "text", "headline": "The slide states one point.", "body": "Text.", "source": "test"}
-            (folder / "spec.json").write_text(
-                json.dumps({"type": "slides", "title": "T", "question": "Q?", "panels": [panel]})
-            )
-            script = str(ROOT / "skills" / "show-better" / "scripts" / "show.py")
-            cmd = [
-                sys.executable,
-                "-I",
-                script,
-                "render",
-                str(folder / "spec.json"),
-                "--out",
-                str(folder / "page.html"),
-            ]
-            self.serve_and_talk([*cmd, "--serve"], folder, "rev", {"on": {"slide": 1, "part": None}})
 
     def test_research_better_board(self):
         with tempfile.TemporaryDirectory() as d:

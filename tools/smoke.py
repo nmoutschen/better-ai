@@ -69,7 +69,7 @@ def run_serve(args: list[str], cwd: Path, label: str) -> str | None:
         for line in proc.stdout:
             found = re.search(r"https?://\S+", line)
             if found:
-                url = found.group(0)
+                url = found.group(0).rstrip(".")  # the sentence around the address ends with a period
                 break
         if url is None:
             return f"{label}: printed no URL; stderr: {proc.stderr.read().strip()[:200]}"

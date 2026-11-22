@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from . import paths, resources, schema
-from .paths import Refused
+from .paths import Refused, Unit
 from .skill import Skill
 
 EXIT_DONE, EXIT_REFUSED, EXIT_USAGE, EXIT_TIMEOUT, EXIT_BUSY, EXIT_BUG = 0, 1, 2, 3, 4, 5
@@ -62,7 +62,7 @@ class Run:
     stderr: Any = field(default=None)
 
     def out(self, text: str = "") -> None:
-        print(text, file=self.stdout or sys.stdout)
+        print(text, file=self.stdout or sys.stdout, flush=True)  # a served page's address must reach a reader at once
 
     def err(self, text: str) -> None:
         print(text, file=self.stderr or sys.stderr)
@@ -202,6 +202,20 @@ def main(argv: list[str] | None = None, *, stdin: Any = None) -> int:
 # ---------------------------------------------------------------- check
 
 
+CHECK_STEPS: dict[str, list[Callable[[Unit, Run], int | None]]] = {}
+
+
+def check_step(skill: str):
+    """Register a step `fn(unit, run) -> int | None` that a skill's `check` runs after every record passed its schemas,
+    for what the schemas cannot say. A step prints its own lines and returns 1 when it found an error."""
+
+    def register(function):
+        CHECK_STEPS.setdefault(skill, []).append(function)
+        return function
+
+    return register
+
+
 def _check_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("unit", help="the unit to check, such as .code/my-change")
 
@@ -225,4 +239,7 @@ def check(args: argparse.Namespace, run: Run) -> int:
         run.out(str(error))
     for notice in notices:
         run.out(str(notice))
-    return EXIT_REFUSED if errors else EXIT_DONE
+    if errors:
+        return EXIT_REFUSED
+    stopped = [step(unit, run) for step in CHECK_STEPS.get(run.skill.name, [])]
+    return EXIT_REFUSED if any(stopped) else EXIT_DONE

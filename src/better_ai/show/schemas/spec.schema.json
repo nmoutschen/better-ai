@@ -2,25 +2,44 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "spec.schema.json",
   "title": "a show-better presentation spec: .show/<slug>/spec.json",
-  "$comment": "The shape of the spec: types, required fields, allowed values, and what its parts say about each other, which the show_spec hook in schema.py checks: the node an edge names, the set a region names, a lane step's actor, the cells of a matrix or table row, a tree's sums, a map's sections, an action's panel, the overview and the focus. show.py keeps what only the drawing knows (a tree's depth, the number of units, a negative bar, an svg's elements), the readability warnings and the digest. A spec is a document a renderer draws, so it has `type` and may have `at` and `by`, not an `id`.",
+  "$comment": "The shape of the spec: types, required fields, allowed values, and what its parts say about each other, which the show_spec hook (show/checks.py) checks: the node an edge names, the set a region names, a lane step's actor, the cells of a matrix or table row, a tree's sums, a map's sections, an action's panel, the overview and the focus. the deck module keeps what only the drawing knows (a tree's depth, the number of units, a negative bar, an svg's elements), the readability warnings and the digest. A spec is a document a renderer draws, so it has `type`, `at` and `by`, and no `id`. A spec written before `at` and `by` were required meets `old_spec` and is kept as is.",
   "x-files": ["spec.json"],
   "x-check": "show_spec",
   "type": "object",
-  "required": ["type", "title", "panels"],
+  "required": ["type", "at", "by", "title", "panels"],
+  "allOf": [{"$ref": "#/$defs/spec_fields"}],
   "properties": {
     "type": {"const": "slides"},
-    "at": {"anyOf": [{"$ref": "base.schema.json#/$defs/at"}, {"type": "null"}]},
-    "by": {"anyOf": [{"$ref": "base.schema.json#/$defs/by"}, {"type": "null"}]},
-    "title": {"$ref": "#/$defs/text"},
-    "question": {"type": ["string", "null"]},
-    "summary": {"type": ["string", "null"]},
-    "source": {"type": ["string", "null"]},
-    "lang": {"type": ["string", "null"]},
-    "document": {"$ref": "#/$defs/document"},
-    "style": {"$ref": "#/$defs/style"},
-    "panels": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/panel"}}
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"}
   },
+  "x-old-format": [{"$ref": "#/$defs/old_spec"}],
   "$defs": {
+    "spec_fields": {
+      "description": "the fields of a spec besides type, at and by",
+      "type": "object",
+      "properties": {
+        "title": {"$ref": "#/$defs/text"},
+        "question": {"type": ["string", "null"]},
+        "summary": {"type": ["string", "null"]},
+        "source": {"type": ["string", "null"]},
+        "lang": {"type": ["string", "null"]},
+        "document": {"$ref": "#/$defs/document"},
+        "style": {"$ref": "#/$defs/style"},
+        "panels": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/panel"}}
+      }
+    },
+    "old_spec": {
+      "description": "a spec from before `at` and `by` were required, or before `type` existed: kept as is, not converted",
+      "type": "object",
+      "required": ["title", "panels"],
+      "allOf": [{"$ref": "#/$defs/spec_fields"}],
+      "properties": {
+        "type": {"const": "slides"},
+        "at": {"anyOf": [{"$ref": "base.schema.json#/$defs/at"}, {"type": "null"}]},
+        "by": {"anyOf": [{"$ref": "base.schema.json#/$defs/by"}, {"type": "null"}]}
+      }
+    },
     "text": {"type": "string", "minLength": 1},
     "detail": {
       "description": "what opens under a visual when its label or mark is clicked",

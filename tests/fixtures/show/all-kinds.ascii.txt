@@ -1,0 +1,282 @@
+Why?
+THE ANSWER.
+---------------
+
+-- 2/27 ----------------------------------------------------------------
+The slide states one clear point.
+
+> Intro
+   why
+
+Source: test
+
+-- 3/27 ----------------------------------------------------------------
+The slide states one clear point.
+
+>A
+  `-- causes -> B
+
+Source: test
+
+-- 4/27 ----------------------------------------------------------------
+The slide states one clear point.
+
++--------------------------------+    +--------------------------------+
+| One                            | -> | Two                            |
++--------------------------------+    +--------------------------------+
+1. n
+-> means: then
+
+Source: test
+
+-- 5/27 ----------------------------------------------------------------
+The slide states one clear point.
+
++>---------------------------------------------+
+| G                                            |
+| * x                                          |
+| * y                                          |
++----------------------------------------------+
+
+Source: test
+
+-- 6/27 ----------------------------------------------------------------
+The slide states one clear point.
+
+All                                                           5 people  100%
+|-- A                                    ############         3 people  60%
+`-- B                                    ########             2 people  40%
+
+Source: test
+
+-- 7/27 ----------------------------------------------------------------
+The slide states one clear point.
+
+     1
+P ========
+Q ========
+
+1 both (3): in P & Q
+
+Source: test
+
+-- 8/27 ----------------------------------------------------------------
+The slide states one clear point.
+
+          c1              c2
+ r        .               ^
+ s        Y               N
+
+Y yes   N no   ^ higher   . not measured
+
+Source: test
+
+-- 9/27 ----------------------------------------------------------------
+The slide states one clear point.
+
+                                           Lowers   No clear   Raises
+                                                     effect
+G
+ f (on o)                                                        ^
+
+^ raises
+
+Source: test
+
+-- 10/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+                    A                         B
+------------------------------------------------------------------------
+ r                  ^ x                         y
+
+^ raises
+
+Source: test
+
+-- 11/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+^ Value: high
+                                   |
+ * o                               |
+                                   |
+ ----------------------------------+----------------------------------
+                                   |
+                                   |
+                                   |
+v low
+Effort: small (left) -> large (right)
+Positions: judgment
+
+Source: test
+
+-- 12/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+  12%
+    of users
+  4
+    x
+
+Source: test
+
+-- 13/27 ---------------------------------------------------------------
+The slide states one clear point.
+
++ + + . .
+
++ 3 p
+. 2 q
+Each mark is one of 5 q.
+
+Source: test
+
+-- 14/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+ a ##############################################################   3
+ b ####################################################           2.5
+   Unit: ms. Bars start at zero.
+
+Source: test
+
+-- 15/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+       2020    2021      change
+ a        1 ->  2         ^ +1
+Values in %.
+
+Source: test
+
+-- 16/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+ g |                   @                  @                           @
+   |                                      ^ median 2
+   +-------------------------------------------------------------------
+    0                                                               3.5
+Values in ms; taller marks mean more values in that range.
+
+Source: test
+
+-- 17/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+y (u)
+3 |                                                           *
+  |
+  |
+  |
+  |
+  |                             *
+  |
+  |
+  |
+  |
+  |
+  |
+  |
+0 |
+  +------------------------------------------------------------
+   0                                                          2
+   x (u)
+* p: 1, 2
+
+Source: test
+
+-- 18/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+ s  +@  1 -> 2 %
+    2020 … 2021  (year)
+
+Source: test
+
+-- 19/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+2020 o start
+Events in order; spacing does not show the time between them.
+
+Source: test
+
+-- 20/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+ ITEM  N (MS)
+ ----  ------
+>a          1
+ b          2
+
+Source: test
+
+-- 21/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+One short paragraph.
+
+Source: test
+
+-- 22/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+[Diagram] a box
+
+Source: test
+
+-- 23/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+ A | 1. one
+     v hand-off to B
+>B | 2. two
+
+Source: test
+
+-- 24/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+in
+  -> who
+    |-- x: ^ helps
+    `-- y: x never, n
+
+Source: test
+
+-- 25/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+A: Before
+
+ a ##############################################################   3
+ b ####################################################           2.5
+   Unit: ms. Bars start at zero.
+
+B: After
+
+ a ##############################################################   3
+ b ####################################################           2.5
+   Unit: ms. Bars start at zero.
+
+Source: test Read: Results.
+
+-- 26/27 ---------------------------------------------------------------
+The slide states one clear point.
+
+12%
+of users left.
+against 4% before
+
+Source: test
+
+-- 27/27 Next ----------------------------------------------------------
+The slide states one clear point.
+
+A short paragraph.
+
+1. Read it (slide 2)
+
+Source: test
+

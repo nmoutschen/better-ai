@@ -867,7 +867,8 @@ def _meets_old_format(record: dict, found: list[tuple[str, dict]], docs: dict, c
     """True when the record is from before the cutoff and has the shape the schemas kept as `x-old-format`: every
     schema it fails lists an old shape it meets in full."""
     at = record.get("at")
-    if not isinstance(at, str) or not at < cutoff:  # times in UTC with Z sort as text
+    # Times in UTC with Z sort as text. A record with no `at` at all was written before records had one.
+    if "at" in record and (not isinstance(at, str) or not at < cutoff):
         return False
     for _, schema in found:
         if not validate_record(record, [schema], docs, context):
@@ -875,7 +876,10 @@ def _meets_old_format(record: dict, found: list[tuple[str, dict]], docs: dict, c
         olds = schema.get("x-old-format")
         if not isinstance(olds, list):
             return False
-        if not any(not Validator(docs, context, "off").validate(record, old, (), schema) for old in olds):
+        try:
+            if not any(not Validator(docs, context, "off").validate(record, old, (), schema) for old in olds):
+                return False
+        except RecursionError:  # too deeply nested to meet any shape: the record's own error stands
             return False
     return True
 
