@@ -851,7 +851,13 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
         run.err(f"notice: {notice}")
     conv = Conversation(unit, spec, docs)
     conv.lines()  # a log that cannot be read is refused here, not found by the first request
-    server = make_server(unit, spec, conv, run.info, args.port)
+    try:
+        server = make_server(unit, spec, conv, run.info, args.port)
+    except OSError as error:  # a port that is taken or not allowed is a refusal with a way out, not a bug
+        reason = (error.strerror or type(error).__name__).lower()
+        raise paths.refusal(
+            unit.label, f"cannot be served on port {args.port} ({reason})", f"serve {unit.label} on a free port"
+        ) from None
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     paths.write_state(unit, ADDRESS, url.encode())
     if not unit.target(SEEN).exists():  # a resumed run keeps its place, so it still sees what came in while it was away
