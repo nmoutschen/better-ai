@@ -1201,6 +1201,114 @@ class ChildrenAndRenderCrashes(unittest.TestCase):
             show.render_text(spec)
 
 
+def spec_variants(values):
+    """(label, spec) for every leaf of every valid spec set to each of `values`, and removed."""
+
+    def leaves(o, path=()):
+        yield path
+        if isinstance(o, dict):
+            for k, v in o.items():
+                yield from leaves(v, (*path, k))
+        elif isinstance(o, list):
+            for i, v in enumerate(o):
+                yield from leaves(v, (*path, i))
+
+    bases = [spec_of(visual(k)) for k in KIND_OK] + [spec_of(copy.deepcopy(p)) for p in OTHER_PANELS.values()]
+    for base in bases:
+        for path in leaves(base):
+            if not path:
+                continue
+            for value in [*values, "<delete>"]:
+                spec = copy.deepcopy(base)
+                target = spec
+                for step in path[:-1]:
+                    target = target[step]
+                if value == "<delete>":
+                    target.pop(path[-1])
+                else:
+                    target[path[-1]] = copy.deepcopy(value)
+                yield (
+                    f"{base['panels'][0].get('kind', base['panels'][0].get('template'))} {list(path)} = {value!r}",
+                    spec,
+                )
+
+
+class SchemaAndShowAgree(unittest.TestCase):
+    """Decided 24: schema.py alone rejects what show.py check rejects for its shape. Both read the same schema, so a spec
+    one refuses for its shape the other does too; show.py adds only what the drawing cannot show."""
+
+    def test_a_spec_the_schema_refuses_is_refused_by_show_py_check_too(self):
+        for label, spec in spec_variants([5, {}, ["x"]]):
+            if shape_problems(spec) and not show.check(copy.deepcopy(spec))[0]:
+                self.fail(f"schema.py refuses {label} and show.py check accepts it")
+
+    def test_a_null_is_judged_the_same_by_the_schema_file_check_and_by_show_py(self):
+        """Only show.py strips nulls before it checks, so the two once differed on a null where a value was needed."""
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "spec.json"
+            for label, spec in spec_variants([None]):
+                path.write_text(json.dumps(spec))
+                refused_by_schema = bool(schema.check_paths([path], SCHEMAS))
+                if refused_by_schema != bool(show.check(copy.deepcopy(spec))[0]):
+                    self.fail(f"{label}: schema.py check says {refused_by_schema}, show.py check the opposite")
+
+
+class FilesThatAreNotSpecs(unittest.TestCase):
+    """The command line answers 1 and never a traceback for a file that holds something other than a spec (verifier of
+    the show-better schema change)."""
+
+    def contents(self):
+        # Built as text: json.dumps of a tree this deep raises RecursionError on Python 3.10.
+        def deep_tree(depth):
+            node = '{"label":"n","children":[' * depth + '{"label":"leaf","value":1}' + "]}" * depth
+            return (
+                '{"type":"slides","title":"T","panels":[{"headline":"A deep tree.","kind":"tree","root":' + node + "}]}"
+            )
+
+        text = {"headline": "x", "kind": "text", "body": [[[[[[[[[[["x"]]]]]]]]]]]}
+        bars = '{"type":"slides","title":"t","panels":[{"headline":"Bars show a clear point.","kind":"bars","items":[{"label":"a","value":%s}]}]}'
+        return {
+            "an array": "[]",
+            "a number": "5",
+            "null": "null",
+            "panels that is text": '{"type":"slides","title":"t","panels":"x"}',
+            # 1200 levels is past what Python 3.10's json reads (that case ends in "nested too deeply to read" before
+            # show.py's own check runs); 300 is one both read, so it reaches the check on every version.
+            "a tree 1200 deep": deep_tree(1200),
+            "a tree 300 deep": deep_tree(300),
+            "a body nested 11 deep": json.dumps({"type": "slides", "title": "T", "panels": [text]}),
+            "a bar value NaN": bars % "NaN",
+            "a bar value Infinity": bars % "Infinity",
+        }  # fmt: skip
+
+    def test_check_never_prints_a_traceback_and_a_spec_that_is_not_one_exits_1(self):
+        for name, content in self.contents().items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as d:
+                path = Path(d) / "spec.json"
+                path.write_text(content)
+                for script in ("show.py", "schema.py"):
+                    done = subprocess.run(
+                        [sys.executable, "-I", str(SHOW / "scripts" / script), "check", str(path)],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotIn("Traceback", done.stderr, (script, done.stderr[-300:]))
+                    if name in (
+                        "an array",
+                        "a number",
+                        "null",
+                        "panels that is text",
+                        "a bar value NaN",
+                        "a bar value Infinity",
+                    ):
+                        self.assertEqual(done.returncode, 1, (script, done.stdout, done.stderr))
+
+    def test_a_bar_that_is_not_finite_is_refused_before_the_text_render(self):
+        spec = json.loads(self.contents()["a bar value NaN"].replace("NaN", "1"))
+        spec["panels"][0]["items"][0]["value"] = float("nan")
+        self.assertTrue(show.check(spec)[0])
+
+
 class DesignBetterFixtures(unittest.TestCase):
     """The planted conversations of the design-better eval cases are typed events canvas.py reads."""
 

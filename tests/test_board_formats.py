@@ -750,5 +750,157 @@ class WrongTypes(unittest.TestCase):
         return data
 
 
+class ConversationEvents(unittest.TestCase):
+    """Every kind of event the board's conversation holds (the verifier of the strip fix found events of some kinds
+    never tried), each field given each wrong value: `load` and `check` do not fail and the page's thread draws it."""
+
+    AT = "2026-11-21T10:00:00Z"
+
+    def events(self) -> list:
+        at = self.AT
+        return [
+            {"type": "note", "at": at, "by": "user", "id": "m-1", "text": "hi", "to": None},
+            {"type": "comment", "at": at, "by": "user", "id": "c-1", "text": "t", "on": {"kind": "question", "id": "Q-w2-4", "title": "t"}},
+            {"type": "reply", "at": at, "by": "coordinator", "id": "r-1", "text": "ok", "to": "m-1"},
+            {"type": "status", "at": at, "by": "coordinator", "to": "m-1", "status": "done"},
+            {"type": "status", "at": at, "by": "coordinator", "to": "c-1", "status": "asked"},
+            {"type": "accepted", "at": at, "by": "coordinator", "to": "c-1", "text": "fine"},
+            {"type": "closed", "at": at, "by": "w2", "id": "x-1", "question": "Q-w2-4", "status": "answered"},
+            {"type": "answer", "at": at, "by": "user", "id": "a-lq3z", "decision": "D1", "text": "go on", "default": False},
+        ]  # fmt: skip
+
+    def test_the_events_are_valid_as_written(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_lines(folder, "conversation.jsonl", self.events())
+            board.SCANS.clear()
+            data = board.load(folder)
+        self.assertEqual([e["line"] for e in data["errors"] if e["file"] == "conversation.jsonl"], [])
+        self.assertEqual([e["type"] for e in data["conversation"]], [e["type"] for e in self.events()])
+
+    def test_no_wrong_type_in_any_event_breaks_load_check_or_the_thread(self):
+        payloads = []
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            for label, changed in wrong_types.variants(self.events()):
+                with self.subTest(label):
+                    write_lines(folder, "conversation.jsonl", changed)
+                    board.SCANS.clear()
+                    data = board.load(folder)
+                    json.dumps(data, allow_nan=False)
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        board.check(folder)
+                    payloads.append({"label": label, "data": data})
+        self.assertGreater(len(payloads), 500)
+        node = shutil.which("node")
+        if node:
+            with tempfile.TemporaryDirectory() as d:
+                path = Path(d) / "payloads.json"
+                path.write_text(json.dumps(payloads))
+                script = ROOT / "tests" / "render-board-thread.js"
+                run = subprocess.run([node, str(script), str(path)], capture_output=True, text=True, timeout=300)
+            self.assertEqual(run.returncode, 0, run.stderr[:3000])
+
+
+class RawFiles(unittest.TestCase):
+    """What a JSON entry or a log can hold instead of a record (NaN, Infinity, nesting 100,000 deep, an array, a line
+    that is not JSON): `load`, `check` and the JSON the board serves do not fail, and the page draws what is left."""
+
+    def put_text(self, folder: Path, relative: str, text: str) -> None:
+        (folder / relative).parent.mkdir(parents=True, exist_ok=True)
+        (folder / relative).write_text(text, encoding="utf-8")
+
+    def cases(self) -> list:
+        deep = "[" * 100000 + "]" * 100000
+        one = json.dumps(seeded("Q-w9-1"))
+        when = "2026-11-21T10:00:00Z"
+        return [
+            ("question raw NaN", "questions/Q-w9-1.json", "NaN"),
+            ("question title NaN", "questions/Q-w9-1.json", one.replace('"title": ', '"title": NaN, "t2": ')),
+            ("question extra NaN", "questions/Q-w9-1.json", one[:-1] + ', "extra": NaN}'),
+            ("question priority Infinity", "questions/Q-w9-1.json", one.replace('"priority": "high"', '"priority": Infinity')),
+            ("question deep", "questions/Q-w9-1.json", deep),
+            ("question deep in a field", "questions/Q-w9-1.json", one[:-1] + ', "extra": ' + deep + "}"),
+            ("question array", "questions/Q-w9-1.json", "[1]"),
+            ("question status 5", "questions/Q-w9-1.json", json.dumps(seeded("Q-w9-1", status=5))),
+            ("question status not a status", "questions/Q-w9-1.json", json.dumps(seeded("Q-w9-1", status="answred"))),
+            ("brief not JSON", "brief.json", "{"),
+            ("brief NaN", "brief.json", '{"status": NaN}'),
+            ("brief status a list", "brief.json", '{"status": ["stopped"]}'),
+            ("decisions NaN", "decisions.jsonl", '{"id":"D9","x":NaN}\n'),
+            ("log NaN", "logs/w2.jsonl", '{"type":"search","by":"w2","question":NaN}\n'),
+            ("log wrong types", "logs/w2.jsonl", json.dumps({"type": "search", "at": when, "by": "w2", "question": ["Q-w2-4"], "query": "x", "new_terms": 5}) + "\n"),
+            ("conversation note NaN text", "conversation.jsonl", '{"type":"note","at":"' + when + '","by":"user","id":"m-1","text":NaN,"to":null}\n'),
+            ("conversation note extra NaN", "conversation.jsonl", '{"type":"note","at":"' + when + '","by":"user","id":"m-1","text":"hi","to":null,"x":NaN}\n'),
+            ("conversation unknown type NaN", "conversation.jsonl", '{"type":"zzz","at":"' + when + '","by":"user","x":NaN}\n'),
+            ("conversation deep", "conversation.jsonl", deep + "\n"),
+        ]  # fmt: skip
+
+    def test_no_file_breaks_load_check_the_served_json_or_the_page(self):
+        payloads = []
+        for label, relative, text in self.cases():
+            with self.subTest(label), tempfile.TemporaryDirectory() as d:
+                folder = Path(d)
+                support(folder)
+                self.put_text(folder, relative, text)
+                board.SCANS.clear()
+                data = board.load(folder)
+                json.dumps(data, allow_nan=False)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    board.check(folder)
+                self.assertTrue([e for e in data["errors"] if e["file"] == relative], "the bad file is listed")
+                payloads.append({"label": label, "data": json.loads(json.dumps(data, allow_nan=False))})
+        result = render(payloads)
+        if result:
+            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+
+
+class BoardsOfSize(unittest.TestCase):
+    def test_a_large_valid_board_loads_in_seconds_and_its_watch_tick_does_too(self):
+        """A bound far above what a scan takes (under a second here), to catch a scan that went quadratic."""
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            for i in range(150):
+                write_entry(folder, seeded(f"Q-w1-{i + 10}"))
+            for i in range(300):
+                write_entry(folder, source(f"S-w1-{i + 10}"))
+            for i in range(750):
+                write_entry(
+                    folder, claim(f"C-w1-{i + 10}", question=f"Q-w1-{10 + i % 150}", source=f"S-w1-{10 + i % 300}")
+                )
+            search = example("logs/<agent>.jsonl", "search")
+            for agent in range(4):
+                write_lines(folder, f"logs/w{agent}.jsonl", [{**search, "by": f"w{agent}"}] * 200)
+            board.SCANS.clear()
+            started = time.monotonic()
+            data = board.load(folder)
+            loaded = time.monotonic() - started
+            started = time.monotonic()
+            board.board_stopped(folder)
+            board.announce_closes(board.conversation(folder), initial=True)
+            ticked = time.monotonic() - started
+        self.assertEqual(data["errors"], [])
+        self.assertEqual(len(data["claims"]), 750 + 2)
+        self.assertLess(loaded, 30)
+        self.assertLess(ticked, 30)
+
+    def test_a_question_merged_into_an_out_of_scope_one_is_drawn_with_its_claims(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d)
+            support(folder)
+            write_entry(folder, seeded("Q-w2-8", status="merged", merged_into="Q-w2-9"))
+            write_entry(folder, seeded("Q-w2-9", status="out of scope"))
+            write_entry(folder, claim("C-w2-9", question="Q-w2-8"))
+            data = board.load(folder)
+        self.assertEqual(data["errors"], [])
+        self.assertIn("C-w2-9", [c["id"] for c in data["claims"]])
+        result = render([{"label": "merged into out of scope", "data": data}])
+        if result:
+            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+
+
 if __name__ == "__main__":
     unittest.main()
