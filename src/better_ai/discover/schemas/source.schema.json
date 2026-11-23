@@ -32,7 +32,7 @@
             "required": ["type", "url", "read"],
             "properties": {
               "type": {"const": "web"},
-              "url": {"description": "an http or https address", "type": "string", "pattern": "^https?://[^\\s]+$"},
+              "url": {"description": "an http or https address of a public page", "type": "string", "pattern": "^https?://[^\\s]+$", "x-public-url": true},
               "read": {"description": "how the analyst read the page", "enum": ["raw", "extracted", "snippet", "blocked"]}
             }
           }
