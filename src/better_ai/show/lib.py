@@ -1,41 +1,17 @@
 """What every kind of slide shares: the limits, the palette, the glyphs and the helpers for HTML, SVG and plain text."""
 
 import html
+import json
 import math
 import re
 import textwrap
 
-KINDS = (
-    "map",
-    "concept",
-    "flow",
-    "groups",
-    "tree",
-    "sets",
-    "matrix",
-    "effects",
-    "pairs",
-    "quadrant",
-    "numbers",
-    "units",
-    "bars",
-    "slope",
-    "dots",
-    "scatter",
-    "line",
-    "timeline",
-    "table",
-    "text",
-    "svg",
-    "lanes",
-    "fork",
-)
-TEMPLATES = ("visual", "compare", "statement", "title")
-OVERVIEW_KINDS = ("flow", "timeline", "concept", "groups")  # kinds that can be the deck's overview
+from .. import resources
+
+# The spec schema lists the kinds once. It is read as plain JSON: the hooks it names are not registered yet.
+KINDS = tuple(json.loads(resources.read_text("show/schemas/spec.schema.json"))["$defs"]["kind"]["enum"])
 SHARED_SCALE = ("bars", "dots", "slope", "line", "scatter")  # in a compare, both sides of one of these share a scale
-EVIDENCE = ("strong", "moderate", "weak", "stated")
 EVIDENCE_WORDS = {"strong": "strong evidence", "moderate": "moderate evidence", "weak": "weak evidence"}
-MARKED_KINDS = ("dots", "effects", "fork", "lanes")  # one mark per item: an item's evidence sets the mark's fill
 OUTCOMES = {"helps": ("up", "helps"), "hurts": ("dn", "hurts"), "never": ("x", "never"), "neutral": ("same", "neutral")}
 
 
