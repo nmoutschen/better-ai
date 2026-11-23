@@ -234,15 +234,16 @@ def _brief_rules(record: dict, context: Context) -> list[tuple[str, str]]:
                 f"{', '.join(BRIEF_MOVES[:-1])} and {BRIEF_MOVES[-1]} do",
             )
         )
-    earlier = []
-    for other in _rows(context, "briefs.jsonl"):  # the briefs before this one: all of them when it is being added
-        if other.get("id") == record.get("id"):
-            break
-        earlier.append(other)
-    for other in earlier:
+    mine = record.get("id")
+    briefs = _rows(context, "briefs.jsonl")
+    if record.get("status") == "draft":
+        rivals = [b for b in briefs if b.get("id") != mine]  # a draft is held against every other brief
+    else:
+        rivals = briefs[: next((i for i, b in enumerate(briefs) if b.get("id") == mine), len(briefs))]  # the earlier
+    for other in rivals:
         if other.get("move") == record.get("move") and other.get("status") == "draft":
             problems.append(
-                ("move", f"{other.get('id')} is already the brief for {record.get('move')}: change it with set")
+                ("move", f"{other.get('id')} is already the draft brief for {record.get('move')}: change it with set")
             )
     if record.get("status") == "final":
         problems += _final_problems(record, context)

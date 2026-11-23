@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .. import cli, paths, schema
-from ..page import open_items
+from ..page import all_items
 from ..paths import Unit
 from . import SKILL, derive
 from .rules_moves import BRIEF_MOVES
@@ -103,34 +103,22 @@ def _at(record: dict) -> datetime | None:
 
 @dataclass
 class Events:
-    tracked: dict[str, dict]  # the user's events by id, in their latest version
-    state: dict[str, str]  # id -> `done`, `accepted`, or the status last given
-    replied: set[str]  # ids an agent replied to
-    open: list[tuple[dict, str, dict]]  # (event, state, extra) of each item not done or accepted: page.open_items
+    """The user's events, read once by the page's own rules (`page.all_items`), so no skill reads them a second way."""
+
+    found: list[tuple[dict, str, dict]]  # (event, state, extra) of every item
+
+    @property
+    def open(self) -> list[tuple[dict, str, dict]]:
+        return [f for f in self.found if f[1] not in ("done", "accepted")]
+
+    @staticmethod
+    def answered(extra: dict) -> bool:
+        """An agent replied under the item."""
+        return any(t.get("from") != "user" for t in extra.get("thread", []))
 
 
 def read_events(lines: list[dict], agent: str = "coordinator") -> Events:
-    tracked: dict[str, dict] = {}
-    state: dict[str, str] = {}
-    replied: set[str] = set()
-    for line in lines:
-        kind, ident, to = line.get("type"), line.get("id"), line.get("to")
-        if kind == "status" and isinstance(to, str):
-            state[to] = str(line.get("status"))
-        elif kind in ("accept", "accepted") and isinstance(to, str):
-            state[to] = "accepted"
-        elif kind == "reopen" and isinstance(to, str):
-            state[to] = "reopened"
-        elif kind == "reply" and isinstance(to, str):
-            replied.add(to)
-        elif (
-            line.get("by") == "user"
-            and isinstance(ident, str)
-            and ident
-            and (kind in USER_EVENTS or (kind == "note" and not to))
-        ):
-            tracked[ident] = line
-    return Events(tracked, state, replied, open_items(lines, (*USER_EVENTS, "note"), agent))
+    return Events(all_items(lines, (*USER_EVENTS, "note"), agent))
 
 
 # ---------------------------------------------------------------- the warnings
@@ -384,13 +372,9 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
         for r in group
         for s in _strings(r)
     }
-    for ident in events.tracked:
-        if (
-            events.state.get(ident) == "done"
-            and ident not in {e.get("id") for e, _, _ in events.open}
-            and ident not in pointed
-            and ident not in events.replied
-        ):
+    for event, state, extra in events.found:
+        ident = event["id"]
+        if state == "done" and ident not in pointed and not events.answered(extra):
             found.append(
                 Warning_(
                     "done-event-unanswered",
@@ -407,7 +391,7 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
         newer = [m.get("id") for m in later_moves if _at(m) > when]
         newer += [
             e.get("id")
-            for e in events.tracked.values()
+            for e, _, _ in events.found
             if e.get("type") == "answer" and e is not event and (_at(e) or when) > when
         ]
         if newer:
