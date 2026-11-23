@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rounds.schema.json",
+  "title": "one line of rounds.jsonl: a round a verifier failed, with its findings, or a last-mile fix the coordinator made",
+  "$comment": "In coordinate mode only the coordinator writes it: a `round` each time a verifier fails a task, before the task starts again, and a `fix` when it makes a last-mile fix. The dashboard reads both.",
+  "x-files": [
+    "rounds.jsonl"
+  ],
+  "type": "object",
+  "required": [
+    "type",
+    "at",
+    "by"
+  ],
+  "properties": {
+    "type": {
+      "enum": [
+        "round",
+        "fix"
+      ]
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "round"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/round"
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "fix"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/fix"
+      }
+    }
+  ],
+  "$defs": {
+    "round": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "task",
+        "round",
+        "verifier",
+        "findings"
+      ],
+      "properties": {
+        "type": {
+          "const": "round"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "task": {
+          "type": "string",
+          "pattern": "^T\\d+$",
+          "x-points-to": {
+            "file": "tasks.jsonl",
+            "type": "task"
+          }
+        },
+        "round": {
+          "description": "the round the verifier failed: 1 for the first verify of the task",
+          "type": "integer",
+          "minimum": 1
+        },
+        "verifier": {
+          "description": "the name of the verifier agent, as its card is named",
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "description": "what the verifier found, each finding once",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "blocking"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "blocking": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "fix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "task",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "fix"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "task": {
+          "type": "string",
+          "pattern": "^T\\d+$",
+          "x-points-to": {
+            "file": "tasks.jsonl",
+            "type": "task"
+          }
+        },
+        "text": {
+          "description": "what the fix changes, in one sentence",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

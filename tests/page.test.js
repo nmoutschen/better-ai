@@ -1,6 +1,8 @@
 // The thread model in page.js: how the log becomes each item's state, the entries and what Open lists.
 // Run with `node --test tests/*.test.js`. page.js is identical in every skill (the Scripts workflow checks it); this loads
 // the shared copy in src/better_ai/page/.
+// The timeline shows local times: the tests pin the zone, so a time written in UTC reads the same on every machine.
+process.env.TZ = 'UTC';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -334,7 +336,7 @@ test('element selectors use the nearest document-unique id in a page or slide', 
 
 // The dashboard's task status and agent tag, on the JSON the dashboard now reads: read out of dashboard.html between `// status:begin` and `// status:end`.
 const statusCode = html.split('// status:begin')[1].split('// status:end')[0];
-const { taskStatus, agentTag, agentClass, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, agentTag, agentClass, DONE, isDone};')(s => String(s));
+const { taskStatus, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, DONE, isDone};')(s => String(s));
 // A task record is tasks.jsonl's: a blocked task names `reason` (task, user or repair limit) and, for task, `waits_on`.
 const blockedFields = by => by === undefined || by === '' ? {} : by === 'user' || by === 'repair limit' ? { reason: by }
   : /^T\d+$/.test(by) ? { reason: 'task', waits_on: by } : { reason: by };
@@ -375,9 +377,10 @@ test('a task that did not validate shows as not valid with its first message; an
 
 test('a status or a blocked reason with markup shows as text, never as HTML', () => {
   const realEsc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-  const { statusLabel } = new Function('esc', statusCode + '; return {statusLabel};')(realEsc);
-  assert.doesNotMatch(statusLabel({ status: 'blocked', reason: '<img src=x onerror=alert(1)>' }, []), /<img/);
-  assert.match(statusLabel({ status: '<b>x</b>' }, []), /&lt;b&gt;x&lt;\/b&gt;/);
+  const { tablesHTML } = new Function('esc', statusCode + html.split('// timeline:begin')[1].split('// timeline:end')[0] + '; return {tablesHTML};')(realEsc);
+  const page = tablesHTML({ now: 1000, tasks: [{ id: 'T1', task: 'x', status: 'blocked', reason: '<img src=x onerror=alert(1)>' }, { id: 'T2', task: 'y', status: '<b>x</b>' }] }, '2h');
+  assert.doesNotMatch(page, /<img/);
+  assert.match(page, /&lt;b&gt;x&lt;\/b&gt;/);
 });
 
 test('an unknown status shows as an error, with the status as written', () => {
@@ -392,33 +395,17 @@ test('only merged and done tasks count as done, in any casing', () => {
   assert.equal([{ status: 'Merged' }, { status: ' DONE ' }, { status: 'verified' }, { status: '' }, {}].filter(isDone).length, 2);
 });
 
-test('a verifier shows as a verifier, a builder by its mode', () => {
-  const v = { role: 'verifier', mode: 'bug fix' }, b = { role: 'builder', mode: 'bug fix' }, n = { mode: 'feature' };
-  assert.match(agentTag(v), /class="mode r-verifier"[^>]*>verifier</);
-  assert.doesNotMatch(agentTag(v), /bug fix/);
-  assert.equal(agentClass(v), 'm-bugfix');  // the card edge is its task's mode colour; the tag says verifier
-  assert.match(agentTag(b), /class="mode m-bugfix"[^>]*>bug fix</);
-  assert.equal(agentClass(b), 'm-bugfix');
-  assert.equal(agentClass(n), 'm-feature');  // no role: shown as a builder
-  assert.match(agentTag({ role: ' Verifier ' }), />verifier</);
-});
-
 // A kept invalid record can hold any type in any field: the page draws what it can and never throws.
-test('a task with a wrongly typed requirements or mode still draws the task list', () => {
-  const rows = html.split("// A task's requirements with their text")[1].split('const taskLabel')[0];
-  const drawCode = html.split('const svg = body =>')[1].split("// The task list's own scroll bar")[0];
-  const el = { hidden: true, textContent: '', html: '' };
-  const OPENTASKS = new Set();
-  const setHTML = (e, h) => { e.html = h; };
-  const { drawTasks } = new Function('esc', 'has', 'D', '$', 'setHTML', 'OPENTASKS', 'ICON',
-    statusCode + ';const reqsOf' + rows.split('const reqsOf')[1] + ';const svg = body =>' + drawCode + '; return {drawTasks};')(
-    realEsc, v => v && v !== 'none', { requirements: { R1: 'text' }, tasks: [], agents: [] }, () => el, setHTML, OPENTASKS,
-    { working: '', finished: '', blocked: '' });
-  const bad = { id: 'T2', task: 'x', mode: 5, requirements: 'R1', check: 7, status: 'built', _errors: ['requirements: expected array'] };
-  drawTasks({ tasks: [{ id: 'T1', task: 'ok', mode: 'feature', requirements: ['R1'], status: 'todo' }, bad], agents: [] });
-  assert.match(el.html, /T1/);
-  assert.match(el.html, /T2/);
-  assert.match(el.html, /not valid: requirements: expected array/);
+test('a task with a wrongly typed requirements, mode or title still draws the tables', () => {
+  const TLb = new Function('esc', statusCode + html.split('// timeline:begin')[1].split('// timeline:end')[0] + '; return {tablesHTML, popupHTML};')(realEsc);
+  const bad = { id: 'T2', task: 7, mode: 5, requirements: 'R1', check: 7, status: 'built', _errors: ['requirements: expected array'] };
+  const d = { now: 100000, start: null, tasks: [{ id: 'T1', task: 'ok', mode: 'feature', requirements: ['R1'], status: 'todo' }, bad],
+    agents: [{ name: 'b', role: 'builder', task: 'T2', branch: 5, at: 3, lines: 'x' }], rounds: 'x', fixes: [{}], git: null, requirements: { R1: 'text' } };
+  const out = TLb.tablesHTML(d, '2h');
+  assert.match(out, />T1</);
+  assert.match(out, />T2</);
+  assert.match(out, /not valid: requirements: expected array/);
+  assert.doesNotThrow(() => TLb.popupHTML(bad, d));
 });
 
 test('a decision that did not validate says so, with its first message, and a question says where it is from', () => {
@@ -781,7 +768,8 @@ const fixture = () => ({
     findings: [{ text: 'Empty export writes no header row', blocking: true }, { text: 'Column order differs', blocking: false }] }],
   fixes: [{ task: 'T2', at: '2026-11-23T10:09:00Z', text: 'renamed the flag' }],
   git: {
-    'task/t4': { buckets: [[E('2026-11-23T09:50:00Z'), 80], [E('2026-11-23T09:55:00Z'), 40], [E('2026-11-23T10:35:00Z'), 30], [E('2026-11-23T10:40:00Z'), 12]],
+    'task/t4': { buckets: [[E('2026-11-23T09:50:00Z'), 80], [E('2026-11-23T09:55:00Z'), 40], [E('2026-11-23T10:00:00Z'), 30], [E('2026-11-23T10:05:00Z'), 20],
+      [E('2026-11-23T10:10:00Z'), 10], [E('2026-11-23T10:15:00Z'), 6], [E('2026-11-23T10:35:00Z'), 30], [E('2026-11-23T10:40:00Z'), 12]],
       commits: 3, added: 212, removed: 38, files: 5, last: E('2026-11-23T10:42:00Z') },
     'task/t7': { buckets: [[E('2026-11-23T10:55:00Z'), 20]], commits: 2, added: 164, removed: 41, files: 4, last: E('2026-11-23T10:57:00Z') },
   },
@@ -826,8 +814,7 @@ test('a build phase takes the lines changed per 5 minutes on its branch, cut at 
   const [first, , second] = TL.phasesOf(d.tasks[0], d);
   const b1 = TL.bucketsOf(first, d), b2 = TL.bucketsOf(second, d);
   assert.deepEqual(b1.slice(0, 2), [[E('2026-11-23T09:52:00Z'), E('2026-11-23T09:55:00Z'), 80], [E('2026-11-23T09:55:00Z'), E('2026-11-23T10:00:00Z'), 40]]);
-  assert.equal(b1.at(-1)[1], E('2026-11-23T10:20:00Z'));  // never past the phase's end
-  assert.equal(b1.at(-1)[2], 0);
+  assert.deepEqual(b1.at(-1), [E('2026-11-23T10:15:00Z'), E('2026-11-23T10:20:00Z'), 6]);  // never past the phase's end
   assert.deepEqual(b2.map(b => b[2]), [30, 12, 0, 0, 0]);
   assert.equal(b2.at(-1)[1], NOW);
 });

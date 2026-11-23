@@ -1,10 +1,12 @@
 <section class="errors" id="errors" aria-labelledby="errors-h" hidden></section>
-<div class="agents-pane">
-  <h2 class="section-h">Agents</h2>
-  <ul class="legend" id="key" title="Key"></ul>
-  <ul class="cards" id="cards"></ul>
+<div class="keyrow">
+  <ul class="key" title="Key">
+    <li><i class="k-build"></i>building</li><li><i class="k-verify"></i>verifying</li><li><i class="k-fix"></i>fix</li>
+    <li><i class="k-more"></i><i class="k-more tall"></i>more change</li><li><i class="k-none"></i>no change</li>
+    <li><i class="k-fail"></i>round failed</li><li><i class="k-merged"></i>merged</li>
+  </ul>
+  <div class="seg seg--light" id="range" role="group" aria-label="Time shown">
+    <button type="button" data-range="1h" aria-pressed="false">1 h</button><button type="button" data-range="2h" aria-pressed="true">2 h</button><button type="button" data-range="6h" aria-pressed="false">6 h</button><button type="button" data-range="all" aria-pressed="false">All</button>
+  </div>
 </div>
-<section class="tasks-pane" id="tasks-sec" aria-labelledby="tasks-h" hidden>
-  <h2 class="section-h" id="tasks-h">Tasks</h2>
-  <div class="tasks-box"><ul class="tasks" id="tasks"></ul><div class="sbar" id="sbar" aria-hidden="true" hidden><i id="sthumb"></i></div></div>
-</section>
+<div id="tables"></div>

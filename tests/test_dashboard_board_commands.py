@@ -292,7 +292,7 @@ class ServedPage(unittest.TestCase):
             url = self.start(folder)
             with urllib.request.urlopen(url, timeout=5) as r:
                 page = r.read().decode()
-            for part in ("/dashboard.js", "/page.js", 'id="tasks"'):
+            for part in ("/dashboard.js", "/page.js", 'id="tables"'):
                 self.assertIn(part, page)
             self.assertNotIn("__PAGE_", page)
             with urllib.request.urlopen(url + "data", timeout=5) as r:

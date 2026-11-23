@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from better import run as better  # noqa: E402
-from test_dashboard_formats import DOCS, card, change, check, check_record, load, log, task, write  # noqa: E402
+from test_dashboard_formats import card, change, check, check_record, load, log, task, write  # noqa: E402
 
 AT = "2026-11-21T10:00:00Z"
 
@@ -36,8 +36,14 @@ def fix_record(task_id="T1", **more):
 
 
 def git(cwd, *args, env=None):
-    full = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com", "GIT_COMMITTER_NAME": "t",
-            "GIT_COMMITTER_EMAIL": "t@example.com", **(env or {})}
+    full = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.com",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.com",
+        **(env or {}),
+    }
     return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, check=True, env=full)
 
 
@@ -67,7 +73,9 @@ class RoundAndFixRecords(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             change(Path(d))
             fields = {k: v for k, v in round_record().items() if k not in ("type", "at", "by")}
-            done = better("code-better", "add", ".code/c", "round", "--by", "coordinator", stdin=json.dumps(fields), cwd=d)
+            done = better(
+                "code-better", "add", ".code/c", "round", "--by", "coordinator", stdin=json.dumps(fields), cwd=d
+            )
             self.assertEqual(done.returncode, 0, done.stderr)
             line = json.loads((Path(d) / ".code/c/rounds.jsonl").read_text().splitlines()[0])
             self.assertEqual((line["type"], line["round"], line["findings"][0]["blocking"]), ("round", 1, True))
@@ -82,7 +90,9 @@ class TaskTitle(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             change(Path(d))
             fields = {k: v for k, v in task("T2", task="y" * 41).items() if k not in ("type", "at", "by", "id")}
-            done = better("code-better", "add", ".code/c", "task", "--by", "coordinator", stdin=json.dumps(fields), cwd=d)
+            done = better(
+                "code-better", "add", ".code/c", "task", "--by", "coordinator", stdin=json.dumps(fields), cwd=d
+            )
             self.assertNotEqual(done.returncode, 0)
             self.assertIn("task", done.stdout + done.stderr)
 
@@ -125,8 +135,9 @@ class TimelineData(unittest.TestCase):
             git(repo, "init", "-q", "-b", "main")
             (repo / "a.py").write_text("x = 1\n")
             git(repo, "add", "a.py")
-            git(repo, "commit", "-q", "-m", "base")
             now = int(time.time())
+            old = f"{now - 7200} +0000"  # the base is older than the card: only the task's own work counts
+            git(repo, "commit", "-q", "-m", "base", env={"GIT_AUTHOR_DATE": old, "GIT_COMMITTER_DATE": old})
             card_at = now - 1800
             git(repo, "branch", "task/t1")
             tree = repo / ".claude-wt"
@@ -134,13 +145,23 @@ class TimelineData(unittest.TestCase):
             (tree / "b.py").write_text("".join(f"line{i}\n" for i in range(10)))
             git(tree, "add", "b.py")
             stamp = str(now - 900)
-            git(tree, "commit", "-q", "-m", "ten lines", env={"GIT_AUTHOR_DATE": f"{stamp} +0000",
-                                                             "GIT_COMMITTER_DATE": f"{stamp} +0000"})
+            git(
+                tree,
+                "commit",
+                "-q",
+                "-m",
+                "ten lines",
+                env={"GIT_AUTHOR_DATE": f"{stamp} +0000", "GIT_COMMITTER_DATE": f"{stamp} +0000"},
+            )
             (tree / "a.py").write_text("x = 1\ny = 2\nz = 3\n")  # two lines added, not committed
             os.utime(tree / "a.py", (now - 60, now - 60))
             folder = change(repo, tasks=[task("T1", status="building")])
-            write(folder, "logs/builder-t1.card.json", [card("builder", "T1", branch="task/t1", at=iso(card_at))],
-                  as_json=True)
+            write(
+                folder,
+                "logs/builder-t1.card.json",
+                [card("builder", "T1", branch="task/t1", at=iso(card_at))],
+                as_json=True,
+            )
             shown = load(folder)["git"]["task/t1"]
             buckets = dict((start, n) for start, n in shown["buckets"])
             self.assertEqual(buckets.get((now - 900) // 300 * 300), 10)
