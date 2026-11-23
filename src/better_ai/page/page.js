@@ -1,3 +1,7 @@
+// Every state the page gives an item, with the words of its progress mark. page.css colours a pin for each of them.
+var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied',
+  working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
+
 // The element-comment layer. A page supplies its target metadata, pin coordinates and navigation;
 // this owns the editor, the numbered pins and their actions.
 function pageElementComments(o) {
@@ -216,7 +220,7 @@ function pageConversation(o) {
     });
   });
   var STEPS = o.steps || ['seen', 'working', 'done', 'accepted'],
-      LABEL = Object.assign({ seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied', working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' }, o.labels || {});
+      LABEL = Object.assign({}, PAGE_STATES, o.labels || {});
   // The box for an answer or a reply, under the item. The button that opened it hides in place while it is open, and
   // the box goes only once the message is sent. By default it sends a note under the item; onSend(text, done) sends
   // something else, such as the answer to a decision.
@@ -463,15 +467,23 @@ function pageTime(at) {
 // LATESTLAST puts the entries in the order of their newest message, replies included, not of their first; the waiting
 // ones still come last.
 function pageThread(log, itemKinds, waiting, latestLast) {
-  var entries = [], byKey = {}, state = {};
+  var entries = [], byKey = {}, state = {}, items = {}, home = {};
+  // The state of each item. A message under a reply belongs to the item that reply is under (HOME). pending in
+  // src/better_ai/page/__init__.py follows the same rules; tests/fixtures/threads.json holds the logs both are run on.
   log.forEach(function (e) {
+    var to = home[e.to] || e.to;
     if (e.type === 'status') state[e.to] = e.status;
     else if (e.type === 'accept' || e.type === 'accepted') state[e.to] = 'accepted';
     else if (e.type === 'reopen') state[e.to] = 'reopened';
-    // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
-    else if (e.type === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
-    // A reply under a finished item is a follow-up: the item goes back to the agent.
-    else if (e.type === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
+    else if (e.type === 'note' && to) {
+      // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
+      if (state[to] === 'asked') state[to] = 'replied';
+      // A reply under a finished item is a follow-up: the item goes back to the agent.
+      else if (state[to] === 'done' || state[to] === 'accepted') state[to] = 'followup';
+      // An answer under an item is part of it; an answer to the agent's own message is an item.
+      if (e.id) { if (items[to]) home[e.id] = to; else items[e.id] = true; }
+    } else if (e.type === 'reply' && to && e.id) home[e.id] = to;
+    else if (e.id && itemKinds.indexOf(e.type) >= 0) items[e.id] = true;
   });
   log.forEach(function (e, i) {
     // What an event answers: an answer to a decision names the decision; the rest name it in `to`.
@@ -773,4 +785,94 @@ function pageConfirm(conversation, requirement, wording, text, done, fail) {
   conversation.send('confirm', { id: 'confirm-' + Date.now().toString(36), requirement: requirement, wording: wording, text: text },
     'Confirmation', done, fail);
   return true;
+}
+
+// Text as HTML: every character that could open markup is written as an entity.
+function pageEscape(text) {
+  return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+// The records that did not validate, as the band above the work: how many, then where each is, its field, why, and who
+// wrote it. A file can hold anything, so every part is text. The valid records are on the page as usual; this band never
+// replaces them. The page has `<section class="errors" id="errors" aria-labelledby="errors-h" hidden></section>`.
+function pageErrors(errors) {
+  if (!errors || !errors.length) return '';
+  return '<h2 id="errors-h">' + errors.length + (errors.length === 1 ? ' record is' : ' records are') + ' not valid</h2><ul>' +
+    errors.map(function (e) {
+      return '<li><code>' + pageEscape(e.file) + ':' + pageEscape(e.line) + '</code> <b>' + pageEscape(e.field) + '</b>: ' +
+        pageEscape(e.message) + (e.by ? ' <span class="by">written by ' + pageEscape(e.by) + '</span>' : '') + '</li>';
+    }).join('') + '</ul>';
+}
+// Shows the band in EL, and hides it when there is none. It is written only when its text changes: it is a live
+// region, and a rewrite at every poll would be read out every time.
+function pageShowErrors(el, errors) {
+  var html = pageErrors(errors);
+  el.hidden = !html;
+  if (el.innerHTML !== html) el.innerHTML = html;
+}
+
+// The details pop-up (.qpop) of a page, one at a time, over the page: it opens with its title in focus, keeps Tab inside
+// and closes on Escape or on its ×; focus goes back to the element it opened from.
+//   o.fill()          writes the pop-up's content into it, and again whenever the page's data changes
+//   o.place(anchor)   puts it where it belongs, next to ANCHOR
+//   o.modal           it is a modal dialog      o.opened(el), o.closed()   called after it opened and after it closed
+// The page calls click(target) first in its click handler and key(event) in its keydown handler: each returns true when
+// it took the event. `anchor` is the element the pop-up opened from, which the page may set again after a redraw.
+function pagePopup(o) {
+  var pop = { anchor: null };
+  pop.el = function () { return document.getElementById('pop'); };
+  pop.open = function (anchor) {
+    pop.close();
+    pop.anchor = anchor;
+    var el = document.createElement('div');
+    el.className = 'qpop'; el.setAttribute('role', 'dialog'); el.id = 'pop';
+    if (o.modal) el.setAttribute('aria-modal', 'true');
+    document.body.append(el);
+    o.fill(); o.place(anchor);
+    var h3 = el.querySelector('h3');
+    if (h3) { h3.id = 'pop-title'; el.setAttribute('aria-labelledby', 'pop-title'); h3.setAttribute('tabindex', '-1'); h3.focus({ preventScroll: true }); }
+    if (o.opened) o.opened(el);
+  };
+  pop.close = function () {
+    var el = pop.el(), back = pop.anchor;
+    if (el) el.remove();
+    pop.anchor = null;
+    if (back && document.contains(back)) back.focus({ preventScroll: true });
+    if (o.closed) o.closed();
+  };
+  pop.click = function (target) {
+    if (target.closest('.qpop .x')) { pop.close(); return true; }
+    return !!target.closest('.qpop');
+  };
+  pop.key = function (ev) {
+    var el = pop.el();
+    if (!el) return false;
+    if (ev.key === 'Tab' && el.contains(ev.target)) {
+      var f = Array.prototype.slice.call(el.querySelectorAll('button, textarea, [tabindex]')), i = f.indexOf(ev.target);
+      if (ev.shiftKey && i <= 0) { ev.preventDefault(); f[f.length - 1].focus(); return true; }
+      if (!ev.shiftKey && i === f.length - 1) { ev.preventDefault(); f[0].focus(); return true; }
+    }
+    if (ev.key === 'Escape' && !(ev.target.closest && ev.target.closest('.why'))) { ev.preventDefault(); pop.close(); return true; }
+    return false;
+  };
+  return pop;
+}
+
+// The colours of a pin by state, as page.css sets them, for a page that draws its pins in a document of its own, such
+// as a frame: the rules of `.pin[data-state]` with CLASSNAME for `.pin`, and each var(--name) as VALUE(name) gives it.
+// SHEETS is document.styleSheets.
+function pagePinCss(sheets, className, value) {
+  var css = '';
+  Array.prototype.forEach.call(sheets, function (sheet) {
+    var rules;
+    try { rules = sheet.cssRules; } catch (e) { return; }  // a sheet from another origin
+    Array.prototype.forEach.call(rules, function (rule) {
+      if (rule.selectorText && rule.selectorText.indexOf('.pin[data-state') === 0) {
+        css += rule.cssText.split('.pin[').join('.' + className + '[').replace(/var\((--[\w-]+)\)/g, function (_, name) { return value(name); });
+      }
+    });
+  });
+  return css;
 }

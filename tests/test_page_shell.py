@@ -104,6 +104,7 @@ class Fixture(unittest.TestCase):
             mock.patch.object(resources, "read_text", text),
             mock.patch.object(resources, "read_bytes", data),
             mock.patch.object(page.webbrowser, "open", return_value=True),  # never a real browser
+            mock.patch.object(page, "TICK", 0.05),
             mock.patch.dict(os.environ, {"BETTER_AI_SKILL": "code-better"}),
             mock.patch.object(sys, "stdout", io.StringIO()),  # the server prints each user event, as `serve` does
         ):
@@ -129,7 +130,7 @@ class Fixture(unittest.TestCase):
         conv = page.Conversation(unit, spec, self.docs)
         info = resources.build_info()
         server = page.make_server(unit, spec, conv, info)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": page.POLL}, daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         self.conv = conv
@@ -210,6 +211,27 @@ class ShellTest(Fixture):
         self.assertNotIn("<", config)
         self.assertEqual(json.loads(config)["title"], spec.title)
         self.assertEqual(json.loads(config)["capabilities"], ["pins", "approve"])
+        spec = page.PageSpec(
+            **{**self.spec.__dict__, "title": "%%MAIN%%"}
+        )  # a marker inside a value is not filled twice
+        self.assertEqual(page.shell(spec).count(FIXTURE_MAIN), 1)
+
+    def test_a_static_page_holds_its_files_and_its_data_and_links_nothing(self):
+        data = {"note": "</script><b>&", "n": [1, 2]}
+        text = page.static_page(self.spec, data)
+        for link in ('href="/page.css"', 'src="/page.js"', 'src="/fixture.js"'):
+            self.assertNotIn(link, text)
+        self.assertIn(FIXTURE_JS, text)
+        self.assertIn("function pageConversation", text)
+        element = text.split('id="page-data">')[1].split("</script>")[0]
+        self.assertNotIn("<", element)
+        self.assertEqual(json.loads(element), data)
+        self.assertLess(text.index('id="page-data"'), text.index('id="page-config"'))
+        with (
+            mock.patch.object(page, "shell", return_value="<p>no links</p>"),
+            self.assertRaisesRegex(ValueError, "does not link /page.css"),
+        ):
+            page.static_page(self.spec, data)
 
     def test_the_research_board_lists_its_agents_in_the_side_column_above_the_conversation_not_under_the_map(self):
         from better_ai.research import board
@@ -219,10 +241,6 @@ class ShellTest(Fixture):
         aside = text[text.index('<aside class="notes"') : text.index("</aside>")]
         self.assertNotIn('id="agents"', main)
         self.assertLess(aside.index('id="agents"'), aside.index('id="notes-h"'))
-
-    def test_a_marker_inside_a_value_is_not_filled_twice(self):
-        spec = page.PageSpec(**{**self.spec.__dict__, "title": "%%MAIN%%"})
-        self.assertEqual(page.shell(spec).count(FIXTURE_MAIN), 1)
 
 
 class ServerTest(Fixture):
@@ -491,6 +509,19 @@ class ConversationTest(Fixture):
         self.assertEqual(target.read_text(), "")
 
 
+# What `pending` shows for an item beyond its state, by the name of the case in the table, as (item, field, value).
+EXTRAS = {
+    "an answer to a question the agent asked ends the wait": (
+        "m1",
+        "thread",
+        [{"from": "coordinator", "text": "t"}, {"from": "user", "text": "t"}],
+    ),
+    "a comment sent again keeps its state, and is the same item": ("c2", "text", "edited"),
+    "a reopened item is work again": ("c1", "reopened_because", "still wrong"),
+    "an answer to what a worker closed is an item": ("m1", "about", "worker-2 closed Q4 as answered"),
+}
+
+
 class VerbsTest(Fixture):
     def test_reply_reads_its_text_from_stdin_with_an_apostrophe_S34(self):
         code_, out, err = self.cli("reply", self.unit_arg, stdin='It\'s done, "quoted" and `ticked`\n')
@@ -545,20 +576,6 @@ class VerbsTest(Fixture):
         self.assertEqual((self.log()[-1]["type"], self.log()[-1]["text"]), ("accepted", "Looks right to me"))
         self.assertEqual(self.cli("status", self.unit_arg, "done", "zzz")[0], 1)
 
-    def test_pending_lists_the_open_items_with_their_threads(self):
-        self.seed(
-            {"type": "note", "by": "user", "id": "m1", "text": "one", "to": None},
-            {"type": "note", "by": "user", "id": "m2", "text": "two", "to": None},
-            {"type": "status", "by": "coordinator", "to": "m2", "status": "done"},
-            {"type": "reply", "by": "coordinator", "id": "r1", "text": "hm", "to": "m1"},
-        )
-        code_, out, _ = self.cli("pending", self.unit_arg)
-        lines = out.splitlines()
-        self.assertEqual(code_, 0)
-        self.assertEqual(lines[-1], "1 not done.")
-        first = json.loads(lines[0])
-        self.assertEqual((first["id"], first["status"], first["thread"][0]["text"]), ("m1", "new", "hm"))
-
     def test_status_refuses_an_unknown_id_and_an_answer_under_an_item_and_marks_an_answer_to_the_agent(self):
         self.seed(
             {"type": "comment", "by": "user", "id": "c1", "n": 1, "text": "too big"},
@@ -581,54 +598,25 @@ class VerbsTest(Fixture):
         self.assertEqual(self.cli("status", self.unit_arg, "accepted", "c1")[0], 1)  # the user's words are missing
         self.assertEqual(len(self.log()), before + 1)
 
-    def test_pending_names_each_state_the_threads_and_what_a_worker_closed(self):
-        user, bot = {"by": "user"}, {"by": "coordinator"}
-        self.seed(
-            {"type": "comment", "id": "c1", "n": 1, "text": "first", **user},
-            {"type": "status", "to": "c1", "status": "done", **bot},
-            {"type": "comment", "id": "c1", "n": 1, "text": "edited after done", **user},
-            {"type": "note", "id": "m1", "text": "a question", "to": None, **user},
-            {"type": "status", "to": "m1", "status": "asked", **bot},
-            {"type": "reply", "id": "r1", "to": "m1", "text": "which?", **bot},
-            {"type": "note", "id": "m2", "to": "m1", "text": "this one", **user},
-            {"type": "note", "id": "m3", "text": "finished", "to": None, **user},
-            {"type": "status", "to": "m3", "status": "done", **bot},
-            {"type": "note", "id": "m4", "text": "followed up", "to": None, **user},
-            {"type": "accept", "to": "m4", **user},
-            {"type": "note", "id": "m5", "to": "m4", "text": "one more thing", **user},
-            {"type": "comment", "id": "c2", "n": 2, "text": "deleted", **user},
-            {"type": "delete", "to": "c2", **user},
-            {"type": "comment", "id": "c3", "n": 3, "text": "reopened", **user},
-            {"type": "status", "to": "c3", "status": "done", **bot},
-            {"type": "reopen", "to": "c3", "text": "still wrong", **user},
-            {"type": "closed", "id": "x1", "by": "worker-2", "question": "Q4", "status": "answered"},
-            {"type": "note", "id": "m6", "to": "x1", "text": "are you sure?", **user},
-        )
-        code_, out, _ = self.cli("pending", self.unit_arg)
-        lines = out.splitlines()
-        self.assertEqual((code_, lines[-1]), (0, "5 not done."))
-        items = {e["id"]: e for e in map(json.loads, lines[:-1])}
-        self.assertEqual(
-            {i: e["status"] for i, e in items.items()},
-            {
-                "c1": "edited",
-                "m1": "answered by the user",
-                "m4": "follow-up from the user",
-                "c3": "reopened",
-                "m6": "new",
-            },
-        )
-        self.assertEqual(items["c1"]["text"], "edited after done")
-        self.assertEqual([t["text"] for t in items["m1"]["thread"]], ["which?", "this one"])
-        self.assertEqual(items["c3"]["reopened_because"], "still wrong")
-        self.assertEqual(items["m6"]["about"], "worker-2 closed Q4 as answered")
-
-    def test_an_accepted_event_from_the_chat_ends_the_item(self):
-        self.seed(
-            {"type": "note", "id": "m1", "text": "ok?", "to": None, "by": "user"},
-            {"type": "accepted", "to": "m1", "by": "coordinator", "text": "yes"},
-        )
-        self.assertEqual(self.cli("pending", self.unit_arg)[1], "0 not done.\n")
+    def test_pending_gives_the_states_of_the_shared_table_of_logs_and_the_threads_the_page_cannot_show(self):
+        """The same logs, with the same open items and states, are run on page.js `pageThread` in tests/page.test.js."""
+        table = json.loads((HERE / "fixtures" / "threads.json").read_text())
+        for case in table:
+            with self.subTest(case["name"]):
+                (self.unit_dir / "conversation.jsonl").unlink(missing_ok=True)
+                self.seed(*case["log"])
+                code_, out, _ = self.cli("pending", self.unit_arg)
+                lines = out.splitlines()
+                self.assertEqual(code_, 0)
+                items = [json.loads(line) for line in lines[:-1]]
+                self.assertEqual([[e["id"], e["status"]] for e in items], case["work"])
+                self.assertEqual(lines[-1], f"{len(items)} not done.")
+                for name, (item, field, expected) in EXTRAS.items():
+                    if name == case["name"]:
+                        got = next(e[field] for e in items if e["id"] == item)
+                        if field == "thread":
+                            got = [{k: v for k, v in t.items() if k != "at"} for t in got]
+                        self.assertEqual(got, expected)
 
     def test_wait_prints_the_users_events_saves_its_place_and_times_out_with_exit_3(self):
         _, host = self.serve()
@@ -749,8 +737,8 @@ class ServeTest(Fixture):
         flag = {"stopped": False}
         spec = page.PageSpec(**{**self.spec.__dict__, "stopped": lambda unit: flag["stopped"]})
         page.PAGES["code-better"] = spec
-        thread, result, url, out, _ = self.run_serve("--linger", "0.5")
-        time.sleep(1.2)
+        thread, result, url, out, _ = self.run_serve("--linger", "0.2")
+        time.sleep(0.6)
         self.assertTrue(thread.is_alive())  # not stopped: it serves on
         flag["stopped"] = True
         thread.join(20)
