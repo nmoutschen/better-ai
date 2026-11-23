@@ -603,6 +603,23 @@ class VerbsTest(Fixture):
         self.assertEqual(self.cli("status", self.unit_arg, "accepted", "c1")[0], 1)  # the user's words are missing
         self.assertEqual(len(self.log()), before + 1)
 
+    def test_status_closes_the_agents_own_message_but_not_a_reply_under_an_item(self):
+        self.seed({"type": "note", "by": "user", "id": "m1", "text": "q", "to": None})
+        self.assertEqual(self.cli("reply", self.unit_arg, stdin="Which size?")[0], 0)
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", stdin="Done.")[0], 0)
+        started, under = [e["id"] for e in self.log() if e["type"] == "reply"]
+        code_, out, _ = self.cli("status", self.unit_arg, "done", started)
+        self.assertEqual(code_, 0, out)
+        self.assertEqual(
+            {k: self.log()[-1][k] for k in ("type", "to", "status")},
+            {"type": "status", "to": started, "status": "done"},
+        )
+        before = len(self.log())
+        code_, _, err = self.cli("status", self.unit_arg, "done", under)  # a reply under an item: mark the item
+        self.assertEqual(code_, 1)
+        self.assertIn(f"no comment or message with id {under}", err)
+        self.assertEqual(len(self.log()), before)
+
     def test_pending_gives_the_states_of_the_shared_table_of_logs_and_the_threads_the_page_cannot_show(self):
         """The same logs, with the same open items and states, are run on page.js `pageThread` in tests/page.test.js."""
         table = json.loads((HERE / "fixtures" / "threads.json").read_text())

@@ -458,8 +458,13 @@ class Conversation:
         except EventError as error:
             raise Refused(f"{self.unit.label}: the event is not valid: {error}") from None
 
-    def known(self, ids: list, what: str = "no comment or message with id") -> None:
-        have = {e.get("id") for e in self.events() if e.get("type") in self.items}
+    def known(self, ids: list, what: str = "no comment or message with id", started: bool = False) -> None:
+        """Refuse ids that name no item of the user's; with `started`, a message the agent sent on its own is known too."""
+        have = {
+            e.get("id")
+            for e in self.events()
+            if e.get("type") in self.items or (started and e.get("type") == "reply" and not e.get("to"))
+        }
         unknown = [i for i in ids if i not in have]
         if unknown:
             raise paths.refusal(
@@ -587,15 +592,17 @@ def reply(args: argparse.Namespace, run: cli.Run) -> int:
 def _status_arguments(parser: argparse.ArgumentParser) -> None:
     _unit_argument(parser)
     parser.add_argument("state", choices=STATES)
-    parser.add_argument("ids", nargs="+", help="the ids of the user's items")
+    parser.add_argument("ids", nargs="+", help="the ids of the user's items, or of a message the agent sent on its own")
     parser.add_argument("--text", action="store_true", help="read the user's words from stdin; needed for accepted")
     parser.add_argument("--by", help="the agent's name, if not the page's role name")
 
 
 @cli.verb("status", help="mark the user's items seen, asked, working, done or accepted", arguments=_status_arguments)
 def status(args: argparse.Namespace, run: cli.Run) -> int:
-    """Mark the user's items as seen, asked, working or done. Accepted records an acceptance the user gave in words, the
-    same as the page's Accept button, as an `accepted` event with those words (on stdin, with `--text`)."""
+    """Mark the user's items as seen, asked, working or done. A message the agent sent on its own (`reply` without
+    `--to`) waits for the user on the page until they answer it, or until it is marked done or accepted. Accepted
+    records an acceptance the user gave in words, the same as the page's Accept button, as an `accepted` event with
+    those words (on stdin, with `--text`)."""
     unit = _unit(args, run)
     conv = _conversation(run, unit)
     by = paths.check_by(args.by) if args.by else conv.agent
@@ -619,7 +626,7 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
             ", ".join(f"{terminal_text(i)} answers {terminal_text(answers[i])}" for i in misplaced),
             "mark the item it answers instead",
         )
-    conv.known(args.ids)
+    conv.known(args.ids, started=True)
     conv.write(
         *(
             {"type": "accepted", "by": by, "to": i, "text": words}
