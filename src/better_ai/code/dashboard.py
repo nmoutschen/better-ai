@@ -72,7 +72,11 @@ def agent(reader: Reader, name: str, modes: dict) -> dict:
         **{key: about.get(key) or "" for key in ("role", "task", "branch", "at")},
         "mode": modes.get(about.get("task"), ""),
         "state": STATES.get(lines[-1]["type"], "working") if lines else "working",
-        "lines": lines[-40:],
+        # its last 40 lines, and every start and hand-back before them: the page draws one phase per round from them,
+        # as a coordinator may resume the same agent for the next round
+        "lines": [
+            line for i, line in enumerate(lines) if i >= len(lines) - 40 or line["type"] in ("start", "handed_back")
+        ],
         # when the agent started: its first line, which the 40 lines kept for the page may no longer hold
         "started": lines[0]["at"] if lines and isinstance(lines[0].get("at"), str) else "",
         "_changed": mtime(reader.unit, card, log),

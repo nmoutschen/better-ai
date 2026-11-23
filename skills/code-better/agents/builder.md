@@ -46,11 +46,11 @@ WHILE you work, TELL the coordinator, in plain words, anything SKILL.md tells yo
 
 IF `log` is not "none", the coordinator's dashboard shows the user your work from it. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/better.pyz add <change folder> <type> --for <agent name>`, with `text` and, for `handed_back`, `result` as JSON on stdin, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. GIVE `text` as one short sentence. ADD, by `type`:
 
-- `start`: what you begin with, when you begin;
+- `start`: what you begin with, when you begin, and again first thing in each later round the coordinator resumes you for;
 - `step`: what you just did or found, after each step of your mode, such as that the check for S3 fails as expected;
 - `asked`: what you sent the coordinator, in a few words, each time you message it;
 - `blocked`: what you need, when you cannot go on;
-- `handed_back`: one short reason, at the end, with `result` set to `done`, `partly done` or `blocked`.
+- `handed_back`: one short reason, at the end of each round, with `result` set to `done`, `partly done` or `blocked`.
 
 ## Output
 
