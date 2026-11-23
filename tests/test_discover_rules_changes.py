@@ -621,10 +621,12 @@ class Writers(Unit):
         (self.unit / "discover.json").write_text("{")
         self.refused(self.add("decision", R.DECISION), "discover.json names no coordinator")
 
-    def test_S31_a_set_on_another_record_type_needs_no_coordinator(self):
+    def test_S31_a_test_is_written_by_the_coordinator_only(self):
         self.ok(self.add("test", R.TEST))
-        self.ok(self.set("X1", {"cost": "a day"}, by="analyst-1"))
-        self.ok(self.set("X1", {"cost": "two days"}, by=None))
+        self.refused(self.set("X1", {"cost": "a day"}, by="analyst-1"), "only", "writes test")
+        self.refused(self.set("X1", {"cost": "a day"}, by=None), "writes test")
+        self.refused(self.add("test", R.record(R.TEST, id="X2"), by="analyst-1"), "writes test")
+        self.ok(self.set("X1", {"cost": "two days"}))
 
 
 class Stamps(Unit):

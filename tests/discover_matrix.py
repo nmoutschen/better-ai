@@ -30,7 +30,7 @@ COORD, ANALYST, VERIFIER = R.COORD, "a1", "v1"
 WRITERS = {"coordinator": COORD, "analyst": ANALYST, "verifier": VERIFIER, "nobody": None}
 STAMPED = ("type", "at", "by", "id")
 AT2 = "2026-11-24T10:00:00Z"
-COORDINATOR_ONLY = ("item", "change", "option", "move", "brief", "decision")
+COORDINATOR_ONLY = ("item", "change", "option", "move", "brief", "decision", "test")
 
 
 # ---------------------------------------------------------------- the world

@@ -29,7 +29,7 @@ from . import SKILL
 from .derive import ItemView, derive
 
 NAME = SKILL.name
-WRITTEN_BY_THE_COORDINATOR = ("item", "change", "option", "move", "brief", "decision")
+WRITTEN_BY_THE_COORDINATOR = ("item", "change", "option", "move", "brief", "decision", "test")
 
 Problem = tuple[str, str]  # what is wrong, and the next action
 
