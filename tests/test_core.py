@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -373,6 +374,20 @@ class Units(Repo):
                 paths.write_atomic(unit, "t.json", b"x")
         self.assertEqual(victim.read_text(), "keep")
         self.assertFalse((self.unit / "t.json").exists())
+
+    def test_a_state_file_keeps_the_umask_unless_a_mode_is_given(self):
+        unit = self.resolve(str(self.unit))
+        old = os.umask(0o022)
+        try:
+            paths.write_state(unit, ".server", b"x")
+            paths.write_state(unit, ".server-token", b"x", 0o600)
+        finally:
+            os.umask(old)
+        self.assertEqual(stat.S_IMODE((self.unit / ".server").stat().st_mode), 0o644)
+        self.assertEqual(stat.S_IMODE((self.unit / ".server-token").stat().st_mode), 0o600)
+        (self.unit / ".server").chmod(0o640)
+        paths.write_state(unit, ".server", b"y")  # a file that was there keeps its mode
+        self.assertEqual(stat.S_IMODE((self.unit / ".server").stat().st_mode), 0o640)
 
     def test_the_exclude_line_is_added_once_and_never_rewritten(self):
         unit = self.resolve(str(self.unit))

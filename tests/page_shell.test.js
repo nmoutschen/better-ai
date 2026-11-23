@@ -287,6 +287,7 @@ const fragment = (hash, stored) => {
     sessionStorage: { getItem: k => kept[k] ?? null, setItem: (k, v) => { kept[k] = v; } },
   } };
 };
+const answerWith = value => Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(value) });
 const answer = status => Promise.resolve({ status, ok: status < 400, json: () => Promise.resolve({ total: 0, events: [] }), text: () => Promise.resolve('0') });
 
 test('every request to the server carries the token the opened address gave in its fragment, and the fragment goes', async () => {
@@ -336,6 +337,15 @@ test('a read the server answers as out of date shows that on the page, and the s
   }, {}, where.globals);
   await page.round(); await page.round();
   assert.equal(events, 1);
+  assert.equal(page.els['.offline'].hidden, false);
+  assert.equal(page.els['.offline'].textContent, 'page out of date: reload');
+});
+
+test('a page that does not stream stays out of date once any request was refused, whatever /listening says later', async () => {
+  const where = fragment('#t=old');
+  const page = stripsOn({ stream: false }, url => url === '/listening' ? answerWith(true) : answer(401), {}, where.globals);
+  await page.context.pageFetch('/data').catch(() => {});
+  await page.round(); await page.round();
   assert.equal(page.els['.offline'].hidden, false);
   assert.equal(page.els['.offline'].textContent, 'page out of date: reload');
 });
