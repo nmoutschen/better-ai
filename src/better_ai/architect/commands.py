@@ -184,21 +184,10 @@ def register(args: argparse.Namespace, run: cli.Run) -> int:
 # ---------------------------------------------------------------- render
 
 
-def static_page(unit: Unit, run: cli.Run, payload: dict) -> str:
-    """The page as one file, with the payload and the conversation, to read, embedded, so it opens without a server."""
-    spec = page.spec_of(run.skill)
-    events = page.Conversation(unit, spec, page.load_docs(run.skill)).events()
-    return page.static_page(spec, {**payload, "events": [e for e in events if e], "static": True})
-
-
-@cli.verb(
-    "render",
-    help="write the page as one file, and the Before and After SVGs, into the unit's render folder",
-    arguments=_unit_argument,
-    skills=(SKILL.name,),
-)
-def render(args: argparse.Namespace, run: cli.Run) -> int:
-    unit = paths.resolve_unit(args.unit, run.skill)
+def static_data(unit: Unit, run: cli.Run) -> dict:
+    """What the shared `render` embeds: the payload and the conversation, to read, with the page's `static` set, so it
+    opens without a server. Before that it writes the Before and After SVGs into the render folder, and refuses a design
+    it cannot draw."""
     payload = model.load(unit)
     broken = [e for e in payload["errors"] if e["file"] == "design.json" or e["file"] == "(unit)"]
     if broken:
@@ -212,12 +201,9 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
     paths.make_folder(unit, RENDER_FOLDER)
     for name, svg in files.items():
         paths.write_atomic(unit, f"{RENDER_FOLDER}/{name}", svg.encode("utf-8"))
-    paths.write_atomic(
-        unit,
-        f"{RENDER_FOLDER}/index.html",
-        page.with_old_note(unit, static_page(unit, run, payload)).encode("utf-8"),
-    )
     if payload["errors"]:
         run.err(f"warning: {len(payload['errors'])} records are not valid: run check {unit.label}")
-    run.out(f"Wrote {unit.label}/{RENDER_FOLDER}/index.html and {len(files)} SVGs.")
-    return 0
+    run.out(f"wrote {len(files)} SVGs in {unit.label}/{RENDER_FOLDER}")
+    spec = page.spec_of(run.skill)
+    events = page.Conversation(unit, spec, page.load_docs(run.skill)).events()
+    return {**payload, "events": [e for e in events if e], "static": True}

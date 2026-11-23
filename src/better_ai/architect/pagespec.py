@@ -7,6 +7,7 @@ import hashlib
 from .. import page, paths, resources
 from ..paths import Unit
 from . import SKILL, model
+from .commands import RENDER_FOLDER, static_data
 
 
 def load(unit: Unit) -> dict:
@@ -40,5 +41,7 @@ SPEC = page.register(
         capabilities=("pins", "accept", "confirm", "approve"),
         empty="Click a box, arrow or step to comment on it, or write to the architect below.",
         revision=revision,
+        rendered=f"{RENDER_FOLDER}/index.html",
+        static_data=static_data,
     ),
 )

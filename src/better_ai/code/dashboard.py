@@ -9,13 +9,12 @@ in an errors band, so one bad record never hides the others.
 
 from __future__ import annotations
 
-import argparse
 import contextlib
 import os
 import time
 from datetime import datetime, timezone
 
-from .. import cli, page, paths, records, resources, schema
+from .. import page, paths, records, resources, schema
 from ..paths import Unit
 from . import activity
 
@@ -167,28 +166,6 @@ SPEC = page.PageSpec(
     methods=("comment",),
     items=("comment", "note", "answer"),
     empty="Nothing yet. Click a task to ask about it, or write to the coordinator below.",
+    rendered=STATIC,
+    static_data=lambda unit, run: {**load(unit), "now": time.time()},
 )
-
-
-# ---------------------------------------------------------------- render
-
-
-def _render_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("unit", help="the change, such as .code/my-change")
-
-
-@cli.verb(
-    "render",
-    help=f"write the dashboard as one page, {STATIC}, in the unit",
-    arguments=_render_arguments,
-    skills=("code-better",),
-)
-def render(args: argparse.Namespace, run: cli.Run) -> int:
-    unit = paths.resolve_unit(args.unit, run.skill)
-    paths.write_atomic(
-        unit,
-        STATIC,
-        page.with_old_note(unit, page.static_page(SPEC, {**load(unit), "now": time.time()})).encode("utf-8"),
-    )
-    run.out(f"{unit.label}/{STATIC}")
-    return cli.EXIT_DONE
