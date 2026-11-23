@@ -2,19 +2,12 @@
 // tests/test_architect_formats.py: `node tests/render-architect-payloads.js payloads.json`, where the file holds
 // [{label, data}]. The page's own code, architect/page.js, runs against stand-in elements.
 const fs = require('node:fs');
-const path = require('node:path');
 const vm = require('node:vm');
+const { read, stand } = require('./harness');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', 'architect', 'page.js'), 'utf8');
-// An element, a document or any other object the page only pokes at: every property and call gives another one.
-const stand = () => new Proxy(function () {}, {
-  get: (_t, k) => (k === Symbol.toPrimitive ? () => '' : stand()),
-  apply: () => stand(),
-  set: () => true,
-});
 const context = {fetch: () => new Promise(() => {}), document: stand(), sessionStorage: stand(), setTimeout: () => {}, URLSearchParams};
 vm.createContext(context);
-vm.runInContext(source, context);
+vm.runInContext(read('architect', 'page.js'), context);
 
 const payloads = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const failed = [];

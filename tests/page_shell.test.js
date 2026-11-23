@@ -3,11 +3,9 @@
 // minimal stand-in: just what these functions touch.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const { read, loadPage } = require('./harness');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', 'page', 'page.js'), 'utf8');
+const source = read('page', 'page.js');
 
 class Node {
   constructor(tag) { this.tag = tag; this.className = ''; this.dataset = {}; this.children = []; this.listeners = {}; this.attrs = {}; this.hidden = false; this.textContent = ''; this._html = ''; }
@@ -26,10 +24,7 @@ function load(config) {
     createElement: tag => new Node(tag),
     getElementById: id => id === 'page-config' && config ? { textContent: JSON.stringify(config) } : null,
   };
-  const context = { document, Date, JSON, Object, Math, String, Array, isNaN };
-  vm.createContext(context);
-  vm.runInContext(source, context);
-  return context;
+  return loadPage({ document, Date, JSON, Object, Math, String, Array, isNaN });
 }
 const copy = list => Array.from(list);
 
@@ -207,13 +202,12 @@ function stripsOn(extra, fetchAnswer, ids = {}) {
   const els = { '.offline': el({ hidden: true }), '.unwatched': el({ hidden: true }), '#note': el(), '.thread': el(), '.notes .empty': el(),
     '.toast': el({ hidden: true }), '.notes .status': el() };
   const timers = [];
-  const context = {
+  const globals = {
     document: { querySelector: s => els[s] || el(), querySelectorAll: () => [], getElementById: id => ids[id] || null, contains: () => true },
     Date, JSON, Object, Math, String, Array, isNaN, fetch: url => fetchAnswer(url),
     setTimeout: f => timers.push(f), clearTimeout() {}, requestAnimationFrame: f => f(),
   };
-  vm.createContext(context);
-  vm.runInContext(source, context);
+  const context = loadPage(globals);
   context.pageConversation(Object.assign({ served: true, thread: els['.thread'] }, extra)).start();
   const flush = () => new Promise(resolve => setImmediate(resolve));
   const round = async () => { await flush(); await flush(); const due = timers.splice(0); due.forEach(f => f()); await flush(); await flush(); };
@@ -275,7 +269,7 @@ test('the shared count says how many records are in the format before this chang
 
 test('the research board and the code-better dashboard draw a decision question with the shared renderer, and neither has its own', () => {
   for (const rel of ['research/board.js', 'code/dashboard.js']) {
-    const text = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', rel), 'utf8');
+    const text = read(...rel.split('/'));
     assert.match(text, /pageDecision\(\{/, rel + ' does not call pageDecision');
     assert.doesNotMatch(text, /['"`]Use the default['"`]/, rel + ' words the default button itself');
   }
