@@ -37,6 +37,7 @@ ADD each record with `python3 <skill dir>/scripts/better.pyz add <UNIT> <type> -
 4. AFTER each page or file you read, ADD before the next search:
    - the source: for a web page, `origin` `web`, its URL; for a file, `origin` `file`, its path; for a connector item, `origin` `tool`, the tool, the item's `ref` it reads it by. GIVE how you read it in `read`: `raw` for the full text, `extracted` for a tool's processed output, `snippet` for search-tool text only, `blocked` when you could not read it. SKIP a source that EXISTING RECORDS already lists;
    - one piece of evidence per quote, with `status` `checking`: the sentence copied word for word, on one line and at most 600 characters, its kind, whether it is about the user's own users or from elsewhere, and each item it bears on with `for` or `against`. FOR a quote from a file or a connector, ALSO GIVE a `summary` that names people by role, never by name, as in an internal discovery.
+   - FOR a result you computed from the user's data, such as a count of tickets, one piece of evidence of kind `data` whose words hold the command or query and its result, as FORMATS shows. The verifier runs it again on the same source, so USE a command that gives the same result each time.
 5. STOP after 10 searches and page reads in all, or once each item in ITEMS has evidence for and against, or a search that found none.
 
 ## Rules
@@ -51,6 +52,7 @@ ADD each record with `python3 <skill dir>/scripts/better.pyz add <UNIT> <type> -
 8. ADD evidence only for the items in ITEMS, including the items a test settles: `add` refuses evidence on an item you are not checking.
 9. BEFORE you repeat an `add` whose output you did not see, LIST your own records: the ids in <UNIT>/sources/ and <UNIT>/evidence/ that carry YOUR NAME. Repeat the `add` only if the record is not there.
 10. DO NOT add changes, questions, tests or options, and DO NOT set any item or evidence.
+11. READ only the files and the connectors in WHERE, and only with tools that read. NEVER call a connector tool that sends, creates, changes or deletes anything.
 
 ## Output
 

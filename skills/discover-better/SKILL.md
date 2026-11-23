@@ -16,13 +16,13 @@ Being invoked does NOT mean running every step. A discovery can end at step 2 or
 
 ## Principles
 
-1. Training founders to test the assumptions their idea rests on made them drop bad projects more often and sooner, across four randomised trials. Which assumption to test first, and stop rules set in advance, are common practice with no direct test of their effect.
-2. What people say they would do overstates what they do: stated willingness to pay averages about a fifth above real willingness to pay. A test shows something only when its result can change a decision.
+1. People who test the assumptions their idea rests on drop bad ideas more often and sooner.
+2. What people say they would do overstates what they do, such as what they would pay. A test shows something only when its result can change a decision.
 3. Evidence about people in general does not show that the user's own users have the problem. What a piece of evidence covers, such as which groups, which setting and which denominator, decides what it supports.
-4. AI tools paraphrase pages and alter quotes, and their errors vary by group. A quote read through a fetch tool can drop the strongest counter-evidence.
-5. Asking questions about a person's idea kept more of their ownership and gave ideas rated better than a model rewriting the idea. Models drift toward what the user believes; turning the user's statement into a question, or asking what follows from the opposite belief, reduces the drift.
+4. AI tools paraphrase pages and alter quotes, and their errors vary by group. A page read through a fetch tool can lose its strongest counter-evidence.
+5. Asking questions about a person's idea keeps more of their ownership, and gives better ideas, than a model rewriting the idea. Models drift toward what the user believes; turning the user's statement into a question, or asking what follows from the opposite belief, reduces the drift.
 6. A brief works best as the start of a discussion with design, not as a finished hand-off.
-7. The steps, the seven moves, the item states, only the user accepting a risk, questions whose default is never applied by silence, the quote verifier reading the raw page, and analysts and verifiers on a cheaper model are design choices. In trial runs of this process, agents accepted risks in the user's name and dropped counter-evidence that a fetch tool had paraphrased.
+7. The steps, the seven moves, the item states, only the user accepting a risk, questions whose default is never applied by silence, the quote verifier re-reading the source itself, only named, read-only sources, and analysts and verifiers on a cheaper model are design choices.
 
 ## Instructions
 
@@ -51,7 +51,7 @@ DRAFT the items the idea rests on, and ADD each with `python3 <skill dir>/script
 - **opportunities** (`O`), only when the idea needs one: what would change for them, such as that no existing tool does it;
 - **behaviours** (`B`): what the idea lets someone do, written "When [situation], [who] can [observable result]", with a testable form: EARS where the system acts, Given/When/Then where a person acts.
 
-LINK each item to the items it rests on. LIST on each item its risks, each with an id `R<n>` and a kind: value (would they want it), usability (could they use it), feasibility (can it be built) or viability (can the organisation sustain it). SET each item's importance, `high` or `lower`, with a first `change`. Linking an outcome, its opportunities and the behaviours that serve them is a common structure for this; no study measured its effect.
+LINK each item to the items it rests on. LIST on each item its risks, each with an id `R<n>` and a kind: value (would they want it), usability (could they use it), feasibility (can it be built) or viability (can the organisation sustain it). SET each item's importance, `high` or `lower`, with a first `change`. LINK an outcome to its opportunities and to the behaviours that serve them: TREAT this as a guide, not a rule.
 
 START a behaviour verifier for the behaviours, as the general rule [Run the sub-agents](#run-the-sub-agents) says. SET each behaviour's `checker` and `since` when its behaviour verifier starts, and CLEAR them when it hands back. READ [agents/behaviour-verifier.md](agents/behaviour-verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent. SET each behaviour's `ambiguity` from its findings, in your own words.
 
@@ -68,11 +68,11 @@ IF the idea no longer holds once shaped, because its core problem is gone or the
 
 ### 3. Run the reality check
 
-ASK four questions of the idea: does something already do it, is the problem real, what does research say, and what would strengthen it. START with the item the idea depends on most and whose evidence is weakest; this is common practice, not a measured rule.
+ASK four questions of the idea: does something already do it, is the problem real, what does research say, and what would strengthen it. START with the item the idea depends on most and whose evidence is weakest: TREAT this as a guide, not a rule.
 
 FOR each item to check, SET its `checker` to a new analyst name and its `since`, ADD a change of its state to `checking`, and START an analyst: READ [agents/analyst.md](agents/analyst.md), FILL IN its Input, with the item's existing sources and evidence, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent. ASK each analyst for evidence against the item as well as for it.
 
-AS evidence appears with `status` `checking`, START a quote verifier for it: SET the evidence's `verifier` to a new verifier name and its `since`, READ [agents/quote-verifier.md](agents/quote-verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent.
+AS evidence appears with `status` `checking`, START a quote verifier for it: SET the evidence's `verifier` to a new verifier name and its `since`, READ [agents/quote-verifier.md](agents/quote-verifier.md), FILL IN its Input, with NAMED SOURCES the files and read-only connector tools the user named, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent.
 
 WAIT for the analysts' and the quote verifiers' hand-backs. Meanwhile, questions to the user go on. DO NOT choose a move or write a brief until they hand back.
 
@@ -209,7 +209,7 @@ DO NOT commit `.discover/` unless the user asks.
 
 IN an internal discovery, NAME people by their role, never by name, in what you add, and ADD a summary by role for each piece of evidence the user gives. GIVE analysts general terms to search with, never people's, customers' or internal project names.
 
-WHEN the user asks to remove a piece of evidence they gave, or any evidence of an internal discovery, on the page or in the chat, RECORD the request: a chat request is a question about that evidence, answered with "remove E<n>", never the user's words. STOP the page server you started, by its process id, and RUN `python3 <skill dir>/scripts/better.pyz redact <unit> <evidence id> --request <event or question id>`. RUN it again until it finishes, THEN START the page again. TELL the user where copies may remain: briefs already handed on, git history, and the harness's transcripts and model provider.
+WHEN the user asks to remove a piece of evidence they gave, evidence from the user's files or connectors, in any discovery, or any evidence of an internal discovery, on the page or in the chat, RECORD the request: a chat request is a question about that evidence, answered with "remove E<n>", never the user's words. STOP the page server you started, by its process id, and RUN `python3 <skill dir>/scripts/better.pyz redact <unit> <evidence id> --request <event or question id>`. RUN it again until it finishes, THEN START the page again. TELL the user where copies may remain: briefs already handed on, git history, and the harness's transcripts and model provider.
 
 ### Stay a discovery
 
@@ -234,8 +234,9 @@ THEN CONTINUE from the step the head names.
 IF you cannot do a step, because a call was denied or the harness lacks a tool, SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done.
 
 - **No sub-agents:** run the analysts in turn yourself, each by [agents/analyst.md](agents/analyst.md). READ the behaviours yourself by [agents/behaviour-verifier.md](agents/behaviour-verifier.md), and SAY in the brief that no separate reader checked them. No quote verifier runs, so no quote counts, and moves do not wait for quotes.
-- **No web access:** analysts read only the files and connectors the user named, the other items stay `unverified`, and the brief says so.
-- **No raw read of pages from the shell:** no quote counts. The first time two verifiers fail to connect to different hosts, TELL the user once, and offer three ways on: allow network for the shell; paste the page text as evidence of their own; or go on with the items unverified, which the brief says.
+- **No web access:** analysts read only the files and connectors the user named; the items no file or connector evidence bears on stay `unverified`, the reality check does not run, and the brief says so.
+- **No raw read of pages from the shell:** no quote from a web page counts. The first time two verifiers fail to connect to different hosts, TELL the user once, and offer three ways on: allow network for the shell; paste the page text as evidence of their own; or go on with the items unverified, which the brief says.
+- **A connector the user named is not available to sub-agents:** TELL the user once, and offer: export the items to a file the analysts can read; paste them as evidence of their own; or go on with those items unverified, which the brief says.
 - **No shell:** KEEP the records in your working notes, MARK the discovery **not finished**, and NAME the records you did not add.
 - **No page:** HOLD the conversation in the chat.
 - **A skill named for the hand-on, or for a test, is not available:** GIVE the user the brief's path and what to run.
