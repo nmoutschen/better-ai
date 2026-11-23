@@ -162,13 +162,10 @@ const checkingOn = (data, id) => (data.evidence || []).filter(e => e.status === 
 const lastChange = (data, id, field) => { let found = null; (data.changes || []).forEach(c => { if (c.field === field && (c.about || {}).item === id) found = c; }); return found; };
 
 // The latest record that carries an agent: its `by`, or its name in an evidence or source id. After 30 quiet minutes a row says so.
+// The agent's latest record, as the page's Python serves it from summary's rule: one rule, not a copy here (L4).
 function lastWord(data, name) {
-  let latest = 0;
-  const note = (record, at) => { const t = Date.parse(at); if (record && isFinite(t) && t > latest) latest = t; };
-  ['items', 'changes', 'options', 'moves', 'briefs', 'decisions', 'tests', 'evidence', 'conversation'].forEach(key => (data[key] || []).forEach(r => {
-    if (r && (r.by === name || s(r.id).replace(/^[ES]-/, '').replace(/-\d+$/, '') === name)) note(r, r.at);
-  }));
-  return latest || null;
+  const t = Date.parse((data.last_word || {})[name]);
+  return isFinite(t) ? t : null;
 }
 // The at-work list: each item and test with a checker, each piece of evidence with a verifier, aged from `since`.
 function agentRows(data, now) {
@@ -672,7 +669,9 @@ function openForm(button) {
   const kind = button.dataset.openForm, row = button.closest('tr');
   const open = row && row.nextElementSibling && row.nextElementSibling.classList.contains('formrow') ? row.nextElementSibling : null;
   if (open) return closeForm(open.querySelector('.rec'));
-  $$('.rec', view).forEach(other => closeForm(other, true));  // one form at a time: no duplicate ids
+  // One form at a time (no duplicate ids). Remove the others without a repaint, which would detach this row; a pending
+  // repaint runs when this form closes.
+  $$('.rec', view).forEach(other => { const tr = other.closest('tr.formrow'); (tr || other).remove(); });
   const html = formFor(kind, button.dataset.record, button.dataset.field);
   let box;
   if (kind === 'add-evidence') {
@@ -775,6 +774,11 @@ eventKinds.decision = (c, state, actions) => {
   const send = $('.notes .send .btn');
   if (send) send.after(pickerButton);
 })();
+// A row of the at-work list opens its record's tab and marks its row (A3): the list sits outside the view.
+byId('agents').addEventListener('click', event => {
+  const button = event.target.closest('[data-goto]');
+  if (button) goto(button.dataset.goto);
+});
 byId('status').addEventListener('click', event => {
   if (!event.target.closest('#questions')) return;
   const first = $('li.open-q', byId('thread'));

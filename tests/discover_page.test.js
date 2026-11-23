@@ -250,10 +250,10 @@ test('S102, S84: the at-work list has a row for each item and test with a checke
   assert.match(html, /No word from analyst-2 for 31 min/);
 });
 
-test('S56: a check that has no word for 30 minutes says so; the last word is the latest record that carries the agent', () => {
+test('S56: a check that has no word for 30 minutes says so; the last word is the one the page data serves', () => {
   const a = api(), d = fixture();
   d.tests[1].since = ago(40);
-  d.evidence.push(rec('evidence', { id: 'E-analyst-2-1', by: 'analyst-2', at: ago(5), source: 'S-x', words: { type: 'quote', text: 'q' }, text: 'q', kind: 'say', about: 'elsewhere', bears_on: [], status: 'checking' }));
+  d.last_word = { 'analyst-2': ago(5) };  // served by the page's Python, from summary's one rule (L4)
   const quiet = a.agentRows(d, NOW).find(r => r.who === 'analyst-2');
   assert.equal(new Date(quiet.last).toISOString().slice(0, 19) + 'Z', ago(5));
   assert.doesNotMatch(a.atWork(d, NOW), /No word from analyst-2/);

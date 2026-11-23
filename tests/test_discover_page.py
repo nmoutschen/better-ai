@@ -8,6 +8,7 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -70,6 +71,24 @@ class Loaded(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.folder = P.populated(Path(self.tmp.name))
         self.unit = unit_of(self.folder)
+
+    def test_S56_the_last_word_of_each_agent_at_work_is_served_from_summary_and_counts_sources(self):
+        data = pagespec.load(self.unit)
+        working = {i["checker"] for i in data["items"] + data["tests"] if i.get("checker")}
+        working |= {e["verifier"] for e in data["evidence"] if e.get("verifier")}
+        self.assertEqual(set(data["last_word"]), working)
+        agent = sorted(working)[0]
+        at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        source = {
+            "type": "source",
+            "at": at,
+            "by": agent,
+            "id": f"S-{agent}-9",
+            "origin": {"type": "web", "url": "https://example.com/"},
+            "title": "t",
+        }
+        (self.folder / "sources" / f"S-{agent}-9.json").write_text(json.dumps(source))
+        self.assertEqual(pagespec.load(self.unit)["last_word"][agent], at)
 
     def test_the_payload_holds_every_record_and_what_the_records_derive(self):
         data = pagespec.load(self.unit)

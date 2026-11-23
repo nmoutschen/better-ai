@@ -14,7 +14,7 @@ from typing import Any
 
 from .. import page, paths, resources, schema
 from ..paths import Unit
-from . import SKILL, derive, rules_moves
+from . import SKILL, derive, rules_moves, summary
 
 PAGE_EVENTS = ("choose", "add_evidence", "add_result", "remove", "edit", "redact")  # discover's own events
 RECORD_FILES = (
@@ -110,6 +110,16 @@ def load(unit: Unit) -> dict:
         if revision:
             revisions[ident] = revision
 
+    # Each agent at work and its latest record, by summary's one rule (S56, L4): the page shows "No word from…" from it.
+    known = summary.Discovery(
+        unit, head=head[0] if head else {}, evidence=evidence, sources=list(sources.values()), **found
+    )
+    working = {r.get("checker") for r in found["items"] + found["tests"]} | {e.get("verifier") for e in evidence}
+    last_word = {}
+    for agent in sorted(a for a in working if isinstance(a, str) and a):
+        heard = summary._last_word(known, agent)
+        last_word[agent] = heard.strftime(schema.TIME) if heard else None
+
     return {
         "errors": errors,
         "head": head[0] if head else {},
@@ -123,6 +133,7 @@ def load(unit: Unit) -> dict:
         "evidence": shown_evidence,
         "conversation": found["conversation"],
         "revisions": revisions,
+        "last_word": last_word,
         "chosen": view.chosen,
     }
 
