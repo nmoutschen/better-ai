@@ -20,3 +20,4 @@ actions:
         return None if stock is None else stock > 0
 - bash: python -m unittest -q
 - bash: ruff check .
+  fails: true

@@ -15,3 +15,4 @@ actions:
             raise ValueError(f"unknown VAT category: {category}") from error
 - bash: python -m unittest -q
 - bash: ruff check .
+  fails: true

@@ -4,4 +4,5 @@ actions:
   content: |
     DISPLAY = 'Zero'
 - bash: python test_scale.py
+  fails: true
 - read: calibrate.py

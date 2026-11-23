@@ -4,11 +4,17 @@ on:
   pull_request:
     paths:
       - "evals/**"
+      - "skills/**"
+      - "src/better_ai/**"
+      - "tests/better.py"
       - ".github/workflows/evals.yml"
   push:
     branches: [main]
     paths:
       - "evals/**"
+      - "skills/**"
+      - "src/better_ai/**"
+      - "tests/better.py"
       - ".github/workflows/evals.yml"
 
 jobs:

@@ -46,11 +46,13 @@ def test_samples_per_case_and_condition() -> None:
 
 
 def test_unknown_case_id_or_skill_fails() -> None:
-    """A case id or skill that matches no case folder is an error that names it, not a silent skip."""
+    """A case id or skill that matches no case folder is an error that names it; a skill name is a plain folder name."""
     with pytest.raises(ValueError, match="invoice-half-upp"):
         cases.samples("code-better", ["no-skill"], None, ["invoice-half-up", "invoice-half-upp"])
     with pytest.raises(ValueError, match="nonexistent-skill"):
         cases.case_dirs("nonexistent-skill")
+    with pytest.raises(ValueError, match="Invalid skill name"):
+        cases.case_dirs("../skills")
 
 
 def write_case(tmp_path: Path, text: str, folder: str = "a-case") -> Path:
@@ -65,8 +67,8 @@ def write_case(tmp_path: Path, text: str, folder: str = "a-case") -> Path:
 VALID_CASE = "id: a-case\nrule: some-behaviour\nsituation: S.\nrequest: R.\ngraders:\n  - type: notes_only\n"
 
 
-def test_case_yaml_keys_are_checked(tmp_path: Path) -> None:
-    """A valid case loads; an unknown top-level key, an unknown grader field, or an id that is not the folder fails."""
+def test_case_yaml_keys_are_checked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A valid case loads; an unknown top-level key, a grader field or type with no implementation, or an id that is not the folder fails."""
     assert cases.load_case(write_case(tmp_path, VALID_CASE))["id"] == "a-case"
     with pytest.raises(ValueError, match="a-case.*read"):
         cases.load_case(write_case(tmp_path / "1", VALID_CASE + "read: [SKILL.md]\n"))
@@ -77,12 +79,9 @@ def test_case_yaml_keys_are_checked(tmp_path: Path) -> None:
         cases.load_case(write_case(tmp_path / "3", nested))
     with pytest.raises(ValueError, match="a-case.*other-name"):
         cases.load_case(write_case(tmp_path / "4", VALID_CASE.replace("id: a-case", "id: other-name")))
-
-
-def test_invalid_skill_name() -> None:
-    """Skill names are plain folder names."""
-    with pytest.raises(ValueError):
-        cases.case_dirs("../skills")
+    monkeypatch.setitem(cases.GRADER_FIELDS, "bogus", ())
+    with pytest.raises(ValueError, match="a-case.*bogus.*no implementation"):
+        cases.load_case(write_case(tmp_path / "5", VALID_CASE + "  - type: bogus\n"))
 
 
 def test_token_errors_never_show_the_token(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -313,18 +312,18 @@ def test_run_ends_after_result_event_although_a_background_shell_runs(tmp_path: 
     fake.write_text(
         "#!/bin/sh\n"
         'echo \'{"type":"assistant","text":"a quoted \\"type\\":\\"result\\" does not end the run"}\'\n'
-        "sleep 20\n"
+        "sleep 2\n"
         'echo \'{"type":"result","stop_reason":"end_turn"}\'\n'
         "exec sleep 600\n"
     )
     fake.chmod(0o755)
     out = tmp_path / "run.out"
-    script = agent.END_AFTER_RESULT.format(run=f"{fake} > {out} < /dev/null", out=out)
+    script = agent.end_after_result(f"{fake} > {out} < /dev/null", str(out), quiet=1, poll=0.2, grace=0.5)
     started = time.monotonic()
-    subprocess.run(["sh", "-c", script], check=False, timeout=90)
+    subprocess.run(["sh", "-c", script], check=False, timeout=30)
     elapsed = time.monotonic() - started
-    # Ended after the real result (printed at 20 s), not after the quoted look-alike, and not at the timeout.
-    assert 20 < elapsed < 50
+    # Ended after the real result (printed at 2 s), not after the quoted look-alike, and not at the timeout.
+    assert 2 < elapsed < 8
     assert out.read_text().splitlines()[-1] == '{"type":"result","stop_reason":"end_turn"}'
 
 
@@ -334,13 +333,13 @@ def test_run_continues_when_events_follow_a_result(tmp_path: Path) -> None:
     fake.write_text(
         "#!/bin/sh\n"
         'echo \'{"type":"result","stop_reason":"end_turn"}\'\n'
-        "sleep 4\n"
+        "sleep 0.4\n"
         'echo \'{"type":"assistant","text":"a background task finished"}\'\n'
-        "sleep 14\n"
+        "sleep 1.4\n"
         'echo \'{"type":"result","stop_reason":"end_turn","turn":2}\'\n'
     )
     fake.chmod(0o755)
     out = tmp_path / "run.out"
-    script = agent.END_AFTER_RESULT.format(run=f"{fake} > {out} < /dev/null", out=out)
-    subprocess.run(["sh", "-c", script], check=False, timeout=90)
+    script = agent.end_after_result(f"{fake} > {out} < /dev/null", str(out), quiet=1, poll=0.2, grace=0.5)
+    subprocess.run(["sh", "-c", script], check=False, timeout=30)
     assert out.read_text().splitlines()[-1] == '{"type":"result","stop_reason":"end_turn","turn":2}'

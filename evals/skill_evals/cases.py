@@ -28,6 +28,8 @@ from typing import Any
 import yaml
 from inspect_ai.dataset import Sample
 
+from skill_evals.grading.files import GRADERS
+
 EVALS = Path(__file__).resolve().parents[1]
 REPO = EVALS.parent
 CASES = EVALS / "cases"
@@ -69,6 +71,8 @@ GRADER_FIELDS: dict[str, tuple[str, ...]] = {
     "planted_unchanged": ("except",),
     "ran_command": ("pattern",),
 }
+# The grader types that no function of grading/files.py implements: the scorer runs them itself.
+SCORER_GRADERS = ("any_of", "judge", "ran_command")
 
 
 def check_skill(skill: str) -> str:
@@ -113,11 +117,13 @@ def _resolve(specs: list[dict[str, Any]], directory: Path) -> list[dict[str, Any
 
 
 def check_graders(name: str, specs: list[dict[str, Any]]) -> None:
-    """Raise unless every grader, also inside any_of, has a known type and only the fields of that type."""
+    """Raise unless every grader, also inside any_of, has a known, implemented type and only the fields of that type."""
     for spec in specs:
         kind = spec.get("type")
         if kind not in GRADER_FIELDS:
             raise ValueError(f"{name}: unknown grader type {kind!r}")
+        if kind not in GRADERS and kind not in SCORER_GRADERS:
+            raise ValueError(f"{name}: grader type {kind!r} has no implementation")
         for key in spec.keys() - {"type", *GRADER_FIELDS[kind]}:
             raise ValueError(f"{name}: {kind} has an unknown field {key!r}")
         if kind == "any_of":
@@ -247,7 +253,7 @@ def samples(
     """
     sentences = source_sentences(skill)
     found = []
-    loaded = [load_case(directory) for directory in case_dirs(skill)]
+    loaded = load_cases(skill)
     if unknown := sorted(set(case_ids or []) - {case["id"] for case in loaded}):
         raise ValueError(f"No case {', '.join(unknown)} in {skill!r}; cases are {', '.join(c['id'] for c in loaded)}")
     for directory, case in zip(case_dirs(skill), loaded, strict=True):

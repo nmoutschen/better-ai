@@ -1,6 +1,6 @@
 """Tests for skill_evals/grading/loaded.py: whether a run loaded the skill without a slash command."""
 
-from inspect_ai.model import ChatMessageAssistant
+from inspect_ai.model import ChatMessageAssistant, ChatMessageTool
 from inspect_ai.tool import ToolCall
 
 from skill_evals.grading import loaded
@@ -22,8 +22,10 @@ def test_skill_tool_with_the_name_loads_it() -> None:
 
 
 def test_reading_skill_md_loads_it() -> None:
-    """Reading or printing the installed SKILL.md counts; another file of the skill or the repository does not."""
+    """Reading the installed SKILL.md with the read tool counts; printing it in the shell, or another file, does not."""
     assert loaded.loaded([assistant("Read", {"file_path": f"{SKILL_DIR}/SKILL.md"})], "write-better")
-    assert loaded.loaded([assistant("Bash", {"command": f"cat {SKILL_DIR}/SKILL.md"})], "write-better")
+    assert not loaded.loaded([assistant("Bash", {"command": f"cat {SKILL_DIR}/SKILL.md"})], "write-better")
+    failed = ChatMessageTool(content="", tool_call_id="call-1", error={"type": "unknown", "message": "no such file"})  # type: ignore[arg-type]
+    assert not loaded.loaded([assistant("Read", {"file_path": f"{SKILL_DIR}/SKILL.md"}), failed], "write-better")
     assert not loaded.loaded([assistant("Read", {"file_path": f"{SKILL_DIR}/formats/x.md"})], "write-better")
     assert not loaded.loaded([assistant("Read", {"file_path": "/work/SKILL.md"})], "write-better")
