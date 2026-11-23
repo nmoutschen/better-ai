@@ -1000,13 +1000,18 @@ def make_server(unit: Unit, spec: PageSpec, conv: Conversation, info: resources.
     return server
 
 
+def page_url(server: http.server.HTTPServer) -> str:
+    """The address a browser opens, with the token in its fragment, which a browser does not send to any server."""
+    return f"http://127.0.0.1:{server.server_address[1]}/#t={server.token}"  # type: ignore[attr-defined]
+
+
 def publish(unit: Unit, server: http.server.HTTPServer) -> str:
     """Write the server's token (private to the user) and then its address to the unit, as an agent finds them; returns
-    the address a browser opens, with the token in its fragment, which a browser does not send to any server."""
+    the address a browser opens (`page_url`)."""
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     paths.write_state(unit, TOKEN, server.token.encode(), 0o600)  # type: ignore[attr-defined]
     paths.write_state(unit, ADDRESS, url.encode())
-    return f"{url}#t={server.token}"  # type: ignore[attr-defined]
+    return page_url(server)
 
 
 def _serve_arguments(parser: argparse.ArgumentParser) -> None:
@@ -1046,12 +1051,15 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
         raise paths.refusal(
             unit.label, f"cannot be served on port {args.port} ({reason})", f"serve {unit.label} on a free port"
         ) from None
-    url = publish(unit, server)
-    if not unit.target(SEEN).exists():  # a resumed run keeps its place, so it still sees what came in while it was away
-        paths.write_state(unit, SEEN, b"0")
+    url = page_url(server)
+    # Printed before the address file is written: a reader that waits for the file and then stops the server has the
+    # address already, even if the stop comes before the signal handler below is set.
     run.out(
         f"Each action the user takes is printed here as one JSON line. Serving {unit.label} at {url}"
     )  # the address last: no full stop after it
+    publish(unit, server)
+    if not unit.target(SEEN).exists():  # a resumed run keeps its place, so it still sees what came in while it was away
+        paths.write_state(unit, SEEN, b"0")
     if args.open and not webbrowser.open(url):
         run.out(
             "Could not open a browser on this machine. If the user's browser runs on another machine, "
