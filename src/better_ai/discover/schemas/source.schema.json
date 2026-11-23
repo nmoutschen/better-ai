@@ -49,7 +49,7 @@
       ]
     },
     "given": {
-      "description": "what the user gave: the page event that holds it, or their typed words in the chat",
+      "description": "what the user gave: the page event that holds it (an add_evidence or an add_result), or their typed words in the chat",
       "type": "object",
       "required": ["type"],
       "properties": {"type": {"enum": ["page", "chat"]}},
@@ -62,7 +62,7 @@
             "required": ["type", "event"],
             "properties": {
               "type": {"const": "page"},
-              "event": {"type": "string", "minLength": 1, "x-points-to": {"file": "../conversation.jsonl", "type": "add_evidence"}}
+              "event": {"type": "string", "minLength": 1, "x-points-to": {"file": "../conversation.jsonl", "type": ["add_evidence", "add_result"]}}
             }
           }
         },
