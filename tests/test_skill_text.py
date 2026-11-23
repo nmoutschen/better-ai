@@ -527,8 +527,7 @@ class CodeBetterTextTest(unittest.TestCase):
         """The hidden checks that look for notes accept a `.code/` JSON working file, as a run of the skill writes."""
         cases = [
             ("record-session-constraint/checks/command_passes_3/recorded.py", [], "instructions.jsonl"),
-            ("shared-migration-plan/checks/command_passes_1/plan.py", ["sales", "stock"], "tasks.jsonl"),
-            ("oldlog-multi-session-plan/checks/command_passes/plan.py", ["billing", "search"], "tasks.jsonl"),
+            ("_checks/plan.py", ["sales", "stock"], "tasks.jsonl"),
         ]
         for script, arguments, name in cases:
             with self.subTest(script=script), tempfile.TemporaryDirectory() as temp:

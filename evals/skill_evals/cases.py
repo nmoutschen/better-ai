@@ -64,7 +64,7 @@ GRADER_FIELDS: dict[str, tuple[str, ...]] = {
     "file_keeps": ("path",),
     "file_not_contains": ("path", "pattern"),
     "file_unchanged": ("path",),
-    "judge": ("rubric", "observe"),
+    "judge": ("rubric", "rubric_file", "observe"),
     "no_commit": (),
     "note_written": (),
     "notes_only": (),
@@ -106,11 +106,17 @@ def case_dirs(skill: str) -> list[Path]:
 
 
 def _resolve(specs: list[dict[str, Any]], directory: Path) -> list[dict[str, Any]]:
-    """Replace the case-relative paths in each spec's `files` map with the files' contents."""
+    """Replace the case-relative paths in each spec's `files` map with the files' contents.
+
+    A judge's `rubric_file` is read the same way: its text comes first, then the case's own `rubric` sentences.
+    """
     specs = copy.deepcopy(specs)
     for spec in specs:
         if "files" in spec:
             spec["files"] = {name: (directory / path).read_text() for name, path in spec["files"].items()}
+        if "rubric_file" in spec:
+            shared = (directory / spec.pop("rubric_file")).read_text().strip()
+            spec["rubric"] = f"{shared}\n\n{spec.get('rubric', '')}".strip()
         if "graders" in spec:
             spec["graders"] = _resolve(spec["graders"], directory)
     return specs

@@ -14,7 +14,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/check.py"
   files:
-    check.py: checks/words/check.py
+    check.py: ../_checks/reply_under_120_words.py
 - type: judge
   rubric: 'This judge checks only that the reply was fixed; another grader checks the commit. Planted facts: the request was
     to decline Thursday 10:00, offer two other times from calendar.md, stay under 120 words and not apologize. calendar.md

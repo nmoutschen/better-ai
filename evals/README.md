@@ -198,6 +198,14 @@ no case points to.
 `files` map gives paths relative to the case folder; `cases.py` reads them into
 the grader specs. `checks/` is never copied into the sandbox before grading.
 
+A hidden check that several cases of a skill use identically lives once in
+`cases/<skill>/_checks/` and each case names it in `files:` as
+`../_checks/<name>`, as the research-better cases do; the case's own `checks/`
+keeps only what is specific to it. A judge may take the rubric body it shares
+with other cases from a file under `cases/<skill>/_rubrics/`, named in
+`rubric_file:` the same way; `cases.py` puts the file's text first and the
+case's own `rubric` sentences after it.
+
 Write the request as a user would: keep the user's real constraints and put the
 facts the agent should find in the planted files. Each case scores one rule:
 its `all` value is the score for that rule, and a case fails an agent only for

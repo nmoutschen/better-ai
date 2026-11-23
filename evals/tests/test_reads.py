@@ -4,22 +4,14 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from inspect_ai.model import ChatMessageAssistant, ChatMessageTool, ChatMessageUser
-from inspect_ai.tool import ToolCall, ToolCallError
+from conftest import assistant, skill_dir
+from inspect_ai.model import ChatMessageTool, ChatMessageUser
+from inspect_ai.tool import ToolCallError
 
 from skill_evals.grading import reads
 from skill_evals.grading.files import GradingError
 
-SKILL_DIR = "/home/agent/.claude/skills/code-better"
-
-
-def assistant(*calls: tuple[str, dict[str, str]], subagent: bool = False) -> ChatMessageAssistant:
-    """An assistant message making the given tool calls, from a sub-agent if asked."""
-    tool_calls = [ToolCall(id=f"call-{n}", function=name, arguments=args) for n, (name, args) in enumerate(calls)]
-    message = ChatMessageAssistant(content="", tool_calls=tool_calls)
-    if subagent:
-        message.metadata = {"subagent_of": "task-1"}
-    return message
+SKILL_DIR = skill_dir("code-better")
 
 
 def test_files_read_counts_only_read_tool_calls_that_did_not_fail() -> None:
@@ -58,10 +50,8 @@ def test_track_accepts_any_alternative() -> None:
     assert tracked["missing"] == ["formats/next-steps.md"]
 
 
-READ_CALL = ToolCall(id="1", function="Read", arguments={"file_path": f"{SKILL_DIR}/modes/bug-fix.md"})
-CAT_CALL = ToolCall(
-    id="2", function="Bash", arguments={"command": "cd ~/.claude/skills/code-better\ncat modes/bug-fix.md"}
-)
+READ_CALL = ("Read", {"file_path": f"{SKILL_DIR}/modes/bug-fix.md"})
+CAT_CALL = ("Bash", {"command": "cd ~/.claude/skills/code-better\ncat modes/bug-fix.md"})
 
 
 class StubJudge:
@@ -103,7 +93,7 @@ async def score(
 async def test_read_tool_read_counts_without_a_judge_call(monkeypatch: pytest.MonkeyPatch) -> None:
     """A Read of the expected file passes by the script alone."""
     stub = StubJudge()
-    result = await score([ChatMessageAssistant(content="", tool_calls=[READ_CALL])], stub=stub, monkeypatch=monkeypatch)
+    result = await score([assistant(READ_CALL)], stub=stub, monkeypatch=monkeypatch)
     assert result.value == 1 and stub.prompts == []
     assert result.metadata["read"] == {"modes/bug-fix.md": reads.MAIN}
     assert result.metadata["missing"] == [] and result.metadata["decided_by"] == "script"
@@ -112,8 +102,10 @@ async def test_read_tool_read_counts_without_a_judge_call(monkeypatch: pytest.Mo
 async def test_failed_read_is_missing_and_goes_to_the_judge(monkeypatch: pytest.MonkeyPatch) -> None:
     """A Read that failed leaves the file missing for the script, so the judge is asked about it."""
     messages = [
-        ChatMessageAssistant(content="", tool_calls=[READ_CALL]),
-        ChatMessageTool(content="EACCES", tool_call_id="1", function="Read", error=ToolCallError("unknown", "EACCES")),
+        assistant(READ_CALL),
+        ChatMessageTool(
+            content="EACCES", tool_call_id="call-0", function="Read", error=ToolCallError("unknown", "EACCES")
+        ),
     ]
     stub = StubJudge("modes/bug-fix.md: NOT READ")
     result = await score(messages, stub=stub, monkeypatch=monkeypatch)
@@ -125,7 +117,7 @@ async def test_judge_finds_a_read_by_cat(monkeypatch: pytest.MonkeyPatch) -> Non
     """When the judge says the file was printed by cat, it is not missed; the metadata says who found it."""
     stub = StubJudge("Step 1 prints it.\nmodes/bug-fix.md: READ")
     result = await score(
-        [ChatMessageUser(content="Fix it"), ChatMessageAssistant(content="", tool_calls=[CAT_CALL])],
+        [ChatMessageUser(content="Fix it"), assistant(CAT_CALL)],
         stub=stub,
         monkeypatch=monkeypatch,
     )
@@ -146,10 +138,7 @@ async def test_judge_says_not_read(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_judge_asked_once_for_every_alternative_of_each_missing_entry(monkeypatch: pytest.MonkeyPatch) -> None:
     """One call per sample: it lists the alternatives of each missing entry, not the entries the script found."""
     stub = StubJudge("modes/bug-fix.md: NOT READ\nmodes/feature.md: READ\nformats/specs.md: NOT READ")
-    found = ChatMessageAssistant(
-        content="",
-        tool_calls=[ToolCall(id="9", function="Read", arguments={"file_path": f"{SKILL_DIR}/agents/verifier.md"})],
-    )
+    found = assistant(("Read", {"file_path": f"{SKILL_DIR}/agents/verifier.md"}))
     result = await score(
         [found],
         stub=stub,

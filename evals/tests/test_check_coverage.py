@@ -66,9 +66,3 @@ def test_numeric_rule_is_an_error(
         )
         assert check_coverage.main(["another"]) == expected
     assert "Cases with a numeric rule" in capsys.readouterr().out
-
-
-@pytest.mark.parametrize("skill", ["code-better", "do-better", "write-better"])
-def test_rules_name_behaviours(skill: str) -> None:
-    """No case's rule is a section number."""
-    assert [case["id"] for case in cases.load_cases(skill) if check_coverage.NUMERIC_RULE.fullmatch(case["rule"])] == []

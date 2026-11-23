@@ -13,7 +13,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/check_built.py"
   files:
-    check_built.py: checks/check_built.py
+    check_built.py: ../_checks/check_built.py
 - type: judge
   rubric: 'Rule: when handing back an interface, report which scenarios were walked and how, keep apart three claims
     (the scenarios can be completed, the checks pass, the audience can use it), claim the third only from a test with

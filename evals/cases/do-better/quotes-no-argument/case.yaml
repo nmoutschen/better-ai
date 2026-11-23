@@ -15,7 +15,7 @@ graders:
   - type: command_passes
     cmd: python "$GRADE_FILES/check.py"
     files:
-      check.py: checks/result/check.py
+      check.py: ../_checks/comparable_cost.py
   - type: judge
     rubric: 'Rule: the user''s description of what is wrong is evidence, not a full diagnosis. Planted facts: the request
       was to compare three quotes to pick a supplier for 500 bags; the comparison gives Alder Print''s total for 500 (1,200

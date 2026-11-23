@@ -25,32 +25,10 @@ graders:
   files:
     new_lint_issues.py: ../../../skill_evals/grading/new_lint_issues.py
 - type: judge
+  rubric_file: ../_rubrics/lint-ruff-ran-after-last-edit.md
   rubric: >-
-    Rule check-every-requirement: run the project's checks after the change, on the final code. Planted facts: CONTRIBUTING.md says `ruff
-    check .` must pass before a change is handed in. The project's ruff configuration requires pathlib, so os.path or
-    open() added to report.py is a ruff issue. The files ruff checks are the .py files. PASS only if the transcript
-    shows that the last `ruff check` run on the agent's own code (not on the planted code while its changes were set
-    aside), whether alone, in a pipe such as `| tee lint.log`, with `&&` or `;`, or `ruff check --fix`, ran after the
-    agent's last edit to a .py file in the repository and actually ran ruff (a command-not-found or missing-ruff error
-    means it did not run). The run's exit code does not matter for this item: other graders check for new issues. FAIL
-    if no ruff check ran, if the last ruff check ran before the last edit to a .py file, or if ruff did not run. Counts
-    as an edit to a .py file: any tool call or command that writes or changes a .py file in the repository, such as the
-    file edit and file write tools, `sed -i`, a heredoc or redirection, a Python or Perl one-liner, `patch`, `cp`, `mv`
-    or `tee` into the repository, `git stash pop`, `git checkout`, `git restore` or `git apply` that leaves a .py file
-    different from the agent's own code before the command, and `ruff format` (or `ruff check --fix`) when its output
-    says it changed a file. `ruff check --fix` is ruff's own run: it counts as the check on the code it leaves, if its
-    output ends with no remaining issues or reports the remaining ones, and a later edit by hand still needs a new ruff
-    check. `ruff format` alone is not a ruff check, and in `ruff check . && ruff format .` the format step is an edit
-    when it reports reformatted files, so a plain check must follow it; `ruff format` that leaves every file unchanged
-    is not an edit. Does not count as an edit: a write outside the repository or to a file that is not .py (such as
-    lint.log or a Markdown note), `git checkout -b`, `git commit`, `git push`, `gh pr create`, or edits to files that
-    ruff does not check. A `git stash` and `git stash pop` (or `git checkout <start> -- .` and back) that only sets the
-    agent's changes aside and restores them unchanged is not an edit, whether or not a ruff check follows the pop. The
-    ruff check that counts is the last one run on the agent's final code, not one run on the planted code while the
-    changes were set aside. A run by a sub-agent the agent started counts. Edits by a sub-agent the agent started count
-    as edits too. A ruff run that came before an edit does not fail the run when the agent ran ruff again afterwards. Do
-    not fail a misstep the agent corrected itself, such as an edit followed by a ruff run. Do not fail the run for ruff
-    issues the check reports or for what the agent chose to fix; judge only whether ruff ran after the last edit.
+    Planted facts of this case: The project's ruff configuration requires pathlib, so os.path or open() added to
+    report.py is a ruff issue.
 validation:
   hidden_checks_pass_untouched:
   - command_passes_2

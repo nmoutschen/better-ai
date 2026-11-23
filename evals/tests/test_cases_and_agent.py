@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from conftest import git, plant_dir, write_case, write_tree
 from inspect_ai.model import ChatMessageAssistant
 
 from skill_evals import agent, cases
@@ -53,15 +54,6 @@ def test_unknown_case_id_or_skill_fails() -> None:
         cases.case_dirs("nonexistent-skill")
     with pytest.raises(ValueError, match="Invalid skill name"):
         cases.case_dirs("../skills")
-
-
-def write_case(tmp_path: Path, text: str, folder: str = "a-case") -> Path:
-    """Write a case.yaml with a minimal valid body plus `text`, and return the case folder."""
-    directory = tmp_path / folder
-    (directory / "repo").mkdir(parents=True)
-    (directory / "repo" / "main.py").write_text("x = 1\n")
-    (directory / "case.yaml").write_text(text)
-    return directory
 
 
 VALID_CASE = "id: a-case\nrule: some-behaviour\nsituation: S.\nrequest: R.\ngraders:\n  - type: notes_only\n"
@@ -133,32 +125,17 @@ def test_short_skill_holds_every_sentence_under_the_real_frontmatter() -> None:
 def test_earlier_work_is_the_last_commit(tmp_path: Path) -> None:
     """A case with earlier/ starts with two commits: the files before that work, then the planted repository."""
     case = cases.load_case(cases.CASES / "do-better" / "refund-total-user-right")
-    for path, source in case["files"].items():
-        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
-        (tmp_path / path).write_bytes(source.read_bytes())
+    plant_dir(case, tmp_path)
     subprocess.run(["bash", "-ec", agent.START_SCRIPT, "bash"], cwd=tmp_path, check=True, capture_output=True)
 
-    def git(*args: str) -> str:
-        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout
-
-    assert git("log", "--format=%s").splitlines() == ["Count refunds in the monthly total", "Planted repository"]
-    assert git("show", "HEAD:sales.py") == (cases.CASES / "do-better/refund-total-user-right/repo/sales.py").read_text()
-    assert "test_sales.py" not in git("ls-tree", "--name-only", "HEAD~1")
-    assert not (tmp_path / ".earlier").exists() and git("status", "--porcelain") == ""
-
-
-def write_tree(root: Path, files: dict[str, str]) -> None:
-    """Write each file under root, creating folders."""
-    for path, text in files.items():
-        (root / path).parent.mkdir(parents=True, exist_ok=True)
-        (root / path).write_text(text)
-
-
-def plant(case: dict, target: Path) -> None:
-    """Copy a loaded case's files into target, as the sandbox receives them."""
-    for path, source in case["files"].items():
-        (target / path).parent.mkdir(parents=True, exist_ok=True)
-        (target / path).write_bytes(source.read_bytes())
+    assert git(tmp_path, "log", "--format=%s").splitlines() == [
+        "Count refunds in the monthly total",
+        "Planted repository",
+    ]
+    sales = (cases.CASES / "do-better/refund-total-user-right/repo/sales.py").read_text()
+    assert git(tmp_path, "show", "HEAD:sales.py") == sales
+    assert "test_sales.py" not in git(tmp_path, "ls-tree", "--name-only", "HEAD~1")
+    assert not (tmp_path / ".earlier").exists() and git(tmp_path, "status", "--porcelain") == ""
 
 
 @pytest.mark.parametrize("final_differs", [True, False])
@@ -188,20 +165,19 @@ def test_history_is_planted_commit_by_commit(tmp_path: Path, final_differs: bool
         (case_dir / "history/01-start/files/old.py").unlink()
     case = cases.load_case(case_dir)
     work.mkdir()
-    plant(case, work)
+    plant_dir(case, work)
     subprocess.run(["bash", "-ec", agent.START_SCRIPT, "bash"], cwd=work, check=True, capture_output=True)
 
-    def git(*args: str) -> str:
-        return subprocess.run(["git", *args], cwd=work, check=True, capture_output=True, text=True).stdout
-
     expected = ["Raise the tax rate", "Start the shop"]
-    assert git("log", "--format=%s").splitlines() == (["Planted repository", *expected] if final_differs else expected)
-    first = git("log", "--reverse", "--format=%an|%ae|%at|%ct").splitlines()[0]
+    assert git(work, "log", "--format=%s").splitlines() == (
+        ["Planted repository", *expected] if final_differs else expected
+    )
+    first = git(work, "log", "--reverse", "--format=%an|%ae|%at|%ct").splitlines()[0]
     stamp = int(datetime(2026, 3, 1, 10, tzinfo=UTC).timestamp())
     assert first == f"Ana|ana@example.invalid|{stamp}|{stamp}"
-    assert sorted(git("ls-tree", "--name-only", "HEAD").split()) == sorted(final)
-    assert git("show", "HEAD:tax.py") == "RATE = 0.21\n"
-    assert not (work / ".history").exists() and git("status", "--porcelain") == ""
+    assert sorted(git(work, "ls-tree", "--name-only", "HEAD").split()) == sorted(final)
+    assert git(work, "show", "HEAD:tax.py") == "RATE = 0.21\n"
+    assert not (work / ".history").exists() and git(work, "status", "--porcelain") == ""
 
 
 def test_history_rejects_bad_steps(tmp_path: Path) -> None:
@@ -261,34 +237,34 @@ async def test_agent_timeout_is_a_sample_error(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_lint_cases_grade_the_lint_run_with_the_judge() -> None:
-    """Each code-better lint case judges whether ruff ran after the last edit, keeps its script checks, and has no command-pattern grader for it."""
+    """Each code-better lint case judges whether ruff ran after the last edit with the shared rubric plus its own sentences."""
     assert "ran_after_last_edit" not in cases.GRADER_FIELDS
+    shared = " ".join((cases.CASES / "code-better/_rubrics/lint-ruff-ran-after-last-edit.md").read_text().split())
+    for phrase in (
+        "ruff",
+        "PASS only if",
+        "FAIL",
+        "whether or not a ruff check follows the pop",
+        "The ruff check that counts is the last one run on the agent's final code",
+        "A run by a sub-agent the agent started counts.",
+        "that leaves a .py file different from the agent's own code before the command",
+        "the last `ruff check` run on the agent's own code (not on the planted code while its changes were set aside)",
+        "any tool call or command that writes or changes a .py file in the repository, such as",
+        "Edits by a sub-agent the agent started count as edits too.",
+        "the file edit and file write tools",
+    ):
+        assert phrase in shared, phrase
+    assert "different from what the last ruff check saw" not in shared
     directories = [path for path in cases.case_dirs("code-better") if path.name.startswith("lint-")]
     assert len(directories) == 7
     for directory in directories:
         graders = cases.load_case(directory)["graders"]
         types = [grader["type"] for grader in graders]
-        assert "ran_after_last_edit" not in types, directory.name
-        assert "command_passes" in types and "planted_unchanged" in types, directory.name
+        assert "ran_after_last_edit" not in types and "command_passes" in types, directory.name
+        assert "planted_unchanged" in types, directory.name
         rubrics = [grader["rubric"] for grader in graders if grader["type"] == "judge"]
-        assert len(rubrics) == 1, directory.name
-        assert "ruff" in rubrics[0] and "PASS only if" in rubrics[0] and "FAIL" in rubrics[0], directory.name
-        assert "whether or not a ruff check follows the pop" in rubrics[0], directory.name
-        assert "The ruff check that counts is the last one run on the agent's final code" in rubrics[0], directory.name
-        assert "A run by a sub-agent the agent started counts." in rubrics[0], directory.name
-        assert "different from what the last ruff check saw" not in rubrics[0], directory.name
-        assert "that leaves a .py file different from the agent's own code before the command" in rubrics[0], (
-            directory.name
-        )
-        assert (
-            "the last `ruff check` run on the agent's own code (not on the planted code while its changes were set aside)"
-            in rubrics[0]
-        ), directory.name
-        assert "any tool call or command that writes or changes a .py file in the repository, such as" in rubrics[0], (
-            directory.name
-        )
-        assert "Edits by a sub-agent the agent started count as edits too." in rubrics[0], directory.name
-        assert "the file edit and file write tools" in rubrics[0], directory.name
+        assert len(rubrics) == 1 and " ".join(rubrics[0].split()).startswith(shared), directory.name
+        assert "Planted facts of this case:" in rubrics[0], directory.name
 
 
 def test_agent_metadata_flags_a_dirty_skill_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -296,10 +272,8 @@ def test_agent_metadata_flags_a_dirty_skill_folder(tmp_path: Path, monkeypatch: 
     folder = tmp_path / "skills" / "demo"
     folder.mkdir(parents=True)
     (folder / "SKILL.md").write_text("one\n")
-    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
-    subprocess.run([*git, "init", "-q"], cwd=tmp_path, check=True)
-    subprocess.run([*git, "add", "."], cwd=tmp_path, check=True)
-    subprocess.run([*git, "commit", "-qm", "x"], cwd=tmp_path, check=True)
+    for command in (("init", "-q"), ("add", "."), ("commit", "-qm", "x")):
+        git(tmp_path, *command)
     monkeypatch.setattr(agent, "REPO", tmp_path)
     assert agent.agent_metadata("fake", "m", "demo")["skill_dirty"] is False
     (folder / "SKILL.md").write_text("two\n")

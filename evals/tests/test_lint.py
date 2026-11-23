@@ -8,16 +8,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from conftest import git
 
 from skill_evals.grading import lint
 
 SCRIPT = Path(__file__).resolve().parents[1] / "skill_evals" / "grading" / "new_lint_issues.py"
-
-
-def git(repo: Path, *args: str) -> str:
-    """Run git in the repository and return its stdout."""
-    command = ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args]
-    return subprocess.run(command, cwd=repo, check=True, capture_output=True, text=True).stdout
 
 
 def run(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:

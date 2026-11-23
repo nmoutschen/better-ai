@@ -21,7 +21,7 @@ graders:
 - type: command_passes
   cmd: PYTHONPATH=. python "$GRADE_FILES/same_code.py" rental.py fee
   files:
-    same_code.py: checks/command_passes_2/same_code.py
+    same_code.py: ../_checks/same_code.py
 validation:
   hidden_checks_pass_untouched:
   - command_passes_2

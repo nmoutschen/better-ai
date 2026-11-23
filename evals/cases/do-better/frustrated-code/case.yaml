@@ -12,7 +12,7 @@ graders:
 - type: command_passes
   cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
   files:
-    check.py: checks/command_passes_1/check.py
+    check.py: ../_checks/monthly_total.py
 - type: judge
   rubric: 'Rule: lead with the corrected result, name what changed in one short sentence, own the error in plain words, and
     avoid defensive explanations, repeated apologies, promises and requests for confirmation. Planted facts: an earlier correction
