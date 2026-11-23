@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {"args": ["create", ".show/demo", "--by", "smoke"], "stdin_file": "spec.json", "stdout_matches": "created \\.show/demo"},
+    {"args": ["add", ".show/demo", "slides", "--by", "smoke"], "stdin": "{}", "exit": 1},
+    {"args": ["set", ".show/demo", "slides"], "stdin": "{\"title\": \"The answer is no.\"}"},
+    {"args": ["check", ".show/demo"], "stdout_matches": "TITLE: The answer is no\\."},
+    {"args": ["render", ".show/demo"], "stdout_matches": "wrote .*page\\.html"},
+    {"args": ["render", ".show/demo", "--format", "text"], "stdout_matches": "THE ANSWER IS NO\\."},
+    {"args": ["serve", ".show/demo", "--no-browser", "--once"], "serve": true}
+  ],
+  "worktree_steps": [
+    {"args": ["add", "{repo}/.show/demo", "slides", "--by", "smoke"], "stdin": "{}", "exit": 1},
+    {"args": ["set", "{repo}/.show/demo", "slides"], "stdin": "{\"question\": \"Why, then?\"}"},
+    {"args": ["render", "{repo}/.show/demo", "--format", "text"], "stdout_matches": "Why, then\\?"}
+  ]
+}

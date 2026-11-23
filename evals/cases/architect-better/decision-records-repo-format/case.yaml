@@ -45,5 +45,5 @@ graders:
     alternatives or their reasons, or its drawback. Does not count: the spec and its checker; the Status word used,
     such as Accepted; the date; the file name after the number; decisions.jsonl fields beyond the script's check;
     Git's own files under .git/ and caches; notes in .code/ or a temporary folder; serving the live page and the files
-    it writes (.server, .conversation-seen, conversation.jsonl entries written by architect.py); asking the user to
+    it writes (.server, .conversation-seen, conversation.jsonl entries written by better.pyz); asking the user to
     confirm in the page; a run that ends waiting for the user.

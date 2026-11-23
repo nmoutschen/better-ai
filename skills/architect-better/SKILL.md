@@ -79,8 +79,12 @@ ASK the user, USING `/ask-better` if available, in these cases:
 
 TREAT a constraint the user set as a requirement. KEEP working on the parts your questions do not affect, EXCEPT where a step says to wait for the user.
 
+### Add the records
+
+ADD each record of the unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand.
+
 ### Missing capabilities
 
-IF you cannot do a step, because a call was denied, the harness lacks a tool or a file the step names is missing, MARK the work **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own, such as reviewing the design yourself.
+IF you cannot do a step, because a call was denied, the harness lacks a tool or a file the step names is missing, MARK the work **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own, such as reviewing the design yourself. IF you cannot run commands, MARK the work **not finished** and NAME the records not added.
 
 IF the design page cannot be served, HOLD its conversation in the chat instead, TREAT the user's approval in words as Approve…, and SAY in the hand-back that the page was not used.

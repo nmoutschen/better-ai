@@ -36,7 +36,7 @@ graders:
     repeats them). FAIL if it states the cause as settled, says the app fell or did not fall, or fills a gap from outside
     the board, such as general knowledge about 3-D Secure abandonment rates presented as a finding. Does not count: the length
     and layout of the report; citation format. Does not count: Git''s own files and caches; notes in .code/ or a temporary
-    folder; starting or not starting the live view (board.py watch) and the files it writes (.server, .conversation-seen,
+    folder; starting or not starting the live view (better.pyz serve) and the files it writes (.server, .conversation-seen,
     conversation.jsonl); which models the sub-agents ran on; a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true

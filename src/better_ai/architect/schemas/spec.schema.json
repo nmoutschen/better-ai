@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "spec.schema.json",
+  "title": "one line of spec.jsonl: a requirement, a gap the design leaves open, or something with no requirement",
+  "$comment": "The spec format of code-better and architect-better; the two skills carry identical copies of this file. A decision or requirement source points to decisions.jsonl or requirements.jsonl next to the file.",
+  "x-files": [
+    "spec.jsonl"
+  ],
+  "type": "object",
+  "required": [
+    "type",
+    "at",
+    "by"
+  ],
+  "properties": {
+    "type": {
+      "enum": [
+        "spec",
+        "gap",
+        "unlinked"
+      ]
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "spec"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/spec"
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "gap"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/gap"
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "unlinked"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/unlinked"
+      }
+    }
+  ],
+  "$defs": {
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "statement",
+        "source",
+        "checked_by"
+      ],
+      "properties": {
+        "type": {
+          "const": "spec"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id",
+          "pattern": "^S\\d+$",
+          "x-id": {
+            "prefix": "S"
+          }
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "description": "where the requirement comes from",
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "design",
+                "request",
+                "decision",
+                "requirement"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "design"
+                  }
+                }
+              },
+              "then": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "section"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "design"
+                  },
+                  "section": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "request"
+                  }
+                }
+              },
+              "then": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "sentence"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "request"
+                  },
+                  "sentence": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "decision"
+                  }
+                }
+              },
+              "then": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "decision"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "decision"
+                  },
+                  "decision": {
+                    "type": "string",
+                    "pattern": "^D\\d+$",
+                    "x-points-to": {
+                      "file": "decisions.jsonl",
+                      "type": "decision"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "requirement"
+                  }
+                }
+              },
+              "then": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "requirement"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "requirement"
+                  },
+                  "requirement": {
+                    "type": "string",
+                    "minLength": 1,
+                    "x-points-to": {
+                      "file": "requirements.jsonl",
+                      "type": "requirement"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "checked_by": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "text",
+        "status",
+        "if_wrong"
+      ],
+      "properties": {
+        "type": {
+          "const": "gap"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id",
+          "pattern": "^G\\d+$",
+          "x-id": {
+            "prefix": "G"
+          }
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "asked",
+            "assumed",
+            "answered"
+          ]
+        },
+        "decision": {
+          "type": "string",
+          "pattern": "^D\\d+$",
+          "x-points-to": {
+            "file": "decisions.jsonl",
+            "type": "decision"
+          }
+        },
+        "choice": {
+          "type": "string",
+          "minLength": 1
+        },
+        "if_wrong": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "asked",
+                  "answered"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "decision"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "choice"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "const": "assumed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "choice"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "decision"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "unlinked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "item",
+        "why"
+      ],
+      "properties": {
+        "type": {
+          "const": "unlinked"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "$ref": "base.schema.json#/$defs/by"
+        },
+        "item": {
+          "type": "string",
+          "minLength": 1
+        },
+        "why": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

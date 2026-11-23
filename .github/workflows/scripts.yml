@@ -8,87 +8,76 @@ on:
     - cron: "0 4 * * 1,4" # Monday and Thursday, 04:00 UTC: the full sweep
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6 # v3
         with:
           args: check
-      - uses: astral-sh/ruff-action@v3
+      - uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6 # v3
         with:
           args: format --check
 
   scripts:
-    # Every script must run on the oldest and newest supported Python with the standard library only:
+    # Every shipped better.pyz must run on the oldest and newest supported Python with the standard library only:
     # -I ignores installed packages and the user's site directory.
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python: ["3.10", "3.x"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # the build check compares with the pull request's base commit
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python }}
       - name: Compile
-        run: python -m compileall -q skills
-      - name: Run each script's help
-        run: |
-          for script in skills/*/scripts/*.py; do
-            echo "$script"
-            python -I "$script" --help > /dev/null
-          done
+        run: python -m compileall -q src tools
+      - name: Build check
+        # Rebuilds every .pyz from src/ and compares it with the committed one; see CONTRIBUTING.md. The build needs
+        # Python 3.12 or later, so only the newest leg runs it. BASE is empty outside a pull request.
+        if: matrix.python == '3.x'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: python -I tools/build.py --check ${BASE:+--base "$BASE"}
+      - name: Run each committed better.pyz
+        # help, create, add, set, check, render, serve --no-browser --once, and an add from a second worktree, from
+        # the fixture unit in tests/fixtures/units/<skill>/. Runs on both legs: the .pyz is built on 3.12 or later and
+        # must run on 3.10.
+        run: python -I tools/smoke.py
       - name: Tests
-        # tests/ checks page.py, the conversation the pages share, and runs each serving script as the agent would.
+        # tests/ checks the build, the source in src/better_ai and the pages' shared code.
         run: python -I -m unittest discover tests
         env:
           # Pull requests and pushes run a sample of the exhaustive tests; the scheduled and manual runs run every case.
           BETTER_AI_SWEEP: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'full' || '' }}
 
   pages:
-    # The page files the scripts fill in: CSS with stylelint's recommended rules (errors such as invalid values,
+    # The page files under src/better_ai: CSS with stylelint's recommended rules (errors such as invalid values,
     # unknown properties and duplicate selectors, not layout preferences), HTML with html-validate's recommended
     # rules, and the JavaScript's syntax.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
       - name: Install the linters
         # Installed into the checkout, so .stylelintrc.json can find the rule set it extends.
         run: npm install --no-save --no-package-lock stylelint@16 stylelint-config-recommended@14 html-validate@9
       - name: CSS
-        run: npx stylelint "skills/*/scripts/*.css"
+        run: npx stylelint --allow-empty-input "src/better_ai/**/*.css"
       - name: HTML
-        run: npx html-validate "skills/*/scripts/*.html"
-      - name: JavaScript syntax
         run: |
-          for js in skills/*/scripts/*.js; do
-            echo "$js"
-            node --check "$js"
-          done
+          if [ -n "$(find src/better_ai -name '*.html')" ]; then npx html-validate "src/better_ai/**/*.html"; fi
+      - name: JavaScript syntax
+        run: find src/better_ai -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: JavaScript tests
         # page.js's thread model: each item's state and what Open lists, with Node's own test runner.
         run: node --test tests/*.test.js
-      - name: Shared page files and the schema validator are identical in every skill
-        run: |
-          # The skills' pages that talk to the agent share page.css (the look), page.py (the log, the server's
-          # conversation endpoints, and wait, reply, status and pending) and page.js (the conversation on the page);
-          # each skill carries a copy of the ones it uses.
-          for name in page.css page.py page.js; do
-            set -- skills/*/scripts/$name
-            test -f "skills/architect-better/scripts/$name" || exit 1
-            for f in "$@"; do cmp "$1" "$f"; done
-          done
-          # schema.py, the validator of every agent file, the base schema its schemas build on, and the conversation
-          # schema every page's log shares, are in all five page skills and identical.
-          for name in scripts/schema.py schemas/base.schema.json schemas/conversation.schema.json; do
-            for skill in architect-better code-better research-better design-better show-better; do
-              cmp "skills/architect-better/$name" "skills/$skill/$name" || exit 1
-            done
-          done
-          # spec.schema.json, the spec format, is in code-better and architect-better and identical.
-          cmp skills/architect-better/schemas/spec.schema.json skills/code-better/schemas/spec.schema.json || exit 1

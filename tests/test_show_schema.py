@@ -1,50 +1,58 @@
-"""Tests for show-better's spec.json schema, and for `show.py check`, which validates a spec through schema.py.
+"""Tests for show-better's spec.json schema, and for the `check` digest, which validates a spec through the schema.
 
-The valid specs below passed `show.py check` before the schema existed, except that `type` ("slides") is now required.
-Every broken one is refused by schema.py with the field named: its shape (types, required fields, allowed values), what
-its parts say about each other (a node an edge names, a row's cell count, the overview and focus: the `show_spec` hook),
-and number limits (`minimum`, `maximum`). show.py keeps only what the drawing needs: a tree deeper than four levels,
-more than 100 units, an svg's elements, and the warnings and the digest; those specs pass the schema and are refused
-by `show.py check`. A field that is optional accepts null as absent, and no wrongly typed value crashes a check.
+The valid specs below passed the old `show.py check`, except that `type`, `at` and `by` are now required (a spec
+written before is the old format: kept as is). Every broken one is refused by the schema with the field named: its
+shape (types, required fields, allowed values), what its parts say about each other (a node an edge names, a row's
+cell count, the overview and focus: the `show_spec` hook), and number limits (`minimum`, `maximum`). The deck module
+keeps only what the drawing needs: a tree deeper than four levels, more than 100 units, an svg's elements, and the
+warnings and the digest; those specs pass the schema and are refused by `check`. A field that is optional accepts null
+as absent, and no wrongly typed value crashes a check.
 """
 
 import copy
-import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SHOW = ROOT / "skills" / "show-better"
-CANVAS = ROOT / "skills" / "design-better"
-ARCHITECT = ROOT / "skills" / "architect-better"
-AT = "2026-11-21T10:00:00Z"
-
-
-def load(path: Path, name: str):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-sys.path.insert(0, str(SHOW / "scripts"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(ROOT / "src"))
+import better  # noqa: E402
 import sweep  # noqa: E402
+from better import run  # noqa: E402
 
-schema = load(SHOW / "scripts" / "schema.py", "show_schema_py")
-show = load(SHOW / "scripts" / "show.py", "show_py")
-SCHEMAS = SHOW / "schemas"
-HEAD = "The slide states one clear point."
+from better_ai import architect, design, resources, schema  # noqa: E402,F401  (their hooks, for their event schemas)
+from better_ai.show import deck as show  # noqa: E402
+
+SHOW_SRC = ROOT / "src" / "better_ai" / "show"
+CANVAS = ROOT / "skills" / "design-better"  # design-better's own tests take these over with its package
+AT = "2026-11-21T10:00:00Z"
+DOCS = schema.load_schemas(*resources.schema_sources("show"))
 
 
 def shape_problems(spec):
     """(field, message) of each problem the spec schema finds."""
-    return schema.check_record(spec, ["spec.schema.json"], SCHEMAS, cross=True)
+    return list(dict.fromkeys(show.spec_problems(spec)))
+
+
+def check_in_a_unit(content: str, verb: str = "check"):
+    """`verb` (check) run as the agent runs it, on a unit in a new repository that holds `content` as its spec.json."""
+    with tempfile.TemporaryDirectory() as d:
+        subprocess.run(["git", "init", "-q", d], check=True)
+        unit = Path(d, ".show", "deck")
+        unit.mkdir(parents=True)
+        (unit / "spec.json").write_text(content)
+        return run("show-better", verb, ".show/deck", cwd=d)
+
+
+HEAD = "The slide states one clear point."
 
 
 # One valid panel of each kind: the least the kind needs.
@@ -132,7 +140,15 @@ KIND_OK = {
 
 
 def spec_of(*panels, **top):
-    return {"type": "slides", "title": "The answer.", "question": "Why?", "panels": list(panels), **top}
+    return {
+        "type": "slides",
+        "at": AT,
+        "by": "agent",
+        "title": "The answer.",
+        "question": "Why?",
+        "panels": list(panels),
+        **top,
+    }
 
 
 def visual(kind):
@@ -220,12 +236,14 @@ class ValidSpecs(unittest.TestCase):
         self.assertEqual(shape_problems(spec_of(panel)), [])
         self.assertEqual(show.check(spec_of(panel))[0], [])
 
-    def test_a_spec_without_type_is_refused_but_at_and_by_are_not_needed(self):
+    def test_a_spec_without_type_at_or_by_is_refused_and_a_spec_with_another_type_too(self):
         spec = spec_of(visual("text"))
         self.assertEqual(shape_problems(spec), [])
-        del spec["type"]
-        self.assertIn("type", [f for f, _ in shape_problems(spec)])
-        self.assertTrue(show.check(spec)[0])
+        for field in ("type", "at", "by"):
+            with self.subTest(field):
+                short = {k: v for k, v in spec.items() if k != field}
+                self.assertIn((field, "required"), shape_problems(short))
+                self.assertTrue(show.check(short)[0])
         spec["type"] = "deck"
         self.assertIn("type", [f for f, _ in shape_problems(spec)])
 
@@ -667,6 +685,47 @@ class RenderingChecks(unittest.TestCase):
                     errors[0].startswith(f"panels[0].{old}: '{old}' is no longer used: move it into 'source'")
                 )
 
+    def test_the_old_hint_is_shown_by_check_and_render_on_the_unit_file(self):
+        for old in ("note", "read"):
+            with self.subTest(old):
+                spec = edited(BASE, lambda s, old=old: s["panels"][0].__setitem__(old, "x"))
+                done = check_in_a_unit(json.dumps({**spec, "type": "slides", "at": better.AFTER_CUTOFF, "by": "x"}))
+                self.assertEqual(done.returncode, 1)
+                self.assertIn(f"panels[0].{old}: '{old}' is no longer used: move it into 'source'", done.stdout)
+                self.assertNotIn("not allowed", done.stdout)
+                self.assertIn("is no longer used", check_in_a_unit(json.dumps(spec), "render").stdout)
+
+    def test_serve_words_the_old_field_as_check_does(self):
+        spec = edited(BASE, lambda s: s["panels"][0].__setitem__("note", "x"))
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run(["git", "init", "-q", d], check=True)
+            unit = Path(d, ".show", "deck")
+            unit.mkdir(parents=True)
+            (unit / "spec.json").write_text(
+                json.dumps({**spec, "type": "slides", "at": better.AFTER_CUTOFF, "by": "x"})
+            )
+            env = {**os.environ, "BETTER_AI_SKILL": "show-better"}
+            server = subprocess.Popen(
+                better.command("serve", ".show/deck", "--no-browser"),
+                cwd=d,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+            for _ in range(100):
+                if (unit / ".server").exists():
+                    break
+                time.sleep(0.1)
+            server.terminate()
+            _, err = server.communicate(timeout=10)
+        self.assertIn("'note' is no longer used: move it into 'source'", err)
+
+    def test_an_old_spec_with_a_null_at_is_old_format_not_refused(self):
+        spec = {**BASE, "type": "slides", "at": None, "by": None}
+        done = check_in_a_unit(json.dumps(spec))
+        self.assertEqual(done.returncode, 0, done.stdout)
+
     def test_a_missing_template_is_worded_as_absent(self):
         spec = edited(BASE, lambda s: s["panels"][0].pop("kind"))
         self.assertIn(("panels[0].kind", "required when template is absent"), shape_problems(spec))
@@ -692,31 +751,31 @@ class Warnings(unittest.TestCase):
 
 
 class CommandLine(unittest.TestCase):
-    def run_check(self, spec):
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "spec.json"
-            path.write_text(json.dumps(spec))
-            script = str(SHOW / "scripts" / "show.py")
-            return subprocess.run([sys.executable, "-I", script, "check", str(path)], capture_output=True, text=True)
-
     def test_check_exits_zero_for_a_valid_spec(self):
-        done = self.run_check(full_spec())
+        done = check_in_a_unit(json.dumps(full_spec()))
         self.assertEqual(done.returncode, 0, done.stderr)
 
     def test_check_exits_one_and_names_the_field(self):
-        done = self.run_check(edited(spec_of(visual("bars")), lambda s: s["panels"][0]["items"][0].pop("value")))
+        spec = edited(spec_of(visual("bars")), lambda s: s["panels"][0]["items"][0].pop("value"))
+        done = check_in_a_unit(json.dumps(spec))
         self.assertEqual(done.returncode, 1)
-        self.assertIn("panels[0].items[0].value", done.stderr)
+        self.assertIn(".show/deck/spec.json:1: panels[0].items[0].value: required", done.stdout)
 
-    def test_schema_py_checks_the_spec_file_as_a_folder_entry(self):
+    def test_check_names_what_the_drawing_refuses_in_the_same_form(self):
+        spec = edited(spec_of(visual("tree")), lambda s: s["panels"][0].update({"root": deep_tree()}))
+        done = check_in_a_unit(json.dumps(spec))
+        self.assertEqual(done.returncode, 1)
+        self.assertRegex(done.stdout, r"\.show/deck/spec\.json:1: .*levels")
+
+    def test_the_file_check_and_the_unit_check_agree_on_a_spec_as_a_folder_entry(self):
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d) / ".show" / "deck"
             folder.mkdir(parents=True)
             (folder / "spec.json").write_text(json.dumps(full_spec()))
-            self.assertEqual(schema.check_paths([folder / "spec.json"], SCHEMAS), [])
+            self.assertEqual(schema.check_paths([folder / "spec.json"], docs=DOCS), [])
             bad = edited(spec_of(visual("bars")), lambda s: s["panels"][0]["items"][0].pop("value"))
             (folder / "spec.json").write_text(json.dumps(bad))
-            errors = schema.check_paths([folder / "spec.json"], SCHEMAS)
+            errors = schema.check_paths([folder / "spec.json"], docs=DOCS)
             self.assertEqual([e.field for e in errors], ["panels[0].items[0].value"])
 
 
@@ -724,9 +783,27 @@ def note(**more):
     return {"type": "note", "at": AT, "by": "user", "id": "m-1", "text": "hi", "to": None, **more}
 
 
+def canvas_schemas() -> Path:
+    """design-better's event schemas now live in src/better_ai/; this validator wants them in one folder, without x-old-format."""
+    folder = Path(tempfile.mkdtemp(prefix="canvas-schemas-"))
+    for source, name in (
+        (ROOT / "src" / "better_ai" / "schemas", "base.schema.json"),
+        (ROOT / "src" / "better_ai" / "schemas", "conversation.schema.json"),
+        (ROOT / "src" / "better_ai" / "design" / "schemas", "canvas-events.schema.json"),
+    ):
+        doc = json.loads((source / name).read_text(encoding="utf-8"))
+        doc.pop("x-old-format", None)
+        (folder / name).write_text(json.dumps(doc), encoding="utf-8")
+    return folder
+
+
 def note_problems(skill, events, event):
+    """(field, message) of each problem an event has against the shared conversation schema and a skill's own."""
+    docs = schema.load_schemas(*resources.schema_sources(skill.removesuffix("-better")))
     names = ["conversation.schema.json", events]
-    return schema.check_record(event, names, ROOT / "skills" / skill / "schemas")
+    return list(
+        dict.fromkeys((p.field, p.message) for name in names for p in schema.validate_instance(event, docs[name], docs))
+    )
 
 
 class SlideOnNotes(unittest.TestCase):
@@ -753,19 +830,16 @@ class SlideOnNotes(unittest.TestCase):
         self.assertIn("on", fields)
         self.assertEqual(note_problems("design-better", "canvas-events.schema.json", note()), [])
 
-    def test_an_architect_note_with_on_is_refused(self):
-        fields = [f for f, _ in note_problems("architect-better", "architect-events.schema.json", note(on=self.ON))]
-        self.assertIn("on", fields)
-        self.assertEqual(note_problems("architect-better", "architect-events.schema.json", note()), [])
-
     def test_the_slide_page_sends_the_slide_with_each_note(self):
-        source = (SHOW / "scripts" / "show.js").read_text(encoding="utf-8")
+        source = (SHOW_SRC / "show.js").read_text(encoding="utf-8")
         self.assertRegex(source, r"noteParams:\s*function \(\) \{ return \{ on: \{ slide: cur \+ 1, part: [^}]*null")
 
 
 # Wrongly typed values that once made the hook raise a TypeError.
 CRASH_1 = {
     "type": "slides",
+    "at": AT,
+    "by": "agent",
     "title": "The answer.",
     "question": "Why?",
     "panels": [
@@ -780,6 +854,8 @@ CRASH_1 = {
 }
 CRASH_2 = {
     "type": "slides",
+    "at": AT,
+    "by": "agent",
     "title": "The answer.",
     "question": "Why?",
     "panels": [
@@ -865,7 +941,7 @@ class WrongTypes(unittest.TestCase):
             with self.subTest(name), tempfile.TemporaryDirectory() as d:
                 path = Path(d) / "spec.json"
                 path.write_text(json.dumps(spec))
-                errors = schema.check_paths([path], SCHEMAS)
+                errors = schema.check_paths([path], docs=DOCS)
                 self.assertTrue(any(e.field.startswith(field) for e in errors), (field, errors))
 
     def test_every_leaf_of_every_valid_spec_set_to_a_wrong_value_gives_an_answer_and_no_exception(self):
@@ -914,8 +990,6 @@ NULLABLE = [
     ("top", ["lang"]),
     ("top", ["document"]),
     ("top", ["style"]),
-    ("top", ["at"]),
-    ("top", ["by"]),
     ("text", ["part"]),
     ("text", ["source"]),
     ("text", ["overview"]),
@@ -961,6 +1035,8 @@ NOT_NULLABLE = [
     ("top", ["title"]),
     ("top", ["panels"]),
     ("top", ["type"]),
+    ("top", ["at"]),
+    ("top", ["by"]),
     ("text", ["headline"]),
     ("text", ["kind"]),
     ("text", ["body"]),
@@ -1049,11 +1125,11 @@ class Nulls(unittest.TestCase):
 
 
 class TypeHint(unittest.TestCase):
-    def test_a_spec_without_type_is_told_to_add_it(self):
+    def test_a_spec_without_type_says_the_field_is_required(self):
         spec = spec_of(visual("text"))
         del spec["type"]
         errors, _, _ = show.check(spec)
-        self.assertEqual(errors, ['type: add "type": "slides" at the top of the spec'])
+        self.assertEqual(errors, ["type: required"])
 
     def test_a_wrong_type_value_keeps_the_schemas_message(self):
         spec = {**spec_of(visual("text")), "type": "deck"}
@@ -1091,19 +1167,12 @@ class Nesting(unittest.TestCase):
 
     def test_the_command_line_checks_a_deep_file_without_a_traceback(self):
         for depth in (300, 50000):
-            with self.subTest(depth), tempfile.TemporaryDirectory() as d:
-                path = Path(d) / "spec.json"
-                path.write_text(
+            with self.subTest(depth):
+                done = check_in_a_unit(
                     json.dumps(deep_tree_spec(depth)) if depth < 1000 else '{"a": ' + "[" * depth + "]" * depth + "}"
                 )
-                for script in ("show.py", "schema.py"):
-                    done = subprocess.run(
-                        [sys.executable, "-I", str(SHOW / "scripts" / script), "check", str(path)],
-                        capture_output=True,
-                        text=True,
-                    )
-                    self.assertEqual(done.returncode, 1, (script, done.stderr[-200:]))
-                    self.assertNotIn("Traceback", done.stderr + done.stdout, script)
+                self.assertEqual(done.returncode, 1, done.stderr[-200:])
+                self.assertNotIn("Traceback", done.stderr + done.stdout)
 
 
 class ChildrenAndRenderCrashes(unittest.TestCase):
@@ -1260,7 +1329,7 @@ class SchemaAndShowAgree(unittest.TestCase):
             path = Path(d) / "spec.json"
             for label, spec in sampled_variants([None]):
                 path.write_text(json.dumps(spec))
-                refused_by_schema = bool(schema.check_paths([path], SCHEMAS))
+                refused_by_schema = bool(schema.check_paths([path], docs=DOCS))
                 if refused_by_schema != bool(show.check(copy.deepcopy(spec))[0]):
                     self.fail(f"{label}: schema.py check says {refused_by_schema}, show.py check the opposite")
 
@@ -1274,46 +1343,41 @@ class FilesThatAreNotSpecs(unittest.TestCase):
         def deep_tree(depth):
             node = '{"label":"n","children":[' * depth + '{"label":"leaf","value":1}' + "]}" * depth
             return (
-                '{"type":"slides","title":"T","panels":[{"headline":"A deep tree.","kind":"tree","root":' + node + "}]}"
+                '{"type":"slides","at":"2026-11-21T10:00:00Z","by":"a","title":"T","panels":[{"headline":"A deep tree.","kind":"tree","root":'
+                + node
+                + "}]}"
             )
 
         text = {"headline": "x", "kind": "text", "body": [[[[[[[[[[["x"]]]]]]]]]]]}
-        bars = '{"type":"slides","title":"t","panels":[{"headline":"Bars show a clear point.","kind":"bars","items":[{"label":"a","value":%s}]}]}'
+        bars = '{"type":"slides","at":"2026-11-21T10:00:00Z","by":"a","title":"t","panels":[{"headline":"Bars show a clear point.","kind":"bars","items":[{"label":"a","value":%s}]}]}'
         return {
             "an array": "[]",
             "a number": "5",
             "null": "null",
-            "panels that is text": '{"type":"slides","title":"t","panels":"x"}',
+            "panels that is text": '{"type":"slides","at":"2026-11-21T10:00:00Z","by":"a","title":"t","panels":"x"}',
             # 1200 levels is past what Python 3.10's json reads (that case ends in "nested too deeply to read" before
-            # show.py's own check runs); 300 is one both read, so it reaches the check on every version.
+            # the deck's own check runs); 300 is one both read, so it reaches the check on every version.
             "a tree 1200 deep": deep_tree(1200),
             "a tree 300 deep": deep_tree(300),
-            "a body nested 11 deep": json.dumps({"type": "slides", "title": "T", "panels": [text]}),
+            "a body nested 11 deep": json.dumps({"type": "slides", "at": AT, "by": "a", "title": "T", "panels": [text]}),
             "a bar value NaN": bars % "NaN",
             "a bar value Infinity": bars % "Infinity",
         }  # fmt: skip
 
     def test_check_never_prints_a_traceback_and_a_spec_that_is_not_one_exits_1(self):
         for name, content in self.contents().items():
-            with self.subTest(name), tempfile.TemporaryDirectory() as d:
-                path = Path(d) / "spec.json"
-                path.write_text(content)
-                for script in ("show.py", "schema.py"):
-                    done = subprocess.run(
-                        [sys.executable, "-I", str(SHOW / "scripts" / script), "check", str(path)],
-                        capture_output=True,
-                        text=True,
-                    )
-                    self.assertNotIn("Traceback", done.stderr, (script, done.stderr[-300:]))
-                    if name in (
-                        "an array",
-                        "a number",
-                        "null",
-                        "panels that is text",
-                        "a bar value NaN",
-                        "a bar value Infinity",
-                    ):
-                        self.assertEqual(done.returncode, 1, (script, done.stdout, done.stderr))
+            with self.subTest(name):
+                done = check_in_a_unit(content)
+                self.assertNotIn("Traceback", done.stderr, done.stderr[-300:])
+                if name in (
+                    "an array",
+                    "a number",
+                    "null",
+                    "panels that is text",
+                    "a bar value NaN",
+                    "a bar value Infinity",
+                ):
+                    self.assertEqual(done.returncode, 1, (done.stdout, done.stderr))
 
     def test_a_bar_that_is_not_finite_is_refused_before_the_text_render(self):
         spec = json.loads(self.contents()["a bar value NaN"].replace("NaN", "1"))
@@ -1322,7 +1386,7 @@ class FilesThatAreNotSpecs(unittest.TestCase):
 
 
 class DesignBetterFixtures(unittest.TestCase):
-    """The planted conversations of the design-better eval cases are typed events canvas.py reads."""
+    """The planted conversations of the design-better eval cases are typed events the unit's `check` and `pending` read."""
 
     CASES = ("acceptance-walk", "design-before-build", "direction-review-before-build", "handback-three-things")
 
@@ -1330,18 +1394,17 @@ class DesignBetterFixtures(unittest.TestCase):
         return ROOT / "evals" / "cases" / "design-better" / case / "repo" / ".design" / "shift-swap"
 
     def test_each_file_passes_the_schemas_and_pending_lists_the_planted_items(self):
+        sys.path.insert(0, str(ROOT / "tests"))
+        import better
+
         for case in self.CASES:
-            with self.subTest(case):
-                log = self.folder(case) / "conversation.jsonl"
-                self.assertEqual(schema.check_paths([log], CANVAS / "schemas"), [])
-                with tempfile.TemporaryDirectory() as d:
-                    copy_to = Path(d) / "shift-swap"
-                    copy_to.mkdir()
-                    (copy_to / "conversation.jsonl").write_text(log.read_text())
-                    script = str(CANVAS / "scripts" / "canvas.py")
-                    done = subprocess.run(
-                        [sys.executable, "-I", script, "pending", str(copy_to)], capture_output=True, text=True
-                    )
+            with self.subTest(case), tempfile.TemporaryDirectory() as d:
+                repo = Path(d)
+                subprocess.run(["git", "init", "-q", str(repo)], check=True)
+                shutil.copytree(self.folder(case), repo / ".design" / "shift-swap")
+                checked = better.run("design-better", "check", ".design/shift-swap", cwd=repo)
+                self.assertEqual((checked.returncode, checked.stdout), (0, ""), checked.stderr)
+                done = better.run("design-better", "pending", ".design/shift-swap", cwd=repo)
                 self.assertIn("3 not done", done.stdout)
                 self.assertIn('"id": "d-1k9"', done.stdout)
 

@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "canvas-events.schema.json",
+  "title": "what the design-better canvas adds to conversation.jsonl: its own events, and what a comment's `on` holds",
+  "$comment": "A line must meet this schema and conversation.schema.json. `type` lists every event this page's log may hold; the page's own events are described here in full. A `decide` event from before this change is kept as written (x-old-format): `approve` replaced it.",
+  "x-files": [
+    "conversation.jsonl"
+  ],
+  "x-versioned": true,
+  "x-old-format": [
+    {
+      "$ref": "#/$defs/old_decide"
+    }
+  ],
+  "type": "object",
+  "properties": {
+    "type": {
+      "enum": [
+        "comment",
+        "note",
+        "verdict",
+        "approve",
+        "delete",
+        "accept",
+        "reopen",
+        "reply",
+        "status",
+        "accepted"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "comment"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "on"
+        ],
+        "properties": {
+          "on": {
+            "$ref": "#/$defs/on"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "const": null
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "verdict"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "text": {
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "note"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "on"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "verdict"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/verdict"
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "approve"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/$defs/approve"
+      }
+    }
+  ],
+  "$defs": {
+    "on": {
+      "description": "where in a version a comment was made",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "screen",
+        "target",
+        "spot"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screen": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "object"
+        },
+        "spot": {
+          "type": "object"
+        }
+      }
+    },
+    "verdict": {
+      "description": "the user's thumb on a version; null takes it back",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "version",
+        "verdict"
+      ],
+      "properties": {
+        "type": {
+          "const": "verdict"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "const": "user"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verdict": {
+          "enum": [
+            "up",
+            "down",
+            null
+          ]
+        }
+      }
+    },
+    "approve": {
+      "description": "the user's approval of a version, or of a combination, with the comments that come with it",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "option",
+        "label",
+        "carries",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "approve"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "const": "user"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id"
+        },
+        "option": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "carries": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "old_decide": {
+      "description": "the user's decision, as events were written before approve replaced it",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "at",
+        "by",
+        "id",
+        "option",
+        "label",
+        "carries",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "decide"
+        },
+        "at": {
+          "$ref": "base.schema.json#/$defs/at"
+        },
+        "by": {
+          "const": "user"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id"
+        },
+        "option": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "carries": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

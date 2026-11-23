@@ -5,7 +5,7 @@ source:
 - SKILL.md#5.2
 reads:
 - agents/worker.md
-- templates/board.md
+- formats/board.md
 situation: A fresh research run on the planted wiki export. Every claim on the board carries a quote copied word for word
   from the wiki page its source points to, and every source records how it was read. A script finds each quote in its page,
   ignoring whitespace and Markdown emphasis.

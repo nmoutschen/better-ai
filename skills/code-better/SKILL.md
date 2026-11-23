@@ -92,7 +92,7 @@ ASK the user, USING `/ask-better` if available, in these cases:
 - **Decisions.** ASK about a decision that changes behaviour, cost, risk or how the code is maintained, and anything that contradicts a decision the design records, with your recommendation, its main reason and its main drawback. USE `/decide-better` if available. IF the user does not read code, DESCRIBE each option by what they would observe or pay.
 - **Conflicts.** ASK about a test that contradicts a requirement, two requirements that conflict, and a requirement that cannot or should not hold as written, with the change you propose and what the user would see differently. DO NOT build to your own version until it is agreed. ONCE agreed, REVISE the requirement in place.
 
-TREAT a constraint the user set as a requirement. ADD each answer to the spec; your own proposals are not answers. RECORD each question you ask in `decisions.jsonl` with status `waiting` before the gap that points to it, in the format of [templates/decision.md](templates/decision.md); in coordinate mode the coordinator records it. WHEN the spec is an architect folder's `spec.jsonl`, NEVER write a gap or a source in it that points to a decision of `.code/<change>/decisions.jsonl`: RECORD the question in that file, and once the user has answered, WRITE the requirement with source `request` holding the user's words. KEEP building the parts your questions do not affect.
+TREAT a constraint the user set as a requirement. ADD each answer to the spec; your own proposals are not answers. ADD each question you ask as a `decision` record with status `waiting`, before the gap that points to it, in the format of [formats/decision.md](formats/decision.md); in coordinate mode the coordinator adds it. WHEN the spec is a copy of an architect folder's spec, NEVER add a gap or a source to it that points to a `decision` record of the change folder: ADD the question as a `decision` record, and once the user has answered, ADD the requirement with source `request` holding the user's words. KEEP building the parts your questions do not affect.
 
 ### Design for structural changes
 
@@ -100,20 +100,22 @@ IF the change adds a module, a data model, a dependency or a migration and no de
 
 ### Working notes
 
-KEEP your working files in `.code/<change>/`, and ADD `.code/` to `.git/info/exclude`. EACH file below is typed JSON, and its schema in `schemas/` is the authority: READ the template before you first write a file, and WRITE the record a pointer names before the pointer.
+KEEP your working records in the change folder `.code/<change>/`: MAKE the folder with `python3 <skill dir>/scripts/better.pyz create .code/<change> --by <your agent name, such as builder>`, with the goal, the design and the mode as JSON on stdin, and the folder of an audit, `.code/audit/<YYYY-MM-DD>/`, the same way. EACH record type below has a format: READ it before you first add a record of that type, and ADD the record a pointer names before the pointer.
 
-| File | Holds | Template |
+| Record types | Hold | Format |
 |---|---|---|
-| `code.json`, `spec.jsonl` | the goal, the design and the mode; the requirements, gaps and design items with no requirement | [templates/spec.md](templates/spec.md) |
-| `tasks.jsonl`, `progress.jsonl` | the tasks and their status; progress, problems and their resolution | [templates/tasks.md](templates/tasks.md) |
-| `decisions.jsonl` | decisions taken and questions to the user | [templates/decision.md](templates/decision.md) |
-| `next-steps.jsonl` | the proposed next steps | [templates/next-steps.md](templates/next-steps.md) |
-| `lessons.jsonl` | the bug classes verifiers found, each with its rule (coordinate mode) | [templates/lessons.md](templates/lessons.md) |
-| `instructions.jsonl` | the user's instructions on how to work | [templates/instructions.md](templates/instructions.md) |
-| `logs/<agent>.card.json`, `logs/<agent>.jsonl` | what an agent works on; its steps | [templates/log.md](templates/log.md) |
-| `.code/audit/<YYYY-MM-DD>/audit.json`, `evidence.jsonl` and `findings.jsonl` | one audit | [templates/audit.md](templates/audit.md) |
+| `code`, `spec`, `gap`, `unlinked` | the goal, the design and the mode; the requirements, gaps and design items with no requirement | [formats/spec.md](formats/spec.md) |
+| `task`, `progress`, `problem`, `resolved` | the tasks and their status; progress, problems and their resolution | [formats/tasks.md](formats/tasks.md) |
+| `decision` | decisions taken and questions to the user | [formats/decision.md](formats/decision.md) |
+| `next_step` | the proposed next steps | [formats/next-steps.md](formats/next-steps.md) |
+| `lesson` | the bug classes verifiers found, each with its rule (coordinate mode) | [formats/lessons.md](formats/lessons.md) |
+| `instruction` | the user's instructions on how to work | [formats/instructions.md](formats/instructions.md) |
+| `card`, `start`, `step`, `asked`, `blocked`, `handed_back` | what an agent works on; its steps | [formats/log.md](formats/log.md) |
+| `audit`, `history`, `check`, `rule`, `finding` (in the folder `.code/audit/<YYYY-MM-DD>/`) | one audit | [formats/audit.md](formats/audit.md) |
 
-AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step. IN a session the harness may compact, WRITE each instruction the user gives on how to work to `instructions.jsonl`, with their words, and each constraint on what the code does into the spec, and READ both again after each compaction.
+ADD each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`, with its fields as JSON on stdin, or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, the rule of Missing capabilities applies: MARK the change **not finished**, and NAME the records you did not add.
+
+IN a session the harness may compact, ADD each instruction the user gives on how to work as an `instruction` record, with their words, and each constraint on what the code does to the spec, and READ both again after each compaction.
 
 KEEP `.code/conventions.md` as a short list of facts about the repo, each with its source.
 

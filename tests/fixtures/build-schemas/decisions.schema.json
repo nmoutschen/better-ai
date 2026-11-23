@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "decisions.schema.json",
+  "title": "one line of decisions.jsonl in a code-better change or a research board: a choice or a question to the user, with its state",
+  "$comment": "Shared by code-better and research-better. The coordinator writes it and rewrites the line as its status changes. waiting: asked, the work goes on (default) or waits (default null); defaulted: the deadline passed and the default applies; answered: the user answered, on the page or in the chat; decided: the agent settled it without asking. The user's answer from the page is pointed to, not copied: it must be an answer event of the user in this unit's conversation.jsonl for this decision. architect-better's decisions are a different record kind and keep their own decisions.schema.json, which replaces this one in that skill. The shapes before this change are kept readable by x-old-format.",
+  "x-files": ["decisions.jsonl"],
+  "x-old-format": [{"$ref": "#/$defs/old_code_better"}, {"$ref": "#/$defs/old_research_better"}],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "id", "raised_by", "about", "asked", "status"],
+  "properties": {
+    "type": {"const": "decision"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "id": {"$ref": "base.schema.json#/$defs/id", "pattern": "^D\\d+$", "x-id": {"prefix": "D"}},
+    "raised_by": {"type": "string", "minLength": 1},
+    "about": {"$ref": "#/$defs/about"},
+    "asked": {"type": "string", "minLength": 1},
+    "status": {"enum": ["waiting", "defaulted", "answered", "decided"]},
+    "default": {"description": "what happens without an answer; null when the work waits", "type": ["string", "null"], "minLength": 1},
+    "deadline": {"description": "when the default applies; null when there is none", "anyOf": [{"$ref": "base.schema.json#/$defs/at"}, {"type": "null"}]},
+    "decision": {"type": "string", "minLength": 1},
+    "answer": {"$ref": "#/$defs/answer"}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["status"], "properties": {"status": {"const": "waiting"}}},
+      "then": {"required": ["default", "deadline"], "not": {"anyOf": [{"required": ["decision"]}, {"required": ["answer"]}]}}
+    },
+    {
+      "if": {"required": ["status"], "properties": {"status": {"const": "defaulted"}}},
+      "then": {
+        "required": ["default", "deadline"],
+        "properties": {"default": {"type": "string"}, "deadline": {"type": "string"}},
+        "not": {"anyOf": [{"required": ["decision"]}, {"required": ["answer"]}]}
+      }
+    },
+    {
+      "if": {"required": ["status"], "properties": {"status": {"const": "answered"}}},
+      "then": {
+        "required": ["default", "deadline", "answer"],
+        "not": {"required": ["decision"]},
+        "x-check": "decision-answer-event"
+      }
+    },
+    {
+      "if": {"required": ["status"], "properties": {"status": {"const": "decided"}}},
+      "then": {
+        "required": ["decision"],
+        "not": {"anyOf": [{"required": ["default"]}, {"required": ["deadline"]}, {"required": ["answer"]}]}
+      }
+    }
+  ],
+  "$defs": {
+    "about": {
+      "description": "what the record is about: a task, the whole change, or the whole research board; a task must be one of this unit's tasks",
+      "type": "object",
+      "required": ["type"],
+      "properties": {"type": {"enum": ["task", "change", "board"]}},
+      "allOf": [
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "task"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "task"],
+            "properties": {
+              "type": {"const": "task"},
+              "task": {"type": "string", "pattern": "^T\\d+$", "x-points-to": {"file": "tasks.jsonl", "type": "task"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "change"}}},
+          "then": {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "change"}}}
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "board"}}},
+          "then": {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "board"}}}
+        }
+      ]
+    },
+    "answer": {
+      "description": "the user's answer: the answer event the page logged, or their words in the chat",
+      "type": "object",
+      "required": ["type"],
+      "properties": {"type": {"enum": ["page", "chat"]}},
+      "allOf": [
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "page"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "event"],
+            "properties": {
+              "type": {"const": "page"},
+              "event": {"type": "string", "minLength": 1, "x-points-to": {"file": "conversation.jsonl", "type": "answer"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "chat"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "text"],
+            "properties": {"type": {"const": "chat"}, "text": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
+    },
+    "old_code_better": {
+      "description": "before this change, code-better: no default or deadline on waiting and answered",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "raised_by", "about", "asked", "status"],
+      "properties": {
+        "type": {"const": "decision"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "id": {"$ref": "base.schema.json#/$defs/id", "pattern": "^D\\d+$"},
+        "raised_by": {"type": "string", "minLength": 1},
+        "about": {"$ref": "#/$defs/about"},
+        "asked": {"type": "string", "minLength": 1},
+        "status": {"enum": ["decided", "waiting", "answered"]},
+        "decision": {"type": "string", "minLength": 1},
+        "answer": {"$ref": "#/$defs/answer"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "decided"}}}, "then": {"required": ["decision"], "not": {"required": ["answer"]}}},
+        {"if": {"properties": {"status": {"const": "waiting"}}}, "then": {"not": {"anyOf": [{"required": ["decision"]}, {"required": ["answer"]}]}}},
+        {"if": {"properties": {"status": {"const": "answered"}}}, "then": {"required": ["answer"], "not": {"required": ["decision"]}}}
+      ]
+    },
+    "old_research_better": {
+      "description": "before this change, research-better: pending, default and changed, with no raised_by or about",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "asked", "default", "deadline", "status"],
+      "properties": {
+        "type": {"const": "decision"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"$ref": "base.schema.json#/$defs/by"},
+        "id": {"type": "string", "pattern": "^D\\d+$"},
+        "asked": {"type": "string", "minLength": 1},
+        "default": {"type": "string", "minLength": 1},
+        "deadline": {"$ref": "base.schema.json#/$defs/at"},
+        "status": {"enum": ["pending", "default", "changed"]},
+        "answer": {"$ref": "#/$defs/answer"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "changed"}}}, "then": {"required": ["answer"]}, "else": {"not": {"required": ["answer"]}}}
+      ]
+    }
+  }
+}

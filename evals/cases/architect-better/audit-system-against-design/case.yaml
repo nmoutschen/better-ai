@@ -36,7 +36,7 @@ graders:
     point. Does not count: other true findings, such as no rate limit on POST /v1/gift-cards, an unknown code charged in
     full, or no expiry; whether the agent used diagrams; Git''s own files under .git/ and caches; any file in .code/ or a
     temporary folder; serving the live page and the files it writes (.server, .conversation-seen, conversation.jsonl
-    entries written by architect.py); asking the user to confirm in the page; asking a question at the end, such as
+    entries written by better.pyz); asking the user to confirm in the page; asking a question at the end, such as
     whether the change from the design was intended; a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true

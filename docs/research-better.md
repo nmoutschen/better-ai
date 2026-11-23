@@ -59,7 +59,7 @@ When the board's server stops, a strip says the board is closed; ask the agent t
 ## What you get
 
 - A research board in `.research/<topic-slug>/`, as JSON files: `brief.json` (the topic, its meaning, your goal and the state of the run), `questions/`, `claims/` (each with its verbatim quote and the verifier's verdict and copied passage) and `sources/`, one file each, `logs/` (each agent's searches), `decisions.jsonl` (the decisions taken during the run), and your conversation with the coordinator (`conversation.jsonl`). It is not committed unless you ask, and a later session can resume from it.
-- Records that fit their schema. Each file is checked against a schema in the skill's `schemas/` after each write, with `scripts/schema.py check`, and the live board lists any record that does not fit, with its file, line and field, instead of hiding it. Nothing others point to is deleted: a wrong claim is marked withdrawn, a source that copies another is marked a duplicate, and a duplicate question is merged into the one that covers it.
+- Records that fit their schema. Each record is stamped and checked against its schema when it is written, with `better.pyz add`, `set` and `check`, and the live board lists any record that does not fit, with its file, line and field, instead of hiding it. Nothing others point to is deleted: a wrong claim is marked withdrawn, a source that copies another is marked a duplicate, and a duplicate question is merged into the one that covers it.
 - A live board while the research runs, or progress lines in the chat.
 - A report: the answer first, where sources disagree or evidence is weak, citations in APA style (7th edition), a reference list, and open questions or blocked sources that could change the answer.
 

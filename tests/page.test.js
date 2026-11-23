@@ -1,13 +1,13 @@
 // The thread model in page.js: how the log becomes each item's state, the entries and what Open lists.
 // Run with `node --test tests/*.test.js`. page.js is identical in every skill (the Scripts workflow checks it); this loads
-// design-better's copy.
+// the shared copy in src/better_ai/page/.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'skills', 'design-better', 'scripts', 'page.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', 'page', 'page.js'), 'utf8');
 const context = {};
 vm.runInNewContext(source, context);
 const ITEMS = ['comment', 'note'];
@@ -210,63 +210,9 @@ test('a list can start at 0', () => {
   assert.equal(md('0. zero\n1. one')[0].start, 0);
 });
 
-// The dashboard's decision card: its step comes from the decision file and from the state of the user's latest answer.
-// The two helpers are read out of dashboard.html, between their own marker comments, so the test runs the shipped code.
-const html = fs.readFileSync(path.join(__dirname, '..', 'skills', 'code-better', 'scripts', 'dashboard.html'), 'utf8');
-const stepCode = html.split('// step:begin')[1].split('// item:end')[0];
-// The whole decision card is run too, with a minimal DOM stub: the helpers it uses are the shipped ones.
-const fakeEl = () => ({ className: '', dataset: {}, html: '', classList: { add(c) { this.list.push(c); }, list: [] },
-  set innerHTML(v) { this.html = v; }, get innerHTML() { return this.html; },
-  append(n) { this.html += n.html; }, insertAdjacentHTML(_w, v) { this.html += v; } });
-const fakeDoc = { createElement: fakeEl };
-const fakeConv = { progress: s => ({ html: `<span class="progress">${s}</span>` }) };
-const { decisionStep, decisionItem } = new Function('document', 'conv', 'esc', 'has', 'md', 'pageTime',
-  stepCode + '; return {decisionStep, decisionItem};')(fakeDoc, fakeConv, s => String(s), v => v && v !== 'none', s => String(s), context.pageTime);
-const STEP_NAME = ['Waiting for you', 'You answered', 'Applied'];
-const shows = (status, answer, st) => STEP_NAME[decisionStep(status, answer, st)];
-
-test('a question the coordinator asked back about waits for the user again, until they answer again', () => {
-  const a1 = { id: 'a-1', type: 'answer' }, a2 = { id: 'a-2', type: 'answer' };
-  assert.equal(shows('waiting', null, {}), 'Waiting for you');
-  assert.equal(shows('waiting', a1, {}), 'You answered');
-  assert.equal(shows('waiting', a1, { 'a-1': 'seen' }), 'You answered');
-  assert.equal(shows('waiting', a1, { 'a-1': 'asked' }), 'Waiting for you');
-  assert.equal(shows('waiting', a2, { 'a-1': 'asked' }), 'You answered');  // the latest answer decides
-  assert.equal(shows('waiting', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
-  // The file already says answered: when the coordinator asks back, the latest answer decides, not the file.
-  assert.equal(shows('answered', a1, { 'a-1': 'asked' }), 'Waiting for you');
-  assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'seen' }), 'Applied');  // answered again: the file's word stands
-  assert.equal(shows('answered', a2, { 'a-1': 'asked', 'a-2': 'done' }), 'Applied');
-  assert.equal(shows('answered', null, {}), 'Applied');  // answered in the chat: no item in the thread
-});
-
-test('a decision card renders for a waiting, an answered-then-asked and a decided decision, and its head agrees with its foot', () => {
-  const card = (status, answers) => ({ e: { x: { id: 'd1', status, asked: 'Which?', at: '2026-11-20T10:00:00' } },
-    replies: answers.map(id => ({ type: 'answer', id })) });
-  const run = (status, answers, st) => { const [item, foot] = decisionItem(card(status, answers), st, true); return { head: item.html.match(/class="when">([^<]*)</)[1], foot: foot.html, item }; };
-  const waiting = run('waiting', [], {});
-  assert.equal(waiting.head, '10:00');  // the time, not a state
-  assert.match(waiting.foot, /Waiting for you/);
-  assert.ok(waiting.item.classList.list.includes('open-q'));
-  const asked = run('waiting', ['a-1'], { 'a-1': 'asked' });
-  assert.equal(asked.head, '10:00');
-  assert.match(asked.foot, /Waiting for you/);
-  const answered = run('waiting', ['a-1'], {});
-  assert.equal(answered.head, 'answered, waiting for the coordinator');
-  assert.match(answered.foot, /You answered/);
-  const applied = run('waiting', ['a-1'], { 'a-1': 'done' });
-  assert.equal(applied.head, 'answered by you');
-  assert.match(applied.foot, /Applied/);
-  const reAsked = run('answered', ['a-1'], { 'a-1': 'asked' });  // the file says answered, the coordinator asked back
-  assert.equal(reAsked.head, '10:00');
-  assert.match(reAsked.foot, /Waiting for you/);
-  assert.ok(reAsked.item.classList.list.includes('open-q'));
-  assert.equal(run('answered', ['a-1', 'a-2'], { 'a-1': 'asked', 'a-2': 'seen' }).head, 'answered by you');
-  assert.equal(run('answered', ['a-1', 'a-2'], { 'a-2': 'done' }).head, 'answered by you');
-  const decided = run('decided', [], {});
-  assert.equal(decided.head, 'decided');
-  assert.doesNotMatch(decided.foot, /Waiting for you|You answered|Applied/);
-});
+// The dashboard's own code is read out of src/better_ai/code/dashboard.js, between marker comments, so the test runs the
+// shipped code. The decision question itself is the shared one: its tests are in page_shell.test.js.
+const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', 'code', 'dashboard.js'), 'utf8');
 
 test('with latestLast, an item whose reply is the newest message comes last, so the newest message is at the bottom', () => {
   const log = [
@@ -475,13 +421,18 @@ test('a task with a wrongly typed requirements or mode still draws the task list
   assert.match(el.html, /not valid: requirements: expected array/);
 });
 
-test('a decision that did not validate says so, with its first message', () => {
+test('a decision that did not validate says so, with its first message, and a question says where it is from', () => {
+  const itemCode = html.split('function decisionItem')[1].split('function crumb')[0];
+  const shared = () => { const item = { html: '', querySelector: () => ({ insertAdjacentHTML: (_w, h) => { item.html += h; } }) }; return [item, {}]; };
+  const decisionItem = new Function('dec', 'esc', 'has', 'function decisionItem' + itemCode + '; return decisionItem;')(
+    { item: shared }, s => String(s), v => v && v !== 'none');
   const card = x => ({ e: { x: { id: 'd1', status: 'waiting', asked: 'Which?', at: '2026-11-20T10:00:00Z', ...x } }, replies: [] });
   const [item] = decisionItem(card({ _errors: ['about.task: dangling: "T9"'] }), {}, true);
   assert.match(item.html, /class="what invalid">not valid: about\.task: dangling/);
-  const [clean] = decisionItem(card({ _errors: [] }), {}, true);
+  const [clean] = decisionItem(card({ _errors: [], raised_by: 'b1', task: 'T2' }), {}, true);
   assert.doesNotMatch(clean.html, /not valid/);
-  const [odd] = decisionItem(card({ asked: 5, from: {}, task: [], _errors: ['asked: expected string'] }), {}, true);
+  assert.match(clean.html, /From b1, task T2/);
+  const [odd] = decisionItem(card({ asked: 5, raised_by: {}, task: [], _errors: ['asked: expected string'] }), {}, true);
   assert.match(odd.html, /not valid/);
 });
 
@@ -517,34 +468,31 @@ test('markup in an invalid record shows as text in the errors band', () => {
   assert.match(band, /&lt;b&gt;f&lt;\/b&gt;/);
 });
 
-// tick() is read out of dashboard.html between `// load:begin` and `// load:end`, with stubs for what a page has.
+// tick() is read out of dashboard.js between `// load:begin` and `// load:end`, with stubs for what a page has. The closed
+// notice is the shared page's: tests/page_shell.test.js.
 const loadCode = html.split('// load:begin')[1].split('// load:end')[0];
-function pageWith(answer) {
-  const els = {};
-  const el = id => els[id] || (els[id] = { hidden: true, textContent: '', id });
+function pageWith(answer, isStatic) {
   const drawn = [];
-  const body = new Function('fetch', '$', 'render', 'let D = null, CLOSED_PAGE = false;' + loadCode + '; return {tick, state: () => ({ fails, CLOSED_PAGE })};')(
-    () => answer(), el, d => drawn.push(d));
-  return { ...body, el, drawn };
+  const body = new Function('fetch', 'render', 'STATIC', loadCode + '; return {tick};')(() => answer(), d => drawn.push(d), !!isStatic);
+  return { ...body, drawn };
 }
 const served = data => () => Promise.resolve({ ok: true, json: () => Promise.resolve(data) });
 
-test('a folder with invalid records is not a closed dashboard: the page renders what is valid and the closed notice stays hidden', async () => {
+test('a folder with invalid records still renders what is valid', async () => {
   const page = pageWith(served({ tasks: [{ id: 'T1' }], agents: [], errors: badRecords, now: 1 }));
   await page.tick();
   await page.tick();
-  assert.equal(page.el('offline').hidden, true);
-  assert.equal(page.state().CLOSED_PAGE, false);
   assert.equal(page.drawn.length, 2);
   assert.equal(page.drawn[0].errors.length, 2);
 });
 
-test('the closed notice shows when the server cannot be reached', async () => {
-  const page = pageWith(() => Promise.reject(new Error('down')));
-  await page.tick();
-  assert.equal(page.el('offline').hidden, true);  // once is a blip
-  await page.tick();
-  assert.equal(page.el('offline').hidden, false);
+test('a server that cannot be reached draws nothing and does not throw; a page written by render never fetches', async () => {
+  const down = pageWith(() => Promise.reject(new Error('down')));
+  await down.tick();
+  assert.equal(down.drawn.length, 0);
+  const fixed = pageWith(() => { throw new Error('fetched'); }, true);
+  await fixed.tick();
+  assert.equal(fixed.drawn.length, 0);
 });
 
 // ---------- Sending: what the user sees when the server refuses an event, as against when it cannot be reached ----------
@@ -673,19 +621,18 @@ test('delete, accept and reopen point at their item with to, and reopen carries 
 
 // The research board's page: its errors band and how it shapes the new record fields. Both are read out of board.js,
 // between marker comments and between `const has =` and the map's layout, so the test runs the shipped code.
-const boardJs = fs.readFileSync(path.join(__dirname, '..', 'skills', 'research-better', 'scripts', 'board.js'), 'utf8');
+const boardJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', 'research', 'board.js'), 'utf8');
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const { showLoaded, notValid } = new Function('esc', 'plural', boardJs.split('// errors:begin')[1].split('// errors:end')[0] + '; return {showLoaded, notValid};')(realEsc, plural);
 const { prepare } = new Function('const has =' + boardJs.split('const has =')[1].split('// ---------- Slices')[0] + '; return {prepare};')();
-const band = () => ({ offline: { hidden: false }, unwatched: { hidden: false }, errors: { hidden: true, innerHTML: '' } });
+const band = () => ({ errors: { hidden: true, innerHTML: '' } });
 
-test('a board with invalid records shows its errors band and never the closed notice', () => {
+test('a board with invalid records shows its errors band', () => {
   const els = band();
   showLoaded({ listening: true, errors: [
     { file: 'claims/C-w2-9.json', line: 1, field: 'question', message: 'dangling: "Q-w9-1" is not a question record in ../questions/', by: 'w2' },
     { file: 'logs/w2.jsonl', line: 2, field: 'query', message: 'required' },
   ] }, els);
-  assert.equal(els.offline.hidden, true);
   assert.equal(els.errors.hidden, false);
   assert.match(els.errors.innerHTML, /2 problems/);
   assert.match(els.errors.innerHTML, /<code>claims\/C-w2-9\.json:1<\/code> question: dangling/);
@@ -696,7 +643,7 @@ test('a board with invalid records shows its errors band and never the closed no
 test('the errors band is hidden when the board has no errors, and shows a message as text, never as HTML', () => {
   const els = band();
   showLoaded({ listening: true, errors: [] }, els);
-  assert.deepEqual([els.errors.hidden, els.errors.innerHTML, els.offline.hidden], [true, '', true]);
+  assert.deepEqual([els.errors.hidden, els.errors.innerHTML], [true, '']);
   showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: '<u>', message: '<img src=x>' }] }, els);
   assert.ok(!els.errors.innerHTML.includes('<img'));
   assert.ok(!els.errors.innerHTML.includes('<u>'));
@@ -727,7 +674,7 @@ test('searches on a merged question count for the question it was merged into', 
 
 test('the errors band is written only when its text changes, so a screen reader is not read it every poll', () => {
   let writes = 0, html = '';
-  const els = { offline: { hidden: false }, unwatched: { hidden: false },
+  const els = { old: { hidden: true, textContent: '' },
     errors: { hidden: true, get innerHTML() { return html; }, set innerHTML(v) { writes++; html = v; } } };
   const d = { listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] };
   showLoaded(d, els); showLoaded(d, els); showLoaded({ ...d }, els);

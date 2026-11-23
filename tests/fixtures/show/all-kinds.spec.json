@@ -1,0 +1,471 @@
+{
+ "type": "slides",
+ "at": "2026-11-21T10:00:00Z",
+ "by": "agent",
+ "title": "The answer.",
+ "question": "Why?",
+ "panels": [
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "map",
+   "sections": [
+    {
+     "id": "s1",
+     "label": "Intro",
+     "gist": "why"
+    }
+   ],
+   "highlight": [
+    "s1"
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "concept",
+   "nodes": [
+    {
+     "id": "a",
+     "label": "A",
+     "highlight": true
+    },
+    {
+     "id": "b",
+     "label": "B"
+    }
+   ],
+   "edges": [
+    {
+     "from": "a",
+     "to": "b",
+     "label": "causes"
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "flow",
+   "arrow": "then",
+   "steps": [
+    {
+     "label": "One",
+     "note": "n"
+    },
+    {
+     "label": "Two"
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "groups",
+   "groups": [
+    {
+     "label": "G",
+     "items": [
+      "x",
+      "y"
+     ],
+     "highlight": true
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "tree",
+   "unit": "people",
+   "root": {
+    "label": "All",
+    "children": [
+     {
+      "label": "A",
+      "value": 3
+     },
+     {
+      "label": "B",
+      "value": 2
+     }
+    ]
+   }
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "sets",
+   "sets": [
+    "P",
+    "Q"
+   ],
+   "regions": [
+    {
+     "label": "both",
+     "in": [
+      "P",
+      "Q"
+     ],
+     "count": 3
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "matrix",
+   "columns": [
+    "c1",
+    {
+     "label": "c2"
+    }
+   ],
+   "rows": [
+    {
+     "label": "r",
+     "cells": [
+      null,
+      "up"
+     ]
+    },
+    {
+     "label": "s",
+     "cells": [
+      {
+       "mark": "yes"
+      },
+      "no"
+     ]
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "effects",
+   "rows": [
+    {
+     "label": "f",
+     "outcome": "o",
+     "effect": "up",
+     "group": "g"
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "pairs",
+   "columns": [
+    "a",
+    "b"
+   ],
+   "rows": [
+    {
+     "label": "r",
+     "left": [
+      {
+       "label": "x",
+       "effect": "up"
+      }
+     ],
+     "right": [
+      {
+       "label": "y"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "quadrant",
+   "basis": "judgment",
+   "x": {
+    "label": "Effort",
+    "low": "small",
+    "high": "large"
+   },
+   "y": {
+    "label": "Value",
+    "low": "low",
+    "high": "high"
+   },
+   "items": [
+    {
+     "label": "o",
+     "x": 0.2,
+     "y": 0.8
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "numbers",
+   "figures": [
+    {
+     "value": "12%",
+     "label": "of users"
+    },
+    {
+     "value": 4,
+     "label": "x"
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "units",
+   "unit": "q",
+   "parts": [
+    {
+     "label": "p",
+     "count": 3
+    },
+    {
+     "label": "q",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "bars",
+   "unit": "ms",
+   "items": [
+    {
+     "label": "a",
+     "value": 3
+    },
+    {
+     "label": "b",
+     "value": 2.5
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "slope",
+   "from": "2020",
+   "to": "2021",
+   "unit": "%",
+   "items": [
+    {
+     "label": "a",
+     "before": 1,
+     "after": 2
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "dots",
+   "unit": "ms",
+   "groups": [
+    {
+     "label": "g",
+     "values": [
+      1,
+      2,
+      3.5
+     ]
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "scatter",
+   "x_label": "x (u)",
+   "y_label": "y (u)",
+   "points": [
+    {
+     "x": 1,
+     "y": 2,
+     "label": "p"
+    },
+    {
+     "x": 2,
+     "y": 3
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "line",
+   "unit": "%",
+   "x_label": "year",
+   "series": [
+    {
+     "name": "s",
+     "points": [
+      [
+       "2020",
+       1
+      ],
+      [
+       "2021",
+       2
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "timeline",
+   "events": [
+    {
+     "date": "2020",
+     "label": "start"
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "table",
+   "columns": [
+    "item",
+    {
+     "label": "n",
+     "unit": "ms"
+    }
+   ],
+   "rows": [
+    [
+     "a",
+     1
+    ],
+    [
+     "b",
+     2
+    ]
+   ],
+   "highlight_rows": [
+    1
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "text",
+   "body": [
+    "One short paragraph."
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "svg",
+   "alt": "a box",
+   "svg": "<svg viewBox=\"0 0 800 100\"><rect x=\"1\" y=\"1\" width=\"10\" height=\"10\"/></svg>"
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "lanes",
+   "actors": [
+    "A",
+    "B"
+   ],
+   "steps": [
+    {
+     "label": "one",
+     "actor": "A"
+    },
+    {
+     "label": "two",
+     "actor": "B",
+     "highlight": true
+    }
+   ]
+  },
+  {
+   "headline": "The slide states one clear point.",
+   "source": "test",
+   "kind": "fork",
+   "input": "in",
+   "decider": "who",
+   "branches": [
+    {
+     "label": "x",
+     "outcome": "helps"
+    },
+    {
+     "label": "y",
+     "outcome": "never",
+     "note": "n"
+    }
+   ]
+  },
+  {
+   "template": "compare",
+   "headline": "The slide states one clear point.",
+   "a": {
+    "label": "Before",
+    "kind": "bars",
+    "unit": "ms",
+    "items": [
+     {
+      "label": "a",
+      "value": 3
+     },
+     {
+      "label": "b",
+      "value": 2.5
+     }
+    ]
+   },
+   "b": {
+    "label": "After",
+    "kind": "bars",
+    "unit": "ms",
+    "items": [
+     {
+      "label": "a",
+      "value": 3
+     },
+     {
+      "label": "b",
+      "value": 2.5
+     }
+    ]
+   },
+   "source": {
+    "text": "test",
+    "section": "Results"
+   }
+  },
+  {
+   "template": "statement",
+   "headline": "The slide states one clear point.",
+   "figure": "12%",
+   "sentence": "of users left.",
+   "compare": "against 4% before",
+   "source": "test"
+  },
+  {
+   "template": "title",
+   "part": "Next",
+   "headline": "The slide states one clear point.",
+   "body": "A short paragraph.",
+   "actions": [
+    {
+     "text": "Read it",
+     "panel": 1
+    }
+   ],
+   "source": "test"
+  }
+ ]
+}

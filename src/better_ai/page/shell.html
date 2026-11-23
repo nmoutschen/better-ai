@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>%%TITLE%%</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="/page.css" rel="stylesheet">
+%%STYLES%%
+</head><body>
+<div class="band"></div>
+<header class="bar--stats"><div><h1 id="title" dir="auto">%%TITLE%%</h1><p class="goal" id="goal" dir="auto" hidden></p></div>
+  <div class="stats" id="status">Loading…</div></header>
+<p class="offline" id="offline" role="status" hidden>The page is closed. Ask the %%AGENT%% to restart it.</p>
+<p class="oldnote" id="oldnote" role="status" hidden></p>
+<div class="work">
+  <main class="view">
+%%MAIN%%
+  </main>
+  <aside class="notes" aria-labelledby="notes-h">
+    <div class="notes-top">
+      <h2 id="notes-h">Conversation</h2>
+      <div class="seg seg--light" role="group" aria-label="Show">
+        <button type="button" data-filter="all" aria-pressed="false">All</button>
+        <button type="button" data-filter="open" aria-pressed="true">Open</button>
+      </div>
+    </div>
+    <p class="empty" id="empty">%%EMPTY%%</p>
+    <ol class="thread" id="thread"></ol>
+    <form class="composer" id="noteform">
+      <p class="unwatched" id="unwatched" role="status" hidden>The %%AGENT%% is not watching this page right now. What you send is saved, but it reads it only when it next looks: tell it in the chat.</p>
+      <label for="note">Message to the %%AGENT%%</label>
+      <textarea id="note"></textarea>
+      <div class="send"><button type="submit" class="btn">Send</button><p class="status" role="status"></p></div>
+    </form>
+  </aside>
+</div>
+<div class="pop" role="dialog" aria-label="Comment" hidden>
+  <p class="target"></p>
+  <textarea aria-label="Comment"></textarea>
+  <div class="row2">
+    <button type="button" class="btn ok">Send</button>
+    <button type="button" class="btn btn--quiet cancel">Cancel</button>
+    <button type="button" class="btn btn--quiet remove" hidden>Delete</button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script type="application/json" id="page-config">%%CONFIG%%</script>
+<script src="/page.js"></script>
+%%SCRIPTS%%
+</body></html>

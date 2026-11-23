@@ -2,9 +2,9 @@ id: oldlog-multi-session-plan
 rule: plan-when-needed
 source:
 - modes/refactor.md
-- templates/tasks.md
+- formats/tasks.md
 reads:
-- templates/tasks.md
+- formats/tasks.md
 situation: Moving five services off a deprecated logger is spread over weeks between two people; write a plan with one task
   per service, a concrete check for each, and only checked services marked done. Doing billing now is optional.
 request: We're moving every service off oldlog onto the standard logging module. Two of us will do it over the next few weeks,

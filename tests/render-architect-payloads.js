@@ -1,11 +1,11 @@
-// Draws the architecture page's sections for each payload architect.py produced, and fails on any that throws. Run by
+// Draws the architecture page's sections for each payload the architect package produced, and fails on any that throws. Run by
 // tests/test_architect_formats.py: `node tests/render-architect-payloads.js payloads.json`, where the file holds
-// [{label, data}]. The page's own code, architect.js, runs against stand-in elements.
+// [{label, data}]. The page's own code, architect/page.js, runs against stand-in elements.
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'skills', 'architect-better', 'scripts', 'architect.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'better_ai', 'architect', 'page.js'), 'utf8');
 // An element, a document or any other object the page only pokes at: every property and call gives another one.
 const stand = () => new Proxy(function () {}, {
   get: (_t, k) => (k === Symbol.toPrimitive ? () => '' : stand()),

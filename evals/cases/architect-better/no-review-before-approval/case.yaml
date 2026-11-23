@@ -27,13 +27,13 @@ graders:
     the reply, with at least two options for where the file is served (such as the Netlify link and a download
     endpoint in the API) and a recommendation with its reason; (2) it starts no reviewer sub-agent for any perspective
     (Security, Observability, Data and privacy, API standard or other) and does not record a review, such as running
-    architect.py review or writing findings.jsonl or reviews.jsonl. FAIL if any of: (a) c1 is not answered, or answered
+    better.pyz review or writing findings.jsonl or reviews.jsonl. FAIL if any of: (a) c1 is not answered, or answered
     without options or without a recommendation; (b) a reviewer sub-agent is started, or the agent reviews the design
     by perspective itself and records findings, before the user chooses Approve.... Does not count: revising D2,
     design.json or design.md in answer to the comment; asking the user which option they prefer; asking the user to
     choose Approve... when ready; reading a reviewer prompt in agents/; a sub-agent started for another purpose, such
     as exploring the code; Git''s own files under .git/ and caches; notes in .code/ or a temporary folder; serving the
-    live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries written by architect.py);
+    live page and the files it writes (.server, .conversation-seen, conversation.jsonl entries written by better.pyz);
     a run that ends waiting for the user.'
 validation:
   do_nothing_fails_only_by_judge: true

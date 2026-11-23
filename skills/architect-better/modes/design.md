@@ -7,46 +7,44 @@ description: Use when designing a feature or a change to a software system.
 
 FOLLOW these steps in order. The general rules of SKILL.md and the rules of this mode apply throughout.
 
-AFTER every write to a JSON or JSONL file in the change folder, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
-
 ## Rules of this mode
 
 ### Files
 
-LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP the design of a change in its own folder, the change folder, in the design location. KEEP decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` as the change folder and for the spec, and `.architect/<change>/decisions/` for decision records.
+LOOK in `docs/` for the repo's design location, in `docs/adr/` or `docs/decisions/` for its decision record location, and in its existing specs location or spec tool for its spec location. KEEP the records of the change in the change folder `.architect/<change>/` at the repo root, and CALL it `<unit>` in the commands. KEEP `design.md`, in a folder of its own for the change, in the design location, and decision records and the spec in their respective locations. WHEN a location has no repo convention, USE `.architect/<change>/` for it, and `.architect/<change>/decisions/` for decision records.
 
-KEEP the files the page reads in the change folder. READ and FOLLOW [../scripts/example/README.md](../scripts/example/README.md) for the fields of each file. READ and FOLLOW [../templates/records.md](../templates/records.md) for one line of each kind of record and the conventions for writing them. RUN scripts from this skill's directory, with the full path of the change folder as `<folder>`. `python3 scripts/architect.py check <folder>` checks the whole folder, and the diagram and the sources too: RUN it before you start the page, and FIX what it reports.
+READ and FOLLOW [../formats/records.md](../formats/records.md) before you first add a record: it gives one line of each kind of record, the fields of each, and the conventions for adding them. RUN `python3 <skill dir>/scripts/better.pyz check <unit>` before you start the page, and FIX what it reports.
 
 ### Live page conversation
 
-- RUN `python3 scripts/architect.py wait <folder>` to wait for new actions. WHEN it returns, START it again and HANDLE those actions.
-- RUN `python3 scripts/architect.py pending <folder>` to read open items and their threads on each wake or resume.
-- RUN `python3 scripts/architect.py reply <folder> "<text>" --to <id>` to reply under the item you answer.
-- RUN `python3 scripts/architect.py status <folder> <state> <id>...` to set the state of items.
+- RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` to wait for new actions. WHEN it returns, START it again and HANDLE those actions.
+- RUN `python3 <skill dir>/scripts/better.pyz pending <unit>` to read open items and their threads on each wake or resume.
+- RUN `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id>`, with your words on stdin, to reply under the item you answer.
+- RUN `python3 <skill dir>/scripts/better.pyz status <unit> <state> <id>...` to set the state of items.
 
 REPLY in the page, in one or two short sentences. MARK each item `seen` when it arrives and `asked` when you need an answer. KEEP `working` on the items you are changing now, usually one. WHEN an item needs only an answer, MARK it `done` once answered. WHEN the user's answer leads to a change, MARK the item `done` once the change is in the page, and PUT your next question in a new message. MARK it `accepted` when the user accepts it in words. TREAT a reply to a finished item as work to do.
 
 ### Box kinds
 
-RUN `python3 scripts/diagram.py register --out <folder>/register.html` to see the available box kinds. USE only kinds from that register.
+RUN `python3 <skill dir>/scripts/better.pyz register <unit>`, then READ `register.html` in the unit for the available box kinds. USE only kinds from that register.
 
 ## 1. Save the request
 
-WRITE `architect.json` in the change folder: the user's request word for word as `request.text`, where it comes from as `request.from` (`{"type": "chat"}`, `{"type": "issue", "url": …}` or `{"type": "file", "path": …}`), a short `title`, an empty `summary` and `scope`, and `accepted` as `[]`.
+RUN `python3 <skill dir>/scripts/better.pyz create .architect/<change> --by <your name>` with the head record on stdin: the user's request word for word as `request.text`, where it comes from as `request.from` (`{"type": "chat"}`, `{"type": "issue", "url": …}` or `{"type": "file", "path": …}`), a short `title`, an empty `summary` and `scope`, and `accepted` as `[]`.
 
 ## 2. Draw the system as it is
 
-DRAW the current containers and flows in `design.json` in the change folder, from the code or existing design docs. GIVE every flow an `id`, such as `order`: a part key names a flow by it. CHECK each box, relationship and flow step against the code. MARK what you could not verify.
+DRAW the current containers and flows as the `design` record, from the code or existing design docs. GIVE every flow an `id`, such as `order`: a part key names a flow by it. CHECK each box, relationship and flow step against the code. MARK what you could not verify.
 
-RUN `python3 scripts/diagram.py check <folder>/design.json` and `python3 scripts/diagram.py render <folder>/design.json --out <folder>/diagrams`.
+RUN `python3 <skill dir>/scripts/better.pyz check <unit>` and `python3 <skill dir>/scripts/better.pyz render <unit>`.
 
-RUN `python3 scripts/architect.py serve <folder>` to start the page and GIVE the user its address.
+RUN `python3 <skill dir>/scripts/better.pyz serve <unit>` to start the page and GIVE the user its address.
 
-ASK the user to confirm or correct Before in the page. IF the change introduces a system or flow, NAME it in your question as not existing yet, and DO NOT add it to `design.json` before step 4. WAIT for the user's confirmation or correction and APPLY any corrections. DO NOT start step 3 before the user confirms or corrects Before: HANDLE other actions and START `wait` again; IF `wait` times out before they answer, END your turn with the question, in the chat as well as the page.
+ASK the user to confirm or correct Before in the page. IF the change introduces a system or flow, NAME it in your question as not existing yet, and DO NOT add it to the `design` record before step 4. WAIT for the user's confirmation or correction and APPLY any corrections. DO NOT start step 3 before the user confirms or corrects Before: HANDLE other actions and START `wait` again; IF `wait` times out before they answer, END your turn with the question, in the chat as well as the page.
 
 ## 3. Agree the requirements
 
-LIST functional requirements, quality attributes and constraints, and WRITE each as a record of `requirements.jsonl`. SET its source to where it comes from:
+LIST functional requirements, quality attributes and constraints, and ADD each with `python3 <skill dir>/scripts/better.pyz add <unit> requirement --by <your name>`. SET its source to where it comes from:
 
 | Where it comes from | Source |
 |---|---|
@@ -61,9 +59,9 @@ DRAFT quality attributes from the request and current system as observable scena
 
 USE Attribute-Driven Design (ADD 3.0). IN each iteration, PICK the requirements and constraints that drive the design of the part in scope. LIST the options before choosing one, including at least one that is not the familiar choice, and COMPARE them against those drivers. CHOOSE an approach for the draft, ASSIGN responsibilities and interfaces, and WALK the scenarios through it. USE gaps or trade-offs from that walk to choose the next iteration.
 
-UPDATE `design.json` with the proposed containers, relationships and flows. USE the same boxes as flow participants. PRESERVE part identities across Before and After. SET `in` on every added or removed part. CHECK and render the updated JSON as in step 2.
+UPDATE the `design` record with `set`, using the proposed containers, relationships and flows. USE the same boxes as flow participants. PRESERVE part identities across Before and After. SET `in` on every added or removed part. CHECK and render the updated JSON as in step 2.
 
-READ and FOLLOW [../templates/design.md](../templates/design.md) for the conventional design document structure. WRITE `design.md` in the change folder, linking the JSON. RECORD each decision in `design.md` as an output of its iteration, with the recommendation, its drivers, each rejected alternative with its reason, and the main drawback of the chosen option. A reason to reject an alternative is not a drawback. TREAT a choice that changes behaviour, cost, risk or how the system is maintained as a decision, and COMPARE its options. LIST other choices in the hand-back as assumptions you made. CHECK the evidence for vendor claims, because vendors often make claims without supporting evidence. FLAG options that rely on unsupported claims.
+READ and FOLLOW [../templates/design.md](../templates/design.md) for the conventional design document structure. WRITE `design.md` in the design location, linking the unit. RECORD each decision in `design.md` as an output of its iteration, with the recommendation, its drivers, each rejected alternative with its reason, and the main drawback of the chosen option. A reason to reject an alternative is not a drawback. TREAT a choice that changes behaviour, cost, risk or how the system is maintained as a decision, and COMPARE its options. LIST other choices in the hand-back as assumptions you made. CHECK the evidence for vendor claims, because vendors often make claims without supporting evidence. FLAG options that rely on unsupported claims.
 
 PICK the perspectives that apply, from what the change touches and the applicable repo standards:
 
@@ -76,28 +74,28 @@ PICK the perspectives that apply, from what the change touches and the applicabl
 | API standards (`api-standards`) | adds or changes an interface others depend on: an API, a library, a CLI, an event or a file format | [../agents/api-standards.md](../agents/api-standards.md) |
 | Each repo standard (its own `id`) | touches what the standard covers | [../agents/repo-standards.md](../agents/repo-standards.md), one reviewer per standard |
 
-WRITE every perspective of the table and every applicable repo standard as a record of `perspectives.jsonl`, with its `id`, whether it applies and why, and where it comes from: `built_in` (with its `method`, such as STRIDE, if it has one), or `standard` with the standard's `file`. KEEP unresolved questions in the design and conversation.
+ADD every perspective of the table and every applicable repo standard with `python3 <skill dir>/scripts/better.pyz add <unit> perspective --by <your name> --id <perspective id>`, giving whether it applies and why, and where it comes from: `built_in` (with its `method`, such as STRIDE, if it has one), or `standard` with the standard's `file`. KEEP unresolved questions in the design and conversation.
 
 ## 5. Debate and iterate in the page
 
 KEEP the page served. INVITE comments on boxes, arrows and flow steps. GIVE the options and your recommendation for each decision under discussion in the page conversation.
 
-UPDATE the files and rendered views as the user corrects the design. WHEN the user accepts a section in words or in the page, ADD its key to `accepted` in `architect.json`. WHEN the design is ready for review, ASK the user to choose Approve….
+UPDATE the files and rendered views as the user corrects the design. WHEN the user accepts a section in words or in the page, ADD its key to `accepted` in the `architect` record, with `set`. WHEN the design is ready for review, ASK the user to choose Approve….
 
 ## 6. Review the approved design
 
-WHEN the user chooses Approve…, START one fresh reviewer per applicable perspective on the approved design: READ and FOLLOW the perspective's reviewer from the table in step 4, and FILL IN its inputs. WRITE its `scenarios` from the scenarios of `requirements.jsonl` that reach what the perspective covers, up to five, the most harmful first. WHEN fewer than three do, WRITE scenarios up to three and MARK each "(added)". GIVE a reviewer in `standards` only the standards that have no reviewer of their own. WRITE its `context` with the facts the review needs that the design does not show, such as where the system runs or which data is personal, not your verdict on the design or the problems you expect. WRITE its `decided` from the constraints and preferences the user stated, such as the records of `requirements.jsonl` with source `user`, not from the design's own decisions.
+WHEN the user chooses Approve…, START one fresh reviewer per applicable perspective on the approved design: READ and FOLLOW the perspective's reviewer from the table in step 4, and FILL IN its inputs. GIVE its `scenarios` from the scenarios of the `requirement` records that reach what the perspective covers, up to five, the most harmful first. WHEN fewer than three do, GIVE scenarios up to three and MARK each "(added)". GIVE a reviewer in `standards` only the standards that have no reviewer of their own. GIVE its `context` with the facts the review needs that the design does not show, such as where the system runs or which data is personal, not your verdict on the design or the problems you expect. GIVE its `decided` from the constraints and preferences the user stated, such as the `requirement` records with source `user`, not from the design's own decisions.
 
-WAIT for every report. HOLD changes and user replies about the reviewed design while the reviewers run. THEN RUN `python3 scripts/architect.py review <folder> --perspectives <id>...` with the ids of the perspectives run.
+WAIT for every report. HOLD changes and user replies about the reviewed design while the reviewers run. THEN RUN `python3 <skill dir>/scripts/better.pyz review <unit> --perspectives <id>...` with the ids of the perspectives run.
 
-USE `/review-better` if available to confirm each finding. OTHERWISE, CONFIRM each finding with evidence you can show, such as the code or the scenario that fails, and KEEP a finding you cannot confirm as unconfirmed. WRITE each finding as a record of `findings.jsonl`, with the next `V<n>` as its `id`, the `id` of its perspective, `confirmed` true when it is confirmed and false otherwise, and `status` `open`. NAME each part it affects as `box:<id>`, `edge:<id>` or `step:<flow id>/<step id>`, where `<flow id>` is the flow's `id`. JOIN the views of one exchange with `+`, such as `edge:<id>+step:<flow id>/<step id>`. WHEN a change or decision addresses the finding, SET `status` to `handled` and `handled_by` to it; `handled_by` exists only then.
+USE `/review-better` if available to confirm each finding. OTHERWISE, CONFIRM each finding with evidence you can show, such as the code or the scenario that fails, and KEEP a finding you cannot confirm as unconfirmed. ADD each finding with `python3 <skill dir>/scripts/better.pyz add <unit> finding --by <your name>`, with the `id` of its perspective, `confirmed` true when it is confirmed and false otherwise, and `status` `open`. NAME each part it affects as `box:<id>`, `edge:<id>` or `step:<flow id>/<step id>`, where `<flow id>` is the flow's `id`. JOIN the views of one exchange with `+`, such as `edge:<id>+step:<flow id>/<step id>`. WHEN a change or decision addresses the finding, SET `status` to `handled` and `handled_by` to it; `handled_by` exists only then.
 
 DEBATE findings in the page and UPDATE the design where needed. WHEN the user disputes a finding, FOLLOW `/review-better` for a disputed finding if available. OTHERWISE, CHANGE the finding only when the user's argument adds evidence or shows that the finding misread the design. SET `status` and `handled_by` on findings the changes address. WHEN the user chooses Review again…, START fresh reviewers for the perspectives the page lists, with `scope` set to the `changes` listed on the approval item, and HANDLE their reports as above.
 
 ## 7. Record decisions and extract the spec
 
-WHEN the approved design and its review are settled, WRITE each decision of `design.md` worth recording as a record of `decisions.jsonl`. WRITE each of these decisions in the decision record location, in the repo's decision record format when it has one: NAME the file as the repo names its records, KEEP its sections and PUT the drivers, rejected alternatives and main drawback within them. OTHERWISE, READ and FOLLOW [../templates/decision.md](../templates/decision.md) and NAME the file `<id>.md`.
+WHEN the approved design and its review are settled, ADD each decision of `design.md` worth recording with `python3 <skill dir>/scripts/better.pyz add <unit> decision --by <your name>`. ALSO write each of these decisions as a document in the decision record location, in the repo's decision record format when it has one: NAME the file as the repo names its records, KEEP its sections and PUT the drivers, rejected alternatives and main drawback within them. OTHERWISE, READ and FOLLOW [../templates/decision.md](../templates/decision.md) and NAME the file `<id>.md`.
 
-READ and FOLLOW [../templates/specs.md](../templates/specs.md) to extract the spec from the design and decisions. INCLUDE each check the reviewers listed under "Checks once built" for behaviour the design states, with that design `section` as its source. WRITE each requirement as a record of `spec.jsonl`, with the `S<n>` as its `id`, its `statement` and its source: the `section` of the design, a request `sentence`, a `decision` id or a `requirement` id. WHEN the repo keeps its specs in a spec format or tool, WRITE the spec there too, in its format. OTHERWISE RUN `python3 scripts/architect.py specs <folder> --out <spec location>/specs.md`: it writes `specs.md` from `spec.jsonl`, marked as generated. NEVER edit that file by hand; change `spec.jsonl` and run the command again.
+READ and FOLLOW [../formats/specs.md](../formats/specs.md) to extract the spec from the design and decisions. INCLUDE each check the reviewers listed under "Checks once built" for behaviour the design states, with that design `section` as its source. ADD each requirement with `python3 <skill dir>/scripts/better.pyz add <unit> spec --by <your name>`, with its `statement` and its source: the `section` of the design, a request `sentence`, a `decision` id or a `requirement` id. WHEN the repo keeps its specs in a spec format or tool, write the spec there too, in its format. OTHERWISE RUN `python3 <skill dir>/scripts/better.pyz specs <unit>` and WRITE its output to `<spec location>/specs.md`, ONLY IF that file is missing or its first line is the generated marker the output starts with. IF it exists and its first line is not that marker, DO NOT overwrite it. NEVER edit a generated `specs.md` by hand; CHANGE the `spec` records with `set` and run the command again.
 
 READ and FOLLOW [../agents/spec-checker.md](../agents/spec-checker.md). FILL IN its inputs and START a separate checker. WAIT for its report. HOLD spec edits and hand-back while it runs. FIX each confirmed blocking finding, THEN START a new checker on the revised spec. DO this at most twice. STOP and CARRY the open findings into the hand-back WHEN the same finding comes back. ASK the user to settle each link the checker lists as unconfirmed. CARRY unresolved links into the hand-back.

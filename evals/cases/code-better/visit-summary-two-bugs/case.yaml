@@ -4,7 +4,7 @@ source:
 - modes/bug-fix.md
 reads:
 - modes/bug-fix.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: The tests are a table of (name, minutes, expected line) rows; add a check for each of the two requested scenarios
   (no visits gives a line with average 0, one visit says "1 visit") that compares the whole line, so that it fails on code

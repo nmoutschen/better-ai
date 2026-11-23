@@ -1,7 +1,6 @@
 """code-better's lessons.jsonl: the schema accepts the lessons of a real build and rejects the shapes it must."""
 
 import copy
-import importlib.util
 import json
 import sys
 import tempfile
@@ -9,14 +8,13 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMAS = ROOT / "skills" / "code-better" / "schemas"
+sys.path.insert(0, str(ROOT / "src"))
+import better_ai.code  # noqa: E402,F401  (registers its hooks)
+from better_ai import resources, schema  # noqa: E402
+
+DOCS = schema.load_schemas(*resources.schema_sources("code"))
 FIXTURE = Path(__file__).parent / "fixtures" / "code-better-lessons.jsonl"
 AT = "2026-11-21T12:00:00Z"
-
-_spec = importlib.util.spec_from_file_location("schema", ROOT / "skills" / "code-better" / "scripts" / "schema.py")
-schema = importlib.util.module_from_spec(_spec)
-sys.modules.setdefault("schema", schema)
-_spec.loader.exec_module(schema)
 
 
 def tasks(ids):
@@ -37,14 +35,14 @@ def tasks(ids):
 
 
 def errors(lessons, task_ids=("T3", "T5", "T6", "T8")):
-    """The schema.py check errors of a change folder with tasks.jsonl and the given lessons.jsonl lines."""
+    """The check errors of a change folder with tasks.jsonl and the given lessons.jsonl lines."""
     with tempfile.TemporaryDirectory() as d:
         folder = Path(d) / ".code" / "c"
         folder.mkdir(parents=True)
         (Path(d) / ".git").mkdir()
         (folder / "tasks.jsonl").write_text("".join(json.dumps(t) + "\n" for t in tasks(task_ids)))
         (folder / "lessons.jsonl").write_text("".join(json.dumps(r) + "\n" for r in lessons))
-        return [str(e) for e in schema.check_paths([folder / "lessons.jsonl"], SCHEMAS)]
+        return [str(e) for e in schema.check_paths([folder / "lessons.jsonl"], docs=DOCS)]
 
 
 def fixture():

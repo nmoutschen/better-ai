@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tasks.schema.json",
+  "title": "one line of tasks.jsonl: a task of a change",
+  "$comment": "In coordinate mode only the coordinator writes it. A status must belong to the set for code.json's mode; requirements resolve in the change folder's own spec.jsonl.",
+  "x-files": [
+    "tasks.jsonl"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "id",
+    "task",
+    "mode",
+    "requirements",
+    "check",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "task"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "id": {
+      "$ref": "base.schema.json#/$defs/id",
+      "pattern": "^T\\d+$",
+      "x-id": {
+        "prefix": "T"
+      }
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "enum": [
+        "feature",
+        "bug fix",
+        "refactor",
+        "tests"
+      ]
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^S\\d+$",
+        "x-points-to": {
+          "file": "spec.jsonl",
+          "type": "spec"
+        }
+      }
+    },
+    "check": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "todo",
+        "building",
+        "built",
+        "verifying",
+        "changes needed",
+        "verified",
+        "merged",
+        "done",
+        "blocked"
+      ],
+      "x-mode-sets": {
+        "file": "code.json",
+        "field": "mode",
+        "coordinate": [
+          "todo",
+          "building",
+          "built",
+          "verifying",
+          "changes needed",
+          "verified",
+          "merged",
+          "blocked"
+        ],
+        "other": [
+          "todo",
+          "done",
+          "blocked"
+        ]
+      }
+    },
+    "reason": {
+      "enum": [
+        "task",
+        "user",
+        "repair limit"
+      ]
+    },
+    "waits_on": {
+      "type": "string",
+      "pattern": "^T\\d+$",
+      "x-points-to": {
+        "file": "tasks.jsonl",
+        "type": "task"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "reason"
+              ]
+            },
+            {
+              "required": [
+                "waits_on"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "const": "task"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "waits_on"
+        ]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "waits_on"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "verified"
+          }
+        }
+      },
+      "then": {
+        "x-check": "verified-needs-passing-verifier"
+      }
+    }
+  ]
+}

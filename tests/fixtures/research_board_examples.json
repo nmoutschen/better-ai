@@ -30,46 +30,112 @@
  ],
  "decisions.jsonl": [
   {
-   "label": "pending",
+   "label": "waiting",
    "record": {
     "type": "decision",
     "at": "2026-11-21T10:00:00Z",
     "by": "coordinator",
     "id": "D1",
+    "raised_by": "coordinator",
+    "about": {
+     "type": "board"
+    },
     "asked": "The analytics wiki asks for a login",
+    "status": "waiting",
     "default": "Go on without it and list it as missing",
-    "deadline": "2026-11-21T10:30:00Z",
-    "status": "pending"
+    "deadline": "2026-11-21T10:30:00Z"
    }
   },
   {
-   "label": "default",
+   "label": "waiting, the work waits",
    "record": {
     "type": "decision",
     "at": "2026-11-21T10:00:00Z",
     "by": "coordinator",
     "id": "D1",
+    "raised_by": "coordinator",
+    "about": {
+     "type": "board"
+    },
     "asked": "The analytics wiki asks for a login",
-    "default": "Go on without it and list it as missing",
-    "deadline": "2026-11-21T10:30:00Z",
-    "status": "default"
+    "status": "waiting",
+    "default": null,
+    "deadline": null
    }
   },
   {
-   "label": "changed",
+   "label": "defaulted",
    "record": {
     "type": "decision",
     "at": "2026-11-21T10:00:00Z",
     "by": "coordinator",
     "id": "D1",
+    "raised_by": "coordinator",
+    "about": {
+     "type": "board"
+    },
     "asked": "The analytics wiki asks for a login",
+    "status": "defaulted",
+    "default": "Go on without it and list it as missing",
+    "deadline": "2026-11-21T10:30:00Z"
+   }
+  },
+  {
+   "label": "answered on the page",
+   "record": {
+    "type": "decision",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "coordinator",
+    "id": "D1",
+    "raised_by": "coordinator",
+    "about": {
+     "type": "board"
+    },
+    "asked": "The analytics wiki asks for a login",
+    "status": "answered",
     "default": "Go on without it and list it as missing",
     "deadline": "2026-11-21T10:30:00Z",
-    "status": "changed",
     "answer": {
      "type": "page",
      "event": "a-lq3z"
     }
+   }
+  },
+  {
+   "label": "answered in the chat",
+   "record": {
+    "type": "decision",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "coordinator",
+    "id": "D1",
+    "raised_by": "coordinator",
+    "about": {
+     "type": "board"
+    },
+    "asked": "The analytics wiki asks for a login",
+    "status": "answered",
+    "default": "Go on without it and list it as missing",
+    "deadline": "2026-11-21T10:30:00Z",
+    "answer": {
+     "type": "chat",
+     "text": "Go on without it"
+    }
+   }
+  },
+  {
+   "label": "decided",
+   "record": {
+    "type": "decision",
+    "at": "2026-11-21T10:00:00Z",
+    "by": "coordinator",
+    "id": "D1",
+    "raised_by": "coordinator",
+    "about": {
+     "type": "board"
+    },
+    "asked": "The analytics wiki asks for a login",
+    "status": "decided",
+    "decision": "Searched the open wiki only"
    }
   }
  ],

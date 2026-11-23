@@ -6,7 +6,7 @@ source:
 reads:
 - modes/design.md
 - agents/security.md
-- scripts/example/README.md
+- formats/records.md
 situation: >-
   The change folder docs/designs/2026-11-order-export/ holds an order-history export design the user approved in the
   page (approval-1, four perspectives). Planted flaw: decision D2 serves each export CSV from the public static
@@ -38,5 +38,5 @@ graders:
     or box:db alone. Does not count: other findings and their parts; whether the exposure finding is marked confirmed;
     whether reviewers ran as sub-agents; whether the design was changed after the review; Git's own files under .git/
     and caches; notes in .code/ or a temporary folder; serving the live page and the files it writes (.server,
-    .conversation-seen, conversation.jsonl entries written by architect.py); asking the user to confirm in the page; a
+    .conversation-seen, conversation.jsonl entries written by better.pyz); asking the user to confirm in the page; a
     run that ends waiting for the user.

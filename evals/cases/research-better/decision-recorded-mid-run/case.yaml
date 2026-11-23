@@ -3,7 +3,7 @@ rule: record-decision-not-wait
 source:
 - SKILL.md#2
 reads:
-- templates/board.md
+- formats/board.md
 situation: 'A board planted mid-run. The brief lists two collections, the wiki export and the payment provider''s dashboard
   export in provider/, and an open high-priority question needs the provider export; provider/ does not exist. The research
   is already running and the user is away, so the agent does not stop to wait: it records a decision in decisions.jsonl with a
@@ -30,5 +30,5 @@ graders:
     do about provider/ and waited, or treated provider/ as searched. Does not count: also asking the user in the final reply,
     if the research went on meanwhile; how the gap is worded in the brief; whether Q-coordinator-8 ends not found or open
     with a note. Does not count: Git''s own files and caches; notes in .code/ or a temporary folder; starting or not starting
-    the live view (board.py watch) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models
+    the live view (better.pyz serve) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models
     the sub-agents ran on.'

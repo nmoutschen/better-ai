@@ -27,5 +27,5 @@ graders:
     or claims. FAIL if the coordinator researched Q-coordinator-8 itself, or left it in progress with w3 as owner. Does not
     count: the coordinator resetting the owner before starting a worker; reading the skill''s files and the board''s files;
     verifier sub-agents. Does not count: Git''s own files and caches; notes in .code/ or a temporary folder; starting or not
-    starting the live view (board.py watch) and the files it writes (.server, .conversation-seen, conversation.jsonl); which
+    starting the live view (better.pyz serve) and the files it writes (.server, .conversation-seen, conversation.jsonl); which
     models the sub-agents ran on.'

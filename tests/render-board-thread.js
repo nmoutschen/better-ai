@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const skill = path.join(__dirname, '..', 'skills', 'research-better', 'scripts');
+const src = path.join(__dirname, '..', 'src', 'better_ai');
 const stand = () => new Proxy(function () {}, {
   get: (_t, k) => (k === Symbol.toPrimitive ? () => '' : k === 'length' ? 0 : stand()),
   apply: () => stand(),
@@ -13,12 +13,12 @@ const stand = () => new Proxy(function () {}, {
 });
 const shared = { document: stand(), setTimeout: () => 0, clearTimeout: () => {}, requestAnimationFrame: () => 0,
   fetch: () => new Promise(() => {}), addEventListener: () => {}, getComputedStyle: () => stand(), console };
-vm.runInNewContext(fs.readFileSync(path.join(skill, 'page.js'), 'utf8'), shared);
-const code = fs.readFileSync(path.join(skill, 'board.js'), 'utf8').replace('__SNAPSHOT__', 'null').split('let fails = 0;')[0];
-const make = new Function('document', 'pageConversation', 'pageMarkdown', 'pageMarkdownText', 'pageTime', 'addEventListener',
+vm.runInNewContext(fs.readFileSync(path.join(src, 'page', 'page.js'), 'utf8'), shared);
+const code = fs.readFileSync(path.join(src, 'research', 'board.js'), 'utf8').split('const bands = ')[0];
+const make = new Function('document', 'pageConversation', 'pageDecision', 'pageDecisionEvents', 'pageMarkdown', 'pageMarkdownText', 'pageTime', 'addEventListener',
   'innerWidth', 'innerHeight', 'getComputedStyle', 'fetch', 'setInterval',
   code + '; return {render, conv, showLoaded};');
-const page = make(stand(), shared.pageConversation, shared.pageMarkdown, shared.pageMarkdownText, shared.pageTime, () => {},
+const page = make(stand(), shared.pageConversation, shared.pageDecision, shared.pageDecisionEvents, shared.pageMarkdown, shared.pageMarkdownText, shared.pageTime, () => {},
   1000, 800, stand(), () => new Promise(() => {}), () => {});
 
 const payloads = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));

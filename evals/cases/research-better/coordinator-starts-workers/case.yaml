@@ -4,7 +4,7 @@ source:
 - SKILL.md#6.1
 reads:
 - agents/worker.md
-- templates/board.md
+- formats/board.md
 situation: 'A fresh research run on the planted wiki export, in a harness with sub-agents. The agent coordinates: it seeds
   the questions, then starts worker sub-agents with the filled-in agents/worker.md, and does not research the questions itself.
   A script checks that claims are on the board and that none has a coordinator ID; the judge checks in the transcript who
@@ -31,5 +31,5 @@ graders:
     claims itself, or started no sub-agent. Reading a few pages before seeding, to confirm the topic and broaden the searches,
     is allowed. Reading the skill''s own files, such as agents/worker.md, and the board''s files does not count. Verifier
     sub-agents and their work do not count either way. Does not count: Git''s own files and caches; notes in .code/ or a temporary
-    folder; starting or not starting the live view (board.py watch) and the files it writes (.server, .conversation-seen,
+    folder; starting or not starting the live view (better.pyz serve) and the files it writes (.server, .conversation-seen,
     conversation.jsonl); which models the sub-agents ran on; a run that ends waiting for the user.'

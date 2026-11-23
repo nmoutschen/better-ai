@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Loaded without blocking: the page draws at once with the fallback fonts, and offline it stays readable. -->
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+{{CSS}}
+{{STYLE}}
+</style>
+</head>
+<body class="static">
+<div class="band"></div>
+<header class="bar--stats">
+  <div><h1 id="title">{{TITLE}}</h1>{{QUESTION}}</div>
+  <div class="stats" id="status"></div>
+</header>
+<p class="oldnote" id="oldnote" role="status" hidden></p>
+<div class="work">
+  <main class="view">
+{{MAIN}}
+  </main>
+</div>
+<div class="toast" role="status" aria-live="polite" hidden></div>
+<script>
+{{PAGE_JS}}
+</script>
+<script id="show-js">
+{{SHOW_JS}}
+</script>
+</body>
+</html>

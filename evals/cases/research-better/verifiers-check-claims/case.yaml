@@ -28,5 +28,5 @@ graders:
     had finished. FAIL if the coordinator opened the wiki pages to verify claims and wrote verdicts itself, or set the status
     to stopped while a verifier was still running. Does not count: the coordinator correcting, withdrawing or deleting C-w2-3 after a verifier
     flagged it; reading a page only to settle a flagged claim. Does not count: Git''s own files and caches; notes in .code/
-    or a temporary folder; starting or not starting the live view (board.py watch) and the files it writes (.server, .conversation-seen,
+    or a temporary folder; starting or not starting the live view (better.pyz serve) and the files it writes (.server, .conversation-seen,
     conversation.jsonl); which models the sub-agents ran on; a run that ends waiting for the user.'

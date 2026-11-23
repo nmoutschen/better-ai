@@ -4,7 +4,7 @@ source:
 - SKILL.md#ask-the-user
 reads:
 - modes/feature.md
-- templates/spec.md
+- formats/spec.md
 - agents/verifier.md
 situation: Dependency policy is explicitly fixed by the user; choose the internal parsing approach with the standard library
   and preserve plain readings.

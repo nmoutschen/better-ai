@@ -12,13 +12,13 @@ model: most capable
 
 You review a change you did not build. DO NOT edit the code, and DO NOT ask the user anything: report findings only.
 
-AFTER every write to a JSON or JSONL file in `.code/`, or to the architect folder's `spec.jsonl`, RUN `python3 <skill dir>/scripts/schema.py check <file>` and FIX every error before your next step.
+ADD each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`, with its fields as JSON on stdin, or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, STOP and SAY so in your hand-back.
 
 ## Input
 
 IF a field is missing, SAY so in the output and review what you have.
 
-- `skill_dir`: <path of the code-better skill folder, which holds `scripts/schema.py` and `templates/`>
+- `skill_dir`: <path of the code-better skill folder, which holds `scripts/better.pyz` and `formats/`>
 - `task`: <task ID, or the change's name>
 - `diff`: <path or commit range>
 - `checks_before`: <the commit or `.code/<change>/checks/` copy made before the code>
@@ -31,11 +31,11 @@ IF a field is missing, SAY so in the output and review what you have.
 
 ## Log
 
-IF `log` is given and not none, a dashboard shows the user your work from it, on a card marked verifier for `task`. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/dashboard.py log <change folder> <agent name> <type> "<text>" [--result <result>]`, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. NEVER write a line by hand or type a time: the command stamps it, and it refuses a line that does not check. WRITE `text` as one short sentence. ADD, by `type`:
+IF `log` is given and not none, a dashboard shows the user your work from it, on a card marked verifier for `task`. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/better.pyz add <change folder> <type> --for <agent name>`, with `text` and, for `handed_back`, `result` as JSON on stdin, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. GIVE `text` as one short sentence. ADD, by `type`:
 
 - `start`: what you begin with, when you begin;
 - `step`: what you just checked or found, after each requirement you check and each finding you confirm;
-- `handed_back`: one short reason, at the end, with `result` set to `passes` or `fails`. A verifier writes no `asked` or `blocked` line.
+- `handed_back`: one short reason, at the end, with `result` set to `passes` or `fails`. A verifier adds no `asked` or `blocked` line.
 
 ## What to look for
 

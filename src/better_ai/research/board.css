@@ -1,0 +1,67 @@
+/* What only the board shows; the shared look (bar, side column, conversation, buttons, toast) is page.css above. */
+.goal { margin:var(--space-tight) 0 0; font:var(--font-subtitle); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.goal.open { white-space:normal; }
+
+/* The map, on the untinted surround */
+.view { min-height:0; display:flex; flex-direction:column; padding:var(--space-item) var(--space-edge); }
+.tools { flex:none; display:flex; gap:var(--space-edge); align-items:center; justify-content:space-between; margin:0 0 var(--space-item); }
+.zoombar { display:flex; gap:var(--space-control); }
+.zoombar .btn { min-width:36px; }
+.zoomwrap { flex:1; min-height:0; display:flex; border:1px solid var(--line); background:var(--cream); overflow:hidden; cursor:grab; touch-action:none; }
+.zoomwrap.drag { cursor:grabbing; }
+svg.map { display:block; width:100%; height:100%; }
+.map text { font-family:var(--sans); fill:var(--ink); }
+.map .rim { font-size:calc(13px * var(--z, 1)); font-weight:700; fill:var(--heading); }
+.map .far { display:none; font-size:calc(11.5px * var(--z, 1)); paint-order:stroke; stroke:var(--cream); stroke-width:calc(3px * var(--z, 1)); }
+.map.close .far, .map .q:hover .far { display:inline; }
+.map.close .rim { display:none; }
+/* Sand and terracotta marks fall under 3:1 on cream: a thin ink line keeps every dot visible. */
+.map circle.dot.filled { stroke:var(--ink); stroke-width:.75; }
+.map .q { cursor:pointer; }
+.map .q:hover text, .map .q:focus text { text-decoration:underline; }
+.map .q:focus { outline:none; }
+.map .q:focus circle.dot { stroke:var(--umber); stroke-width:3; }
+.map .sel circle.dot { stroke:var(--heading); stroke-width:2.5; }
+.zoomwrap .empty { margin:auto; color:var(--muted); font-style:italic; }
+
+/* The pop-up for a question or an agent: the shared header and sections are page.css's; the board adds the claims and
+   the searches, and the thread in the small label style. */
+.qpop .thread .head, .qpop .progress { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
+.qpop .btn { font-size:var(--text-label); }
+.qpop .sec > ul.claims { list-style:none; padding-left:0; }
+.qpop .claims li { padding-left:1.3em; text-indent:-1.3em; }
+/* A static copy has no message box: an empty conversation drops its label too. */
+.qpop .sec:has(> .thread:empty):not(:has(form)) { display:none; }
+.chip { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
+.chip.ok { color:var(--moss-dark); }
+.chip.todo { color:var(--muted); }
+.chip.bad { color:var(--terracotta-dark); }
+.chip.now { color:var(--cream); background:var(--umber); padding:1px var(--space-control); }
+.muted { color:var(--muted); }
+
+/* A worker's message when it closes a question: white like the user's, with a sand edge, so the coordinator's stay distinct. */
+.thread > li.msg.worker { border-left:4px solid var(--sand); }
+.msg .qlink { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; text-align:left; }
+.msg .added { margin:var(--space-tight) 0 0; font-size:var(--text-small); color:var(--muted); }
+/* The agents at work, under the map: a run can have twenty, and a list there scrolls on its own (at most 30% of the
+   height) without taking room from the map. */
+.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-top:1px solid var(--line); padding:var(--space-item) 0 0; margin-top:var(--space-item); }
+.agentsec h2 { margin:0 0 var(--space-control); }
+.agents { list-style:none; margin:0; padding:0; }
+.agents button { display:block; width:100%; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
+  padding:var(--space-tight) var(--space-control); margin:0 0 var(--space-control); font:var(--font-message); color:var(--ink); cursor:pointer; }
+.agents button.verifier { border-color:var(--moss-dark); }
+.agents button:hover span { text-decoration:underline; }
+.agents .dry { display:block; font-style:normal; font-size:var(--text-small); color:var(--error); }
+.agents b { font-size:var(--text-small); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--space-control); }
+
+/* The records the board could not show: a band above the map, in the error colour, so it is seen without taking the
+   page away from the user. */
+.errors { flex:none; margin:0 0 var(--space-item); padding:var(--space-control) var(--space-edge); max-height:25vh; overflow-y:auto; background:var(--cream); color:var(--ink); border-left:4px solid var(--error); font:var(--font-message); }
+.errors[hidden] { display:none; }
+.errors p { margin:0 0 var(--space-tight); font:var(--font-message-strong); color:var(--error); }
+.errors ul { margin:0; padding-left:var(--space-edge); }
+.errors .by { color:var(--muted); }
+.invalid { color:var(--error); font-weight:700; }
+.invalid[hidden] { display:none; }
+.map .bang { fill:var(--error); font-weight:700; font-size:calc(14px * var(--z, 1)); }

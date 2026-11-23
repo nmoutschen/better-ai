@@ -1,0 +1,33 @@
+name: Base build
+
+# A required check that a pull request's committed better.pyz files are what the base branch's build makes from the
+# pull request's src/. It runs from this file on the base branch (pull_request_target), so a pull request cannot edit
+# the workflow or the build it runs. It has read-only permissions and no secrets, and the pull request's checkout is
+# only data: tools/build.py zips and parses it with `ast`, and never imports or runs it. Nothing here runs a .pyz.
+on:
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  base-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the base branch (the trusted build)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: base
+          persist-credentials: false
+      - name: Check out the pull request as data
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.x"
+      - name: Build the pull request's src/ with the base build and compare
+        run: python -I base/tools/build.py --compare --src pr/src --skills pr/skills
