@@ -19,6 +19,9 @@ sys.path.insert(0, str(HERE.parent / "src"))
 
 import better  # noqa: E402
 
+sys.path.insert(0, str(HERE.parent / "tools"))
+import smoke  # noqa: E402
+
 from better_ai import page  # noqa: E402
 
 SRC = HERE.parent / "src" / "better_ai"
@@ -26,13 +29,16 @@ UNITS = HERE / "fixtures" / "units"
 OLD_AT = "2026-11-01T10:00:00Z"
 
 
-def steps(skill, count):
-    """The first `count` steps of the skill's smoke fixture, as (args, stdin)."""
-    for step in json.loads((UNITS / skill / "smoke.json").read_text())["steps"][:count]:
-        stdin = step.get("stdin")
-        if "stdin_file" in step:
-            stdin = (UNITS / skill / step["stdin_file"]).read_text()
-        yield step["args"], stdin
+def prepare(skill, repo, count):
+    """A git repository holding the skill's fixture files and the first `count` steps of its smoke fixture run."""
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    fixture = UNITS / skill
+    spec = json.loads((fixture / "smoke.json").read_text())
+    smoke.place_repo_files(spec, fixture, repo)
+    for step in spec["steps"][:count]:
+        args, stdin = smoke.step_input(step, fixture, repo)
+        done = better.run(skill, *args, stdin=stdin, cwd=repo)
+        assert done.returncode == 0, done.stdout + done.stderr
 
 
 def lines(folder, name, *records):
@@ -99,14 +105,7 @@ class OldFormatCountTest(unittest.TestCase):
         for skill, (unit, setup, make_old, expected) in CASES.items():
             with self.subTest(skill), tempfile.TemporaryDirectory() as tmp:
                 repo = Path(tmp)
-                subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-                if skill == "design-better":  # the versions it names are files of the unit
-                    (repo / unit).mkdir(parents=True)
-                    for name in ("a.html", "b.html"):
-                        (repo / unit / name).write_text((UNITS / skill / name).read_text())
-                for args, stdin in steps(skill, setup):
-                    done = better.run(skill, *args, stdin=stdin, cwd=repo)
-                    self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                prepare(skill, repo, setup)
                 folder = repo / unit
                 if make_old:
                     make_old(folder)
@@ -138,13 +137,7 @@ class OldFormatCountTest(unittest.TestCase):
             unit, setup, make_old, expected = CASES[skill]
             with self.subTest(skill), tempfile.TemporaryDirectory() as tmp:
                 repo = Path(tmp)
-                subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-                if skill == "design-better":
-                    (repo / unit).mkdir(parents=True)
-                    for n in ("a.html", "b.html"):
-                        (repo / unit / n).write_text((UNITS / skill / n).read_text())
-                for args, stdin in steps(skill, setup):
-                    better.run(skill, *args, stdin=stdin, cwd=repo)
+                prepare(skill, repo, setup)
                 make_old(repo / unit)
                 done = better.run(skill, "render", unit, cwd=repo)
                 self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
