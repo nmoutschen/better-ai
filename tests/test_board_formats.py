@@ -949,13 +949,16 @@ class Verbs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             board_dir = made_board(Path(d))
             first = json.dumps({"changes": [{"text": "Dropped the wiki collection"}]})
-            done = better.run(SKILL, "set", ".research/b", "brief", stdin=first, cwd=d)
+            done = better.run(SKILL, "set", ".research/b", "brief", "--by", "coordinator", stdin=first, cwd=d)
             self.assertEqual(done.returncode, 0, done.stderr)
             changes = json.loads((board_dir / "brief.json").read_text())["changes"]
             self.assertEqual([c["text"] for c in changes], ["Dropped the wiki collection"])
             self.assertRegex(changes[0]["at"], self.UTC)
             second = json.dumps({"changes": [{"text": "Searched the archive too"}, changes[0]]})
-            self.assertEqual(better.run(SKILL, "set", ".research/b", "brief", stdin=second, cwd=d).returncode, 0)
+            self.assertEqual(
+                better.run(SKILL, "set", ".research/b", "brief", "--by", "coordinator", stdin=second, cwd=d).returncode,
+                0,
+            )
             kept = json.loads((board_dir / "brief.json").read_text())["changes"]
             self.assertEqual([c["text"] for c in kept], ["Searched the archive too", "Dropped the wiki collection"])
             self.assertEqual(kept[1], changes[0])
@@ -1127,7 +1130,9 @@ class Verbs(unittest.TestCase):
                 )
                 time.sleep(0.3)
                 self.assertEqual(log.read_text().count('"closed"'), 1)  # once, not on every tick
-                done = better.call(SKILL, "set", str(board_dir), "brief", stdin='{"status": "stopped"}', cwd=d)
+                done = better.call(
+                    SKILL, "set", str(board_dir), "brief", "--by", "coordinator", stdin='{"status": "stopped"}', cwd=d
+                )
                 self.assertEqual(done.returncode, 0, done.stderr)
                 runner.join(15)
             self.assertFalse(runner.is_alive())  # it ended by itself, after its linger
@@ -1145,7 +1150,7 @@ class Changes(unittest.TestCase):
         for text in ("Dropped the wiki", "Searched the archive"):
             earlier = json.loads((board_dir / "brief.json").read_text())["changes"]
             patch = json.dumps({"changes": [{"text": text}, *earlier]})
-            done = better.call(SKILL, "set", ".research/b", "brief", stdin=patch, cwd=d)
+            done = better.call(SKILL, "set", ".research/b", "brief", "--by", "coordinator", stdin=patch, cwd=d)
             assert done.returncode == 0, done.stdout + done.stderr
         return board_dir
 
@@ -1153,7 +1158,9 @@ class Changes(unittest.TestCase):
         return json.loads((board_dir / "brief.json").read_text())["changes"]
 
     def set(self, d, changes):
-        return better.call(SKILL, "set", ".research/b", "brief", stdin=json.dumps({"changes": changes}), cwd=d)
+        return better.call(
+            SKILL, "set", ".research/b", "brief", "--by", "coordinator", stdin=json.dumps({"changes": changes}), cwd=d
+        )
 
     def test_a_new_board_is_created_with_no_changes_so_no_agent_types_their_time(self):
         with tempfile.TemporaryDirectory() as d:

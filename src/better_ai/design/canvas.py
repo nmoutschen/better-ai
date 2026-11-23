@@ -21,7 +21,7 @@ from ..paths import Refused, Unit
 from ..skill import Skill
 from .checks import is_page, page_reason, version_path
 
-SIZE = re.compile(r"^(\d{3,4})(?:x(\d{3,4}))?$")
+SIZE = re.compile(r"(\d{3,4})(?:x(\d{3,4}))?")  # the whole value: fullmatch
 # `src` of any element, and `href` of a <link> (a style sheet, an icon): files that a version needs to look right. A link
 # to another page (<a href>) is left alone.
 SRC = re.compile(r"""(\bsrc\s*=\s*)(["'])([^"'#?]+)(?:[?#][^"']*)?\2""", re.I)
@@ -38,7 +38,7 @@ def sizes(widths: list[str]) -> list[dict]:
     """The screen sizes of `canvas.json`: width, height and the name the page shows for each."""
     found = []
     for text in widths:
-        match = SIZE.match(text)
+        match = SIZE.fullmatch(text)
         w = int(match.group(1))
         h = int(match.group(2)) if match.group(2) else (800 if w >= 768 else 700)
         found.append({"w": w, "h": h, "name": "Desktop" if w >= 1024 else "Tablet" if w >= 600 else "Mobile"})
@@ -148,7 +148,7 @@ def data_of(unit: Unit) -> tuple[dict, list]:
     listed = head.get("versions") if isinstance(head.get("versions"), list) else []
     versions = [version_data(unit, v, warnings) for v in listed if isinstance(v, dict) and "label" in v]
     listed = head.get("widths") if isinstance(head.get("widths"), list) else []
-    widths = [w for w in listed if isinstance(w, str) and SIZE.match(w)] or list(DEFAULTS)
+    widths = [w for w in listed if isinstance(w, str) and SIZE.fullmatch(w)] or list(DEFAULTS)
     title, question = head.get("title"), head.get("question")
     data = {
         "title": title if isinstance(title, str) and title else "Versions",
