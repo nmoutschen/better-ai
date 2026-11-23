@@ -147,12 +147,6 @@ function briefFor(data, move) {
   return writesBrief(move, data) ? 'being written' : 'none for this move';
 }
 const step = head => STEP_NAMES[head.step] ? 'Step ' + head.step + ': ' + STEP_NAMES[head.step] : 'Step ' + s(head.step);
-function lastMove(data) {
-  const move = lastOf(data.moves || []);
-  if (!move) return null;
-  const option = optionOf(data, move.option);
-  return { text: moveName(data, move) + (option ? ': ' + s(option.text) : ''), step: move.step };
-}
 
 // What an item is and what bears on it, read from the records.
 const countsFor = (data, id, about, direction) => (data.evidence || []).filter(e => e.status === 'counts' && e.about === about &&
@@ -204,11 +198,13 @@ function pendingChoose(log, states, moves) {
 }
 
 // ---------- The header ----------
+// The header holds figures only (DESIGN.md, stats header): the step of ten, the brief version, the open questions.
+// The step's name, the last move and the brief's state live on their tabs.
 function headerHTML(data, open) {
-  const move = lastMove(data), head = data.head || {};
-  const stat = (big, label) => '<span class="stat"><b>' + esc(big) + '</b>' + esc(label || '') + '</span>';
-  return stat(step(head)) + (move ? stat(move.text, 'last move, at step ' + s(move.step)) : stat('No move yet', 'last move')) +
-    stat(briefLabel(data), 'brief') +
+  const head = data.head || {}, briefs = data.briefs || [];
+  const stat = (big, label) => '<span class="stat"><b>' + big + '</b>' + esc(label) + '</span>';
+  const version = briefs.length ? 'v' + Math.max(...briefs.map(b => briefNumber(b.id))) : '–';
+  return stat(esc(s(head.step) || '–') + '<span class="of"> / 10</span>', 'step') + stat(esc(version), 'brief') +
     (open.length ? '<button type="button" class="stat" id="questions"><b>' + open.length + '</b>' + (open.length === 1 ? 'open question' : 'open questions') + '</button>'
       : '<span class="stat"><b>0</b>open questions</span>');
 }

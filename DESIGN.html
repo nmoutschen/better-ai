@@ -63,10 +63,10 @@ header { flex:none; display:flex; flex-wrap:wrap; gap:var(--space-item) var(--sp
 h1 { font:var(--font-title); color:var(--cream); margin:0; }
 
 /* The stats header: the page's title on the left, its figures on the right. The title wraps to two lines at most, then cuts off. */
-header.bar--stats { flex-wrap:wrap; align-items:flex-end; }  /* long stat values wrap below the title, not off the page */
+header.bar--stats { flex-wrap:nowrap; align-items:flex-end; }
 header.bar--stats > div { min-width:0; }
 header.bar--stats h1 { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
-.stats { flex:0 1 auto; min-width:0; flex-wrap:wrap; justify-content:flex-end; display:flex; gap:var(--space-group); align-items:flex-end; margin:0; font-size:var(--text-small); }
+.stats { flex:none; display:flex; gap:var(--space-group); align-items:flex-end; margin:0; font-size:var(--text-small); }
 .stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
 .stat b { font:var(--font-figure); }
 .stat .of { font-size:var(--text-message); opacity:.8; }

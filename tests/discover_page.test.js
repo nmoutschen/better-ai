@@ -115,17 +115,17 @@ test('S106: 0 open questions is a plain figure, not a button; with some, the fig
   assert.match(a.headerHTML(d, [d.decisions[0]]), /<button type="button" class="stat" id="questions"><b>1<\/b>open question<\/button>/);
 });
 
-test('S2: the header names the step, the last move and the brief version', () => {
+test('S2: the header holds figures only: the step of ten, the brief version and the open questions; never a sentence', () => {
   const a = api(), d = fixture({
     moves: [rec('move', { id: 'M1', option: 'K2', step: '3', why: 'Owners first.', answer: { type: 'page', event: 'c1' } })], chosen: 'K2',
     briefs: [rec('brief', { id: 'v1', move: 'M1', status: 'draft' })],
   });
   const html = a.headerHTML(d, []);
-  assert.match(html, /Step 5: your calls/);
-  assert.match(html, /Shrink: Owners only\./);
-  assert.match(html, /v1, being written/);
+  const stats = [...html.matchAll(/<b>(.*?)<\/b>([^<]*)/g)].map(m => [m[1].replace(/<[^>]+>/g, ''), m[2]]);
+  assert.deepEqual(stats, [['5 / 10', 'step'], ['v1', 'brief'], ['0', 'open questions']]);
+  assert.doesNotMatch(html, /Owners only|your calls|being written|last move/);
+  assert.match(a.headerHTML(fixture(), []), /<b>–<\/b>brief/);  // no brief yet: a dash, not a sentence
   assert.equal(a.briefLabel(fixture({ moves: d.moves, briefs: [rec('brief', { id: 'v1', move: 'M1', status: 'final' })] })), 'v1, final');
-  assert.equal(a.briefLabel(fixture({ briefs: [rec('brief', { id: 'v1', move: 'M9', status: 'draft' })] })), 'v1, draft');
   assert.equal(a.briefLabel(fixture()), 'no brief yet');
 });
 
