@@ -299,7 +299,7 @@ class Architect(unittest.TestCase):
     def test_perspective_table_marks_unconfirmed_findings(self):
         view = model.model(self.read())
         html = self.render_javascript(view, "perspectiveTables(data.perspectives, data.findings, data.parts, true)")
-        self.assertEqual(html.count('<span class="chip guess">Unconfirmed</span>'), 1)
+        self.assertEqual(html.count('<span class="chip plain">Unconfirmed</span>'), 1)
         self.assertIn("Dashboard page to dashboard.py: POST /rpc (Flows, step 2c)", html)
         self.assertIn("Coordinator agent to dashboard.py: wait ends with the answer (Flows, step 2d)", html)
 
@@ -605,7 +605,7 @@ class Architect(unittest.TestCase):
 
         def status(path):
             try:
-                with urllib.request.urlopen(url + path, timeout=10) as response:
+                with urllib.request.urlopen(self.request(url + path), timeout=10) as response:
                     return response.status, response.read()
             except urllib.error.HTTPError as error:
                 error.close()
@@ -638,10 +638,15 @@ class Architect(unittest.TestCase):
         "accept": {"to": "c1-x"},
     }
 
+    def request(self, url, body=None, headers=None):
+        """A request with the page token `serve` left in the unit, as the page sends it."""
+        token = (self.folder / ".server-token").read_text().strip()
+        return urllib.request.Request(url, body, {**(headers or {}), "X-Page-Token": token})
+
     def post(self, url, method, params):
         body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
         headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
-        with urllib.request.urlopen(urllib.request.Request(url + "rpc", body, headers), timeout=10) as response:
+        with urllib.request.urlopen(self.request(url + "rpc", body, headers), timeout=10) as response:
             return json.loads(response.read())
 
     def test_an_architect_note_with_on_and_a_confirm_without_wording_are_refused(self):

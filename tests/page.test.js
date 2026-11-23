@@ -439,3 +439,66 @@ test('delete, accept and reopen point at their item with to, and reopen carries 
   assert.equal(t.state.c2, 'reopened');
   assert.deepEqual(Array.from(t.entries[1].replies, r => r.text), ['still wrong']);
 });
+
+// The agents at work (pageAgents): rows of who, what, since and the time of the last record, from any board.
+const MIN = 60000, T0 = Date.parse('2026-11-23T12:00:00Z');
+const ago = n => new Date(T0 - n * MIN).toISOString();
+const agents = (rows, over) => context.pageAgents(rows, { now: T0 / 1000, ...over });
+
+test('an agent row names who and what, and the age of its work in the shared working chip', () => {
+  const html = agents([{ who: 'analyst-1', what: 'K2: Slow checkout', state: 'Checking', since: ago(12), last: ago(2) }]);
+  assert.match(html, /<b>analyst-1<\/b>/);
+  assert.match(html, /K2: Slow checkout/);
+  assert.match(html, /<span class="chip working">Checking, 12 min<\/span>/);
+  assert.doesNotMatch(html, /No word/);
+});
+
+test('a row without since shows no age, and one without a state word says Working', () => {
+  assert.doesNotMatch(agents([{ who: 'w2', what: 'Q-1' }]), /chip/);
+  assert.match(agents([{ who: 'w2', what: 'Q-1', since: ago(3) }]), />Working, 3 min</);
+});
+
+test('thirty minutes without a record from the agent says so, and twenty-nine do not', () => {
+  const row = last => agents([{ who: 'analyst-2', what: 'E4', state: 'Checking', since: ago(90), last }]);
+  assert.match(row(ago(40)), /No word from analyst-2 for 40 min/);
+  assert.match(row(ago(30)), /No word from analyst-2 for 30 min/);
+  assert.doesNotMatch(row(ago(29)), /No word/);
+  assert.doesNotMatch(agents([{ who: 'a', what: 'x', since: ago(90) }]), /No word/);  // no last record given: nothing to say
+});
+
+test('a second try says so, and a plain row does not', () => {
+  assert.match(agents([{ who: 'a', what: 'x', second: true }]), /second try/);
+  assert.doesNotMatch(agents([{ who: 'a', what: 'x' }]), /second try/);
+});
+
+test('every part of a row is text, however it is written', () => {
+  const html = agents([{ who: '<img src=x>', what: '<script>x</script>', state: '<i>', since: ago(1), note: '<u>', data: { a: '"><s>' } }]);
+  assert.doesNotMatch(html, /<img|<script|<i>|<u>|<s>/);
+});
+
+test('a row with data is a button carrying it, and one without is not', () => {
+  assert.match(agents([{ who: 'w2', what: 'Q-1', data: { a: 'w2', for: 'Q-1' } }]), /<button type="button" data-a="w2" data-for="Q-1">/);
+  assert.doesNotMatch(agents([{ who: 'w2', what: 'Q-1' }]), /<button/);
+});
+
+test('no rows give the empty text, and a note is listed under its row', () => {
+  assert.match(agents([], { empty: 'Nobody is working.' }), /<li class="muted">Nobody is working\.<\/li>/);
+  assert.match(agents([{ who: 'a', what: 'x', note: '5 searches with nothing new' }]), /<em class="dry">5 searches with nothing new<\/em>/);
+});
+
+test('the age is read from a time in milliseconds or in ISO form, against the clock of the page, and never negative', () => {
+  assert.match(agents([{ who: 'a', what: 'x', since: T0 - 5 * MIN }]), /Working, 5 min/);
+  assert.match(agents([{ who: 'a', what: 'x', since: ago(-5) }]), /Working, 0 min/);
+});
+
+test('a verifier row carries its kind as a class, so its edge is the checker colour', () => {
+  assert.match(agents([{ who: 'v1', what: 'Checking claims', kind: 'verifier', data: { a: 'v1' } }]), /<button type="button" class="verifier" data-a="v1">/);
+  assert.match(agents([{ who: 'v1', what: 'x', kind: 'verifier' }]), /<div class="verifier">/);
+});
+
+test('an unusable time or a missing clock leaves the age out and never shows NaN', () => {
+  const bad = agents([{ who: 'a', what: 'x', since: 'not a time', last: 'also not' }]);
+  assert.doesNotMatch(bad, /NaN|chip|No word/);
+  const noNow = context.pageAgents([{ who: 'a', what: 'x', since: ago(5), last: ago(90) }], {});
+  assert.doesNotMatch(noNow, /NaN|chip|No word/);
+});

@@ -10,9 +10,9 @@ const has = v => v && v !== "none";
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const mins = s => s < 90 ? "under 2 min" : `${Math.round(s / 60)} min`;
 // A question's status is one of the schema's words; one this table lacks still counts as to do.
-const STATE = { "answered": ["answered", "ok"], "in progress": ["working", "now"], "open": ["to do", "todo"], "proposed": ["proposed", "todo"],
-  "contested": ["contested", "bad"], "not found": ["not found", "bad"], "unclear": ["unclear", "bad"] };
-const FILL = { ok: "#6B7F5E", now: "#5C4033", todo: "#C4B69C", bad: "#E8725C" };
+const STATE = { "answered": ["answered", "ok"], "in progress": ["working", "working"], "open": ["to do", "plain"], "proposed": ["proposed", "plain"],
+  "contested": ["contested", "error"], "not found": ["not found", "error"], "unclear": ["unclear", "error"] };
+const FILL = { ok: "#6B7F5E", working: "#E8725C", plain: "#C4B69C", error: "#9A3B2A" };
 const SIZE = { high: 10, medium: 7, low: 4.5 };  // dot radius by priority; a question without one is drawn as medium
 const CLOSED = new Set(["answered", "contested", "not found"]);
 let D = null, LAYOUT = "", OPEN = null, REPLIES = -1, SCROLLED = false, CLOSED_PAGE = false;  // OPEN: what the open pop-up shows, as {kind, id}
@@ -97,7 +97,7 @@ function drawMap(d) {
     const hollow = (stroke, dash) => `<circle class="dot" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r - 1}" fill="#FFFCF7" stroke="${stroke}" stroke-width="2.5"${dash ? ' stroke-dasharray="3 2"' : ""}/>`;
     const dot = q.view === "proposed" ? hollow("#78736B") : q.view === "not found" ? hollow("#9A3B2A") : q.view === "unclear" ? hollow("#9A3B2A", true)
       : `<circle class="dot filled" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r}" fill="${FILL[cls]}"/>`;
-    const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#5C4033" stroke-dasharray="3 2"/>` : "";
+    const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#E8725C" stroke-dasharray="3 2"/>` : "";
     const mark = q._errors ? `<text class="bang" x="${(x + r + 3).toFixed(0)}" y="${(y - r).toFixed(0)}">!</text>` : "";
     const right = x >= CX, far = dp > 1 ? `<text class="far" x="${(x + (r + 4) * (right ? 1 : -1)).toFixed(0)}" y="${(y + 4).toFixed(0)}" text-anchor="${right ? "start" : "end"}">${esc(q.label)}</text>` : "";
     const who = q.view === "in progress" && has(q.owner) ? `, ${q.owner} on it` : "";
@@ -234,9 +234,9 @@ function drawAgents(d) {
   const dry = name => { const l = ((d.logs || {})[name] || {}).searches || []; let n = 0;  // searches in a row that found no new term
     for (let i = l.length - 1; i >= 0 && !(l[i].new_terms || []).length; i--) n++; return n; };
   const rows = working.map(q => { const who = has(q.owner) ? q.owner : "unassigned", n = dry(who);
-    return `<li><button type="button" data-a="${esc(who)}" data-for="${esc(q.id)}"><b>${esc(who)}</b><span dir="auto">${esc(q.label)}</span>${n >= 5 ? `<em class="dry">${n} searches with nothing new</em>` : ""}</button></li>`; })
-    .concat(Object.keys(checkers).sort().map(v => `<li><button type="button" class="verifier" data-a="${esc(v)}"><b>${esc(v)}</b><span>Checking claims</span></button></li>`));
-  setHTML($("agents"), rows.join("") || `<li class="muted">${d.brief.status === "stopped" ? "The run has stopped." : "No agent is working right now."}</li>`);
+    return {who, what: q.label, data: {a: who, for: q.id}, note: n >= 5 ? `${n} searches with nothing new` : ""}; })
+    .concat(Object.keys(checkers).sort().map(v => ({who: v, what: "Checking claims", kind: "verifier", data: {a: v}})));
+  setHTML($("agents"), pageAgents(rows, {now: d.now, empty: d.brief.status === "stopped" ? "The run has stopped." : "No agent is working right now."}));
 }
 
 function setHTML(el, html) { if (el._html !== html) el.innerHTML = el._html = html; }
@@ -290,7 +290,7 @@ function fillPop() {
   } else if (D.claims.some(c => c.checker === id)) {
     const mine = D.claims.filter(c => c.checker === id), v = x => x.status;
     const holding = mine.filter(c => v(c) === "checking"), failed = mine.filter(c => v(c) === "unverified");
-    html = `<div class="hd"><p class="kind">Verifier, <span class="chip now">checking</span></p><h3>${esc(id)}</h3></div>
+    html = `<div class="hd"><p class="kind">Verifier, <span class="chip working">checking</span></p><h3>${esc(id)}</h3></div>
       <div class="bd"><p>Checked ${plural(mine.length - holding.length, "claim")}: ${mine.filter(c => v(c) === "verified").length} verified, ${failed.length} failed.</p>
       ${holding.length ? `<div class="sec"><h4 class="section-h">Checking now</h4><ul>${holding.map(c => `<li dir="auto">${esc(c.claim)}</li>`).join("")}</ul></div>` : ""}
       ${failed.length ? `<div class="sec"><h4 class="section-h">Failed</h4><ul>${failed.map(c => `<li dir="auto">${esc(c.claim)} <span class="muted">${esc(c.reason)}</span></li>`).join("")}</ul></div>` : ""}
@@ -302,7 +302,7 @@ function fillPop() {
     const counts = new Map();
     (log.searches || []).slice().reverse().forEach(r => counts.set(r.query, (counts.get(r.query) || 0) + 1));
     const s = [...counts].slice(0, 5).map(([q, n]) => n > 1 ? `${q} (${n} times)` : q);
-    html = `<div class="hd"><p class="kind">Agent, <span class="chip now">working</span></p><h3>${esc(id)}${q ? " on " + esc(q.label) : ""}</h3></div>
+    html = `<div class="hd"><p class="kind">Agent, <span class="chip working">working</span></p><h3>${esc(id)}${q ? " on " + esc(q.label) : ""}</h3></div>
       <div class="bd"><div class="sec"><h4 class="section-h">Latest searches</h4>
       <ul>${s.map(x => `<li dir="auto">${esc(x)}</li>`).join("") || "<li>None logged yet.</li>"}</ul></div>
       <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>`;
@@ -390,9 +390,9 @@ const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))
 // ---------- Polling ----------
 let fails = 0;
 function tick() {
-  return fetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  return pageFetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(d => { fails = 0; CLOSED_PAGE = false; pageShowErrors($("errors"), d.errors, ERRORS_NOTE); render(d); },
-      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
+      e => { if (e && e.stale) return; if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
 }
 if (SNAPSHOT) { pageShowErrors($("errors"), SNAPSHOT.errors, ERRORS_NOTE); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
 else { conv.start(); tick(); setInterval(tick, 2000); }

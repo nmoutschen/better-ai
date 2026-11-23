@@ -15,9 +15,9 @@ function wholeBoard(snapshot) {
   const page = loadPage();
   const document = new Proxy(stand(), { get: (t, k) => (k === 'getElementById' ? id => (id === 'page-data' ? (snapshot ? { textContent: JSON.stringify(snapshot) } : null) : stand()) : t[k]) });
   const env = { document, pageConversation: o => { seen.conversation = o; return stand(); }, pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents,
-    pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime, pageEscape: page.pageEscape, pagePopup: page.pagePopup,
+    pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime, pageEscape: page.pageEscape, pageAgents: page.pageAgents, pagePopup: page.pagePopup,
     pageShowErrors: (band, errors, note) => seen.bands.push([errors, note]), addEventListener: () => {}, innerWidth: 1000, innerHeight: 800,
-    getComputedStyle: stand(), fetch: () => new Promise(() => {}), setInterval: () => {} };
+    getComputedStyle: stand(), pageFetch: () => new Promise(() => {}), setInterval: () => {} };
   new Function(...Object.keys(env), read('research', 'board.js'))(...Object.values(env));
   return seen;
 }
@@ -175,3 +175,36 @@ test('the board marks an invalid brief like any other record', () => {
   assert.equal(notValid({ title: 'T', _errors: ['stop_at: must be one of "high"'] }), 'not valid: stop_at: must be one of "high"');
 });
 
+
+// The agents at work: the board hands its question owners and checking claims to the shared list.
+function agentsList(d) {
+  const el = {};
+  const document = new Proxy(stand(), { get: (t, k) => (k === 'getElementById' ? id => (id === 'agents' ? el : stand()) : t[k]) });
+  loadBoard('{drawAgents}', { document }).drawAgents(d);
+  return el.innerHTML;
+}
+const working = (id, owner) => ({ id, label: id, view: 'in progress', owner });
+
+test('the board lists the owner of each question in progress and each checker of a claim, with what each works on', () => {
+  const html = agentsList({ brief: {}, logs: {}, qs: [working('Q-1', 'w2'), working('Q-2', '')], claims: [{ status: 'checking', checker: 'v1' }, { status: 'verified', checker: 'v9' }] });
+  assert.match(html, /<button type="button" data-a="w2" data-for="Q-1"><b>w2<\/b><span dir="auto">Q-1<\/span>/);
+  assert.match(html, /data-a="unassigned"/);
+  assert.match(html, /<b>v1<\/b>.*Checking claims/);
+  assert.doesNotMatch(html, /v9/);
+});
+
+test('the board says so when no agent works, and when the run has stopped', () => {
+  assert.match(agentsList({ brief: {}, logs: {}, qs: [], claims: [] }), /No agent is working right now\./);
+  assert.match(agentsList({ brief: { status: 'stopped' }, logs: {}, qs: [], claims: [] }), /The run has stopped\./);
+});
+
+test('five searches in a row with nothing new are listed under the agent', () => {
+  const searches = n => Array.from({ length: n }, () => ({ new_terms: [] }));
+  assert.match(agentsList({ brief: {}, logs: { w2: { searches: searches(5) } }, qs: [working('Q-1', 'w2')], claims: [] }), /5 searches with nothing new/);
+  assert.doesNotMatch(agentsList({ brief: {}, logs: { w2: { searches: searches(4) } }, qs: [working('Q-1', 'w2')], claims: [] }), /nothing new/);
+});
+
+test('the board has no list of its own: it feeds the shared one', () => {
+  assert.match(between(boardJs, 'function drawAgents', '\nfunction setHTML'), /pageAgents\(/);
+  assert.doesNotMatch(boardJs, /class="verifier"|class="dry"/);
+});

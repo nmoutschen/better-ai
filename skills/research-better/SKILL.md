@@ -53,7 +53,7 @@ MAKE the board with `python3 <skill dir>/scripts/better.pyz create .research/<to
 
 TELL the user the board's path once.
 
-IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the live view: `python3 <skill dir>/scripts/better.pyz serve <board-path> --open`. GIVE the user the address. IF the harness can only run commands in the foreground, DO NOT start it. TELL the user they can run it themselves instead.
+IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the live view: `python3 <skill dir>/scripts/better.pyz serve <board-path> --open`. GIVE the user the address it prints, whole, with its `#t=` part. IF the harness can only run commands in the foreground, DO NOT start it. TELL the user they can run it themselves instead.
 
 IF your harness tells you when a background command ends, ALSO RUN `python3 <skill dir>/scripts/better.pyz wait <board-path>` in the background while the live view runs: it ends with the user's new actions, so a message wakes you even when you are waiting for workers. START it again at once each time it ends, before you act on what it printed. WHILE no `wait` runs, the page tells the user that you are not watching.
 

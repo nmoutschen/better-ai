@@ -656,7 +656,8 @@
   }
   var carried = document.getElementById('page-data');
   if (carried) boot(JSON.parse(carried.textContent));
-  else fetch('/data').then(function (r) { return r.json(); }).then(boot).catch(function () {
+  else pageFetch('/data').then(function (r) { return r.json(); }).then(boot).catch(function (e) {
+    if (e && e.stale) return;  // page.js shows that the page is out of date; nothing else is true
     var problem = document.getElementById('canvas-problem');
     problem.textContent = 'The page could not load its versions: ask the agent to restart it.'; problem.hidden = false;
   });

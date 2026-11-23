@@ -119,6 +119,60 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .tabs .count { flex:none; white-space:nowrap;
   font:var(--font-label); font-variant-numeric:tabular-nums; background:var(--umber); color:var(--cream); padding:1px var(--space-control); }
 .tabs .count.ok { background:var(--moss-dark); }
+/* A tab row with many tabs wraps onto more lines instead of scrolling. */
+.tabs--wrap { flex-wrap:wrap; overflow:visible; }
+
+/* A chip: a short state word in a box. The colour follows the meaning: moss-dark done, terracotta working, umber waiting
+   for the user, error blocked; a plain chip is anything else. The word always says it; this file puts the ⊘ before a blocked chip's word. */
+.chip { white-space:nowrap; display:inline-block; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase;
+  padding:var(--space-tight) var(--space-control); border:1px solid var(--sand); color:var(--ink); background:var(--linen); }
+.chip.ok { border-color:var(--moss-dark); color:var(--moss-dark); background:var(--cream); }
+.chip.error { border-color:var(--error); color:var(--error); background:var(--cream); }
+.chip.working { border-color:var(--terracotta); color:var(--terracotta-dark); background:var(--cream); }
+.chip.working::before { content:""; display:inline-block; width:10px; height:4px; margin-right:var(--space-control); vertical-align:middle;
+  background:var(--terracotta); animation:pulse-bar 1.2s ease-in-out infinite; }
+.chip.error::before { content:"\2298\00a0" / ""; }
+.chip.wait { border-color:var(--umber); color:var(--umber); background:var(--cream); }
+@media (prefers-reduced-motion: reduce) { .chip.working::before { animation:none; } }
+
+/* A table of records, its heads in the label style. */
+table.tbl { border-collapse:collapse; width:100%; font-size:var(--text-message); }
+table.tbl th, table.tbl td { text-align:left; vertical-align:top; padding:var(--space-control) var(--space-item); border-bottom:1px solid var(--line); }
+table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+
+/* A decision the user is asked to make, on the page body. */
+.decide { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item); margin-bottom:var(--space-item); }
+.decide p { margin:0 0 var(--space-control); }
+
+/* One line under a section's title that says what the section is for. */
+.intro { font:var(--font-message); color:var(--ink); max-width:72ch; margin:0 0 var(--space-section); }
+
+/* The agents at work (pageAgents in page.js), at the top of the side column: a run can have twenty, and a list there
+   scrolls on its own (at most 30% of the height) without taking room from the view. */
+.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-bottom:1px solid var(--line); padding:0 var(--space-edge) var(--space-item); margin-bottom:var(--space-section); }
+.agentsec h2 { margin:0 0 var(--space-control); }
+.agents { list-style:none; margin:0; padding:0; }
+.agents button, .agents li > div { display:block; width:100%; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
+  padding:var(--space-tight) var(--space-control); margin:0 0 var(--space-control); font:var(--font-message); color:var(--ink); }
+.agents button { cursor:pointer; }
+.agents .verifier { border-color:var(--moss-dark); }
+.agents button:hover span[dir] { text-decoration:underline; }
+.agents .chip { margin-left:var(--space-control); }
+.agents em { display:block; font-style:normal; font-size:var(--text-small); }
+.agents .dry { color:var(--error); }
+.agents .second { color:var(--muted); }
+.agents .muted { color:var(--muted); }
+.agents b { font-size:var(--text-small); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--space-control); }
+
+/* An inline form that adds, changes or removes one record: labelled fields, one button. */
+.rec { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item) var(--space-section); margin:var(--space-control) 0 var(--space-section);
+  max-width:700px; display:grid; gap:var(--space-tight); }
+.rec label { font:var(--font-small-strong); margin-top:var(--space-control); }
+.rec textarea, .rec input, .rec select { font:var(--font-message); padding:var(--space-tight) var(--space-control); border:1px solid var(--ink); background:var(--white); }
+.rec textarea { min-height:4em; }
+.rec fieldset { border:0; padding:0; margin:var(--space-control) 0 0; display:grid; gap:var(--space-tight); }
+.rec fieldset label { font:var(--font-message); margin:0; }
+.rec .btn { justify-self:start; }
 
 .scroll-setting { display:grid; gap:var(--space-tight); }
 .scroll-setting[hidden] { display:none; }
@@ -201,6 +255,9 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .thread .reply + .foot { margin-top:var(--space-section); }
 .thread .reply:has(+ .foot) { padding-bottom:var(--space-tight); }
 .thread .foot .answer { margin-left:auto; }
+/* An open question's footer keeps its state and its two buttons on one row. */
+.thread .foot.question { flex-wrap:nowrap; }
+.thread .foot.question .progress { min-width:0; }
 .thread .foot .answer + .answer { margin-left:0; }
 .thread .foot .mini:first-of-type { margin-left:auto; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer;
@@ -212,7 +269,8 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .progress .bars { display:inline-flex; gap:var(--space-tight); }
 .progress .bars i { width:10px; height:4px; background:var(--line); }
 .progress.seen .bars i.on, .progress.replied .bars i.on, .progress.followup .bars i.on { background:var(--sand); }
-.progress.asked, .progress.working { color:var(--umber); }
+.progress.asked { color:var(--umber); }
+.progress.working { color:var(--terracotta-dark); }
 .progress.asked .bars i.on { background:var(--umber); }
 .progress.working .bars i.on { background:var(--terracotta); }
 .progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
@@ -340,7 +398,7 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 .ref .row { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; margin:0 0 8px; }
 .swatches { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(15rem, 1fr)); gap:12px; }
 .swatches li { border:1px solid var(--line); background:var(--cream); }
-.swatches .chip { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:var(--space-control); padding:0 var(--space-item); font:var(--font-body-strong); }
+.swatches .swatch { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:var(--space-control); padding:0 var(--space-item); font:var(--font-body-strong); }
 .swatches .info { padding:8px 12px 10px; font-size:13px; line-height:1.4; }
 .swatches code { font:var(--font-code); }
 .swatches b { color:var(--heading); }
@@ -483,6 +541,43 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
       <button type="button" role="tab" aria-selected="false">Requirements <span class="count ok">✓</span></button>
       <button type="button" role="tab" aria-selected="false">Flows <span class="count">1</span></button>
     </div>
+
+    <h3>Tabs that wrap</h3>
+    <div class="tabs tabs--wrap" role="tablist" aria-label="Many sections">
+      <button type="button" role="tab" aria-selected="true">Moves <span class="count">2</span></button>
+      <button type="button" role="tab" aria-selected="false">Problems <span class="count">3</span></button>
+      <button type="button" role="tab" aria-selected="false">Opportunities</button>
+      <button type="button" role="tab" aria-selected="false">Decisions</button>
+      <button type="button" role="tab" aria-selected="false">Evidence</button>
+    </div>
+
+    <h3>Chips</h3>
+    <div class="row">
+      <span class="chip ok">Supported</span>
+      <span class="chip error">Contradicted</span>
+      <span class="chip working">Checking</span>
+      <span class="chip wait">Waiting for you</span>
+      <span class="chip plain">Unverified</span>
+    </div>
+
+    <h3>Table, section intro, decision panel and inline record form</h3>
+    <p class="intro">What each record says, and where it stands.</p>
+    <table class="tbl">
+      <thead><tr><th>Record</th><th>State</th></tr></thead>
+      <tbody><tr><td>Customers export weekly</td><td><span class="chip ok">Supported</span></td></tr></tbody>
+    </table>
+    <div class="decide"><p>Keep this problem, or drop it?</p><button type="button" class="btn btn--quiet btn--sm">Keep</button></div>
+    <form class="rec" aria-label="Add a problem">
+      <label for="rec-text">Problem</label><textarea id="rec-text"></textarea>
+      <button type="button" class="btn">Add</button>
+    </form>
+
+    <h3>Agents at work</h3>
+    <section class="agentsec" aria-labelledby="agents-demo-h"><h2 class="section-h" id="agents-demo-h">Agents</h2><ul class="agents">
+      <li><button type="button" data-a="analyst-1"><b>analyst-1</b><span dir="auto">Customers export weekly</span><span class="chip working">Checking, 12 min</span></button></li>
+      <li><button type="button" data-a="analyst-2"><b>analyst-2</b><span dir="auto">Reports take a day</span><span class="chip working">Checking, 40 min</span><em class="second">second try</em><em class="dry">No word from analyst-2 for 40 min</em></button></li>
+      <li><button type="button" class="verifier" data-a="verifier-1"><b>verifier-1</b><span dir="auto">Checking claims</span></button></li>
+    </ul></section>
 
     <h3>Buttons and segmented controls</h3>
     <div class="row">
@@ -648,6 +743,37 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 // Every state the page gives an item, with the words of its progress mark. page.css colours a pin for each of them.
 var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied',
   working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
+
+// The page token. `serve` gives it in the fragment of the address it opens (#t=...), which a browser never sends. The page
+// keeps it for the tab, so a reload still has it, and takes it out of the address bar. Every request to /rpc, /data,
+// /events and /wait goes through pageFetch, which sends it; the server answers a page without it as out of date. The
+// page then drops the token it saved: a reload cannot fix it, only the address the agent gave.
+var PAGE_STALE = 'page out of date: open the address the agent gave', pageIsStale = false;
+var pageToken = (function () {
+  var found = typeof location === 'undefined' ? null : /[#&]t=([\w-]+)/.exec(location.hash || '');
+  try {
+    if (found) { sessionStorage.setItem('pageToken', found[1]); history.replaceState(null, '', location.pathname + location.search); }
+    return found ? found[1] : sessionStorage.getItem('pageToken') || '';
+  } catch (e) { return found ? found[1] : ''; }
+})();
+function pageStale() {
+  var strip = document.querySelector('.offline');
+  pageIsStale = true; pageToken = '';
+  try { sessionStorage.removeItem('pageToken'); } catch (e) {}
+  if (strip) { strip.textContent = PAGE_STALE; strip.hidden = false; }
+  var stale = new Error(PAGE_STALE);
+  stale.stale = true;
+  return stale;
+}
+function pageFetch(url, init) {
+  if (pageIsStale) return Promise.reject(pageStale());  // the server refused this page's token: asking again cannot help
+  init = Object.assign({}, init);
+  init.headers = Object.assign({}, init.headers, { 'X-Page-Token': pageToken });
+  return fetch(url, init).then(function (r) {
+    if (r.status !== 401) return r;
+    throw pageStale();
+  });
+}
 
 // The element-comment layer. A page supplies its target metadata, pin coordinates and navigation;
 // this owns the editor, the numbered pins and their actions.
@@ -822,11 +948,11 @@ function pageConversation(o) {
     if (o.apply) o.apply(event, true);
     if (!o.served) { log.push(event); renderThread(); flash(what + ' saved on this page. ' + (o.unsent || ''), 'ok'); if (done) done(); return; }
     flash('Sending ' + what.toLowerCase() + '…', 'busy');
-    fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    pageFetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
       .then(function (r) { return r.json(); })
       .then(function (r) {
-        if (r.error) { var refused = new Error(r.error.message); refused.refused = true; throw refused; }
+        if (r.error) { if (r.error.code === -32001) pageStale(); var refused = new Error(r.error.message); refused.refused = true; throw refused; }
         return r;
       })
       .then(function () {
@@ -1060,16 +1186,17 @@ function pageConversation(o) {
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
     // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
-    function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
+    // Once a request was refused as out of date the strip stays: no later poll or stream event clears it.
+    function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = !pageIsStale && (on || misses < 2); }
     if (streaming) (function stream(after) {
-      fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
+      pageFetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
         // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
         if (after > 0) r.events.forEach(function (e) { if (e.type === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
         if (r.events.length) renderThread();
         stream(r.total);
-      }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
+      }).catch(function (e) { if (e && e.stale) return; connected(false); setTimeout(function () { stream(after); }, 2000); });
     })(0);
     // A new render from the agent loads by itself, as soon as the user is not typing: a comment, a message or an answer
     // in progress would be lost. The page keeps its place through o.beforeReload.
@@ -1325,6 +1452,10 @@ function pageCan(name) { return (pageConfig().capabilities || []).indexOf(name) 
 //   o.conversation  the page's pageConversation()     o.now()  the page's clock in seconds (the server's)
 //   o.md(text)      Markdown to an HTML string        o.esc(text)  HTML-escaped text
 //   o.id(prefix)    a new event id
+//   o.suggested     true: the default is a suggestion, never applied on a timer: "Suggested default", no deadline words
+//   o.next()        the element that waits after the open questions, such as a move that is due (optional)
+// The footer of an open question is [✓] [Answer] on one row; each control's name includes the question. After ✓ the focus
+// goes to the next open question, then to what waits next.
 // pageDecisionEvents(decisions, conversation) is the log the thread draws: each decision as an entry of type `decision`
 // (the record in `x`), among the conversation's events, in the order things happened. Nothing comes before what it
 // answers: an answer never shows above its decision, a reply never above the answer it replies to.
@@ -1342,9 +1473,46 @@ function pageDecision(o) {
   function waiting(c, state) { return step(status(c.e.x), answerOf(c), state) === 0; }
   function left(x) { var t = Date.parse(x.deadline); return isNaN(t) ? null : t / 1000 - o.now(); }
   function deadlineWords(x) {
-    var s = left(x);
+    var s = o.suggested ? null : left(x);
     if (s === null) return '';
     return s > 0 ? 'default in ' + (s < 90 ? 'under 2 min' : Math.round(s / 60) + ' min') : 'default due now';
+  }
+  // What takes the focus after the question FROM is answered, found at the click, before the send: the thread may redraw
+  // before the send is done, and the answered question is then gone. It is kept as a name, never as an element, which a
+  // redraw replaces: {id} the open question after it, else the first before it; {next} what the page says waits next,
+  // asked again at focus time; {asked} another item the agent asked about, found again by its id. Nothing else waits: null.
+  function nextWaiting(from) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q')), i = -1, k;
+    for (k = 0; k < list.length; k++) if (list[k].dataset.d === from) i = k;
+    var others = list.slice(i + 1).concat(list.slice(0, Math.max(i, 0))).filter(function (q) { return q.dataset.d !== from; });
+    if (others.length) return { id: others[0].dataset.d };
+    if (o.next && o.next()) return { next: true };
+    var asked = Array.prototype.slice.call(document.querySelectorAll('li[data-state="asked"]')).filter(function (q) { return q.dataset.d !== from && !/open-q/.test(q.className); });
+    return asked.length && asked[0].dataset.id ? { asked: asked[0].dataset.id } : null;
+  }
+  function questionEl(id) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q'));
+    for (var k = 0; k < list.length; k++) if (list[k].dataset.d === id) return list[k].querySelector('.use') || list[k].querySelector('.answer') || list[k];
+    return null;
+  }
+  function askedEl(id) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li[data-state="asked"]'));
+    for (var k = 0; k < list.length; k++) if (list[k].dataset.id === id) { list[k].setAttribute('tabindex', '-1'); return list[k]; }
+    return null;
+  }
+  // The focus moves on only while it is still on the button that was clicked, on the page or on nothing: where the user
+  // went during the send stays. A redraw after the answer replaces the nodes: the question's new ✓ is focused once drawn,
+  // under the same rule.
+  var want = null;
+  function focusFree(from) {
+    var now = document.activeElement;
+    return !now || now === document.body || now === from || !document.contains(now);
+  }
+  function focusTarget(n, from) {
+    if (!n || !focusFree(from)) return;
+    var el = n.id ? questionEl(n.id) : n.next ? (o.next && o.next()) : askedEl(n.asked);
+    if (el && el.focus) el.focus({ preventScroll: true });
+    want = n.id ? { id: n.id, from: el } : null;
   }
   function head(who, label) {
     return '<div class="head"><span class="who">' + o.esc(who) + '</span><span class="when">' + o.esc(label) + '</span></div>';
@@ -1358,30 +1526,42 @@ function pageDecision(o) {
     li.className = 'msg decision ' + st + (asked ? ' open-q' : '');
     // The default shows under an open question, as what happens without an answer; the answer the agent copied shows
     // only when the user gave it in the chat: an answer from the page is in the thread.
-    var after = x.default && ((st === 'waiting' && n <= 0) || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? "If you don't answer: " : 'Default applied: ') + x.default
+    var after = x.default && ((st === 'waiting' && n <= 0) || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? (o.suggested ? 'Suggested default: ' : "If you don't answer: ") : 'Default applied: ') + x.default
       : st === 'answered' && x.answer && x.answer.type === 'chat' ? '\n\nYour answer:\n\n' + x.answer.text
       : st === 'decided' && x.decision ? '\n\nDecided:\n\n' + x.decision : '';
     li.innerHTML = head(pageRole().replace(/^./, function (ch) { return ch.toUpperCase(); }), label || pageTime(x.at)) + o.md(String(x.asked || '') + after);
     li.dataset.d = x.id;
     li.dataset.state = STEP ? STEP[0] : '';
     var foot = document.createElement('div');
-    foot.className = 'foot';
+    foot.className = 'foot' + (asked ? ' question' : '');
+    var q = pageMarkdownText(x.asked);
     if (STEP) foot.insertAdjacentHTML('beforeend', '<span class="progress ' + STEP[0] + '"><span class="bars" aria-hidden="true">' +
       [0, 1, 2].map(function (i) { return '<i class="' + (i <= n ? 'on' : '') + '"></i>'; }).join('') + '</span><span>' + STEP[1] + '</span></span>');
     else if (answer) foot.append(conv.progress(state[answer.id]));
     if (actions) {
       if (asked && x.default) {
         var use = document.createElement('button');
-        use.type = 'button'; use.className = 'btn btn--sm answer'; use.textContent = 'Use the default';
+        use.type = 'button'; use.className = 'btn btn--sm answer use'; use.textContent = '✓'; use.title = 'Use the default';
+        use.setAttribute('aria-label', 'Use the default for: ' + q);
         use.addEventListener('click', function () {
+          var target = nextWaiting(x.id);
           use.disabled = true;
-          conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer', null, function () { use.disabled = false; });
+          conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer',
+            function () { focusTarget(target, use); }, function () { use.disabled = false; });
         });
         foot.append(use);
+        if (want && want.id === x.id) {
+          var from = want.from; want = null;
+          Promise.resolve().then(function () {
+            var now = document.activeElement;
+            if (!now || now === document.body || now === from) use.focus({ preventScroll: true });
+          });
+        }
       }
       var change = document.createElement('button');
-      change.type = 'button'; change.className = 'btn btn--sm answer change' + (asked ? '' : ' btn--quiet');
+      change.type = 'button'; change.className = 'btn btn--sm btn--quiet answer change';
       change.textContent = asked ? 'Answer' : 'Reply';
+      change.setAttribute('aria-label', (asked ? 'Answer: ' : 'Reply to: ') + q);
       change.addEventListener('click', function () {
         conv.box(li, x.id, asked ? 'Your answer' : 'Your reply', change, function (text, done) {
           conv.send('answer', { id: o.id('a'), decision: x.id, text: text, default: false }, 'Answer', done);
@@ -1459,6 +1639,37 @@ function pageShowErrors(el, errors, note) {
   var html = pageErrors(errors, note);
   el.hidden = !html;
   if (el.innerHTML !== html) el.innerHTML = html;
+}
+
+// The agents at work, as the list items of `<ul class="agents" id="agents">`: one row for each agent in ROWS, from any
+// board; the page reads no log, the board says what each agent does. A row is
+//   who      the agent's name            what    what it works on
+//   state    the word of its chip, "Working" when none     since   when the work began: the chip adds its age
+//   last     when the agent last wrote a record: from 30 minutes on, the row says there was no word from it
+//   second   true for a second try      note    one more line for the row, in the error colour
+//   data     data attributes (name to value): the row is then a button that carries them
+//   kind     "verifier" for an agent that checks what others wrote: its edge is moss, not terracotta
+// A time is an ISO string or a number of milliseconds. O.now is the page's clock in seconds (the server's), O.empty the
+// line when there are no rows.
+function pageAgents(rows, o) {
+  var now = o.now * 1000;
+  // The whole minutes since AT, or null when AT or the clock is not a time: the row then leaves that part out.
+  function minutes(at) {
+    var n = Math.floor((now - (typeof at === 'number' ? at : Date.parse(at))) / 60000);
+    return isFinite(n) ? Math.max(0, n) : null;
+  }
+  if (!rows.length) return '<li class="muted">' + pageEscape(o.empty) + '</li>';
+  return rows.map(function (r) {
+    var attrs = Object.keys(r.data || {}).map(function (k) { return ' data-' + pageEscape(k) + '="' + pageEscape(r.data[k]) + '"'; }).join('');
+    var tag = (r.data ? 'button type="button"' : 'div') + (r.kind ? ' class="' + pageEscape(r.kind) + '"' : '') + attrs;
+    var age = r.since != null ? minutes(r.since) : null, quiet = r.last != null ? minutes(r.last) : null;
+    return '<li><' + tag + '><b>' + pageEscape(r.who) + '</b><span dir="auto">' + pageEscape(r.what) + '</span>' +
+      (age !== null ? '<span class="chip working">' + pageEscape(r.state || 'Working') + ', ' + age + ' min</span>' : '') +
+      (r.second ? '<em class="second">second try</em>' : '') +
+      (quiet !== null && quiet >= 30 ? '<em class="dry">No word from ' + pageEscape(r.who) + ' for ' + quiet + ' min</em>' : '') +
+      (r.note ? '<em class="dry">' + pageEscape(r.note) + '</em>' : '') +
+      '</' + (r.data ? 'button' : 'div') + '></li>';
+  }).join('');
 }
 
 // The details pop-up (.qpop) of a page, one at a time, over the page: it opens with its title in focus, keeps Tab inside
@@ -1555,7 +1766,7 @@ function lum(hex) {
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => p - q); return ((y + .05) / (x + .05)).toFixed(1); };
 document.getElementById("swatches").replaceChildren(...COLOURS.map(([name, role, on]) => {
   const li = document.createElement("li"), bg = v(name);
-  const chip = document.createElement("div"); chip.className = "chip"; chip.style.background = bg;
+  const chip = document.createElement("div"); chip.className = "swatch"; chip.style.background = bg;
   on.forEach(fg => { const s = document.createElement("span"); s.style.color = v(fg); s.textContent = "Aa"; s.title = `--${fg} on --${name}, ${ratio(v(fg), bg)}:1`; chip.append(s); });
   const info = document.createElement("div"); info.className = "info";
   info.innerHTML = `<b>--${name}</b> <code>${bg}</code><div class="role"></div>`;

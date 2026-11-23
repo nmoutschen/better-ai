@@ -226,6 +226,7 @@ class LivePage(unittest.TestCase):
                 break
             time.sleep(0.1)
         self.base = (self.unit / ".server").read_text().strip().rstrip("/")
+        self.token = (self.unit / ".server-token").read_text().strip()  # what the page sends with each request
         self.addCleanup(self.stop)
 
     def stop(self):
@@ -234,12 +235,13 @@ class LivePage(unittest.TestCase):
         self.server.communicate(timeout=10)
 
     def get(self, path):
-        with urllib.request.urlopen(self.base + path, timeout=5) as r:
+        request = urllib.request.Request(self.base + path, headers={"X-Page-Token": self.token})
+        with urllib.request.urlopen(request, timeout=5) as r:
             return r.status, r.read().decode()
 
     def send(self, method, params):
         body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-        headers = {"Content-Type": "application/json", "Origin": self.base}
+        headers = {"Content-Type": "application/json", "Origin": self.base, "X-Page-Token": self.token}
         request = urllib.request.Request(self.base + "/rpc", data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(request, timeout=5) as r:
             return json.loads(r.read())

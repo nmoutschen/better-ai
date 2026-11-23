@@ -20,6 +20,10 @@ registers with `register(SKILL, PageSpec(...))` when it is imported:
 - `revision(unit)`, `stopped(unit)`, `tick(unit, conversation)`: optional. A page reloads itself when `/rev` changes;
   `serve` ends `--linger` seconds after `stopped` becomes true; `tick` runs every TICK seconds (one) while serving.
 
+`serve` makes a random token, keeps it in the unit's `.server-token` (private to the user) and gives it to the browser
+only in the fragment of the address it opens (`#t=...`, which a browser does not send). `/rpc`, `/data`, `/events` and
+`/wait` need it in the `X-Page-Token` header; `wait` reads it from the file. The shell, its files and `/listening` do not.
+
 The shell (`shell.html`) is filled only with bundled files and `html.escape`d constants, never with record data.
 """
 
@@ -29,15 +33,18 @@ import argparse
 import contextlib
 import functools
 import hashlib
+import hmac
 import html
 import http.server
 import json
 import os
+import secrets
 import signal
 import sys
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -50,7 +57,9 @@ from ..paths import Refused, Unit
 from ..skill import Skill
 
 COMMON = "conversation.schema.json"
-LOG, SEEN, ADDRESS = "conversation.jsonl", ".conversation-seen", ".server"
+LOG, SEEN, ADDRESS, TOKEN = "conversation.jsonl", ".conversation-seen", ".server", ".server-token"
+TOKEN_HEADER = "X-Page-Token"
+OUT_OF_DATE = "page out of date: open the address the agent gave"  # what a page without the token is told; page.js shows it and keeps the typing
 MAX_BODY = 200_000
 LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the agent is not watching
 WAIT_DEFAULT = 600  # seconds `wait` waits, in every skill
@@ -456,13 +465,25 @@ def wait(args: argparse.Namespace, run: cli.Run) -> int:
     if address is None:
         raise paths.refusal(unit.label, "no page is served", f"run serve {unit.label} first")
     seen = conv.seen()
+    headers = {}
+    with contextlib.suppress(FileNotFoundError):  # a server from before the token has no file, and ignores the header
+        headers[TOKEN_HEADER] = paths.read_bytes(unit, TOKEN).decode("ascii", errors="replace").strip()
     deadline = time.time() + args.timeout
     while time.time() < deadline:
+        request = urllib.request.Request(
+            f"{address}wait?after={seen}&seconds={max(1, int(deadline - time.time()))}", headers=headers
+        )
         try:
-            with urllib.request.urlopen(
-                f"{address}wait?after={seen}&seconds={max(1, int(deadline - time.time()))}", timeout=30
-            ) as response:
+            with urllib.request.urlopen(request, timeout=30) as response:
                 total = int(response.read())
+        except urllib.error.HTTPError as error:
+            if error.code == 401:
+                raise paths.refusal(
+                    unit.label, "the page's server does not accept this token", f"run serve {unit.label} again"
+                ) from None
+            raise paths.refusal(
+                unit.label, "the page's server is not answering", f"run serve {unit.label} again"
+            ) from None
         except (OSError, ValueError):
             raise paths.refusal(
                 unit.label, "the page's server is not answering", f"run serve {unit.label} again"
@@ -728,6 +749,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     assets: dict
     bug_prefix = "bug"
     cutoff: str | None = None
+    token = ""
     answer_started = False
     old_cache: tuple[float, int] = (0.0, 0)
 
@@ -784,6 +806,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def has_token(self) -> bool:
+        """Whether the request carries this server's token: what keeps another process on this machine from reading
+        or writing the conversation as the user. Compared in constant time."""
+        if not self.token:
+            return False  # a server made without a token answers nobody
+        given = self.headers.get(TOKEN_HEADER) or ""
+        return hmac.compare_digest(given.encode("utf-8", "replace"), self.token.encode())
+
     def send_json(self, value) -> None:
         self.send(200, json.dumps(value).encode(), "application/json")
 
@@ -811,6 +841,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in self.assets:
             kind = CONTENT_TYPES[os.path.splitext(path)[1]]
             return self.send(200, resources.read_bytes(self.assets[path]), kind)
+        if path in ("/data", "/events", "/wait") and not self.has_token():
+            return self.send(401, f"{OUT_OF_DATE}\n".encode(), "text/plain; charset=utf-8")
         if path == "/data":
             return self.send_json({**self.spec.load(self.unit), "listening": c.listening(), "now": time.time()})
         if path == "/old":
@@ -837,6 +869,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         origin = self.headers.get("Origin", "")
         if not self.local() or self.path != "/rpc" or origin != "http://" + (self.headers.get("Host") or ""):
             return self.send_error(403)
+        if not self.has_token():
+            return self.send_json(rpc_error(None, -32001, OUT_OF_DATE))
         if not (self.headers.get("Content-Type") or "").startswith("application/json"):
             return self.send_error(415)
         size = int(self.headers.get("Content-Length") or 0)
@@ -873,7 +907,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def make_server(unit: Unit, spec: PageSpec, conv: Conversation, info: resources.BuildInfo, port: int = 0):
-    """The HTTP server for a unit's page, on 127.0.0.1; not started."""
+    """The HTTP server for a unit's page, on 127.0.0.1; not started. Its `token` is made here, new for each server."""
 
     class PageHandler(Handler):
         pass
@@ -882,7 +916,19 @@ def make_server(unit: Unit, spec: PageSpec, conv: Conversation, info: resources.
     PageHandler.methods, PageHandler.assets = spec.sendable(), spec.table()
     PageHandler.bug_prefix = f"{unit.skill.name} {info.hash}"
     PageHandler.cutoff = info.cutoff
-    return http.server.ThreadingHTTPServer(("127.0.0.1", port), PageHandler)
+    PageHandler.token = secrets.token_urlsafe(32)
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), PageHandler)
+    server.token = PageHandler.token  # type: ignore[attr-defined]
+    return server
+
+
+def publish(unit: Unit, server: http.server.HTTPServer) -> str:
+    """Write the server's token (private to the user) and then its address to the unit, as an agent finds them; returns
+    the address a browser opens, with the token in its fragment, which a browser does not send to any server."""
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    paths.write_state(unit, TOKEN, server.token.encode(), 0o600)  # type: ignore[attr-defined]
+    paths.write_state(unit, ADDRESS, url.encode())
+    return f"{url}#t={server.token}"  # type: ignore[attr-defined]
 
 
 def _serve_arguments(parser: argparse.ArgumentParser) -> None:
@@ -922,8 +968,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
         raise paths.refusal(
             unit.label, f"cannot be served on port {args.port} ({reason})", f"serve {unit.label} on a free port"
         ) from None
-    url = f"http://127.0.0.1:{server.server_address[1]}/"
-    paths.write_state(unit, ADDRESS, url.encode())
+    url = publish(unit, server)
     if not unit.target(SEEN).exists():  # a resumed run keeps its place, so it still sees what came in while it was away
         paths.write_state(unit, SEEN, b"0")
     run.out(
@@ -965,8 +1010,9 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
         if not args.once and serving.is_alive():
             server.shutdown()
         server.server_close()
-        with contextlib.suppress(OSError, Refused):
-            os.unlink(unit.target(ADDRESS))
+        for name in (ADDRESS, TOKEN):
+            with contextlib.suppress(OSError, Refused):
+                os.unlink(unit.target(name))
 
 
 def revision_of(*parts: Any) -> str:
@@ -981,6 +1027,7 @@ __all__ = [
     "EventError",
     "PageSpec",
     "make_server",
+    "publish",
     "old_count_of",
     "with_old_note",
     "old_format_count",
