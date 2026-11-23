@@ -61,7 +61,12 @@ VALID_CASE = "id: a-case\nrule: some-behaviour\nsituation: S.\nrequest: R.\ngrad
 
 def test_case_yaml_keys_are_checked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A valid case loads; an unknown top-level key, a grader field or type with no implementation, or an id that is not the folder fails."""
-    assert cases.load_case(write_case(tmp_path, VALID_CASE))["id"] == "a-case"
+    folder = write_case(tmp_path, VALID_CASE)
+    (folder / "repo" / "__pycache__").mkdir()
+    (folder / "repo" / "__pycache__" / "main.cpython-312.pyc").write_bytes(b"x")
+    loaded = cases.load_case(folder)
+    assert loaded["id"] == "a-case"
+    assert list(loaded["files"]) == ["main.py"], "a Python cache left in a planted repo is not part of the case"
     with pytest.raises(ValueError, match="a-case.*read"):
         cases.load_case(write_case(tmp_path / "1", VALID_CASE + "read: [SKILL.md]\n"))
     with pytest.raises(ValueError, match="a-case.*paterns"):

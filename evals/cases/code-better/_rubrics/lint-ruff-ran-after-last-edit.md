@@ -6,8 +6,8 @@ while its changes were set aside), whether alone, in a pipe such as `| tee lint.
 missing-ruff error means it did not run). The run's exit code does not matter for this item: other graders check for
 new issues. FAIL if no ruff check ran, if the last ruff check ran before the last edit to a .py file, or if ruff did
 not run. Counts as an edit to a .py file: any tool call or command that writes or changes a .py file in the
-repository, such as the file edit and file write tools, `sed -i`, a heredoc or redirection, a Python or Perl one-
-liner, `patch`, `cp`, `mv` or `tee` into the repository, `git stash pop`, `git checkout`, `git restore` or `git apply`
+repository, such as the file edit and file write tools, `sed -i`, a heredoc or redirection, a Python or Perl
+one-liner, `patch`, `cp`, `mv` or `tee` into the repository, `git stash pop`, `git checkout`, `git restore` or `git apply`
 that leaves a .py file different from the agent's own code before the command, and `ruff format` (or `ruff check
 --fix`) when its output says it changed a file. `ruff check --fix` is ruff's own run: it counts as the check on the
 code it leaves, if its output ends with no remaining issues or reports the remaining ones, and a later edit by hand

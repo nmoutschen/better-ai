@@ -155,7 +155,11 @@ def load_case(directory: Path) -> dict[str, Any]:
     case["reads"] = case.get("reads") or []
     case["graders"] = _resolve(case["graders"], directory)
     repo = directory / "repo"
-    case["files"] = {path.relative_to(repo).as_posix(): path for path in sorted(repo.rglob("*")) if path.is_file()}
+    case["files"] = {
+        path.relative_to(repo).as_posix(): path
+        for path in sorted(repo.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts
+    }
     earlier, history = directory / "earlier", directory / "history"
     if earlier.is_dir() and history.is_dir():
         raise ValueError(f"{directory.name}: a case has earlier/ or history/, not both")
