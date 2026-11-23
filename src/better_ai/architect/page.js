@@ -7,7 +7,7 @@ const text = pageEscape;
 const inlineCode = value => value.split(/(`[^`]+`)/).map((part, index) =>
   index % 2 ? '<code>' + text(part.slice(1, -1)) + '</code>' : text(part)).join('');
 const invalid = record => record._errors && record._errors.length ?
-  '<p class="invalid">' + chip('Not valid', 'guess') + ' ' + text(record._errors[0]) + '</p>' : '';
+  '<p class="invalid">' + chip('Not valid', 'plain') + ' ' + text(record._errors[0]) + '</p>' : '';
 const nameOf = (perspectives, id) => (perspectives.find(p => p.id === id) || {}).name || id;
 // A perspective's origin as words: a sum type tagged by type, so no string mixes cases.
 const fromWords = from => from.type === 'built_in' ? 'built in' + (from.method ? ' (' + from.method + ')' : '') :
@@ -32,9 +32,9 @@ function editor(label, value = '') {
 const changeButton = '<button class="btn btn--quiet btn--sm" type="button" data-edit>Change</button>';
 
 function sourceLink(source) {
-  if (source.type === 'guessed') return chip('guessed', 'guess');
+  if (source.type === 'guessed') return chip('guessed', 'plain');
   if (source.type === 'user') return 'You, on this page<br>' + text(String(source.at).slice(11, 16));
-  if (source.type !== 'request' && source.type !== 'file') return chip('no valid source', 'guess');
+  if (source.type !== 'request' && source.type !== 'file') return chip('no valid source', 'plain');
   return source.sentence ? text(source.sentence) : text(source.file) + (source.symbol ? '<br>' + text(source.symbol) : '');
 }
 
@@ -50,7 +50,7 @@ function requirementRows(requirements) {
 function decisionRecords(decisions) {
   return decisions.map(decision => {
     const drivers = decision.drivers.map(id =>
-      '<a class="chip req" href="#req-' + encodeURIComponent(id) + '" data-driver="' + text(id) + '">' + text(id) + '</a>'
+      '<a class="chip" href="#req-' + encodeURIComponent(id) + '" data-driver="' + text(id) + '">' + text(id) + '</a>'
     ).join(' ');
     const alternatives = decision.rejected.map(alt =>
       '<li><strong>' + text(alt.option) + '</strong><span class="muted">Not chosen: ' + text(alt.why) + '</span></li>'
@@ -123,7 +123,7 @@ function perspectiveTables(perspectives, findings, parts, reviewed, removedLabel
           icon + '<span>' + text(label) + '</span></a>';
       }).join('<br>');
       return row(['<strong>' + text(f.id) + '</strong>', links, text(f.text) +
-        (f.confirmed ? '' : ' ' + chip('Unconfirmed', 'guess')) + invalid(f), text(f.handled_by ?? 'Open')],
+        (f.confirmed ? '' : ' ' + chip('Unconfirmed', 'plain')) + invalid(f), text(f.handled_by ?? 'Open')],
         'data-finding="' + text(f.id) + '" data-perspective="' + text(p.id) + '"');
     });
     return '<h3>' + text(p.name) + '</h3>' + (rows.length ? table(headers, rows) : '<p class="muted">No findings.</p>');
@@ -211,7 +211,7 @@ function start(data) {
   const diagramControls = controls(applicable, review);
   section('containers', 'Containers', diagramControls + figures(data.containers, 'The containers are not drawn: see the errors above.'));
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
-    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'open') : '') +
+    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'error') : '') +
     (flow.removed ? ' ' + chip('Removed') : '') + '</h3>' +
     figures(flow.versions)).join(''));
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
@@ -384,7 +384,7 @@ function start(data) {
         $('.count', button)?.remove();
         if (count) button.insertAdjacentHTML('beforeend', '<span class="count">' + count + '</span>');
         const status = $('[data-section-status="' + key + '"]');
-        status.innerHTML = count ? chip(count + (count === 1 ? ' comment' : ' comments'), 'open') : chip('Draft');
+        status.innerHTML = count ? chip(count + (count === 1 ? ' comment' : ' comments'), 'error') : chip('Draft');
       }
       for (const event of log) {
         if (event.type !== 'confirm' || event.wording !== requirementWording.get(event.requirement)) continue;

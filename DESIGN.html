@@ -119,6 +119,42 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .tabs .count { flex:none; white-space:nowrap;
   font:var(--font-label); font-variant-numeric:tabular-nums; background:var(--umber); color:var(--cream); padding:1px var(--space-control); }
 .tabs .count.ok { background:var(--moss-dark); }
+/* A tab row with many tabs wraps onto more lines instead of scrolling. */
+.tabs--wrap { flex-wrap:wrap; overflow:visible; }
+
+/* A chip: a short state word in a box. The colour follows the meaning: moss-dark done, terracotta working, umber waiting
+   for the user, error blocked; a plain chip is anything else. The word always says it; a blocked chip also starts with the ⊘. */
+.chip { white-space:nowrap; display:inline-block; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase;
+  padding:var(--space-tight) var(--space-control); border:1px solid var(--sand); color:var(--ink); background:var(--linen); }
+.chip.ok { border-color:var(--moss-dark); color:var(--moss-dark); background:var(--cream); }
+.chip.error { border-color:var(--error); color:var(--error); background:var(--cream); }
+.chip.working { border-color:var(--terracotta); color:var(--terracotta-dark); background:var(--cream); }
+.chip.working::before { content:""; display:inline-block; width:10px; height:4px; margin-right:var(--space-control); vertical-align:middle;
+  background:var(--terracotta); animation:pulse-bar 1.2s ease-in-out infinite; }
+.chip.wait { border-color:var(--umber); color:var(--umber); background:var(--cream); }
+@media (prefers-reduced-motion: reduce) { .chip.working::before { animation:none; } }
+
+/* A table of records, its heads in the label style. */
+.tbl { border-collapse:collapse; width:100%; font-size:var(--text-message); }
+.tbl th, .tbl td { text-align:left; vertical-align:top; padding:var(--space-control) var(--space-item); border-bottom:1px solid var(--line); }
+.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+
+/* A decision the user is asked to make, on the page body. */
+.decide { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item); margin-bottom:var(--space-item); }
+.decide p { margin:0 0 var(--space-control); }
+
+/* One line under a section's title that says what the section is for. */
+.intro { font:var(--font-message); color:var(--ink); max-width:72ch; margin:0 0 var(--space-section); }
+
+/* An inline form that adds, changes or removes one record: labelled fields, one button. */
+.rec { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item) var(--space-section); margin:var(--space-control) 0 var(--space-section);
+  max-width:700px; display:grid; gap:var(--space-tight); }
+.rec label { font:var(--font-small-strong); margin-top:var(--space-control); }
+.rec textarea, .rec input, .rec select { font:var(--font-message); padding:var(--space-tight) var(--space-control); border:1px solid var(--ink); background:var(--white); }
+.rec textarea { min-height:4em; }
+.rec fieldset { border:0; padding:0; margin:var(--space-control) 0 0; display:grid; gap:var(--space-tight); }
+.rec fieldset label { font:var(--font-message); margin:0; }
+.rec .btn { justify-self:start; }
 
 .scroll-setting { display:grid; gap:var(--space-tight); }
 .scroll-setting[hidden] { display:none; }
@@ -340,7 +376,7 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
 .ref .row { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; margin:0 0 8px; }
 .swatches { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(15rem, 1fr)); gap:12px; }
 .swatches li { border:1px solid var(--line); background:var(--cream); }
-.swatches .chip { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:var(--space-control); padding:0 var(--space-item); font:var(--font-body-strong); }
+.swatches .swatch { height:56px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:var(--space-control); padding:0 var(--space-item); font:var(--font-body-strong); }
 .swatches .info { padding:8px 12px 10px; font-size:13px; line-height:1.4; }
 .swatches code { font:var(--font-code); }
 .swatches b { color:var(--heading); }
@@ -483,6 +519,36 @@ main.ref { min-height:0; overflow:auto; padding:0 20px 48px; }
       <button type="button" role="tab" aria-selected="false">Requirements <span class="count ok">✓</span></button>
       <button type="button" role="tab" aria-selected="false">Flows <span class="count">1</span></button>
     </div>
+
+    <h3>Tabs that wrap</h3>
+    <div class="tabs tabs--wrap" role="tablist" aria-label="Many sections">
+      <button type="button" role="tab" aria-selected="true">Moves <span class="count">2</span></button>
+      <button type="button" role="tab" aria-selected="false">Problems <span class="count">3</span></button>
+      <button type="button" role="tab" aria-selected="false">Opportunities</button>
+      <button type="button" role="tab" aria-selected="false">Decisions</button>
+      <button type="button" role="tab" aria-selected="false">Evidence</button>
+    </div>
+
+    <h3>Chips</h3>
+    <div class="row">
+      <span class="chip ok">Supported</span>
+      <span class="chip error">⊘ Contradicted</span>
+      <span class="chip working">Checking</span>
+      <span class="chip wait">Waiting for you</span>
+      <span class="chip plain">Unverified</span>
+    </div>
+
+    <h3>Table, section intro, decision panel and inline record form</h3>
+    <p class="intro">What each record says, and where it stands.</p>
+    <table class="tbl">
+      <thead><tr><th>Record</th><th>State</th></tr></thead>
+      <tbody><tr><td>Customers export weekly</td><td><span class="chip ok">Supported</span></td></tr></tbody>
+    </table>
+    <div class="decide"><p>Keep this problem, or drop it?</p><button type="button" class="btn btn--quiet btn--sm">Keep</button></div>
+    <form class="rec" aria-label="Add a problem">
+      <label for="rec-text">Problem</label><textarea id="rec-text"></textarea>
+      <button type="button" class="btn">Add</button>
+    </form>
 
     <h3>Buttons and segmented controls</h3>
     <div class="row">
@@ -1555,7 +1621,7 @@ function lum(hex) {
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => p - q); return ((y + .05) / (x + .05)).toFixed(1); };
 document.getElementById("swatches").replaceChildren(...COLOURS.map(([name, role, on]) => {
   const li = document.createElement("li"), bg = v(name);
-  const chip = document.createElement("div"); chip.className = "chip"; chip.style.background = bg;
+  const chip = document.createElement("div"); chip.className = "swatch"; chip.style.background = bg;
   on.forEach(fg => { const s = document.createElement("span"); s.style.color = v(fg); s.textContent = "Aa"; s.title = `--${fg} on --${name}, ${ratio(v(fg), bg)}:1`; chip.append(s); });
   const info = document.createElement("div"); info.className = "info";
   info.innerHTML = `<b>--${name}</b> <code>${bg}</code><div class="role"></div>`;

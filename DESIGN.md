@@ -11,9 +11,9 @@ better-ai's pages share one look: the live pages the skills serve (boards) and t
 
 | What | File | Rule |
 |---|---|---|
-| Tokens and shared components | `skills/*/scripts/page.css` | Identical in every skill that serves a board. Change it in one skill, then copy it to the others: the Scripts workflow fails if the copies differ. |
-| The conversation column | `skills/*/scripts/page.js`, `page.py` | Identical copies, as page.css. |
-| What only one board shows | `board.css`, `dashboard.html`, `canvas.css`, `show.css`, `architect.css` | Uses only the tokens and components below. |
+| Tokens and shared components | `src/better_ai/page/page.css` | The one copy. Every board's page loads it, and no board restyles what it defines. |
+| The conversation column | `src/better_ai/page/page.js`, `shell.html` | The one copy, as page.css. |
+| What only one board shows | `src/better_ai/*/` (`board.css`, `dashboard.css`, `canvas.css`, `show.css`, `page.css` in architect) | Uses only the tokens and components below. |
 | This document | `DESIGN.md`, `DESIGN.html` | The names here are the names in page.css. DESIGN.html holds copies of page.css and page.js, so it works as a single file: after changing either, paste it again into DESIGN.html (the test says which). |
 
 `tests/test_design.py` fails when a page uses a colour that is not in the colour table below, a raw px value for a space or a type size, a `font` shorthand that is not a `--font-*` token, or when this document and page.css disagree.
@@ -222,7 +222,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ### Tabs and segmented controls
 
-- Tabs (`.tabs`, `role="tab"`): switch between sections of one page; the selected tab has a terracotta underline; a count badge in umber, or moss-dark when done.
+- Tabs (`.tabs`, `role="tab"`): switch between sections of one page; the selected tab has a terracotta underline; a count badge in umber, or moss-dark when done. `.tabs--wrap` on the row lets a page with many tabs wrap them onto more lines instead of scrolling the row.
 - Segmented control (`.seg`, `.seg--light` on cream): one of a few options, the chosen one filled, `aria-pressed`.
 
 ### Buttons
@@ -235,6 +235,46 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 | `.mini` | a small square action, such as a thumbs up |
 
 - Labels are uppercase `--font-small-strong` (`--font-label` on a small button). Square corners. A button names its action.
+
+### Chip
+
+- Use for: a short state word on an item, in a table or a header, such as "Supported" or "Waiting for you" (`.chip`).
+- Markup: `<span class="chip ok">Supported</span>`. The modifier carries the meaning, and the word always says it too:
+
+| Class | Meaning | Look |
+|---|---|---|
+| `.ok` | done, confirmed | moss-dark border and word |
+| `.error` | blocked, contradicted | error border and word; the word starts with ⊘ |
+| `.working` | being worked on | terracotta border, terracotta-dark word, a pulsing bar |
+| `.wait` | waiting for the user | umber border and word |
+| `.plain` (or none) | anything else | sand border, ink on linen |
+
+- The word is in the label style, uppercase, one or two words. Do not recolour a chip or add a modifier for a new meaning: use the nearest one and change the word.
+- Name and role: text only, no role. A chip that is a link is an `a.chip`.
+
+### Table
+
+- Use for: records with the same fields, one per row (`.tbl`); its heads are in the label style and muted, its rows are separated by hairlines.
+- Markup: `<table class="tbl"><thead><tr><th>…` with `th` heads and `td` cells.
+- Name and role: a real `table` with `th` heads. A page-specific highlight, such as an outline on a row, belongs to that page's file.
+
+### Decision panel
+
+- Use for: a decision the user is asked to make on the page body, next to the figure or table it is about (`.decide`): a cream box with a sand border, a short paragraph, then the options.
+- Markup: `<div class="decide"><p>…</p>` and its buttons.
+- Name and role: a `div` in the page's flow; its buttons name their options. The conversation's own decisions use "Decision in the conversation".
+
+### Section intro
+
+- Use for: one line under a section's title that says what the section is for (`.intro`), in `--font-message`, up to 72 characters wide. One sentence, not a paragraph.
+- Markup: `<p class="intro">…</p>`.
+- Name and role: a plain paragraph.
+
+### Inline record form
+
+- Use for: adding, changing or removing one record in place (`.rec`): a cream box with a sand border, a label above each field, and one button under the last.
+- Markup: `<form class="rec">` with a `label` and its `input`, `textarea` or `select` for each field, a `fieldset` with a `legend` for a group of radio buttons or checkboxes, and one `.btn`.
+- Name and role: a `form` with a name (its heading, or `aria-label`); every field has its `label`.
 
 ### Conversation
 

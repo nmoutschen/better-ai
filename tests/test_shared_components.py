@@ -16,10 +16,9 @@ DESIGN = (ROOT / "DESIGN.md").read_text(encoding="utf-8")
 
 def rule(css: str, selector: str) -> str:
     """The declarations of the rule whose selector list is exactly `selector`, or '' when there is none."""
-    for match in re.finditer(r"(?m)^([^{}/@\n][^{}]*?)\s*\{([^}]*)\}", css):
-        if [s.strip() for s in match.group(1).split(",")] == [selector] or selector in [
-            s.strip() for s in match.group(1).split(",")
-        ]:
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    for match in re.finditer(r"(?m)^([^{}@\n][^{}]*?)\s*\{([^}]*)\}", css):
+        if selector in [s.strip() for s in match.group(1).split(",")]:
             return match.group(2)
     return ""
 
@@ -73,8 +72,21 @@ class SharedComponents(unittest.TestCase):
 
     def test_research_state_names_map_to_the_shared_chip(self):
         script = (SRC / "research" / "board.js").read_text(encoding="utf-8")
-        states = dict(re.findall(r'"([a-z ]+)": \["[a-z ]+", "([a-z]+)"\]', script.split("const STATE", 1)[1].split("};", 1)[0]))
-        self.assertEqual(states, {"answered": "ok", "in progress": "wait", "open": "plain", "proposed": "plain"})
+        states = dict(
+            re.findall(r'"([a-z ]+)": \["[a-z ]+", "([a-z]+)"\]', script.split("const STATE", 1)[1].split("};", 1)[0])
+        )
+        self.assertEqual(
+            states,
+            {
+                "answered": "ok",
+                "in progress": "wait",
+                "open": "plain",
+                "proposed": "plain",
+                "contested": "error",
+                "not found": "error",
+                "unclear": "error",
+            },
+        )
         self.assertNotRegex(script, r'class="chip (now|todo|bad)')
 
     def test_architect_guess_and_open_become_plain_and_error(self):
