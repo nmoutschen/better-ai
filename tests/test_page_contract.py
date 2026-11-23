@@ -159,9 +159,9 @@ def serve(root: Path, folder: Path, skill: str) -> subprocess.Popen:
     return process
 
 
-def rpc(url: str, method: str, params: dict) -> dict:
+def rpc(url: str, method: str, params: dict, token: str) -> dict:
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
+    headers = {"Content-Type": "application/json", "Origin": url.rstrip("/"), "X-Page-Token": token}
     with urllib.request.urlopen(urllib.request.Request(url + "rpc", body, headers), timeout=10) as response:
         return json.loads(response.read())
 
@@ -180,9 +180,10 @@ class PageContract(unittest.TestCase):
                 self.addCleanup(process.stdout.close)
                 self.addCleanup(process.kill)
                 url = (folder / ".server").read_text().strip()
+                token = (folder / ".server-token").read_text().strip()
                 kept = [m for m in samples if m not in UNSAVED.get(skill, ())]
                 for method, params in samples.items():
-                    answer = rpc(url, method, params)
+                    answer = rpc(url, method, params, token)
                     if method in kept:
                         self.assertEqual(answer.get("result"), "saved", f"{method}: {answer}")
                     else:
@@ -194,7 +195,7 @@ class PageContract(unittest.TestCase):
                 self.assertEqual([e["type"] for e in events], kept)
                 self.assertEqual({e["by"] for e in events}, {"user"})
                 saved = log.read_text()
-                refused = rpc(url, "note", {**NOTE, "by": "agent"})
+                refused = rpc(url, "note", {**NOTE, "by": "agent"}, token)
                 self.assertEqual(refused["error"]["code"], -32602)
                 self.assertIn("by", refused["error"]["message"])
                 self.assertEqual(log.read_text(), saved)
@@ -210,6 +211,7 @@ class PageContract(unittest.TestCase):
                 process.send_signal(signal.SIGTERM)
                 process.communicate(timeout=20)
                 self.assertFalse((folder / ".server").exists())
+                self.assertFalse((folder / ".server-token").exists())
 
 
 if __name__ == "__main__":

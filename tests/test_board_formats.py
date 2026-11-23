@@ -1046,11 +1046,14 @@ class Verbs(unittest.TestCase):
             if (board_dir / ".server").exists():
                 break
             time.sleep(0.1)
+        self.token = (board_dir / ".server-token").read_text().strip()  # what `serve` leaves for the page's requests
         return process, (board_dir / ".server").read_text().strip()
 
     def get(self, url: str):
         try:
-            with urllib.request.urlopen(url, timeout=5) as r:
+            with urllib.request.urlopen(
+                urllib.request.Request(url, headers={"X-Page-Token": self.token}), timeout=5
+            ) as r:
                 return r.status, r.read().decode()
         except urllib.error.HTTPError as error:
             error.close()
@@ -1060,7 +1063,10 @@ class Verbs(unittest.TestCase):
         body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
         origin = url.rstrip("/")
         request = urllib.request.Request(
-            url + "rpc", body, {"Content-Type": "application/json", "Origin": origin}, method="POST"
+            url + "rpc",
+            body,
+            {"Content-Type": "application/json", "Origin": origin, "X-Page-Token": self.token},
+            method="POST",
         )
         with urllib.request.urlopen(request, timeout=5) as r:
             return json.loads(r.read())

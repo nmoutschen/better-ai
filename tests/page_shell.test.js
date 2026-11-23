@@ -197,7 +197,7 @@ test('a page without actions shows the decision without buttons', () => {
 
 // ---- the strips, on every served page
 
-function stripsOn(extra, fetchAnswer, ids = {}) {
+function stripsOn(extra, fetchAnswer, ids = {}, more = {}) {
   const el = (more) => Object.assign({
     value: '', textContent: '', className: '', hidden: false, dataset: {}, style: {},
     classList: { toggle() {}, add() {}, remove() {} }, addEventListener() {}, querySelector() { return el(); },
@@ -208,14 +208,15 @@ function stripsOn(extra, fetchAnswer, ids = {}) {
   const timers = [];
   const globals = {
     document: { querySelector: s => els[s] || el(), querySelectorAll: () => [], getElementById: id => ids[id] || null, contains: () => true },
-    Date, JSON, Object, Math, String, Array, isNaN, fetch: url => fetchAnswer(url),
-    setTimeout: f => timers.push(f), clearTimeout() {}, requestAnimationFrame: f => f(),
+    Date, JSON, Object, Math, String, Array, isNaN, fetch: (url, init) => fetchAnswer(url, init),
+    setTimeout: f => timers.push(f), clearTimeout() {}, requestAnimationFrame: f => f(), ...more,
   };
   const context = loadPage(globals);
-  context.pageConversation(Object.assign({ served: true, thread: els['.thread'] }, extra)).start();
+  const conversation = context.pageConversation(Object.assign({ served: true, thread: els['.thread'] }, extra));
+  conversation.start();
   const flush = () => new Promise(resolve => setImmediate(resolve));
   const round = async () => { await flush(); await flush(); const due = timers.splice(0); due.forEach(f => f()); await flush(); await flush(); };
-  return { els, round, flush: async () => { await flush(); await flush(); await flush(); } };
+  return { els, round, conversation, context, flush: async () => { await flush(); await flush(); await flush(); } };
 }
 
 test('a page that does not stream shows the not-watching strip when /listening says false', async () => {
@@ -400,4 +401,75 @@ test('a later redraw does not take the focus from where the user went', async ()
   await Promise.resolve(); await Promise.resolve();
   assert.equal(Node.focused, composer);
   load.thread = null;
+// ---- the page token
+
+const fragment = (hash, stored) => {
+  const kept = { ...(stored ? { pageToken: stored } : {}) }, replaced = [];
+  return { kept, replaced, globals: {
+    location: { hash, pathname: '/', search: '' },
+    history: { replaceState: (...args) => replaced.push(args[2]) },
+    sessionStorage: { getItem: k => kept[k] ?? null, setItem: (k, v) => { kept[k] = v; } },
+  } };
+};
+const answerWith = value => Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(value) });
+const answer = status => Promise.resolve({ status, ok: status < 400, json: () => Promise.resolve({ total: 0, events: [] }), text: () => Promise.resolve('0') });
+
+test('every request to the server carries the token the opened address gave in its fragment, and the fragment goes', async () => {
+  const seen = [], where = fragment('#t=abc_DEF-123');
+  const page = stripsOn({}, (url, init) => { seen.push({ url, init }); return url.startsWith('/events') ? new Promise(() => {}) : answer(200); }, {}, where.globals);
+  await page.flush();
+  const asked = seen.filter(r => r.url === '/data' || r.url.startsWith('/events'));
+  assert.ok(asked.length > 0);
+  for (const r of asked) assert.equal(r.init.headers['X-Page-Token'], 'abc_DEF-123', r.url);
+  assert.deepEqual(where.replaced, ['/']);  // the token is not left in the address bar
+  assert.equal(where.kept.pageToken, 'abc_DEF-123');  // a reload of the page keeps it
+  await page.context.pageFetch('/data');
+  assert.equal(seen.at(-1).init.headers['X-Page-Token'], 'abc_DEF-123');
+});
+
+test('a reloaded page, with no fragment left, sends the token it kept', async () => {
+  const seen = [], where = fragment('', 'kept-token');
+  const page = stripsOn({}, (url, init) => { seen.push(init); return url.startsWith('/events') ? new Promise(() => {}) : answer(200); }, {}, where.globals);
+  await page.context.pageFetch('/data');
+  assert.equal(seen.at(-1).headers['X-Page-Token'], 'kept-token');
+  assert.deepEqual(where.replaced, []);
+});
+
+test('a message the page sends goes with the token, and a refusal as out of date is shown and keeps the typed text', async () => {
+  const sent = [], where = fragment('#t=tok');
+  let finished = false, failed = false;
+  const page = stripsOn({}, (url, init) => {
+    sent.push({ url, init });
+    if (url === '/rpc') return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ error: { code: -32001, message: 'page out of date: reload' } }) });
+    return url.startsWith('/events') ? new Promise(() => {}) : answer(200);
+  }, {}, where.globals);
+  page.conversation.send('note', { id: 'm1', text: 'my long answer', to: null }, 'Reply', () => { finished = true; }, () => { failed = true; });
+  await page.flush();
+  assert.equal(sent.find(r => r.url === '/rpc').init.headers['X-Page-Token'], 'tok');
+  assert.equal(finished, false);  // done is what clears the typed text: it is not called
+  assert.equal(failed, true);
+  assert.equal(page.els['.toast'].textContent, 'Not sent: reply. page out of date: reload');
+  assert.equal(page.els['.notes .status'].textContent, 'Not sent: page out of date: reload');
+});
+
+test('a read the server answers as out of date shows that on the page, and the stream does not retry', async () => {
+  let events = 0;
+  const where = fragment('#t=old');
+  const page = stripsOn({}, url => {
+    if (url.startsWith('/events')) { events++; return events > 20 ? new Promise(() => {}) : answer(401); }
+    return answer(200);
+  }, {}, where.globals);
+  await page.round(); await page.round();
+  assert.equal(events, 1);
+  assert.equal(page.els['.offline'].hidden, false);
+  assert.equal(page.els['.offline'].textContent, 'page out of date: reload');
+});
+
+test('a page that does not stream stays out of date once any request was refused, whatever /listening says later', async () => {
+  const where = fragment('#t=old');
+  const page = stripsOn({ stream: false }, url => url === '/listening' ? answerWith(true) : answer(401), {}, where.globals);
+  await page.context.pageFetch('/data').catch(() => {});
+  await page.round(); await page.round();
+  assert.equal(page.els['.offline'].hidden, false);
+  assert.equal(page.els['.offline'].textContent, 'page out of date: reload');
 });

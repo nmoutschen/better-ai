@@ -553,7 +553,7 @@ async function loadDesign() {
   let data = embeddedData();
   if (!data) {
     try {
-      const response = await fetch('/data');
+      const response = await pageFetch('/data');
       if (!response.ok) throw new Error(await response.text());
       data = await response.json();
     } catch (error) {

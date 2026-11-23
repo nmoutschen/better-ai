@@ -390,7 +390,7 @@ const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))
 // ---------- Polling ----------
 let fails = 0;
 function tick() {
-  return fetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  return pageFetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(d => { fails = 0; CLOSED_PAGE = false; pageShowErrors($("errors"), d.errors, ERRORS_NOTE); render(d); },
       () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
 }

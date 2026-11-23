@@ -113,6 +113,7 @@ class Fixture(unittest.TestCase):
             target.start()
             self.addCleanup(target.stop)
         self.opened = page.webbrowser.open
+        self.tokens = {}
 
     # --- helpers
 
@@ -135,12 +136,16 @@ class Fixture(unittest.TestCase):
         self.addCleanup(server.shutdown)
         self.conv = conv
         host = f"127.0.0.1:{server.server_address[1]}"
-        paths.write_state(unit, ".server", f"http://{host}/".encode())
+        page.publish(unit, server)  # the address and the token, as `serve` leaves them
+        self.tokens[host] = server.token
         return server, host
+
+    def with_token(self, host, headers):
+        return {**headers, "X-Page-Token": self.tokens[host]} if host in self.tokens else headers
 
     def get(self, host, path, with_type=False):
         connection = http.client.HTTPConnection(host, timeout=10)
-        connection.request("GET", path, headers={"Host": host})
+        connection.request("GET", path, headers=self.with_token(host, {"Host": host}))
         response = connection.getresponse()
         body = response.read()
         return (
@@ -153,7 +158,7 @@ class Fixture(unittest.TestCase):
         if origin:
             headers["Origin"] = f"http://{host}"
         body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-        connection.request("POST", "/rpc", body, headers)
+        connection.request("POST", "/rpc", body, self.with_token(host, headers))
         return json.loads(connection.getresponse().read())
 
     def log(self):
@@ -705,7 +710,8 @@ class ServeTest(Fixture):
         self.get(url.removeprefix("http://").rstrip("/"), "/")
         thread.join(15)
         self.opened.assert_called_once()
-        self.assertEqual(self.opened.call_args.args[0], url)
+        self.assertRegex(self.opened.call_args.args[0], "^" + url + r"#t=[\w-]{32,}$")
+        self.assertFalse((self.unit_dir / ".server-token").exists())  # gone with the server
 
     def test_a_port_in_use_is_a_refusal_in_one_line_not_a_bug(self):
         """S29, S30: an address that is taken is not an internal error, as it was not for the scripts before."""

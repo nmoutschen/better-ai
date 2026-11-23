@@ -127,6 +127,7 @@ class Unit(unittest.TestCase):
             "conversation.jsonl": "one of the live page's own files",
             "Conversation.JSONL": "one of the live page's own files",
             ".server": "one of the live page's own files",
+            ".server-token": "one of the live page's own files",
             ".Conversation-Seen": "one of the live page's own files",
         }
         for name, reason in names.items():
@@ -235,7 +236,7 @@ class Script(unittest.TestCase):
 
 
 def serve(root: Path) -> tuple:
-    """A `serve` process on the unit .design/pay of `root`, and its address."""
+    """A `serve` process on the unit .design/pay of `root`, its address and its page token."""
     env = {**os.environ, "BETTER_AI_SKILL": SKILL, "PYTHONUNBUFFERED": "1"}
     server = subprocess.Popen(
         better.command("serve", ".design/pay", "--no-browser", "--linger", "0.2"),
@@ -245,7 +246,8 @@ def serve(root: Path) -> tuple:
         stderr=subprocess.DEVNULL,
         text=True,
     )
-    return server, re.search(r"http://\S+/", server.stdout.readline()).group(0)  # printed as it happens, on a pipe too
+    line = server.stdout.readline()  # printed as it happens, on a pipe too
+    return server, re.search(r"http://\S+/", line).group(0), re.search(r"#t=([\w-]+)", line).group(1)
 
 
 def stop(server):
@@ -266,7 +268,7 @@ class Served(unittest.TestCase):
         done = run(cls.root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(HEAD))
         assert done.returncode == 0, done.stderr
         cls.files = {p.name: p.read_bytes() for p in cls.folder.iterdir()}
-        cls.server, cls.url = serve(cls.root)
+        cls.server, cls.url, cls.token = serve(cls.root)
 
     @classmethod
     def tearDownClass(cls):
@@ -280,14 +282,17 @@ class Served(unittest.TestCase):
         for name, data in self.files.items():
             (self.folder / name).write_bytes(data)
         (self.folder / ".server").write_text(self.url)
+        (self.folder / ".server-token").write_text(self.token)
 
     def get(self, path):
-        with urllib.request.urlopen(self.url + path, timeout=10) as r:
+        with urllib.request.urlopen(
+            urllib.request.Request(self.url + path, headers={"X-Page-Token": self.token}), timeout=10
+        ) as r:
             return r.read().decode()
 
     def send(self, method, params):
         body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-        headers = {"Content-Type": "application/json", "Origin": self.url.rstrip("/")}
+        headers = {"Content-Type": "application/json", "Origin": self.url.rstrip("/"), "X-Page-Token": self.token}
         request = urllib.request.Request(self.url + "rpc", data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(request, timeout=10) as r:
             return json.loads(r.read())

@@ -332,7 +332,7 @@
     if (data.style) { var st = el('style'); st.textContent = data.style; document.head.append(st); }
     stage.innerHTML = data.slides;
   }
-  fetch('/data').then(function (r) { return r.json(); }).then(function (data) {
+  pageFetch('/data').then(function (r) { return r.json(); }).then(function (data) {
     if (data.errors) {
       // A spec that fails its checks has no slides; the page still carries the conversation, so the user can say so.
       var box = el('div', 'bad'); box.append(el('p', '', 'The spec has errors. The agent fixes them; this page then loads the slides.'));
