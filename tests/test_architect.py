@@ -317,6 +317,21 @@ class Architect(unittest.TestCase):
             [req["id"] for req in view["requirements"]],
             ["F1", "F2", "F3", "F4", "F8", "F10", "Q1", "Q2", "Q3", "C1", "C2", "C11"],
         )
+        # A record whose id is not valid goes after the valid ones, whatever its kind.
+        self.update("requirements.jsonl", lambda reqs: reqs.insert(0, {**reqs[0], "id": "F-1"}))
+        view = model.model(self.read())
+        self.assertEqual(view["requirements"][-1]["id"], "(line 1)")
+        self.assertEqual(view["requirements"][0]["id"], "F1")
+
+    def test_a_flow_the_change_removes_is_drawn_in_both_states_and_marked_removed(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        design["flows"][0]["in"] = ["before"]
+        path.write_text(json.dumps(design))
+        flow = model.model(self.read())["flows"][0]
+        self.assertEqual((flow["new"], flow["removed"]), (False, True))
+        self.assertTrue(flow["versions"]["before"])
+        self.assertIn("REMOVED", flow["versions"]["after"])
 
     def test_a_requirement_source_is_shown_as_words_and_no_link_to_an_endpoint(self):
         view = model.model(self.read())

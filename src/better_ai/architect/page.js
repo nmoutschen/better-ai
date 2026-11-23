@@ -75,11 +75,9 @@ function controls(perspectives, review) {
     (review ? segment('Findings', 'findings', [['', 'No findings'], ...perspectives.map(p => [p.id, p.name])]) : '') + '</div>';
 }
 
-const missingFlow = {before: 'This flow does not exist before the change.', after: 'The change removes this flow.'};
-
-function figures(versions, empty) {
+function figures(versions, empty = 'This flow does not exist before the change.') {
   return Object.entries(versions).map(([state, svg]) => '<div class="fig" data-state="' + state + '" hidden>' +
-    (svg || '<p class="muted">' + text(empty ?? missingFlow[state]) + '</p>') + '</div>').join('');
+    (svg || '<p class="muted">' + text(empty) + '</p>') + '</div>').join('');
 }
 
 function specSource(source) {
@@ -223,7 +221,8 @@ function start(data) {
   const diagramControls = controls(applicable, review);
   section('containers', 'Containers', diagramControls + figures(data.containers, 'The containers are not drawn: see the errors above.'));
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
-    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'open') : '') + '</h3>' +
+    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'open') : '') +
+    (flow.removed ? ' ' + chip('Removed') : '') + '</h3>' +
     figures(flow.versions)).join(''));
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
   section('decisions', 'Decision records', decisionRecords(data.decisions));

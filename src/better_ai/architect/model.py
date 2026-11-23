@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .. import paths, resources, schema
 from ..paths import Unit
-from . import diagram
+from . import checks, diagram
 
 FILES = (
     "architect.json",
@@ -239,13 +239,9 @@ def document_path(unit: Unit, architect: dict) -> Path | None:
     name = document.get("file") if isinstance(document, dict) else None
     if not isinstance(name, str) or not name:
         return None
-    relative = Path(name)
-    if relative.is_absolute() or {"..", ".git"} & set(relative.parts):
-        return None
     root = next((folder for folder in (unit.path, *unit.path.parents) if (folder / ".git").exists()), unit.path)
-    root = root.resolve()
-    target = (root / relative).resolve()
-    return target if target.is_relative_to(root) and target.is_file() else None
+    target, problem = checks.repo_file(root, name)
+    return None if problem else target
 
 
 def text_hashes(unit: Unit, architect: dict, requirements: list, reader: Reader) -> dict[str, str]:
@@ -351,6 +347,7 @@ def render_diagrams(design, marks):
             {
                 "name": flow["name"],
                 "new": flow.get("in") == ["after"],
+                "removed": flow.get("in") == ["before"],
                 "versions": {
                     s: diagram.svg_flow(flow, s, layout, f"flow{i}") if diagram.visible(flow, s) else ""
                     for s in diagram.STATES
@@ -386,9 +383,10 @@ def requirement_order(requirement):
     """Where a requirement sits on the page: by kind, then by the number in its ID (F2 before F10), whatever the order of
     the lines; a record whose kind or ID is not valid goes after the valid ones, in line order."""
     kind, ident = requirement["kind"], requirement.get("id", "")
-    rank = REQUIREMENT_KINDS.index(kind) if kind in REQUIREMENT_KINDS else len(REQUIREMENT_KINDS)
-    number = re.fullmatch(r"[A-Z]+([0-9]+)", ident)
-    return rank, int(number[1]) if number else float("inf")
+    number = re.fullmatch(r"[A-Z]+([0-9]+)", ident) if isinstance(ident, str) else None
+    if kind not in REQUIREMENT_KINDS or number is None:
+        return len(REQUIREMENT_KINDS), float("inf")
+    return REQUIREMENT_KINDS.index(kind), int(number[1])
 
 
 def model(data):

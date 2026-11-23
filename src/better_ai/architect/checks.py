@@ -220,14 +220,21 @@ def _source_file_exists(record: dict, context: Context) -> list[tuple[str, str]]
     path = record.get("file") if isinstance(record, dict) else None
     if not isinstance(path, str) or not path:
         return []
+    _, problem = repo_file(context.repo_root() or context.directory, path)
+    return [("file", problem)] if problem else []
+
+
+def repo_file(root: Path, path: str) -> tuple[Path | None, str | None]:
+    """The file `path` names in the repository at `root`, or why it names none: an absolute path, one through `..` or
+    .git, or one that leaves the repository or is not a file."""
     name = Path(path)
     if name.is_absolute() or {"..", ".git"} & set(name.parts):
-        return [("file", f"invalid source path {path!r}")]
-    root = (context.repo_root() or context.directory).resolve()
+        return None, f"invalid source path {path!r}"
+    root = root.resolve()
     target = (root / name).resolve()
     if not (target.is_relative_to(root) and target.is_file()):
-        return [("file", f"missing or out-of-scope source {path!r}")]
-    return []
+        return None, f"missing or out-of-scope source {path!r}"
+    return target, None
 
 
 @hook("design-flow-ids")
