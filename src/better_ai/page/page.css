@@ -139,6 +139,23 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 /* One line under a section's title that says what the section is for. */
 .intro { font:var(--font-message); color:var(--ink); max-width:72ch; margin:0 0 var(--space-section); }
 
+/* The agents at work (pageAgents in page.js), at the top of the side column: a run can have twenty, and a list there
+   scrolls on its own (at most 30% of the height) without taking room from the view. */
+.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-bottom:1px solid var(--line); padding:0 var(--space-edge) var(--space-item); margin-bottom:var(--space-section); }
+.agentsec h2 { margin:0 0 var(--space-control); }
+.agents { list-style:none; margin:0; padding:0; }
+.agents button, .agents li > div { display:block; width:100%; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
+  padding:var(--space-tight) var(--space-control); margin:0 0 var(--space-control); font:var(--font-message); color:var(--ink); }
+.agents button { cursor:pointer; }
+.agents .verifier { border-color:var(--moss-dark); }
+.agents button:hover span[dir] { text-decoration:underline; }
+.agents .chip { margin-left:var(--space-control); }
+.agents em { display:block; font-style:normal; font-size:var(--text-small); }
+.agents .dry { color:var(--error); }
+.agents .second { color:var(--muted); }
+.agents .muted { color:var(--muted); }
+.agents b { font-size:var(--text-small); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--space-control); }
+
 /* An inline form that adds, changes or removes one record: labelled fields, one button. */
 .rec { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item) var(--space-section); margin:var(--space-control) 0 var(--space-section);
   max-width:700px; display:grid; gap:var(--space-tight); }

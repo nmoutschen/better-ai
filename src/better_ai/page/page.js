@@ -860,6 +860,37 @@ function pageShowErrors(el, errors, note) {
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 
+// The agents at work, as the list items of `<ul class="agents" id="agents">`: one row for each agent in ROWS, from any
+// board; the page reads no log, the board says what each agent does. A row is
+//   who      the agent's name            what    what it works on
+//   state    the word of its chip, "Working" when none     since   when the work began: the chip adds its age
+//   last     when the agent last wrote a record: from 30 minutes on, the row says there was no word from it
+//   second   true for a second try      note    one more line for the row, in the error colour
+//   data     data attributes (name to value): the row is then a button that carries them
+//   kind     "verifier" for an agent that checks what others wrote: its edge is moss, not terracotta
+// A time is an ISO string or a number of milliseconds. O.now is the page's clock in seconds (the server's), O.empty the
+// line when there are no rows.
+function pageAgents(rows, o) {
+  var now = o.now * 1000;
+  // The whole minutes since AT, or null when AT or the clock is not a time: the row then leaves that part out.
+  function minutes(at) {
+    var n = Math.floor((now - (typeof at === 'number' ? at : Date.parse(at))) / 60000);
+    return isFinite(n) ? Math.max(0, n) : null;
+  }
+  if (!rows.length) return '<li class="muted">' + pageEscape(o.empty) + '</li>';
+  return rows.map(function (r) {
+    var attrs = Object.keys(r.data || {}).map(function (k) { return ' data-' + pageEscape(k) + '="' + pageEscape(r.data[k]) + '"'; }).join('');
+    var tag = (r.data ? 'button type="button"' : 'div') + (r.kind ? ' class="' + pageEscape(r.kind) + '"' : '') + attrs;
+    var age = r.since != null ? minutes(r.since) : null, quiet = r.last != null ? minutes(r.last) : null;
+    return '<li><' + tag + '><b>' + pageEscape(r.who) + '</b><span dir="auto">' + pageEscape(r.what) + '</span>' +
+      (age !== null ? '<span class="chip working">' + pageEscape(r.state || 'Working') + ', ' + age + ' min</span>' : '') +
+      (r.second ? '<em class="second">second try</em>' : '') +
+      (quiet !== null && quiet >= 30 ? '<em class="dry">No word from ' + pageEscape(r.who) + ' for ' + quiet + ' min</em>' : '') +
+      (r.note ? '<em class="dry">' + pageEscape(r.note) + '</em>' : '') +
+      '</' + (r.data ? 'button' : 'div') + '></li>';
+  }).join('');
+}
+
 // The details pop-up (.qpop) of a page, one at a time, over the page: it opens with its title in focus, keeps Tab inside
 // and closes on Escape or on its ×; focus goes back to the element it opened from.
 //   o.fill()          writes the pop-up's content into it, and again whenever the page's data changes
