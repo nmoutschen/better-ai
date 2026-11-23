@@ -1,4 +1,4 @@
-.view h2 { font:var(--font-title); color:var(--heading); margin:0 0 var(--space-control); }
+.view h2:not(#errors-h) { font:var(--font-title); color:var(--heading); margin:0 0 var(--space-control); }
 .view h3 { font:var(--font-body-strong); color:var(--heading); margin:var(--space-edge) 0 var(--space-control); }
 .lead { color:var(--muted); margin:0 0 var(--space-section); max-width:70ch; }
 .tbl { border-collapse:collapse; width:100%; font-size:var(--text-message); }

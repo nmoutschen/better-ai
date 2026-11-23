@@ -226,6 +226,8 @@ def _source_file_exists(record: dict, context: Context) -> list[tuple[str, str]]
         read_repo_file(context.repo_root() or context.directory, path)
     except paths.Refused:
         return [("file", f"invalid source path {path!r}")]
+    except PermissionError:
+        return [("file", f"cannot read source {path!r}")]
     except OSError:
         return [("file", f"missing or out-of-scope source {path!r}")]
     return []

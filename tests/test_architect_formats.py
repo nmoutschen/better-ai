@@ -658,12 +658,15 @@ class MovedChecks(unittest.TestCase):
             "/etc/passwd": "invalid source path",
             ".git/config": "invalid source path",
             "docs": "missing or out-of-scope source",
+            "docs/locked.md": "cannot read source",
         }
         for path, message in cases.items():
             with self.subTest(path), tempfile.TemporaryDirectory() as d:
                 folder = make_folder(Path(d))
                 (Path(d) / "docs").mkdir(exist_ok=True)
                 (Path(d) / "docs" / "there.md").write_text("x\n")
+                (Path(d) / "docs" / "locked.md").write_text("x\n")
+                (Path(d) / "docs" / "locked.md").chmod(0)
                 requirements = read(folder, "requirements.jsonl")
                 requirements[0]["source"] = {"type": "file", "file": path, "symbol": "s"}
                 write(folder, "requirements.jsonl", requirements)
