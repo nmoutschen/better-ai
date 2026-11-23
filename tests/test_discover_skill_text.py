@@ -315,7 +315,7 @@ class Rules(unittest.TestCase):
         self.assertIn("files and connectors", flat(found[7][1]))
 
     def test_named_sources_and_computed_results(self):
-        """D21-D23: named, read-only sources; redact in any discovery; computed results re-run by the verifier."""
+        """D21-D22: named, read-only sources; redact in any discovery."""
         skill = flat(read(SKILL))
         analyst = flat(read(AGENTS["analyst"]))
         verifier = read(AGENTS["quote-verifier"])
@@ -332,7 +332,6 @@ class Rules(unittest.TestCase):
         self.assertIn("A connector the user named is not available to sub-agents", skill)
         self.assertIn("export the items to a file the analysts can read", skill)
         self.assertIn("the command or query and its result", analyst)
-        self.assertIn("RE-RUN the same command or query on the named source", flat(verifier))
         self.assertIn("the command or query and its result", records)
 
     def test_round_4_wording(self):
@@ -372,6 +371,29 @@ class Rules(unittest.TestCase):
             with self.subTest(word):
                 self.assertNotRegex(skill, word)
         self.assertGreaterEqual(skill.count("TREAT this as a guide, not a rule"), 2)
+
+    def test_a_computed_result_counts_once_the_user_confirms_it(self):
+        """D24: nothing runs a computed result again; the user confirms it."""
+        skill = flat(read(SKILL))
+        verifier = read(AGENTS["quote-verifier"])
+        analyst = flat(read(AGENTS["analyst"]))
+        records = flat(read(RECORDS))
+        self.assertIn('with the suggested default "Confirm this result"', skill)
+        self.assertIn("ONCE the user takes it, SET the evidence `counts`", skill)
+        self.assertNotRegex(verifier, r"(?i)re-?run")
+        self.assertIn("SKIP evidence whose words hold a command or query and its result", flat(verifier))
+        self.assertIn("one read-only command or query on a named source", analyst)
+        self.assertNotIn("runs it again", analyst + records)
+        self.assertIn("counts only once the user confirms it", records)
+        self.assertIn('"default": "Confirm this result"', records)
+
+    def test_named_sources_live_in_the_head(self):
+        skill = flat(read(SKILL))
+        self.assertIn('"named_sources": [', read(RECORDS))
+        self.assertIn("ADD them to the head's `named_sources`", skill)
+        self.assertIn("from the head's `named_sources`", flat(steps(read(SKILL))[3][1]))
+        self.assertIn("`named_sources`", flat(section(read(SKILL), "### Resume a discovery")))
+        self.assertIn("re-reads each quote's web page, file or connector item", flat(read(DOCS)))
 
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
@@ -450,7 +472,7 @@ class Agents(unittest.TestCase):
     def test_the_analyst_keeps_to_its_budget_and_its_records(self):
         text = flat(read(AGENTS["analyst"]))
         for phrase in (
-            "10 searches and page reads",
+            "10 searches and reads",
             "people's, customers' or internal project names",
             "keep no copy of a page",
             "EXISTING RECORDS",
