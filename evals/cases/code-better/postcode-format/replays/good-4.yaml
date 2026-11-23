@@ -2,6 +2,7 @@ reply: ''
 actions:
 - bash: git checkout -q -b prep
 - bash: cat address.py ship.py test_ship.py CONTRIBUTING.md missing.txt
+  fails: true
 - write: address.py
   content: |
     def postcode(raw):

@@ -24,7 +24,7 @@ from inspect_ai.model import ChatMessageAssistant
 from inspect_ai.tool import ToolCall
 from inspect_ai.util._sandbox.local import LocalSandboxEnvironment
 
-from skill_evals.agent import IGNORED_PATHS, READ_TOOL, SHELL_TOOL, START_SCRIPT, WRITE_TOOL
+from skill_evals.agent import IGNORED_PATHS, START_SCRIPT, action_call, play_action
 from skill_evals.cases import case_dirs, load_case, replays
 from skill_evals.grading.files import Checkout
 from skill_evals.grading.judge import NO_JUDGE
@@ -50,12 +50,7 @@ def replay_messages(actions: list[dict[str, Any]]) -> list[ChatMessageAssistant]
     """Turn a replay's writes, reads and commands into tool calls, as the agent's transcript would hold them."""
     messages = []
     for number, action in enumerate(actions):
-        if "write" in action:
-            name, arguments = WRITE_TOOL, {"file_path": action["write"], "content": action["content"]}
-        elif "read" in action:
-            name, arguments = READ_TOOL, {"file_path": action["read"]}
-        else:
-            name, arguments = SHELL_TOOL, {"command": action["bash"]}
+        name, arguments = action_call(action)
         call = ToolCall(id=f"replay-{number}", function=name, arguments=arguments)
         messages.append(ChatMessageAssistant(content="", tool_calls=[call]))
     return messages
@@ -67,15 +62,6 @@ def put_python_on_path() -> None:
     for name in ("python", "python3"):
         (directory / name).symlink_to(sys.executable)
     os.environ["PATH"] = f"{directory}{os.pathsep}{os.environ['PATH']}"
-
-
-async def play_actions(sandbox_env: LocalSandboxEnvironment, actions: list[dict[str, Any]]) -> None:
-    """Carry out a replay's writes and Bash commands; reads change nothing."""
-    for action in actions:
-        if "write" in action:
-            await sandbox_env.write_file(action["write"], action["content"])
-        elif "bash" in action:
-            await sandbox_env.exec(["bash", "-c", action["bash"]], timeout=60)
 
 
 def nested_commands(specs: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
@@ -98,10 +84,13 @@ def _nested_in(key: str, spec: dict[str, Any]) -> list[tuple[str, dict[str, Any]
     return found
 
 
-async def replay(case: dict[str, Any], run: dict[str, Any]) -> tuple[dict[str, float], list[str], dict[str, float]]:
-    """Plant the case, play the run, and return each deterministic grader's value, the notes, and the nested ones.
+async def replay(
+    case: dict[str, Any], run: dict[str, Any]
+) -> tuple[dict[str, float], list[str], dict[str, float], list[str]]:
+    """Plant the case, play the run, and return each grader's value, the notes, the nested values and bad commands.
 
-    The nested values are those of the command_passes graders inside any_of, by their scorer keys.
+    The nested values are those of the command_passes graders inside any_of, by their scorer keys; the bad commands
+    are the Bash commands that exited nonzero without `fails: true`.
     """
     sandbox_env = LocalSandboxEnvironment()
     try:
@@ -109,7 +98,11 @@ async def replay(case: dict[str, Any], run: dict[str, Any]) -> tuple[dict[str, f
             await sandbox_env.write_file(path, source.read_bytes())
         started = await sandbox_env.exec(["bash", "-ec", START_SCRIPT, "bash", *IGNORED_PATHS])
         repo = Checkout(sandbox_env, started.stdout.split()[-1], sandbox_env.directory.name)
-        await play_actions(sandbox_env, run.get("actions") or [])
+        unexpected = []
+        for action in run.get("actions") or []:
+            _, error = await play_action(sandbox_env, action)
+            if error and "bash" in action and not action.get("fails"):
+                unexpected.append(action["bash"])
         grading = ReplayGrading(repo, run.get("judge", True), run.get("actions") or [])
         values = {}
         for key, spec in zip(grader_keys(case["graders"]), case["graders"], strict=True):
@@ -117,7 +110,7 @@ async def replay(case: dict[str, Any], run: dict[str, Any]) -> tuple[dict[str, f
             if not math.isnan(value):
                 values[key] = value
         nested = {key: await grading.run(key, spec) for key, spec in nested_commands(case["graders"])}
-        return values, repo.notes, nested
+        return values, repo.notes, nested, unexpected
     finally:
         sandbox_env.directory.cleanup()
 
@@ -128,15 +121,17 @@ async def validate(directory: Path, verbose: bool) -> list[str]:
     checks = case.get("validation") or {}
     problems = []
     for name, run in replays(directory).items():
-        values, notes, _ = await replay(case, run)
+        values, notes, _, unexpected = await replay(case, run)
         failed = [key for key, value in values.items() if not value]
+        if name.startswith("good") and unexpected:
+            problems.append(f"{name} runs a command that exits nonzero without `fails: true`: {unexpected}")
         if name.startswith("good") and failed:
             problems.append(f"{name} fails {failed} {notes or ''}")
         elif name.startswith("bad") and not failed:
             problems.append(f"{name} passes every deterministic grader")
         elif name.startswith("bad") and verbose:
             print(f"    {name} fails {failed}")
-    values, _, nested = await replay(case, {"actions": [], "reply": ""})
+    values, _, nested, _ = await replay(case, {"actions": [], "reply": ""})
     if all(values.values()) and not checks.get("do_nothing_fails_only_by_judge"):
         problems.append("a do-nothing run passes every deterministic grader")
     allowed = set(checks.get("hidden_checks_pass_untouched") or [])

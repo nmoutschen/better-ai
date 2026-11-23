@@ -62,21 +62,8 @@ breaks a case shows up before any model run.
 
 ## Conditions
 
-- **no-skill:** the request as is.
-- **skill:** the skill installed and invoked with `/code-better`. This measures
-  what the skill does once loaded; whether it loads by itself is a separate
-  test.
-- **one-sentence:** the request plus one sentence from the rule's core
-  instruction. It names the rule the case tests, so its score is an upper bound
-  for that sentence, not a fair comparison with the skill. It is a diagnostic,
-  not a default condition: run it on the rules where the skill trails the
-  short skill, to tell whether the rule's wording or the rest of the skill is
-  at fault.
-- **short-skill:** a skill with the same name and frontmatter whose body is
-  every sentence of `one_sentence.yaml`, installed and invoked like the skill.
-  This separates the skill's length from its content.
-
-A default run uses no-skill, skill and short-skill.
+The conditions, what each measures and which a run uses by default are in the
+README, section "Running".
 
 ## Development and held-out sets
 

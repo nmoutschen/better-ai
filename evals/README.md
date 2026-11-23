@@ -284,8 +284,8 @@ score.
 
 A third scorer, `skill_loaded` (`grading/loaded.py`), scores the
 skill-installed condition only: 1 when the agent or a sub-agent called the
-harness's skill tool with the skill's name, or read the installed SKILL.md, and
-0 otherwise. The skill tool's name comes from `agent.py`. The report shows how
+harness's skill tool with the skill's name, or read the installed SKILL.md with
+the read tool, and 0 otherwise (a shell command that prints it does not count). The skill tool's name comes from `agent.py`. The report shows how
 many runs loaded the skill and the pass rate with and without it.
 
 ## Lint issues added

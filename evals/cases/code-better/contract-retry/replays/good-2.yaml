@@ -4,4 +4,5 @@ actions:
   content: |
     LABEL = 'Invoice'
 - bash: python test_invoice.py
+  fails: true
 - read: refresh_contract.py
