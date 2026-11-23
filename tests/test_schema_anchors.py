@@ -30,7 +30,8 @@ def patterns(node, where=""):
 
 
 def ends_with_dollar(pattern):
-    return pattern.endswith("$") and not pattern.endswith("\\$")
+    """A pattern that ends at `$`, unless it deliberately allows white space (a newline) just before it."""
+    return pattern.endswith("$") and not pattern.endswith("\\$") and not pattern.endswith(("\\s*$", "\\s+$"))
 
 
 class Anchors(unittest.TestCase):
