@@ -392,7 +392,7 @@ let fails = 0;
 function tick() {
   return pageFetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(d => { fails = 0; CLOSED_PAGE = false; pageShowErrors($("errors"), d.errors, ERRORS_NOTE); render(d); },
-      () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
+      e => { if (e && e.stale) return; if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
 }
 if (SNAPSHOT) { pageShowErrors($("errors"), SNAPSHOT.errors, ERRORS_NOTE); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
 else { conv.start(); tick(); setInterval(tick, 2000); }

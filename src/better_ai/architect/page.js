@@ -557,6 +557,7 @@ async function loadDesign() {
       if (!response.ok) throw new Error(await response.text());
       data = await response.json();
     } catch (error) {
+      if (error && error.stale) return;  // the shared strip says the page is out of date; asking again cannot help
       status.textContent = 'Could not load the design. ' + error.message;
       setTimeout(loadDesign, 2000);
       return;
