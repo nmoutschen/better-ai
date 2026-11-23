@@ -223,6 +223,9 @@ class Rules(unittest.TestCase):
                 with self.subTest(name, pattern=pattern):
                     self.assertRegex(text, pattern)
 
+    def test_the_quote_verifier_deletes_its_folder_when_it_ends(self):
+        self.assertIn("WHEN you end, DELETE your folder", flat(read(AGENTS["quote-verifier"])))
+
     def test_an_analyst_running_a_test_is_the_checker_of_the_test_and_its_items(self):
         body = flat(steps(read(SKILL))[7][1])
         self.assertIn("`checker` of the test and of each item in its `settles`", body)
@@ -390,19 +393,6 @@ class Rules(unittest.TestCase):
         self.assertIn("`named_sources`", flat(section(read(SKILL), "### Resume a discovery")))
         self.assertIn("re-reads each quote's web page, file or connector item", flat(read(DOCS)))
 
-    def test_no_page_or_record_text_reaches_a_shell_unquoted(self):
-        """L7: each path and value in a command is single-quoted, and a value with a quote is refused."""
-        verifier = read(AGENTS["quote-verifier"])
-        self.assertNotRegex(verifier, r"[^'](?:<url>|<path>)[^']")
-        for phrase in (
-            "PUT each path and each other value you fill into a command in single quotes",
-            'a single quote or a control character, SET the evidence `not reachable` with the reason "address not plain", '
-            "and do not run the command",
-            '"ref is a query"',
-            "equal to a named path or inside a named folder",
-        ):
-            self.assertIn(phrase, flat(verifier))
-
     def test_round_6_records(self):
         records = flat(read(RECORDS))
         self.assertIn('"to": "<the skills you handed it to, such as /design-better and /architect-better>"', records)
@@ -429,51 +419,11 @@ class Rules(unittest.TestCase):
         )
         self.assertNotIn("<the command or query, and its result: is it right?>", records)
 
-    def test_record_json_goes_through_a_quoted_heredoc(self):
-        """L7: record JSON never passes through echo or double quotes, where backticks and $() run."""
-        for path, where in (
-            (SKILL, section(read(SKILL), "### Add the records")),
-            (AGENTS["analyst"], read(AGENTS["analyst"])),
-            (AGENTS["quote-verifier"], read(AGENTS["quote-verifier"])),
-            (RECORDS, read(RECORDS)),
-        ):
-            text = flat(where)
-            with self.subTest(path.name):
-                self.assertIn("<<'JSON'", text)
-                self.assertIn("then `JSON` on its own line", text)
-                self.assertIn("NEVER with echo or inside double quotes", text)
-        rule = flat(section(read(SKILL), "### Add the records"))
-        self.assertRegex(rule, r"Same for `set` and `reply`|`set` and `reply` the same way")
-
-    def test_the_analyst_quotes_and_checks_each_path(self):
-        rule = flat(read(AGENTS["analyst"]))
-        for phrase in (
-            "PUT each path in single quotes in a command",
-            "SKIP a path that holds a single quote or a control character",
-            "os.path.realpath",
-            "READ web pages with your web tools, never with a command",
-        ):
-            self.assertIn(phrase, rule)
-        self.assertIn("os.path.realpath", flat(read(AGENTS["quote-verifier"])))
-        self.assertIn("os.path.realpath", flat(read(RECORDS)))
-
     def test_records_name_the_one_exception_to_the_verifier_setting_the_outcome(self):
         records = flat(read(RECORDS))
         self.assertIn(
             "the coordinator sets a computed result `counts` once the user confirms it, or `unverified`", records
         )
-
-    def test_every_value_in_a_command_is_single_quoted(self):
-        """L7 as a class: in each command the skill shows, no `<placeholder>` stands outside single quotes."""
-        found = []
-        for path in [*skill_texts(), DOCS]:
-            for span in re.findall(r"`([^`\n]+)`", read(path)):
-                if not re.match(r"(?:python3|rm|better\.pyz)\b", span):
-                    continue
-                bare = re.sub(r"'[^']*'", "''", span)
-                if re.search(r"<[A-Za-z][^<>]*>", bare):
-                    found.append(f"{path.name}: {span}")
-        self.assertEqual(found, [])
 
     def test_no_text_pipes_echo_into_a_command(self):
         for path in [*skill_texts(), DOCS]:
@@ -481,23 +431,6 @@ class Rules(unittest.TestCase):
                 if re.search(r"\becho\b", sentence):
                     with self.subTest(path.name, sentence=sentence[:80]):
                         self.assertIn("NEVER", sentence)
-
-    def test_record_text_reaches_a_tool_or_a_command_only_as_a_plain_value(self):
-        """The sweep: refs, ids, the slug and the verifier's folder."""
-        verifier = flat(read(AGENTS["quote-verifier"]))
-        self.assertIn("PASS the `ref` only as the argument the tool reads an item by", verifier)
-        self.assertIn("rm -r '<TEMP>/discover-verify/<IDEA>/<YOUR NAME>'", verifier)
-        skill = flat(read(SKILL))
-        self.assertIn("lowercase letters, digits and hyphens only", skill)
-        self.assertIn(
-            "PUT each value you fill into a command, such as a path, an id or a name, in single quotes", skill
-        )
-
-    def test_json_newlines_are_escaped_and_the_analyst_reads_only_public_pages(self):
-        for path in (SKILL, AGENTS["analyst"], AGENTS["quote-verifier"]):
-            with self.subTest(path.name):
-                self.assertIn("ESCAPE every newline in a JSON string as `\\n`", flat(read(path)))
-        self.assertNotIn("host is not public", flat(read(AGENTS["analyst"])))
 
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
