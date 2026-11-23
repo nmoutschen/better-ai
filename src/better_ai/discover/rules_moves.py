@@ -21,11 +21,10 @@ Every message names the existing record and the next action.
 from __future__ import annotations
 
 import hashlib
-import json
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .. import paths, records
+from .. import paths, records, schema
 from ..schema import Context, hook
 from . import SKILL, derive
 
@@ -75,8 +74,7 @@ def revision_of(option: dict, items: list[dict], changes: list[dict]) -> str:
             }
         )
     body = {"option": {k: v for k, v in option.items() if k not in ("at", "by")}, "items": shown}
-    text = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-    return hashlib.sha256(text.encode("ascii")).hexdigest()
+    return schema.fingerprint(body)
 
 
 def revision_in(folder: Path, option: str) -> str | None:
