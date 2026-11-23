@@ -22,7 +22,7 @@ def content(svg, element_id):
 
 class DiagramTests(unittest.TestCase):
     def setUp(self):
-        self.design = json.loads((FIXTURES / "example.json").read_text(encoding="utf-8"))
+        self.design = json.loads((FIXTURES / "architect-example" / "design.json").read_text(encoding="utf-8"))
 
     def test_check_refuses_unknown_kind(self):
         errors = diagram.validate(

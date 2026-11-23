@@ -3,9 +3,7 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const all = (selector, root = document) => [...root.querySelectorAll(selector)];
 const byId = id => document.getElementById(id);
-const text = value => String(value).replace(/[&<>"']/g, char => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-}[char]));
+const text = pageEscape;
 const inlineCode = value => value.split(/(`[^`]+`)/).map((part, index) =>
   index % 2 ? '<code>' + text(part.slice(1, -1)) + '</code>' : text(part)).join('');
 const invalid = record => record._errors && record._errors.length ?
@@ -97,12 +95,6 @@ function specTables(records) {
       text(gap.if_wrong ?? '')]))) : '') +
     (unlinked.length ? '<h3>Design items with no requirement</h3>' + table(['Item', 'Why'],
       unlinked.map(item => row([text(item.item ?? ''), text(item.why ?? '') + invalid(item)]))) : '');
-}
-
-function errorsHTML(errors) {
-  return !errors || !errors.length ? '' : '<h2 id="errors-h">' + errors.length + (errors.length === 1 ? ' record is' : ' records are') +
-    ' not valid</h2><ul>' + errors.map(e => '<li><code>' + text(e.file) + ':' + text(e.line) + '</code> <b>' + text(e.field) + '</b>: ' +
-      text(e.message) + (e.by ? ' <span class="by">written by ' + text(e.by) + '</span>' : '') + '</li>').join('') + '</ul>';
 }
 
 function perspectiveTables(perspectives, findings, parts, reviewed, removedLabels = {}) {
@@ -201,9 +193,7 @@ function start(data) {
     panel(key).innerHTML = '<h2>' + text(heading) + '</h2>' + content;
   }
 
-  const band = errorsHTML(data.errors);
-  byId('errors').hidden = !band;
-  byId('errors').innerHTML = band;
+  pageShowErrors(byId('errors'), data.errors);
   document.title = 'Design: ' + data.title;
   byId('title').textContent = document.title;
   byId('accepted-count').innerHTML = new Set(data.accepted).size + '<span class="of"> / ' + (tabs.length - 1) + '</span>';

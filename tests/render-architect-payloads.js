@@ -1,12 +1,13 @@
 // Draws the architecture page's sections for each payload the architect package produced, and fails on any that throws. Run by
 // tests/test_architect_formats.py: `node tests/render-architect-payloads.js payloads.json`, where the file holds
-// [{label, data}]. The page's own code, architect/page.js, runs against stand-in elements.
+// [{label, data}]. The shared page.js and the page's own code, architect/page.js, run against stand-in elements.
 const fs = require('node:fs');
 const vm = require('node:vm');
 const { read, stand } = require('./harness');
 
 const context = {fetch: () => new Promise(() => {}), document: stand(), sessionStorage: stand(), setTimeout: () => {}, URLSearchParams};
 vm.createContext(context);
+vm.runInContext(read('page', 'page.js'), context);
 vm.runInContext(read('architect', 'page.js'), context);
 
 const payloads = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -21,7 +22,7 @@ for (const {label, data} of payloads) {
     draw('perspectiveTables(data.perspectives, data.findings, data.parts, false, data.removed_labels)');
     draw('controls(data.perspectives, data.reviews.at(-1))');
     draw('specTables(data.spec)');
-    draw('errorsHTML(data.errors)');
+    draw('pageErrors(data.errors)');
     draw('figures(data.containers)');
     draw('data.flows.map(flow => figures(flow.versions)).join("")');
     draw('reviewSummary(data.since.map(key => data.change_labels[key]), data.rerun.map(id => nameOf(data.perspectives, id)))');
