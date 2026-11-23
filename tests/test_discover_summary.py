@@ -264,6 +264,17 @@ class Warnings(Discovery):
         self.evidence(R.record(R.EVIDENCE, id="E-coord-1", by=R.COORD, corrects="E-a1-1"))
         self.quiet("reworded-without-correction")
 
+    def test_a_correction_is_not_a_copy_of_the_page_words_it_quotes(self):
+        words = "Over half said they mute the alerts."
+        self.evidence(
+            R.record(R.EVIDENCE, status="reworded", verifier="v1", tries=["v1"], reason="reworded", page_words=words)
+        )
+        self.evidence(
+            R.record(R.EVIDENCE, id="E-coord-1", by=R.COORD, corrects="E-a1-1", words={"type": "quote", "text": words})
+        )
+        texts = [w["text"] for w in self.summary()[1] if w.get("type") == "warning"]
+        self.assertFalse([t for t in texts if "also occur" in t], texts)
+
     def test_S55_an_item_checker_with_no_record_for_30_minutes(self):
         put(self.unit, "items.jsonl", [R.record(R.ITEM, checker="analyst-1", since=ago(120))])
         self.warns("no-word-from-agent", "P1")

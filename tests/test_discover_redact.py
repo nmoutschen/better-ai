@@ -346,6 +346,53 @@ class Removal(Fixture):
         self.assertIn("none recorded", out)
 
 
+class Reworded(Fixture):
+    """A reworded quote and the correction that quotes its page's words: redact removes the words from both."""
+
+    WORDS = "Over half said they mute the alerts."
+
+    def setUp(self):
+        super().setUp()
+        P.set_setting(self.unit, "internal")
+        reworded = R.record(
+            R.EVIDENCE,
+            id="E-a1-2",
+            status="reworded",
+            verifier="v1",
+            tries=["v1"],
+            reason="reworded",
+            words={"type": "quote", "text": "People ignore the alerts."},
+            page_words=self.WORDS,
+        )
+        fix = R.record(
+            R.COUNTING,
+            id="E-coord-9",
+            by=R.COORD,
+            corrects="E-a1-2",
+            words={"type": "quote", "text": self.WORDS},
+            span=self.WORDS,
+            verifier="v2",
+            tries=["v2"],
+        )
+        P.write_json(self.unit / "evidence" / "E-a1-2.json", reworded)
+        P.write_json(self.unit / "evidence" / "E-coord-9.json", fix)
+
+    def test_redacting_reworded_evidence_finishes_and_drops_its_page_words(self):
+        self.ask_on_the_page(evidence="E-a1-2")
+        done = self.redact(evidence="E-a1-2")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        record = json.loads((self.unit / "evidence" / "E-a1-2.json").read_text())
+        self.assertEqual(record["status"], "removed")
+        self.assertNotIn("page_words", record)
+
+    def test_redacting_a_correction_empties_the_page_words_of_the_evidence_it_corrects(self):
+        self.ask_on_the_page(evidence="E-coord-9")
+        done = self.redact(evidence="E-coord-9")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn(self.WORDS, self.everything())
+        self.assertEqual(json.loads((self.unit / "evidence" / "E-a1-2.json").read_text())["status"], "reworded")
+
+
 class Stopping(Fixture):
     def expected(self):
         clean = self.root / "clean"

@@ -1472,6 +1472,12 @@ class NotFoundAndCorrected(Rules):
         again = self.corrected(words={"type": "quote", "text": "In the end, we lost a whole week!"})
         self.refused(self.add("evidence", again, COORD), "E-coord-1")
 
+    def test_a_span_without_the_quote_points_to_reworded_not_unverified(self):
+        self.started()
+        done = self.counts(span="A post.")
+        self.refused(done, '"status": "reworded"', "page_words")
+        self.assertNotIn('unverified with the reason "reworded"', done.stdout + done.stderr)
+
     def test_check_accepts_both_new_statuses_at_rest(self):
         self.put(status="not found", verifier="v1", tries=["v1"], reason="not on the page")
         self.put("E-a1-2", status="reworded", verifier="v1", tries=["v1"], reason="reworded", page_words="x y")

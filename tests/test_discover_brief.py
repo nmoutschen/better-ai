@@ -67,6 +67,33 @@ class Final(Fixture):
         leftovers = [p.name for p in (unit / "brief").iterdir() if p.name != "v1.md"]
         self.assertEqual(leftovers, [])
 
+    def test_a_reworded_quote_that_was_corrected_is_left_out_and_its_correction_is_in(self):
+        unit = self.unit()
+        reworded = R.record(
+            R.EVIDENCE,
+            id="E-a1-2",
+            status="reworded",
+            verifier="v1",
+            tries=["v1"],
+            reason="reworded",
+            words={"type": "quote", "text": "People ignore the alerts."},
+            page_words="Over half mute the alerts.",
+        )
+        fix = R.record(
+            R.EVIDENCE,
+            id="E-coord-9",
+            by=R.COORD,
+            corrects="E-a1-2",
+            words={"type": "quote", "text": "Over half mute the alerts."},
+        )
+        P.write_json(unit / "evidence" / "E-a1-2.json", reworded)
+        P.write_json(unit / "evidence" / "E-coord-9.json", fix)
+        done = run_brief(self.root, unit)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        text = self.text(unit)
+        self.assertNotIn("People ignore the alerts.", text)
+        self.assertIn("Over half mute the alerts.", text)
+
     def test_S40_an_item_whose_latest_change_cites_evidence_that_does_not_count_is_refused(self):
         unit = self.unit()
         evidence = json.loads((unit / "evidence" / "E-a1-1.json").read_text())

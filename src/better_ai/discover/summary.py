@@ -193,6 +193,12 @@ def _without_cited_text(test: dict, ident: Any) -> dict:
     return test
 
 
+def _without_corrected(other: dict, evidence: dict) -> dict:
+    if other.get("id") == evidence.get("corrects"):
+        return {k: v for k, v in other.items() if k != "page_words"}
+    return other
+
+
 def _holders(d: Discovery, evidence: dict) -> list[tuple[str, str, dict]]:
     """The records that must not hold the evidence's text: every record but the evidence itself, its own source (which
     keeps what the user typed) and the page's log (which keeps the user's events)."""
@@ -206,7 +212,8 @@ def _holders(d: Discovery, evidence: dict) -> list[tuple[str, str, dict]]:
         ("briefs.jsonl", d.briefs),
         ("decisions.jsonl", d.decisions),
         ("tests.jsonl", [_without_cited_text(t, evidence.get("id")) for t in d.tests]),
-        ("evidence", [e for e in d.evidence if e is not evidence]),
+        # a correction quotes the page_words of the evidence it corrects: those are not a copy of it
+        ("evidence", [_without_corrected(e, evidence) for e in d.evidence if e is not evidence]),
         ("sources", [s for s in d.sources if s.get("id") != evidence.get("source")]),
     ):
         for record in group:

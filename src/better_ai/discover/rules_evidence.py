@@ -504,7 +504,11 @@ def _count(ctx: records.SetContext, by: str) -> None:
         raise _refuse(ctx.unit, "counts needs the span you copied from the page", 'set "span" to that text')
     words = record.get("words") if isinstance(record.get("words"), dict) else {}
     digest = quotes.check_read(
-        ctx, [span], words.get("text"), "save the raw page to a file outside .discover/ and run again with --raw <file>"
+        ctx,
+        [span],
+        words.get("text"),
+        "save the raw page to a file outside .discover/ and run again with --raw <file>",
+        reworded='set "status": "reworded" with the reason "reworded" and the page\'s passage in "page_words"',
     )
     patch["sha256"] = digest
 

@@ -288,9 +288,10 @@ def render(unit: Unit, data: Data, version: str) -> str:
         for line in _item_lines(item, derived.items[item["id"]])
     ]
     blocks = []
+    corrected = {e.get("corrects") for e in data.evidence.values()}  # a reworded quote shows as its correction
     for ident in sorted(data.evidence, key=_sort_key):
         found = data.evidence[ident]
-        if found.get("status") == "removed":
+        if found.get("status") == "removed" or ident in corrected:
             continue
         if not EVIDENCE_ID.fullmatch(ident):
             raise refusal(unit.label, f"evidence {ident!r} has an id that is not valid", f"run check {unit.label}")
@@ -556,6 +557,9 @@ def _plan(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
     if given.get("type") == "chat" and source.get("id"):
         steps.append({"do": "source", "ref": source["id"]})
     steps += [{"do": "test", "ref": t["id"]} for t in data.tests if evidence_id in _cited_by(t)]
+    corrected = evidence.get("corrects")
+    if isinstance(corrected, str) and corrected in data.evidence:  # the reworded evidence holds the same words
+        steps.append({"do": "page_words", "ref": corrected})
     steps.append({"do": "evidence", "ref": evidence_id})
     return [{**s, "done": False} for s in steps]
 
@@ -608,6 +612,15 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
         return [f"{ref}: removed, a leftover file that held the block for {evidence_id}"], lambda: os.unlink(
             unit.target(ref)
         )
+    if kind == "page_words":
+        current = data.evidence[ref]
+        if current.get("page_words") in (None, REMOVED):
+            return [], None
+        new = _valid(unit, {**current, "page_words": REMOVED}, "evidence.schema.json")
+        text = records._json_file(new)
+        return [
+            f"evidence/{ref}.json:{_line_of(text, 'page_words')}: emptied the page words"
+        ], lambda: paths.write_atomic(unit, f"evidence/{ref}.json", records._encode(text))
     if kind == "test":
 
         def emptied_result(found: dict) -> dict | None:
@@ -651,7 +664,7 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
         shown = "emptied the given text"
         key = "origin"
     else:
-        new = {k: v for k, v in current.items() if k not in ("checked_read", "span", "sha256", "since")}
+        new = {k: v for k, v in current.items() if k not in ("checked_read", "span", "sha256", "since", "page_words")}
         words = new.get("words") or {}
         if words.get("type") == "quote":
             new["words"] = {"type": "quote", "text": REMOVED}
