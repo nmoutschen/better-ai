@@ -14,7 +14,7 @@
 .chat { font-size:var(--text-small); }
 
 /* A table that is long scrolls inside the view, and its head stays in sight. */
-.tablewrap { max-height:70vh; overflow:auto; }
+.tablewrap { max-height:70vh; overflow:auto; container-type:inline-size; }
 .tablewrap table.tbl th { position:sticky; top:0; background:var(--cream); z-index:1; }
 .row-actions { display:flex; flex-wrap:nowrap; gap:var(--space-tight); white-space:nowrap; }
 @media (max-width:1279px) { .row-actions { flex-wrap:wrap; white-space:normal; } }
@@ -53,7 +53,6 @@ table.items td:nth-child(5) { min-width:8rem; }
 
 /* Risks: a full-width bar under an item opens its risks as sub-rows. The bar's text stays inside the visible
    width of a table that scrolls sideways, and wraps when it runs out. */
-.tablewrap { container-type:inline-size; }
 .tbl tr.riskbar > td { padding:0; border-top:0; }
 .riskbar-btn { position:sticky; left:0; box-sizing:border-box; display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--space-tight) var(--space-control);
   width:100%; max-width:100cqw; padding:var(--space-tight) var(--space-control); background:var(--cream); border:0; border-top:1px dashed var(--sand);
