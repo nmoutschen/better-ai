@@ -18,44 +18,21 @@ What an item's state is comes from `derive`, never from a second reading of the 
 
 from __future__ import annotations
 
-import json
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .. import cli, paths, records, schema
+from .. import cli, records, schema
 from ..paths import Refused, Unit, refusal
 from . import SKILL
-from .derive import ItemView, derive
+from .derive import ItemView, derive, read_lines, read_object
 
 NAME = SKILL.name
-WRITTEN_BY_THE_COORDINATOR = ("item", "change", "option", "move", "brief", "decision", "test")
 
 Problem = tuple[str, str]  # what is wrong, and the next action
 
 
 # ---------------------------------------------------------------- reading the unit
-
-
-def _object(text: str) -> dict | None:
-    try:
-        value = json.loads(text)
-    except (ValueError, RecursionError):
-        return None
-    return value if isinstance(value, dict) else None
-
-
-def _read(unit: Unit, relative: str) -> str:
-    try:
-        return paths.read_bytes(unit, relative).decode("utf-8", "replace")
-    except (OSError, Refused):
-        return ""
-
-
-def _lines(unit: Unit, relative: str) -> list[dict]:
-    """The records of a JSONL file of the unit, in order; a line that does not parse is skipped (`check` reports it)."""
-    found = (_object(line) for line in schema._lines(_read(unit, relative)) if line.strip())
-    return [r for r in found if r is not None]
 
 
 def _evidence(unit: Unit) -> dict[str, dict]:
@@ -65,14 +42,10 @@ def _evidence(unit: Unit) -> dict[str, dict]:
     except (OSError, Refused):
         return found
     for name in names:
-        record = _object(_read(unit, f"evidence/{name}"))
+        record = read_object(unit.path, f"evidence/{name}")
         if record is not None and isinstance(record.get("id"), str):
             found[record["id"]] = record
     return found
-
-
-def _head(unit: Unit) -> dict:
-    return _object(_read(unit, unit.kind.head)) or {}
 
 
 def _text(value: Any) -> str:
@@ -85,24 +58,6 @@ def _dict(value: Any) -> Mapping:
 
 def _list(value: Any) -> list:
     return value if isinstance(value, list) else []
-
-
-# ---------------------------------------------------------------- who writes what (the coordinator only)
-
-
-def _coordinator_only(unit: Unit, kind: str, by: str | None) -> None:
-    name = _text(_head(unit).get("coordinator"))
-    if not name:
-        raise Refused(f"{unit.label}: discover.json names no coordinator: fix discover.json, then run again")
-    if by != name:
-        raise Refused(
-            f"{unit.label}: only {name} (discover.json coordinator) writes {kind}: use --by {name}",
-        )
-
-
-@records.add_guard(NAME, *WRITTEN_BY_THE_COORDINATOR)
-def _add_by_the_coordinator(ctx: records.AddContext) -> None:
-    _coordinator_only(ctx.unit, ctx.type, ctx.by)
 
 
 # ---------------------------------------------------------------- the risk rule
@@ -318,7 +273,7 @@ def _add_change(ctx: records.AddContext) -> None:
             "risk accepted is not a state: it is derived once every risk of an item is accepted",
             "accept each risk with a risk change citing the user's answer",
         )
-    items, changes = _lines(unit, "items.jsonl"), _lines(unit, "changes.jsonl")
+    items, changes = read_lines(unit.path, "items.jsonl"), read_lines(unit.path, "changes.jsonl")
     if _is_identical(change, items, changes):
         raise refusal(unit.label, "already recorded: nothing to do")
     evidence = _evidence(unit)
@@ -326,7 +281,11 @@ def _add_change(ctx: records.AddContext) -> None:
     item = _items_by_id(items).get(_text(_dict(change.get("about")).get("item")))
     if not problems and change.get("field") == "state" and item is not None:
         problems = state_problems(
-            _text(change.get("to")), item, evidence, _lines(unit, "tests.jsonl"), _lines(unit, "decisions.jsonl")
+            _text(change.get("to")),
+            item,
+            evidence,
+            read_lines(unit.path, "tests.jsonl"),
+            read_lines(unit.path, "decisions.jsonl"),
         )
     if problems:
         raise refusal(unit.label, problems[0][0], problems[0][1])
@@ -346,7 +305,7 @@ def _add_decision(ctx: records.AddContext) -> None:
         record["answered_at"] = ctx.run.now().strftime(schema.TIME)
     if record.get("status") != "waiting":
         return
-    for other in _lines(ctx.unit, "decisions.jsonl"):
+    for other in read_lines(ctx.unit.path, "decisions.jsonl"):
         if (
             other.get("status") == "waiting"
             and other.get("about") == record.get("about")
@@ -369,11 +328,11 @@ def _now(ctx: records.SetContext) -> str:
 def _cited_risks(unit: Unit, item: str) -> set[str]:
     """The risks of an item that a decision or a change names."""
     cited = set()
-    for decision in _lines(unit, "decisions.jsonl"):
+    for decision in read_lines(unit.path, "decisions.jsonl"):
         about = _dict(decision.get("about"))
         if about.get("type") == "risk" and about.get("item") == item and isinstance(about.get("risk"), str):
             cited.add(about["risk"])
-    for change in _lines(unit, "changes.jsonl"):
+    for change in read_lines(unit.path, "changes.jsonl"):
         if (
             change.get("field") == "risk"
             and _dict(change.get("about")).get("item") == item
@@ -405,7 +364,7 @@ OPEN_AFTER_A_MOVE = ("note", "updated_at")  # what an option that a move chose m
 def _keep_chosen_option(ctx: records.SetContext, after: Mapping) -> None:
     """An option that a move chose keeps every field but its note: the move, its brief and the user's choice read it."""
     ident = _text(ctx.record.get("id"))
-    chosen = [m.get("id") for m in _lines(ctx.unit, "moves.jsonl") if m.get("option") == ident]
+    chosen = [m.get("id") for m in read_lines(ctx.unit.path, "moves.jsonl") if m.get("option") == ident]
     changed = [
         f
         for f in dict.fromkeys([*ctx.record, *after])
@@ -478,8 +437,6 @@ def _set(ctx: records.SetContext) -> None:
         raise refusal(
             ctx.unit.label, f"a {kind} is never edited ({ident or 'it'} stays as written)", f"add a new {kind}"
         )
-    if kind in WRITTEN_BY_THE_COORDINATOR:
-        _coordinator_only(ctx.unit, kind, ctx.by)
     if kind == "decision" and ctx.record.get("status") == "waiting" and ctx.patch.get("status") == "answered":
         ctx.patch["answered_at"] = _now(ctx)
     after = _after(ctx)
@@ -493,7 +450,9 @@ def _set(ctx: records.SetContext) -> None:
         ctx.patch["updated_at"] = _now(ctx)
     elif kind == "discover":
         if after.get("named_sources") != ctx.record.get("named_sources"):
-            _coordinator_only(ctx.unit, "named_sources", ctx.by)
+            name = records.written_by(ctx.unit, "coordinator")
+            if ctx.by != name:
+                raise Refused(f"{ctx.unit.label}: only {name} writes named_sources: use --by {name}")
             kept = after.get("named_sources")
             lost = [n for n in _list(ctx.record.get("named_sources")) if not isinstance(kept, list) or n not in kept]
             if lost:
@@ -516,8 +475,12 @@ def _set(ctx: records.SetContext) -> None:
 def _stale(unit: Unit) -> list[tuple[str, str, Mapping, str]]:
     """Each item whose latest state or importance change no longer holds, as (item, field, the change, why): the one
     rule `check` warns by and `brief` refuses by. A cited evidence that is not in the unit does not hold either."""
-    items, changes = _lines(unit, "items.jsonl"), _lines(unit, "changes.jsonl")
-    evidence, tests, decisions = _evidence(unit), _lines(unit, "tests.jsonl"), _lines(unit, "decisions.jsonl")
+    items, changes = read_lines(unit.path, "items.jsonl"), read_lines(unit.path, "changes.jsonl")
+    evidence, tests, decisions = (
+        _evidence(unit),
+        read_lines(unit.path, "tests.jsonl"),
+        read_lines(unit.path, "decisions.jsonl"),
+    )
     found = []
     views = derive(items, changes).items
     for item in items:

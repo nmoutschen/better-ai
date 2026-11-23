@@ -39,8 +39,6 @@ record must be to count and `add` and `set` hold how it got there.
 from __future__ import annotations
 
 import hashlib
-import ipaddress
-import json
 import os
 import re
 import unicodedata
@@ -48,9 +46,9 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlsplit
 
 from .. import cli, paths, records, schema
+from . import derive
 
 SKILL = "discover-better"
 TIMEOUT = 30  # minutes a verifier may run before the coordinator may give up on it
@@ -58,15 +56,13 @@ TIMEOUT_REASON = "verifier did not finish"
 MAX_TRIES = 2  # a `not reachable` evidence is tried again only while fewer verifiers than this were started
 CHECKED = ("checked_read", "span", "sha256")  # what `counts` holds and nothing else does
 SOURCE_ID = re.compile(r"S-[\w.-]+-\d+")
-NAT64 = ipaddress.ip_network("64:ff9b::/96")
-PLAIN_HOST = re.compile(r"[a-z0-9_.-]+")
 READ_KINDS = ("web", "file", "tool")  # origins an analyst read and a verifier reads again, as against `you`
 CONFIRM = "Confirm this result"  # the default of the question that makes a computed result count
 NOT_CONFIRMED = "not confirmed by you"
 USER_ONLY = ("verifier", "tries", "since", *CHECKED)  # fields the user's own evidence never has
 
 
-# ---------------------------------------------------------------- words and addresses
+# ---------------------------------------------------------------- words
 
 
 def normalise(text: str) -> str:
@@ -81,116 +77,7 @@ def quote_in_span(quote: str, span: str) -> bool:
     return bool(words) and f" {words} " in f" {normalise(span)} "
 
 
-def _short_form(host: str) -> ipaddress.IPv4Address | None:
-    """An IPv4 address written the short ways a client reads: 127.1, 0x7f.0.0.1, 0177.0.0.1, 2130706433."""
-    parts = host.split(".")
-    if not 1 <= len(parts) <= 4 or not all(re.fullmatch(r"0[xX][0-9a-fA-F]+|[0-9]+", p) for p in parts):
-        return None
-    try:
-        numbers = [
-            int(p, 16) if p[:2] in ("0x", "0X") else int(p, 8) if p[0] == "0" and len(p) > 1 else int(p) for p in parts
-        ]
-    except ValueError:  # an octal part with an 8 or 9
-        return None
-    *head, last = numbers
-    if any(n > 255 for n in head) or last >= 256 ** (5 - len(parts)):
-        return None
-    value = last
-    for position, n in enumerate(head):
-        value += n << (8 * (3 - position))
-    return ipaddress.IPv4Address(value)
-
-
-def _literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
-    """The address a host names when it is an IP literal, in any form a client reads: dotted, short, octal, hex, decimal."""
-    try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
-        return _short_form(host)
-    if ip.version == 6 and ip.ipv4_mapped is not None:
-        return ip.ipv4_mapped
-    if ip.version == 6 and (int(ip) >> 32 == 0 or ip in NAT64):  # ::/96 and 64:ff9b::/96 hold an IPv4 address
-        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
-    return ip
-
-
-def _is_ip(host: str) -> bool:
-    try:
-        ipaddress.ip_address(host)
-    except ValueError:
-        return False
-    return True
-
-
-def _host(host: str) -> str | None:
-    """A host as a client reads it: an IP literal as it is, a name through IDNA (full-width digits and dots, other
-    scripts) in lower case. None if it is not a valid host."""
-    try:
-        ipaddress.ip_address(host)
-    except ValueError:
-        try:
-            return host.encode("idna").decode("ascii").lower()
-        except UnicodeError:
-            return None
-    return host.lower()
-
-
-def url_problem(url: str) -> str | None:
-    """Why a source's address is refused, or None. An http or https address of a public host only: not localhost, and
-    not a loopback, private, link-local or otherwise non-public IP literal. Offline: a name that resolves to a private
-    address is the verifier's to catch at each redirect."""
-    if re.search(r"[\s\\\x00-\x1f]", url):
-        return "has a backslash, space or control character: write the plain address"
-    try:
-        parts = urlsplit(url)
-        host = parts.hostname
-    except ValueError:
-        return "is not a valid address: give the page's http or https address"
-    if parts.scheme not in ("http", "https"):
-        return f"must be an http or https address, not {parts.scheme or 'no scheme'}: give the page's http or https address"
-    if not host:
-        return "has no host: give the page's http or https address"
-    host = unquote(host)  # as a client reads it: the percent-encoded bytes first
-    if "%" in host:
-        return "has a percent sign in its host: write the host name or address plainly"
-    host = _host(host.rstrip("."))
-    numeric_end = bool(host) and re.fullmatch(r"[0-9]+|0[xX][0-9a-fA-F]*", host.rsplit(".", 1)[-1])
-    if numeric_end and not _is_ip(host) and _short_form(host) is None:  # a number a client would wrap or refuse
-        return "is not a plain host name or address: give the page's http or https address"
-    if not host or not (PLAIN_HOST.fullmatch(host) or _is_ip(host)):
-        return "is not a plain host name or address: give the page's http or https address"
-    if host == "localhost" or host.endswith(".localhost"):
-        return "is localhost: read a public page, or give the page text as your own evidence"
-    ip = _literal(host)
-    if ip is not None and not ip.is_global:
-        return f"is {host}, a loopback, private or link-local address: use the page's public address"
-    return None
-
-
 # ---------------------------------------------------------------- reading the unit
-
-
-def _json(unit: paths.Unit, relative: str) -> Any:
-    try:
-        return json.loads(unit.target(relative).read_text(encoding="utf-8"))
-    except (OSError, ValueError, paths.Refused):
-        return None
-
-
-def _lines(unit: paths.Unit, relative: str) -> list[dict]:
-    try:
-        text = unit.target(relative).read_text(encoding="utf-8")
-    except (OSError, paths.Refused):
-        return []
-    found = []
-    for line in text.splitlines():
-        try:
-            value = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(value, dict):
-            found.append(value)
-    return found
 
 
 def _folder(unit: paths.Unit, name: str) -> Iterator[tuple[str, dict]]:
@@ -203,24 +90,15 @@ def _folder(unit: paths.Unit, name: str) -> Iterator[tuple[str, dict]]:
     for file in files:
         if file.is_symlink():
             continue
-        value = _json(unit, f"{name}/{file.name}")
+        value = derive.read_object(unit.path, f"{name}/{file.name}")
         if isinstance(value, dict):
             yield f"{name}/{file.name}", value
-
-
-def _coordinator(unit: paths.Unit) -> str:
-    head = _json(unit, unit.kind.head)
-    name = head.get("coordinator") if isinstance(head, dict) else None
-    if not isinstance(name, str) or not name:
-        raise paths.refusal(unit.label, f"{unit.kind.head} does not name the coordinator", f"run check {unit.label}")
-    return name
 
 
 def _source(unit: paths.Unit, ident: Any) -> dict | None:
     if not isinstance(ident, str) or not SOURCE_ID.fullmatch(ident):
         return None
-    value = _json(unit, f"sources/{ident}.json")
-    return value if isinstance(value, dict) else None
+    return derive.read_object(unit.path, f"sources/{ident}.json")
 
 
 def _origin(source: dict | None) -> str | None:
@@ -284,14 +162,11 @@ def confirmation_problem(decisions: list, events: list, ident: str) -> str | Non
 
 @schema.hook("discover-source")
 def _source_at_rest(record: dict, ctx: schema.Context) -> list[tuple[str, str]]:
-    """The URL rule, and the role a source from you needs where the setting is internal."""
+    """Who may name a file or tool, and the role a source from you needs where the setting is internal. The address of a
+    web source is held to `x-public-url` in the schema."""
     origin = record.get("origin")
     if not isinstance(origin, dict):
         return []
-    if origin.get("type") == "web" and isinstance(origin.get("url"), str):
-        why = url_problem(origin["url"])
-        if why:
-            return [("origin.url", why)]
     head = ctx.read_json("../discover.json")
     if origin.get("type") in ("file", "tool") and record.get("by") != (head or {}).get("coordinator"):
         why = named_problem(head, origin)
@@ -382,7 +257,7 @@ def _source_by_the_coordinator_if_from_you(ctx: records.AddContext) -> None:
     """A source from you holds the user's own words or event: only the coordinator adds it."""
     origin = ctx.record.get("origin")
     if isinstance(origin, dict) and origin.get("type") == "you":
-        coordinator = _coordinator(ctx.unit)
+        coordinator = records.written_by(ctx.unit, "coordinator")
         if ctx.by != coordinator:
             raise _refuse(
                 ctx.unit,
@@ -395,7 +270,7 @@ def _source_by_the_coordinator_if_from_you(ctx: records.AddContext) -> None:
 def _evidence_writer_and_start(ctx: records.AddContext) -> None:
     """Who adds evidence, how it starts, and that it is not repeated."""
     unit, record, by = ctx.unit, ctx.record, ctx.by
-    coordinator = _coordinator(unit)
+    coordinator = records.written_by(unit, "coordinator")
     kind = _origin(_source(unit, record.get("source")))
     if kind == "you" and by != coordinator:
         raise _refuse(
@@ -425,7 +300,7 @@ def _must_be_checker(unit: paths.Unit, by: str, record: dict) -> None:
             f"evidence added by {by} must bear on an item it checks: bears_on is empty",
             "name the items it bears on, or leave the evidence to the coordinator",
         )
-    items = {i.get("id"): i for i in _lines(unit, "items.jsonl")}
+    items = {i.get("id"): i for i in derive.read_lines(unit.path, "items.jsonl")}
     for bears in record.get("bears_on") or []:
         item = items.get(bears.get("item")) if isinstance(bears, dict) else None
         if item is None:
@@ -490,7 +365,7 @@ def _unit_records(unit: paths.Unit) -> Iterator[tuple[str, int, dict]]:
     except OSError:
         files = []
     for file in files:
-        for number, record in enumerate(_lines(unit, file.name), 1):
+        for number, record in enumerate(derive.read_lines(unit.path, file.name), 1):
             yield file.name, number, record
     for folder in ("sources", "evidence"):
         for relative, record in _folder(unit, folder):
@@ -563,14 +438,14 @@ def _names_the_request(unit: paths.Unit, ident: str, reason: Any) -> bool:
         return False
     wanted = [
         e.get("id")
-        for e in _lines(unit, "conversation.jsonl")
+        for e in derive.read_lines(unit.path, "conversation.jsonl")
         if e.get("by") == "user"
         and (
             (e.get("type") == "remove" and e.get("record") == ident)
             or (e.get("type") == "redact" and e.get("evidence") == ident)
         )
     ]
-    for decision in _lines(unit, "decisions.jsonl"):
+    for decision in derive.read_lines(unit.path, "decisions.jsonl"):
         about = decision.get("about")
         answer = decision.get("answer")
         said = answer.get("text") if isinstance(answer, dict) else None
@@ -646,7 +521,11 @@ def _computed_outcome(ctx: records.SetContext, by: str, coordinator: str, new: s
             "stop: tell the coordinator, in your hand-back",
         )
     if new == "counts":
-        why = confirmation_problem(_lines(ctx.unit, "decisions.jsonl"), _lines(ctx.unit, "conversation.jsonl"), ident)
+        why = confirmation_problem(
+            derive.read_lines(ctx.unit.path, "decisions.jsonl"),
+            derive.read_lines(ctx.unit.path, "conversation.jsonl"),
+            ident,
+        )
         if why:
             raise _refuse(ctx.unit, f"{ident} cannot count yet: {why}")
     elif new != "unverified" or ctx.patch.get("reason") != NOT_CONFIRMED:
@@ -831,7 +710,7 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
     if record.get("type") != "evidence":
         return
     ident = record["id"]
-    coordinator = _coordinator(unit)
+    coordinator = records.written_by(unit, "coordinator")
     if by is None:
         raise _refuse(unit, f"setting {ident} needs --by", "run again with --by <your agent name>")
     verifier = record.get("verifier")
@@ -913,7 +792,7 @@ def source_write_table(ctx: records.SetContext) -> None:
     if record.get("type") != "source":
         return
     ident = record["id"]
-    coordinator = _coordinator(unit)
+    coordinator = records.written_by(unit, "coordinator")
     if by is None:
         raise _refuse(unit, f"setting {ident} needs --by", "run again with --by <your agent name>")
     for name, value in _changes(record, ctx.patch, ctx.unsets).items():

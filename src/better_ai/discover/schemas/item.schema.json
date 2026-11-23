@@ -4,6 +4,7 @@
   "title": "one line of items.jsonl: a problem, an opportunity or a behaviour the idea rests on, with its risks",
   "$comment": "An item holds no state: its state and importance come from the last change that names it (derive.py). The coordinator writes it; `checker`, `since` and `tries` say who checks it now; a set step stamps `updated_at`.",
   "x-files": ["items.jsonl"],
+  "x-written-by": "coordinator",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "at", "by", "id", "kind", "text", "rests_on", "risks"],

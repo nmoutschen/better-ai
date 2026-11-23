@@ -16,11 +16,12 @@ line that does not parse (`check` reports those).
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from .. import schema
 
 UNVERIFIED = "unverified"
 RISK_ACCEPTED = "risk accepted"
@@ -120,26 +121,23 @@ def derive(
     return Derived(views, chosen, {k: tuple(v) for k, v in by_option.items()})
 
 
-def _read_lines(path: Path) -> list[dict]:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return []
-    records = []
-    for line in text.splitlines():
-        try:
-            record = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(record, dict):
-            records.append(record)
-    return records
+def read_lines(folder: Path, relative: str) -> list[dict]:
+    """The records of a JSONL file of a discovery's folder, in order, by the shared reader; a line that does not parse
+    or is not an object is skipped (`check` reports it), and a file that is not there has none."""
+    return [r for r in schema.Context(folder, relative, {}).read_jsonl(relative) or [] if isinstance(r, dict)]
+
+
+def read_object(folder: Path, relative: str) -> dict | None:
+    """The record in a JSON file of a discovery's folder, by the shared reader; None if the file is not there, does not
+    parse or holds no object."""
+    value = schema.Context(folder, relative, {}).read_json(relative)
+    return value if isinstance(value, dict) else None
 
 
 def derive_folder(folder: Path) -> Derived:
     """`derive` over `items.jsonl`, `changes.jsonl` and `moves.jsonl` of a discovery's folder."""
     return derive(
-        _read_lines(folder / "items.jsonl"),
-        _read_lines(folder / "changes.jsonl"),
-        _read_lines(folder / "moves.jsonl"),
+        read_lines(folder, "items.jsonl"),
+        read_lines(folder, "changes.jsonl"),
+        read_lines(folder, "moves.jsonl"),
     )

@@ -4,6 +4,7 @@
   "title": "one line of options.jsonl: one of the seven moves, with what it costs and how hard it is to undo",
   "$comment": "The coordinator writes it; a set step stamps `updated_at`. Which option is chosen comes from the moves, never from a field here.",
   "x-files": ["options.jsonl"],
+  "x-written-by": "coordinator",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "at", "by", "id", "move", "text", "cost", "speed", "upkeep", "undo", "note"],

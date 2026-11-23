@@ -47,6 +47,19 @@ class LastWord(unittest.TestCase):
         )
         self.assertEqual(found, datetime(2026, 11, 23, 10, 20, tzinfo=timezone.utc))
 
+    def test_an_id_that_carries_the_agent_counts_when_the_prefix_is_given(self):
+        records = [
+            {"by": "coord", "id": "E-w1-3", "at": "2026-11-23T10:30:00Z"},
+            {"by": "coord", "id": "S-w1-2", "at": "2026-11-23T10:10:00Z"},
+            {"by": "coord", "id": "X-w1-9", "at": "2026-11-23T10:50:00Z"},
+            {"by": "coord", "id": "E-w10-1", "at": "2026-11-23T10:55:00Z"},
+            {"by": "coord", "id": "E-w1", "at": "2026-11-23T10:56:00Z"},
+        ]
+        self.assertIsNone(page.last_word(records, "w1"))
+        self.assertEqual(
+            page.last_word(records, "w1", id_prefixes=("E-", "S-")), datetime(2026, 11, 23, 10, 30, tzinfo=timezone.utc)
+        )
+
     def test_none_when_the_agent_wrote_nothing(self):
         self.assertIsNone(page.last_word([{"by": "w2", "at": "2026-11-23T10:40:00Z"}], "w1"))
 

@@ -21,11 +21,10 @@ Every message names the existing record and the next action.
 from __future__ import annotations
 
 import hashlib
-import json
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .. import paths, records
+from .. import paths, records, schema
 from ..schema import Context, hook
 from . import SKILL, derive
 
@@ -75,16 +74,15 @@ def revision_of(option: dict, items: list[dict], changes: list[dict]) -> str:
             }
         )
     body = {"option": {k: v for k, v in option.items() if k not in ("at", "by")}, "items": shown}
-    text = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-    return hashlib.sha256(text.encode("ascii")).hexdigest()
+    return schema.fingerprint(body)
 
 
 def revision_in(folder: Path, option: str) -> str | None:
     """`revision_of` for an option of a discovery's folder; None if the option is not there."""
-    chosen = next((o for o in derive._read_lines(folder / "options.jsonl") if o.get("id") == option), None)
+    chosen = next((o for o in derive.read_lines(folder, "options.jsonl") if o.get("id") == option), None)
     if chosen is None:
         return None
-    return revision_of(chosen, derive._read_lines(folder / "items.jsonl"), derive._read_lines(folder / "changes.jsonl"))
+    return revision_of(chosen, derive.read_lines(folder, "items.jsonl"), derive.read_lines(folder, "changes.jsonl"))
 
 
 # ---------------------------------------------------------------- moves
@@ -178,7 +176,7 @@ def _the_choice_is_current(ctx: records.AddContext) -> None:
     answer = ctx.record.get("answer")
     if not isinstance(answer, dict) or answer.get("type") != "page":
         return
-    events = [e for e in derive._read_lines(ctx.unit.path / "conversation.jsonl") if e.get("id") == answer.get("event")]
+    events = [e for e in derive.read_lines(ctx.unit.path, "conversation.jsonl") if e.get("id") == answer.get("event")]
     event = events[-1] if events else None
     if event is None or event.get("type") != "choose" or event.get("option") != ctx.record.get("option"):
         return  # the move rule says what is wrong

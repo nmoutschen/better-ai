@@ -20,6 +20,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 import discover_records as R  # noqa: E402
 
+from better_ai import schema  # noqa: E402
 from better_ai.discover import rules_evidence  # noqa: E402
 
 COORD = R.COORD
@@ -524,7 +525,7 @@ class Urls(Rules):
     def test_s17_every_host_form_is_judged_as_a_client_reads_it(self):
         for url, refused in self.HOST_FORMS:
             with self.subTest(url=url):
-                self.assertEqual(rules_evidence.url_problem(url) is not None, refused, url)
+                self.assertEqual(schema.url_problem(url) is not None, refused, url)
 
     def test_s17_the_same_forms_through_add(self):
         for url, refused in self.HOST_FORMS[::3]:
@@ -543,9 +544,12 @@ class Urls(Rules):
         self.assertEqual(done.returncode, 1, done.stdout)
         self.assertIn("S-a1-2.json", done.stdout + done.stderr)
 
-    def test_s17_the_rule_is_one_function(self):
-        self.assertIsNone(rules_evidence.url_problem("https://example.com/"))
-        self.assertTrue(rules_evidence.url_problem("http://169.254.1.1/"))
+    def test_s17_the_rule_is_the_shared_one(self):
+        schema_text = (HERE.parent / "src" / "better_ai" / "discover" / "schemas" / "source.schema.json").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"x-public-url": true', schema_text)
+        self.assertFalse(hasattr(rules_evidence, "url_problem"))
 
 
 class UserEvidence(Rules):

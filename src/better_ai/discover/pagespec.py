@@ -16,7 +16,6 @@ from .. import page, paths, resources, schema
 from ..paths import Unit
 from . import SKILL, derive, rules_moves, summary
 
-PAGE_EVENTS = ("choose", "add_evidence", "add_result", "remove", "edit", "redact")  # discover's own events
 RECORD_FILES = (
     ("items.jsonl", "items"),
     ("changes.jsonl", "changes"),
@@ -117,7 +116,7 @@ def load(unit: Unit) -> dict:
     working = {r.get("checker") for r in found["items"] + found["tests"]} | {e.get("verifier") for e in evidence}
     last_word = {}
     for agent in sorted(a for a in working if isinstance(a, str) and a):
-        heard = summary._last_word(known, agent)
+        heard = summary.last_word(known, agent)
         last_word[agent] = heard.strftime(schema.TIME) if heard else None
 
     return {
@@ -151,8 +150,8 @@ SPEC = page.register(
         css=("/discover.css",),
         js=("/discover.js",),
         capabilities=("decisions",),
-        methods=PAGE_EVENTS,
-        items=("note", "answer", *PAGE_EVENTS),
+        methods=summary.PAGE_EVENTS,
+        items=("note", "answer", *summary.PAGE_EVENTS),
         empty="Nothing yet. Answer a question, add evidence, or write to the coordinator below.",
     ),
 )
