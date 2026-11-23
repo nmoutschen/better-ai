@@ -86,7 +86,6 @@ class Package(unittest.TestCase):
         import better_ai.discover as package
 
         owners = {
-            "rules_evidence": "T8",
             "rules_moves": "T9",
             "summary": "T9",
             "brief": "T10",
@@ -167,7 +166,7 @@ class Create(unittest.TestCase):
             repo = Path(tmp)
             unit = R.made_unit(repo)
             fields = {
-                "item": R.without(R.ITEM, "type", "at", "by", "id"),
+                "item": {**R.without(R.ITEM, "type", "at", "by", "id"), "checker": "a1", "since": R.AT},
                 "option": R.without(R.OPTION, "type", "at", "by", "id"),
                 "test": R.without(R.TEST, "type", "at", "by", "id"),
                 "decision": R.without(R.DECISION, "type", "at", "by", "id"),
@@ -193,15 +192,20 @@ class Create(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             unit = R.made_unit(repo)
-            item = json.dumps(R.without(R.ITEM, "type", "at", "by", "id"))
-            self.assertEqual(R.run(repo, "add", ".discover/d", "item", "--by", R.COORD, stdin=item).returncode, 0)
+            for checker in ("a1", "a2"):
+                item = {**R.without(R.ITEM, "type", "at", "by", "id"), "text": checker, "checker": checker}
+                done = R.run(
+                    repo, "add", ".discover/d", "item", "--by", R.COORD, stdin=json.dumps({**item, "since": R.AT})
+                )
+                self.assertEqual(done.returncode, 0, done.stderr)
             for agent in ("a1", "a2"):
                 body = json.dumps(R.without(R.SOURCE, "type", "at", "by", "id"))
                 self.assertEqual(R.run(repo, "add", ".discover/d", "source", "--by", agent, stdin=body).returncode, 0)
             body = json.dumps(R.without(R.EVIDENCE, "type", "at", "by", "id", "source"))
 
             def add(agent):
-                text = json.dumps({**json.loads(body), "source": f"S-{agent}-1"})
+                bears = [{"item": "P1" if agent == "a1" else "P2", "direction": "for"}]
+                text = json.dumps({**json.loads(body), "source": f"S-{agent}-1", "bears_on": bears})
                 return better.run(
                     R.SKILL, "add", ".discover/d", "evidence", "--by", agent, stdin=text, cwd=repo
                 ).returncode

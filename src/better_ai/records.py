@@ -32,7 +32,8 @@ A skill package adds what is specific to its skill with three hooks, registered 
     def stamp(ctx: records.SetContext): ...          # `ctx.by` is the writer given as `--by`, or None
 
 `set --by <agent>` names who makes the change, for the steps that care; it is checked as `add` checks it and never
-changes the `by` the record was created with.
+changes the `by` the record was created with. `set --raw <file>` hands a step a file path (`ctx.raw`) for a rule that
+reads a file; a step that reads it sets `ctx.raw_read`, and `set` refuses a `--raw` that no step read.
 """
 
 from __future__ import annotations
@@ -98,6 +99,8 @@ class SetContext:
     record: dict
     patch: dict
     by: str | None = None  # who makes the change (`set --by`); the record's own `by`, its creator, never changes
+    raw: str | None = None  # a file path given as `set --raw`, for a step whose rule reads that file
+    raw_read: bool = False  # a step that reads `raw` sets it; `set` refuses a `--raw` that no step read
     unsets: tuple[str, ...] = ()  # the fields `set --unset` removes, which a step that guards a field must also see
 
 
@@ -751,6 +754,7 @@ def _set_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--by", help="who makes the change: your agent name (the record's own by stays)")
     parser.add_argument("--for", dest="for_agent", metavar="AGENT", help="the agent, for a per-agent file such as card")
     parser.add_argument("--unset", action="append", default=[], metavar="FIELD", help="remove a field (repeatable)")
+    parser.add_argument("--raw", metavar="FILE", help="a file the skill's rule reads (not every record takes one)")
 
 
 @dataclass
@@ -865,8 +869,13 @@ def set_(args: argparse.Namespace, run: Run) -> int:
         label = args.ref if args.ref in lay.forms else ""
     patch = _own_fields(_fields(run, unit, empty_ok=bool(args.unset)), unit, label)
     _deadline(patch, run, unit)
+    context = SetContext(run, unit, found.record, patch, by, args.raw, False, tuple(args.unset))
     for step in SET_STEPS.get(run.skill.name, []):
-        step(SetContext(run, unit, found.record, patch, by, tuple(args.unset)))
+        step(context)
+    if args.raw is not None and not context.raw_read:
+        raise refusal(
+            unit.label, f"--raw is not used when setting {args.ref}", "leave --raw out, or set the field that reads it"
+        )
     first = _merged(found.record, patch, args.unset, keep_null=True)
     candidates = [first]
     if any(v is None for v in patch.values()):
