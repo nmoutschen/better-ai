@@ -1273,11 +1273,11 @@ function pageThread(log, itemKinds, waiting, latestLast) {
     else if (e.type === 'accept' || e.type === 'accepted' || e.type === 'reopen' || e.type === 'status') return;
     else { var n = { kind: e.type, e: e, replies: [], last: i }; if (e.id) byKey[e.id] = n; entries.push(n); }
   });
-  // A message the agent sent on its own, a question, waits for the user until they answer it: it counts as open and
-  // comes last, next to the message box.
+  // A message the agent sent on its own, a question, waits for the user until they answer it or the agent closes it with
+  // a status: it counts as open and comes last, next to the message box.
   if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
   var waits = waiting ? function (c) { return waiting(c, state); }
-    : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && !c.replies.some(function (r) { return r.type === 'note'; }); };
+    : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && state[c.e.id] !== 'done' && state[c.e.id] !== 'accepted' && !c.replies.some(function (r) { return r.type === 'note'; }); };
   entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
   // Open: the user's items not yet accepted, with what was said under them, and the entries waiting for the user.
   var open = entries.filter(function (c) {

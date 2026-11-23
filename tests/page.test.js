@@ -47,6 +47,22 @@ test("the user's answer ends the agent's wait", () => {
   assert.deepEqual(Array.from(t.entries[0].replies, r => r.id), ['m2']);
 });
 
+test("the agent's own message waits for the user until the user answers it or the agent closes it", () => {
+  const log = [
+    { type: 'reply', id: 'r1', text: 'Which size?', to: null },
+    { type: 'note', id: 'm1', text: 'later', to: null },
+  ];
+  assert.deepEqual(ids(thread(log).open), ['m1', 'r1']);
+  assert.deepEqual(ids(thread(log).entries), ['m1', 'r1']);  // waiting: last, next to the message box
+  for (const status of ['done', 'accepted']) {
+    const closed = thread(log.concat([{ type: 'status', to: 'r1', status }]));
+    assert.deepEqual(ids(closed.open), ['m1'], status);
+    assert.deepEqual(ids(closed.entries), ['r1', 'm1'], status);  // back in its place
+  }
+  const answered = thread(log.concat([{ type: 'note', id: 'm2', text: 'large', to: 'r1' }]));
+  assert.deepEqual(ids(answered.open), ['m1']);
+});
+
 test('Open lists items not yet accepted, and not deleted comments', () => {
   const t = thread([
     { type: 'note', id: 'm1', text: 'open' },
