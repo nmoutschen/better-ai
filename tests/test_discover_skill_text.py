@@ -234,6 +234,44 @@ class Rules(unittest.TestCase):
         self.assertIn("`set` the evidence `removed`, with a `reason` naming the event", text)
         self.assertIn('"status": "removed", "reason": "<the user\'s remove event', text)
 
+    def test_the_page_edit_event_is_named_edit(self):
+        text = read(RECORDS)
+        self.assertIn("- `edit`: `set` the record's `field` to `value`", text)
+        for path in [*skill_texts(), DOCS]:
+            with self.subTest(path.name):
+                self.assertNotIn("- `change`:", read(path))
+                self.assertNotRegex(read(path), r"`change` event")
+
+    def test_an_analyst_on_a_test_gets_the_items_it_settles(self):
+        text = flat(read(AGENTS["analyst"]))
+        self.assertIn("the ids and text of the items in its `settles`", text)
+        self.assertIn("ADD evidence only for the items in ITEMS, including the items a test settles", text)
+        self.assertIn("<UNIT>/sources/ and <UNIT>/evidence/", text)
+
+    def test_the_states_when_nothing_counts_and_after_an_answer(self):
+        found = steps(read(SKILL))
+        self.assertIn("`unverified` when no counting evidence bears on it", flat(found[3][1]))
+        self.assertIn("ONCE the question is answered, ADD the change its answer leads to", flat(found[5][1]))
+
+    def test_step_7_adds_the_evidence_before_the_result_points_to_it(self):
+        body = flat(steps(read(SKILL))[7][1])
+        self.assertLess(body.index("ADD the evidence it gave"), body.index("THEN SET the test `done`"))
+
+    def test_step_2_sets_the_behaviour_checker(self):
+        body = flat(steps(read(SKILL))[2][1])
+        self.assertIn("SET each behaviour's `checker` and `since`", body)
+        self.assertIn("CLEAR them when it hands back", body)
+
+    def test_the_resume_rule_starts_the_page_before_the_events(self):
+        body = flat(section(read(SKILL), "### Resume a discovery"))
+        self.assertLess(body.index("START the page as step 1 does"), body.index("better.pyz pending"))
+
+    def test_the_curl_example_saves_to_the_verifier_folder(self):
+        self.assertIn("-o <temp>/discover-verify/<idea>/<YOUR NAME>/", read(AGENTS["quote-verifier"]))
+
+    def test_the_docs_hand_on_only_expand_and_shrink_briefs(self):
+        self.assertIn("Expand and Shrink briefs are handed to", flat(read(DOCS)))
+
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
         for path in [*skill_texts(), DOCS]:
