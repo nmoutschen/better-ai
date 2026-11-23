@@ -497,6 +497,19 @@ test('a page that does not stream stays out of date once any request was refused
   assert.equal(page.els['.offline'].textContent, 'page out of date: open the address the agent gave');
 });
 
+test('a page out of date shows only the out of date strip: /listening goes through pageFetch, and the not-watching note stays hidden', async () => {
+  const where = fragment('#t=old'), sent = [];
+  const page = stripsOn({ stream: false }, (url, init) => { sent.push([url, ((init || {}).headers || {})['X-Page-Token']]);
+    return url === '/listening' ? answerWith(false) : answer(401); }, {}, where.globals);
+  await page.round();
+  assert.deepEqual(sent.find(x => x[0] === '/listening'), ['/listening', 'old']);  // with the token, as every request of the page
+  await page.context.pageFetch('/data').catch(() => {});
+  await page.round(); await page.round();
+  assert.equal(page.els['.unwatched'].hidden, true);
+  assert.equal(page.els['.offline'].hidden, false);
+  assert.equal(page.els['.offline'].textContent, 'page out of date: open the address the agent gave');
+});
+
 // ---- the focus after the check, when the send takes time
 
 // A conversation whose send does not finish until the test says so.

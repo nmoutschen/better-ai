@@ -1,7 +1,6 @@
 """Check the live architecture page's payload and the architect-better commands: review, specs, register, render, serve
 and the conversation verbs, on a copy of the fixture change folder."""
 
-import hashlib
 import json
 import re
 import shutil
@@ -22,7 +21,7 @@ import architect_records as rec  # noqa: E402
 from better import call as better_call  # noqa: E402
 from better import run as better_run  # noqa: E402
 
-from better_ai import page  # noqa: E402
+from better_ai import page, schema  # noqa: E402
 from better_ai.architect import commands, diagram, model  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -105,15 +104,19 @@ class Architect(unittest.TestCase):
         self.command("review", "--perspectives", "security")
         first = json.loads(path.read_text())
         node = next(n for n in design["containers"]["nodes"] if n["id"] == "server")
-        self.assertEqual(
-            first["hashes"]["box:server"], hashlib.sha256(json.dumps(node, sort_keys=True).encode()).hexdigest()
-        )
+        self.assertEqual(first["hashes"]["box:server"], schema.fingerprint(node, drop=()))
         self.assertEqual(set(first["changed"]), set(first["hashes"]))
         self.assertEqual(first["labels"]["box:server"], node["label"])
         self.assertEqual(first["labels"].keys(), first["hashes"].keys())
         self.assertEqual(first["by"], "architect")
         view = model.model(self.read())
         self.assertEqual(view["since"], [])
+        # A review written before the shared fingerprint holds the earlier form of each part's: it still matches.
+        nodes = {f"box:{n['id']}": n for n in design["containers"]["nodes"]}
+        stored = {**first, "hashes": {**first["hashes"], "box:server": model.stored_fingerprint(nodes["box:server"])}}
+        path.write_text(json.dumps(stored) + "\n")
+        self.assertEqual(model.model(self.read())["since"], [])
+        path.write_text(json.dumps(first) + "\n")
         self.assertEqual(view["rerun"], ["observability"])
         self.assertEqual(
             self.render_javascript(view, RERUN_SUMMARY),

@@ -469,13 +469,15 @@ function pageConversation(o) {
       }).catch(function () {}).then(function () { setTimeout(poll, 2000); });
     })();
     // Once the agent has used `wait`, a note above the message box says when no `wait` is connected: what the user
-    // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more.
+    // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more. It goes
+    // through pageFetch like every request: a page out of date shows only that strip, and asks nothing more.
     var unwatched = document.querySelector('.unwatched');
     (function watch() {
-      fetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
+      pageFetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
         unwatched.hidden = on !== false;
         if (!streaming) connected(true);
-      }).catch(function () { unwatched.hidden = true; if (!streaming) connected(false); }).then(function () { setTimeout(watch, 2000); });
+      }).catch(function (e) { unwatched.hidden = true; if (!streaming) connected(false); return e && e.stale ? 'stale' : null; })
+        .then(function (stale) { if (stale !== 'stale') setTimeout(watch, 2000); });
     })();
   }
 
@@ -717,18 +719,33 @@ function pageCan(name) { return (pageConfig().capabilities || []).indexOf(name) 
 // pageDecisionEvents(decisions, conversation) is the log the thread draws: each decision as an entry of type `decision`
 // (the record in `x`), among the conversation's events, in the order things happened. Nothing comes before what it
 // answers: an answer never shows above its decision, a reply never above the answer it replies to.
+// The decision rule every page shares. A decision's status word; the user's last answer under its thread entry C; and its
+// step: 0 the user is up (Waiting for you), 1 the user answered and the agent has not applied it, 2 applied, -1 no steps.
+// A decision waits for the user at step 0: until they answer it on the page, and again once the agent asked back.
+function pageDecisionStatus(x) { return String(x.status || 'decided').trim().toLowerCase(); }
+function pageDecisionAnswer(c) { return c.replies.filter(function (r) { return r.type === 'answer'; }).pop(); }
+function pageDecisionStep(st, answer, state) {
+  if (st !== 'waiting' && st !== 'answered') return -1;
+  if (answer && state[answer.id] === 'asked') return 0;
+  if (st === 'answered') return 2;
+  return !answer ? 0 : (state[answer.id] === 'done' || state[answer.id] === 'accepted') ? 2 : 1;
+}
+function pageDecisionWaits(c, state) { return pageDecisionStep(pageDecisionStatus(c.e.x), pageDecisionAnswer(c), state) === 0; }
+
+// The questions open for the user, for every page's count and badges: the thread entries, from DECISIONS and the
+// conversation LOG, that wait for the user. A decision waits by the shared rule above; any other entry only when the
+// page's WAITING(c, state) says so (none: no other entry counts). ITEMKINDS are the page's item kinds, as pageThread takes.
+function pageOpenDecisions(decisions, log, itemKinds, waiting) {
+  var model = pageThread(pageDecisionEvents(decisions || [], log || []), itemKinds || [], null);
+  return model.entries.filter(function (c) {
+    if (c.deleted) return false;
+    return c.kind === 'decision' ? pageDecisionWaits(c, model.state) : !!waiting && !!waiting(c, model.state);
+  });
+}
+
 function pageDecision(o) {
   var conv = o.conversation;
-  function status(x) { return String(x.status || 'decided').trim().toLowerCase(); }
-  function answerOf(c) { return c.replies.filter(function (r) { return r.type === 'answer'; }).pop(); }
-  // 0: the user is up (Waiting for you); 1: the user answered, the agent has not applied it; 2: applied; -1: no steps.
-  function step(st, answer, state) {
-    if (st !== 'waiting' && st !== 'answered') return -1;
-    if (answer && state[answer.id] === 'asked') return 0;
-    if (st === 'answered') return 2;
-    return !answer ? 0 : (state[answer.id] === 'done' || state[answer.id] === 'accepted') ? 2 : 1;
-  }
-  function waiting(c, state) { return step(status(c.e.x), answerOf(c), state) === 0; }
+  var status = pageDecisionStatus, answerOf = pageDecisionAnswer, step = pageDecisionStep, waiting = pageDecisionWaits;
   function left(x) { var t = Date.parse(x.deadline); return isNaN(t) ? null : t / 1000 - o.now(); }
   function deadlineWords(x) {
     var s = o.suggested ? null : left(x);
@@ -903,12 +920,13 @@ function pageShowErrors(el, errors, note) {
 // board; the page reads no log, the board says what each agent does. A row is
 //   who      the agent's name            what    what it works on
 //   state    the word of its chip, "Working" when none     since   when the work began: the chip adds its age
-//   last     when the agent last wrote a record: from 30 minutes on, the row says there was no word from it
+//   last     when the agent last wrote a record (its last word): from O.quietAfter seconds on, the row says there was no
+//            word from it. The threshold is the server's, `quiet_after` in the page's data.
 //   second   true for a second try      note    one more line for the row, in the error colour
 //   data     data attributes (name to value): the row is then a button that carries them
 //   kind     "verifier" for an agent that checks what others wrote: its edge is moss, not terracotta
 // A time is an ISO string or a number of milliseconds. O.now is the page's clock in seconds (the server's), O.empty the
-// line when there are no rows.
+// line when there are no rows. Without O.quietAfter no row says it was quiet.
 function pageAgents(rows, o) {
   var now = o.now * 1000;
   // The whole minutes since AT, or null when AT or the clock is not a time: the row then leaves that part out.
@@ -924,7 +942,7 @@ function pageAgents(rows, o) {
     return '<li><' + tag + '><b>' + pageEscape(r.who) + '</b><span dir="auto">' + pageEscape(r.what) + '</span>' +
       (age !== null ? '<span class="chip working">' + pageEscape(r.state || 'Working') + ', ' + age + ' min</span>' : '') +
       (r.second ? '<em class="second">second try</em>' : '') +
-      (quiet !== null && quiet >= 30 ? '<em class="dry">No word from ' + pageEscape(r.who) + ' for ' + quiet + ' min</em>' : '') +
+      (quiet !== null && o.quietAfter > 0 && quiet * 60 >= o.quietAfter ? '<em class="dry">No word from ' + pageEscape(r.who) + ' for ' + quiet + ' min</em>' : '') +
       (r.note ? '<em class="dry">' + pageEscape(r.note) + '</em>' : '') +
       '</' + (r.data ? 'button' : 'div') + '></li>';
   }).join('');

@@ -97,8 +97,9 @@ class Cli(unittest.TestCase):
     def test_s28_an_unknown_verb_exits_2_and_lists_the_valid_ones(self):
         result = run("code-better", "nope")
         self.assertEqual(result.returncode, 2)
-        self.assertIn("invalid choice: 'nope'", result.stderr)
-        self.assertIn("'check'", result.stderr)
+        # argparse quotes the verbs in some Python versions and not in others: look for the names alone.
+        self.assertRegex(result.stderr, r"invalid choice: '?nope'?")
+        self.assertRegex(result.stderr, r"choose from .*\bcheck\b")
 
     def test_s29_usage_errors_exit_2(self):
         self.assertEqual(run("code-better").returncode, 2)

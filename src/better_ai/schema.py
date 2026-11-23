@@ -49,6 +49,12 @@ Extensions, which other JSON Schema tools ignore:
 - `x-id` (the `id` property of a record type): how `add` assigns the id: `{"prefix": "D"}`,
   `{"prefix_by": "<field>", "map": {...}}`, `{"prefix": "Q", "agent": true}` or `{"from": "caller"}`. The validator
   only checks its shape; `records.py` uses it.
+- `x-public-url` (a string field): true when the value must be the http or https address of a public host: not
+  `file:` or another scheme, not localhost, and not a loopback, private, link-local or otherwise non-public IP literal
+  (`url_problem`). The check makes no network call: a name that resolves to a private address is not caught.
+- `x-written-by` (schema root): `"coordinator"` when only the coordinator writes the record type. `add` and `set`
+  (and `set --unset`) refuse any other `--by`, naming the coordinator: the `coordinator` field of the unit's head
+  where the skill's head has one, else the literal name. The validator only checks its shape; `records.py` uses it.
 - `x-old-format` (schema root): a list of schemas, the shapes a record had before this change. A record that fails the
   schema but meets one of them, and whose `at` is earlier than the cutoff the caller passes, is not an error: it is
   reported as written in the format before this change, kept as is, not converted.
@@ -65,6 +71,8 @@ from __future__ import annotations
 import copy
 import fnmatch
 import functools
+import hashlib
+import ipaddress
 import json
 import math
 import os
@@ -74,6 +82,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, NamedTuple
+from urllib.parse import unquote, urlsplit
 
 ANNOTATIONS = {"$schema", "$id", "$comment", "$defs", "title", "description", "examples", "default"}
 KEYWORDS = {
@@ -111,6 +120,8 @@ EXTENSIONS = {
     "x-check",
     "x-id",
     "x-old-format",
+    "x-public-url",
+    "x-written-by",
 }
 TYPE_NAMES = {"string", "integer", "number", "boolean", "null", "object", "array"}
 PAUSE = 0.05  # seconds before a file that failed to parse is read once more
@@ -452,8 +463,10 @@ class Validator:
         if "enum" in schema and not any(_equal(value, v) for v in schema["enum"]):
             problems.append(Problem(at, f"must be one of {', '.join(show(v) for v in schema['enum'])}"))
         if isinstance(value, str):
-            if "pattern" in schema and not re.search(schema["pattern"], value):
+            if "pattern" in schema and not _search(schema["pattern"], value):
                 problems.append(Problem(at, f"must match {schema['pattern']}"))
+            if schema.get("x-public-url") is True and (problem := url_problem(value)):
+                problems.append(Problem(at, problem))
             if "minLength" in schema and len(value) < schema["minLength"]:
                 n = schema["minLength"]
                 problems.append(Problem(at, f"must have at least {n} character{'' if n == 1 else 's'}"))
@@ -706,6 +719,106 @@ def _decision_answer_event(record: dict, context: Context) -> list[tuple[str, st
     return problems
 
 
+# ---------------------------------------------------------------- shared rules on values
+
+
+def fingerprint(value: Any, drop: tuple[str, ...] = ("at", "by")) -> str:
+    """The sha256 of a value's canonical JSON (keys sorted, no spaces, text as is), without the top-level fields in
+    `drop` when it is an object: when and by whom a record was written does not change what it says."""
+    if isinstance(value, dict):
+        value = {k: v for k, v in value.items() if k not in drop}
+    text = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+NAT64 = ipaddress.ip_network("64:ff9b::/96")
+PLAIN_HOST = re.compile(r"[a-z0-9_.-]+")
+
+
+def _short_form(host: str) -> ipaddress.IPv4Address | None:
+    """An IPv4 address written the short ways a client reads: 127.1, 0x7f.0.0.1, 0177.0.0.1, 2130706433."""
+    parts = host.split(".")
+    if not 1 <= len(parts) <= 4 or not all(re.fullmatch(r"0[xX][0-9a-fA-F]+|[0-9]+", p) for p in parts):
+        return None
+    try:
+        numbers = [
+            int(p, 16) if p[:2] in ("0x", "0X") else int(p, 8) if p[0] == "0" and len(p) > 1 else int(p) for p in parts
+        ]
+    except ValueError:  # an octal part with an 8 or 9
+        return None
+    *head, last = numbers
+    if any(n > 255 for n in head) or last >= 256 ** (5 - len(parts)):
+        return None
+    value = last
+    for position, n in enumerate(head):
+        value += n << (8 * (3 - position))
+    return ipaddress.IPv4Address(value)
+
+
+def _literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """The address a host names when it is an IP literal, in any form a client reads: dotted, short, octal, hex, decimal."""
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return _short_form(host)
+    if ip.version == 6 and ip.ipv4_mapped is not None:
+        return ip.ipv4_mapped
+    if ip.version == 6 and (int(ip) >> 32 == 0 or ip in NAT64):  # ::/96 and 64:ff9b::/96 hold an IPv4 address
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    return ip
+
+
+def _is_ip(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
+
+
+def _host(host: str) -> str | None:
+    """A host as a client reads it: an IP literal as it is, a name through IDNA (full-width digits and dots, other
+    scripts) in lower case. None if it is not a valid host."""
+    if _is_ip(host):
+        return host.lower()
+    try:
+        return host.encode("idna").decode("ascii").lower()
+    except UnicodeError:
+        return None
+
+
+def url_problem(url: str) -> str | None:
+    """Why an address is refused as a public page's, or None (`x-public-url`): an http or https address of a public
+    host only: not localhost, and not a loopback, private, link-local or otherwise non-public IP literal. Offline: a
+    name that resolves to a private address is not caught here."""
+    if re.search(r"[\s\\\x00-\x1f]", url):
+        return "has a backslash, space or control character: write the plain address"
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname
+    except ValueError:
+        return "is not a valid address: give the page's http or https address"
+    if parts.scheme not in ("http", "https"):
+        return f"must be an http or https address, not {parts.scheme or 'no scheme'}: give the page's http or https address"
+    if not host:
+        return "has no host: give the page's http or https address"
+    host = unquote(host)  # as a client reads it: the percent-encoded bytes first
+    if "%" in host:
+        return "has a percent sign in its host: write the host name or address plainly"
+    host = _host(host.rstrip("."))
+    numeric_end = bool(host) and re.fullmatch(r"[0-9]+|0[xX][0-9a-fA-F]*", host.rsplit(".", 1)[-1])
+    if numeric_end and not _is_ip(host) and _short_form(host) is None:  # a number a client would wrap or refuse
+        return "is not a plain host name or address: give the page's http or https address"
+    if not host or not (PLAIN_HOST.fullmatch(host) or _is_ip(host)):
+        return "is not a plain host name or address: give the page's http or https address"
+    if host == "localhost" or host.endswith(".localhost"):
+        return "is localhost: give the address of a public page"
+    ip = _literal(host)
+    if ip is not None and not ip.is_global:
+        return f"is {host}, a loopback, private or link-local address: use the page's public address"
+    return None
+
+
 # ---------------------------------------------------------------- checking files
 
 
@@ -733,6 +846,10 @@ def _audit_extensions(node: dict, where: str) -> None:
         caller = isinstance(rule, dict) and rule.get("from") == "caller"
         if not (by_field or fixed or caller):
             raise SchemaError(f'{where}: x-id needs a "prefix", a "prefix_by" with a "map", or "from": "caller"')
+    if "x-public-url" in node and node["x-public-url"] is not True:
+        raise SchemaError(f"{where}: x-public-url must be true")
+    if "x-written-by" in node and node["x-written-by"] != "coordinator":
+        raise SchemaError(f'{where}: x-written-by must be "coordinator"')
     if "x-old-format" in node and not (
         isinstance(node["x-old-format"], list) and all(isinstance(s, dict) for s in node["x-old-format"])
     ):
@@ -792,6 +909,31 @@ def _audit(node: Any, where: str, boolean_ok: bool = False) -> None:
             _audit(node[keyword], f"{where}/{keyword}")
     if "additionalProperties" in node:
         _audit(node["additionalProperties"], f"{where}/additionalProperties", boolean_ok=True)
+
+
+@functools.cache
+def _strict(pattern: str) -> str:
+    """The pattern with each `$` outside a character class turned into `\\Z`. In Python `$` also matches just before a
+    final newline, so `^[a-z]+$` would accept "abc\\n"; JSON Schema's `$` is the end of the string."""
+    out, i, inside = [], 0, False
+    while i < len(pattern):
+        c = pattern[i]
+        if c == "\\" and i + 1 < len(pattern):
+            out.append(pattern[i : i + 2])
+            i += 2
+            continue
+        if c == "[" and not inside:
+            inside = True
+        elif c == "]" and inside:
+            inside = False
+        out.append("\\Z" if c == "$" and not inside else c)
+        i += 1
+    return "".join(out)
+
+
+def _search(pattern: str, value: str) -> bool:
+    """JSON Schema `pattern`: found anywhere in the value, with `$` meaning the very end."""
+    return re.search(_strict(pattern), value) is not None
 
 
 def load_schemas(*sources: Any) -> dict[str, dict]:

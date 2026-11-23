@@ -402,7 +402,7 @@ function start(data) {
       commentsById = new Map(model.entries.filter(entry => entry.kind === 'comment' && !entry.deleted)
         .map(entry => [entry.e.id, entry.e]));
       openComments.textContent = open.length;
-      openQuestions.textContent = model.entries.filter(entry => !entry.deleted && waiting(entry, states)).length;
+      openQuestions.textContent = pageOpenDecisions([], log, items, waiting).length;
       const counts = new Map();
       for (const {e} of open) {
         const key = locate(e)?.closest('[role="tabpanel"]')?.id.slice(6);
