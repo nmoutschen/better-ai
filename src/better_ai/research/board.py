@@ -275,6 +275,7 @@ SPEC = page.register(
         title="Research board",
         agent="coordinator",
         main="research/board.html",
+        aside="research/agents.html",
         load=load,
         events="board-events.schema.json",
         assets={"/board.css": "research/board.css", "/board.js": "research/board.js"},

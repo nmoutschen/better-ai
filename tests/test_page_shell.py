@@ -211,6 +211,15 @@ class ShellTest(Fixture):
         self.assertEqual(json.loads(config)["title"], spec.title)
         self.assertEqual(json.loads(config)["capabilities"], ["pins", "approve"])
 
+    def test_the_research_board_lists_its_agents_in_the_side_column_above_the_conversation_not_under_the_map(self):
+        from better_ai.research import board
+
+        text = page.shell(board.SPEC)
+        main = text[text.index("<main") : text.index("</main>")]
+        aside = text[text.index('<aside class="notes"') : text.index("</aside>")]
+        self.assertNotIn('id="agents"', main)
+        self.assertLess(aside.index('id="agents"'), aside.index('id="notes-h"'))
+
     def test_a_marker_inside_a_value_is_not_filled_twice(self):
         spec = page.PageSpec(**{**self.spec.__dict__, "title": "%%MAIN%%"})
         self.assertEqual(page.shell(spec).count(FIXTURE_MAIN), 1)

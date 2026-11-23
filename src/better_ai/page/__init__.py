@@ -8,6 +8,7 @@ registers with `register(SKILL, PageSpec(...))` when it is imported:
 - `title`, `agent`: the page's title, and the agent's role name (such as "coordinator"), which the shared "not watching" and
   "closed" strips and the thread say;
 - `main`: the bundled HTML of the page's main section (a name under `better_ai/`, such as "research/board.html");
+- `aside`: optional bundled HTML put at the top of the side column, above the conversation;
 - `assets`, `css`, `js`: the fixed table of files the page serves, by URL path (`{"/board.js": "research/board.js"}`),
   and which of them the shell links; no other path is served;
 - `capabilities`: the shared parts of the page it uses, from CAPABILITIES; the server accepts the events of those and
@@ -94,6 +95,7 @@ class PageSpec:
     methods: tuple[str, ...] = ()
     items: tuple[str, ...] | None = None
     empty: str | None = None
+    aside: str | None = None
     revision: Callable[[Unit], str] | None = None
     stopped: Callable[[Unit], bool] | None = None
     tick: Callable[[Unit, Conversation], None] | None = None
@@ -136,6 +138,8 @@ def register(skill: Skill, spec: PageSpec) -> PageSpec:
             raise ValueError(f"{skill.name}: {url!r} is linked but not in the asset table")
     if not resources.exists(spec.main):
         raise ValueError(f"{skill.name}: the main section {spec.main!r} is not bundled")
+    if spec.aside and not resources.exists(spec.aside):
+        raise ValueError(f"{skill.name}: the side section {spec.aside!r} is not bundled")
     PAGES[skill.name] = spec
     return spec
 
@@ -615,6 +619,7 @@ def shell(spec: PageSpec) -> str:
         "%%SCRIPTS%%": "\n".join(f'<script src="{html.escape(url)}"></script>' for url in spec.js),
         "%%CONFIG%%": _json_for_html(config),
         "%%MAIN%%": resources.read_text(spec.main),
+        "%%ASIDE%%": resources.read_text(spec.aside) if spec.aside else "",
     }
     text = resources.read_text("page/shell.html")
     # One pass over the shell, so a value that holds a marker is not filled in again.
