@@ -2,7 +2,8 @@
 
     python3 tests/run.py [--jobs N] [module ...]
 
-Each module runs as `python -I -m unittest discover -s tests -p <module>.py`, the way the full discover run imports it.
+Each module runs as `python -I tests/run.py --child <module>`, which loads it the way the full discover run does
+and writes its counts as JSON for this process to read.
 Failing modules print their whole output; then one summary line and the slowest modules. Exits 1 on any failure.
 """
 
@@ -50,6 +51,9 @@ def child(name, result_file):
         "unexpected_successes": len(result.unexpectedSuccesses),
     }
     Path(result_file).write_text(json.dumps(counts))
+    if suite.countTestCases() == 0:
+        print(f"no tests found for {name}")
+        return 1
     return 0 if result.wasSuccessful() else 1
 
 
