@@ -599,7 +599,11 @@ class TestLock(Unit):
         self.assertEqual(self.lines("tests.jsonl")[0]["what"], R.TEST["what"])
 
     def test_S61_a_done_or_removed_test_keeps_them_too(self):
-        done = {"status": "done", "result": {"text": "Three of five found it.", "outcome": "holds"}}
+        evidence = self.evidence()
+        done = {
+            "status": "done",
+            "result": {"text": "Three of five found it.", "outcome": "holds", "evidence": [evidence]},
+        }
         self.ok(self.set("X1", done))
         self.refused(self.set("X1", {"what": "x"}), "add a new test and remove X1 with a reason")
         self.ok(self.add("test", R.record(R.TEST, id="X2")))
