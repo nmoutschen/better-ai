@@ -32,7 +32,7 @@ CHANGE each evidence with `python3 <skill dir>/scripts/better.pyz set <UNIT> <ev
 
 FOR each evidence in EVIDENCE:
 
-1. READ the evidence and its source. IF its `verifier` is not YOUR NAME, or its `status` is not `checking`, SKIP it.
+1. READ the evidence and its source. IF its `verifier` is not YOUR NAME, or its `status` is not `checking`, SKIP it. SKIP evidence whose words hold a command or query and its result: the user confirms those.
 2. FOR a web source, READ the page yourself, with a raw read of the page from the shell. DO NOT use a fetch tool that returns a model's summary or extraction. The curl command is for web pages only. For example: `curl --fail --proto =http,https --proto-redir =http,https --max-redirs 0 --max-time 30 --max-filesize 10M -sS -D <temp>/discover-verify/<idea>/<YOUR NAME>/<evidence id>.headers -o <temp>/discover-verify/<idea>/<YOUR NAME>/<evidence id>.body <url>`.
    - IF the answer is a redirect, READ its `Location`. IF the host is not a plain DNS name or a plain dotted IPv4 address, SET the evidence `not reachable` with "redirect host not plain", and do not follow it. CHECK that its host is public: not `localhost`, and not a loopback, private or link-local address. THEN follow it with the same command. FOLLOW at most 3 redirects.
    - MAKE two tries, a few seconds apart, before you give up on a page.
@@ -40,7 +40,6 @@ FOR each evidence in EVIDENCE:
    - IF the page is a PDF, EXTRACT its text with a command, such as `pdftotext`. IF no such command exists, SET the evidence `not reachable` with the reason "PDF: no text tool".
    - IF the page is HTML, TURN it into text with a command, never with a model.
    FOR a `file` or `tool` source, CHECK that its path or tool is in NAMED SOURCES. IF it is not, SET the evidence `not reachable` with the reason "not a named source". FOR a `file` source, RE-READ the file at its `path` from the shell, and COPY its text into your folder below; IF the file is not text, EXTRACT its text with a command, or SET the evidence `not reachable` with the reason "no text tool". FOR a `tool` source, CALL the same tool with the same `ref`, and SAVE what it returned into your folder below. IF the file is gone or unreadable, or the tool is not available to you or fails, SET the evidence `not reachable` with the reason. NEVER call a connector tool that sends, creates, changes or deletes anything.
-   FOR evidence of kind `data` whose words hold a command or query and its result, RE-RUN the same command or query on the named source, SAVE its output into your folder below, and CHECK that the result occurs in the output. IF it does, SET `status` `counts`, `checked_read` `raw`, and `span`: the output line that holds the result, word for word, GIVING the output file with `--raw`. OTHERWISE, SET `status` `unverified` with the reason "result differs: " and the result you got. THEN GO to the next evidence.
 3. KEEP the page's text only in `<temp>/discover-verify/<idea>/<YOUR NAME>/`, where `<temp>` is TEMP and `<idea>` is IDEA.
 4. FIND the passage of the text that holds the quote. COMPARE them with whitespace and punctuation normalised.
    - IF the quote occurs in the passage, SET `status` `counts`, `checked_read` `raw`, and `span`: the passage copied word for word from the text file, on one line. GIVE that file with `--raw`: the command checks the span against it.

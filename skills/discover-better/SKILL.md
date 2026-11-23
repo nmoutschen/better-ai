@@ -32,7 +32,7 @@ FOLLOW these steps in order, from step 1 for a new discovery, or from the step t
 
 READ [formats/records.md](formats/records.md): it is MANDATORY, and no step can add a record without it.
 
-NAME the user's GOAL: what they must be able to decide once the discovery ends. CAPTURE the idea in the user's own words, their own criteria, and what they brought, such as notes, data or names of tools, before you offer any alternative.
+NAME the user's GOAL: what they must be able to decide once the discovery ends. CAPTURE the idea in the user's own words, their own criteria, and what they brought, such as notes, data or names of tools, before you offer any alternative. WHEN the user names files or connectors for analysts to read, at any step, ADD them to the head's `named_sources` with `set`, as formats/records.md shows: analysts and verifiers read no other file or connector.
 
 ASK, as the general rule [Ask the user](#ask-the-user) says, for what the request does not state:
 
@@ -72,7 +72,9 @@ ASK four questions of the idea: does something already do it, is the problem rea
 
 FOR each item to check, SET its `checker` to a new analyst name and its `since`, ADD a change of its state to `checking`, and START an analyst: READ [agents/analyst.md](agents/analyst.md), FILL IN its Input, with the item's existing sources and evidence, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent. ASK each analyst for evidence against the item as well as for it.
 
-AS evidence appears with `status` `checking`, START a quote verifier for it: SET the evidence's `verifier` to a new verifier name and its `since`, READ [agents/quote-verifier.md](agents/quote-verifier.md), FILL IN its Input, with NAMED SOURCES the files and read-only connector tools the user named, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent.
+AS evidence appears with `status` `checking`, START a quote verifier for it: SET the evidence's `verifier` to a new verifier name and its `since`, READ [agents/quote-verifier.md](agents/quote-verifier.md), FILL IN its Input, with NAMED SOURCES from the head's `named_sources`, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent.
+
+FOR evidence of kind `data` whose words hold a command or query and its result, START no verifier: nothing runs it again. ASK a question about that evidence, showing its command or query and its result, with the suggested default "Confirm this result". ONCE the user takes it, SET the evidence `counts`.
 
 WAIT for the analysts' and the quote verifiers' hand-backs. Meanwhile, questions to the user go on. DO NOT choose a move or write a brief until they hand back.
 
@@ -197,7 +199,7 @@ RUN at most 4 analysts and at most 4 verifiers at once. GIVE each a new, short n
 
 WAIT for checks at most 30 minutes, then go on, treating evidence still `checking` as not counting, and TELL the user.
 
-WHEN a sub-agent ends with work still under its name, RUN `check`, THEN restart it once under a new name: `tries` holds at most two. OTHERWISE, SET its evidence `unverified` with the reason "verifier did not finish", or CLEAR the item's `checker`, and SAY so. WHEN you replace a quote verifier, DELETE its temporary folder, `<temp>/discover-verify/<idea>/<its name>/`. START a verifier for each evidence `checking` with no verifier.
+WHEN a sub-agent ends with work still under its name, RUN `check`, THEN restart it once under a new name: `tries` holds at most two. OTHERWISE, SET its evidence `unverified` with the reason "verifier did not finish", or CLEAR the item's `checker`, and SAY so. WHEN you replace a quote verifier, DELETE its temporary folder, `<temp>/discover-verify/<idea>/<its name>/`. START a verifier for each evidence `checking` with no verifier, except a computed result, which the user confirms as step 3 says.
 
 ### Add the records
 
@@ -222,7 +224,7 @@ WHEN you resume a discovery, after a new invocation or after the harness compact
 1. RUN `python3 <skill dir>/scripts/better.pyz summary <unit>`: its first line names the coordinator to use with `--by`. THEN RUN `python3 <skill dir>/scripts/better.pyz check <unit>`.
 2. START the page as step 1 does, if it is not served. THEN RUN `python3 <skill dir>/scripts/better.pyz pending <unit>`, and handle each open page event.
 3. ASK the harness which sub-agents are still running, and restart each checker or verifier that is not, under a new name. IF the harness cannot list them, restart only those with no record for 30 minutes.
-4. START a verifier for each evidence `checking` with no verifier.
+4. START a verifier for each evidence `checking` with no verifier, except a computed result, giving NAMED SOURCES from the head's `named_sources`.
 5. FINISH an unfinished `brief` or `redact` by running it again.
 6. ADD the changes for counting evidence and answered risk questions that no change cites.
 7. IF a final brief exists for Expand or Shrink and the head has no `handed`, hand it on as step 9 says.
