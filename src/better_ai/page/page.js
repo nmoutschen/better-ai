@@ -703,13 +703,15 @@ function pageDecision(o) {
     if (s === null) return '';
     return s > 0 ? 'default in ' + (s < 90 ? 'under 2 min' : Math.round(s / 60) + ' min') : 'default due now';
   }
-  // The open question after the one with id FROM, else the first before it: its ✓, or its Answer. Else what the page says
-  // waits next, else another item the agent asked about. Nothing else waits: null.
+  // What takes the focus after the question FROM is answered, found at the click, before the send: the thread may redraw
+  // before the send is done, and the answered question is then gone. The open question after it, else the first before
+  // it: {id}, found again by id afterwards. Else what the page says waits next, else another item the agent asked
+  // about: {el}. Nothing else waits: null.
   function nextWaiting(from) {
     var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q')), i = -1, k;
     for (k = 0; k < list.length; k++) if (list[k].dataset.d === from) i = k;
     var others = list.slice(i + 1).concat(list.slice(0, Math.max(i, 0))).filter(function (q) { return q.dataset.d !== from; });
-    if (others.length) { var q = others[0]; return { id: q.dataset.d, el: q.querySelector('.use') || q.querySelector('.answer') || q }; }
+    if (others.length) return { id: others[0].dataset.d };
     var page = o.next && o.next();
     if (page) return { el: page };
     var asked = Array.prototype.slice.call(document.querySelectorAll('li[data-state="asked"]')).filter(function (q) { return q.dataset.d !== from && !/open-q/.test(q.className); });
@@ -717,13 +719,19 @@ function pageDecision(o) {
     asked[0].setAttribute('tabindex', '-1');
     return { el: asked[0] };
   }
-  // The redraw after an answer replaces the nodes: the question to focus is focused again once it is drawn.
+  function questionEl(id) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q'));
+    for (var k = 0; k < list.length; k++) if (list[k].dataset.d === id) return list[k].querySelector('.use') || list[k].querySelector('.answer') || list[k];
+    return null;
+  }
+  // A redraw after the answer replaces the nodes: the question's new ✓ is focused once drawn, only while the focus is
+  // still on the button that had it or on nothing, so a redraw never takes it from where the user went.
   var want = null;
-  function focusNext(from) {
-    var n = nextWaiting(from);
+  function focusTarget(n) {
     if (!n) return;
-    if (n.el.focus) n.el.focus({ preventScroll: true });
-    if (n.id) want = n.id;
+    var el = n.id ? questionEl(n.id) : n.el;
+    if (el && el.focus) el.focus({ preventScroll: true });
+    want = n.id ? { id: n.id, from: el } : null;
   }
   function head(who, label) {
     return '<div class="head"><span class="who">' + o.esc(who) + '</span><span class="when">' + o.esc(label) + '</span></div>';
@@ -755,12 +763,19 @@ function pageDecision(o) {
         use.type = 'button'; use.className = 'btn btn--sm answer use'; use.textContent = '✓'; use.title = 'Use the default';
         use.setAttribute('aria-label', 'Use the default for: ' + q);
         use.addEventListener('click', function () {
+          var target = nextWaiting(x.id);
           use.disabled = true;
           conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer',
-            function () { focusNext(x.id); }, function () { use.disabled = false; });
+            function () { focusTarget(target); }, function () { use.disabled = false; });
         });
         foot.append(use);
-        if (want === x.id) { want = null; Promise.resolve().then(function () { use.focus({ preventScroll: true }); }); }
+        if (want && want.id === x.id) {
+          var from = want.from; want = null;
+          Promise.resolve().then(function () {
+            var now = document.activeElement;
+            if (!now || now === document.body || now === from) use.focus({ preventScroll: true });
+          });
+        }
       }
       var change = document.createElement('button');
       change.type = 'button'; change.className = 'btn btn--sm btn--quiet answer change';

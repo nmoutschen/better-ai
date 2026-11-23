@@ -25,6 +25,7 @@ function load(config) {
   const document = {
     createElement: tag => new Node(tag),
     getElementById: id => id === 'page-config' && config ? { textContent: JSON.stringify(config) } : null,
+    get activeElement() { return Node.focused; },
     querySelectorAll: sel => (load.thread && load.thread[sel]) || [],
   };
   return loadPage({ document, Date, JSON, Object, Math, String, Array, isNaN });
@@ -367,4 +368,36 @@ test('code-better and research-better decisions render as before, with the deadl
   assert.match(seen[1], /default in under 2 min/);
   assert.match(seen[2], /default due now/);
   seen.forEach(html => { assert.match(html, /If you don(&#39;|')t answer: /); assert.doesNotMatch(html, /Suggested default/); });
+});
+
+// The thread can be redrawn before `done` runs (a page that is not served redraws in send; a served one by its poll): the
+// answered question is then gone, and the target must come from what the click saw.
+test('after the check on the middle of three questions, the focus goes to the third, though the thread redrew first', () => {
+  const page = load({ capabilities: ['decisions'] });
+  let rows = [];
+  const conversation = { box() {}, progress: () => new Node('span'),
+    send(m, p, w, done) { load.thread['li.open-q'] = [rows[0].n, rows[2].n]; done(); } };
+  const d = page.pageDecision({ conversation, now: () => 0, md: t => t, esc: String, id: p => p + '-1' });
+  rows = ['D1', 'D2', 'D3'].map(id => {
+    const [n, foot] = d.item({ e: { x: { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' } }, replies: [] }, {}, true);
+    n.dataset.d = id; n.found = { '.use': buttons(foot)[0], '.answer': buttons(foot)[1] };
+    return { n, use: buttons(foot)[0] };
+  });
+  load.thread = { 'li.open-q': rows.map(r => r.n) };
+  Node.focused = null;
+  rows[1].use.click();
+  assert.equal(Node.focused, rows[2].use);
+  load.thread = null;
+});
+
+test('a later redraw does not take the focus from where the user went', async () => {
+  const page = load({ capabilities: ['decisions'] });
+  const items = questions(page, ['D1', 'D2']);
+  items[0].use.click();
+  const composer = new Node('textarea');
+  Node.focused = composer;
+  const [, foot] = items[0].t.d.item(items[1].t.entry, {}, true);
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(Node.focused, composer);
+  load.thread = null;
 });
