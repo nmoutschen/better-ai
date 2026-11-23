@@ -38,16 +38,14 @@ record must be to count and `add` and `set` hold how it got there.
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
-import unicodedata
 from collections.abc import Iterator
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-from .. import cli, paths, records, schema
+from .. import cli, paths, quotes, records, schema
+from ..quotes import normalise, quote_in_span
 from . import derive
 
 SKILL = "discover-better"
@@ -60,21 +58,6 @@ READ_KINDS = ("web", "file", "tool")  # origins an analyst read and a verifier r
 CONFIRM = "Confirm this result"  # the default of the question that makes a computed result count
 NOT_CONFIRMED = "not confirmed by you"
 USER_ONLY = ("verifier", "tries", "since", *CHECKED)  # fields the user's own evidence never has
-
-
-# ---------------------------------------------------------------- words
-
-
-def normalise(text: str) -> str:
-    """The words of `text` for comparing: lower case, punctuation and runs of whitespace as one space."""
-    folded = unicodedata.normalize("NFKC", text).casefold()
-    return re.sub(r"[\W_]+", " ", folded).strip()
-
-
-def quote_in_span(quote: str, span: str) -> bool:
-    """The quote's words occur in the span as whole words, after whitespace and punctuation are normalised."""
-    words = normalise(quote)
-    return bool(words) and f" {words} " in f" {normalise(span)} "
 
 
 # ---------------------------------------------------------------- reading the unit
@@ -455,25 +438,6 @@ def _names_the_request(unit: paths.Unit, ident: str, reason: Any) -> bool:
     return any(isinstance(w, str) and re.search(rf"(?<![\w-]){re.escape(w)}(?![\w-])", reason) for w in wanted)
 
 
-def _raw_text(ctx: records.SetContext) -> tuple[str, str]:
-    """The page the verifier read, as the file given with --raw says: its text and its sha256."""
-    if ctx.raw is None:
-        raise _refuse(
-            ctx.unit,
-            "counts needs the page the verifier read",
-            "save the raw page to a file outside .discover/ and run again with --raw <file>",
-        )
-    ctx.raw_read = True
-    path = Path(ctx.raw)
-    try:
-        if not path.is_file():
-            raise OSError("not a file")
-        data = path.read_bytes()
-    except OSError as error:
-        raise _refuse(ctx.unit, f"cannot read --raw {ctx.raw} ({error})", "give the file the verifier saved") from None
-    return data.decode("utf-8", "replace"), hashlib.sha256(data).hexdigest()
-
-
 def _count(ctx: records.SetContext, by: str) -> None:
     """Make the patch of a set to `counts` complete, or refuse. The verifier gives `checked_read` and `span`; the
     command adds the hash of the file."""
@@ -493,20 +457,10 @@ def _count(ctx: records.SetContext, by: str) -> None:
     span = patch.get("span")
     if not isinstance(span, str) or not span:
         raise _refuse(ctx.unit, "counts needs the span you copied from the page", 'set "span" to that text')
-    text, digest = _raw_text(ctx)
-    if span not in text:
-        raise _refuse(
-            ctx.unit,
-            f"the span does not occur in {ctx.raw}",
-            "copy the span from the page file exactly, or set unverified or not reachable with a reason",
-        )
     words = record.get("words") if isinstance(record.get("words"), dict) else {}
-    if not isinstance(words.get("text"), str) or not quote_in_span(words["text"], span):
-        raise _refuse(
-            ctx.unit,
-            "the quote does not occur in the span",
-            'copy the part of the page that holds the quote, or set unverified with the reason "reworded"',
-        )
+    digest = quotes.check_read(
+        ctx, [span], words.get("text"), "save the raw page to a file outside .discover/ and run again with --raw <file>"
+    )
     patch["sha256"] = digest
 
 

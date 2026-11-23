@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .. import paths, records
+from .. import paths, quotes, records
 
 
 @records.set_step("research-better")
@@ -56,3 +56,39 @@ def new_board_has_no_changes(ctx: records.CreateContext):
             "a new board's changes must be []",
             'create it with "changes": [], then set the brief to record a change',
         )
+
+
+RAW_THEN = "save the text of the page you read to a file outside the board and run again with --raw <file>"
+
+
+@records.add_guard("research-better", "claim")
+def claim_starts_unchecked(ctx: records.AddContext) -> None:
+    """A claim is added `unchecked`: only `set` by a verifier, with the page it read, makes it `verified`."""
+    if ctx.record.get("status") != "unchecked":
+        raise paths.refusal(
+            ctx.unit.label, 'a new claim must have "status": "unchecked"', "add it unchecked: a verifier checks it"
+        )
+
+
+@records.set_step("research-better")
+def verified_needs_the_page_read(ctx: records.SetContext) -> None:
+    """A claim set `verified`, or a verified claim whose span or quote changes, needs `--raw`: the text of the page the
+    verifier read. Each passage of the span (joined by " ... ") must occur in it, and the quote in the span; the
+    command keeps the file's `sha256`. A claim that stops being verified loses its `sha256`."""
+    record, patch = ctx.record, ctx.patch
+    if record.get("type") != "claim":
+        return
+    status = patch.get("status", record.get("status"))
+    if "sha256" in patch or ("sha256" in ctx.unsets and status == "verified"):
+        raise paths.refusal(ctx.unit.label, "sha256 is computed by better.pyz from --raw", "leave sha256 out")
+    if status != "verified":
+        if "sha256" in record and "sha256" not in ctx.unsets:
+            ctx.unsets = (*ctx.unsets, "sha256")
+        return
+    if record.get("status") == "verified" and "span" not in patch and "quote" not in patch:
+        return
+    span = patch.get("span", record.get("span"))
+    if not isinstance(span, str) or not span.strip():
+        raise paths.refusal(ctx.unit.label, "verified needs the span you copied from the page", 'set "span"')
+    passages = [p for p in span.split(" ... ") if p.strip()]
+    patch["sha256"] = quotes.check_read(ctx, passages, patch.get("quote", record.get("quote")), RAW_THEN)

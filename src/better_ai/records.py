@@ -101,7 +101,8 @@ class SetContext:
     by: str | None = None  # who makes the change (`set --by`); the record's own `by`, its creator, never changes
     raw: str | None = None  # a file path given as `set --raw`, for a step whose rule reads that file
     raw_read: bool = False  # a step that reads `raw` sets it; `set` refuses a `--raw` that no step read
-    unsets: tuple[str, ...] = ()  # the fields `set --unset` removes, which a step that guards a field must also see
+    unsets: tuple[str, ...] = ()  # the fields `set --unset` removes, which a step that guards a field must also see;
+    # a step may add to it, such as to drop a field the command computed
 
 
 CREATE_STEPS: dict[str, list[Callable]] = {}
@@ -909,10 +910,10 @@ def set_(args: argparse.Namespace, run: Run) -> int:
         raise refusal(
             unit.label, f"--raw is not used when setting {args.ref}", "leave --raw out, or set the field that reads it"
         )
-    first = _merged(found.record, patch, args.unset, keep_null=True)
+    first = _merged(found.record, patch, list(context.unsets), keep_null=True)
     candidates = [first]
     if any(v is None for v in patch.values()):
-        candidates.append(_merged(found.record, patch, args.unset, keep_null=False))
+        candidates.append(_merged(found.record, patch, list(context.unsets), keep_null=False))
     chosen = None
     for record in candidates:
         errors, warnings = _check_set(run, unit, found, record, lay.forms.get(found.record.get("type")))
