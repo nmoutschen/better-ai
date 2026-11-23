@@ -249,11 +249,11 @@ def _brief_rules(record: dict, context: Context) -> list[tuple[str, str]]:
     return problems
 
 
-def _only_brief_makes_final(ctx: Any, what: str) -> None:
+def _only_brief_makes_final(ctx: Any, what: str, field: str | None = None) -> None:
     ident = ctx.record.get("id")
     raise paths.refusal(
         ctx.unit.label,
-        f"{what} cannot make {ident} final",
+        f"{what} cannot change {field} of {ident}" if field else f"{what} cannot make {ident} final",
         f"finish the text, then run `better.pyz brief {ctx.unit.label} {ident}`, which writes the file and sets it final",
     )
 
@@ -264,7 +264,28 @@ def _add_is_for_drafts(ctx: records.AddContext) -> None:
         _only_brief_makes_final(ctx, "add")
 
 
+GUARDED = ("status", "file", "sha256", "redacted")  # what `brief` and `redact` write: a draft never gains them by set
+
+
 @records.set_step(SKILL.name)
-def _set_is_for_drafts(ctx: records.SetContext) -> None:
-    if ctx.record.get("type") == "brief" and ctx.patch.get("status") == "final":
+def _set_leaves_moves_and_final_briefs_alone(ctx: records.SetContext) -> None:
+    """A move is never changed. A final brief is never changed by set: only `redact` edits one, in place. A draft may
+    change its text, but never gains `status`, `file`, `sha256` or `redacted`, whether the field is given or removed."""
+    ident, kind = ctx.record.get("id"), ctx.record.get("type")
+    if kind == "move":
+        raise paths.refusal(
+            ctx.unit.label, f"{ident} is a move, and set cannot change it", "add a new move for the user's new choice"
+        )
+    if kind != "brief":
+        return
+    if ctx.record.get("status") == "final":
+        raise paths.refusal(
+            ctx.unit.label,
+            f"{ident} is final, and set cannot change it",
+            f"add the next brief version for {ctx.record.get('move')}, or run redact to remove evidence",
+        )
+    touched = [f for f in GUARDED if f in ctx.patch or f in ctx.unsets]
+    if ctx.patch.get("status") == "final":
         _only_brief_makes_final(ctx, "set")
+    if touched:
+        _only_brief_makes_final(ctx, "set", touched[0])

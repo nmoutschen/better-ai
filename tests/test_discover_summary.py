@@ -352,6 +352,14 @@ class Warnings(Discovery):
         put_json(self.unit, "sources/S-coord-1.json", R.record(R.YOU_SOURCE, origin={"type": "you", "given": given}))
         self.quiet("done-event-unanswered")
 
+    def test_S55_a_done_event_the_user_followed_up_is_open_not_done(self):
+        note = {"type": "note", "at": R.AT, "by": "user", "id": "n9", "to": "a1", "text": "Also this."}
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), note])
+        self.quiet("done-event-unanswered")
+        reopen = {"type": "reopen", "at": R.AT, "by": "user", "to": "a1", "text": "No."}
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), reopen])
+        self.quiet("done-event-unanswered")
+
     def test_S55_an_open_event_is_not_a_done_event(self):
         put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1")])
         self.quiet("done-event-unanswered")

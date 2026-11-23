@@ -385,7 +385,12 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
         for s in _strings(r)
     }
     for ident in events.tracked:
-        if events.state.get(ident) == "done" and ident not in pointed and ident not in events.replied:
+        if (
+            events.state.get(ident) == "done"
+            and ident not in {e.get("id") for e, _, _ in events.open}
+            and ident not in pointed
+            and ident not in events.replied
+        ):
             found.append(
                 Warning_(
                     "done-event-unanswered",

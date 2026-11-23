@@ -275,6 +275,57 @@ class Briefs(Unit):
         self.refused(self.set("v1", {"status": "final"}), "set cannot make v1 final", "better.pyz brief")
         self.assertIn('"status": "draft"', (self.unit / "briefs.jsonl").read_text())
 
+    def set_unset(self, ident, fields, *unsets):
+        args = [a for field in unsets for a in ("--unset", field)]
+        return better.call(
+            SKILL, "set", UNIT, ident, "--by", R.COORD, *args, stdin=json.dumps(fields) if fields else "", cwd=self.repo
+        )
+
+    def test_S42_a_final_brief_refuses_every_set_and_every_unset_and_stays_as_it_was(self):
+        self.final()
+        briefs, text = (self.unit / "briefs.jsonl").read_bytes(), (self.unit / "brief" / "v1.md").read_bytes()
+        patches = {
+            "move": "M1",
+            "status": "draft",
+            "decision": "x",
+            "why": "x",
+            "questions": ["x"],
+            "file": "brief/other.md",
+            "sha256": "c" * 64,
+            "redacted": ["d" * 64],
+        }
+        for name, value in patches.items():
+            with self.subTest(patch=name):
+                self.refused(self.set("v1", {name: value}), "v1 is final, and set cannot change it", "redact")
+        for name in (*patches, "file"):
+            with self.subTest(unset=name):
+                self.refused(self.set_unset("v1", None, name), "v1 is final, and set cannot change it")
+        with self.subTest(case="back to draft, unsetting file and sha256"):
+            self.refused(
+                self.set_unset("v1", {"status": "draft"}, "file", "sha256"), "v1 is final, and set cannot change it"
+            )
+        self.assertEqual((self.unit / "briefs.jsonl").read_bytes(), briefs)
+        self.assertEqual((self.unit / "brief" / "v1.md").read_bytes(), text)
+        self.assertEqual(self.check().returncode, 0, self.check().stdout)
+
+    def test_S42_a_draft_never_gains_status_file_or_sha256_through_set(self):
+        self.accepted(self.brief("M2"))
+        for name, value in {
+            "status": "draft",
+            "file": "brief/v1.md",
+            "sha256": "c" * 64,
+            "redacted": ["d" * 64],
+        }.items():
+            with self.subTest(patch=name):
+                self.refused(self.set("v1", {name: value}), "set cannot change")
+
+    def test_S28_a_move_refuses_every_set_and_every_unset(self):
+        before = (self.unit / "moves.jsonl").read_bytes()
+        self.refused(self.set("M1", {"why": "Another reason."}), "M1 is a move, and set cannot change it")
+        self.refused(self.set_unset("M1", None, "why"), "set cannot change it")
+        self.refused(self.set_unset("M1", {"why": "x"}, "answer"), "set cannot change it")
+        self.assertEqual((self.unit / "moves.jsonl").read_bytes(), before)
+
     def test_S42_set_still_changes_the_text_of_a_draft(self):
         self.accepted(self.brief("M2"))
         self.accepted(self.set("v1", {"why": "Because the probe held."}))
