@@ -18,10 +18,10 @@ import argparse
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
-from .. import cli, paths, schema
+from .. import cli, page, paths, schema
 from ..page import FINISHED, all_items
 from ..paths import Unit
 from . import SKILL, derive
@@ -29,7 +29,6 @@ from .brief import REMOVED
 from .brief import STATE as REDACT_STATE
 from .rules_moves import BRIEF_MOVES
 
-STALE = timedelta(minutes=30)  # how long a checker or verifier may go without a record
 PAGE_EVENTS = ("choose", "add_evidence", "add_result", "remove", "edit", "redact")  # discover's own events
 USER_EVENTS = (*PAGE_EVENTS, "answer", "comment")  # what the user sends that the agent tracks; a note with no `to` too
 SHOWN_ERRORS = 20  # how many error lines the `invalid` line carries
@@ -152,36 +151,22 @@ def _occurs(text: str, value: str) -> bool:
     return re.search(r"(?<!\w)" + re.escape(text) + r"(?!\w)", _norm(value)) is not None
 
 
-def _agent_of(ident: Any) -> str | None:
-    """The agent an id carries: `analyst-2` in `E-analyst-2-3`."""
-    if isinstance(ident, str) and ident[:2] in ("E-", "S-") and "-" in ident[2:]:
-        return ident[2:].rsplit("-", 1)[0]
-    return None
-
-
-def _last_word(d: Discovery, agent: str) -> datetime | None:
-    """The latest `at` among the records whose `by`, or whose id, carries the agent's name."""
-    latest = None
-    for group in (d.items, d.changes, d.options, d.moves, d.briefs, d.decisions, d.tests, d.evidence, d.sources):
-        for record in group:
-            if record.get("by") == agent or _agent_of(record.get("id")) == agent:
-                at = _at(record)
-                if at and (latest is None or at > latest):
-                    latest = at
-    for line in d.conversation:
-        if line.get("by") == agent:
-            at = _at(line)
-            if at and (latest is None or at > latest):
-                latest = at
-    return latest
+def last_word(d: Discovery, agent: str) -> datetime | None:
+    """The latest `at` among the records whose `by`, or whose evidence or source id, carries the agent's name."""
+    found = (
+        r
+        for group in (d.items, d.changes, d.options, d.moves, d.briefs, d.decisions, d.tests, d.evidence, d.sources)
+        for r in group
+    )
+    return page.last_word([*found, *d.conversation], agent, id_prefixes=("E-", "S-"))
 
 
 def _silent(d: Discovery, agent: str, since: Any, fallback: dict, now: datetime) -> int | None:
-    """Minutes of silence if the agent has been quiet for more than STALE, else None."""
+    """Minutes of silence if the agent has been quiet for more than the shared quiet threshold, else None."""
     started = _at({"at": since}) if isinstance(since, str) else _at(fallback)
-    heard = _last_word(d, agent)
+    heard = last_word(d, agent)
     last = max((t for t in (started, heard) if t), default=None)
-    if last is None or now - last <= STALE:
+    if last is None or now - last <= page.QUIET_AFTER:
         return None
     return int((now - last).total_seconds() // 60)
 

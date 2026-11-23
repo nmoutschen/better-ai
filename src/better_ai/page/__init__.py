@@ -201,12 +201,26 @@ def now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def last_word(records: Iterable[Any], agent: str) -> datetime | None:
+def _named_in(ident: Any, prefixes: tuple[str, ...]) -> str | None:
+    """The agent an id carries after one of the prefixes: `analyst-2` in `E-analyst-2-3` for the prefix `E-`."""
+    if isinstance(ident, str):
+        for prefix in prefixes:
+            rest = ident[len(prefix) :]
+            if ident.startswith(prefix) and "-" in rest:
+                return rest.rsplit("-", 1)[0]
+    return None
+
+
+def last_word(records: Iterable[Any], agent: str, id_prefixes: tuple[str, ...] = ()) -> datetime | None:
     """An agent's last word: the latest `at` among the records whose `by` is the agent, or None. Every page that says
-    an agent has gone quiet reads it from here, and compares it with QUIET_AFTER."""
+    an agent has gone quiet reads it from here, and compares it with QUIET_AFTER. A board whose records another agent
+    rewrites names the agent in the id too: with `id_prefixes` (`("E-", "S-")`), a record whose id is a prefix, the
+    agent's name and a number counts as the agent's."""
     latest = None
     for record in records:
-        if not isinstance(record, Mapping) or record.get("by") != agent or not isinstance(record.get("at"), str):
+        if not isinstance(record, Mapping) or not isinstance(record.get("at"), str):
+            continue
+        if record.get("by") != agent and (not id_prefixes or _named_in(record.get("id"), id_prefixes) != agent):
             continue
         try:
             at = datetime.strptime(record["at"], schema.TIME).replace(tzinfo=timezone.utc)
