@@ -223,6 +223,17 @@ class Rules(unittest.TestCase):
                 with self.subTest(name, pattern=pattern):
                     self.assertRegex(text, pattern)
 
+    def test_an_analyst_running_a_test_is_the_checker_of_the_test_and_its_items(self):
+        body = flat(steps(read(SKILL))[7][1])
+        self.assertIn("`checker` of the test and of each item in its `settles`", body)
+        self.assertIn("CLEAR them when the analyst ends", body)
+
+    def test_a_remove_event_sets_any_evidence_removed_and_redact_erases_words(self):
+        text = flat(read(RECORDS))
+        self.assertNotIn("`removed` is set only by `redact`", text)
+        self.assertIn("`set` the evidence `removed`, with a `reason` naming the event", text)
+        self.assertIn('"status": "removed", "reason": "<the user\'s remove event', text)
+
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
         for path in [*skill_texts(), DOCS]:
