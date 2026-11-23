@@ -1395,6 +1395,97 @@ class Computed(Sourced):
         self.refused(self.set("E-a1-1", {"status": "counts"}, COORD), "verifier")
 
 
+class NotFoundAndCorrected(Rules):
+    """#126: a quote that is not on the page is `not found`; a reworded one is `reworded` with the page's words, and the
+    coordinator adds the corrected quote as new evidence that `corrects` it and goes through the check again."""
+
+    PAGE_WORDS = "In the end, we lost a whole week."
+
+    def reword(self, by="v1"):
+        return self.set("E-a1-1", {"status": "reworded", "reason": "reworded", "page_words": self.PAGE_WORDS}, by)
+
+    def corrected(self, **over):
+        return {
+            "source": "S-a1-1",
+            "words": {"type": "quote", "text": self.PAGE_WORDS},
+            "kind": "say",
+            "about": "your users",
+            "bears_on": [{"item": "P1", "direction": "for"}],
+            "status": "checking",
+            "corrects": "E-a1-1",
+            **over,
+        }
+
+    def test_the_verifier_sets_not_found_with_its_reason(self):
+        self.started()
+        self.ok(self.set("E-a1-1", {"status": "not found", "reason": "not on the page"}, "v1"))
+        self.assertEqual(self.evidence()["status"], "not found")
+        self.assertNotIn("since", self.evidence())
+
+    def test_not_found_needs_a_reason_and_only_the_verifier_sets_it(self):
+        self.started()
+        self.refused(self.set("E-a1-1", {"status": "not found"}, "v1"), "reason")
+        self.refused(self.set("E-a1-1", {"status": "not found", "reason": "not on the page"}, COORD), "verifier")
+        self.refused(self.set("E-a1-1", {"status": "not found", "reason": "not on the page"}, "a1"), "verifier")
+
+    def test_not_found_is_final_but_for_removal(self):
+        self.put(status="not found", verifier="v1", tries=["v1"], reason="not on the page")
+        self.refused(self.set("E-a1-1", {"status": "checking", "verifier": "v2"}, COORD))
+        self.ok(self.set("E-a1-1", {"status": "removed", "reason": "the user asked: remove m1"}, COORD))
+
+    def test_the_verifier_sets_reworded_with_the_pages_words(self):
+        self.started()
+        self.ok(self.reword())
+        record = self.evidence()
+        self.assertEqual((record["status"], record["page_words"]), ("reworded", self.PAGE_WORDS))
+
+    def test_reworded_needs_the_pages_words_and_only_with_reworded(self):
+        self.started()
+        self.refused(self.set("E-a1-1", {"status": "reworded", "reason": "reworded"}, "v1"), "page_words")
+        self.refused(
+            self.set("E-a1-1", {"status": "not found", "reason": "x", "page_words": self.PAGE_WORDS}, "v1"),
+            "page_words",
+        )
+        self.refused(self.reword(COORD), "verifier")
+
+    def test_the_coordinator_adds_the_corrected_quote_and_it_starts_checking(self):
+        self.started()
+        self.ok(self.reword())
+        done = self.add("evidence", self.corrected(), COORD)
+        self.ok(done)
+        self.assertEqual(self.evidence("E-coord-1")["corrects"], "E-a1-1")
+        self.assertEqual(self.evidence("E-coord-1")["status"], "checking")
+
+    def test_a_correction_must_point_to_reworded_evidence_and_hold_its_page_words(self):
+        self.started()
+        self.refused(self.add("evidence", self.corrected(), COORD), "reworded")
+        self.ok(self.reword())
+        wrong = self.corrected(words={"type": "quote", "text": "Something the page never said."})
+        self.refused(self.add("evidence", wrong, COORD), "page_words")
+        self.refused(self.add("evidence", self.corrected(source="S-a1-2"), COORD), "source")
+
+    def test_only_the_coordinator_corrects_and_only_once(self):
+        self.started()
+        self.ok(self.reword())
+        self.refused(self.add("evidence", self.corrected(), "a1"), "coordinator")
+        self.ok(self.add("evidence", self.corrected(), COORD))
+        again = self.corrected(words={"type": "quote", "text": "In the end, we lost a whole week!"})
+        self.refused(self.add("evidence", again, COORD), "E-coord-1")
+
+    def test_a_span_without_the_quote_points_to_reworded_not_unverified(self):
+        self.started()
+        done = self.counts(span="A post.")
+        self.refused(done, '"status": "reworded"', "page_words")
+        self.assertNotIn('unverified with the reason "reworded"', done.stdout + done.stderr)
+
+    def test_check_accepts_both_new_statuses_at_rest(self):
+        self.put(status="not found", verifier="v1", tries=["v1"], reason="not on the page")
+        self.put("E-a1-2", status="reworded", verifier="v1", tries=["v1"], reason="reworded", page_words="x y")
+        done = self.run_("check", self.unit)
+        self.assertNotIn("E-a1-1.json", done.stdout + done.stderr)
+        self.assertNotIn("E-a1-2.json", done.stdout + done.stderr)
+
+
 class Hooks(unittest.TestCase):
     def test_normalise(self):
         n = rules_evidence.normalise

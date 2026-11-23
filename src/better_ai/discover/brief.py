@@ -288,9 +288,10 @@ def render(unit: Unit, data: Data, version: str) -> str:
         for line in _item_lines(item, derived.items[item["id"]])
     ]
     blocks = []
+    corrected = {e.get("corrects") for e in data.evidence.values()}  # a reworded quote shows as its correction
     for ident in sorted(data.evidence, key=_sort_key):
         found = data.evidence[ident]
-        if found.get("status") == "removed":
+        if found.get("status") == "removed" or ident in corrected:
             continue
         if not EVIDENCE_ID.fullmatch(ident):
             raise refusal(unit.label, f"evidence {ident!r} has an id that is not valid", f"run check {unit.label}")
@@ -533,8 +534,28 @@ def _line_of(text: str, key: str) -> int:
     return 1
 
 
+def _linked(data: Data, evidence_id: str) -> list[str]:
+    """The evidence, then the reworded quote it corrects or the corrections of it: a reworded quote and its correction
+    hold the same person's words, so redact takes them together."""
+    found = [evidence_id]
+    for ident in found:  # grows as it goes: a correction can be reworded and corrected again, so follow every link
+        corrected = data.evidence[ident].get("corrects")
+        if isinstance(corrected, str) and corrected in data.evidence and corrected not in found:
+            found.append(corrected)
+        found += [i for i, e in data.evidence.items() if e.get("corrects") == ident and i not in found]
+    return found
+
+
 def _plan(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
     """The places that hold the evidence's words, in the order redact works through them."""
+    steps: list[dict] = []
+    for ident in _linked(data, evidence_id):
+        steps += [{**s, "evidence": ident} for s in _places(unit, data, ident)]
+    return [{**s, "done": False} for s in steps]
+
+
+def _places(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
+    """The places of one evidence's words."""
     evidence = data.evidence[evidence_id]
     source = data.sources.get(evidence.get("source"), {})
     steps: list[dict] = []
@@ -557,7 +578,7 @@ def _plan(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
         steps.append({"do": "source", "ref": source["id"]})
     steps += [{"do": "test", "ref": t["id"]} for t in data.tests if evidence_id in _cited_by(t)]
     steps.append({"do": "evidence", "ref": evidence_id})
-    return [{**s, "done": False} for s in steps]
+    return steps
 
 
 def _cited_by(test: dict) -> list:
@@ -651,7 +672,7 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
         shown = "emptied the given text"
         key = "origin"
     else:
-        new = {k: v for k, v in current.items() if k not in ("checked_read", "span", "sha256", "since")}
+        new = {k: v for k, v in current.items() if k not in ("checked_read", "span", "sha256", "since", "page_words")}
         words = new.get("words") or {}
         if words.get("type") == "quote":
             new["words"] = {"type": "quote", "text": REMOVED}
@@ -751,7 +772,7 @@ def _work(unit: Unit, run: cli.Run, state: dict, request: str) -> None:
         if step["done"]:
             continue
         data = _load(unit)
-        lines, write = _prepare(unit, data, {**step, "evidence": evidence_id}, request)
+        lines, write = _prepare(unit, data, {"evidence": evidence_id, **step}, request)
         if (
             "lines" not in step
         ):  # what the place prints is kept first, so a run that stops after the write still prints it

@@ -53,9 +53,16 @@ def raw_text(ctx: records.SetContext, then: str) -> tuple[str, str]:
     return data.decode("utf-8", "replace"), hashlib.sha256(data).hexdigest()
 
 
-def check_read(ctx: records.SetContext, passages: list[str], quote: object, then: str) -> str:
+def check_read(
+    ctx: records.SetContext,
+    passages: list[str],
+    quote: object,
+    then: str,
+    reworded: str = 'set unverified with the reason "reworded"',
+) -> str:
     """Refuse unless each passage occurs in the `--raw` file (whitespace aside) and the quote occurs within one
-    passage; return the file's sha256. `then` is as for `raw_text`."""
+    passage; return the file's sha256. `then` is as for `raw_text`; `reworded` is what a skill's verifier does when
+    the page says it in other words."""
     text, digest = raw_text(ctx, then)
     page = _spaced(text)
     for passage in passages:
@@ -69,6 +76,6 @@ def check_read(ctx: records.SetContext, passages: list[str], quote: object, then
         raise paths.refusal(
             ctx.unit.label,
             "the quote does not occur in the span",
-            'copy the part of the page that holds the quote, or set unverified with the reason "reworded"',
+            "copy the part of the page that holds the quote, or " + reworded,
         )
     return digest

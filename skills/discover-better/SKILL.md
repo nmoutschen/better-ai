@@ -199,7 +199,7 @@ RUN at most 4 analysts and at most 4 verifiers at once. GIVE each a new, short n
 
 WAIT for checks at most 30 minutes, then go on, treating evidence still `checking` as not counting, and TELL the user.
 
-WHEN a sub-agent ends with work still under its name, RUN `check`, THEN restart it once under a new name: `tries` holds at most two. OTHERWISE, SET its evidence `unverified` with the reason "verifier did not finish", or CLEAR the item's `checker`, and SAY so. WHEN you replace a quote verifier, DELETE its temporary folder with `rm -r <temp>/discover-verify/<idea>/<its name>`. START a verifier for each evidence `checking` with no verifier, except a computed result, which the user confirms as step 3 says.
+WHEN a sub-agent ends with work still under its name, RUN `check`, THEN restart it once under a new name: `tries` holds at most two. OTHERWISE, SET its evidence `unverified` with the reason "verifier did not finish", or CLEAR the item's `checker`, and SAY so. WHEN a quote verifier sets evidence `reworded`, ADD the corrected quote as new evidence: its `words` are the `page_words`, from the same source, with `corrects` naming the reworded evidence and `status` `checking`. JUDGE again what the page's words bear on, and in which direction, before you add it; it then goes through a quote verifier like any quote. WHEN you replace a quote verifier, DELETE its temporary folder with `rm -r <temp>/discover-verify/<idea>/<its name>`. START a verifier for each evidence `checking` with no verifier, except a computed result, which the user confirms as step 3 says.
 
 ### Add the records
 

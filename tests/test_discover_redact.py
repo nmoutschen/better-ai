@@ -346,6 +346,111 @@ class Removal(Fixture):
         self.assertIn("none recorded", out)
 
 
+class Reworded(Fixture):
+    """A reworded quote and the correction that quotes its page's words: redact removes the words from both."""
+
+    WORDS = "Over half said they mute the alerts."
+
+    def setUp(self):
+        super().setUp()
+        P.set_setting(self.unit, "internal")
+        reworded = R.record(
+            R.EVIDENCE,
+            id="E-a1-2",
+            status="reworded",
+            verifier="v1",
+            tries=["v1"],
+            reason="reworded",
+            words={"type": "quote", "text": "People ignore the alerts."},
+            page_words=self.WORDS,
+        )
+        fix = R.record(
+            R.COUNTING,
+            id="E-coord-9",
+            by=R.COORD,
+            corrects="E-a1-2",
+            words={"type": "quote", "text": self.WORDS},
+            span=self.WORDS,
+            verifier="v2",
+            tries=["v2"],
+        )
+        P.write_json(self.unit / "evidence" / "E-a1-2.json", reworded)
+        P.write_json(self.unit / "evidence" / "E-coord-9.json", fix)
+
+    def test_redacting_reworded_evidence_finishes_and_drops_its_page_words(self):
+        self.ask_on_the_page(evidence="E-a1-2")
+        done = self.redact(evidence="E-a1-2")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        record = json.loads((self.unit / "evidence" / "E-a1-2.json").read_text())
+        self.assertEqual(record["status"], "removed")
+        self.assertNotIn("page_words", record)
+
+    ANALYST = "People ignore the alerts."
+
+    def status(self, ident):
+        return json.loads((self.unit / "evidence" / f"{ident}.json").read_text())["status"]
+
+    def test_redacting_a_correction_removes_the_quote_it_corrects_too(self):
+        # the user's decision: the analyst's wording of a reworded quote is the person's words as well
+        self.ask_on_the_page(evidence="E-coord-9")
+        done = self.redact(evidence="E-coord-9")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn(self.WORDS, self.everything())
+        self.assertNotIn(self.ANALYST, self.everything())
+        self.assertEqual((self.status("E-coord-9"), self.status("E-a1-2")), ("removed", "removed"))
+
+    def test_redacting_the_reworded_quote_removes_its_correction_too(self):
+        self.ask_on_the_page(evidence="E-a1-2")
+        done = self.redact(evidence="E-a1-2")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn(self.WORDS, self.everything())
+        self.assertNotIn(self.ANALYST, self.everything())
+        self.assertEqual((self.status("E-coord-9"), self.status("E-a1-2")), ("removed", "removed"))
+
+    def test_a_brief_written_before_the_correction_loses_the_analysts_wording(self):
+        fix = self.unit / "evidence" / "E-coord-9.json"
+        kept = fix.read_text()
+        fix.unlink()  # the brief is written while the quote waits for its correction
+        self.brief_final()
+        self.assertIn(self.ANALYST, (self.unit / "brief" / "v1.md").read_text())
+        fix.write_text(kept)
+        self.ask_on_the_page(evidence="E-coord-9")
+        done = self.redact(evidence="E-coord-9")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn(self.ANALYST, (self.unit / "brief" / "v1.md").read_text())
+
+    def test_a_chain_of_corrections_is_redacted_whole_from_either_end(self):
+        # a correction can itself be found reworded and corrected again: every link holds the same person's words
+        chain = R.record(
+            R.EVIDENCE,
+            id="E-coord-10",
+            by=R.COORD,
+            corrects="E-coord-9",
+            status="counts",
+            verifier="v3",
+            tries=["v3"],
+            checked_read="raw",
+            span="Over half mute alerts.",
+            sha256="a" * 64,
+            words={"type": "quote", "text": "Over half mute alerts."},
+        )
+        middle = json.loads((self.unit / "evidence" / "E-coord-9.json").read_text())
+        for key in ("checked_read", "span", "sha256"):
+            middle.pop(key)
+        middle.update(status="reworded", reason="reworded", page_words="Over half mute alerts.")
+        for end in ("E-coord-10", "E-a1-2"):
+            with self.subTest(end=end):
+                self.setUp()
+                P.write_json(self.unit / "evidence" / "E-coord-9.json", middle)
+                P.write_json(self.unit / "evidence" / "E-coord-10.json", chain)
+                self.ask_on_the_page(evidence=end)
+                done = self.redact(evidence=end)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertEqual([self.status(i) for i in ("E-a1-2", "E-coord-9", "E-coord-10")], ["removed"] * 3)
+                for words in (self.ANALYST, self.WORDS, "Over half mute alerts."):
+                    self.assertNotIn(words, self.everything())
+
+
 class Stopping(Fixture):
     def expected(self):
         clean = self.root / "clean"

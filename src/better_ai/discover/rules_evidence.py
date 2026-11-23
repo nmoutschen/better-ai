@@ -10,10 +10,15 @@ Who may change an evidence's status:
 
 | From | To | Who | When |
 |---|---|---|---|
-| `checking` | `counts`, `unverified`, `not reachable` | the current `verifier` | always |
+| `checking` | `counts`, `unverified`, `not reachable`, `not found`, `reworded` | the current `verifier` | always |
 | `not reachable` | `checking` | the coordinator | `tries` holds fewer than two verifiers; it sets a new `verifier` |
 | `checking` | `unverified` ("verifier did not finish") | the coordinator | `since` is older than 30 minutes |
 | any | `removed` | the coordinator | the reason names the user's request (a `remove` or `redact` event, or an answered decision about the evidence) |
+
+`not found`: the words are not on a raw read of the page. `reworded`: the page says the same in other words, which the
+verifier copies into `page_words`. The coordinator then adds the corrected quote as new evidence whose `corrects`
+names the reworded one and whose words are its `page_words`: it starts `checking` and goes through the same flow, and
+the coordinator judges again what it bears on.
 
 A source may also be a file or a connector item (origin `file`, `tool`); an analyst adds one only for a named source
 (`named_problem`), and its quotes follow the same flow with no URL rule. Evidence of kind `data` from such a source is
@@ -58,6 +63,14 @@ READ_KINDS = ("web", "file", "tool")  # origins an analyst read and a verifier r
 CONFIRM = "Confirm this result"  # the default of the question that makes a computed result count
 NOT_CONFIRMED = "not confirmed by you"
 USER_ONLY = ("verifier", "tries", "since", *CHECKED)  # fields the user's own evidence never has
+OUTCOMES = (
+    "counts",
+    "unverified",
+    "not reachable",
+    "not found",
+    "reworded",
+)  # what a verifier sets on checking evidence
+WITH_REASON = ("unverified", "not reachable", "not found", "reworded", "removed")  # the statuses that hold a reason
 
 
 # ---------------------------------------------------------------- reading the unit
@@ -271,9 +284,41 @@ def _evidence_writer_and_start(ctx: records.AddContext) -> None:
                 'add it with "status": "checking" and without verifier, tries, since, checked_read, span, sha256 or '
                 "reason; the coordinator starts a verifier",
             )
+    if "corrects" in record:
+        _corrects_reworded(unit, record, by, coordinator)
     if by != coordinator:
         _must_be_checker(unit, by, record)
     _not_repeated(unit, record)
+
+
+def _corrects_reworded(unit: paths.Unit, record: dict, by: str, coordinator: str) -> None:
+    """A correction: the coordinator quotes the page's words of a reworded evidence, from the same source, once."""
+    target = record.get("corrects")
+    if by != coordinator:
+        raise _refuse(
+            unit,
+            f"only the coordinator ({coordinator}) adds the correction of a reworded quote",
+            "stop: tell the coordinator, in your hand-back",
+        )
+    found = dict(_folder(unit, "evidence")).get(f"evidence/{target}.json")
+    if not isinstance(found, dict) or found.get("status") != "reworded":
+        raise _refuse(
+            unit,
+            f"{target} is not reworded: only reworded evidence is corrected",
+            "correct evidence its verifier set reworded",
+        )
+    if record.get("source") != found.get("source"):
+        raise _refuse(unit, f"the correction quotes the same source as {target} ({found.get('source')})")
+    words = record.get("words") if isinstance(record.get("words"), dict) else {}
+    if normalise(str(words.get("text") or "")) != normalise(str(found.get("page_words") or "")):
+        raise _refuse(
+            unit,
+            f"the correction's words must be the page_words of {target}",
+            f'quote "{found.get("page_words")}" word for word',
+        )
+    for _, other in _folder(unit, "evidence"):
+        if other.get("corrects") == target:
+            raise _refuse(unit, f"{target} is already corrected by {other.get('id')}", f"use {other.get('id')}")
 
 
 def _must_be_checker(unit: paths.Unit, by: str, record: dict) -> None:
@@ -459,7 +504,11 @@ def _count(ctx: records.SetContext, by: str) -> None:
         raise _refuse(ctx.unit, "counts needs the span you copied from the page", 'set "span" to that text')
     words = record.get("words") if isinstance(record.get("words"), dict) else {}
     digest = quotes.check_read(
-        ctx, [span], words.get("text"), "save the raw page to a file outside .discover/ and run again with --raw <file>"
+        ctx,
+        [span],
+        words.get("text"),
+        "save the raw page to a file outside .discover/ and run again with --raw <file>",
+        reworded='set "status": "reworded" with the reason "reworded" and the page\'s passage in "page_words"',
     )
     patch["sha256"] = digest
 
@@ -497,7 +546,7 @@ def _who(ctx: records.SetContext, by: str, coordinator: str, old: str, new: str)
     tries = record.get("tries") or []
     if by != coordinator and verifier and by in tries and by != verifier:
         return _refuse(ctx.unit, f"you were replaced by {verifier}: stop")
-    if old == "checking" and new in ("counts", "unverified", "not reachable"):
+    if old == "checking" and new in OUTCOMES:
         if by == coordinator:
             how = (
                 f"only the verifier {verifier} sets the outcome; after {TIMEOUT} minutes of its silence set unverified "
@@ -512,10 +561,13 @@ def _who(ctx: records.SetContext, by: str, coordinator: str, old: str, new: str)
             "stop: only the verifier the coordinator started sets the outcome",
         )
     allowed = {
-        "checking": "its verifier sets counts, unverified or not reachable",
+        "checking": "its verifier sets counts, unverified, not reachable, not found or reworded",
         "not reachable": f"the coordinator may set checking again with a new verifier while fewer than {MAX_TRIES} tried",
         "counts": "nothing but removed, by the coordinator, at the user's request",
         "unverified": "nothing but removed, by the coordinator, at the user's request",
+        "not found": "nothing but removed, by the coordinator, at the user's request",
+        "reworded": "nothing but removed, by the coordinator, at the user's request; the coordinator adds the "
+        "corrected quote as new evidence that corrects it",
         "removed": "nothing: removed evidence stays removed",
     }.get(old, "nothing")
     return _refuse(
@@ -541,6 +593,7 @@ EVIDENCE_FIELDS = (
     "checked_read",  # only with counts, from the verifier
     "span",  # only with counts, from the verifier
     "sha256",  # better.pyz alone, from --raw
+    "page_words",  # only with reworded, from the verifier
 )
 SOURCE_FIELDS = ("origin", "title", "said_by_role")  # origin: never; title: coordinator or analyst; role: coordinator
 
@@ -641,8 +694,15 @@ def _write_table(
                     f"{value} is already in tries of {ident} ({', '.join(tries)})",
                     "start a verifier with a new name",
                 )
+        elif name == "page_words":
+            if not (old == "checking" and new == "reworded"):
+                raise _refuse(
+                    unit,
+                    f"page_words of {ident} is set only when its verifier sets it reworded",
+                    'set "status": "reworded" with the reason and the page\'s words together',
+                )
         elif name == "reason":
-            if new == old or new not in ("unverified", "not reachable", "removed"):
+            if new == old or new not in WITH_REASON:
                 raise _refuse(
                     unit,
                     f"reason of {ident} is set only with the change of status that needs it",
@@ -691,12 +751,12 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
                     + ident
                     + '"',
                 )
-            for name in CHECKED:
+            for name in (*CHECKED, "page_words"):
                 if name in record:
                     patch[name] = None
-        elif old == "checking" and new in ("counts", "unverified", "not reachable") and computed:
+        elif old == "checking" and new in OUTCOMES and computed:
             _computed_outcome(ctx, by, coordinator, new)
-        elif old == "checking" and new in ("counts", "unverified", "not reachable"):
+        elif old == "checking" and new in OUTCOMES:
             if by == verifier:
                 pass
             elif new == "unverified" and by == coordinator and patch.get("reason") == TIMEOUT_REASON:
@@ -727,6 +787,12 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
         else:
             raise _who(ctx, by, coordinator, old, new)
 
+    if new == "reworded" and new != old and not patch.get("page_words"):
+        raise _refuse(
+            unit,
+            f"reworded needs page_words: what the page says in place of the quote of {ident}",
+            'set "page_words" to the page\'s passage, word for word, on one line',
+        )
     if new == "counts" and old == "checking" and not computed:
         _count(ctx, by)
     elif ctx.raw is not None:
