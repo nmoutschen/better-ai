@@ -71,6 +71,7 @@ PICK the perspectives that apply, from what the change touches and the applicabl
 | Data and privacy (`data-and-privacy`, method LINDDUN) | collects, derives, moves, keeps, logs or deletes data about people | [../agents/data-and-privacy.md](../agents/data-and-privacy.md) |
 | Failure handling (`failure-handling`) | adds or changes a call, message or write that crosses a process or network boundary | [../agents/failure-handling.md](../agents/failure-handling.md) |
 | Observability (`observability`) | adds or changes a flow, job or part that someone must operate | [../agents/observability.md](../agents/observability.md) |
+| Agent experience (`agent-experience`) | adds or changes something an agent calls, a call to an agent, or a workspace agents share with people | [../agents/agent-experience.md](../agents/agent-experience.md) |
 | API standards (`api-standards`) | adds or changes an interface others depend on: an API, a library, a CLI, an event or a file format | [../agents/api-standards.md](../agents/api-standards.md) |
 | Each repo standard (its own `id`) | touches what the standard covers | [../agents/repo-standards.md](../agents/repo-standards.md), one reviewer per standard |
 
