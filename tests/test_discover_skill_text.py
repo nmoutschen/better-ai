@@ -240,7 +240,7 @@ class Rules(unittest.TestCase):
         for path in [*skill_texts(), DOCS]:
             with self.subTest(path.name):
                 self.assertNotIn("- `change`:", read(path))
-                self.assertNotRegex(read(path), r"`change` event")
+                self.assertNotRegex(read(path), r"`?change`? event")
 
     def test_an_analyst_on_a_test_gets_the_items_it_settles(self):
         text = flat(read(AGENTS["analyst"]))
@@ -271,6 +271,23 @@ class Rules(unittest.TestCase):
 
     def test_the_docs_hand_on_only_expand_and_shrink_briefs(self):
         self.assertIn("Expand and Shrink briefs are handed to", flat(read(DOCS)))
+
+    def test_round_3_wording(self):
+        skill = flat(read(SKILL))
+        self.assertIn(
+            "READ the behaviours yourself by [agents/behaviour-verifier.md](agents/behaviour-verifier.md), "
+            "and SAY in the brief that no separate reader checked them",
+            skill,
+        )
+        self.assertIn(
+            "DO NOT change a risk's text or id once a question or a change cites it: ADD a new risk instead", skill
+        )
+        self.assertNotIn("AN item", skill)
+        self.assertIn(
+            "- `add_result`: ADD a `you` source and evidence whose `given` and `words` name the event, "
+            "THEN `set` the test `done` with its `result`",
+            read(RECORDS),
+        )
 
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
