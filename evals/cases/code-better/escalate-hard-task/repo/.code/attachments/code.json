@@ -1,0 +1,11 @@
+{
+  "type": "code",
+  "at": "2026-11-23T16:56:27Z",
+  "by": "coordinator",
+  "goal": "Customers can list and download the attachments of their tickets, and nothing outside the attachments folder can be read.",
+  "design": {
+    "type": "request",
+    "text": "Add a small attachments service: list a ticket's attachments and serve one by name from attachments/. It must never serve a file outside attachments/."
+  },
+  "mode": "coordinate"
+}

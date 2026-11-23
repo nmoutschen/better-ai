@@ -1,0 +1,2 @@
+{"type": "start", "at": "2026-11-23T16:56:43Z", "by": "v-t2-1", "text": "Verify T2."}
+{"type": "handed_back", "at": "2026-11-23T16:56:44Z", "by": "v-t2-1", "result": "fails", "text": "A name with ../ reads files outside attachments/."}

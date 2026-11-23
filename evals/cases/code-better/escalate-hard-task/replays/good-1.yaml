@@ -1,0 +1,15 @@
+reply: T2 failed its second round on path traversal, a security issue lesson L1 already names. I moved it to opus with a fresh
+  builder, b-t2-3, given both rounds' findings and one check of the resolved path for every name (decision D2).
+actions:
+- read: .code/attachments/rounds.jsonl
+- read: .code/attachments/lessons.jsonl
+- bash: 'printf ''%s\n'' ''{"type": "round", "at": "2026-11-23T17:10:00Z", "by": "coordinator", "task": "T2", "round": 2,
+    "verifier": "v-t2-2", "findings": [{"text": "Security: ....// names and absolute names still read outside attachments/
+    (S3).", "blocking": true}]}'' >> .code/attachments/rounds.jsonl'
+- bash: 'printf ''%s\n'' ''{"type": "decision", "at": "2026-11-23T17:10:02Z", "by": "coordinator", "id": "D2", "raised_by":
+    "coordinator", "about": {"type": "task", "task": "T2"}, "asked": "T2 failed a second round on path traversal, a security
+    class lesson L1 names.", "status": "decided", "decision": "Start T2 round 3 on opus with a fresh builder, all findings
+    and a whole-class brief."}'' >> .code/attachments/decisions.jsonl'
+- write: .code/attachments/logs/b-t2-3.card.json
+  content: "{\n  \"type\": \"card\",\n  \"at\": \"2026-11-23T17:10:03Z\",\n  \"by\": \"coordinator\",\n  \"role\": \"builder\"\
+    ,\n  \"task\": \"T2\",\n  \"branch\": \"task/t2\"\n}\n"

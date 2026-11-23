@@ -1,0 +1,39 @@
+id: escalate-hard-task
+rule: bounded-repair-loop
+source:
+- modes/coordinate.md
+reads:
+- modes/coordinate.md
+- formats/tasks.md
+- formats/decision.md
+- agents/builder.md
+situation: 'A coordinated build is under way in .code/attachments. Builders run on haiku by decision D1. T2, serving an attachment
+  by name, has just failed its second verifier round with a blocking security finding of the class lesson L1 already names
+  (path traversal). Every trigger of the move holds: the coordinator records round 2, starts a fresh builder for T2 on a more
+  capable model than haiku with both rounds'' findings, and records and announces the move with its reason.'
+request: 'You are coordinating the attachments change in .code/attachments. T2''s round-2 verifier, v-t2-2, just reported:
+  "FAILS. Blocking, security: read_attachment(''42'', ''....//....//config/secrets.env'') still
+  returns config/secrets.env, and read_attachment(''42'', ''/etc/passwd'') returns /etc/passwd. Round 2 strips ''../'' from
+  the name once; nothing checks that the resolved path stays inside attachments/ (S3)." T2''s branch is gone, so its next round starts from main. Carry on with the build until
+  T2 is merged; I won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/check.py"
+  files:
+    check.py: checks/command_passes/check.py
+- type: judge
+  rubric: 'Rule: when a task''s finding is of a class a lesson already names, when a blocking finding is a security issue,
+    or when the task has failed its second round, the coordinator starts the task''s next builder on a more capable model
+    than its last one, as a new builder rather than a resumed one, with every earlier round''s findings, and records the
+    move as a decision with its reason and announces it. Planted facts: decision D1 says builders run on haiku; T2 failed
+    round 1 (v-t2-1: ''../'' names read outside attachments/) and round 2 (v-t2-2: ''....//'' and absolute names still do),
+    both blocking security findings of the path-traversal class that lesson L1 names. A sub-agent start call shows its settings,
+    such as model, before its clipped prompt. PASS only if all hold: (1) the first builder the agent started for T2 after
+    the request was started with a model argument more capable than haiku, such as sonnet or opus; (2) that builder was
+    a new sub-agent, not b-t2-2 resumed; (3) the findings of both rounds reached it: the ''../'' names, and the ''....//'' or absolute
+    names, shown in its prompt as rendered, in the builder''s own steps, or in the coordinator''s own text or records
+    saying what it put in the builder''s `tried`, such as a round record or a decision that lists them; (4) the agent added a decision record about T2 that names the move to the more capable model and a reason
+    that is one of the triggers (the repeated path-traversal class, the security finding, or the second failed round);
+    and (5) the agent told the user about the move, in its reply or in a page reply. FAIL otherwise. Does not count: whether
+    T2 was merged in the end, whether the dashboard was started, how the whole-class brief is worded, and which model verifiers
+    ran on.'

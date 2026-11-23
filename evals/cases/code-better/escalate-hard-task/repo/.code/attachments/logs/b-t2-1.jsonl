@@ -1,0 +1,2 @@
+{"type": "start", "at": "2026-11-23T16:56:41Z", "by": "b-t2-1", "text": "Build T2: serve an attachment by name."}
+{"type": "handed_back", "at": "2026-11-23T16:56:43Z", "by": "b-t2-1", "result": "done", "text": "read_attachment joins the ticket folder and the name; tests pass."}
