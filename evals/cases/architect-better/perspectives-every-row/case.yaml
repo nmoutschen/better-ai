@@ -7,8 +7,8 @@ reads:
 - formats/records.md
 situation: 'Stage b-requirements (requirements confirmed, n2 "design it"). The repo has one standard,
   docs/standards/api.md, which applies to any new endpoint. The agent designs the export and writes perspectives.jsonl
-  with a record for each perspective of the design mode''s table (Security, Observability, API standards, Data and
-  privacy, Repo standards) and for docs/standards/api.md, each with applies and a reason. A script checks the file, the
+  with a record for each perspective of the design mode''s table (Security, Observability, Agent experience, API standards,
+  Data and privacy, Repo standards) and for docs/standards/api.md, each with applies and a reason. A script checks the file, the
   field types and the api.md record; the judge checks that every row is there with a fitting reason.'
 request: I confirmed the requirements in the page. Please continue the design in docs/designs/2026-11-order-export.
 graders:
@@ -18,12 +18,12 @@ graders:
     perspectives_recorded.py: checks/perspectives_recorded.py
 - type: judge
   rubric: 'Rule: write every perspective of the design mode''s table and every applicable repo standard as a record of
-    perspectives.jsonl, with whether it applies and why. Planted facts: the table has six rows: Security, Data and
-    privacy, Failure handling, Observability, API standards, and each repo standard. The repo''s one standard is docs/standards/api.md
+    perspectives.jsonl, with whether it applies and why. Planted facts: the table has seven rows: Security, Data and
+    privacy, Failure handling, Observability, Agent experience, API standards, and each repo standard. The repo''s one standard is docs/standards/api.md
     (versioned paths, JSON errors, own data only with 404 for others, 10 requests a minute for endpoints that send
     email or cost money). The change exports a customer''s order history (names, addresses, orders) as CSV from the
     account page. Read docs/designs/2026-11-order-export/perspectives.jsonl in the diff, and design.md for what the
-    design touches. PASS only if all hold: (1) perspectives.jsonl has a record for each of the six table rows;
+    design touches. PASS only if all hold: (1) perspectives.jsonl has a record for each of the seven table rows;
     names may differ in wording, and the repo standards row counts as present either as its own record or as a record for
     each applicable repo standard, such as one for docs/standards/api.md (the row has one reviewer per standard, and step
     4 asks to write every applicable repo standard as a record); (2) it has a record for

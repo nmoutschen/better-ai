@@ -10,7 +10,7 @@ Designs a feature or a change to a software system. You check how the system wor
 - **Draws the current system.** It checks the affected containers and flows against the code and asks you to correct the drawing.
 - **Agrees requirements with you.** It drafts observable scenarios for quality attributes, marks its guesses and shows where each requirement came from.
 - **Shows options and trade-offs.** It recommends a design, explains why it rejected alternatives and records the main drawback of each recorded choice.
-- **Reviews the design after you approve it.** It runs a separate review for each applicable perspective, such as security, failure handling or API standards, and attaches findings to the affected parts.
+- **Reviews the design after you approve it.** It runs a separate review for each applicable perspective, such as security, failure handling, agent experience or API standards, and attaches findings to the affected parts.
 
 ## When to use it
 
