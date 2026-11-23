@@ -44,7 +44,7 @@ def populated(root: Path, *, setting: str = "external", users: bool = True) -> P
         unit / "changes.jsonl",
         [R.record(R.CHANGE, cause={"evidence": cites}), R.record(R.RISK_CHANGE)],
     )
-    write_lines(unit / "options.jsonl", [R.OPTION])
+    write_lines(unit / "options.jsonl", [R.record(R.OPTION, move="shrink")])
     write_lines(unit / "moves.jsonl", [R.MOVE])
     write_lines(unit / "tests.jsonl", [R.TEST])
     write_lines(
@@ -63,6 +63,8 @@ def populated(root: Path, *, setting: str = "external", users: bool = True) -> P
         [
             R.record(
                 R.DECISION,
+                about={"type": "risk", "item": "P1", "risk": "R1"},
+                default="Accept the risk",
                 status="answered",
                 answer={"type": "chat", "text": "Yes, run the probe."},
                 answered_at=R.AT,

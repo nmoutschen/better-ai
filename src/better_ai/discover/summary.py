@@ -22,13 +22,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .. import cli, paths, schema
-from ..page import all_items
+from ..page import FINISHED, all_items
 from ..paths import Unit
-from . import SKILL, derive
+from . import SKILL, brief, derive
 from .rules_moves import BRIEF_MOVES
 
 STALE = timedelta(minutes=30)  # how long a checker or verifier may go without a record
-REDACT_STATE = "redact-state.json"  # the state file `redact` keeps in the discovery's folder until it has finished
+REDACT_STATE = brief.STATE  # the state file `redact` keeps in the discovery's folder until it has finished
 PAGE_EVENTS = ("choose", "add_evidence", "add_result", "remove", "edit", "redact")  # discover's own events
 USER_EVENTS = (*PAGE_EVENTS, "answer", "comment")  # what the user sends that the agent tracks; a note with no `to` too
 SHOWN_ERRORS = 20  # how many error lines the `invalid` line carries
@@ -109,7 +109,7 @@ class Events:
 
     @property
     def open(self) -> list[tuple[dict, str, dict]]:
-        return [f for f in self.found if f[1] not in ("done", "accepted")]
+        return [f for f in self.found if f[1] not in FINISHED]
 
     @staticmethod
     def answered(extra: dict) -> bool:

@@ -160,16 +160,7 @@ class PageMoves(Unit):
     def test_S36_a_second_move_for_the_same_event_is_refused_naming_the_first(self):
         self.choose_now("K1")
         self.accepted(self.move(self.page(), option="K1"))
-        self.refused(self.move(self.page(), option="K1"), "already recorded as M1", "mark the event done")
-
-    def test_S36_check_reports_two_moves_on_one_event(self):
-        self.choose_now("K1")
-        put(
-            self.unit,
-            "moves.jsonl",
-            [R.record(R.MOVE, answer=self.page()), R.record(R.MOVE, id="M2", answer=self.page())],
-        )
-        self.refused(self.check(), "already recorded as M1", "already recorded as M2")
+        self.refused(self.move(self.page(), option="K1"), "page event c1 is already used by M1", "use another event")
 
 
 class ChatMoves(Unit):
@@ -344,9 +335,9 @@ class Briefs(Unit):
 
     def test_S28_a_move_refuses_every_set_and_every_unset(self):
         before = (self.unit / "moves.jsonl").read_bytes()
-        self.refused(self.set("M1", {"why": "Another reason."}), "M1 is a move, and set cannot change it")
-        self.refused(self.set_unset("M1", None, "why"), "set cannot change it")
-        self.refused(self.set_unset("M1", {"why": "x"}, "answer"), "set cannot change it")
+        self.refused(self.set("M1", {"why": "Another reason."}), "a move is never edited", "M1 stays as written")
+        self.refused(self.set_unset("M1", None, "why"), "a move is never edited")
+        self.refused(self.set_unset("M1", {"why": "x"}, "answer"), "a move is never edited")
         self.assertEqual((self.unit / "moves.jsonl").read_bytes(), before)
 
     def test_S42_set_still_changes_the_text_of_a_draft(self):

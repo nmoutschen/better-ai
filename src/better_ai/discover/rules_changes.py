@@ -472,11 +472,12 @@ def _set(ctx: records.SetContext) -> None:
 # ---------------------------------------------------------------- check: a latest change that no longer holds
 
 
-def stale(unit: Unit) -> list[str]:
-    """One line for each item whose latest state or importance change no longer holds."""
+def _stale(unit: Unit) -> list[tuple[str, str, Mapping, str]]:
+    """Each item whose latest state or importance change no longer holds, as (item, field, the change, why): the one
+    rule `check` warns by and `brief` refuses by. A cited evidence that is not in the unit does not hold either."""
     items, changes = _lines(unit, "items.jsonl"), _lines(unit, "changes.jsonl")
     evidence, tests, decisions = _evidence(unit), _lines(unit, "tests.jsonl"), _lines(unit, "decisions.jsonl")
-    lines = []
+    found = []
     views = derive(items, changes).items
     for item in items:
         ident = item.get("id")
@@ -486,12 +487,29 @@ def stale(unit: Unit) -> list[str]:
         for name, change in (("state", view.last_state_change), ("importance", view.last_importance_change)):
             if change is None:
                 continue
+            missing = [e for e in _list(_dict(change.get("cause")).get("evidence")) if e not in evidence]
+            if missing:
+                found.append((ident, name, change, f"{missing[0]} is not in evidence/"))
+                continue
             problems = cited_problems(change, evidence)
             if name == "state" and not problems:
                 problems = state_problems(_text(change.get("to")), item, evidence, tests, decisions)
             if problems:
-                lines.append(f"{ident}'s {name} is stale: add a change ({problems[0][0]})")
-    return lines
+                found.append((ident, name, change, problems[0][0]))
+    return found
+
+
+def stale(unit: Unit) -> list[str]:
+    """One line for each item whose latest state or importance change no longer holds."""
+    return [f"{item}'s {name} is stale: add a change ({why})" for item, name, _, why in _stale(unit)]
+
+
+def stale_items(unit: Unit) -> dict[str, str]:
+    """The items whose latest state or importance change no longer holds, each with why (the first of its changes)."""
+    found: dict[str, str] = {}
+    for item, name, change, why in _stale(unit):
+        found.setdefault(item, f"its latest {name} change ({change.get('to')}) no longer holds: {why}")
+    return found
 
 
 @cli.check_step(NAME)

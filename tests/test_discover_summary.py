@@ -11,12 +11,16 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 import better  # noqa: E402
+import discover_populated as P  # noqa: E402
 import discover_records as R  # noqa: E402
+
+from better_ai.discover import brief, summary  # noqa: E402
 
 SKILL = R.SKILL
 UNIT = ".discover/d"
@@ -328,8 +332,28 @@ class Warnings(Discovery):
 
     def test_S55_an_unfinished_redact(self):
         self.quiet("redact-unfinished")
-        (self.unit / "redact-state.json").write_text("{}", encoding="utf-8")
-        self.warns("redact-unfinished", "redact-state.json")
+        (self.unit / brief.STATE).write_text("{}", encoding="utf-8")
+        self.warns("redact-unfinished", brief.STATE)
+
+    def test_S55_a_redact_that_was_stopped_leaves_the_warning_and_a_finished_one_takes_it_away(self):
+        root = self.repo / "redacting"
+        root.mkdir()
+        unit = P.populated(root)
+        (unit / "conversation.jsonl").write_text(json.dumps(R.event("redact", id="d1", evidence="E-coord-1")) + "\n")
+        label = str(unit.relative_to(root))
+
+        def warnings():
+            lines = better.call(SKILL, "summary", label, cwd=root).stdout.splitlines()
+            return [json.loads(x)["code"] for x in lines if json.loads(x)["type"] == "warning"]
+
+        with mock.patch.object(brief, "_after_place", mock.Mock(side_effect=KeyboardInterrupt)):
+            R.run(root, "redact", label, "E-coord-1", "--request", "d1")
+        self.assertIn("redact-unfinished", warnings())
+        self.assertEqual(R.run(root, "redact", label, "E-coord-1", "--request", "d1").returncode, 0)
+        self.assertNotIn("redact-unfinished", warnings())
+
+    def test_D15_the_state_file_has_one_name_which_summary_takes_from_brief(self):
+        self.assertEqual(summary.REDACT_STATE, brief.STATE)
 
     def test_S55_a_final_brief_holding_a_block_for_removed_evidence(self):
         gone = R.record(R.COUNTING, status="removed", reason="redact", words={"type": "quote", "text": "x"})

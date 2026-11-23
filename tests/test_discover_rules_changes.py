@@ -554,6 +554,22 @@ class Changes(Unit):
         self.evidence("E-a1-1", status="removed")
         self.assertIn("P1's importance is stale: add a change", self.ok(self.check()).stderr)
 
+    def test_S29_stale_items_is_the_one_rule_check_and_brief_both_use(self):
+        self.evidence()
+        self.ok(self.state("supported", {"evidence": ["E-a1-1"]}))
+        self.assertEqual(rules.stale_items(self.as_unit()), {})
+        self.evidence("E-a1-1", status="removed")
+        found = rules.stale_items(self.as_unit())
+        self.assertEqual(list(found), ["P1"])
+        self.assertIn("latest state change (supported) no longer holds", found["P1"])
+        self.assertIn("E-a1-1", found["P1"])
+
+    def test_S29_a_cited_evidence_that_is_not_in_the_unit_is_stale_too(self):
+        self.evidence()
+        self.ok(self.state("supported", {"evidence": ["E-a1-1"]}))
+        (self.unit / "evidence" / "E-a1-1.json").unlink()
+        self.assertIn("E-a1-1 is not in evidence/", rules.stale_items(self.as_unit())["P1"])
+
 
 class Writers(Unit):
     def test_S31_only_the_coordinator_adds_items_changes_options_moves_briefs_and_decisions(self):
