@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "brief.schema.json",
+  "title": "one line of briefs.jsonl: one version of the brief for the next skill, a draft until `better.pyz brief` writes it",
+  "$comment": "The coordinator adds a draft and fills in its text; only the `brief` verb sets `final`, with the file's hash, and only `redact` changes a final one, keeping the old hash under `redacted`.",
+  "x-files": ["briefs.jsonl"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "id", "move", "status"],
+  "properties": {
+    "type": {"const": "brief"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "id": {"$ref": "base.schema.json#/$defs/id", "pattern": "^v\\d+$", "x-id": {"prefix": "v"}},
+    "move": {"type": "string", "minLength": 1, "x-points-to": {"file": "moves.jsonl", "type": "move"}},
+    "status": {"enum": ["draft", "final"]},
+    "decision": {"description": "the decision the brief reports", "type": "string", "minLength": 1},
+    "why": {"type": "string", "minLength": 1},
+    "questions": {
+      "description": "open questions for design",
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "file": {"description": "the brief file, from the unit folder", "type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "redacted": {
+      "description": "the hashes the file had before a redaction",
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    }
+  },
+  "if": {"required": ["status"], "properties": {"status": {"const": "final"}}},
+  "then": {"required": ["file", "sha256"]},
+  "else": {"not": {"anyOf": [{"required": ["file"]}, {"required": ["sha256"]}, {"required": ["redacted"]}]}}
+}

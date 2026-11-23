@@ -1,0 +1,95 @@
+{
+ "steps": [
+  {
+   "args": [
+    "create",
+    ".discover/demo",
+    "--by",
+    "coordinator"
+   ],
+   "stdin": "{\"idea\": \"a page that shows where an idea stands\", \"appetite\": \"two weeks of one person\", \"setting\": \"external\", \"coordinator\": \"coordinator\", \"step\": \"1\", \"status\": \"open\"}"
+  },
+  {
+   "args": [
+    "add",
+    ".discover/demo",
+    "item",
+    "--by",
+    "coordinator"
+   ],
+   "stdin": "{\"kind\": \"problem\", \"text\": \"People lose track of what they checked.\", \"rests_on\": [], \"risks\": [{\"id\": \"R1\", \"kind\": \"value\", \"text\": \"Nobody would pay to fix it.\"}]}",
+   "stdout_matches": "^P1"
+  },
+  {
+   "args": [
+    "add",
+    ".discover/demo",
+    "option",
+    "--by",
+    "coordinator"
+   ],
+   "stdin": "{\"move\": \"test first\", \"text\": \"Run a probe before building.\", \"cost\": \"an afternoon\", \"speed\": \"a day\", \"upkeep\": \"none\", \"undo\": \"nothing to undo\", \"note\": \"proposed\"}",
+   "stdout_matches": "^K1"
+  },
+  {
+   "args": [
+    "add",
+    ".discover/demo",
+    "decision",
+    "--by",
+    "coordinator"
+   ],
+   "stdin": "{\"raised_by\": \"coordinator\", \"about\": {\"type\": \"item\", \"item\": \"P1\"}, \"asked\": \"Is P1 the problem to start with?\", \"default\": \"Yes\", \"status\": \"waiting\"}",
+   "stdout_matches": "^D1"
+  },
+  {
+   "args": [
+    "set",
+    ".discover/demo",
+    "P1"
+   ],
+   "stdin": "{\"text\": \"People lose track of what they already checked.\"}"
+  },
+  {
+   "args": [
+    "check",
+    ".discover/demo"
+   ]
+  },
+  {
+   "args": [
+    "render",
+    ".discover/demo"
+   ],
+   "stdout_matches": "index.html"
+  },
+  {
+   "args": [
+    "serve",
+    ".discover/demo",
+    "--no-browser",
+    "--once"
+   ],
+   "serve": true
+  }
+ ],
+ "worktree_steps": [
+  {
+   "args": [
+    "add",
+    "{repo}/.discover/demo",
+    "decision",
+    "--by",
+    "coordinator"
+   ],
+   "stdin": "{\"raised_by\": \"coordinator\", \"about\": {\"type\": \"discovery\"}, \"asked\": \"Should the probe come before any building?\", \"default\": \"Yes\", \"status\": \"waiting\"}",
+   "stdout_matches": "^D2"
+  },
+  {
+   "args": [
+    "check",
+    "{repo}/.discover/demo"
+   ]
+  }
+ ]
+}

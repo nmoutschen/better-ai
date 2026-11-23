@@ -19,17 +19,21 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
 import better  # noqa: E402
 import discover_records as R  # noqa: E402
-from better_ai.discover import SKILL  # noqa: E402
 
 from better_ai import resources, schema, skill  # noqa: E402
+from better_ai.discover import SKILL  # noqa: E402
 
 PACKAGE = ROOT / "src" / "better_ai" / "discover"
 EVENTS = ["conversation.schema.json", "discover-events.schema.json"]
 HEX = "b" * 64
 
 
+DOCS = schema.docs_for("discover")
+
+
 def problems(record, name):
-    return schema.check_record(record, [name], cross=False)
+    """The shape problems of one record: (field, message). Pointers need the files around it: `Pointers` checks those."""
+    return list(dict.fromkeys((p.field, p.message) for p in schema.validate_instance(record, DOCS[name], DOCS)))
 
 
 class Shape(unittest.TestCase):
@@ -179,6 +183,8 @@ class Create(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             unit = R.made_unit(repo)
+            item = json.dumps(R.without(R.ITEM, "type", "at", "by", "id"))
+            self.assertEqual(R.run(repo, "add", ".discover/d", "item", "--by", R.COORD, stdin=item).returncode, 0)
             for agent in ("a1", "a2"):
                 body = json.dumps(R.without(R.SOURCE, "type", "at", "by", "id"))
                 self.assertEqual(R.run(repo, "add", ".discover/d", "source", "--by", agent, stdin=body).returncode, 0)
@@ -445,9 +451,10 @@ class Evidence(Shape):
     def test_S93_verifier_stays_after_an_outcome_and_since_goes(self):
         self.valid(R.record(R.COUNTING, verifier="v1"), self.NAME)
         self.valid(R.record(R.EVIDENCE, status="unverified", verifier="v1", reason="reworded"), self.NAME)
-        for status, extra in (("counts", R.COUNTING), ("unverified", {"reason": "x"}), ("removed", {"reason": "x"})):
-            with self.subTest(status=status):
-                self.refused(R.record(R.EVIDENCE, status=status, since=R.AT, **extra), self.NAME, "since")
+        outcomes = (R.COUNTING, R.record(R.EVIDENCE, status="unverified", reason="x"))
+        for outcome in (*outcomes, R.record(R.EVIDENCE, status="removed", reason="x")):
+            with self.subTest(status=outcome["status"]):
+                self.refused(R.record(outcome, since=R.AT), self.NAME, "since")
 
     def test_a_summary_is_text(self):
         self.valid(R.record(R.EVIDENCE, summary="Reported by you: a teammate lost a week."), self.NAME)
@@ -469,7 +476,7 @@ class Tests(Shape):
         self.refused(R.record(R.TEST, kind="survey"), self.NAME, "kind")
         self.refused(R.record(R.TEST, runner="me"), self.NAME, "runner")
         self.refused(R.record(R.TEST, status="finished"), self.NAME, "status")
-        self.refused(R.record(R.TEST, settles=["x"]), self.NAME, "settles")
+        self.refused(R.record(R.TEST, settles="P1"), self.NAME, "settles")
 
     def test_S76_a_done_test_has_a_result_and_a_removed_one_a_reason(self):
         done = {"text": "Three of five found it.", "outcome": "holds", "evidence": ["E-a1-1"]}
@@ -501,7 +508,7 @@ class Options(Shape):
             with self.subTest(missing=key):
                 self.refused(R.without(R.OPTION, key), self.NAME, key)
         for note in ("proposed", "ruled out by your appetite", None):
-            self.valid(R.record(R.OPTION, note=note) if note else {**R.OPTION, "note": None}, self.NAME)
+            self.valid(R.record(R.OPTION, note=note), self.NAME)
         self.refused(R.record(R.OPTION, note="maybe"), self.NAME, "note")
         self.valid(R.record(R.OPTION, updated_at=R.AT), self.NAME)
 
@@ -612,8 +619,7 @@ class Decisions(Shape):
     def test_the_shared_decision_schema_is_unchanged(self):
         shared = json.loads((ROOT / "src" / "better_ai" / "schemas" / "decisions.schema.json").read_text())
         self.assertIn("defaulted", shared["properties"]["status"]["enum"])
-        docs = schema.docs_for("discover")
-        self.assertNotIn("defaulted", docs["decisions.schema.json"]["properties"]["status"]["enum"])
+        self.assertNotIn("defaulted", DOCS["decisions.schema.json"]["properties"]["status"]["enum"])
 
 
 class Events(Shape):

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "item.schema.json",
+  "title": "one line of items.jsonl: a problem, an opportunity or a behaviour the idea rests on, with its risks",
+  "$comment": "An item holds no state: its state and importance come from the last change that names it (derive.py). The coordinator writes it; `checker`, `since` and `tries` say who checks it now; a set step stamps `updated_at`.",
+  "x-files": ["items.jsonl"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "id", "kind", "text", "rests_on", "risks"],
+  "properties": {
+    "type": {"const": "item"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "id": {
+      "$ref": "base.schema.json#/$defs/id",
+      "pattern": "^[POB]\\d+$",
+      "x-id": {"prefix_by": "kind", "map": {"problem": "P", "opportunity": "O", "behaviour": "B"}}
+    },
+    "kind": {"enum": ["problem", "opportunity", "behaviour"]},
+    "text": {"type": "string", "minLength": 1},
+    "rests_on": {
+      "description": "the items this one rests on",
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "items.jsonl", "type": "item"}}
+    },
+    "risks": {
+      "description": "what could make the item wrong, each with an id that stays once a decision or change cites it",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "text"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^R\\d+$"},
+          "kind": {"enum": ["value", "usability", "feasibility", "viability"]},
+          "text": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "alternative": {
+      "description": "an alternative idea that came up: null, the move it became, or the evidence of a reality check",
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "move"],
+          "properties": {
+            "type": {"const": "move"},
+            "move": {"type": "string", "minLength": 1, "x-points-to": {"file": "moves.jsonl", "type": "move"}}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "evidence"],
+          "properties": {
+            "type": {"const": "reality_check"},
+            "evidence": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "evidence/", "type": "evidence"}}
+            }
+          }
+        }
+      ]
+    },
+    "checker": {"description": "the analyst or verifier that works on the item now", "type": ["string", "null"], "minLength": 1},
+    "since": {"description": "when the checker started", "anyOf": [{"$ref": "base.schema.json#/$defs/at"}, {"type": "null"}]},
+    "tries": {"description": "every checker started on the item", "type": "array", "items": {"type": "string", "minLength": 1}},
+    "testable": {
+      "description": "a behaviour's testable form",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["form", "text"],
+      "properties": {
+        "form": {"enum": ["ears", "given when then"]},
+        "text": {"type": "string", "minLength": 1}
+      }
+    },
+    "ambiguity": {"description": "what the behaviour verifier found unclear in the testable form; outside text, read as data", "type": "string", "minLength": 1},
+    "updated_at": {"$ref": "base.schema.json#/$defs/at"}
+  },
+  "if": {"required": ["kind"], "properties": {"kind": {"const": "behaviour"}}},
+  "then": {"required": ["testable"]}
+}

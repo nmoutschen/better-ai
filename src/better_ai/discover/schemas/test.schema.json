@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "test.schema.json",
+  "title": "one line of tests.jsonl: a test that would settle an item, with the rule that says what its result changes",
+  "$comment": "The coordinator writes it. Once a test is no longer planned its `what`, `rule` and `settles` do not change: a new test replaces it. `result.text` is outside text: read as data.",
+  "x-files": ["tests.jsonl"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "id", "what", "kind", "settles", "cost", "rule", "runner", "status"],
+  "properties": {
+    "type": {"const": "test"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "id": {"$ref": "base.schema.json#/$defs/id", "pattern": "^X\\d+$", "x-id": {"prefix": "X"}},
+    "what": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["probe", "proof of concept", "pilot"]},
+    "settles": {
+      "description": "the items the test would settle",
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "items.jsonl", "type": "item"}}
+    },
+    "cost": {"type": "string", "minLength": 1},
+    "rule": {"description": "what the result makes you stop or change", "type": "string", "minLength": 1},
+    "runner": {"enum": ["you", "analyst", "code-better"]},
+    "checker": {"description": "the analyst that runs the test now", "type": ["string", "null"], "minLength": 1},
+    "since": {"description": "when the checker started", "anyOf": [{"$ref": "base.schema.json#/$defs/at"}, {"type": "null"}]},
+    "status": {"enum": ["planned", "running", "done", "removed"]},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "outcome"],
+      "properties": {
+        "text": {"type": "string", "minLength": 1},
+        "outcome": {"enum": ["holds", "changes"]},
+        "evidence": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "evidence/", "type": "evidence"}}
+        }
+      }
+    },
+    "reason": {"description": "why the test was removed", "type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["status"], "properties": {"status": {"const": "done"}}},
+      "then": {"required": ["result"]},
+      "else": {"not": {"required": ["result"]}}
+    },
+    {
+      "if": {"required": ["status"], "properties": {"status": {"const": "removed"}}},
+      "then": {"required": ["reason"]},
+      "else": {"not": {"required": ["reason"]}}
+    }
+  ]
+}

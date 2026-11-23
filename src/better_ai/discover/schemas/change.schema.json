@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "change.schema.json",
+  "title": "one line of changes.jsonl: one change to an item or to the discovery, with what caused it",
+  "$comment": "Append only: a change is never edited or removed. An item's state and importance are the `to` of its last change for that field. `to: accepted` is only for a risk, and Risk accepted is never a state: it is derived once every risk of an item is accepted. A change has no id.",
+  "x-files": ["changes.jsonl"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "about", "field", "from", "to", "cause"],
+  "properties": {
+    "type": {"const": "change"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "about": {"$ref": "#/$defs/about"},
+    "field": {"enum": ["state", "importance", "risk", "appetite", "setting"]},
+    "risk": {"description": "the risk a risk change is about", "type": "string", "pattern": "^R\\d+$"},
+    "from": {"description": "the value before; null when there was none", "type": ["string", "null"]},
+    "to": {"description": "the value after; its allowed values depend on the field", "type": "string", "minLength": 1},
+    "cause": {"$ref": "#/$defs/cause"}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["about"], "properties": {"about": {"required": ["type"], "properties": {"type": {"const": "item"}}}}},
+      "then": {"properties": {"field": {"enum": ["state", "importance", "risk"]}}}
+    },
+    {
+      "if": {"required": ["about"], "properties": {"about": {"required": ["type"], "properties": {"type": {"const": "discovery"}}}}},
+      "then": {"properties": {"field": {"enum": ["appetite", "setting"]}}}
+    },
+    {
+      "if": {"required": ["field"], "properties": {"field": {"const": "risk"}}},
+      "then": {"required": ["risk"], "properties": {"to": {"const": "accepted"}}},
+      "else": {"not": {"required": ["risk"]}}
+    },
+    {
+      "if": {"required": ["field"], "properties": {"field": {"const": "state"}}},
+      "then": {"properties": {"to": {"enum": ["unverified", "checking", "supported", "contradicted", "needs a test", "waiting for you"]}}}
+    },
+    {
+      "if": {"required": ["field"], "properties": {"field": {"const": "importance"}}},
+      "then": {"properties": {"to": {"enum": ["high", "lower"]}}}
+    },
+    {
+      "if": {"required": ["field"], "properties": {"field": {"const": "setting"}}},
+      "then": {"properties": {"to": {"enum": ["internal", "external"]}}}
+    }
+  ],
+  "$defs": {
+    "about": {
+      "description": "an item, or the whole discovery",
+      "type": "object",
+      "required": ["type"],
+      "properties": {"type": {"enum": ["item", "discovery"]}},
+      "allOf": [
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "item"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "item"],
+            "properties": {
+              "type": {"const": "item"},
+              "item": {"type": "string", "minLength": 1, "x-points-to": {"file": "items.jsonl", "type": "item"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "discovery"}}},
+          "then": {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "discovery"}}}
+        }
+      ]
+    },
+    "cause": {
+      "description": "what made the change: evidence that counts, a finished test, the user's answer, or reasoning; at least one",
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {"required": ["evidence"]},
+        {"required": ["test"]},
+        {"required": ["answer"]},
+        {"required": ["reasoning"]}
+      ],
+      "properties": {
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "evidence/", "type": "evidence"}}
+        },
+        "test": {"type": "string", "minLength": 1, "x-points-to": {"file": "tests.jsonl", "type": "test"}},
+        "answer": {"$ref": "#/$defs/answer"},
+        "reasoning": {"type": "string", "minLength": 1}
+      }
+    },
+    "answer": {
+      "description": "the user's answer: a decision they answered, the page event that carries it, or their words in the chat",
+      "type": "object",
+      "required": ["type"],
+      "properties": {"type": {"enum": ["decision", "page", "chat"]}},
+      "allOf": [
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "decision"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "id"],
+            "properties": {
+              "type": {"const": "decision"},
+              "id": {"type": "string", "minLength": 1, "x-points-to": {"file": "decisions.jsonl", "type": "decision"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "page"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "event"],
+            "properties": {
+              "type": {"const": "page"},
+              "event": {"type": "string", "minLength": 1, "x-points-to": {"file": "conversation.jsonl", "type": "answer"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "chat"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "text"],
+            "properties": {"type": {"const": "chat"}, "text": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
+    }
+  }
+}

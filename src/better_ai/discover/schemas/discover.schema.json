@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "discover.schema.json",
+  "title": "discover.json: the head of one discovery, what it is about and where it stands",
+  "$comment": "The coordinator writes it and sets `step` as each step opens. Everything else about the idea is in the records beside it.",
+  "x-files": ["discover.json"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "idea", "appetite", "setting", "coordinator", "step", "status"],
+  "properties": {
+    "type": {"const": "discover"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "idea": {"description": "the idea in the user's words", "type": "string", "minLength": 1},
+    "appetite": {"description": "what the user would waste if the idea is wrong", "type": "string", "minLength": 1},
+    "setting": {"description": "internal: for the user's own organisation; external: for people outside it", "enum": ["internal", "external"]},
+    "brought": {"description": "what the user brought with them, such as notes or links", "type": "string"},
+    "coordinator": {"description": "the agent that runs the discovery; the only one that writes items, changes, options, moves, briefs and decisions", "type": "string", "minLength": 1},
+    "step": {"description": "the step the discovery is in, 1 to 10", "enum": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]},
+    "status": {"enum": ["open", "finished"]},
+    "handed": {
+      "description": "the brief handed on, to which skill, and when",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brief", "to", "at"],
+      "properties": {
+        "brief": {"type": "string", "minLength": 1},
+        "to": {"type": "string", "minLength": 1},
+        "at": {"$ref": "base.schema.json#/$defs/at"}
+      }
+    }
+  }
+}

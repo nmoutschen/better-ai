@@ -154,14 +154,13 @@ EVENTS = {
 }
 
 
-def event(kind: str, **over) -> dict:
-    return {"type": kind, "at": AT, "by": "user", **copy.deepcopy(EVENTS[kind]), **over}
+def event(name: str, **over) -> dict:
+    return {"type": name, "at": AT, "by": "user", **copy.deepcopy(EVENTS[name]), **over}
 
 
 def record(base: dict, **over) -> dict:
-    """A copy of `base` with `over` applied; a key set to None is removed."""
-    out = {**copy.deepcopy(base), **copy.deepcopy(over)}
-    return {k: v for k, v in out.items() if v is not None}
+    """A copy of `base` with `over` applied; a key set to None is kept as null."""
+    return {**copy.deepcopy(base), **copy.deepcopy(over)}
 
 
 def without(base: dict, *keys: str) -> dict:
