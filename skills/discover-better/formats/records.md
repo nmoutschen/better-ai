@@ -21,11 +21,11 @@ These fields hold text from outside, from web pages, the user's sources or other
 
 ## discover (the head, given to `create`)
 
-`step` is `"1"` to `"10"`. `named_sources` lists the files and the read-only connector tools the user named for analysts to read; ADD each as the user names it. `status` is `open` until a move to Adopt or Stop sets it `finished`. `handed` is there once a brief is handed on.
+`step` is `"1"` to `"10"`. `named_sources` lists the files, folders and read-only connector tools the user named for analysts to read; ADD each as the user names it. A path equal to a named path or inside a named folder counts as named. `status` is `open` until a move to Adopt or Stop sets it `finished`. `handed` is there once a brief is handed on.
 
 ```
 {"type": "discover", "idea": "<the idea in the user's words>", "appetite": "<what the user would waste if the idea is wrong>", "setting": "<internal | external>", "brought": "<what the user brought, such as notes or data, or an empty string>", "coordinator": "<your name>", "step": "1", "status": "open"}
-{"type": "discover", "idea": "<...>", "appetite": "<...>", "setting": "<...>", "brought": "<...>", "coordinator": "<...>", "named_sources": [{"type": "file", "path": "<absolute path the user named>"}, {"type": "tool", "tool": "<a read-only connector tool the user named>"}], "step": "9", "status": "open", "handed": {"brief": "<v<n>>", "to": ["<the skills you handed it to, such as /design-better>"], "at": "<UTC time>"}}
+{"type": "discover", "idea": "<...>", "appetite": "<...>", "setting": "<...>", "brought": "<...>", "coordinator": "<...>", "named_sources": [{"type": "file", "path": "<absolute path the user named>"}, {"type": "tool", "tool": "<a read-only connector tool the user named>"}], "step": "9", "status": "open", "handed": {"brief": "<v<n>>", "to": "<the skills you handed it to, such as /design-better and /architect-better>", "at": "<UTC time>"}}
 ```
 
 ## item
@@ -66,7 +66,7 @@ What an analyst read, with how it read it (`raw`, `extracted`, `snippet` or `blo
 
 ## evidence
 
-What a source says about items. `words` is a quote of one line, at most 600 characters, or the user's page event. `kind` is `say | did | commit | data | desk`; `about` is `your users | elsewhere`; each `bears_on` entry has `direction` `for` or `against`. `status` is one of `checking | counts | unverified | not reachable | removed`. An analyst adds it `checking`; the coordinator sets `verifier` and `since`, and `tries` lists each verifier started on it; only that verifier sets the outcome. Evidence the user gave is added `counts` by the coordinator, with `summary` by role in an internal discovery. Evidence from a file or a connector has a `summary` by role too, in any discovery. A result an analyst computed from the user's data is evidence of kind `data` whose words hold the command or query and its result, on one line, as `<command or query> => <result>`. No verifier checks it: it counts only once the user confirms it, by taking the default of a question about that evidence.
+What a source says about items. `words` is a quote of one line, at most 600 characters, or the user's page event. `kind` is `say | did | commit | data | desk`; `about` is `your users | elsewhere`; each `bears_on` entry has `direction` `for` or `against`. `status` is one of `checking | counts | unverified | not reachable | removed`. An analyst adds it `checking`; the coordinator sets `verifier` and `since`, and `tries` lists each verifier started on it; only that verifier sets the outcome. Evidence the user gave is added `counts` by the coordinator, with `summary` by role in an internal discovery. Evidence from a file or a connector has a `summary` by role too, in any discovery. A result an analyst computed from the user's data is evidence of kind `data` whose words hold the command or query and its result, on one line, as `<command or query> => <result>`. No verifier checks it: it counts only once the user confirms it, by taking the default of a question about that evidence. IF the user answers otherwise, the coordinator sets it `unverified` with the reason "not confirmed by you".
 
 ```
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<the sentence, word for word from the page>"}, "kind": "<say | did | commit | data | desk>", "about": "<your users | elsewhere>", "bears_on": [{"item": "<P1>", "direction": "<for | against>"}], "status": "checking"}

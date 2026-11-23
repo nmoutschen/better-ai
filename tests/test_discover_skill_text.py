@@ -267,7 +267,7 @@ class Rules(unittest.TestCase):
         self.assertLess(body.index("START the page as step 1 does"), body.index("better.pyz pending"))
 
     def test_the_curl_example_saves_to_the_verifier_folder(self):
-        self.assertIn("-o <temp>/discover-verify/<idea>/<YOUR NAME>/", read(AGENTS["quote-verifier"]))
+        self.assertIn("-o '<temp>/discover-verify/<idea>/<YOUR NAME>/", read(AGENTS["quote-verifier"]))
 
     def test_the_docs_hand_on_only_expand_and_shrink_briefs(self):
         self.assertIn("Expand and Shrink briefs are handed to", flat(read(DOCS)))

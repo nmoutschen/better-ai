@@ -74,7 +74,7 @@ FOR each item to check, SET its `checker` to a new analyst name and its `since`,
 
 AS evidence appears with `status` `checking`, START a quote verifier for it: SET the evidence's `verifier` to a new verifier name and its `since`, READ [agents/quote-verifier.md](agents/quote-verifier.md), FILL IN its Input, with NAMED SOURCES from the head's `named_sources`, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent.
 
-FOR evidence of kind `data` whose words hold a command or query and its result, START no verifier: nothing runs it again. ASK a question about that evidence, showing its command or query and its result, with the suggested default "Confirm this result". ONCE the user takes it, SET the evidence `counts`.
+FOR evidence of kind `data` whose words hold a command or query and its result, START no verifier: nothing runs it again. ASK a question about that evidence, showing its command or query and its result, with the suggested default "Confirm this result". ONCE the user takes it, SET the evidence `counts` and ADD the change of state for each item it bears on. IF the user answers otherwise, SET it `unverified` with the reason "not confirmed by you".
 
 WAIT for the analysts' and the quote verifiers' hand-backs. Meanwhile, questions to the user go on. DO NOT choose a move or write a brief until they hand back.
 
