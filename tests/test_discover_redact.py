@@ -22,7 +22,6 @@ import discover_records as R  # noqa: E402
 
 from better_ai.discover import brief  # noqa: E402
 
-WORDS = (P.GIVEN, P.EVENT_TEXT, "Dana from payments", "Dana, in the hallway", "lost a week")
 CHAT = "E-coord-1"
 PAGE = "E-coord-2"
 
@@ -177,7 +176,7 @@ class Removal(Fixture):
     def test_S49_the_event_that_holds_the_words_is_emptied_and_its_line_stays(self):
         self.ask_on_the_page(evidence=PAGE)
         with (self.unit / "conversation.jsonl").open("a") as log:
-            log.write(json.dumps(R.event("note", id="n1", text="hello", to=None)) + "\n")
+            log.write(json.dumps({"type": "note", "at": R.AT, "by": "user", "id": "n1", "text": "hello", "to": None}) + "\n")
         before = lines_of(self.unit / "conversation.jsonl")
         done = self.redact(evidence=PAGE)
         self.assertEqual(done.returncode, 0, done.stderr)

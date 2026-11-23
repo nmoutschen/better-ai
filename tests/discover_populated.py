@@ -70,7 +70,7 @@ def populated(root: Path, *, setting: str = "external", users: bool = True) -> P
         ],
     )
     write_json(unit / "sources" / "S-a1-1.json", R.SOURCE)
-    write_json(unit / "evidence" / "E-a1-1.json", R.COUNTING)
+    write_json(unit / "evidence" / "E-a1-1.json", R.record(R.COUNTING, about="elsewhere"))
     if users:
         write_json(
             unit / "sources" / "S-coord-1.json",
@@ -125,5 +125,10 @@ def populated(root: Path, *, setting: str = "external", users: bool = True) -> P
 
 
 def files_under(unit: Path) -> dict[str, bytes]:
-    """Every file of the unit by relative name, for a test that shows nothing was written."""
-    return {str(p.relative_to(unit)): p.read_bytes() for p in sorted(unit.rglob("*")) if p.is_file()}
+    """Every file of the unit by relative name, for a test that shows nothing was written or two runs agree. The head
+    is left out: `create` stamps it with the clock."""
+    return {
+        str(p.relative_to(unit)): p.read_bytes()
+        for p in sorted(unit.rglob("*"))
+        if p.is_file() and p.name != "discover.json"
+    }

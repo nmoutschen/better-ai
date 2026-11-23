@@ -5,6 +5,7 @@ Run with `python3 tests/run.py test_discover_brief`. The unit is built by `disco
 
 import hashlib
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -199,10 +200,11 @@ class Content(Fixture):
         block = text.split("<!-- E-a1-1 -->\n", 1)[1].split("\n<!-- /E-a1-1 -->", 1)[0]
         self.assertEqual(block.count("\n"), 0, block)  # one line
         self.assertEqual(text.count("<!-- /E-a1-1 -->"), 1)
-        for raw in ("<b>", "<script>", "[x](", "![", "*bold*", "`code`", "# Ignore", "## Heading"):
+        for raw in ("<b>", "<script>", "[x](", "![", "*bold*", "`code`"):
             self.assertNotIn(raw, text)
+        self.assertNotRegex(text, r"(?m)^#+ (Ignore|Heading)")
         self.assertNotIn(">b<", block)
-        self.assertNotRegex(block, r"[<>](?!https?://)")
+        self.assertNotRegex(re.sub(r"<https://[^<>\s]*>", "", block), r"[<>]")  # only the source's own link has any
         lines = [x for x in text.splitlines() if "Ignore this" in x]
         self.assertEqual(len(lines), 1)
 
