@@ -41,7 +41,7 @@ ASK, as the general rule [Ask the user](#ask-the-user) says, for what the reques
 
 MAKE the discovery with `python3 <skill dir>/scripts/better.pyz create .discover/<idea> --by <coordinator>`, with the head as JSON on stdin, as formats/records.md shows. MAKE the `<idea>` slug from general terms only, such as `flaky-test-owner`: no person's, customer's or internal project's name. CHOOSE your own name, such as `coordinator`, GIVE it as the head's `coordinator`, and USE it with `--by` from then on. TELL the user the folder's path once.
 
-IF the harness can run a command in the background and the user's browser can reach this machine, START the page with `python3 <skill dir>/scripts/better.pyz serve <unit> --open` and GIVE the user its address. IF your harness tells you when a background command ends, ALSO RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` in the background, and START it again each time it ends, before you act on what it printed. The general rule [Work in the page](#work-in-the-page) applies from then on.
+IF the harness can run a command in the background and the user's browser can reach this machine, START the page with `python3 <skill dir>/scripts/better.pyz serve <unit> --open` and GIVE the user the address it prints, whole, with its `#t=` part. IF your harness tells you when a background command ends, ALSO RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` in the background, and START it again each time it ends, before you act on what it printed. The general rule [Work in the page](#work-in-the-page) applies from then on.
 
 ### 2. Draft and challenge what the idea assumes
 
