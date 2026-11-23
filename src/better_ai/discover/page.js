@@ -665,6 +665,14 @@ function showTab(key) {
 // Opens or closes an item's risks in place: the sub-rows and the bar's button. paint() draws the same from OPEN_RISKS,
 // but waits while a form is open, so a bar or a risk link must not depend on it.
 function setRisksOpen(item, open) {
+  const group = byId('risks-' + item);
+  if (!open && group) {
+    // Nothing stays open under a closed bar: a risk's Change form closes, and so does an answer box in a risk's State
+    // cell, which would otherwise hold paint() back with no form in sight.
+    $$('tr.formrow .rec', group).forEach(box => closeForm(box, true));
+    $$('.why', group).forEach(box => box.remove());
+    $$('[data-answer]', group).forEach(b => { b.style.visibility = ''; });
+  }
   if (open) OPEN_RISKS.add(item); else OPEN_RISKS.delete(item);
   $$('#risks-' + CSS.escape(item) + ' tr.risk', view).forEach(row => { row.hidden = !open; });
   const bar = $('#bar-' + CSS.escape(item) + ' [data-risks]', view);
@@ -674,6 +682,7 @@ function setRisksOpen(item, open) {
   const glyph = $('[aria-hidden="true"]', bar), what = $('.what', bar);
   if (glyph) glyph.textContent = open ? '▾' : '▸';
   if (what) what.textContent = open ? 'Hide risks' : 'Show risks';
+  if (!open && DIRTY && !formOpen()) paint();
 }
 // Goes to the row an ID names, opens its tab and marks it.
 function goto(id) {

@@ -537,12 +537,12 @@ def _line_of(text: str, key: str) -> int:
 def _linked(data: Data, evidence_id: str) -> list[str]:
     """The evidence, then the reworded quote it corrects or the corrections of it: a reworded quote and its correction
     hold the same person's words, so redact takes them together."""
-    evidence = data.evidence[evidence_id]
     found = [evidence_id]
-    corrected = evidence.get("corrects")
-    if isinstance(corrected, str) and corrected in data.evidence:
-        found.append(corrected)
-    found += [i for i, e in data.evidence.items() if e.get("corrects") == evidence_id and i not in found]
+    for ident in found:  # grows as it goes: a correction can be reworded and corrected again, so follow every link
+        corrected = data.evidence[ident].get("corrects")
+        if isinstance(corrected, str) and corrected in data.evidence and corrected not in found:
+            found.append(corrected)
+        found += [i for i, e in data.evidence.items() if e.get("corrects") == ident and i not in found]
     return found
 
 

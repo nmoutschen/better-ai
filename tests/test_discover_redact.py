@@ -419,6 +419,37 @@ class Reworded(Fixture):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn(self.ANALYST, (self.unit / "brief" / "v1.md").read_text())
 
+    def test_a_chain_of_corrections_is_redacted_whole_from_either_end(self):
+        # a correction can itself be found reworded and corrected again: every link holds the same person's words
+        chain = R.record(
+            R.EVIDENCE,
+            id="E-coord-10",
+            by=R.COORD,
+            corrects="E-coord-9",
+            status="counts",
+            verifier="v3",
+            tries=["v3"],
+            checked_read="raw",
+            span="Over half mute alerts.",
+            sha256="a" * 64,
+            words={"type": "quote", "text": "Over half mute alerts."},
+        )
+        middle = json.loads((self.unit / "evidence" / "E-coord-9.json").read_text())
+        for key in ("checked_read", "span", "sha256"):
+            middle.pop(key)
+        middle.update(status="reworded", reason="reworded", page_words="Over half mute alerts.")
+        for end in ("E-coord-10", "E-a1-2"):
+            with self.subTest(end=end):
+                self.setUp()
+                P.write_json(self.unit / "evidence" / "E-coord-9.json", middle)
+                P.write_json(self.unit / "evidence" / "E-coord-10.json", chain)
+                self.ask_on_the_page(evidence=end)
+                done = self.redact(evidence=end)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertEqual([self.status(i) for i in ("E-a1-2", "E-coord-9", "E-coord-10")], ["removed"] * 3)
+                for words in (self.ANALYST, self.WORDS, "Over half mute alerts."):
+                    self.assertNotIn(words, self.everything())
+
 
 class Stopping(Fixture):
     def expected(self):
