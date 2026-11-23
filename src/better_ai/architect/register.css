@@ -1,3 +1,14 @@
+/* The page has no page.css: these are its copies of the tokens it uses (test_design checks they match page.css). */
+:root {
+  --space-tight: 4px;
+  --space-control: 8px;
+  --space-item: 12px;
+  --space-section: 16px;
+  --space-group: 24px;
+  --space-wide: 40px;
+  --text-label: 11px;
+}
+
 body {
   margin: 0;
   background: #fffcf7;
@@ -8,7 +19,7 @@ body {
 main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 28px 32px 60px;
+  padding: var(--space-group) var(--space-wide) var(--space-wide);
 }
 
 h1,
@@ -18,24 +29,24 @@ h2 {
 }
 
 h1 {
-  margin: 0 0 4px;
-  padding-left: 12px;
+  margin: 0 0 var(--space-tight);
+  padding-left: var(--space-item);
   border-left: 6px solid #e8725c;
   font-size: 1.6rem;
 }
 
 h2 {
-  margin: 28px 0 8px;
+  margin: var(--space-group) 0 var(--space-control);
   font-size: 1.2rem;
 }
 
 h3 {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-tight);
   font-size: 1.05rem;
 }
 
 p {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-tight);
   font-size: 0.9rem;
   line-height: 1.45;
 }
@@ -47,13 +58,13 @@ p {
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
-  gap: 16px;
+  gap: var(--space-section);
 }
 
 article {
   display: flex;
-  gap: 16px;
-  padding: 16px;
+  gap: var(--space-section);
+  padding: var(--space-section);
   border: 1px solid #c4b69c;
 }
 
@@ -70,13 +81,13 @@ article {
 .box {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 8px 12px;
+  gap: var(--space-tight);
+  margin-top: var(--space-control);
+  padding: var(--space-control) var(--space-item);
   border: 1.5px solid #33302b;
   background: #f2ede5;
   color: #78736b;
-  font-size: 11px;
+  font-size: var(--text-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }

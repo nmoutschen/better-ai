@@ -404,26 +404,26 @@
              parents: parents, point: { x: Math.round(cx + win.scrollX), y: Math.round(cy + win.scrollY) },
              box: { x: Math.round(r.left + win.scrollX), y: Math.round(r.top + win.scrollY), w: Math.round(r.width), h: Math.round(r.height) } };
   }
-  var PIN_CSS = 'html.db-commenting, html.db-commenting *{cursor:crosshair!important}' +
-    '.db-pin{position:absolute;z-index:2147483647;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;' +
-    'background:#E8725C;color:#1C1A17;font:700 12px/24px sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFCF7;cursor:pointer;transform:scale(var(--db-s,1))}' +
-    '.db-pin.db-new{animation:db-pulse 1.2s ease-out 2}' +
-    // A pin shows its comment's progress in the colours of the conversation panel.
-    '.db-pin[data-state=seen],.db-pin[data-state=replied]{background:#C4B69C}' +
-    '.db-pin[data-state=asked]{background:#FFFCF7;color:#5C4033;box-shadow:0 0 0 2px #5C4033}' +
-    '.db-pin[data-state=working]{background:#E8725C;animation:db-pulse 1.4s ease-out infinite}' +
-    '.db-pin[data-state=done]{background:#66795A;color:#FFFCF7}' +
-    // An accepted comment's pin goes away; showing it from the conversation brings it back for a moment.
-    '.db-pin[data-state=accepted]{display:none;background:#66795A;color:#FFFCF7}' +
-    '.db-pin.db-flash{display:block!important;animation:db-pulse .9s ease-out 3!important}' +
-    '.db-pin[data-state=reopened]{background:#E8725C;box-shadow:0 0 0 2px #FFFCF7,0 0 0 4px #9A3B2A}' +
-    '@media (prefers-reduced-motion: reduce){.db-pin{animation:none!important}}' +
-    '@keyframes db-pulse{0%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 0 rgba(232,114,92,.9)}100%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 18px rgba(232,114,92,0)}}';
+  // The pin colours are the page's own table (pagePinCss, from page.css), with the page's colour variables filled in:
+  // the version's document has none of them.
+  function pinCss() {
+    var root = getComputedStyle(document.documentElement);
+    return 'html.db-commenting, html.db-commenting *{cursor:crosshair!important}' +
+      '.db-pin{position:absolute;z-index:2147483647;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;' +
+      'background:#E8725C;color:#1C1A17;font:700 12px/24px sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFCF7;cursor:pointer;transform:scale(var(--db-s,1))}' +
+      '.db-pin.db-new{animation:db-pulse 1.2s ease-out 2}' +
+      pagePinCss(document.styleSheets, 'db-pin', function (name) { return root.getPropertyValue(name).trim(); }) +
+      '.db-pin[data-state=working]{animation:db-pulse 1.4s ease-out infinite}' +
+      // An accepted comment's pin goes away; showing it from the conversation brings it back for a moment.
+      '.db-pin.db-flash{display:block!important;animation:db-pulse .9s ease-out 3!important}' +
+      '@media (prefers-reduced-motion: reduce){.db-pin{animation:none!important}}' +
+      '@keyframes db-pulse{0%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 0 rgba(232,114,92,.9)}100%{box-shadow:0 0 0 2px #FFFCF7,0 0 0 18px rgba(232,114,92,0)}}';
+  }
   function instrument(frame) {
     var doc; try { doc = frame.contentDocument; } catch (e) { return; }
     if (!doc || !doc.body || doc.documentElement.dataset.dbReady) return;
     doc.documentElement.dataset.dbReady = '1';
-    var style = doc.createElement('style'); style.textContent = PIN_CSS; doc.head.appendChild(style);
+    var style = doc.createElement('style'); style.textContent = pinCss(); doc.head.appendChild(style);
     doc.documentElement.classList.toggle('db-commenting', commenting);
     doc.addEventListener('keydown', shortcut);
     doc.addEventListener('click', function (e) {

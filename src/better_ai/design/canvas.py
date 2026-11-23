@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import argparse
 import base64
+import html
 import json
 import mimetypes
 import posixpath
 import re
-from typing import Any
 
-from .. import cli, page, paths, resources
+from .. import cli, page, paths
 from ..paths import Refused, Unit
 from ..skill import Skill
 from .checks import is_page, page_reason, version_path
@@ -132,17 +132,13 @@ def version_data(unit: Unit, version: dict, warnings: list) -> dict:
         warnings.append(f"{file} is not a file of the unit.")
         return {
             "label": label,
-            "srcdoc": f"<p style='font:16px sans-serif;padding:1em'>{_escape(str(file))} is not a file of the unit.</p>",
+            "srcdoc": f"<p style='font:16px sans-serif;padding:1em'>{html.escape(str(file), quote=False)} is not a file of the unit.</p>",
         }
     missed: set = set()
     doc = embed_links(unit, path, doc, missed)
     for link in sorted(missed):
         warnings.append(f"{file} links {link}, which is not a file of the unit: the page may not show it.")
     return {"label": label, "srcdoc": doc}
-
-
-def _escape(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def data_of(unit: Unit) -> tuple[dict, list]:
@@ -216,30 +212,6 @@ def register(skill: Skill) -> None:
 # ---------------------------------------------------------------- render
 
 
-def _script_json(value: Any) -> str:
-    return json.dumps(value).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
-
-
-def static_page(data: dict) -> str:
-    """The page as one file: the shell with its style sheets and scripts inlined, and the data it would fetch."""
-    text = page.shell(SPEC)
-    for url, name in SPEC.table().items():
-        body = resources.read_text(name)
-        if "</script" in body.lower() or "</style" in body.lower():
-            raise ValueError(f"{name} holds a closing tag that would end its element")
-        if url.endswith(".css"):
-            tag, new = f'<link href="{url}" rel="stylesheet">', f"<style>\n{body}\n</style>"
-        else:
-            tag, new = f'<script src="{url}"></script>', f"<script>\n{body}\n</script>"
-        if tag not in text:
-            raise ValueError(f"the shell does not link {url}")
-        text = text.replace(tag, new, 1)
-    marker = '<script type="application/json" id="page-config">'
-    return text.replace(
-        marker, f'<script type="application/json" id="page-data">{_script_json(data)}</script>\n{marker}', 1
-    )
-
-
 def _render_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("unit", help="the unit to render, such as .design/pay-screen")
 
@@ -258,7 +230,7 @@ def render(args: argparse.Namespace, run: cli.Run) -> int:
         named = version_path(version.get("file")) if isinstance(version, dict) else None
         if is_page(named):
             raise Refused(f"{unit.label}: {page_reason(named)}. set {unit.label} canvas")
-    paths.write_atomic(unit, "index.html", page.with_old_note(unit, static_page(data)).encode("utf-8"))
+    paths.write_atomic(unit, "index.html", page.with_old_note(unit, page.static_page(SPEC, data)).encode("utf-8"))
     for warning in warnings:
         run.err(f"warning: {warning}")
     run.out(str(unit.target("index.html")))
