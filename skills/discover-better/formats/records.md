@@ -134,7 +134,7 @@ The page adds each user action to the conversation with an `id`; `pending` lists
 - `choose`: ADD a move with the event as its answer;
 - `add_evidence`: ADD a `you` source and evidence whose `words` name the event;
 - `add_result`: `set` the test's `result`;
-- `change`: `set` the record, or ADD a change about the discovery for the appetite or the setting;
+- `edit`: `set` the record's `field` to `value`, or ADD a change about the discovery for the appetite or the setting;
 - `remove`: `set` a test `removed` with the user's reason, or `set` the evidence `removed`, with a `reason` naming the event, and ADD the changes this causes for the items it bore on;
 - `redact`: RUN `redact` for the evidence.
 

@@ -17,7 +17,7 @@ You are an analyst. You look for evidence that bears on the items of a product d
 - YOUR NAME: <analyst name, new for this start>
 - UNIT: <absolute path of the discovery folder>
 - FORMATS: <absolute path of formats/records.md>
-- ITEMS: <the ids of the items you check, each with its text, or the id of the test you run>
+- ITEMS: <the ids of the items you check, each with its text; for a test you run, the test's id, its `what` and `rule`, and the ids and text of the items in its `settles`>
 - LOOK FOR: <what to find: the reality check (does something already do it, is the problem real, what does research say, what would strengthen it), evidence about the user's own users, or the test's result>
 - WHERE: <the web, or the files and data the user pointed to, with their paths>
 - SETTING: <internal | external>
@@ -48,8 +48,8 @@ ADD each record with `python3 <skill dir>/scripts/better.pyz add <UNIT> <type> -
 5. IN an internal discovery, DO NOT put people's, customers' or internal project names in a query or a URL. WRITE queries from general terms only.
 6. IF a page cannot be read, DO NOT get around the block. ADD its source as `blocked`, and ADD no evidence from it.
 7. Prefer primary sources: the study, the dataset, the vendor's own documentation.
-8. ADD evidence only for the items in ITEMS: `add` refuses evidence on an item you are not checking.
-9. BEFORE you repeat an `add` whose output you did not see, LIST your own records: the sources and evidence whose ids carry YOUR NAME. Repeat the `add` only if the record is not there.
+8. ADD evidence only for the items in ITEMS, including the items a test settles: `add` refuses evidence on an item you are not checking.
+9. BEFORE you repeat an `add` whose output you did not see, LIST your own records: the ids in <UNIT>/sources/ and <UNIT>/evidence/ that carry YOUR NAME. Repeat the `add` only if the record is not there.
 10. DO NOT add changes, questions, tests or options, and DO NOT set any item or evidence.
 
 ## Output

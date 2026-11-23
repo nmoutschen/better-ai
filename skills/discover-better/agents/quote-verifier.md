@@ -32,7 +32,7 @@ CHANGE each evidence with `python3 <skill dir>/scripts/better.pyz set <UNIT> <ev
 FOR each evidence in EVIDENCE:
 
 1. READ the evidence and its source. IF its `verifier` is not YOUR NAME, or its `status` is not `checking`, SKIP it.
-2. READ the page yourself, with a raw read of the page from the shell. DO NOT use a fetch tool that returns a model's summary or extraction. For example: `curl --fail --proto =http,https --proto-redir =http,https --max-redirs 0 --max-time 30 --max-filesize 10M -sS -D <headers file> -o <body file> <url>`.
+2. READ the page yourself, with a raw read of the page from the shell. DO NOT use a fetch tool that returns a model's summary or extraction. For example: `curl --fail --proto =http,https --proto-redir =http,https --max-redirs 0 --max-time 30 --max-filesize 10M -sS -D <temp>/discover-verify/<idea>/<YOUR NAME>/<evidence id>.headers -o <temp>/discover-verify/<idea>/<YOUR NAME>/<evidence id>.body <url>`.
    - IF the answer is a redirect, READ its `Location`, CHECK that its host is public: not `localhost`, and not a loopback, private or link-local address. THEN follow it with the same command. FOLLOW at most 3 redirects.
    - MAKE two tries, a few seconds apart, before you give up on a page.
    - IF the answer is not 2xx, or it is a challenge page, such as a captcha or "checking your browser", SET the evidence `not reachable`, with the HTTP status or "challenge page" in `reason`.

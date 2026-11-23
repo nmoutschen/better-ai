@@ -53,7 +53,7 @@ DRAFT the items the idea rests on, and ADD each with `python3 <skill dir>/script
 
 LINK each item to the items it rests on. LIST on each item its risks, each with an id `R<n>` and a kind: value (would they want it), usability (could they use it), feasibility (can it be built) or viability (can the organisation sustain it). SET each item's importance, `high` or `lower`, with a first `change`. Linking an outcome, its opportunities and the behaviours that serve them is a common structure for this; no study measured its effect.
 
-START a behaviour verifier for the behaviours, as the general rule [Run the sub-agents](#run-the-sub-agents) says: READ [agents/behaviour-verifier.md](agents/behaviour-verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent. SET each behaviour's `ambiguity` from its findings, in your own words.
+START a behaviour verifier for the behaviours, as the general rule [Run the sub-agents](#run-the-sub-agents) says. SET each behaviour's `checker` and `since` when its behaviour verifier starts, and CLEAR them when it hands back. READ [agents/behaviour-verifier.md](agents/behaviour-verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to a new sub-agent. SET each behaviour's `ambiguity` from its findings, in your own words.
 
 SHAPE and CHALLENGE the draft with the user, one question at a time:
 
@@ -76,7 +76,7 @@ AS evidence appears with `status` `checking`, START a quote verifier for it: SET
 
 WAIT for the analysts' and the quote verifiers' hand-backs. Meanwhile, questions to the user go on. DO NOT choose a move or write a brief until they hand back.
 
-ONCE they hand back, CLEAR each item's `checker` and `since` with `set --unset`. FOR each item, ADD a change of state from the evidence that counts: `supported` when counting evidence bears for it and none against, `contradicted` when counting evidence bears against it, mixed evidence included. WHEN something that exists covers the idea, ADD an option with the move `adopt`, and ADD the items of an alternative idea the evidence points to, with `alternative` naming that evidence.
+ONCE they hand back, CLEAR each item's `checker` and `since` with `set --unset`. FOR each item, ADD a change of state from the evidence that counts: `supported` when counting evidence bears for it and none against, `contradicted` when counting evidence bears against it, mixed evidence included, and `unverified` when no counting evidence bears on it. WHEN something that exists covers the idea, ADD an option with the move `adopt`, and ADD the items of an alternative idea the evidence points to, with `alternative` naming that evidence.
 
 IF the idea no longer holds, because its core is contradicted or something that exists covers it, GO to step 5 to choose a move now, such as Stop, Switch or Adopt.
 
@@ -92,7 +92,7 @@ WAIT for the analysts' and the quote verifiers' hand-backs. Meanwhile, questions
 
 ### 5. Make your calls and choose a move
 
-ASK what is still open and only the user can decide, as the general rules [Ask the user](#ask-the-user) and [Only the user accepts a risk](#only-the-user-accepts-a-risk) say. ADD an item's change to `waiting for you` while a question about it is open.
+ASK what is still open and only the user can decide, as the general rules [Ask the user](#ask-the-user) and [Only the user accepts a risk](#only-the-user-accepts-a-risk) say. ADD an item's change to `waiting for you` while a question about it is open. ONCE the question is answered, ADD the change its answer leads to, such as `needs a test`, or back to the state its evidence gives.
 
 ADD the options with `python3 <skill dir>/scripts/better.pyz add <unit> option --by <coordinator>`. EACH option names one move of the seven, and a move can have several options. GIVE each its cost, speed, upkeep and how hard it is to undo, and its note: `proposed` for the one you recommend, `ruled out by your appetite` for one the appetite excludes. WEIGH each option by who would use it and who pays, its reach, its gain, its build and running cost, and the next-best use of the user's time, as ranges with the assumptions behind them.
 
@@ -127,7 +127,7 @@ IF a test is `planned` and the user agreed to run it, SET it `running`, THEN run
 
 WAIT for the result: the analysts', the quote verifiers' and `/code-better`'s hand-backs, or the user's. Meanwhile, questions to the user go on. DO NOT choose a move or write a brief until they hand back.
 
-WHEN the result is in, SET the test `done` with its `result`: its text, `holds` or `changes` by the test's own rule, and the evidence it gave. ADD that evidence as step 4 says, and GO back to step 4. IF the user drops a test, SET it `removed` with their reason, and ASK, for each item it would have settled, whether to accept the risk or plan another test.
+WHEN the result is in, ADD the evidence it gave, as step 4 says, THEN SET the test `done` with its `result`: its text, `holds` or `changes` by the test's own rule, and that evidence. GO back to step 4. IF the user drops a test, SET it `removed` with their reason, and ASK, for each item it would have settled, whether to accept the risk or plan another test.
 
 ### 8. Write brief version n
 
@@ -220,7 +220,7 @@ IF the user wants research on a topic rather than a product brief, USE `/researc
 WHEN you resume a discovery, after a new invocation or after the harness compacted the session, DO these in order:
 
 1. RUN `python3 <skill dir>/scripts/better.pyz summary <unit>`: its first line names the coordinator to use with `--by`. THEN RUN `python3 <skill dir>/scripts/better.pyz check <unit>`.
-2. RUN `python3 <skill dir>/scripts/better.pyz pending <unit>`, and handle each open page event.
+2. START the page as step 1 does, if it is not served. THEN RUN `python3 <skill dir>/scripts/better.pyz pending <unit>`, and handle each open page event.
 3. ASK the harness which sub-agents are still running, and restart each checker or verifier that is not, under a new name. IF the harness cannot list them, restart only those with no record for 30 minutes.
 4. START a verifier for each evidence `checking` with no verifier.
 5. FINISH an unfinished `brief` or `redact` by running it again.

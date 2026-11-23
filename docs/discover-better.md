@@ -11,7 +11,7 @@ Takes your product idea to a brief for design, in versions. It drafts what the i
 - **Separates evidence about your users from evidence from elsewhere.** An item supported only by evidence from elsewhere shows as not yet known for your users.
 - **Leaves your calls to you.** Each question has a suggested default you take with one click, and none is ever applied by silence. Only you accept a risk.
 - **Has you choose each move.** Test first, Expand, Shrink, Switch, Adopt, Pause or Stop, each option with its cost, speed, upkeep and how hard it is to undo. Expand, Adopt and Stop ask you to confirm.
-- **Writes a brief for each move that commits.** Each version is kept, names the move that wrote it, and is handed to [`/design-better`](design-better.md) and [`/architect-better`](architect-better.md).
+- **Writes a brief for each move that commits.** Each version is kept and names the move that wrote it. Expand and Shrink briefs are handed to [`/design-better`](design-better.md) and [`/architect-better`](architect-better.md).
 
 ## When to use it
 
