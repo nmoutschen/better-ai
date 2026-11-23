@@ -495,3 +495,10 @@ test('a verifier row carries its kind as a class, so its edge is the checker col
   assert.match(agents([{ who: 'v1', what: 'Checking claims', kind: 'verifier', data: { a: 'v1' } }]), /<button type="button" class="verifier" data-a="v1">/);
   assert.match(agents([{ who: 'v1', what: 'x', kind: 'verifier' }]), /<div class="verifier">/);
 });
+
+test('an unusable time or a missing clock leaves the age out and never shows NaN', () => {
+  const bad = agents([{ who: 'a', what: 'x', since: 'not a time', last: 'also not' }]);
+  assert.doesNotMatch(bad, /NaN|chip|No word/);
+  const noNow = context.pageAgents([{ who: 'a', what: 'x', since: ago(5), last: ago(90) }], {});
+  assert.doesNotMatch(noNow, /NaN|chip|No word/);
+});

@@ -826,16 +826,20 @@ function pageShowErrors(el, errors, note) {
 // line when there are no rows.
 function pageAgents(rows, o) {
   var now = o.now * 1000;
-  function minutes(at) { return Math.max(0, Math.floor((now - (typeof at === 'number' ? at : Date.parse(at))) / 60000)); }
+  // The whole minutes since AT, or null when AT or the clock is not a time: the row then leaves that part out.
+  function minutes(at) {
+    var n = Math.floor((now - (typeof at === 'number' ? at : Date.parse(at))) / 60000);
+    return isFinite(n) ? Math.max(0, n) : null;
+  }
   if (!rows.length) return '<li class="muted">' + pageEscape(o.empty) + '</li>';
   return rows.map(function (r) {
     var attrs = Object.keys(r.data || {}).map(function (k) { return ' data-' + pageEscape(k) + '="' + pageEscape(r.data[k]) + '"'; }).join('');
     var tag = (r.data ? 'button type="button"' : 'div') + (r.kind ? ' class="' + pageEscape(r.kind) + '"' : '') + attrs;
-    var late = r.last != null && minutes(r.last) >= 30;
+    var age = r.since != null ? minutes(r.since) : null, quiet = r.last != null ? minutes(r.last) : null;
     return '<li><' + tag + '><b>' + pageEscape(r.who) + '</b><span dir="auto">' + pageEscape(r.what) + '</span>' +
-      (r.since != null ? '<span class="chip working">' + pageEscape(r.state || 'Working') + ', ' + minutes(r.since) + ' min</span>' : '') +
+      (age !== null ? '<span class="chip working">' + pageEscape(r.state || 'Working') + ', ' + age + ' min</span>' : '') +
       (r.second ? '<em class="second">second try</em>' : '') +
-      (late ? '<em class="dry">No word from ' + pageEscape(r.who) + ' for ' + minutes(r.last) + ' min</em>' : '') +
+      (quiet !== null && quiet >= 30 ? '<em class="dry">No word from ' + pageEscape(r.who) + ' for ' + quiet + ' min</em>' : '') +
       (r.note ? '<em class="dry">' + pageEscape(r.note) + '</em>' : '') +
       '</' + (r.data ? 'button' : 'div') + '></li>';
   }).join('');
