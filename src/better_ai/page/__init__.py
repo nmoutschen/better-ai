@@ -17,6 +17,9 @@ registers with `register(SKILL, PageSpec(...))` when it is imported:
   (by default: notes, and the events of the declared capabilities that ask for an answer);
 - `events`: the file name of the page's own events schema, in its package's `schemas/` folder;
 - `load(unit)`: the page's data, a JSON object, served at `/data` (with `listening`, `now` and `quiet_after` added);
+- `rendered`, `static_data(unit, run)`: the `render` verb writes the page as one static file, `rendered` (a path
+  in the unit; it prints the file's path), with `static_data` (default: `load`) embedded; the hook may refuse, warn on `run.err` or write other
+  files first (the architect's SVGs);
 - `revision(unit)`, `stopped(unit)`, `tick(unit, conversation)`: optional. A page reloads itself when `/rev` changes;
   `serve` ends `--linger` seconds after `stopped` becomes true; `tick` runs every TICK seconds (one) while serving.
 
@@ -109,6 +112,8 @@ class PageSpec:
     methods: tuple[str, ...] = ()
     items: tuple[str, ...] | None = None
     empty: str | None = None
+    rendered: str = "index.html"
+    static_data: Callable[[Unit, cli.Run], Mapping[str, Any]] | None = None
     aside: str | None = None
     revision: Callable[[Unit], str] | None = None
     stopped: Callable[[Unit], bool] | None = None
@@ -755,6 +760,22 @@ def static_page(spec: PageSpec, data: Mapping[str, Any]) -> str:
         f'<script type="application/json" id="page-data">{_json_for_html(page_data(data))}</script>\n{config}',
         1,
     )
+
+
+# show-better has its own `render`: it checks a slide spec and prints text as well as a page.
+@cli.verb(
+    "render",
+    help="write the unit's page as one static file, with its data in it, so it opens without a server",
+    arguments=_unit_argument,
+    skills=("architect-better", "code-better", "design-better", "discover-better", "research-better"),
+)
+def render(args: argparse.Namespace, run: cli.Run) -> int:
+    unit = _unit(args, run)
+    spec = spec_of(run.skill)
+    data = spec.static_data(unit, run) if spec.static_data else spec.load(unit)
+    paths.write_atomic(unit, spec.rendered, with_old_note(unit, static_page(spec, data)).encode("utf-8"))
+    run.out(str(unit.target(spec.rendered)))
+    return cli.EXIT_DONE
 
 
 # ---------------------------------------------------------------- the server
