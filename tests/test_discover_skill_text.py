@@ -289,6 +289,31 @@ class Rules(unittest.TestCase):
             read(RECORDS),
         )
 
+    def test_analysts_read_files_and_connectors_too(self):
+        """S127: a source can be a web page, a file the user pointed to, or an item of a connector such as an MCP server."""
+        analyst = flat(read(AGENTS["analyst"]))
+        for phrase in (
+            "the connectors named, such as MCP servers",
+            "`origin` `file`, its path",
+            "`origin` `tool`, the tool, the item's `ref`",
+            "a `summary` that names people by role, never by name",
+            "NEVER put an internal name, or text from the user's files or connectors, in a web search or a URL",
+        ):
+            self.assertIn(phrase, analyst)
+        verifier = flat(read(AGENTS["quote-verifier"]))
+        for phrase in (
+            "RE-READ the file at its `path`",
+            "the same tool with the same `ref`",
+            "The curl command is for web pages only",
+        ):
+            self.assertIn(phrase, verifier)
+        records = read(RECORDS)
+        self.assertIn('"origin": {"type": "file", "path": "<', records)
+        self.assertIn('"origin": {"type": "tool", "tool": "<', records)
+        found = steps(read(SKILL))
+        self.assertIn("files and connectors the user points to, such as MCP servers", flat(found[4][1]))
+        self.assertIn("files and connectors", flat(found[7][1]))
+
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
         for path in [*skill_texts(), DOCS]:
