@@ -385,12 +385,39 @@ class Reworded(Fixture):
         self.assertEqual(record["status"], "removed")
         self.assertNotIn("page_words", record)
 
-    def test_redacting_a_correction_empties_the_page_words_of_the_evidence_it_corrects(self):
+    ANALYST = "People ignore the alerts."
+
+    def status(self, ident):
+        return json.loads((self.unit / "evidence" / f"{ident}.json").read_text())["status"]
+
+    def test_redacting_a_correction_removes_the_quote_it_corrects_too(self):
+        # the user's decision: the analyst's wording of a reworded quote is the person's words as well
         self.ask_on_the_page(evidence="E-coord-9")
         done = self.redact(evidence="E-coord-9")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn(self.WORDS, self.everything())
-        self.assertEqual(json.loads((self.unit / "evidence" / "E-a1-2.json").read_text())["status"], "reworded")
+        self.assertNotIn(self.ANALYST, self.everything())
+        self.assertEqual((self.status("E-coord-9"), self.status("E-a1-2")), ("removed", "removed"))
+
+    def test_redacting_the_reworded_quote_removes_its_correction_too(self):
+        self.ask_on_the_page(evidence="E-a1-2")
+        done = self.redact(evidence="E-a1-2")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn(self.WORDS, self.everything())
+        self.assertNotIn(self.ANALYST, self.everything())
+        self.assertEqual((self.status("E-coord-9"), self.status("E-a1-2")), ("removed", "removed"))
+
+    def test_a_brief_written_before_the_correction_loses_the_analysts_wording(self):
+        fix = self.unit / "evidence" / "E-coord-9.json"
+        kept = fix.read_text()
+        fix.unlink()  # the brief is written while the quote waits for its correction
+        self.brief_final()
+        self.assertIn(self.ANALYST, (self.unit / "brief" / "v1.md").read_text())
+        fix.write_text(kept)
+        self.ask_on_the_page(evidence="E-coord-9")
+        done = self.redact(evidence="E-coord-9")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn(self.ANALYST, (self.unit / "brief" / "v1.md").read_text())
 
 
 class Stopping(Fixture):

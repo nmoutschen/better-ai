@@ -662,12 +662,25 @@ function showTab(key) {
     panel(button.id.slice(4)).hidden = !on;
   });
 }
+// Opens or closes an item's risks in place: the sub-rows and the bar's button. paint() draws the same from OPEN_RISKS,
+// but waits while a form is open, so a bar or a risk link must not depend on it.
+function setRisksOpen(item, open) {
+  if (open) OPEN_RISKS.add(item); else OPEN_RISKS.delete(item);
+  $$('#risks-' + CSS.escape(item) + ' tr.risk', view).forEach(row => { row.hidden = !open; });
+  const bar = $('#bar-' + CSS.escape(item) + ' [data-risks]', view);
+  if (!bar) return;
+  bar.setAttribute('aria-expanded', String(open));
+  bar.setAttribute('aria-label', (open ? 'Hide' : 'Show') + ' risks of ' + item);
+  const glyph = $('[aria-hidden="true"]', bar), what = $('.what', bar);
+  if (glyph) glyph.textContent = open ? '▾' : '▸';
+  if (what) what.textContent = open ? 'Hide risks' : 'Show risks';
+}
 // Goes to the row an ID names, opens its tab and marks it.
 function goto(id) {
   showTab(tabOf(id, DATA));
   $$('.highlighted', view).forEach(r => r.classList.remove('highlighted'));
   const owner = isRisk(id) ? riskItem(id, DATA) : null;
-  if (owner && !OPEN_RISKS.has(owner)) { OPEN_RISKS.add(owner); paint(); }
+  if (owner) setRisksOpen(owner, true);
   const row = byId((owner ? 'risk-' : 'row-') + id);
   if (!row) return;
   row.classList.add('highlighted');
@@ -810,8 +823,7 @@ view.addEventListener('click', event => {
   if (target.matches('[data-open-picker]')) return togglePicker(true);
   if (target.matches('[data-risks]')) {
     const id = target.dataset.risks;
-    if (OPEN_RISKS.has(id)) OPEN_RISKS.delete(id); else OPEN_RISKS.add(id);
-    return paint();
+    return setRisksOpen(id, !OPEN_RISKS.has(id));
   }
   const row = target.closest('li.q, .rq');
   if (target.matches('[data-use]') && row) {

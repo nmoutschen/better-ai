@@ -534,8 +534,28 @@ def _line_of(text: str, key: str) -> int:
     return 1
 
 
+def _linked(data: Data, evidence_id: str) -> list[str]:
+    """The evidence, then the reworded quote it corrects or the corrections of it: a reworded quote and its correction
+    hold the same person's words, so redact takes them together."""
+    evidence = data.evidence[evidence_id]
+    found = [evidence_id]
+    corrected = evidence.get("corrects")
+    if isinstance(corrected, str) and corrected in data.evidence:
+        found.append(corrected)
+    found += [i for i, e in data.evidence.items() if e.get("corrects") == evidence_id and i not in found]
+    return found
+
+
 def _plan(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
     """The places that hold the evidence's words, in the order redact works through them."""
+    steps: list[dict] = []
+    for ident in _linked(data, evidence_id):
+        steps += [{**s, "evidence": ident} for s in _places(unit, data, ident)]
+    return [{**s, "done": False} for s in steps]
+
+
+def _places(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
+    """The places of one evidence's words."""
     evidence = data.evidence[evidence_id]
     source = data.sources.get(evidence.get("source"), {})
     steps: list[dict] = []
@@ -557,11 +577,8 @@ def _plan(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
     if given.get("type") == "chat" and source.get("id"):
         steps.append({"do": "source", "ref": source["id"]})
     steps += [{"do": "test", "ref": t["id"]} for t in data.tests if evidence_id in _cited_by(t)]
-    corrected = evidence.get("corrects")
-    if isinstance(corrected, str) and corrected in data.evidence:  # the reworded evidence holds the same words
-        steps.append({"do": "page_words", "ref": corrected})
     steps.append({"do": "evidence", "ref": evidence_id})
-    return [{**s, "done": False} for s in steps]
+    return steps
 
 
 def _cited_by(test: dict) -> list:
@@ -612,15 +629,6 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
         return [f"{ref}: removed, a leftover file that held the block for {evidence_id}"], lambda: os.unlink(
             unit.target(ref)
         )
-    if kind == "page_words":
-        current = data.evidence[ref]
-        if current.get("page_words") in (None, REMOVED):
-            return [], None
-        new = _valid(unit, {**current, "page_words": REMOVED}, "evidence.schema.json")
-        text = records._json_file(new)
-        return [
-            f"evidence/{ref}.json:{_line_of(text, 'page_words')}: emptied the page words"
-        ], lambda: paths.write_atomic(unit, f"evidence/{ref}.json", records._encode(text))
     if kind == "test":
 
         def emptied_result(found: dict) -> dict | None:
@@ -764,7 +772,7 @@ def _work(unit: Unit, run: cli.Run, state: dict, request: str) -> None:
         if step["done"]:
             continue
         data = _load(unit)
-        lines, write = _prepare(unit, data, {**step, "evidence": evidence_id}, request)
+        lines, write = _prepare(unit, data, {"evidence": evidence_id, **step}, request)
         if (
             "lines" not in step
         ):  # what the place prints is kept first, so a run that stops after the write still prints it
