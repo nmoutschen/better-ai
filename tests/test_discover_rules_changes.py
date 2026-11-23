@@ -43,8 +43,10 @@ class Unit(unittest.TestCase):
     def add(self, kind, fields, by=R.COORD):
         return self.verb("add", ".discover/d", kind, "--by", by, fields=R.without(fields, *BODY))
 
-    def set(self, ref, fields, by=R.COORD):
+    def set(self, ref, fields, by=R.COORD, unset=()):
         args = ["set", ".discover/d", ref] + (["--by", by] if by else [])
+        for name in unset:
+            args += ["--unset", name]
         return self.verb(*args, fields=fields)
 
     def check(self):
@@ -628,6 +630,117 @@ class Stamps(Unit):
     def test_S38_adding_does_not_stamp_updated_at(self):
         self.ok(self.add("option", R.OPTION))
         self.assertNotIn("updated_at", self.lines("options.jsonl")[0])
+
+
+class EveryLock(Unit):
+    """A locked record stays as it is: every status it may not move to, and every unset of a field it keeps, is refused
+    for the coordinator, and the file is the same afterwards."""
+
+    def reach(self, status):
+        """Put test X1 in `status` by allowed steps."""
+        if status == "planned":
+            return
+        if status == "running":
+            self.ok(self.set("X1", {"status": "running"}))
+        elif status == "done":
+            result = {"text": "Three of five found it.", "outcome": "holds", "evidence": [self.evidence()]}
+            self.ok(self.set("X1", {"status": "done", "result": result}))
+        else:
+            self.ok(self.set("X1", {"status": "removed", "reason": "Too slow."}))
+
+    def target(self, status, old):
+        """A patch and unsets that are valid for a test in `status`, coming from `old`."""
+        if status == "done":
+            result = {"text": "Again.", "outcome": "holds", "evidence": ["E-a1-1"]}
+            return {"status": "done", "result": result}, ["reason"] if old == "removed" else []
+        if status == "removed":
+            return {"status": "removed", "reason": "Another reason."}, ["result"] if old == "done" else []
+        return {"status": status}, [
+            x for x in ("result", "reason") if (old, x) in (("done", "result"), ("removed", "reason"))
+        ]
+
+    def untouched(self, name, attempt, *words):
+        before = (self.unit / name).read_text()
+        text = self.refused(attempt, *words)
+        self.assertEqual((self.unit / name).read_text(), before, text)
+
+    def test_a_test_goes_planned_running_done_and_any_to_removed_and_never_back(self):
+        disallowed = {
+            "running": ["planned"],
+            "done": ["planned", "running"],
+            "removed": ["planned", "running", "done"],
+        }
+        for old, news in disallowed.items():
+            for new in news:
+                with self.subTest(old=old, new=new):
+                    self.setUp()
+                    self.ok(self.add("test", R.TEST))
+                    self.reach(old)
+                    patch, unset = self.target(new, old)
+                    self.untouched(
+                        "tests.jsonl",
+                        self.set("X1", patch, unset=unset),
+                        "X1",
+                        "add a new test and remove X1 with a reason",
+                    )
+
+    def test_a_test_that_is_not_planned_keeps_what_rule_and_settles_even_when_unset(self):
+        for old in ("running", "done", "removed"):
+            for name in ("what", "rule", "settles"):
+                with self.subTest(old=old, field=name):
+                    self.setUp()
+                    self.ok(self.add("test", R.TEST))
+                    self.reach(old)
+                    self.untouched(
+                        "tests.jsonl",
+                        self.set("X1", {}, unset=[name]),
+                        "add a new test and remove X1 with a reason",
+                    )
+                    self.untouched(
+                        "tests.jsonl",
+                        self.set("X1", {name: None}),
+                        "add a new test and remove X1 with a reason",
+                    )
+
+    def test_an_answered_decision_never_leaves_answered_and_keeps_its_fields_even_when_unset(self):
+        self.ok(self.ask({"type": "item", "item": "P1"}))
+        self.answer_chat("D1")
+        attempts = [
+            ({"status": "waiting"}, ["answer", "answered_at"]),
+            ({"status": "waiting"}, []),
+            ({}, ["status"]),
+            ({}, ["about"]),
+            ({}, ["answer"]),
+            ({}, ["answered_at"]),
+            ({"about": None}, []),
+            ({"answer": None}, []),
+            ({"answered_at": None}, []),
+            ({"answered_at": "2020-01-01T00:00:00Z"}, []),
+            ({"about": {"type": "discovery"}}, []),
+        ]
+        for patch, unset in attempts:
+            with self.subTest(patch=patch, unset=unset):
+                self.untouched("decisions.jsonl", self.set("D1", patch, unset=unset), "D1", "ask a new question")
+
+    def test_a_waiting_decision_cannot_lose_its_status(self):
+        self.ok(self.ask({"type": "item", "item": "P1"}))
+        self.untouched("decisions.jsonl", self.set("D1", {}, unset=["status"]), "D1", "ask a new question")
+
+    def test_a_cited_risk_stays_even_when_the_risks_are_unset_or_nulled(self):
+        self.ok(self.ask_risk("R1"))
+        self.untouched("items.jsonl", self.set("P1", {}, unset=["risks"]), "R1")
+        self.untouched("items.jsonl", self.set("P1", {"risks": None}), "R1")
+
+    def test_a_move_and_a_change_are_never_edited_even_when_a_field_is_unset(self):
+        self.ok(self.add("option", R.OPTION))
+        self.ok(self.add("move", R.MOVE))
+        self.untouched("moves.jsonl", self.set("M1", {}, unset=["why"]), "M1")
+        self.untouched("moves.jsonl", self.set("M1", {"why": None}), "M1")
+
+    def test_a_writer_that_is_not_the_coordinator_changes_nothing(self):
+        self.ok(self.ask({"type": "item", "item": "P1"}))
+        self.untouched("decisions.jsonl", self.set("D1", {}, by="analyst-1", unset=["default"]), "only coord")
+        self.untouched("decisions.jsonl", self.set("D1", {}, by=None, unset=["default"]), "use --by coord")
 
 
 class TestLock(Unit):
