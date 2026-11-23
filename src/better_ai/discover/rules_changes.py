@@ -6,9 +6,10 @@ Each rule is one function over lists of records, so the same code holds wherever
   evidence a change cites, an identical change, and a question asked twice;
 - the schema hook `risk-change` (named by `x-check` in change.schema.json): the risk rule, applied when a risk change is
   added and again by `check` to every risk change, because what it looks at cannot change;
-- `set` (a step): changes and moves are never edited, the coordinator-only writer rule, an answered decision keeps its
-  `about` and `answer`, `answered_at` and `updated_at` are stamped, a risk that a decision or change cites keeps its id
-  and text, and a test that is not planned keeps its `what`, `rule` and `settles`;
+- `set` (a step): changes and moves are never edited, the coordinator-only writer rule, the coordinator named
+  in the head and the fields of a chosen option but its note stay, an answered decision keeps its `about` and `answer`,
+  `answered_at` and `updated_at` are stamped, a risk that a decision or change cites keeps its id and text, and a test
+  that is not planned keeps its `what`, `rule` and `settles`; `add` of an answered decision stamps `answered_at` too;
 - `check` (a step): an item's latest state or importance change that no longer holds is a warning, "add a change",
   never an error, because the log cannot be edited.
 
@@ -28,7 +29,7 @@ from . import SKILL
 from .derive import ItemView, derive
 
 NAME = SKILL.name
-WRITTEN_BY_THE_COORDINATOR = ("item", "change", "option", "move", "brief", "decision")
+WRITTEN_BY_THE_COORDINATOR = ("item", "change", "option", "move", "brief", "decision", "test")
 
 Problem = tuple[str, str]  # what is wrong, and the next action
 
@@ -341,6 +342,8 @@ def _same_words(text: Any) -> str:
 @records.add_guard(NAME, "decision")
 def _add_decision(ctx: records.AddContext) -> None:
     record = ctx.record
+    if record.get("status") == "answered":  # as in set, the time of the answer is the tool's, never the agent's
+        record["answered_at"] = ctx.run.now().strftime(schema.TIME)
     if record.get("status") != "waiting":
         return
     for other in _lines(ctx.unit, "decisions.jsonl"):
@@ -394,6 +397,26 @@ def _keep_cited_risks(ctx: records.SetContext, after: Mapping) -> None:
                 f"{ident} of {item} is cited by a decision or a change, so it stays once, with its id and text",
                 f"keep {ident} as it is and add a new risk",
             )
+
+
+OPEN_AFTER_A_MOVE = ("note", "updated_at")  # what an option that a move chose may still change
+
+
+def _keep_chosen_option(ctx: records.SetContext, after: Mapping) -> None:
+    """An option that a move chose keeps every field but its note: the move, its brief and the user's choice read it."""
+    ident = _text(ctx.record.get("id"))
+    chosen = [m.get("id") for m in _lines(ctx.unit, "moves.jsonl") if m.get("option") == ident]
+    changed = [
+        f
+        for f in dict.fromkeys([*ctx.record, *after])
+        if f not in OPEN_AFTER_A_MOVE and after.get(f) != ctx.record.get(f)
+    ]
+    if chosen and changed:
+        raise refusal(
+            ctx.unit.label,
+            f"{ident} was chosen by {chosen[0]}, so its {', '.join(changed)} cannot change",
+            "add a new option; only its note can change",
+        )
 
 
 # What a locked record may become, by the status it has now: the one table every set is held to, as the patch and the
@@ -466,17 +489,25 @@ def _set(ctx: records.SetContext) -> None:
         _keep_cited_risks(ctx, after)
         ctx.patch["updated_at"] = _now(ctx)
     elif kind == "option":
+        _keep_chosen_option(ctx, after)
         ctx.patch["updated_at"] = _now(ctx)
+    elif kind == "discover" and after.get("coordinator") != ctx.record.get("coordinator"):
+        raise refusal(
+            ctx.unit.label,
+            "the coordinator of a discovery cannot change: what the user's evidence says it was added by stays true",
+            "start a new discovery for another coordinator",
+        )
 
 
 # ---------------------------------------------------------------- check: a latest change that no longer holds
 
 
-def stale(unit: Unit) -> list[str]:
-    """One line for each item whose latest state or importance change no longer holds."""
+def _stale(unit: Unit) -> list[tuple[str, str, Mapping, str]]:
+    """Each item whose latest state or importance change no longer holds, as (item, field, the change, why): the one
+    rule `check` warns by and `brief` refuses by. A cited evidence that is not in the unit does not hold either."""
     items, changes = _lines(unit, "items.jsonl"), _lines(unit, "changes.jsonl")
     evidence, tests, decisions = _evidence(unit), _lines(unit, "tests.jsonl"), _lines(unit, "decisions.jsonl")
-    lines = []
+    found = []
     views = derive(items, changes).items
     for item in items:
         ident = item.get("id")
@@ -486,12 +517,29 @@ def stale(unit: Unit) -> list[str]:
         for name, change in (("state", view.last_state_change), ("importance", view.last_importance_change)):
             if change is None:
                 continue
+            missing = [e for e in _list(_dict(change.get("cause")).get("evidence")) if e not in evidence]
+            if missing:
+                found.append((ident, name, change, f"{missing[0]} is not in evidence/"))
+                continue
             problems = cited_problems(change, evidence)
             if name == "state" and not problems:
                 problems = state_problems(_text(change.get("to")), item, evidence, tests, decisions)
             if problems:
-                lines.append(f"{ident}'s {name} is stale: add a change ({problems[0][0]})")
-    return lines
+                found.append((ident, name, change, problems[0][0]))
+    return found
+
+
+def stale(unit: Unit) -> list[str]:
+    """One line for each item whose latest state or importance change no longer holds."""
+    return [f"{item}'s {name} is stale: add a change ({why})" for item, name, _, why in _stale(unit)]
+
+
+def stale_items(unit: Unit) -> dict[str, str]:
+    """The items whose latest state or importance change no longer holds, each with why (the first of its changes)."""
+    found: dict[str, str] = {}
+    for item, name, change, why in _stale(unit):
+        found.setdefault(item, f"its latest {name} change ({change.get('to')}) no longer holds: {why}")
+    return found
 
 
 @cli.check_step(NAME)

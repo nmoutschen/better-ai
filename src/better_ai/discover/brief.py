@@ -5,12 +5,15 @@
   temporary file, links that file to its name, and then sets the version final, so a run that stops at any point is
   finished by running it again.
 - `redact <unit> E-<agent>-<n> --request <id>` removes a person's words from the unit: from each final brief (in
-  place, by the marked block of the evidence), from the page event that holds them, from the source and from the
-  evidence itself. It works from a state file, `.redact`, so a run that stops is finished by running it again, and
+  place, by the marked block of the evidence), from a leftover draft file or temporary file of the brief folder that
+  holds the block (removed), from the page event that holds them, from the source, from the result text of each test
+  that cites the evidence, and from the evidence itself. It works from a state file, `.redact`, so a run that stops is finished by running it again, and
   the page does not start while that file exists.
 
 A person's words are stored in one field of one record and everything else points to the evidence by id; the brief is
-the one other place the words are copied to, and each copy sits in a block marked with the evidence id.
+the one other place the words are copied to, and each copy sits in a block marked with the evidence id (the text of a
+test result that cites only that evidence sits in the block too). Evidence from the user's files and tools is shown by
+role in any discovery, never by its words.
 """
 
 from __future__ import annotations
@@ -29,12 +32,13 @@ from typing import Any
 
 from .. import cli, page, paths, records, resources, schema
 from ..paths import Refused, Unit, refusal
-from . import SKILL, derive
+from . import SKILL, derive, rules_changes
 
 BRIEF_FOLDER = "brief"
 STATE = ".redact"  # the state file of a redact that has not finished
 SERVER = ".server"  # where the page says it is served
 REMOVED = "[removed]"
+WORDS_EVENTS = ("add_evidence", "add_result")  # the page events whose text evidence words may name
 VERSION = re.compile(r"^v\d+$")
 EVIDENCE_ID = re.compile(r"^E-[\w.-]+-\d+$")
 POINTS = ("rendered", "linked", "recorded")  # where a `brief` run may stop; a test stops it at each
@@ -122,82 +126,6 @@ def _internal(data: Data) -> bool:
 # ---------------------------------------------------------------- what still holds
 
 
-def _bears(evidence: dict, item: str) -> list[str]:
-    return [b.get("direction") for b in evidence.get("bears_on") or [] if isinstance(b, dict) and b.get("item") == item]
-
-
-def _last_change(data: Data, item: str, name: str) -> dict | None:
-    found = None
-    for change in data.changes:
-        about = change.get("about")
-        named = change.get("field") == name and isinstance(about, dict) and about.get("item") == item
-        if (
-            named
-            and isinstance(change.get("to"), str)
-            and not (name == "state" and change["to"] == derive.RISK_ACCEPTED)
-        ):
-            found = change
-    return found
-
-
-def _why_not(data: Data, item: dict, name: str) -> str | None:
-    """Why the latest change of `name` for the item no longer holds, or None when it holds (or there is none)."""
-    ident = item["id"]
-    change = _last_change(data, ident, name)
-    if change is None:
-        return None
-    for cited in (change.get("cause") or {}).get("evidence") or []:
-        found = data.evidence.get(cited)
-        if found is None:
-            return f"{cited} is not in evidence/"
-        if found.get("status") != "counts":
-            return f"{cited} is {found.get('status')}, so it does not count"
-        if not _bears(found, ident):
-            return f"{cited} does not bear on {ident}"
-    if name != "state":
-        return None
-    counting = [e for e in data.evidence.values() if e.get("status") == "counts"]
-    pro = any("for" in _bears(e, ident) for e in counting)
-    con = any("against" in _bears(e, ident) for e in counting)
-    to = change["to"]
-    if to == "supported" and not (pro and not con):
-        return "supported needs counting evidence for it and none against"
-    if to == "contradicted" and not con:
-        return "contradicted needs counting evidence against it"
-    if to == "checking" and not (
-        item.get("checker") or any(e.get("status") == "checking" and _bears(e, ident) for e in data.evidence.values())
-    ):
-        return "checking needs a checker or evidence that is being checked"
-    if to == "waiting for you" and not any(_about(d, ident) for d in data.decisions if d.get("status") == "waiting"):
-        return "waiting for you needs an open question about it"
-    if to == "needs a test" and not any(
-        ident in (t.get("settles") or []) and t.get("status") != "removed" for t in data.tests
-    ):
-        return "needs a test needs a test that settles it"
-    return None
-
-
-def _about(decision: dict, item: str) -> bool:
-    about = decision.get("about") or {}
-    return about.get("type") in ("item", "risk") and about.get("item") == item
-
-
-def stale_items(data: Data) -> dict[str, str]:
-    """The items whose latest state or importance change no longer holds, each with why: the check `brief` makes
-    before it renders, and what `redact` reports after it removes evidence."""
-    stale: dict[str, str] = {}
-    for item in data.items:
-        if not isinstance(item.get("id"), str):
-            continue
-        for name in ("state", "importance"):
-            why = _why_not(data, item, name)
-            if why:
-                change = _last_change(data, item["id"], name)
-                stale[item["id"]] = f"its latest {name} change ({change['to']}) no longer holds: {why}"
-                break
-    return stale
-
-
 def _add_a_change(items: list[str], unit: Unit) -> str:
     return f"add a change for {' and '.join(items)}, then run brief again"
 
@@ -228,9 +156,29 @@ def _sort_key(ident: str) -> tuple:
 
 def _event_text(data: Data, ident: str) -> str:
     for event in data.conversation:
-        if event.get("id") == ident and event.get("type") == "add_evidence" and isinstance(event.get("text"), str):
+        if event.get("id") == ident and event.get("type") in WORDS_EVENTS and isinstance(event.get("text"), str):
             return event["text"]
     return "words not found"
+
+
+def _by_role(origin: dict, internal: bool) -> bool:
+    """Whether the brief shows the evidence's summary by role in place of its words: the user's own words in an internal
+    discovery, and anything from the user's files or tools in any discovery."""
+    return origin.get("type") in ("file", "tool") or (internal and origin.get("type") == "you")
+
+
+def _results(data: Data, ident: str, internal: bool) -> list[str]:
+    """The text of each test result that cites only this evidence, as lines of its block: the one place a result's
+    words are copied to, so redacting the evidence reaches them. A result that cites several evidence keeps its text
+    out of the brief, and so does any result in an internal discovery."""
+    lines = []
+    for test in data.tests:
+        result = test.get("result")
+        if isinstance(result, dict) and result.get("evidence") == [ident] and not internal:
+            lines.append(
+                f'  - Result of {inline(test.get("id"))} ({inline(result.get("outcome"))}): "{inline(result.get("text"))}"'
+            )
+    return lines
 
 
 def _evidence_block(ident: str, evidence: dict, data: Data, internal: bool) -> str:
@@ -239,16 +187,19 @@ def _evidence_block(ident: str, evidence: dict, data: Data, internal: bool) -> s
     about = "about your users" if evidence.get("about") == "your users" else "from elsewhere"
     bears = ", ".join(f"{b['direction']} {b['item']}" for b in evidence.get("bears_on") or []) or "bears on no item"
     facts = f"({inline(evidence.get('kind'))}, {about}; {inline(evidence.get('status'))}; {inline(bears)})"
-    if internal and origin.get("type") == "you":
-        role = inline(source.get("said_by_role") or "a person")
-        line = f"Reported by you, from {role}: {inline(evidence.get('summary') or 'no summary given')} {facts}."
+    if _by_role(origin, internal):
+        summary = inline(evidence.get("summary") or "no summary given")
+        if origin.get("type") == "you":
+            line = f"Reported by you, from {inline(source.get('said_by_role') or 'a person')}: {summary} {facts}."
+        else:  # a file or a tool: the summary, under the source's own title
+            line = f"From {inline(source.get('title') or 'your files')}: {summary} {facts}."
     else:
         words = evidence.get("words") or {}
         text = _event_text(data, words.get("event")) if words.get("type") == "event" else words.get("text")
         line = f'"{inline(text)}" {facts}.'
         title = inline(source.get("title") or "no title")
         line += f" Source: {title}" + (f", {_url(origin['url'])}" if origin.get("type") == "web" else "") + "."
-    return f"<!-- {ident} -->\n- {line}\n<!-- /{ident} -->"
+    return "\n".join([f"<!-- {ident} -->", f"- {line}", *_results(data, ident, internal), f"<!-- /{ident} -->"])
 
 
 def _risk_line(risk: dict) -> str:
@@ -274,6 +225,19 @@ def _item_lines(item: dict, view: derive.ItemView) -> list[str]:
     return lines
 
 
+def _said(result: dict, cited: list) -> str:
+    cited = list(dict.fromkeys(cited))  # one marker pair per evidence, even if cited twice
+    """The text of a result in the tests section. A result that cites one evidence has its text in that evidence's block;
+    one that cites several has it here, inside the markers of each, so redacting any one of them removes it; one that
+    cites none has it plain."""
+    text = f'"{inline(result.get("text"))}"'
+    if not cited:
+        return f" {text}"
+    if len(cited) == 1 or not all(isinstance(e, str) and EVIDENCE_ID.fullmatch(e) for e in cited):
+        return ""
+    return " " + "".join(f"<!-- {e} -->" for e in cited) + text + "".join(f"<!-- /{e} -->" for e in reversed(cited))
+
+
 def _test_lines(test: dict, internal: bool) -> list[str]:
     head = (
         f"- {inline(test.get('id'))} ({inline(test.get('kind'))}, {inline(test.get('status'))}): "
@@ -283,7 +247,8 @@ def _test_lines(test: dict, internal: bool) -> list[str]:
     lines = [head]
     result = test.get("result")
     if isinstance(result, dict):
-        said = "" if internal else f' "{inline(result.get("text"))}"'
+        cited = result.get("evidence") or []
+        said = "" if internal else _said(result, cited)
         ids = ", ".join(inline(e) for e in result.get("evidence") or [])
         lines.append(f"  - Result ({inline(result.get('outcome'))}):{said}" + (f" Evidence: {ids}." if ids else ""))
     if test.get("status") == "removed":
@@ -420,7 +385,7 @@ def brief(args: argparse.Namespace, run: cli.Run) -> int:
         raise refusal(unit.label, f"no brief {version} in briefs.jsonl", f"add it first: add {unit.label} brief")
     if record.get("status") == "final":
         return _again(run, unit, record)
-    stale = stale_items(data)
+    stale = rules_changes.stale_items(unit)
     if stale:
         reasons = "; ".join(f"{item}: {why}" for item, why in stale.items())
         raise refusal(unit.label, f"{version} cannot be rendered ({reasons})", _add_a_change(list(stale), unit))
@@ -586,6 +551,7 @@ def _plan(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
             continue
         if _block(evidence_id).search(text):
             steps += [{"do": "brief", "ref": record["id"]}, {"do": "hash", "ref": record["id"]}]
+    steps += _leftovers(unit, data, evidence_id)
     given = (source.get("origin") or {}).get("given") or {}
     for event in dict.fromkeys(
         e for e in ((evidence.get("words") or {}).get("event"), given.get("event")) if isinstance(e, str)
@@ -593,8 +559,33 @@ def _plan(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
         steps.append({"do": "event", "ref": event})
     if given.get("type") == "chat" and source.get("id"):
         steps.append({"do": "source", "ref": source["id"]})
+    steps += [{"do": "test", "ref": t["id"]} for t in data.tests if evidence_id in _cited_by(t)]
     steps.append({"do": "evidence", "ref": evidence_id})
     return [{**s, "done": False} for s in steps]
+
+
+def _cited_by(test: dict) -> list:
+    result = test.get("result")
+    return result.get("evidence") or [] if isinstance(result, dict) else []
+
+
+def _leftovers(unit: Unit, data: Data, evidence_id: str) -> list[dict]:
+    """The files of the brief folder that hold the evidence's block and are not a final brief's file: a draft's file
+    that a run left, and the temporary file of a run that stopped before it linked. Each is removed."""
+    final = {b.get("file") for b in data.briefs if b.get("status") == "final"}
+    found = []
+    folder = unit.target(BRIEF_FOLDER)
+    for path in sorted(folder.glob("*")) if folder.is_dir() else []:
+        relative = f"{BRIEF_FOLDER}/{path.name}"
+        if relative in final or path.is_symlink() or not path.is_file():
+            continue
+        try:
+            text = paths.read_bytes(unit, relative).decode("utf-8", errors="replace")
+        except OSError:
+            continue
+        if _block(evidence_id).search(text):
+            found.append({"do": "leftover", "ref": relative})
+    return found
 
 
 def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str], Callable[[], None] | None]:
@@ -604,15 +595,33 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
     if kind == "brief":
         record = next(b for b in data.briefs if b.get("id") == ref)
         text = paths.read_bytes(unit, record["file"]).decode("utf-8")
-        found = _block(evidence_id).search(text)
+        found = list(_block(evidence_id).finditer(text))
         if not found:
             return [], None
-        line = text[: found.start()].count("\n") + 1
-        new = text[: found.start()] + REMOVED + text[found.end() :]
+        new = _block(evidence_id).sub(REMOVED, text)
         return (
-            [f"{record['file']}:{line}: replaced the block for {evidence_id} with {REMOVED}"],
+            [
+                f"{record['file']}:{text[: m.start()].count(chr(10)) + 1}: replaced the block for {evidence_id} with {REMOVED}"
+                for m in found
+            ],
             lambda: paths.write_atomic(unit, record["file"], new.encode("utf-8")),
         )
+    if kind == "leftover":
+        if not unit.target(ref).is_file():
+            return [], None
+        return [f"{ref}: removed, a leftover file that held the block for {evidence_id}"], lambda: os.unlink(
+            unit.target(ref)
+        )
+    if kind == "test":
+
+        def emptied_result(found: dict) -> dict | None:
+            result = found.get("result")
+            if found.get("id") != ref or not isinstance(result, dict) or result.get("text") == REMOVED:
+                return None
+            return _valid(unit, {**found, "result": {**result, "text": REMOVED}}, "test.schema.json")
+
+        lines, write = _rewritten(unit, "tests.jsonl", emptied_result)
+        return [f"tests.jsonl:{n}: emptied the result text of {ref}" for n in lines], write
     if kind == "hash":
         record = next(b for b in data.briefs if b.get("id") == ref)
         digest = hashlib.sha256(paths.read_bytes(unit, record["file"])).hexdigest()
@@ -631,7 +640,7 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
     if kind == "event":
 
         def emptied(found: dict) -> dict | None:
-            if found.get("id") != ref or found.get("type") not in ("add_evidence", "add_result"):
+            if found.get("id") != ref or found.get("type") not in WORDS_EVENTS:
                 return None
             words = {"text": REMOVED, **({"source": REMOVED} if found["type"] == "add_evidence" else {})}
             return {**found, **words}
@@ -721,7 +730,7 @@ def redact(args: argparse.Namespace, run: cli.Run) -> int:
     if answering:
         raise refusal(unit.label, answering, "close the page, then run again")
     if state is None:
-        before = sorted(stale_items(data))
+        before = sorted(rules_changes.stale_items(unit))
         state = {
             "evidence": evidence_id,
             "request": request,
@@ -758,7 +767,7 @@ def _work(unit: Unit, run: cli.Run, state: dict, request: str) -> None:
         _write_state(unit, state)
         _after_place(f"{step['do']}:{step['ref']}")
     data = _load(unit)
-    caused = {k: v for k, v in stale_items(data).items() if k not in state.get("stale_before", [])}
+    caused = {k: v for k, v in rules_changes.stale_items(unit).items() if k not in state.get("stale_before", [])}
     os.unlink(unit.target(STATE))
     run.out("Changed:")
     for step in state["steps"]:

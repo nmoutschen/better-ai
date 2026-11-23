@@ -194,6 +194,7 @@ class Removal(Fixture):
         self.assertEqual(R.run(self.root, "check", str(self.unit.relative_to(self.root))).returncode, 0)
 
     def test_S49_words_held_by_a_result_event_are_emptied_too(self):
+        """A source of the user's points to the add_result event that holds the words; check accepts every record."""
         source = json.loads((self.unit / "sources" / "S-coord-2.json").read_text())
         source["origin"]["given"]["event"] = "r1"
         P.write_json(self.unit / "sources" / "S-coord-2.json", source)
@@ -202,9 +203,87 @@ class Removal(Fixture):
         P.write_json(self.unit / "evidence" / f"{PAGE}.json", evidence)
         with (self.unit / "conversation.jsonl").open("a") as log:
             log.write(json.dumps(R.event("add_result", text="Dana's team found it fast.")) + "\n")
-        self.ask_on_the_page(evidence=PAGE)
+            log.write(json.dumps(R.event("redact", id="d1", evidence=PAGE)) + "\n")
+        self.assertEqual(R.run(self.root, "check", str(self.unit.relative_to(self.root))).returncode, 0)
         self.assertEqual(self.redact(evidence=PAGE).returncode, 0)
         self.assertNotIn("Dana's team", self.everything())
+        self.assertEqual(R.run(self.root, "check", str(self.unit.relative_to(self.root))).returncode, 0)
+
+    def result(self, evidence=(CHAT,), text="Dana's team found it fast."):
+        done = {"text": text, "outcome": "holds", "evidence": list(evidence)}
+        P.write_lines(self.unit / "tests.jsonl", [R.record(R.TEST, status="done", result=done)])
+
+    def test_D16_the_text_of_a_result_that_cites_the_evidence_is_emptied_in_the_tests(self):
+        self.result()
+        self.brief_final()
+        self.assertIn("Dana's team", (self.unit / "brief" / "v1.md").read_text())
+        self.ask_on_the_page()
+        done = self.redact()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertNotIn("Dana's team", self.everything())
+        (test,) = lines_of(self.unit / "tests.jsonl")
+        self.assertEqual(test["result"], {"text": "[removed]", "outcome": "holds", "evidence": [CHAT]})
+        self.assertIn("tests.jsonl:1", done.stdout)
+        self.assertEqual(R.run(self.root, "check", str(self.unit.relative_to(self.root))).returncode, 0)
+
+    def test_D16_redacting_either_of_two_evidence_a_result_cites_removes_its_text_from_the_brief(self):
+        for evidence in (CHAT, "E-a1-1"):
+            with self.subTest(evidence=evidence):
+                self.setUp()
+                self.result(evidence=("E-a1-1", CHAT))
+                self.brief_final()
+                self.assertIn("Dana's team", (self.unit / "brief" / "v1.md").read_text())
+                self.ask_on_the_page(evidence=evidence)
+                done = self.redact(evidence=evidence)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertNotIn("Dana's team", self.everything())
+                self.assertEqual(self.verb("brief", "v1").returncode, 0)
+
+    def test_D16_a_result_that_cites_other_evidence_is_left_alone(self):
+        self.result(evidence=("E-a1-1",))
+        self.ask_on_the_page()
+        self.assertEqual(self.redact().returncode, 0)
+        self.assertIn("Dana's team", (self.unit / "tests.jsonl").read_text())
+
+    def test_D21_evidence_from_a_file_or_a_tool_is_redactable_in_an_external_discovery(self):
+        for origin in (
+            {"type": "file", "path": "notes/call.md", "read": "raw"},
+            {"type": "tool", "tool": "tickets", "ref": "T-1", "read": "raw"},
+        ):
+            with self.subTest(origin=origin["type"]):
+                self.setUp()
+                P.write_json(
+                    self.unit / "sources" / "S-a1-2.json",
+                    R.record(R.SOURCE, id="S-a1-2", origin=origin, said_by_role="a customer"),
+                )
+                found = R.record(
+                    R.COUNTING,
+                    id="E-a1-2",
+                    source="S-a1-2",
+                    words={"type": "quote", "text": "Acme Corp told us it took a week."},
+                    summary="a customer lost a week",
+                )
+                P.write_json(self.unit / "evidence" / "E-a1-2.json", found)
+                self.brief_final()
+                self.assertNotIn("Acme", (self.unit / "brief" / "v1.md").read_text())  # shown by role, not as quoted
+                self.ask_on_the_page(evidence="E-a1-2")
+                self.assertEqual(self.redact(evidence="E-a1-2").returncode, 0)
+                self.assertNotIn("Acme", self.everything())
+                self.assertEqual(json.loads((self.unit / "evidence" / "E-a1-2.json").read_text())["status"], "removed")
+
+    def test_S49_a_leftover_draft_file_and_an_orphan_temporary_file_do_not_keep_the_block(self):
+        self.brief_final()
+        text = (self.unit / "brief" / "v1.md").read_text()
+        (self.unit / "brief" / "v2.md").write_text(text)  # a draft whose run stopped after it linked the file
+        (self.unit / "brief" / ".v3.md.0123456789abcdef.tmp").write_text(text)  # a run that stopped before it linked
+        (self.unit / "brief" / "notes.md").write_text("nothing about the evidence\n")
+        self.ask_on_the_page()
+        done = self.redact()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertNotIn(P.GIVEN, self.everything())
+        self.assertEqual((self.unit / "brief" / "notes.md").read_text(), "nothing about the evidence\n")
+        self.assertIn("brief/v2.md", done.stdout)
+        self.assertIn("brief/.v3.md.0123456789abcdef.tmp", done.stdout)
 
     def test_L3_an_evidence_id_with_a_trailing_newline_is_refused(self):
         self.assertEqual(self.redact(evidence=CHAT + "\n").returncode, 1)

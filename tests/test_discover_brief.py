@@ -109,6 +109,60 @@ class Final(Fixture):
         self.assertIn("M1", done.stderr)
 
 
+class Agreement(Fixture):
+    """`check` warns about an item and `brief` refuses it for the same reason: both call `rules_changes.stale_items`."""
+
+    def against(self, unit):
+        record = R.record(
+            R.COUNTING, id="E-a2-1", bears_on=[{"item": "P1", "direction": "against"}], span=R.EVIDENCE["words"]["text"]
+        )
+        P.write_json(unit / "evidence" / "E-a2-1.json", record)
+
+    def gone(self, unit):
+        (unit / "evidence" / "E-a1-1.json").unlink()
+
+    def unverified(self, unit):
+        found = json.loads((unit / "evidence" / "E-a1-1.json").read_text())
+        found = R.without(found, "verifier", "checked_read", "span", "sha256") | {"status": "unverified", "reason": "x"}
+        P.write_json(unit / "evidence" / "E-a1-1.json", found)
+
+    def contradicted(self, unit):
+        changes = [json.loads(x) for x in (unit / "changes.jsonl").read_text().splitlines()]
+        P.write_lines(unit / "changes.jsonl", [R.record(changes[0], to="contradicted"), *changes[1:]])
+
+    def test_S29_S40_brief_refuses_exactly_the_items_check_warns_about(self):
+        for name, stale in (
+            ("holds", None),
+            ("unverified", self.unverified),
+            ("counter-evidence", self.against),
+            ("contradicted without evidence against", self.contradicted),
+        ):
+            with self.subTest(name):
+                root = self.root / name.replace(" ", "-")
+                root.mkdir()
+                unit = P.populated(root)
+                if stale:
+                    stale(unit)
+                warned = "P1's state is stale: add a change" in R.run(root, "check", str(unit.relative_to(root))).stderr
+                refused = run_brief(root, unit)
+                self.assertEqual(warned, stale is not None)
+                self.assertEqual(refused.returncode == 1, stale is not None, refused.stderr)
+                self.assertEqual("add a change for P1, then run brief again" in refused.stderr, stale is not None)
+
+    def test_S40_a_cited_evidence_that_is_gone_is_refused_and_check_reports_it_as_an_error(self):
+        unit = self.unit()
+        self.gone(unit)
+        self.assertEqual(R.run(self.root, "check", str(unit.relative_to(self.root))).returncode, 1)
+        done = run_brief(self.root, unit)
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("add a change for P1, then run brief again", done.stderr)
+        self.assertIn("E-a1-1 is not in evidence/", done.stderr)
+
+    def test_S29_S40_brief_keeps_no_copy_of_the_stale_rule(self):
+        for name in ("stale_items", "_why_not", "_last_change", "_bears", "_about"):
+            self.assertFalse(hasattr(brief, name), name)
+
+
 class Reruns(Fixture):
     def test_S41_a_final_version_with_a_matching_hash_prints_the_same_line(self):
         unit = self.unit()
@@ -254,6 +308,92 @@ class Content(Fixture):
         template = (HERE.parent / "src" / "better_ai" / "discover" / "brief.md").read_text()
         self.assertNotIn("experiment", template.lower())
         self.assertNotIn("experiment", Path(brief.__file__).read_text().lower())
+
+
+class Outside(Fixture):
+    """What the brief shows of a test's result and of evidence from the user's files and tools."""
+
+    SAID = "Dana's team found it in a minute."
+
+    def done_test(self, unit, evidence):
+        result = {"text": self.SAID, "outcome": "holds", "evidence": evidence}
+        P.write_lines(unit / "tests.jsonl", [R.record(R.TEST, status="done", result=result)])
+
+    def block(self, text, ident):
+        return text.split(f"<!-- {ident} -->\n", 1)[1].split(f"\n<!-- /{ident} -->", 1)[0]
+
+    def test_D16_a_result_that_cites_one_evidence_shows_its_text_inside_that_evidence_block_only(self):
+        unit = self.unit()
+        self.done_test(unit, ["E-a1-1"])
+        self.assertEqual(run_brief(self.root, unit).returncode, 0)
+        text = self.text(unit)
+        self.assertIn(self.SAID.rstrip("."), self.block(text, "E-a1-1"))
+        self.assertEqual(text.count("Dana"), 1 + 1)  # the block of E-a1-1, and the user's own words elsewhere
+        tests = text.split("## Tests\n", 1)[1]
+        self.assertNotIn("Dana's team", tests.split("## Open questions", 1)[0])
+        self.assertIn("E-a1-1", tests)  # the result still names the evidence it rests on
+
+    def test_D16_a_result_that_cites_several_evidence_shows_its_text_under_its_test_inside_each_evidence_marker(self):
+        unit = self.unit()
+        self.done_test(unit, ["E-a1-1", "E-coord-1"])
+        self.assertEqual(run_brief(self.root, unit).returncode, 0)
+        text = self.text(unit)
+        tests = text.split("## Tests\n", 1)[1]
+        self.assertIn(
+            f'<!-- E-a1-1 --><!-- E-coord-1 -->"{self.SAID}"<!-- /E-coord-1 --><!-- /E-a1-1 -->',
+            tests,
+        )
+        self.assertEqual(text.count("Dana's team"), 1)
+
+    def test_D16_a_result_in_an_internal_discovery_is_not_shown_even_when_it_cites_several_evidence(self):
+        unit = self.unit()
+        P.set_setting(unit, "internal")
+        self.done_test(unit, ["E-a1-1", "E-coord-1"])
+        self.assertEqual(run_brief(self.root, unit).returncode, 0)
+        self.assertNotIn("Dana's team", self.text(unit))
+
+    def test_D16_in_an_internal_discovery_a_result_text_is_not_shown(self):
+        unit = self.unit()
+        P.set_setting(unit, "internal")
+        self.done_test(unit, ["E-a1-1"])
+        self.assertEqual(run_brief(self.root, unit).returncode, 0)
+        self.assertNotIn("Dana's team", self.text(unit))
+
+    def test_D21_a_file_source_without_a_title_reads_from_your_files(self):
+        unit = self.unit()
+        source = R.record(R.SOURCE, id="S-a1-2", origin={"type": "file", "path": "n.md", "read": "raw"}, title="")
+        P.write_json(unit / "sources" / "S-a1-2.json", source)
+        found = R.record(R.COUNTING, id="E-a1-2", source="S-a1-2", summary="a customer lost a week")
+        P.write_json(unit / "evidence" / "E-a1-2.json", found)
+        self.assertEqual(run_brief(self.root, unit).returncode, 0)
+        self.assertIn("From your files: a customer lost a week", self.block(self.text(unit), "E-a1-2"))
+
+    def test_D21_evidence_from_a_file_or_a_tool_shows_its_summary_by_role_in_any_discovery(self):
+        for origin in (
+            {"type": "file", "path": "notes/call.md", "read": "raw"},
+            {"type": "tool", "tool": "tickets", "ref": "T-12", "read": "raw"},
+        ):
+            with self.subTest(origin=origin["type"]):
+                root = self.root / origin["type"]
+                root.mkdir()
+                unit = P.populated(root)  # external
+                source = R.record(R.SOURCE, id="S-a1-2", origin=origin, said_by_role="a customer in support")
+                P.write_json(unit / "sources" / "S-a1-2.json", source)
+                found = R.record(
+                    R.COUNTING,
+                    id="E-a1-2",
+                    source="S-a1-2",
+                    words={"type": "quote", "text": "Acme Corp told us: it took a week."},
+                    summary="a customer lost a week",
+                )
+                P.write_json(unit / "evidence" / "E-a1-2.json", found)
+                self.assertEqual(run_brief(root, unit).returncode, 0)
+                block = self.block((unit / "brief" / "v1.md").read_text(), "E-a1-2")
+                self.assertIn("a customer lost a week", block)
+                self.assertNotIn("Reported by you", block)
+                self.assertNotIn("a person", block)
+                self.assertTrue(block.lstrip("- ").startswith("From A post about the problem: "), block)
+                self.assertNotIn("Acme", block)
 
 
 if __name__ == "__main__":

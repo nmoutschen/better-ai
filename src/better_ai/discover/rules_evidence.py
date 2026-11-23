@@ -36,6 +36,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import json
+import os
 import re
 import unicodedata
 from collections.abc import Iterator
@@ -44,7 +45,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
-from .. import paths, records, schema
+from .. import cli, paths, records, schema
 
 SKILL = "discover-better"
 TIMEOUT = 30  # minutes a verifier may run before the coordinator may give up on it
@@ -429,26 +430,53 @@ def _unit_records(unit: paths.Unit) -> Iterator[tuple[str, int, dict]]:
             yield relative, 1, record
 
 
+def _clash(first: dict, second: dict) -> str | None:
+    """A page event both records point to, unless one is evidence and the other its source: the evidence of a source
+    from the user states the same event as its source."""
+    for evidence, source in ((first, second), (second, first)):
+        if (
+            evidence.get("type") == "evidence"
+            and source.get("type") == "source"
+            and source.get("id") == evidence.get("source")
+        ):
+            return None
+    shared = set(_page_events(first)) & set(_page_events(second))
+    return min(shared) if shared else None
+
+
+def _clash_message(event: str, other: dict, number: int, relative: str) -> str:
+    name = other.get("id") or f"line {number}"
+    return f"page event {event} is already used by {name} ({relative})"
+
+
+CLASH_NEXT = "a page event backs one record: use another event, or change that record"
+
+
 @records.add_guard(SKILL)
 def _a_page_event_backs_one_record(ctx: records.AddContext) -> None:
-    """A page event is one thing the user did: one record points to it. The evidence of a source from the user is the
-    one exception, since it states the same event as its source."""
-    events = set(_page_events(ctx.record))
-    if not events:
+    """A page event is one thing the user did: one record points to it."""
+    if not set(_page_events(ctx.record)):
         return
     for relative, number, other in _unit_records(ctx.unit):
-        own_source = (
-            ctx.type == "evidence" and other.get("type") == "source" and other.get("id") == ctx.record.get("source")
-        )
-        if own_source:
-            continue
-        for event in events & set(_page_events(other)):
-            name = other.get("id") or f"line {number}"
-            raise _refuse(
-                ctx.unit,
-                f"page event {event} is already used by {name} ({relative})",
-                "a page event backs one record: use another event, or change that record",
-            )
+        event = _clash(ctx.record, other)
+        if event:
+            raise _refuse(ctx.unit, _clash_message(event, other, number, relative), CLASH_NEXT)
+
+
+@cli.check_step(SKILL)
+def _check_page_events(unit: paths.Unit, run: cli.Run) -> int:
+    """The same rule over the whole unit, as an error: the later record of two that point to one event."""
+    seen = [(r, n, rec) for r, n, rec in _unit_records(unit) if set(_page_events(rec))]
+    shown = os.path.relpath(unit.path)
+    found = 0
+    for index, (relative, number, record) in enumerate(seen):
+        for earlier_relative, earlier_number, earlier in seen[:index]:
+            event = _clash(record, earlier)
+            if event:
+                message = _clash_message(event, earlier, earlier_number, earlier_relative)
+                run.out(f"{shown}/{relative}:{number}: page event: {message}: {CLASH_NEXT}")
+                found = 1
+    return found
 
 
 # ---------------------------------------------------------------- the set step

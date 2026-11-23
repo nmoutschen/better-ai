@@ -11,6 +11,8 @@ confirmation (`CONFIRMED_MOVES`). The rules run where the design says:
   compared with what they are now. `check` cannot repeat it, because the items change after a move is recorded;
 - `brief-rules`, a schema check on `brief.schema.json`, runs on `add` and in `check`: a brief belongs to a move that
   writes one, a move has one draft brief at a time (a final one may be followed by a new version), and a final brief's file is there with the recorded `sha256`;
+- one page event backs one record: the generic rule of `rules_evidence` refuses a second move on it; a move is never
+  set: `rules_changes` refuses that;
 - `set` and `add` refuse `status: final` on a brief: only the `brief` verb makes one final.
 
 Every message names the existing record and the next action.
@@ -88,7 +90,7 @@ def revision_in(folder: Path, option: str) -> str | None:
 # ---------------------------------------------------------------- moves
 
 
-def _page_problems(record: dict, kind: str | None, context: Context, others: list[dict]) -> list[tuple[str, str]]:
+def _page_problems(record: dict, kind: str | None, context: Context) -> list[tuple[str, str]]:
     ident = record["answer"]["event"]
     event = _latest_event(context, ident)
     problems = []
@@ -110,9 +112,6 @@ def _page_problems(record: dict, kind: str | None, context: Context, others: lis
                 "ask the user to choose again",
             )
         )
-    for move in others:
-        if isinstance(move.get("answer"), dict) and move["answer"].get("event") == ident:
-            problems.append(("answer.event", f"already recorded as {move.get('id')}: mark the event done"))
     return problems
 
 
@@ -167,7 +166,7 @@ def _move_rules(record: dict, context: Context) -> list[tuple[str, str]]:
         return []
     others = [m for m in _rows(context, "moves.jsonl") if m.get("id") != record.get("id")]
     if answer.get("type") == "page" and isinstance(answer.get("event"), str):
-        return _page_problems(record, kind, context, others)
+        return _page_problems(record, kind, context)
     if answer.get("type") == "chat":
         return _chat_problems(record, kind, context, others)
     return []
@@ -270,14 +269,10 @@ GUARDED = ("status", "file", "sha256", "redacted")  # what `brief` and `redact` 
 
 @records.set_step(SKILL.name)
 def _set_leaves_moves_and_final_briefs_alone(ctx: records.SetContext) -> None:
-    """A move is never changed. A final brief is never changed by set: only `redact` edits one, in place. A draft may
+    """A final brief is never changed by set: only `redact` edits one, in place. A draft may
     change its text, but never gains `status`, `file`, `sha256` or `redacted`, whether the field is given or removed."""
-    ident, kind = ctx.record.get("id"), ctx.record.get("type")
-    if kind == "move":
-        raise paths.refusal(
-            ctx.unit.label, f"{ident} is a move, and set cannot change it", "add a new move for the user's new choice"
-        )
-    if kind != "brief":
+    ident = ctx.record.get("id")
+    if ctx.record.get("type") != "brief":  # a move is never set: rules_changes refuses it
         return
     if ctx.record.get("status") == "final":
         raise paths.refusal(

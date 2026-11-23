@@ -3,7 +3,7 @@
 ## Version, move and option
 
 - Version: v1
-- Move: M1, test first
+- Move: M1, shrink
 - Option: K1, Run the probe before building.
 - Cost: an afternoon. Speed: a day. Upkeep: none. How hard to undo: nothing to undo.
 

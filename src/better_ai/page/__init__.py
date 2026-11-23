@@ -67,6 +67,7 @@ TICK = 1  # seconds between the ticks of a served page; tests set it shorter
 POLL = 0.05  # seconds serve_forever waits for a request before it looks whether it was told to stop
 STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is written as its own event, `accepted`
 REPLY_STATES = ("done", "asked", "working")
+FINISHED = ("done", "accepted")  # the states of an item that needs no more work, until a follow-up reopens it
 BUG_TEXT = "The page hit a bug: ask the agent to restart it and report it"
 # What each shared capability lets the page send, and which of those events the agent tracks with a status.
 CAPABILITIES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
@@ -584,7 +585,7 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
 
 def open_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
     """The user's items that are neither done nor accepted: `all_items` without the finished ones."""
-    return [found for found in all_items(events, item_types, agent) if found[1] not in ("done", "accepted")]
+    return [found for found in all_items(events, item_types, agent) if found[1] not in FINISHED]
 
 
 def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
@@ -608,7 +609,7 @@ def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tup
             thread.setdefault(to, []).append({"from": "user", "at": e.get("at"), "text": e.get("text")})
             if state.get(to) == "asked":  # the answer ends the wait: the item is the agent's again
                 state[to] = "replied"
-            elif state.get(to) in ("done", "accepted"):  # a follow-up under a finished item is work again
+            elif state.get(to) in FINISHED:  # a follow-up under a finished item is work again
                 state[to] = "followup"
             if i:
                 home[i] = to
