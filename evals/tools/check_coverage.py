@@ -20,6 +20,7 @@ from typing import Any
 import yaml
 
 from skill_evals import cases
+from skill_evals.grading.reads import alternatives
 
 HEADING = re.compile(r"^(#{2,6})\s+([0-9]+(?:\.[0-9]+)*)(?:[.:)]?\s|$)")
 NAMED = re.compile(r"^###\s+([^0-9\s].*?)\s*$")
@@ -75,7 +76,7 @@ def skill_sources(folder: Path) -> set[str]:
 
 def read_paths(case: dict[str, Any]) -> list[str]:
     """Flatten a case's `reads`, whose entries are a path or a list of alternative paths."""
-    return [path for entry in case.get("reads") or [] for path in ([entry] if isinstance(entry, str) else entry)]
+    return [path for entry in case.get("reads") or [] for path in alternatives(entry)]
 
 
 def main(argv: list[str] | None = None) -> int:

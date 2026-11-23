@@ -47,7 +47,15 @@ def test_nested_command_that_fails_untouched_is_fine(tmp_path: Path) -> None:
         "  - type: file_contains\n    path: main.py\n    pattern: NEVER\n"
         "  - type: any_of\n    graders:\n      - type: command_passes\n        cmd: 'false'\n"
     )
-    assert asyncio.run(validate_cases.validate(graders_case(tmp_path, graders), False)) == []
+    case = graders_case(tmp_path, graders)
+    assert asyncio.run(validate_cases.validate(case, False)) == []
+    # A good replay's bash action that exits nonzero is reported, unless it says `fails: true`.
+    (case / "replays").mkdir()
+    replay = case / "replays" / "good-1.yaml"
+    replay.write_text("actions:\n  - bash: 'echo NEVER >> main.py; false'\n")
+    assert any("without `fails: true`" in problem for problem in asyncio.run(validate_cases.validate(case, False)))
+    replay.write_text("actions:\n  - bash: 'echo NEVER >> main.py; false'\n    fails: true\n")
+    assert not any("fails: true" in problem for problem in asyncio.run(validate_cases.validate(case, False)))
 
 
 def test_nested_any_of_key_equals_the_scorer_key() -> None:

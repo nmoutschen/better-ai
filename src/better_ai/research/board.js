@@ -1,7 +1,9 @@
-// A page written by `render` carries its data in #page-data (read at the end) and has no server; a served page reads /data.
+// A page written by `render` carries its data in #page-data and has no server; a served page reads /data.
 // What the board shows of an invalid record, said under the errors band.
 const ERRORS_NOTE = "Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here.";
-let SNAPSHOT = null;
+// The page's data, read before anything depends on it: the page is a read-only copy when it has any.
+const snapshotText = document.getElementById("page-data") && document.getElementById("page-data").textContent;
+const SNAPSHOT = typeof snapshotText === "string" && snapshotText ? JSON.parse(snapshotText) : null;
 const $ = id => document.getElementById(id);
 const esc = pageEscape;
 const has = v => v && v !== "none";
@@ -392,7 +394,6 @@ function tick() {
     .then(d => { fails = 0; CLOSED_PAGE = false; pageShowErrors($("errors"), d.errors, ERRORS_NOTE); render(d); },
       () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
 }
-const embedded = $("page-data");
-if (embedded) { SNAPSHOT = JSON.parse(embedded.textContent); pageShowErrors($("errors"), SNAPSHOT.errors, ERRORS_NOTE); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
+if (SNAPSHOT) { pageShowErrors($("errors"), SNAPSHOT.errors, ERRORS_NOTE); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
 else { conv.start(); tick(); setInterval(tick, 2000); }
 setView();
