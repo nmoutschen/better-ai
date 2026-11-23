@@ -324,6 +324,12 @@ class Changes(Shape):
         self.refused(R.record(R.CHANGE, field="importance", to="accepted"), self.NAME, "to")
         self.refused(R.record(R.RISK_CHANGE, to="supported"), self.NAME, "to")
 
+    def test_S111_accepted_is_refused_for_appetite_and_setting_too(self):
+        about = {"type": "discovery"}
+        for field in ("appetite", "setting"):
+            with self.subTest(field=field):
+                self.refused(R.record(R.CHANGE, about=about, field=field, to="accepted"), self.NAME, "to")
+
     def test_S74_a_state_is_one_of_six_and_an_importance_one_of_two(self):
         for state in ("unverified", "checking", "supported", "contradicted", "needs a test", "waiting for you"):
             self.valid(R.record(R.CHANGE, to=state), self.NAME)
@@ -428,7 +434,7 @@ class Evidence(Shape):
 
     def test_S18_a_quote_holds_no_newline_and_at_most_600_characters(self):
         self.valid(R.record(R.EVIDENCE, words={"type": "quote", "text": "x" * 600}), self.NAME)
-        for text in ("x" * 601, "one\ntwo", "one\r\ntwo", ""):
+        for text in ("x" * 601, "one\ntwo", "one\r\ntwo", "one line\n", ""):
             with self.subTest(text=text[:12]):
                 self.refused(R.record(R.EVIDENCE, words={"type": "quote", "text": text}), self.NAME, "words")
 
@@ -496,6 +502,8 @@ class Tests(Shape):
         self.refused(R.record(R.TEST, status="done"), self.NAME, "result")
         self.refused(R.record(R.TEST, status="done", result={**done, "outcome": "maybe"}), self.NAME, "outcome")
         self.refused(R.record(R.TEST, status="done", result=R.without(done, "text")), self.NAME, "result")
+        self.refused(R.record(R.TEST, status="done", result=R.without(done, "evidence")), self.NAME, "evidence")
+        self.refused(R.record(R.TEST, status="done", result={**done, "evidence": []}), self.NAME, "evidence")
         self.valid(R.record(R.TEST, status="removed", reason="too costly"), self.NAME)
         self.refused(R.record(R.TEST, status="removed"), self.NAME, "reason")
 
@@ -708,6 +716,34 @@ class Pointers(unittest.TestCase):
             (unit / "evidence" / "E-a1-1.json").write_text(json.dumps(R.COUNTING))
             done = R.run(repo, "check", ".discover/d")
             self.assertEqual(done.returncode, 0, done.stdout)
+
+    def test_a_tests_settles_naming_a_missing_item_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            unit = R.made_unit(repo)
+            (unit / "tests.jsonl").write_text(json.dumps(R.TEST) + "\n")
+            done = R.run(repo, "check", ".discover/d")
+            self.assertEqual(done.returncode, 1)
+            self.assertIn("settles", done.stdout)
+            self.assertIn("dangling", done.stdout)
+            (unit / "items.jsonl").write_text(json.dumps(R.ITEM) + "\n")
+            self.assertEqual(R.run(repo, "check", ".discover/d").returncode, 0)
+
+    def test_a_source_from_you_may_point_to_an_add_evidence_or_an_add_result_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            unit = R.made_unit(repo)
+            (unit / "items.jsonl").write_text(json.dumps(R.ITEM) + "\n")
+            (unit / "tests.jsonl").write_text(json.dumps(R.TEST) + "\n")
+            (unit / "options.jsonl").write_text(json.dumps(R.OPTION) + "\n")
+            events = [R.event("add_evidence"), R.event("add_result"), R.event("choose", id="c1")]
+            (unit / "conversation.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+            for event, ok in (("a1", True), ("r1", True), ("c1", False)):
+                with self.subTest(event=event):
+                    given = {"type": "you", "given": {"type": "page", "event": event}}
+                    (unit / "sources" / "S-coord-1.json").write_text(json.dumps(R.record(R.YOU_SOURCE, origin=given)))
+                    done = R.run(repo, "check", ".discover/d")
+                    self.assertEqual(done.returncode, 0 if ok else 1, done.stdout)
 
 
 if __name__ == "__main__":

@@ -28,12 +28,13 @@
     "result": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["text", "outcome"],
+      "required": ["text", "outcome", "evidence"],
       "properties": {
         "text": {"type": "string", "minLength": 1},
         "outcome": {"enum": ["holds", "changes"]},
         "evidence": {
           "type": "array",
+          "minItems": 1,
           "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "evidence/", "type": "evidence"}}
         }
       }
