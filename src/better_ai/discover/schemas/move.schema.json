@@ -4,6 +4,7 @@
   "title": "one line of moves.jsonl: the move the user chose, and the answer that proves it",
   "$comment": "Append only: a move is never edited. Its move is the move of its option. A move made in the chat names the answered decision that confirms it (`confirm`) when it is Expand, Adopt or Stop.",
   "x-files": ["moves.jsonl"],
+  "x-check": "move-rules",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "at", "by", "id", "option", "step", "why", "answer"],
