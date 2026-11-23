@@ -1,12 +1,12 @@
 # Discovery records
 
-A discovery is the folder `.discover/<idea>`, made with `python3 <skill dir>/scripts/better.pyz create .discover/<idea> --by <coordinator>` and the head on stdin. ADD each other record with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, its fields as JSON on stdin, where `<type>` is `item`, `change`, `source`, `evidence`, `test`, `option`, `move`, `brief` or `decision`. CHANGE a record with `python3 <skill dir>/scripts/better.pyz set <unit> <id> --by <your name>`, or `set <unit> discover` for the head; REMOVE a field with `--unset <field>`. Leave out `at`, `by` and `id`: the command adds them. IF the command refuses a record, DO the next action it names, FIX the record and RUN it again. Copy a line below and replace the `<placeholders>`.
+A discovery is the folder `.discover/<idea>`, made with `python3 '<skill dir>'/scripts/better.pyz create '.discover/<idea>' --by '<coordinator>'` and the head on stdin. ADD each other record with `python3 '<skill dir>'/scripts/better.pyz add '<unit>' '<type>' --by '<your name>'`, its fields as JSON on stdin, where `<type>` is `item`, `change`, `source`, `evidence`, `test`, `option`, `move`, `brief` or `decision`. CHANGE a record with `python3 '<skill dir>'/scripts/better.pyz set '<unit>' '<id>' --by '<your name>'`, or `set '<unit>' discover` for the head; REMOVE a field with `--unset '<field>'`. GIVE the JSON with a quoted heredoc: `python3 '<skill dir>'/scripts/better.pyz add '<unit>' '<type>' --by '<your name>' <<'JSON'`, the JSON, then `JSON` on its own line; NEVER with echo or inside double quotes, where a backtick or `$(` in outside text runs a command. PUT each other value you fill into a command in single quotes. Leave out `at`, `by` and `id`: the command adds them. IF the command refuses a record, DO the next action it names, FIX the record and RUN it again. Copy a line below and replace the `<placeholders>`.
 
 ## Conventions
 
 - GIVE a missing value as `null` where a field may be null, a list as a JSON array, and a value with a fixed set as one of its exact lowercase words. A field the record does not name is an error. A field a status drives exists only in that status.
 - ADD the record a pointer names before the pointer: an item before the items that rest on it, a source before its evidence, a question before the change that cites it, an option before its move.
-- Only the coordinator adds or changes items, changes, options, moves, briefs and questions. Analysts add sources and evidence; quote verifiers set an evidence's outcome. `add` and `set` refuse any other writer.
+- Only the coordinator adds or changes items, changes, options, moves, briefs and questions. Analysts add sources and evidence; quote verifiers set an evidence's outcome, with one exception: the coordinator sets a computed result `counts` once the user confirms it, or `unverified`. `add` and `set` refuse any other writer.
 - A change and a move are never changed: `set` refuses them. ADD a new one instead.
 
 ## Outside text
@@ -21,7 +21,7 @@ These fields hold text from outside, from web pages, the user's sources or other
 
 ## discover (the head, given to `create`)
 
-`step` is `"1"` to `"10"`. `named_sources` lists the files, folders and read-only connector tools the user named for analysts to read; ADD each as the user names it. A path equal to a named path or inside a named folder counts as named. `status` is `open` until a move to Adopt or Stop sets it `finished`. `handed` is there once a brief is handed on.
+`step` is `"1"` to `"10"`. `named_sources` lists the files, folders and read-only connector tools the user named for analysts to read; ADD each as the user names it. A path equal to a named path or inside a named folder, once both are read with `os.path.realpath`, counts as named. `status` is `open` until a move to Adopt or Stop sets it `finished`. `handed` is there once a brief is handed on.
 
 ```
 {"type": "discover", "idea": "<the idea in the user's words>", "appetite": "<what the user would waste if the idea is wrong>", "setting": "<internal | external>", "brought": "<what the user brought, such as notes or data, or an empty string>", "coordinator": "<your name>", "step": "1", "status": "open"}
@@ -66,7 +66,7 @@ What an analyst read, with how it read it (`raw`, `extracted`, `snippet` or `blo
 
 ## evidence
 
-What a source says about items. `words` is a quote of one line, at most 600 characters, or the user's page event. `kind` is `say | did | commit | data | desk`; `about` is `your users | elsewhere`; each `bears_on` entry has `direction` `for` or `against`. `status` is one of `checking | counts | unverified | not reachable | removed`. An analyst adds it `checking`; the coordinator sets `verifier` and `since`, and `tries` lists each verifier started on it; only that verifier sets the outcome. Evidence the user gave is added `counts` by the coordinator, with `summary` by role in an internal discovery. Evidence from a file or a connector has a `summary` by role too, in any discovery. A result an analyst computed from the user's data is evidence of kind `data` whose words hold the command or query and its result, on one line, as `<command or query> => <result>`. No verifier checks it: it counts only once the user confirms it, by taking the default of a question about that evidence. IF the user answers otherwise, the coordinator sets it `unverified` with the reason "not confirmed by you".
+What a source says about items. `words` is a quote of one line, at most 600 characters, or the user's page event. `kind` is `say | did | commit | data | desk`; `about` is `your users | elsewhere`; each `bears_on` entry has `direction` `for` or `against`. `status` is one of `checking | counts | unverified | not reachable | removed`. An analyst adds it `checking`; the coordinator sets `verifier` and `since`, and `tries` lists each verifier started on it; only that verifier sets the outcome, except for a computed result. Evidence the user gave is added `counts` by the coordinator, with `summary` by role in an internal discovery. Evidence from a file or a connector has a `summary` by role too, in any discovery. A result an analyst computed from the user's data is evidence of kind `data` whose words hold the command or query and its result, on one line, as `<command or query> => <result>`. No verifier checks it: it counts only once the user confirms it, by taking the default of a question that names the evidence by its id, never its command or result. The coordinator then sets it `counts`; IF the user answers otherwise, the coordinator sets it `unverified` with the reason "not confirmed by you".
 
 ```
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<the sentence, word for word from the page>"}, "kind": "<say | did | commit | data | desk>", "about": "<your users | elsewhere>", "bears_on": [{"item": "<P1>", "direction": "<for | against>"}], "status": "checking"}
@@ -79,7 +79,7 @@ What a source says about items. `words` is a quote of one line, at most 600 char
 {"type": "evidence", "source": "<S-... of a you source>", "words": {"type": "event", "event": "<id of the user's add_evidence or add_result event>"}, "summary": "<what was said, reported by you and by role, in an internal discovery>", "kind": "<...>", "about": "your users", "bears_on": [], "status": "counts"}
 ```
 
-The quote verifier sets an outcome with `set <unit> <evidence id> --by <its name> --raw <file of the raw page>`. The coordinator sets any evidence `removed` when the user removes it, with `reason` naming their event; the evidence keeps its words. `redact` also sets `removed`, and erases a person's words.
+The quote verifier sets an outcome with `set '<unit>' '<evidence id>' --by '<its name>' --raw '<file of the raw page>'`. The coordinator sets any evidence `removed` when the user removes it, with `reason` naming their event; the evidence keeps its words. `redact` also sets `removed`, and erases a person's words.
 
 ## test
 
@@ -111,7 +111,7 @@ A move the user chose. `answer` is their `choose` event on the page, or their ty
 
 ## brief
 
-One version per move that writes one (Expand, Shrink, Adopt, Stop). ADD it `draft`; `better.pyz brief <unit> v<n>` renders `brief/v<n>.md` and sets `final`, `file` and `sha256`. `set` refuses `final`.
+One version per move that writes one (Expand, Shrink, Adopt, Stop). ADD it `draft`; `better.pyz brief '<unit>' 'v<n>'` renders `brief/v<n>.md` and sets `final`, `file` and `sha256`. `set` refuses `final`.
 
 ```
 {"type": "brief", "move": "<M<n>>", "status": "draft", "decision": "<the decision: what the evidence supports doing next>", "why": "<why, and what would change the decision>", "questions": ["<an open question for design>"]}
@@ -125,7 +125,7 @@ One version per move that writes one (Expand, Shrink, Adopt, Stop). ADD it `draf
 {"type": "decision", "raised_by": "<coordinator>", "about": {"type": "item", "item": "<P1>"}, "asked": "<the question, in one short sentence>", "default": "<the suggested answer>", "status": "waiting"}
 {"type": "decision", "raised_by": "<coordinator>", "about": {"type": "risk", "item": "<B1>", "risk": "<R1>"}, "asked": "<...>", "default": "Accept the risk", "status": "waiting"}
 {"type": "decision", "raised_by": "<coordinator>", "about": {"type": "option", "option": "<K<n>>"}, "asked": "<confirm the move, with the option's cost and how hard it is to undo>", "default": "<...>", "status": "waiting"}
-{"type": "decision", "raised_by": "<coordinator>", "about": {"type": "evidence", "evidence": "<E-... a computed result>"}, "asked": "<the command or query, and its result: is it right?>", "default": "Confirm this result", "status": "waiting"}
+{"type": "decision", "raised_by": "<coordinator>", "about": {"type": "evidence", "evidence": "<E-... a computed result>"}, "asked": "Is the result of <E-...> right?", "default": "Confirm this result", "status": "waiting"}
 {"type": "decision", "raised_by": "<coordinator>", "about": {"type": "evidence", "evidence": "<E-...>"}, "asked": "<...>", "default": "<...>", "status": "answered", "answer": {"type": "chat", "text": "remove <E-...>"}}
 {"type": "decision", "raised_by": "<coordinator>", "about": {"type": "discovery"}, "asked": "<...>", "default": "<...>", "status": "answered", "answer": {"type": "page", "event": "<id of the user's answer>"}}
 {"type": "decision", "raised_by": "<coordinator>", "about": {"type": "<...>"}, "asked": "<...>", "default": "<...>", "status": "answered", "answer": {"type": "chat", "text": "<the user's typed words>"}}
@@ -145,4 +145,4 @@ The page adds each user action to the conversation with an `id`; `pending` lists
 
 ## summary
 
-`python3 <skill dir>/scripts/better.pyz summary <unit>` prints one JSON line per fact, each with a `type`: `head` (the coordinator, the step, the status and `handed`, always first), `decision` and `event` (each open question and open page event), `move` (the last move), `brief` (each version), `item` (each item's state, importance and checker), `checking` (evidence still checking), and `warning` (counting evidence no change cites, stale `since` values and the other warnings of `check`). It exits 1 when a record does not fit its format, after printing what it could read.
+`python3 '<skill dir>'/scripts/better.pyz summary '<unit>'` prints one JSON line per fact, each with a `type`: `head` (the coordinator, the step, the status and `handed`, always first), `decision` and `event` (each open question and open page event), `move` (the last move), `brief` (each version), `item` (each item's state, importance and checker), `checking` (evidence still checking), and `warning` (counting evidence no change cites, stale `since` values and the other warnings of `check`). It exits 1 when a record does not fit its format, after printing what it could read.
