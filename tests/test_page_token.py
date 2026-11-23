@@ -107,6 +107,27 @@ class TokenTest(Served):
         out = self.process.communicate(timeout=20)[0]
         self.assertIn(f"{self.url}#t={self.token}", out)
 
+    def test_the_address_is_printed_before_the_address_file_is_written(self):
+        """A reader that waits for `.server` and then stops the server has the address already: `serve` stopped at the
+        moment it writes `.server` has printed the address."""
+        from unittest import mock
+
+        from better_ai import paths
+
+        write = paths.write_state
+
+        class Stopped(Exception):
+            pass
+
+        def stop_at_address(unit, relative, data, mode=None):
+            if relative == ".server":
+                raise Stopped
+            write(unit, relative, data, mode)
+
+        with mock.patch.object(paths, "write_state", stop_at_address):
+            done = better.call("show-better", "serve", str(self.folder), "--no-browser", cwd=self.root)
+        self.assertRegex(done.stdout, r"Serving .* at http://127\.0\.0\.1:\d+/#t=\S+")
+
     def test_a_request_without_the_token_is_out_of_date_and_reads_and_writes_nothing(self):
         self.serve()
         for path in ("data", "events?after=0", "wait?after=0&seconds=1"):
