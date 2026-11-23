@@ -23,7 +23,7 @@ sys.path.insert(0, str(HERE.parent / "src"))
 import better  # noqa: E402
 
 HEADER = "X-Page-Token"
-OUT_OF_DATE = "page out of date: reload"
+OUT_OF_DATE = "page out of date: open the address the agent gave"
 NOTE = {"id": "m-x", "text": "hi", "to": None, "on": {"slide": 1, "part": None}}
 SHOW = {
     "type": "slides",

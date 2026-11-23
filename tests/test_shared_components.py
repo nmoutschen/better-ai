@@ -119,6 +119,8 @@ class SharedComponents(unittest.TestCase):
         self.assertIn("chip('guessed', 'plain')", script)
         self.assertIn("chip('Unconfirmed', 'plain')", script)
         self.assertIn("chip('Not valid', 'error')", script)
+        self.assertIn("chip('Applies', 'plain')", script)  # a fact, not a result: plain
+        self.assertIn("chip('Review runs once you approve the design', 'wait')", script)  # it waits for the user
         self.assertIn("chip('no valid source', 'error')", script)
         self.assertIn("chip('New')", script)
         self.assertIn("' comments'))", script)
@@ -149,6 +151,10 @@ class SharedComponents(unittest.TestCase):
         for kind, expected in (("ok", done), ("working", working), ("wait", wait), ("error", blocked)):
             border = re.search(r"border-color:var\((--[a-z-]+)\)", rule(PAGE_CSS, f".chip.{kind}")).group(1)
             self.assertEqual(table[border], expected, f".chip.{kind}")
+        # the progress word on a pin: asked umber, working terracotta-dark, done moss-dark
+        for kind, expected in (("asked", wait), ("working", table["--terracotta-dark"]), ("done", done)):
+            colour = re.search(r"(?<![-\w])color:var\((--[a-z-]+)\)", rule(PAGE_CSS, f".progress.{kind}")).group(1)
+            self.assertEqual(table[colour], expected, f".progress.{kind} word")
         # the research board's dots, rings and legend
         script = (SRC / "research" / "board.js").read_text(encoding="utf-8")
         fill = {

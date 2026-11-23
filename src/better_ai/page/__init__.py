@@ -59,7 +59,7 @@ from ..skill import Skill
 COMMON = "conversation.schema.json"
 LOG, SEEN, ADDRESS, TOKEN = "conversation.jsonl", ".conversation-seen", ".server", ".server-token"
 TOKEN_HEADER = "X-Page-Token"
-OUT_OF_DATE = "page out of date: reload"  # what a page without the token is told; page.js shows it and keeps the typing
+OUT_OF_DATE = "page out of date: open the address the agent gave"  # what a page without the token is told; page.js shows it and keeps the typing
 MAX_BODY = 200_000
 LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the agent is not watching
 WAIT_DEFAULT = 600  # seconds `wait` waits, in every skill

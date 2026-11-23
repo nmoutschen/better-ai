@@ -4,8 +4,9 @@ var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied
 
 // The page token. `serve` gives it in the fragment of the address it opens (#t=...), which a browser never sends. The page
 // keeps it for the tab, so a reload still has it, and takes it out of the address bar. Every request to /rpc, /data,
-// /events and /wait goes through pageFetch, which sends it; the server answers a page without it as out of date.
-var PAGE_STALE = 'page out of date: reload', pageIsStale = false;
+// /events and /wait goes through pageFetch, which sends it; the server answers a page without it as out of date. The
+// page then drops the token it saved: a reload cannot fix it, only the address the agent gave.
+var PAGE_STALE = 'page out of date: open the address the agent gave', pageIsStale = false;
 var pageToken = (function () {
   var found = typeof location === 'undefined' ? null : /[#&]t=([\w-]+)/.exec(location.hash || '');
   try {
@@ -13,16 +14,21 @@ var pageToken = (function () {
     return found ? found[1] : sessionStorage.getItem('pageToken') || '';
   } catch (e) { return found ? found[1] : ''; }
 })();
+function pageStale() {
+  var strip = document.querySelector('.offline');
+  pageIsStale = true; pageToken = '';
+  try { sessionStorage.removeItem('pageToken'); } catch (e) {}
+  if (strip) { strip.textContent = PAGE_STALE; strip.hidden = false; }
+  var stale = new Error(PAGE_STALE);
+  stale.stale = true;
+  return stale;
+}
 function pageFetch(url, init) {
   init = Object.assign({}, init);
   init.headers = Object.assign({}, init.headers, { 'X-Page-Token': pageToken });
   return fetch(url, init).then(function (r) {
     if (r.status !== 401) return r;
-    var strip = document.querySelector('.offline'), stale = new Error(PAGE_STALE);
-    pageIsStale = true;
-    if (strip) { strip.textContent = PAGE_STALE; strip.hidden = false; }
-    stale.stale = true;
-    throw stale;
+    throw pageStale();
   });
 }
 
@@ -203,7 +209,7 @@ function pageConversation(o) {
       body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
       .then(function (r) { return r.json(); })
       .then(function (r) {
-        if (r.error) { var refused = new Error(r.error.message); refused.refused = true; throw refused; }
+        if (r.error) { if (r.error.code === -32001) pageStale(); var refused = new Error(r.error.message); refused.refused = true; throw refused; }
         return r;
       })
       .then(function () {
@@ -729,32 +735,39 @@ function pageDecision(o) {
     return s > 0 ? 'default in ' + (s < 90 ? 'under 2 min' : Math.round(s / 60) + ' min') : 'default due now';
   }
   // What takes the focus after the question FROM is answered, found at the click, before the send: the thread may redraw
-  // before the send is done, and the answered question is then gone. The open question after it, else the first before
-  // it: {id}, found again by id afterwards. Else what the page says waits next, else another item the agent asked
-  // about: {el}. Nothing else waits: null.
+  // before the send is done, and the answered question is then gone. It is kept as a name, never as an element, which a
+  // redraw replaces: {id} the open question after it, else the first before it; {next} what the page says waits next,
+  // asked again at focus time; {asked} another item the agent asked about, found again by its id. Nothing else waits: null.
   function nextWaiting(from) {
     var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q')), i = -1, k;
     for (k = 0; k < list.length; k++) if (list[k].dataset.d === from) i = k;
     var others = list.slice(i + 1).concat(list.slice(0, Math.max(i, 0))).filter(function (q) { return q.dataset.d !== from; });
     if (others.length) return { id: others[0].dataset.d };
-    var page = o.next && o.next();
-    if (page) return { el: page };
+    if (o.next && o.next()) return { next: true };
     var asked = Array.prototype.slice.call(document.querySelectorAll('li[data-state="asked"]')).filter(function (q) { return q.dataset.d !== from && !/open-q/.test(q.className); });
-    if (!asked.length) return null;
-    asked[0].setAttribute('tabindex', '-1');
-    return { el: asked[0] };
+    return asked.length && asked[0].dataset.id ? { asked: asked[0].dataset.id } : null;
   }
   function questionEl(id) {
     var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q'));
     for (var k = 0; k < list.length; k++) if (list[k].dataset.d === id) return list[k].querySelector('.use') || list[k].querySelector('.answer') || list[k];
     return null;
   }
-  // A redraw after the answer replaces the nodes: the question's new ✓ is focused once drawn, only while the focus is
-  // still on the button that had it or on nothing, so a redraw never takes it from where the user went.
+  function askedEl(id) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li[data-state="asked"]'));
+    for (var k = 0; k < list.length; k++) if (list[k].dataset.id === id) { list[k].setAttribute('tabindex', '-1'); return list[k]; }
+    return null;
+  }
+  // The focus moves on only while it is still on the button that was clicked, on the page or on nothing: where the user
+  // went during the send stays. A redraw after the answer replaces the nodes: the question's new ✓ is focused once drawn,
+  // under the same rule.
   var want = null;
-  function focusTarget(n) {
-    if (!n) return;
-    var el = n.id ? questionEl(n.id) : n.el;
+  function focusFree(from) {
+    var now = document.activeElement;
+    return !now || now === document.body || now === from || !document.contains(now);
+  }
+  function focusTarget(n, from) {
+    if (!n || !focusFree(from)) return;
+    var el = n.id ? questionEl(n.id) : n.next ? (o.next && o.next()) : askedEl(n.asked);
     if (el && el.focus) el.focus({ preventScroll: true });
     want = n.id ? { id: n.id, from: el } : null;
   }
@@ -778,7 +791,7 @@ function pageDecision(o) {
     li.dataset.state = STEP ? STEP[0] : '';
     var foot = document.createElement('div');
     foot.className = 'foot' + (asked ? ' question' : '');
-    var q = String(x.asked || '').replace(/\s+/g, ' ').trim();
+    var q = pageMarkdownText(x.asked);
     if (STEP) foot.insertAdjacentHTML('beforeend', '<span class="progress ' + STEP[0] + '"><span class="bars" aria-hidden="true">' +
       [0, 1, 2].map(function (i) { return '<i class="' + (i <= n ? 'on' : '') + '"></i>'; }).join('') + '</span><span>' + STEP[1] + '</span></span>');
     else if (answer) foot.append(conv.progress(state[answer.id]));
@@ -791,7 +804,7 @@ function pageDecision(o) {
           var target = nextWaiting(x.id);
           use.disabled = true;
           conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer',
-            function () { focusTarget(target); }, function () { use.disabled = false; });
+            function () { focusTarget(target, use); }, function () { use.disabled = false; });
         });
         foot.append(use);
         if (want && want.id === x.id) {
