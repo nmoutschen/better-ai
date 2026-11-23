@@ -19,7 +19,7 @@ function pure(returns, over = {}) {
   return new Function(...Object.keys(env), `${between(source, '', '// ---------- Start ----------')}; return ${returns};`)(...Object.values(env));
 }
 const api = () => pure('{TABS, openQuestions, aboutTab, badges, tabLabel, stateChip, safeLink, idLink, firstSentence, agentRows, ' +
-  'chooseParams, removeFor, nextAfter, evidenceBlock, pendingChoose, headerHTML, movesPanel, itemsTable, evidencePanel, optionsPanel, testsPanel, briefPanel, ' +
+  'chooseParams, removeFor, nextAfter, riskCounts, riskItem, tabOf, evidenceLabel, evidenceBlock, pendingChoose, headerHTML, movesPanel, itemsTable, evidencePanel, optionsPanel, testsPanel, briefPanel, ' +
   'choosePanel, addEvidenceForm, resultForm, removeForm, changeForm, atWork, briefLabel}');
 
 const rec = (type, over) => ({ type, at: ago(60), by: 'coord', ...over });
@@ -258,10 +258,10 @@ test('S56: a check that has no word for 30 minutes says so; the last word is the
   assert.doesNotMatch(a.atWork(d, NOW), /No word from analyst-2/);
 });
 
-test('S56: evidence checking with no verifier reads Waiting for a verifier with its age; a chat act reads recorded from the chat', () => {
+test('S56: evidence checking with no verifier reads Queued with its age; a chat act reads recorded from the chat', () => {
   const a = api(), d = fixture();
-  assert.match(a.evidencePanel(d, ctx(d)), /Waiting for a verifier, 5 min/);
-  assert.match(a.evidencePanel(d, ctx(d)), /Checking quote/);
+  assert.match(a.evidencePanel(d, ctx(d)), /Queued, 5 min/);
+  assert.match(a.evidencePanel(d, ctx(d)), /Checking, 3 min/);
   assert.match(a.evidencePanel(d, ctx(d)), /recorded from the chat/);
   d.moves = [rec('move', { id: 'M1', option: 'K1', step: '5', why: 'Probe first.', answer: { type: 'chat', text: 'go' } })];
   assert.match(a.movesPanel(d, ctx(d)), /recorded from the chat/);
@@ -296,12 +296,87 @@ test('the item tables: first sentence, then More; importance, state, evidence fo
   assert.match(html, /Checking, 12 min/);  // the age on the item chip
 });
 
-test('risks by kind show only under an item\'s More (issue 125)', () => {
-  const a = api(), d = fixture();
+// ---------- #125: risks by kind ----------
+const riskFixture = () => {
+  const d = fixture();
+  const b1 = d.items.find(i => i.id === 'B1');
+  b1.risks = [{ id: 'R1', kind: 'value', text: 'Nobody reads it.' }, { id: 'R2', kind: 'usability', text: 'Too noisy.' }, { id: 'R3', kind: 'feasibility', text: 'No retry data.' }];
+  b1.accepted_risks = ['R3']; b1.open_risks = ['R1', 'R2'];
+  d.changes.push(rec('change', { about: { type: 'item', item: 'B1' }, field: 'risk', risk: 'R3', from: 'open', to: 'accepted', cause: { answer: { type: 'decision', id: 'D9' } } }));
+  d.decisions.push(rec('decision', { id: 'D9', about: { type: 'risk', item: 'B1', risk: 'R3' }, asked: 'Accept R3?', default: 'Accept the risk', status: 'answered', raised_by: 'coord', answer: { type: 'chat', text: 'yes' }, answered_at: ago(2) }));
+  d.decisions.find(x => x.id === 'D2').asked = 'Will you build B1 without knowing whether people read it? It may be noise.';
+  return d;
+};
+const rowOf = (html, id) => { const at = html.indexOf('id="' + id + '"'); return at < 0 ? '' : html.slice(at, html.indexOf('</tr>', at)); };
+
+test('S6: an item with risks has a bar under it: counts, a question for you, and the kinds with none; it starts closed', () => {
+  const a = api(), d = riskFixture();
   const html = a.itemsTable('behaviour', d, ctx(d));
-  const before = html.slice(0, html.indexOf('<details'));
-  assert.doesNotMatch(before, /Nobody reads it/);
-  assert.match(html, /<details[^>]*>[^]*Nobody reads it\./);
+  const bar = rowOf(html, 'bar-B1');
+  assert.match(bar, /<button type="button"[^>]*aria-expanded="false"[^>]*aria-controls="risks-B1"[^>]*aria-label="Show risks of B1"/);
+  assert.match(bar, /3 risks: 2 open, 1 accepted, 1 question for you/);
+  assert.match(bar, /None listed: viability/);
+  assert.match(bar, /<span aria-hidden="true">▸<\/span>/);
+  assert.doesNotMatch(html, /id="risk-R1"[^>]*>(?![^]*hidden)/);  // the sub-rows are hidden while the bar is closed
+  assert.match(html, /<tr class="risk"[^>]*id="risk-R1"[^>]*hidden/);
+});
+
+test('S6: the bar\'s counts: one risk, no zero counts, and no question when none waits', () => {
+  const a = api();
+  assert.equal(a.riskCounts(1, 1, 0, 0), '1 risk, open');
+  assert.equal(a.riskCounts(3, 3, 0, 0), '3 risks, all open');
+  assert.equal(a.riskCounts(2, 0, 2, 0), '2 risks, both accepted');
+  assert.equal(a.riskCounts(1, 0, 1, 0), '1 risk, accepted');
+  assert.equal(a.riskCounts(5, 0, 5, 0), '5 risks, all accepted');
+  assert.equal(a.riskCounts(3, 2, 1, 1), '3 risks: 2 open, 1 accepted, 1 question for you');
+  assert.equal(a.riskCounts(3, 3, 0, 2), '3 risks, all open, 2 questions for you');
+});
+
+test('S6: an open bar shows one sub-row per risk: kind then text, Open or Accepted, what settled it, and Change named for the risk', () => {
+  const a = api(), d = riskFixture();
+  const html = a.itemsTable('behaviour', d, ctx(d, { openRisks: new Set(['B1']) }));
+  assert.match(rowOf(html, 'bar-B1'), /aria-expanded="true"[^>]*aria-label="Hide risks of B1"/);
+  const r2 = rowOf(html, 'risk-R2'), r3 = rowOf(html, 'risk-R3');
+  assert.doesNotMatch(r2, /hidden/);
+  assert.match(r2, /<b>Usability:<\/b> Too noisy\./);
+  assert.match(r2, />Open</);
+  assert.match(r2, /Nothing yet/);
+  assert.match(r2, /aria-label="Change R2"/);
+  assert.match(r3, />Accepted</);
+  assert.match(r3, /<a href="#row-D9" data-goto="D9">D9<\/a>/);
+  assert.ok(html.indexOf('id="risk-R1"') < html.indexOf('id="risk-R2"') && html.indexOf('id="risk-R2"') < html.indexOf('id="risk-R3"'));
+});
+
+test('S6, A22: a question about a risk sits in its State cell with the question, its default and the shared controls', () => {
+  const a = api(), d = riskFixture();
+  const r1 = rowOf(a.itemsTable('behaviour', d, ctx(d, { openRisks: new Set(['B1']) })), 'risk-R1');
+  assert.match(r1, /<a href="#row-D2" data-goto="D2">D2<\/a>: Will you build B1 without knowing whether people read it\?/);
+  assert.doesNotMatch(r1, /It may be noise/);
+  assert.match(r1, /Suggested default: Accept the risk/);
+  assert.match(r1, /data-use="D2" aria-label="Use the default for D2">✓</);
+  assert.match(r1, /data-answer="D2" aria-label="Answer D2">Answer</);
+});
+
+test('A18: Question open on an item counts only questions about the item, not about its risks', () => {
+  const a = api(), d = riskFixture();
+  assert.doesNotMatch(rowOf(a.itemsTable('behaviour', d, ctx(d)), 'row-B1'), /Question open/);
+  assert.match(rowOf(a.itemsTable('problem', d, ctx(d)), 'row-P1'), /Question open/);
+});
+
+test('an item with no risk shows No risk listed under its state and has no bar', () => {
+  const a = api(), d = riskFixture();
+  const html = a.itemsTable('problem', d, ctx(d));
+  assert.match(rowOf(html, 'row-P2'), /No risk listed/);
+  assert.equal(rowOf(html, 'bar-P2'), '');
+  assert.doesNotMatch(html, /<th[^>]*>Risks</);
+});
+
+test('A3: a risk ID shown outside its sub-row is a link that goes to it', () => {
+  const a = api(), d = riskFixture();
+  assert.match(a.movesPanel(d, ctx(d)), /About <a href="#risk-R1" data-goto="R1">R1<\/a> of <a href="#row-B1" data-goto="B1">B1<\/a>/);
+  assert.equal(a.tabOf('R1', d), 'behaviours');
+  assert.equal(a.riskItem('R1', d), 'B1');
+  assert.equal(a.riskItem('R9', d), null);
 });
 
 test('the Evidence tab: users, not yet known, elsewhere; Checking quote; not reachable and unverified stay on the row and do not count', () => {
@@ -309,7 +384,7 @@ test('the Evidence tab: users, not yet known, elsewhere; Checking quote; not rea
   d.evidence.push({ ...d.evidence[0], id: 'E-a9-1', status: 'not reachable', reason: 'HTTP 403' });
   const html = a.evidencePanel(d, ctx(d));
   for (const heading of ['About your users', 'Not yet known for your users', 'From elsewhere']) assert.match(html, new RegExp(heading));
-  assert.match(html, /Source not reachable/);
+  assert.match(html, /Unreachable/);
   assert.match(html, /Remove…/);
   assert.match(html, /Add evidence…/);
   assert.match(a.evidencePanel(fixture({ evidence: [] }), ctx(fixture())), /No evidence yet\./);
@@ -362,13 +437,73 @@ test('the Brief tab: the current version and the earlier ones behind a disclosur
   assert.match(a.briefPanel(fixture(), ctx(fixture())), /No brief yet/);
 });
 
-test('evidence that is still being checked says it does not count; a move that writes a brief names it on the Brief tab until the brief is there', () => {
+test('evidence that is still being checked has only its label and age; a move that writes a brief names it on the Brief tab until the brief is there', () => {
   const a = api(), d = fixture();
-  assert.match(a.evidencePanel(d, ctx(d)), /It does not count until the check passes\./);
+  assert.doesNotMatch(a.evidencePanel(d, ctx(d)), /does not count/);
   d.moves = [rec('move', { id: 'M2', option: 'K2', step: '5', why: 'x', answer: { type: 'page', event: 'c1' } })];
   assert.match(a.briefPanel(d, ctx(d)), /v1 is being written for <a href="#row-M2"[^>]*>M2<\/a> \(Shrink\)/);
   d.briefs = [rec('brief', { id: 'v1', move: 'M2', status: 'draft', decision: 'Shrink.' })];
   assert.doesNotMatch(a.briefPanel(d, ctx(d)), /is being written for/);
+});
+
+// ---------- #126: evidence labels ----------
+test('S7, A19: each evidence gets one of eleven labels from its status, origin and kind only, never from its reason', () => {
+  const a = api(), d = fixture();
+  const web = { origin: { type: 'web', url: 'https://example.com/a', read: 'raw' }, kind: 'say' };
+  const you = { origin: { type: 'you', given: { type: 'chat', text: 'x' } }, kind: 'say' };
+  const computed = { origin: { type: 'file', path: 'db.csv' }, kind: 'data', text: 'count => 3', words: { type: 'quote', text: 'count => 3' } };
+  const cases = [
+    [{ ...web, status: 'counts' }, 'Found'], [{ ...you, status: 'counts' }, 'From you'], [{ ...computed, status: 'counts' }, 'Confirmed'],
+    [{ ...web, status: 'checking' }, 'Queued'], [{ ...web, status: 'checking', verifier: 'v1', since: ago(2) }, 'Checking'],
+    [{ ...computed, status: 'checking' }, 'Needs you'], [{ ...web, status: 'not found', reason: 'not on the page' }, 'Not found'],
+    [{ ...web, status: 'not reachable', reason: 'HTTP 403' }, 'Unreachable'], [{ ...web, status: 'unverified', reason: 'page read only as an extraction' }, 'Not checked'],
+    [{ ...computed, status: 'unverified', reason: 'not confirmed by you' }, 'Not confirmed'], [{ ...web, status: 'removed', reason: 'm1' }, 'Removed'],
+    [{ ...web, status: 'reworded', reason: 'reworded', page_words: 'x' }, 'Checking'],
+  ];
+  for (const [e, label] of cases) assert.equal(a.evidenceLabel({ id: 'E-x-1', ...e }, d), label, JSON.stringify(e));
+  assert.equal(a.evidenceLabel({ id: 'E-x-1', ...web, status: 'unverified', reason: 'not confirmed by you' }, d), 'Not checked');  // the reason never decides
+  assert.doesNotMatch(source.slice(source.indexOf('function evidenceLabel'), source.indexOf('function evidenceLabel') + 1500), /\.reason/);
+});
+
+test('S7: under a label only a reason, never Used, Not used or It does not count', () => {
+  const a = api(), d = fixture();
+  d.evidence.push({ ...d.evidence[0], id: 'E-a9-1', status: 'not found', reason: 'not on the page' });
+  d.evidence.push({ ...d.evidence[0], id: 'E-a9-2', status: 'not reachable', reason: 'The site asks for a login.' });
+  const html = a.evidencePanel(d, ctx(d));
+  assert.match(rowOf(html, 'row-E-a9-1'), /chip">Not found<\/span><p class="muted">not on the page<\/p>/);
+  assert.match(rowOf(html, 'row-E-a9-2'), /Unreachable<\/span><p class="muted">The site asks for a login\.<\/p>/);
+  assert.match(rowOf(html, 'row-E-a1-1'), /chip ok">Found<\/span><\/td>/);
+  assert.doesNotMatch(html, /Used\.|Not used|does not count/);
+});
+
+test('S7: the Evidence intro says which labels count', () => {
+  const a = api(), d = fixture();
+  assert.match(a.evidencePanel(d, ctx(d)), /Evidence is what you saw or were told, and what research found\. Found, From you and Confirmed count\. Queued, Checking and Needs you don(’|'|&#39;)t count yet\. The rest don(’|'|&#39;)t count\./);
+});
+
+test('a stalled Queued or Checking evidence gives the reason No word for n min, past the quiet time', () => {
+  const a = api(), d = fixture();
+  d.quiet_after = 1800;
+  d.evidence.find(e => e.id === 'E-a3-1').since = ago(35);
+  d.evidence.find(e => e.id === 'E-a2-1').at = ago(40);
+  const html = a.evidencePanel(d, ctx(d));
+  assert.match(rowOf(html, 'row-E-a3-1'), /No word for 35 min/);
+  assert.match(rowOf(html, 'row-E-a2-1'), /No word for 40 min/);
+  assert.doesNotMatch(rowOf(html, 'row-E-a1-1'), /No word/);
+});
+
+test('a corrected quote shows the page\'s words, the mark, and the analyst\'s wording under More; the reworded one it corrects is not listed', () => {
+  const a = api(), d = fixture();
+  d.evidence.push({ ...d.evidence[0], id: 'E-a9-1', status: 'reworded', reason: 'reworded', page_words: 'Over half mute alerts.', text: 'People ignore alerts.', words: { type: 'quote', text: 'People ignore alerts.' } });
+  d.evidence.push({ ...d.evidence[0], id: 'E-coord-7', corrects: 'E-a9-1', status: 'counts', text: 'Over half mute alerts.', words: { type: 'quote', text: 'Over half mute alerts.' } });
+  const html = a.evidencePanel(d, ctx(d));
+  assert.equal(rowOf(html, 'row-E-a9-1'), '');
+  const row = rowOf(html, 'row-E-coord-7');
+  assert.match(row, /Over half mute alerts\./);
+  assert.match(row, /quote corrected to the page(’|'|&#39;)s words/);
+  assert.match(row, /<details class="more"><summary>More<\/summary><p>The analyst quoted: “People ignore alerts\.”/);
+  const lone = fixture(); lone.evidence.push(d.evidence[d.evidence.length - 2]);
+  assert.match(rowOf(a.evidencePanel(lone, ctx(lone)), 'row-E-a9-1'), /Checking[^]*Reworded on the page: being corrected/);
 });
 
 // ---------- A5 ----------
@@ -437,9 +572,8 @@ test('a decision about evidence shows that evidence\'s words and source in the M
   assert.match(a.movesPanel(answered, ctx(answered)), /count users =&gt; 12/);
   const panel = a.evidencePanel(d, c);
   const row = panel.slice(panel.indexOf('id="row-E-a1-9"'));
-  assert.match(row.slice(0, row.indexOf('</tr>')), /Waiting for your confirmation/);
-  assert.doesNotMatch(row.slice(0, row.indexOf('</tr>')), /Waiting for a verifier/);
-  assert.match(row.slice(0, row.indexOf('</tr>')), /chip wait">Waiting for your confirmation/);
+  assert.doesNotMatch(row.slice(0, row.indexOf('</tr>')), /Queued/);
+  assert.match(row.slice(0, row.indexOf('</tr>')), /chip wait">Needs you/);
 });
 
 test('A14: after the check the focus goes to the next open question after the current one, wrapping; its Answer when it has no default; the move when none remain', () => {
