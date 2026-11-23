@@ -141,6 +141,7 @@ class Design(unittest.TestCase):
         register = (ROOT / "src" / "better_ai" / "architect" / "register.css").read_text(encoding="utf-8")
         copies = dict(re.findall(r"(--[a-z-]+):\s*([^;]+);", register.split("}", 1)[0]))
         self.assertEqual(copies, {name: page_css_tokens()[name] for name in copies})
+        self.assertLessEqual(set(re.findall(r"var\((--[a-z-]+)\)", register)), copies.keys())
 
     def test_pages_use_only_named_colours(self):
         allowed = {hex6(c) for v in design_table().values() for c in COLOUR.findall(v)}
