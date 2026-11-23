@@ -88,8 +88,6 @@ class Package(unittest.TestCase):
         owners = {
             "rules_changes": "T7",
             "rules_evidence": "T8",
-            "rules_moves": "T9",
-            "summary": "T9",
             "brief": "T10",
             "pagespec": "T11",
         }
