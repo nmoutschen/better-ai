@@ -425,6 +425,102 @@ class Rules(unittest.TestCase):
         )
         self.assertIn('SET it `unverified` with the reason "not confirmed by you"', body)
 
+    def test_the_host_check_refuses_every_address_that_is_not_global(self):
+        """L6: every resolved address is judged by ipaddress, IPv6 pins take brackets, a relative Location is resolved."""
+        verifier = flat(read(AGENTS["quote-verifier"]))
+        self.assertIn(
+            "`python3 -c 'import ipaddress,socket,sys;print([(a[4][0],ipaddress.ip_address(a[4][0]).is_global) "
+            "for a in socket.getaddrinfo(sys.argv[1],None)])' '<host>'`",
+            verifier,
+        )
+        self.assertIn(
+            "IF any address it prints is not global, or the host is `localhost`, SET the evidence `not reachable` "
+            'with "host not public"',
+            verifier,
+        )
+        self.assertNotIn("loopback, private or link-local", verifier)
+        self.assertIn("--resolve '<host>:<port>:[<address>]'", verifier)
+        self.assertIn("RESOLVE a relative `Location` against the address it came from", verifier)
+        self.assertIn("urllib.parse.urljoin", verifier)
+
+    def test_the_confirm_question_names_the_computed_result_by_its_id(self):
+        """S90, redact: the question holds no evidence text; the page or the chat shows the command and result."""
+        body = flat(steps(read(SKILL))[3][1])
+        self.assertIn('"Is the result of <E-...> right?"', body)
+        self.assertIn("never copied into the question's text", body)
+        self.assertNotIn("showing its command or query and its result", body)
+        records = read(RECORDS)
+        self.assertIn(
+            '"about": {"type": "evidence", "evidence": "<E-... a computed result>"}, '
+            '"asked": "Is the result of <E-...> right?", "default": "Confirm this result"',
+            records,
+        )
+        self.assertNotIn("<the command or query, and its result: is it right?>", records)
+
+    def test_record_json_goes_through_a_quoted_heredoc(self):
+        """L7: record JSON never passes through echo or double quotes, where backticks and $() run."""
+        for path, where in (
+            (SKILL, section(read(SKILL), "### Add the records")),
+            (AGENTS["analyst"], read(AGENTS["analyst"])),
+            (AGENTS["quote-verifier"], read(AGENTS["quote-verifier"])),
+            (RECORDS, read(RECORDS)),
+        ):
+            text = flat(where)
+            with self.subTest(path.name):
+                self.assertIn("<<'JSON'", text)
+                self.assertIn("then `JSON` on its own line", text)
+                self.assertIn("NEVER with echo or inside double quotes", text)
+        rule = flat(section(read(SKILL), "### Add the records"))
+        self.assertRegex(rule, r"Same for `set` and `reply`|`set` and `reply` the same way")
+
+    def test_the_analyst_quotes_and_checks_each_path(self):
+        rule = flat(read(AGENTS["analyst"]))
+        for phrase in (
+            "PUT each path in single quotes in a command",
+            "SKIP a path that holds a single quote or a control character",
+            "os.path.realpath",
+            "READ web pages with your web tools, never with a command",
+        ):
+            self.assertIn(phrase, rule)
+        self.assertIn("os.path.realpath", flat(read(AGENTS["quote-verifier"])))
+        self.assertIn("os.path.realpath", flat(read(RECORDS)))
+
+    def test_records_name_the_one_exception_to_the_verifier_setting_the_outcome(self):
+        records = flat(read(RECORDS))
+        self.assertIn(
+            "the coordinator sets a computed result `counts` once the user confirms it, or `unverified`", records
+        )
+
+    def test_every_value_in_a_command_is_single_quoted(self):
+        """L7 as a class: in each command the skill shows, no `<placeholder>` stands outside single quotes."""
+        found = []
+        for path in [*skill_texts(), DOCS]:
+            for span in re.findall(r"`([^`\n]+)`", read(path)):
+                if not re.match(r"(?:python3|curl|rm|pdftotext|better\.pyz)\b", span):
+                    continue
+                bare = re.sub(r"'[^']*'", "''", span)
+                if re.search(r"<[A-Za-z][^<>]*>", bare):
+                    found.append(f"{path.name}: {span}")
+        self.assertEqual(found, [])
+
+    def test_no_text_pipes_echo_into_a_command(self):
+        for path in [*skill_texts(), DOCS]:
+            for sentence in re.split(r"(?<=[.:])\s+", flat(read(path))):
+                if re.search(r"\becho\b", sentence):
+                    with self.subTest(path.name, sentence=sentence[:80]):
+                        self.assertIn("NEVER", sentence)
+
+    def test_record_text_reaches_a_tool_or_a_command_only_as_a_plain_value(self):
+        """The sweep: refs, ids, the slug and the verifier's folder."""
+        verifier = flat(read(AGENTS["quote-verifier"]))
+        self.assertIn("PASS the `ref` only as the argument the tool reads an item by", verifier)
+        self.assertIn("rm -r '<temp>/discover-verify/<idea>/<YOUR NAME>'", verifier)
+        skill = flat(read(SKILL))
+        self.assertIn("lowercase letters, digits and hyphens only", skill)
+        self.assertIn(
+            "PUT each value you fill into a command, such as a path, an id or a name, in single quotes", skill
+        )
+
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
         for path in [*skill_texts(), DOCS]:
