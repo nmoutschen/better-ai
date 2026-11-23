@@ -13,6 +13,8 @@ FOLLOW these steps in order. The general rules of SKILL.md apply throughout.
 
 ## 1. Prepare the spec and task list
 
+READ the last finished retrospective of an earlier change, IF one exists: the `.code/*/retro.md` of another change, with an `## Actions` section, whose title holds the latest end date. APPLY each of its actions for the `coordinator` that fits this change, and each earlier `coordinator` action it still lists as not done, as you prepare and brief: step 5 checks them. DO NOT apply a `user` action: the user decides those.
+
 MAKE the change folder with `python3 <skill dir>/scripts/better.pyz create .code/<change> --by coordinator`, with the goal, the design and the mode `coordinate` as JSON on stdin. READ [../formats/spec.md](../formats/spec.md) and ADD each requirement with `python3 <skill dir>/scripts/better.pyz add .code/<change> spec --by <your agent name>`, in the format's fields, always, with the requirements of the whole change: from the existing spec when one covers it. IF the repo keeps specs in a spec tool, such as OpenSpec, Spec Kit or Kiro, UPDATE its files from it. WHEN the design is an architect folder, the change's spec is the copy of its spec in the change folder: CHANGE it there with `set`.
 
 IN coordinate mode only you add `task`, `progress`, `problem`, `resolved`, `instruction`, `decision` and `lesson` records. Builders and verifiers add only the records of their own log.
@@ -20,6 +22,8 @@ IN coordinate mode only you add `task`, `progress`, `problem`, `resolved`, `inst
 SPLIT the work into tasks by part, such as one module or one flow per task, never by role. EACH task fits in one context, and names its mode and its requirements. ADD each with `python3 <skill dir>/scripts/better.pyz add .code/<change> task --by coordinator`: READ [../formats/tasks.md](../formats/tasks.md), with the statuses of [Task status](#task-status) instead of the format's. ADD each requirement before the task that names it.
 
 PUT what several tasks share first: WHEN a decision, a schema, an interface or a validation rule is needed by more than one task, DECIDE it, or MAKE it a task of its own, before the tasks that use it start, and GIVE them what they need from it in their brief. MAKE the tasks that use it wait on its implementation only WHEN they cannot proceed from the agreed decision or interface alone. IN each wave of tasks that run in parallel, GIVE each shared behaviour, and each file that is hard to merge such as a schema or a lock file, one task that owns it, or an order in which the tasks edit it: a builder that needs a change there tells you, and you pass it to the owner. Edits to separate parts of one file can run together. BEFORE you start the builders, CHECK that every requirement has a task, each shared piece names its owner, and tasks that run together do not write the same thing.
+
+THEN, IF `.code/<change>/retro.md` does not exist yet, START it with its title and its `## Expected` section, in the layout of step 5, before any builder starts: an expectation written after the build is hindsight. WHEN you resume a change whose file exists, DO NOT change it. GIVE the task and requirement counts and how many gaps are still open; your most likely elapsed time, agent count and review rounds, each with a range from low to high; the basis of each, from the figures of the finished retrospectives of other changes in `.code/`. WHEN there are none, WRITE `none` as the most likely value, the range and the basis: a figure with no basis is a guess, and step 5 compares only figures with a basis; and the benefit the goal and the design expect from the change, with a signal that would show it. DO NOT give these figures to a builder or a verifier: an agent that knows an estimate works towards it.
 
 ### Task status
 
@@ -91,4 +95,68 @@ MERGE each task into your main branch only after its verifier passed it, or afte
 
 A change of a few lines in a known place late in the build, such as a wording, a mapping or a verifier's suggestion, is a last-mile fix, not a task. MAKE it yourself on your main branch: WRITE its check first, SEE it fail, THEN make the change and RUN the tests it affects. ADD a `fix` record with `python3 <skill dir>/scripts/better.pyz add <change folder> fix --by coordinator`, with `task` and `text` (what the fix changes) as JSON on stdin, when you start it. It gets no builder and no verifier of its own: LIST it for the whole-change verifier below, which covers it. START a builder only for a change that needs design or touches several files.
 
-AFTER the last merge, START a builder to run every check of the spec on your main branch, and FIX failures by starting the task again. THEN go on with step 4 of SKILL.md on the whole diff. MERGE into the user's branch only once you have handed back and the user allows it.
+AFTER the last merge, START a builder to run every check of the spec on your main branch, and FIX failures by starting the task again. THEN go on with step 4 of SKILL.md on the whole diff, THEN with step 5 below, and only THEN hand back, with step 5 of SKILL.md. MERGE into the user's branch only once you have handed back and the user allows it.
+
+## 5. Write the retrospective
+
+AFTER the whole-change verifier and BEFORE you hand back, COMPLETE `.code/<change>/retro.md`, in the layout below: ADD the end date to its title and every section after `## Expected`, which you DO NOT change. It is for the next coordinator and for the user: the next change's step 1 reads it.
+
+- BASE every figure and every item on the change folder's records, the agents' logs and git, and NAME its source: a task, a round, a decision, a fix or a log line. IF a figure has no source you can read, such as cost when you cannot read the agents' transcripts, WRITE that it is missing; DO NOT estimate it.
+- WRITE the finding as what the next change should do differently, or keep, and why, in one sentence: a figure belongs in it only as the reason.
+- COMPARE each figure that has an expectation with it as actual ÷ most likely, and SAY whether it fell inside the range; the other figures have none, so LEAVE their Expected cell as `—`. COMPARE each figure with the finished retrospectives of other changes in `.code/`: per task, and per changed line where the figure grows with size. GIVE the spread of the earlier ratios, not only the last one: a single run's cost or time says little, since runs of the same work vary widely.
+- FOR each failed round, GIVE its reason, not only the count.
+- FOR the expected benefit, SAY whether its signal was seen, or that it cannot be seen yet.
+- JUDGE each choice by what was known when it was made: the records up to that moment, not the outcome. A failure is not shown to be predictable because a fix is easy to imagine now.
+- NAME what made a problem likely, such as a brief that left out the threat model or two tasks writing one file, not which agent erred.
+- LIST what went well as fully as what could be better: a rule that held is worth keeping as much as a failure is worth fixing.
+- FOR each action of the retrospective step 1 read, SAY whether it was done, and whether the figure or problem it targeted changed. Done is not the same as having worked.
+- MARK an item recurring WHEN an earlier retro lists the same problem.
+- GIVE each action the place it belongs, such as this skill, another skill, the repo's tests or the dashboard, and who can do it: `coordinator` for a way of working the next coordinator can apply alone, `user` for anything else. ADD each `user` action as a `next_step` record, in the format of [../formats/next-steps.md](../formats/next-steps.md), with origin `{"type": "file", "path": ".code/<change>/retro.md"}` and status `asked`, and LIST it among the proposed next steps of your hand-back. DO NOT change a skill or the repo yourself to apply one.
+
+```markdown
+# Retrospective: <change>, <start YYYY-MM-DD> to <end YYYY-MM-DD>
+
+## Expected
+| Figure | Most likely | Range | Basis |
+|---|---|---|---|
+| Elapsed time | | | |
+| Agents started | | | |
+| Review rounds | | | |
+- Size: <n> tasks, <n> requirements, <n> open gaps
+- Benefit: <what the user expects> · signal: <what would show it>
+
+## Finding
+<What the next change should do differently, or keep, and why, in one sentence.>
+
+## Figures
+| Figure | Expected | Actual | Actual ÷ expected | Per task | Earlier changes (spread) | Source |
+|---|---|---|---|---|---|---|
+| Elapsed time | | | | | | |
+| Agents started | | | | | | |
+| Review rounds, and the share of tasks passed first time | | | | | | |
+| Blocking findings | | | | | | |
+| Changed lines and files | | | | | | |
+| Tests before → after, suite time before → after | | | | | | |
+| Share of elapsed time spent waiting on tests | | | | | | |
+| Cost | | | | | | |
+- Benefit signal: <seen, not seen, or not visible yet>
+
+## Earlier actions
+From: <path of the retrospective step 1 read, or none>
+
+| Action | Done? | Did what it targeted change? | Source |
+|---|---|---|---|
+
+## What went well
+- <what held> (<source>)
+
+## What could be better
+- <what happened> · known when decided: <…> · what made it likely: <…> (<source>) <recurring, if an earlier retro lists it>
+
+## Actions
+| Action | Why | Where | Who |
+|---|---|---|---|
+
+## How the figures were made
+- <for each figure: what was counted, from which records>
+```
