@@ -14,7 +14,6 @@ from importlib.resources import files
 from typing import Any
 
 PACKAGE = "better_ai"
-DEFAULT_CUTOFF = "2026-11-22T00:00:00Z"  # used only when running from source without skills.json
 
 
 def root() -> Any:
@@ -50,10 +49,16 @@ class BuildInfo:
     cutoff: str  # records written before this time may be in the format before this change
 
 
+def _source_cutoff(environ: Any) -> str:
+    """The cutoff of a run from source: BETTER_AI_CUTOFF in `environ` (a test pins one in the past), else the
+    `format_cutoff` of skills.json, the one place a release writes it."""
+    return environ.get("BETTER_AI_CUTOFF") or json.loads(read_text("skills.json"))["format_cutoff"]
+
+
 def build_info(environ: Any = None) -> BuildInfo:
     """What this run is. A built `.pyz` holds `_build.json`, written by the build. Run from source (the tests), the
-    skill is the environment variable BETTER_AI_SKILL, the hash is "source" and the cutoff is `format_cutoff` of
-    skills.json when that file exists. A run that cannot tell its skill raises LookupError."""
+    skill is BETTER_AI_SKILL in `environ` (os.environ by default), the hash is "source" and the cutoff is
+    BETTER_AI_CUTOFF or the `format_cutoff` of skills.json. A run that cannot tell its skill raises LookupError."""
     environ = os.environ if environ is None else environ
     if exists("_build.json"):
         data = json.loads(read_text("_build.json"))
@@ -61,12 +66,16 @@ def build_info(environ: Any = None) -> BuildInfo:
     skill = environ.get("BETTER_AI_SKILL", "")
     if not skill.endswith("-better"):
         raise LookupError("BETTER_AI_SKILL is not set to a skill such as code-better, and this is not a built .pyz")
-    cutoff = DEFAULT_CUTOFF
-    if exists("skills.json"):
-        cutoff = json.loads(read_text("skills.json")).get("format_cutoff", cutoff)
-    # Run from source (tests), a test may pin the cutoff; a built .pyz always uses the one the build wrote.
-    cutoff = os.environ.get("BETTER_AI_CUTOFF", cutoff)
-    return BuildInfo(skill, skill.removesuffix("-better"), "source", cutoff)
+    return BuildInfo(skill, skill.removesuffix("-better"), "source", _source_cutoff(environ))
+
+
+def cutoff(environ: Any = None) -> str:
+    """The format cutoff of this run, also for a reader run in-process with no skill named."""
+    environ = os.environ if environ is None else environ
+    try:
+        return build_info(environ).cutoff
+    except LookupError:
+        return _source_cutoff(environ)
 
 
 def skill_package(package: str) -> Any:

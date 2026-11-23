@@ -45,14 +45,14 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
-from . import cli, paths, resources, schema
+from . import cli, paths, schema
 from .cli import Busy, Run, verb
 from .paths import Refused, Unit, refusal
 from .skill import OWNER_BY_HEAD
 
 STAMPED = ("at", "by", "id")  # fields the command sets, which stdin may not hold
 DEADLINE = re.compile(r"^\+(\d{1,9})m$")
-TIME = "%Y-%m-%dT%H:%M:%SZ"
+TIME = schema.TIME
 BUSY = "the file changed while I worked; run the command again"
 TRIES = 1000  # numbers tried for a folder entry before giving up
 
@@ -400,12 +400,12 @@ def _check(
 ) -> tuple[list[schema.Error], list[schema.Error]]:
     """The errors of line `line` of a file's new text, and (as warnings) those of every other line. Old-format lines
     before the build's cutoff are not warnings. An unknown field on the new line names the fields of the type."""
-    docs = schema.load_schemas(*resources.schema_sources(run.info.package))
+    docs = schema.docs_for(run.info.package)
     path = unit.target(relative)
     notices: list[schema.Error] = []
     pointers: list[tuple[int, Path, str]] = []
     found = schema.check_text(
-        path, text, docs, {}, now=run.now(), cutoff=run.info.cutoff, notices=notices, pointers=pointers
+        path, text, docs, {}, now=run.now(), cutoff=run.info.cutoff, notices=notices, pointers=pointers, root=unit.root
     )
     shown = _shown(path)
     errors = [e._replace(file=shown) for e in found if e.line == line]
@@ -425,8 +425,12 @@ def _check(
 
 def _gate(run: Run, unit: Unit, docs: dict, pointed: list[tuple[Path, str]]) -> None:
     """Refuse when a record the new one points to has a line that fails its schema (an old-format line before the
-    cutoff does not count): the pointer would rest on a record the unit does not hold as valid."""
+    cutoff does not count): the pointer would rest on a record the unit does not hold as valid. A file outside the unit,
+    such as the requirements of an architect design, is another skill's: its own `check` holds it to its schemas, which
+    this skill's do not include."""
     for target, ident in pointed:
+        if not target.is_relative_to(unit.path):
+            continue
         files = [target] if not target.is_dir() else sorted(target.glob("*.json"))
         for file in files:
             if file.is_symlink() or not file.is_file():
@@ -439,7 +443,9 @@ def _gate(run: Run, unit: Unit, docs: dict, pointed: list[tuple[Path, str]]) -> 
             ]
             if not at:
                 continue
-            found = schema.check_text(file, text, docs, {}, now=run.now(), cutoff=run.info.cutoff, notices=[])
+            found = schema.check_text(
+                file, text, docs, {}, now=run.now(), cutoff=run.info.cutoff, notices=[], root=unit.root
+            )
             if any(e.line in at for e in found):
                 raise refusal(
                     unit.label,
@@ -526,7 +532,7 @@ def create(args: argparse.Namespace, run: Run) -> int:
     holds = [n for n in OWNER_BY_HEAD if (unit.path / n).exists() or os.path.islink(unit.path / n)]
     if holds:
         if unit.exists():
-            ctx = CreateContext(run, unit, by, schema.load_schemas(*resources.schema_sources(run.info.package)))
+            ctx = CreateContext(run, unit, by, schema.docs_for(run.info.package))
             handled = [step(ctx) for step in EXISTING_STEPS.get(run.skill.name, [])]
             if any(handled):
                 return cli.EXIT_DONE
@@ -538,7 +544,7 @@ def create(args: argparse.Namespace, run: Run) -> int:
     fields = _own_fields(_fields(run, unit), unit, kind.head_type)
     _deadline(fields, run, unit)
     record = _stamp(run, kind.head_type, by, {k: v for k, v in fields.items() if k != "id"})
-    docs = schema.load_schemas(*resources.schema_sources(run.info.package))
+    docs = schema.docs_for(run.info.package)
     errors, _ = _check(run, unit, kind.head, _json_file(record), 1, layout(unit, docs).forms.get(kind.head_type))
     if errors:
         return _report(run, errors, new=True)
@@ -615,7 +621,7 @@ def _chosen_id(args: argparse.Namespace, unit: Unit, form: Form, lay: Layout) ->
 @_unit_named
 def add(args: argparse.Namespace, run: Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
-    docs = schema.load_schemas(*resources.schema_sources(run.info.package))
+    docs = schema.docs_for(run.info.package)
     lay = layout(unit, docs)
     form = _form(unit, lay, args.type)
     by, for_agent = _names(args, unit, form)
@@ -843,7 +849,7 @@ def _merged(record: dict, patch: dict, unsets: list[str], keep_null: bool) -> di
 @_unit_named
 def set_(args: argparse.Namespace, run: Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
-    docs = schema.load_schemas(*resources.schema_sources(run.info.package))
+    docs = schema.docs_for(run.info.package)
     lay = layout(unit, docs)
     for_agent = paths.check_agent(args.for_agent, "--for name") if args.for_agent is not None else None
     found = _locate(unit, lay, args.ref, for_agent)

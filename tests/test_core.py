@@ -18,9 +18,9 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 
 import sweep  # noqa: E402
-from better import SRC, run  # noqa: E402
+from better import SRC, call, run  # noqa: E402
 
-from better_ai import architect, cli, code, design, paths, research, resources, schema, show, skill  # noqa: E402  # noqa: E402
+from better_ai import _entry, architect, cli, code, design, paths, records, research, resources, schema, show, skill  # noqa: E402
 
 SKILLS = {
     "architect-better": architect.SKILL,
@@ -33,7 +33,7 @@ OLD = "2026-11-01T10:00:00Z"  # before the cutoff of a source run
 
 
 def stamp(minutes=0):
-    return (datetime.now(timezone.utc) + timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return (datetime.now(timezone.utc) + timedelta(minutes=minutes)).strftime(records.TIME)
 
 
 def jsonl(*records):
@@ -113,36 +113,26 @@ class Cli(unittest.TestCase):
             "busy": mock.Mock(side_effect=cli.Busy("the file changed; run it again")),
             "bug": mock.Mock(side_effect=KeyError("oops")),
         }
-        fake = [cli.Verb(name, "x", function) for name, function in calls.items()]
-        info = resources.BuildInfo("code-better", "code", "abc123", resources.DEFAULT_CUTOFF)
-        with (
-            mock.patch.object(cli, "VERBS", fake),
-            mock.patch.object(resources, "build_info", return_value=info),
-            contextlib.redirect_stderr(io.StringIO()),
-        ):
-            codes = {name: cli.main([name]) for name in calls}
+        with mock.patch.object(cli, "VERBS", [cli.Verb(name, "x", function) for name, function in calls.items()]):
+            codes = {name: call("code-better", name).returncode for name in calls}
         self.assertEqual(codes, {"ok": 0, "refused": 1, "slow": 3, "busy": 4, "bug": 5})
 
     def test_s30_an_internal_error_is_one_line_naming_the_skill_and_hash(self):
-        info = resources.BuildInfo("code-better", "code", "abc123", resources.DEFAULT_CUTOFF)
-
         def boom(args, run):
             raise ModuleNotFoundError("No module named 'gone'", name="gone")
 
-        err = mock.MagicMock()
-        with (
-            mock.patch.object(cli, "VERBS", [cli.Verb("boom", "x", boom)]),
-            mock.patch.object(resources, "build_info", return_value=info),
-            mock.patch.object(sys, "stderr", err),
-        ):
-            self.assertEqual(cli.main(["boom"]), 5)
-        line = "".join(call.args[0] for call in err.write.call_args_list if call.args).strip()
-        self.assertTrue(line.startswith("bug in better.pyz code-better abc123: ModuleNotFoundError"), line)
+        with mock.patch.object(cli, "VERBS", [cli.Verb("boom", "x", boom)]):
+            done = call("code-better", "boom")
+        self.assertEqual(done.returncode, 5)
+        line = done.stderr.strip()
+        self.assertTrue(line.startswith("bug in better.pyz code-better source: ModuleNotFoundError"), line)
         self.assertIn("(missing: gone)", line)
-        parent = cli._bug_line(
-            "code-better", "h1", ImportError("cannot import name 'schema' from 'better_ai'", name="better_ai")
-        )
-        self.assertNotIn("(missing: better_ai)", parent)
+        parent = io.StringIO()
+        with contextlib.redirect_stderr(parent):
+            _entry.report_bug(
+                "code-better", "h1", ImportError("cannot import name 'schema' from 'better_ai'", name="better_ai")
+            )
+        self.assertNotIn("(missing: better_ai)", parent.getvalue())
         self.assertTrue(line.endswith("set BETTER_AI_TRACEBACK=1 for the full trace"), line)
 
     def test_s30_an_import_error_in_the_package_is_still_the_bug_line_and_the_trace_comes_on_request(self):
@@ -206,15 +196,15 @@ class Cli(unittest.TestCase):
 
 class Resources(unittest.TestCase):
     def test_every_skill_loads_its_schemas_and_names_only_registered_hooks(self):
-        for name, one in sweep.cases(SKILLS.items()):
+        for name, one in SKILLS.items():
             with self.subTest(skill=name):
-                docs = schema.load_schemas(*resources.schema_sources(one.package))
+                docs = schema.docs_for(one.package)
                 self.assertIn("base.schema.json", docs)
                 self.assertIn("conversation.schema.json", docs)
 
     def test_a_skills_own_schema_replaces_a_shared_one_of_the_same_name(self):
-        shared = schema.load_schemas(*resources.schema_sources("code"))["decisions.schema.json"]
-        own = schema.load_schemas(*resources.schema_sources("architect"))["decisions.schema.json"]
+        shared = schema.docs_for("code")["decisions.schema.json"]
+        own = schema.docs_for("architect")["decisions.schema.json"]
         self.assertIn("raised_by", shared["required"])
         self.assertNotEqual(shared, own)
 
@@ -228,12 +218,25 @@ class Resources(unittest.TestCase):
                 self.assertTrue(kind.folder.startswith(one.root))
         self.assertEqual({k.kind for k in code.SKILL.kinds}, {"change", "audit"})
         self.assertEqual(code.SKILL.reserved(".code"), {"audit"})
+        # The tables that name the owner of a folder or head file, and the shared packages, are what the skills say.
+        listed = json.loads(resources.read_text("skills.json"))
+        self.assertEqual(
+            {n: s["package"] for n, s in listed["skills"].items()}, {n: s.package for n, s in SKILLS.items()}
+        )
+        self.assertEqual(skill.OWNER_BY_ROOT, {s.root: n for n, s in SKILLS.items()})
+        self.assertEqual(skill.OWNER_BY_HEAD, {k.head: n for n, s in SKILLS.items() for k in s.kinds})
+        self.assertEqual(cli.SHARED_PACKAGES, {f[len("better_ai/") : -1] for f in listed["shared"] if f.endswith("/")})
 
     def test_bundled_files_are_read_by_name(self):
         self.assertEqual(json.loads(resources.read_text("architect/kinds.json"))[0]["name"], "person")
         self.assertFalse(resources.exists("_build.json"))
         info = resources.build_info({"BETTER_AI_SKILL": "show-better"})
         self.assertEqual((info.skill, info.package, info.hash), ("show-better", "show", "source"))
+        # The cutoff is skills.json's, unless the environ given says another: never one that is written twice.
+        self.assertEqual(info.cutoff, json.loads(resources.read_text("skills.json"))["format_cutoff"])
+        pinned = {"BETTER_AI_SKILL": "show-better", "BETTER_AI_CUTOFF": "2026-01-01T00:00:00Z"}
+        self.assertEqual(resources.build_info(pinned).cutoff, "2026-01-01T00:00:00Z")
+        self.assertEqual(resources.cutoff({}), info.cutoff)
 
 
 class Units(Repo):
@@ -500,7 +503,7 @@ def combinations():
 
 class Decisions(Repo):
     def problems(self, record):
-        docs = schema.load_schemas(*resources.schema_sources("code"))
+        docs = schema.docs_for("code")
         return schema.validate_instance(record, docs["decisions.schema.json"], docs)
 
     def test_s48_every_status_requires_and_rejects_exactly_the_fields_of_the_table(self):
@@ -563,13 +566,13 @@ class Decisions(Repo):
                 self.assertEqual(result.returncode, 0 if ok else 1, result.stdout)
 
     def test_the_answer_event_type_is_in_the_shared_conversation_schema(self):
-        docs = schema.load_schemas(*resources.schema_sources("show"))
+        docs = schema.docs_for("show")
         self.assertEqual(schema.validate_instance(self.answer_event(), docs["conversation.schema.json"], docs), [])
         bad = self.answer_event(by="coordinator")
         self.assertTrue(schema.validate_instance(bad, docs["conversation.schema.json"], docs))
 
     def test_architect_better_keeps_its_own_decision_records(self):
-        docs = schema.load_schemas(*resources.schema_sources("architect"))
+        docs = schema.docs_for("architect")
         self.assertNotIn("raised_by", docs["decisions.schema.json"]["required"])
 
 
@@ -599,7 +602,7 @@ class Declarations(unittest.TestCase):
     def test_every_id_declaration_has_a_valid_shape_and_the_hooks_the_schemas_name_exist(self):
         for name, one in SKILLS.items():
             with self.subTest(skill=name):
-                docs = schema.load_schemas(*resources.schema_sources(one.package))
+                docs = schema.docs_for(one.package)
                 for rule in id_rules(docs):
                     self.assertTrue(
                         {"prefix"} <= set(rule) or {"prefix_by", "map"} <= set(rule) or rule == {"from": "caller"}

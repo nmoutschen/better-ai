@@ -34,10 +34,6 @@ class Skill:
         """The skill's own folder at the repository top level, such as ".code": every unit lives under it."""
         return self.kinds[0].folder.split("/")[0]
 
-    def kind_of(self, folder: str) -> UnitKind | None:
-        """The kind whose units live in `folder` (".code", ".code/audit"), or None."""
-        return next((k for k in self.kinds if k.folder == folder), None)
-
     def reserved(self, folder: str) -> set[str]:
         """Names a slug may not take in `folder` because another kind's folder is nested there: `audit` in `.code`."""
         prefix = folder + "/"
