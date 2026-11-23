@@ -395,6 +395,36 @@ class Rules(unittest.TestCase):
         self.assertIn("`named_sources`", flat(section(read(SKILL), "### Resume a discovery")))
         self.assertIn("re-reads each quote's web page, file or connector item", flat(read(DOCS)))
 
+    def test_no_page_or_record_text_reaches_a_shell_unquoted(self):
+        """L7: every URL, Location and path in a command is single-quoted, refused when it holds a quote, and pinned."""
+        verifier = read(AGENTS["quote-verifier"])
+        flat_verifier = flat(verifier)
+        self.assertIn("-o '<temp>/discover-verify/<idea>/<YOUR NAME>/<evidence id>.body' '<url>'`", verifier)
+        self.assertNotRegex(verifier, r"[^'](?:<url>|<path>|<host>)[^']")
+        for phrase in (
+            "PUT the URL, each Location and each path in single quotes in the command",
+            'a single quote or a control character, SET the evidence `not reachable` with the reason "address not plain", '
+            "and do not run the command",
+            "BEFORE each fetch, the first included, RESOLVE the host",
+            '"host not public"',
+            "--resolve '<host>:<port>:<address>'",
+            '"ref is a query"',
+            "equal to a named path or inside a named folder",
+        ):
+            self.assertIn(phrase, flat_verifier)
+
+    def test_round_6_records(self):
+        records = flat(read(RECORDS))
+        self.assertIn('"to": "<the skills you handed it to, such as /design-better and /architect-better>"', records)
+        self.assertIn("not confirmed by you", records)
+        self.assertIn("inside a named folder", records)
+        body = flat(steps(read(SKILL))[3][1])
+        self.assertIn(
+            "ONCE the user takes it, SET the evidence `counts` and ADD the change of state for each item it bears on",
+            body,
+        )
+        self.assertIn('SET it `unverified` with the reason "not confirmed by you"', body)
+
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
         for path in [*skill_texts(), DOCS]:
