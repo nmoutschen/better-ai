@@ -185,14 +185,15 @@ class Summary(Discovery):
 
     def test_S54_a_record_that_fails_its_schema_is_printed_around_and_the_last_line_names_the_file(self):
         self.compacted()
-        put(self.unit, "decisions.jsonl", [R.record(R.DECISION, status="open")])
+        decisions = [json.loads(x) for x in (self.unit / "decisions.jsonl").read_text().splitlines()]
+        put(self.unit, "decisions.jsonl", [*decisions, R.record(R.DECISION, id="D3", status="open")])
         done, lines = self.summary()
         self.assertEqual(done.returncode, 1)
         self.assertEqual(lines[0]["type"], "head")
         self.assertTrue([x for x in lines if x["type"] == "item"])
         self.assertEqual(lines[-1]["type"], "invalid")
         self.assertEqual(lines[-1]["files"], ["decisions.jsonl"])
-        self.assertIn("decisions.jsonl:1: status", lines[-1]["errors"][0])
+        self.assertIn("decisions.jsonl:3: status", lines[-1]["errors"][0])
 
     def test_S54_an_invalid_evidence_file_is_named_with_its_folder(self):
         self.evidence(R.record(R.COUNTING, sha256="short"))
@@ -336,7 +337,7 @@ class Warnings(Discovery):
         put(
             self.unit,
             "conversation.jsonl",
-            [R.event("choose", id="c1", at=ago(60)), R.event("choose", id="c2", at=ago(30))],
+            [R.event("choose", id="c1", at=ago(60)), R.event("choose", id="c2", at=ago(30)), status("c2")],
         )
         put(self.unit, "moves.jsonl", [R.record(R.MOVE, at=ago(10), answer={"type": "page", "event": "c2"})])
         self.warns("open-event-older", "c1")
@@ -344,7 +345,12 @@ class Warnings(Discovery):
         put(
             self.unit,
             "conversation.jsonl",
-            [R.event("choose", id="c1", at=ago(60)), status("c1"), R.event("choose", id="c2", at=ago(30))],
+            [
+                R.event("choose", id="c1", at=ago(60)),
+                status("c1"),
+                R.event("choose", id="c2", at=ago(30)),
+                status("c2"),
+            ],
         )
         self.quiet("open-event-older")
 
@@ -397,7 +403,7 @@ class Warnings(Discovery):
         put(
             self.unit,
             "decisions.jsonl",
-            [R.record(R.DECISION, asked="Is it true that a teammate on payments lost a week?")],
+            [R.record(R.DECISION, asked="Is it true that a teammate on payments lost a week.")],
         )
         self.warns("evidence-text-copied", "E-a1-1")
 

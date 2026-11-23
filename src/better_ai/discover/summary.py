@@ -459,8 +459,8 @@ def _check_step(unit: Unit, run: cli.Run) -> int:
 # ---------------------------------------------------------------- summary
 
 
-def _line(run: cli.Run, kind: str, **fields: Any) -> None:
-    run.out(json.dumps({"type": kind, **fields}, ensure_ascii=True))
+def _line(run: cli.Run, record_type: str, /, **fields: Any) -> None:
+    run.out(json.dumps({"type": record_type, **fields}, ensure_ascii=True))
 
 
 def _risks(view: derive.ItemView | None) -> dict:
