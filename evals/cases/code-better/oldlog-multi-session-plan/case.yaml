@@ -13,7 +13,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/plan.py" billing search mail auth exports
   files:
-    plan.py: checks/command_passes/plan.py
+    plan.py: ../_checks/plan.py
 - type: judge
   rubric: 'Rule: work that spans several sessions or people gets a plan with one task per step, a check per task, and a task
     marked done only after its check passes. Planted facts: services/ has five modules (billing, search, mail, auth, exports)

@@ -16,7 +16,7 @@ graders:
 - type: command_passes
   cmd: PYTHONPATH=. python "$GRADE_FILES/plan.py" sales stock staff suppliers returns payroll
   files:
-    plan.py: checks/command_passes_1/plan.py
+    plan.py: ../_checks/plan.py
 - type: command_passes
   cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
   files:

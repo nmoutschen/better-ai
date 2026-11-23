@@ -16,7 +16,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/no_code_no_after.py"
   files:
-    no_code_no_after.py: checks/no_code_no_after.py
+    no_code_no_after.py: ../_checks/no_code_no_after.py
 - type: judge
   rubric: 'Rule: ask about a requirement that contradicts a recorded decision, with the change you propose, and do not
     design to your own version until it is agreed. Planted facts: docs/adr/0003-sql-only-in-shop-modules.md, Status

@@ -18,7 +18,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/no_code_no_after.py"
   files:
-    no_code_no_after.py: checks/no_code_no_after.py
+    no_code_no_after.py: ../_checks/no_code_no_after.py
 - type: judge
   rubric: 'Rule: ask, in one message, every gap that changes what the system stores, who can reach what, what it costs
     to run, what users see when it fails or what is hard to undo, each with the outcome of each option; decide or mark as
