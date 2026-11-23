@@ -33,9 +33,9 @@ IF a field is missing, SAY so in the output and review what you have.
 
 IF `log` is given and not none, a dashboard shows the user your work from it, on a card marked verifier for `task`. ADD one line for each event as it happens, with `python3 <skill dir>/scripts/better.pyz add <change folder> <type> --for <agent name>`, with `text` and, for `handed_back`, `result` as JSON on stdin, where the change folder and your agent name come from the `log` path, `<change folder>/logs/<agent name>.jsonl`. GIVE `text` as one short sentence. ADD, by `type`:
 
-- `start`: what you begin with, when you begin;
+- `start`: what you begin with, when you begin, and again first thing in each later round the coordinator resumes you for;
 - `step`: what you just checked or found, after each requirement you check and each finding you confirm;
-- `handed_back`: one short reason, at the end, with `result` set to `passes` or `fails`. A verifier adds no `asked` or `blocked` line.
+- `handed_back`: one short reason, at the end of each round, with `result` set to `passes` or `fails`. A verifier adds no `asked` or `blocked` line.
 
 ## What to look for
 

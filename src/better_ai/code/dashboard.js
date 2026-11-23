@@ -59,18 +59,30 @@ const agentsOf = (t, d) => list(d && d.agents).filter(a => a && typeof a === "ob
 const mergedAt = t => isDone(t) ? sec(t.status_at) : null;
 const gitOf = (branch, d) => { const g = d && d.git && typeof d.git === "object" ? d.git[branch] : null; return g && typeof g === "object" ? g : null; };
 
-// The task's phases in time order: a build or verify per agent card, from the `at` of its first and hand-back log
-// lines, and a coordinator fix per fix record, which lasts until the next phase starts, the merge, or now.
+// An agent's log cut into its rounds: a round ends at a hand-back, and any line after one starts the next round, as
+// when the coordinator resumed the same agent instead of starting a new one.
+function roundsOfAgent(a) {
+  const out = [];
+  let cur = [];
+  for (const l of list(a.lines).filter(l => l && typeof l === "object")) {
+    cur.push(l);
+    if (l.type === "handed_back") { out.push(cur); cur = []; }
+  }
+  if (cur.length || !out.length) out.push(cur);
+  return out;
+}
+// The task's phases in time order: a build or verify per round of each agent card, from the `at` of its first and
+// hand-back log lines, and a coordinator fix per fix record, which lasts until the next phase starts, the merge, or now.
 function phasesOf(t, d) {
   const now = d.now, out = [];
-  for (const a of agentsOf(t, d)) {
-    const lines = list(a.lines).filter(l => l && typeof l === "object");
-    const start = sec(a.started) ?? sec((lines[0] || {}).at) ?? sec(a.at);
-    if (start === null) continue;
+  for (const a of agentsOf(t, d)) roundsOfAgent(a).forEach((lines, i) => {
+    // The first round starts when the agent started, which the lines the page holds may no longer show.
+    const start = i === 0 ? sec(a.started) ?? sec((lines[0] || {}).at) ?? sec(a.at) : lines.map(l => sec(l.at)).find(x => x !== null) ?? null;
+    if (start === null) return;
     const back = lines.find(l => l.type === "handed_back");
     out.push({kind: a.role === "verifier" ? "v" : "b", agent: str(a.name), branch: str(a.branch), start,
       end: back ? sec(back.at) : null, result: back ? str(back.result) : "", lines});
-  }
+  });
   for (const f of list(d.fixes)) {
     if (!f || f.task !== t.id || sec(f.at) === null) continue;
     out.push({kind: "f", start: sec(f.at), end: null, text: str(f.text), lines: []});
@@ -126,11 +138,12 @@ function statusOf(t, d) {
 const groupOf = (t, d) => isDone(t) ? "merged" : agentsOf(t, d).length ? "working" : "pending";
 const roundOf = (t, d) => { const p = phasesOf(t, d).at(-1); return p ? p.round : 1; };
 const failures = (t, d) => phasesOf(t, d).filter(p => p.kind === "v" && p.result === "fails" && p.end !== null);
-// The round record of a verify: the one naming its verifier; for a failed verify with none, the one of its round
+// The round record of a verify: the first naming its verifier that was added after the verify started, so a resumed
+// verifier's later round never takes its earlier round's record; for a failed verify with none, the one of its round
 // number that names no verifier of this task, so a verify never shows another verifier's findings.
 function roundRecord(t, p, d, byNumber = true) {
   const mine = list(d.rounds).filter(x => x && typeof x === "object" && x.task === t.id);
-  const own = mine.find(x => p.agent && x.verifier === p.agent);
+  const own = mine.find(x => p.agent && x.verifier === p.agent && (sec(x.at) ?? Infinity) >= p.start);
   if (own || !byNumber || p.result !== "fails") return own;
   const named = new Set(agentsOf(t, d).filter(a => a.role === "verifier").map(a => a.name));
   return mine.find(x => x.round === p.round && !named.has(x.verifier));
@@ -143,11 +156,13 @@ function lastChange(t, d) {
   return times.length ? Math.max(...times) : null;
 }
 
-// The range of the axis: it ends now and spans the chosen hours, or starts at the run's start when the run is shorter.
+// The range of the axis: it ends now and spans exactly the chosen hours, blank before the run's start when the run is
+// shorter; All spans the whole run, at least ten minutes.
 const HOURS = {"1h": 1, "2h": 2, "6h": 6};
 function rangeOf(d, range) {
-  const now = d.now, start = sec(d.start) ?? now;
-  let t0 = range in HOURS ? Math.max(start, now - HOURS[range] * 3600) : start;
+  const now = d.now;
+  if (range in HOURS) return [now - HOURS[range] * 3600, now];
+  let t0 = sec(d.start) ?? now;
   if (now - t0 < 600) t0 = now - 600;
   return [t0, now];
 }

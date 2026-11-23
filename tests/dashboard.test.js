@@ -300,10 +300,13 @@ test('no requirement text is drawn outside the pop-up, so a row stays one row wh
   assert.doesNotMatch(page, /seven|nine/);
 });
 
-test('the range ends now, starts at the run start when the run is shorter, and All spans the whole run', () => {
-  const d = fixture();
-  assert.deepEqual(TL.rangeOf(d, '1h'), [NOW - 3600, NOW]);
-  assert.deepEqual(TL.rangeOf(d, '2h'), [E('2026-11-23T09:30:00Z'), NOW]);
+test('each range spans exactly its hours and ends now, even past the run start; All spans the whole run', () => {
+  const d = fixture();  // a run of 88 minutes: longer than 1h, shorter than 2h and 6h
+  for (const [range, hours] of [['1h', 1], ['2h', 2], ['6h', 6]]) {
+    assert.deepEqual(TL.rangeOf(d, range), [NOW - hours * 3600, NOW], range);
+    // the drawn lane is that many minutes wide, so each choice draws a different axis
+    assert.match(TL.tablesHTML(d, range), new RegExp(`viewBox="0 0 ${(hours * 60).toFixed(3)} 28"`), range);
+  }
   assert.deepEqual(TL.rangeOf(d, 'all'), [E('2026-11-23T09:30:00Z'), NOW]);
   const long = fixture(); long.start = '2026-11-23T05:00:00Z';
   assert.deepEqual(TL.rangeOf(long, '2h'), [NOW - 7200, NOW]);
@@ -362,6 +365,52 @@ test("a failed round takes its number and findings from the round record that na
   assert.match(m, /✕ R1/);
   assert.match(m, /Empty export writes no header row/);
   assert.match(TL.popupHTML(d.tasks[0], d), /Verify, round 1: failed/);
+});
+
+// A builder the coordinator resumed for the next round keeps its card and its log: each round after a hand-back is a build of its own.
+const resumed = () => {
+  const d = fixture();
+  d.agents.splice(2, 1);  // no second builder: builder-t4 is resumed instead
+  d.agents[0].lines.push(line('start', '2026-11-23T10:36:00Z'), line('handed_back', '2026-11-23T10:50:00Z', { result: 'done' }));
+  return d;
+};
+test('a resumed builder shows a build for each round, from its card, the round record and its start and hand-back lines', () => {
+  const d = resumed();
+  const p = TL.phasesOf(d.tasks[0], d).map(x => [x.kind, x.round, x.agent, x.start, x.end]);
+  assert.deepEqual(p, [
+    ['b', 1, 'builder-t4', E('2026-11-23T09:52:00Z'), E('2026-11-23T10:20:00Z')],
+    ['v', 1, 'verifier-t4', E('2026-11-23T10:20:00Z'), E('2026-11-23T10:35:00Z')],
+    ['b', 2, 'builder-t4', E('2026-11-23T10:36:00Z'), E('2026-11-23T10:50:00Z')],
+  ]);
+  const heads = [...TL.popupHTML(d.tasks[0], d).matchAll(/class="section-h">([^<]+)</g)].map(m => m[1]);
+  assert.deepEqual(heads, ['Must make true', 'Build, round 2', 'Verify, round 1: failed', 'Build, round 1', 'Conversation']);
+  const [t0, t1] = TL.rangeOf(d, '2h');
+  assert.equal((TL.laneSVG(d.tasks[0], d, t0, t1).match(/fill="var\(--sand\)"/g) || []).length, 2);
+});
+
+test('a resumed builder that logs a step but no start still opens its next round, and an open round counts as building', () => {
+  const d = resumed();
+  d.agents[0].lines.splice(-2, 2, line('step', '2026-11-23T10:45:00Z', { text: 'added the header row' }));
+  const last = TL.phasesOf(d.tasks[0], d).at(-1);
+  assert.deepEqual([last.kind, last.round, last.start, last.end], ['b', 2, E('2026-11-23T10:45:00Z'), null]);
+});
+
+test("a later round whose first line has no time starts at its first line that has one", () => {
+  const d = resumed();
+  d.agents[0].lines.splice(-2, 1, { type: 'start', text: 'no time' });
+  const last = TL.phasesOf(d.tasks[0], d).at(-1);
+  assert.deepEqual([last.kind, last.start, last.end], ['b', E('2026-11-23T10:50:00Z'), E('2026-11-23T10:50:00Z')]);
+});
+
+test('a resumed verifier shows its own findings in each round, never those of its earlier round', () => {
+  const d = fixture();
+  d.agents[1].lines.push(line('start', '2026-11-23T10:51:00Z'), line('handed_back', '2026-11-23T10:55:00Z', { result: 'passes' }));
+  d.agents[2].lines.push(line('handed_back', '2026-11-23T10:50:00Z', { result: 'done' }));
+  const v = TL.phasesOf(d.tasks[0], d).filter(x => x.kind === 'v').map(x => [x.round, x.result]);
+  assert.deepEqual(v, [[1, 'fails'], [2, 'passes']]);
+  const pop = TL.popupHTML(d.tasks[0], d);
+  assert.match(pop, /Verify, round 2: passed/);
+  assert.equal((pop.match(/Empty export writes no header row/g) || []).length, 1);
 });
 
 test("a task's lane opens the task's pop-up, as its label does", () => {

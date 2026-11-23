@@ -239,3 +239,33 @@ class LongLogs(unittest.TestCase):
             steps = [log("step", "builder-t1", at=f"2026-11-21T10:{m:02d}:00Z") for m in range(1, 46)]
             write(folder, "logs/builder-t1.jsonl", [log("start", "builder-t1", at="2026-11-21T10:00:00Z"), *steps])
             self.assertEqual(load(folder)["agents"][0]["started"], "2026-11-21T10:00:00Z")
+
+    def test_a_resumed_agent_keeps_every_start_and_hand_back_past_40_lines(self):
+        # a builder resumed for round 2: the page draws one build per round from these lines, so none may be cut
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d), tasks=[task("T1", status="building")])
+            write(folder, "logs/builder-t1.card.json", [card("builder", "T1", at="2026-11-21T09:59:00Z")], as_json=True)
+            first = [log("step", "builder-t1", at=f"2026-11-21T10:{m:02d}:00Z") for m in range(1, 46)]
+            second = [log("step", "builder-t1", at=f"2026-11-21T11:{m:02d}:00Z") for m in range(1, 46)]
+            write(
+                folder,
+                "logs/builder-t1.jsonl",
+                [
+                    log("start", "builder-t1", at="2026-11-21T10:00:00Z"),
+                    *first,
+                    log("handed_back", "builder-t1", at="2026-11-21T10:50:00Z", result="done"),
+                    log("start", "builder-t1", at="2026-11-21T11:00:00Z"),
+                    *second,
+                ],
+            )
+            kept = [(line["type"], line["at"]) for line in load(folder)["agents"][0]["lines"]]
+            self.assertEqual(
+                [x for x in kept if x[0] != "step"],
+                [
+                    ("start", "2026-11-21T10:00:00Z"),
+                    ("handed_back", "2026-11-21T10:50:00Z"),
+                    ("start", "2026-11-21T11:00:00Z"),
+                ],
+            )
+            self.assertEqual(kept, sorted(kept, key=lambda x: x[1]))  # still in time order
+            self.assertEqual(sum(1 for x in kept if x[0] == "step"), 40)
