@@ -6,11 +6,12 @@ ADD each with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <yo
 - `kind` of a requirement is `functional`, `quality` or `constraint`. ADD one record per requirement, with the source it comes from.
 - Name a perspective with `--id <perspective id>` on the command.
 
-The head, type `architect`, one record given to `create`: the request word for word, and where it comes from.
+The head, type `architect`, one record given to `create`: the request word for word, and where it comes from. Once `design.md` exists, `document` gives its path from the repo root.
 
 {"type": "architect", "request": {"text": "<the request, verbatim>", "from": {"type": "chat"}}, "title": "<title>", "summary": "<summary, or an empty string>", "scope": "<scope, or an empty string>", "accepted": []}
 {"type": "architect", "request": {"text": "<the request, verbatim>", "from": {"type": "issue", "url": "<issue url>"}}, "title": "<title>", "summary": "<summary>", "scope": "<scope>", "accepted": ["requirements"]}
 {"type": "architect", "request": {"text": "<the request, verbatim>", "from": {"type": "file", "path": "<path of the file>"}}, "title": "<title>", "summary": "<summary>", "scope": "<scope>", "accepted": []}
+{"type": "architect", "request": {"text": "<the request, verbatim>", "from": {"type": "chat"}}, "title": "<title>", "summary": "<summary>", "scope": "<scope>", "accepted": ["requirements", "containers"], "document": {"file": "<path of design.md from the repo root>"}}
 
 The design, type `design`, one record: the containers and the flows, each flow with an `id`.
 
@@ -41,4 +42,4 @@ The decisions, type `decision`: one per decision.
 
 The reviews, type `review`: the `review` command adds them, never `add`:
 
-{"type": "review", "perspectives": ["<perspective id>"], "changed": ["box:<box id>"], "hashes": {"box:<box id>": "<SHA-256 of the part's JSON>"}, "labels": {"box:<box id>": "<label>"}}
+{"type": "review", "perspectives": ["<perspective id>"], "changed": ["box:<box id>"], "hashes": {"box:<box id>": "<SHA-256 of the part's JSON>"}, "labels": {"box:<box id>": "<label>"}, "texts": {"requirement:<requirement id>": "<SHA-256 of the requirement>", "section:<heading>": "<SHA-256 of the section of design.md>"}}

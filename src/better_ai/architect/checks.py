@@ -215,8 +215,9 @@ def _design_renders(record: dict, context: Context) -> list[tuple[str, str]]:
 @hook("source-file-exists")
 def _source_file_exists(record: dict, context: Context) -> list[tuple[str, str]]:
     """A `file` source of a requirement names a file of the repository the change folder is in (the nearest folder up
-    with a .git; the change folder itself if there is none), reached without leaving it, and never inside .git."""
-    path = record.get("file")
+    with a .git; the change folder itself if there is none), reached without leaving it, and never inside .git. The same
+    holds for the design document architect.json names."""
+    path = record.get("file") if isinstance(record, dict) else None
     if not isinstance(path, str) or not path:
         return []
     name = Path(path)
