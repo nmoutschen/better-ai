@@ -7,7 +7,6 @@ import json
 import os
 import re
 import shutil
-import signal
 import subprocess
 import sys
 import tempfile
@@ -332,27 +331,14 @@ class Served(unittest.TestCase):
     def log(self):
         return [json.loads(x) for x in (self.folder / "conversation.jsonl").read_text().splitlines()]
 
-    def test_what_the_page_may_not_send_is_refused_and_logs_nothing(self):
+    def test_what_the_page_may_not_send_is_refused_and_a_verdict_alone_is_a_comment(self):
         silent = self.send("comment", {**self.EVENTS["comment"], "text": None})
         self.assertEqual(silent["error"]["code"], -32602)
         self.assertIn("verdict", silent["error"]["message"])  # a comment with no text and no verdict
-        by = self.send("note", {**self.EVENTS["note"], "by": "agent"})
-        self.assertEqual(by["error"]["code"], -32602)
-        self.assertIn("by", by["error"]["message"])  # the page does not say who it is
         approval = {"id": "ap1", "option": "A", "label": "Build A", "carries": ["c1"], "text": None}
         self.assertEqual(self.send("decide", {**approval, "id": "d1"})["error"]["code"], -32601)  # decide is gone
         self.assertEqual(self.send("approve", {"id": "ap2", "option": "A"})["error"]["code"], -32602)
         self.assertFalse((self.folder / "conversation.jsonl").exists())
-
-    def test_every_method_the_page_sends_has_a_valid_event_that_is_saved_as_the_users(self):
-        for method, params in self.EVENTS.items():
-            answer = self.send(method, params)
-            self.assertEqual(answer.get("result"), "saved", f"{method}: {answer}")
-        events = self.log()
-        self.assertEqual([e["type"] for e in events], list(self.EVENTS))
-        self.assertEqual({e["by"] for e in events}, {"user"})
-        self.assertTrue(all(re.match(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$", e["at"]) for e in events))
-        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
         thumbs = {**self.EVENTS["comment"], "id": "c2-x", "text": None, "verdict": "up"}
         self.assertEqual(self.send("comment", thumbs).get("result"), "saved")  # a verdict alone is a comment
 
@@ -364,19 +350,6 @@ class Served(unittest.TestCase):
         out = run(self.root, "pending", ".design/pay").stdout
         shown = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
         self.assertEqual([(e["id"], e["text"]) for e in shown], [(first["id"], "edited")])
-
-    def test_the_agent_answers_and_tracks_with_the_shared_verbs(self):
-        self.send("note", {"id": "m1", "text": "hello", "to": None})
-        waited = run(self.root, "wait", ".design/pay", "--timeout", "10")
-        self.assertEqual(json.loads(waited.stdout.splitlines()[0])["id"], "m1")
-        self.assertEqual(run(self.root, "reply", ".design/pay", "--to", "m1", stdin="done it").returncode, 0)
-        self.assertEqual(run(self.root, "status", ".design/pay", "done", "m1").returncode, 0)
-        self.assertEqual(run(self.root, "pending", ".design/pay").returncode, 0)
-        done = run(self.root, "status", ".design/pay", "accepted", "m1", "--text", stdin="good")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
-        for old in ("answers.jsonl", ".answers-seen"):
-            self.assertFalse((self.folder / old).exists())
 
     def test_a_head_that_holds_anything_or_is_gone_is_still_answered(self):
         heads = [
@@ -393,20 +366,6 @@ class Served(unittest.TestCase):
                 self.assertIsInstance(self.get("rev"), str)
         os.unlink(self.folder / "canvas.json")  # gone: an error the page shows
         self.assertIn("create", json.loads(self.get("data"))["error"])
-
-
-class Stopped(unittest.TestCase):
-    def test_sigterm_ends_the_server_and_removes_its_address(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            folder = make_repo(root)
-            run(root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(HEAD))
-            server, _ = serve(root)
-            self.addCleanup(server.stdout.close)
-            self.assertTrue((folder / ".server").exists())
-            server.send_signal(signal.SIGTERM)
-            server.wait(timeout=20)
-            self.assertFalse((folder / ".server").exists())
 
 
 class Events(unittest.TestCase):

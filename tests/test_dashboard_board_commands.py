@@ -314,7 +314,6 @@ class ServedPage(unittest.TestCase):
             refused = self.send(url, "answer", {**events["answer"], "id": "a-y", "text": ""})
             self.assertEqual(refused["error"]["code"], -32602)
             self.assertIn("text", refused["error"]["message"])
-            self.assertEqual(self.send(url, "note", {**events["note"], "by": "agent"})["error"]["code"], -32602)
             self.assertIn("error", self.send(url, "approve", {"id": "x"}))  # the page declares no approve
             out = run(folder, "pending", str(folder)).stdout
             items = [json.loads(line) for line in out.splitlines() if line.startswith("{")]

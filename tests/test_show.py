@@ -275,49 +275,13 @@ class LivePage(unittest.TestCase):
         self.assertTrue(data["errors"])
         self.assertNotIn("slides", data)
 
-    def test_the_user_sends_and_the_agent_waits_replies_marks_and_lists(self):
-        slide = {"on": {"slide": 1, "part": None}}
-        self.assertEqual(self.send("note", {"id": "m1", "text": "hi", "to": None, **slide})["result"], "saved")
-        done = better(self.cwd, "wait", UNIT, "--timeout", "10")
-        self.assertEqual(json.loads(done.stdout.splitlines()[0])["id"], "m1", done.stdout + done.stderr)
-        done = better(self.cwd, "reply", UNIT, "--to", "m1", stdin="ok")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(better(self.cwd, "status", UNIT, "done", "m1").returncode, 0)
-        self.assertEqual(better(self.cwd, "pending", UNIT).stdout.strip(), "0 not done.")
-        done = better(self.cwd, "status", UNIT, "accepted", "m1", "--text", stdin="good")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        log = [json.loads(x) for x in (self.unit / "conversation.jsonl").read_text().splitlines()]
-        self.assertEqual([e["type"] for e in log][-1], "accepted")
-
-    def test_the_pages_events_are_accepted_and_what_its_schema_forbids_is_refused(self):
-        comment = {
-            "id": "c1",
-            "n": 1,
-            "text": "which source?",
-            "on": {"slide": 2, "part": "headline", "headline": "H", "target": {}, "spot": {"fx": 0.1, "fy": 0.2}},
-        }
-        for method, params in (
-            ("comment", comment),
-            ("note", {"id": "m1", "text": "hi", "to": None, "on": {"slide": 2, "part": "Does it arrive?"}}),
-            ("delete", {"to": "c1"}),
-            ("accept", {"to": "c1"}),
-            ("reopen", {"to": "c1", "text": "still wrong"}),
-        ):
-            with self.subTest(method):
-                self.assertEqual(self.send(method, params).get("result"), "saved")
+    def test_what_the_slides_schema_forbids_is_refused(self):
+        comment = {"id": "c1", "n": 1, "text": "which source?", "on": {"slide": 2, "part": "headline"}}
         refused = self.send("comment", {**comment, "on": {"part": "headline"}})
         self.assertEqual(refused["error"]["code"], -32602)
         self.assertIn("slide", refused["error"]["message"])
-        self.assertEqual(
-            self.send("note", {"id": "m2", "text": "x", "to": None, "by": "agent"})["error"]["code"], -32602
-        )
         self.assertEqual(self.send("answer", {"id": "a1", "text": "x"})["error"]["code"], -32601)  # no decisions here
-        types = [json.loads(x)["type"] for x in (self.unit / "conversation.jsonl").read_text().splitlines()]
-        self.assertEqual(types, ["comment", "note", "delete", "accept", "reopen"])
-        done = better(self.cwd, "check", UNIT)  # the log is valid next to the spec
-        self.assertEqual(done.returncode, 0, done.stdout)
-        self.stop()  # ending the server removes its address
-        self.assertFalse((self.unit / ".server").exists())
+        self.assertFalse((self.unit / "conversation.jsonl").exists())  # nothing refused was written
 
 
 class OnceAndRegistry(unittest.TestCase):

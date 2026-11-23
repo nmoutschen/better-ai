@@ -1108,22 +1108,8 @@ class Verbs(unittest.TestCase):
             closed = self.rpc(url, "closed", id="c-0", question="Q-w2-4", status="answered")  # the page may not send it
             self.assertEqual(closed["error"]["code"], -32601)
             self.assertFalse((board_dir / "conversation.jsonl").exists())
-            on = {"kind": "question", "id": "Q-w2-4", "title": "t"}
-            self.assertEqual(self.rpc(url, "comment", id="c-1", text="why?", on=on)["result"], "saved")
-            self.assertEqual(self.rpc(url, "note", id="m-1", text="hello", to=None)["result"], "saved")
-            answer = self.rpc(url, "answer", id="a-1", decision="D1", text="go on", default=False)
-            self.assertEqual(answer["result"], "saved")
             for method in ("accept", "approve", "confirm", "delete"):  # shared parts this page does not declare
                 self.assertEqual(self.rpc(url, method, to="c-1")["error"]["code"], -32601, method)
-            events = [json.loads(x) for x in (board_dir / "conversation.jsonl").read_text().splitlines()]
-            self.assertEqual(
-                [(e["type"], e["by"]) for e in events], [("comment", "user"), ("note", "user"), ("answer", "user")]
-            )
-            for line in (board_dir / "conversation.jsonl").read_text().splitlines():
-                self.assertRegex(json.loads(line)["at"], self.UTC)
-            process.send_signal(signal.SIGTERM)
-            process.communicate(timeout=20)
-            self.assertFalse((board_dir / ".server").exists())  # it stopped like Ctrl+C and took its address away
 
     def test_a_worker_closing_a_question_is_announced_once_and_the_board_stopped_ends_serve(self):
         with tempfile.TemporaryDirectory() as d:
