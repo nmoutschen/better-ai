@@ -3,8 +3,13 @@
 Run them from the repository root with the standard library only:
 
 ```
-python3 -I -m unittest discover tests
+python3 tests/run.py
 ```
+
+It runs each `tests/test_*.py` module as its own process, in parallel (`--jobs N`, default the number of CPUs), prints
+the whole output of each failing module, then one summary line and the five slowest modules, and exits 1 on any
+failure. Name modules to run only those (`python3 tests/run.py test_core`). `python3 -I -m unittest discover tests`
+still runs everything in one process, one module after the other.
 
 The exhaustive tests (every wrong value in every field, every exception in every function a command calls, and so on)
 run a sample of their cases by default, about one in ten, the same on every run, with at least one case of every class
@@ -12,7 +17,7 @@ the test tells apart. Pull requests run that sample. To run every case, as the s
 Thursdays:
 
 ```
-BETTER_AI_SWEEP=full python3 -I -m unittest discover tests
+BETTER_AI_SWEEP=full python3 tests/run.py
 ```
 
 A test picks its cases with `sweep.cases(items, key=...)` from `tests/sweep.py`; `key` gives an item's class.

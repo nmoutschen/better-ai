@@ -6,38 +6,38 @@ the dashboard must show every valid record next to the errors of the invalid one
 """
 
 import json
-import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import sweep  # noqa: E402
 import wrong_types  # noqa: E402
+from better import call  # noqa: E402
 from better import run as better  # noqa: E402
+from code_records import (  # noqa: E402
+    AT,
+    DOCS,
+    card,
+    change,
+    check,
+    check_record,
+    code,
+    load,
+    log,
+    spec,
+    task,
+    write,
+)
 
-from better_ai import paths, resources, schema  # noqa: E402
+from better_ai import paths, schema  # noqa: E402
 from better_ai.code import SKILL, dashboard  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCS = schema.load_schemas(*resources.schema_sources("code"))
 EXAMPLES = json.loads((Path(__file__).parent / "fixtures" / "code-better-examples.json").read_text())
-
-
-def check_record(record, names):
-    """The problems of one record against the named schemas of code-better, as (field, message)."""
-    found = []
-    for name in names:
-        found += [(p.field, p.message) for p in schema.validate_instance(record, DOCS[name], DOCS)]
-    return list(dict.fromkeys(found))
-
-
-def load(folder: Path) -> dict:
-    """What the dashboard shows of a change folder."""
-    return dashboard.load(paths.resolve_unit(str(folder), SKILL))
 
 
 # The spec page's file kinds, the schema each is checked against, and where the file sits in a change folder.
@@ -55,7 +55,6 @@ KINDS = {
     "audit/<date>/findings.jsonl": ("findings.schema.json", "audit/2026-11-21/findings.jsonl"),
 }
 AUDIT = ("audit.schema.json", "audit/2026-11-21/audit.json")
-AT = "2026-11-21T10:00:00Z"
 
 
 def examples(kind):
@@ -68,76 +67,6 @@ def audit_header():
         json.loads(e["line"]) for e in EXAMPLES["audit/<date>/findings.jsonl"] if e["title"].startswith("audit")
     ]
     return found
-
-
-def write(folder: Path, relative: str, records, as_json=False):
-    path = folder / relative
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if as_json:
-        path.write_text(json.dumps(records[0]) + "\n", encoding="utf-8")
-    else:
-        path.write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
-    return path
-
-
-def by_id(kind, wanted):
-    return [r for _, r in examples(kind) if r.get("id") in wanted]
-
-
-def spec(identity, statement="The upload service shall reject empty files.", **more):
-    record = {"type": "spec", "at": AT, "by": "coordinator", "id": identity, "statement": statement}
-    record["source"] = {"type": "request", "sentence": "empty uploads should fail loudly"}
-    record["checked_by"] = "code review"
-    return {**record, **more}
-
-
-def task(identity, **more):
-    record = {
-        "type": "task",
-        "at": AT,
-        "by": "coordinator",
-        "id": identity,
-        "task": "Reject empty uploads",
-        "mode": "feature",
-        "requirements": ["S1"],
-        "check": "uv run pytest",
-        "status": "todo",
-    }
-    return {**record, **more}
-
-
-def code(mode="coordinate", design=None):
-    design = design or {"type": "request", "text": "empty uploads should fail loudly"}
-    return {
-        "type": "code",
-        "at": AT,
-        "by": "coordinator",
-        "goal": "Uploads fail loudly",
-        "design": design,
-        "mode": mode,
-    }
-
-
-def card(role, task_id, **more):
-    return {"type": "card", "at": AT, "by": "coordinator", "role": role, "task": task_id, "branch": "b", **more}
-
-
-def log(kind, by, text="x", **more):
-    return {"type": kind, "at": AT, "by": by, "text": text, **more}
-
-
-def change(root: Path, mode="coordinate", tasks=None, specs=None, design=None) -> Path:
-    """A small valid change folder: code.json, one spec record, the given tasks."""
-    folder = root / ".code" / "c"
-    write(folder, "code.json", [code(mode, design)], as_json=True)
-    if specs is not False:
-        write(folder, "spec.jsonl", specs or [spec("S1")])
-    write(folder, "tasks.jsonl", tasks or [task("T1")])
-    return folder
-
-
-def check(folder: Path):
-    return schema.check_paths([folder], docs=DOCS)
 
 
 class Examples(unittest.TestCase):
@@ -403,7 +332,7 @@ class Dashboard(unittest.TestCase):
             errors = load(folder)["errors"]
             self.assertTrue(errors)
             self.assertEqual({e["file"] for e in errors}, {"lessons.jsonl"})
-            done = better("code-better", "check", str(folder), cwd=d)
+            done = call("code-better", "check", folder, cwd=d)
         self.assertEqual(done.returncode, 1)
         self.assertIn("lessons.jsonl", done.stdout)
 
@@ -425,6 +354,13 @@ class Dashboard(unittest.TestCase):
             data = load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]][:1], ["T1"])
         self.assertTrue(any(e["line"] == 2 for e in data["errors"]))
+        # A bug in the check is not a record's error: it stops the load.
+        with (
+            tempfile.TemporaryDirectory() as d,
+            mock.patch.object(schema, "check_text", side_effect=KeyError("x")),
+            self.assertRaises(KeyError),
+        ):
+            load(change(Path(d)))
 
     def test_the_dashboard_reads_each_file_it_shows(self):
         with tempfile.TemporaryDirectory() as d:
@@ -622,6 +558,16 @@ class Dashboard(unittest.TestCase):
         self.assertEqual([t["id"] for t in data["tasks"]], ["T1"])
         self.assertEqual(data["errors"], [])
 
+    def test_a_bug_in_the_loader_is_not_a_record_error(self):
+        """Only a file that cannot be read or parsed becomes an entry; anything else reaches the page's bug path."""
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d))
+            with (
+                mock.patch.object(dashboard.Reader, "records", side_effect=KeyError("bug")),
+                self.assertRaises(KeyError),
+            ):
+                load(folder)
+
     def test_the_audit_folder_is_not_the_changes(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
@@ -629,7 +575,7 @@ class Dashboard(unittest.TestCase):
             self.assertEqual(load(folder)["errors"], [])
 
 
-WRONG, RAW_LINES = wrong_types.WRONG, wrong_types.RAW_LINES
+RAW_LINES = wrong_types.RAW_LINES
 
 
 class WrongTypes(unittest.TestCase):
@@ -667,53 +613,45 @@ class WrongTypes(unittest.TestCase):
             "logs/b1.jsonl": ([log("start", "b1"), log("handed_back", "b1", result="done")], False),
         }
 
-    def variants(self, records):
-        return wrong_types.variants(records)
-
     def test_no_wrong_type_breaks_check_load_or_the_page(self):
-        node = shutil.which("node")
-        payloads = []
+        base = self.files()
+        files = {name: records for name, (records, _) in base.items()}
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / ".git").mkdir()
             folder = root / ".code" / "c"
-            base = self.files()
-            for relative, (records, as_json) in base.items():
-                write(folder, relative, records, as_json)
-            total = 0
-            for relative, (records, as_json) in base.items():
-                every = list(self.variants(records))
-                total += len(every)
-                for label, changed in sweep.cases(every, key=lambda v: wrong_types.wrong_kind(v[0])):
-                    name = f"{relative}: {label}"
-                    with self.subTest(name):
-                        write(folder, relative, changed, as_json)
-                        data = load(folder)
-                        json.dumps(data, allow_nan=False)
-                        for error in schema.check_paths([folder], docs=DOCS):  # `check` does not raise either
-                            str(error)
-                        payloads.append({"label": name, "data": data})
-                write(folder, relative, records, as_json)
-            pairs = [(relative, raw) for relative in base for raw in RAW_LINES]
-            picked = sweep.cases(pairs, key=lambda pair: pair[1])  # each raw line once, across the files
-            for relative, (records, as_json) in base.items():
-                total += len(RAW_LINES)
-                for raw in [raw for name, raw in picked if name == relative]:
-                    with self.subTest(f"{relative}: raw {raw[:10]}"):
-                        path = folder / relative
-                        path.write_text(raw + "\n" + ("" if as_json else path.read_text()), encoding="utf-8")
-                        data = load(folder)
-                        json.dumps(data, allow_nan=False)
-                        payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": data})
-                write(folder, relative, records, as_json)
+
+            def put(name, records):
+                write(folder, name, records, base[name][1])
+
+            for name, records in files.items():
+                put(name, records)
+            unit = paths.resolve_unit(str(folder), SKILL)  # once: the folder stays where it is
+
+            def survives(label):
+                data = load(folder, unit)
+                json.dumps(data, allow_nan=False)
+                for error in schema.check_paths([folder], docs=DOCS):  # `check` does not raise either
+                    str(error)
+                return data
+
+            # What git says of a branch does not depend on the card's types: only the card's own fields are fuzzed here.
+            with (
+                mock.patch.object(dashboard.activity, "worktrees", return_value={}),
+                mock.patch.object(dashboard.activity, "branch_activity", return_value=None),
+            ):
+                payloads, total = wrong_types.fuzz(self, files, put, survives)
+                pairs = [(name, raw) for name in files for raw in RAW_LINES]
+                picked = sweep.cases(pairs, key=lambda pair: pair[1])  # each raw line once, across the files
+                total += len(pairs)
+                for name, raw in picked:
+                    with self.subTest(f"{name}: raw {raw[:10]}"):
+                        path = folder / name
+                        path.write_text(raw + "\n" + ("" if base[name][1] else path.read_text()), encoding="utf-8")
+                        payloads.append({"label": f"{name}: raw {raw[:10]}", "data": survives(raw)})
+                        put(name, files[name])
             self.assertGreater(total, 1000)
-            if node:
-                path = root / "payloads.json"
-                path.write_text(json.dumps(payloads))
-                run = subprocess.run(
-                    [node, str(ROOT / "tests" / "render-payloads.js"), str(path)], capture_output=True, text=True
-                )
-                self.assertEqual(run.returncode, 0, run.stderr[:3000])
+        wrong_types.render("render-payloads.js", payloads, self)
 
     def test_an_invalid_record_shows_without_the_fields_that_failed(self):
         with tempfile.TemporaryDirectory() as d:
@@ -833,7 +771,7 @@ class LoneSurrogates(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             write(folder, "tasks.jsonl", [task("T1", task="a\ud800b")])
-            done = better("code-better", "check", str(folder), cwd=d)
+            done = call("code-better", "check", folder, cwd=d)
         self.assertEqual(done.returncode, 1, done.stderr)
         self.assertNotIn("Traceback", done.stderr)
         self.assertRegex(done.stdout, r"non-text|ud800")
@@ -891,20 +829,27 @@ class LessonsWrongTypes(unittest.TestCase):
     """Every field of lessons.jsonl given each wrong value, raw lines, NaN, 50,000-deep nesting and bad UTF-8: `load`
     lists the file's errors and nothing else, `check` exits 1 without a traceback, and the page draws the payload."""
 
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.folder = change(Path(cls.tmp.name))
+        cls.unit = paths.resolve_unit(str(cls.folder), SKILL)  # once: every case rewrites the one file
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
     def run_all(self, text):
-        """(load result, exit code of check) for a lessons.jsonl holding `text`, a str or bytes."""
-        with tempfile.TemporaryDirectory() as d:
-            folder = change(Path(d))
-            path = folder / "lessons.jsonl"
-            path.write_bytes(text if isinstance(text, bytes) else text.encode("utf-8"))
-            data = load(folder)
-            json.dumps(data, allow_nan=False)
-            done = better("code-better", "check", str(folder), cwd=d)
-            self.assertNotEqual(done.returncode, 5, done.stderr)
-            self.assertNotIn("Traceback", done.stderr)
-            lessons = [(e["line"], e["field"]) for e in data["errors"] if e["file"] == "lessons.jsonl"]
-            self.assertEqual([e for e in data["errors"] if e["file"] != "lessons.jsonl"], [])
-            return data, lessons, done.returncode, done.stdout
+        """(load result, lessons errors, exit code of check, its output) for a lessons.jsonl holding `text`, str or bytes."""
+        (self.folder / "lessons.jsonl").write_bytes(text if isinstance(text, bytes) else text.encode("utf-8"))
+        data = load(self.folder, self.unit)
+        json.dumps(data, allow_nan=False)
+        done = call("code-better", "check", self.folder, cwd=self.tmp.name)
+        self.assertNotEqual(done.returncode, 5, done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
+        lessons = [(e["line"], e["field"]) for e in data["errors"] if e["file"] == "lessons.jsonl"]
+        self.assertEqual([e for e in data["errors"] if e["file"] != "lessons.jsonl"], [])
+        return data, lessons, done.returncode, done.stdout
 
     def test_a_valid_lesson_is_clean(self):
         _, lessons, code_, out = self.run_all(json.dumps(GOOD_LESSON) + "\n")
@@ -941,7 +886,8 @@ class LessonsWrongTypes(unittest.TestCase):
         for field in GOOD_LESSON:
             with self.subTest(field):
                 record = {k: v for k, v in GOOD_LESSON.items() if k != field}
-                self.assertTrue(self.run_all(json.dumps(record) + "\n")[1])
+                _, lessons, _, _ = self.run_all(json.dumps(record) + "\n")
+                self.assertEqual([f for _, f in lessons], [field])
 
     def test_the_same_id_twice_is_an_error_on_the_second_line(self):
         _, lessons, _, _ = self.run_all((json.dumps(GOOD_LESSON) + "\n") * 2)
@@ -974,31 +920,25 @@ class LessonsWrongTypes(unittest.TestCase):
         self.assertEqual(code_, 1)
 
     def test_every_payload_is_drawn_by_the_page(self):
-        node = shutil.which("node")
-        if not node:
-            self.skipTest("node is not installed")
-        payloads = []
-        for label, changed in wrong_types.variants([GOOD_LESSON]):
-            data, *_ = self.run_all(json.dumps(changed[0]) + "\n")
-            payloads.append({"label": label, "data": data})
-        self.assertGreater(len(payloads), 100)
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "payloads.json"
-            path.write_text(json.dumps(payloads))
-            run = subprocess.run(
-                [node, str(ROOT / "tests" / "render-payloads.js"), str(path)], capture_output=True, text=True
-            )
-        self.assertEqual(run.returncode, 0, run.stderr[:3000])
+        def put(name, records):
+            (self.folder / name).write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
+
+        def survives(label):
+            return self.run_all((self.folder / "lessons.jsonl").read_bytes())[0]
+
+        payloads, total = wrong_types.fuzz(self, {"lessons.jsonl": [GOOD_LESSON]}, put, survives)
+        self.assertGreater(total, 100)
+        wrong_types.render("render-payloads.js", payloads, self)
 
 
 class Check(unittest.TestCase):
-    def run_check(self, folder):
-        return better("code-better", "check", str(folder), cwd=folder.parent.parent.parent)
+    def run_check(self, folder, run=call):
+        return run("code-better", "check", folder, cwd=folder.parent.parent.parent)
 
     def test_check_exits_one_on_a_bad_folder_and_zero_on_a_good_one(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
-            good = self.run_check(folder)
+            good = self.run_check(folder, better)  # the one run of `check` in its own process
             self.assertEqual((good.returncode, good.stdout), (0, ""))
             with (folder / "tasks.jsonl").open("a") as f:
                 f.write(json.dumps(task("T2", status="in review")) + "\n")

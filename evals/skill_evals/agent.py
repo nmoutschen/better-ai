@@ -48,24 +48,36 @@ SKILL_TOOL = "Skill"
 # `claude -p` stays open while a shell it started in the background still runs, such as a skill's live page server,
 # even after it printed its final `result` event. End it once that event is out, so such a run ends when the agent's
 # turn ends, not at the timeout. The quotes inside a JSON string are escaped, so only the top-level event matches.
-# The run ends only while that event is still the last line 10 seconds later: a background task that finishes may
-# start another turn, which prints more events and a new result.
+# The run ends only while that event is still the last line `quiet` seconds later (10 in a real run): a background
+# task that finishes may start another turn, which prints more events and a new result. The output is checked every
+# `poll` seconds (2); the process gets `grace` seconds (5) after SIGTERM before SIGKILL, and the wait ends once it is gone.
 END_AFTER_RESULT = """{run} &
 pid=$!
+killer=
 while kill -0 $pid 2>/dev/null; do
     if tail -n 1 {out} 2>/dev/null | grep -q '"type":"result"'; then
-        sleep 10
+        sleep {quiet}
         if tail -n 1 {out} | grep -q '"type":"result"'; then
             kill -TERM $pid 2>/dev/null || true
-            sleep 5
-            kill -KILL $pid 2>/dev/null || true
+            (sleep {grace}; kill -KILL $pid) >/dev/null 2>&1 &
+            killer=$!
             break
         fi
     fi
-    sleep 2
+    sleep {poll}
 done
 wait $pid
+status=$?
+if [ -n "$killer" ]; then kill $killer 2>/dev/null || true; fi
+exit $status
 """
+
+
+def end_after_result(run: str, out: str, *, quiet: float = 10, poll: float = 2, grace: float = 5) -> str:
+    """Return the shell script that runs `run`, which writes `out`, and ends it once its result event is out."""
+    return END_AFTER_RESULT.format(run=run, out=out, quiet=quiet, poll=poll, grace=grace)
+
+
 START_SCRIPT = """
 commit() {
     git add -f -A
@@ -176,7 +188,7 @@ async def claude_cli(
     # A command sent to the background reads /dev/null, so a run with input (the judge) stays in the foreground.
     script = f'run-claude "$@" > {out}.out 2> {out}.err'
     if stdin is None:
-        script = END_AFTER_RESULT.format(run=script + " < /dev/null", out=f"{out}.out")
+        script = end_after_result(script + " < /dev/null", f"{out}.out")
     timed_out = False
     try:
         await sandbox_env.exec(
@@ -270,35 +282,42 @@ def claude_code(model: str = "sonnet", timeout: int = 1800) -> Solver:
     return solve
 
 
-async def play_action(
-    sandbox_env: SandboxEnvironment, number: int, action: dict[str, Any]
-) -> tuple[dict[str, Any], str, bool]:
-    """Carry out one scripted action as the agent user; return its tool_use block, output and error flag."""
+def action_call(action: dict[str, Any], workdir: str | None = None) -> tuple[str, dict[str, Any]]:
+    """Map a replay action (`write`, `read` or `bash`) to the tool name and arguments the agent would call it with."""
+    prefix = f"{workdir}/" if workdir else ""
     if "write" in action:
-        path, content = f"{WORKDIR}/{action['write']}", action["content"]
-        script = 'mkdir -p "$(dirname "$1")" && cat > "$1"'
-        await run_checked(sandbox_env, ["sh", "-c", script, "sh", path], input=content, user=AGENT_USER)
-        return (
-            tool_use_block(number, WRITE_TOOL, {"file_path": path, "content": content}),
-            f"File created at: {path}",
-            False,
-        )
+        return WRITE_TOOL, {"file_path": prefix + action["write"], "content": action["content"]}
     if "read" in action:
-        path = f"{WORKDIR}/{action['read']}"
-        result = await sandbox_env.exec(["cat", path], user=AGENT_USER)
+        return READ_TOOL, {"file_path": prefix + action["read"]}
+    return SHELL_TOOL, {"command": action["bash"]}
+
+
+async def play_action(
+    sandbox_env: SandboxEnvironment, action: dict[str, Any], *, workdir: str | None = None, user: str | None = None
+) -> tuple[str, bool]:
+    """Carry out one replay action in the sandbox, in `workdir` and as `user`; return its output and error flag."""
+    tool, arguments = action_call(action, workdir)
+    options: dict[str, Any] = {"cwd": workdir, "user": user}
+    if tool == WRITE_TOOL:
+        script = 'mkdir -p "$(dirname "$1")" && cat > "$1"'
+        await run_checked(
+            sandbox_env, ["sh", "-c", script, "sh", arguments["file_path"]], input=arguments["content"], **options
+        )
+        return f"File created at: {arguments['file_path']}", False
+    if tool == READ_TOOL:
+        result = await sandbox_env.exec(["cat", arguments["file_path"]], **options)
         lines = result.stdout.splitlines()
         text = (
             "".join(f"{line_number:6}\t{line}\n" for line_number, line in enumerate(lines, 1))
             if result.success
             else result.stderr
         )
-        return tool_use_block(number, READ_TOOL, {"file_path": path}), text, not result.success
-    command = action["bash"]
-    result = await sandbox_env.exec(["bash", "-c", command], cwd=WORKDIR, user=AGENT_USER, timeout=120)
+        return text, not result.success
+    result = await sandbox_env.exec(["bash", "-c", arguments["command"]], timeout=120, **options)
     output = (result.stdout + result.stderr).strip()
     if not result.success:
         output = f"Exit code {result.returncode}\n{output}"
-    return tool_use_block(number, SHELL_TOOL, {"command": command}), output, not result.success
+    return output, not result.success
 
 
 def tool_use_block(number: int, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -315,7 +334,8 @@ def fake_agent() -> Solver:
         scripted = state.metadata.get("scripted_run") or {}
         events: list[dict[str, Any]] = [{"type": "system", "subtype": "init", "model": "fake", "skills": []}]
         for number, action in enumerate(scripted.get("actions") or []):
-            block, output, error = await play_action(sandbox_env, number, action)
+            output, error = await play_action(sandbox_env, action, workdir=WORKDIR, user=AGENT_USER)
+            block = tool_use_block(number, *action_call(action, WORKDIR))
             content = [block]
             events.append({"type": "assistant", "message": {"id": f"msg_{number}", "content": content}})
             result = {"type": "tool_result", "tool_use_id": block["id"], "content": output, "is_error": error}

@@ -38,13 +38,25 @@ def git(cwd: Path, *args: str) -> None:
     subprocess.run(cmd, cwd=cwd, check=True, capture_output=True)
 
 
-def run_step(pyz: Path, step: dict, cwd: Path, fixture: Path, repo: Path) -> str | None:
-    """Run one fixture step; return what went wrong, or None."""
-    step_args = [a.replace("{repo}", str(repo)) for a in step["args"]]
-    args = [sys.executable, "-I", str(pyz), *step_args]
+def step_input(step: dict, fixture: Path, repo: Path) -> tuple[list[str], str | None]:
+    """A fixture step's arguments, with `{repo}` filled in, and its stdin."""
     stdin = step.get("stdin")
     if "stdin_file" in step:
         stdin = (fixture / step["stdin_file"]).read_text()
+    return [a.replace("{repo}", str(repo)) for a in step["args"]], stdin
+
+
+def place_repo_files(spec: dict, fixture: Path, repo: Path) -> None:
+    """Copy the fixture's `repo_files` into the repository."""
+    for target, source in (spec.get("repo_files") or {}).items():
+        (repo / target).parent.mkdir(parents=True, exist_ok=True)
+        (repo / target).write_bytes((fixture / source).read_bytes())
+
+
+def run_step(pyz: Path, step: dict, cwd: Path, fixture: Path, repo: Path) -> str | None:
+    """Run one fixture step; return what went wrong, or None."""
+    step_args, stdin = step_input(step, fixture, repo)
+    args = [sys.executable, "-I", str(pyz), *step_args]
     label = " ".join(step_args)
     if step.get("serve"):
         return run_serve(args, cwd, label)
@@ -126,9 +138,7 @@ def smoke_skill(skill: str, skills: Path, fixtures: Path) -> list[str]:
         repo = Path(scratch) / "repo"
         repo.mkdir()
         git(repo, "init", "-q", "-b", "main")
-        for target, source in (spec.get("repo_files") or {}).items():
-            (repo / target).parent.mkdir(parents=True, exist_ok=True)
-            (repo / target).write_bytes((fixture / source).read_bytes())
+        place_repo_files(spec, fixture, repo)
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "--allow-empty", "-m", "start")
         for step in spec.get("steps", []):

@@ -19,145 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pyz  # noqa: E402
-
-ROOT = Path(__file__).resolve().parent.parent
-BUILD = ROOT / "tools" / "build.py"
-PY310 = os.environ.get(
-    "BETTER_AI_PYTHON310", "/Users/ninou/.local/share/uv/python/cpython-3.10-macos-aarch64-none/bin/python3.10"
-)
-
-ENTRY = """import json
-import sys
-import zipfile
-
-
-def main():
-    info = json.loads(zipfile.ZipFile(sys.argv[0]).read("better_ai/_build.json"))
-    print("better.pyz", info["skill"], info["hash"])
-
-
-main()
-"""
-
-
-SNAPSHOTS = ROOT / "tests" / "fixtures" / "build-schemas"
-
-
-def snapshot(name):
-    """A schema copied from the real tree (tests/fixtures/build-schemas), as a dict to change and write."""
-    return json.loads((SNAPSHOTS / name).read_text())
-
-
-def snapshot_text(name):
-    return (SNAPSHOTS / name).read_text()
-
-
-ALPHA_INIT = '''"""alpha, shaped like code-better: a change and an audit."""
-
-from ..skill import Skill, UnitKind
-
-SKILL = Skill(
-    name="alpha-better",
-    package="alpha",
-    kinds=(
-        UnitKind(kind="change", folder=".alpha", head="code.json", head_type="code", folders=("logs",)),
-        UnitKind(kind="audit", folder=".alpha/audit", head="audit.json", head_type="audit"),
-    ),
-    exclude=".alpha/",
-)
-'''
-
-BETA_INIT = '''"""beta, shaped like research-better: one kind of unit."""
-
-from ..skill import Skill, UnitKind
-
-SKILL = Skill(
-    name="beta-better",
-    package="beta",
-    kinds=(UnitKind(kind="board", folder=".beta", head="brief.json", head_type="brief"),),
-    exclude=".beta/",
-)
-'''
-
-
-def fixture_files():
-    """The fixture source tree: {path under src/: text}. The schemas are copies of real ones (decisions, code's
-    code, tasks, progress, next-steps and audit, research's claims) and the packages declare their unit kinds the way
-    the real ones do."""
-    files = {
-        "skills.json": json.dumps(
-            {
-                "format_cutoff": "2026-11-22T00:00:00Z",
-                "shared": [
-                    "better_ai/__init__.py",
-                    "better_ai/cli.py",
-                    "better_ai/skill.py",
-                    "better_ai/_entry.py",
-                    "better_ai/schemas/",
-                    "better_ai/page/",
-                ],
-                "skills": {"alpha-better": {"package": "alpha"}, "beta-better": {"package": "beta"}},
-            }
-        ),
-        "__init__.py": "",
-        "_entry.py": ENTRY,
-        "cli.py": "import json\nimport os.path\nfrom better_ai import page\nfrom . import _entry\nfrom .skill import Skill\n",
-        "skill.py": snapshot_text("skill.py.txt"),
-        "page/__init__.py": "",
-        "page/page.js": "export const a = 1;\n",
-        "schemas/base.schema.json": snapshot_text("base.schema.json"),
-        "schemas/decisions.schema.json": snapshot_text("decisions.schema.json"),
-        "alpha/__init__.py": ALPHA_INIT,
-        "beta/__init__.py": BETA_INIT,
-    }
-    for name in ["code", "tasks", "progress", "next-steps", "audit"]:
-        files[f"alpha/schemas/{name}.schema.json"] = snapshot_text(f"{name}.schema.json")
-    files["beta/schemas/claims.schema.json"] = snapshot_text("claims.schema.json")
-    return {f"better_ai/{k}": v for k, v in files.items()}
-
-
-def git(repo, *args):
-    cmd = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com", *args]
-    return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
-
-
-class Fixture:
-    """A fixture repository: tools/build.py, src/ and a git history; `tmp` is the folder it lives in."""
-
-    def __init__(self, tmp: Path):
-        self.root = tmp / "repo"
-        self.root.mkdir()
-        (self.root / "tools").mkdir()
-        shutil.copy(BUILD, self.root / "tools" / "build.py")
-        git(self.root, "init", "-q", "-b", "main")
-        for name, text in fixture_files().items():
-            self.write(f"src/{name}", text)
-
-    def write(self, rel, text, tracked=True):
-        """Write a file; one under src/ is staged, as a maintainer's would be (the build reads tracked files)."""
-        path = self.root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
-        if tracked and rel.startswith("src/"):
-            git(self.root, "add", "-f", rel)
-
-    def run(self, *args, env=None, python=None):
-        cmd = [python or pyz.build_python(), "-I", str(self.root / "tools" / "build.py"), *args]
-        merged = {**os.environ, **(env or {})}
-        return subprocess.run(cmd, capture_output=True, text=True, cwd=self.root, env=merged)
-
-    def build(self):
-        result = self.run()
-        assert result.returncode == 0, result.stderr
-        return result
-
-    def commit(self, message="c"):
-        git(self.root, "add", "-A")
-        git(self.root, "commit", "-q", "-m", message)
-        return git(self.root, "rev-parse", "HEAD")
-
-    def pyz(self, skill):
-        return self.root / "skills" / skill / "scripts" / "better.pyz"
+from build_fixture import ALPHA_INIT, BETA_INIT, BUILD, ROOT, Fixture, fixture_files, git, snapshot, snapshot_text  # noqa: E402
 
 
 class BuildTestCase(unittest.TestCase):
@@ -251,9 +113,9 @@ class TestBuild(BuildTestCase):
                 self.assertEqual(mode, 0o755 if info.is_dir() else 0o644, info.filename)
 
     def test_older_python_is_refused_with_exit_2_naming_the_minimum(self):
-        if not Path(PY310).exists():
-            self.skipTest("no Python 3.10 at BETTER_AI_PYTHON310")
-        result = self.repo.run(python=PY310)
+        if not pyz.PY310:
+            self.skipTest("no Python 3.10; set BETTER_AI_PYTHON310")
+        result = self.repo.run(python=pyz.PY310)
         self.assertEqual(result.returncode, 2)
         self.assertIn("3.12", result.stderr)
         self.assertFalse((self.repo.root / "skills").exists())
@@ -261,7 +123,7 @@ class TestBuild(BuildTestCase):
     def test_the_pyz_runs_with_python_dash_i_from_a_copy_of_its_skill_folder_alone(self):
         # S67: built on 3.12+, run on every Python we have
         self.repo.build()
-        interpreters = list(dict.fromkeys([sys.executable, *([PY310] if Path(PY310).exists() else [])]))
+        interpreters = list(dict.fromkeys([sys.executable, *([pyz.PY310] if pyz.PY310 else [])]))
         for python in interpreters:
             copy = self.tmp / "copy" / str(interpreters.index(python))
             shutil.copytree(self.repo.root / "skills" / "alpha-better", copy)
@@ -553,7 +415,7 @@ class TestUnitKindInvariants(BuildTestCase):
             self.assertIn(subject_part, line)
 
     def test_a_type_in_two_files_of_one_unit_kind_is_refused(self):
-        # today's code-better `step`: in a log and in next-steps
+        # the fixture's `step` is in a log and in next-steps
         self.repo.write("src/better_ai/alpha/schemas/log.schema.json", snapshot_text("log.schema.json"))
         self.expect("duplicate type", "alpha-better/change: step")
         self.assertFalse((self.repo.root / "skills").exists())
@@ -565,7 +427,7 @@ class TestUnitKindInvariants(BuildTestCase):
         self.expect("duplicate type", "alpha-better/change: task")
 
     def test_two_types_sharing_an_id_prefix_in_different_files_are_refused(self):
-        # x-id sits on the `id` property, as in the real schemas; next-steps takes tasks' prefix
+        # x-id sits on the `id` property, as the real schemas have it; next-steps takes tasks' prefix
         steps = snapshot("next-steps.schema.json")
         steps["properties"]["id"]["x-id"] = {"prefix": "T"}
         self.repo.write("src/better_ai/alpha/schemas/next-steps.schema.json", json.dumps(steps))

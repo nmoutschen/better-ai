@@ -1,24 +1,49 @@
 """Tests for tools/report.py: the pass-rate table, the sample lines and judge agreement."""
 
 import math
+import random
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
 from tools import report
 
 
+def result(**fields: Any) -> report.SampleResult:
+    """One run of sample a-skill (case a, rule 1.1, passed) with the given fields changed."""
+    return report.SampleResult(
+        **{"sample_id": "a-skill", "case": "a", "condition": "skill", "rule": "1.1", "passed": 1.0, **fields}
+    )
+
+
+def verdict(passed: bool | None, **fields: Any) -> dict[str, Any]:
+    """The judges field of a run whose judge gave this verdict."""
+    return {"judge": {"verdict": passed, **fields}}
+
+
 def rows() -> list[report.SampleResult]:
     """Three samples over two rules and two conditions, one of them errored."""
     return [
-        report.SampleResult(
-            "a-no-skill", "a", "no-skill", "1.1", 1, {"input_tokens": 5}, 0.5, 0.1, 30, {"judge": {"verdict": True}}
+        result(
+            sample_id="a-no-skill",
+            condition="no-skill",
+            tokens={"input_tokens": 5},
+            cost=0.5,
+            judge_cost=0.1,
+            seconds=30,
+            judges=verdict(True),
         ),
-        report.SampleResult(
-            "a-skill", "a", "skill", "1.1", 0, {"input_tokens": 7}, 0.7, 0.1, 40, {"judge": {"verdict": False}}
+        result(passed=0, tokens={"input_tokens": 7}, cost=0.7, judge_cost=0.1, seconds=40, judges=verdict(False)),
+        result(
+            sample_id="b-no-skill",
+            case="b",
+            condition="no-skill",
+            rule="invocation",
+            passed=math.nan,
+            error="RuntimeError: 429",
         ),
-        report.SampleResult("b-no-skill", "b", "no-skill", "invocation", math.nan, error="RuntimeError: 429"),
     ]
 
 
@@ -57,41 +82,27 @@ def test_bad_label(tmp_path: Path) -> None:
 
 def test_holm_adjusted_keeps_order_and_is_monotone() -> None:
     """Holm's correction multiplies the smallest p-value by the number of tests and never decreases."""
-    from tools.report import holm_adjusted
-
-    assert holm_adjusted([0.01, 0.04, 0.03]) == pytest.approx([0.03, 0.06, 0.06])
+    assert report.holm_adjusted([0.01, 0.04, 0.03]) == pytest.approx([0.03, 0.06, 0.06])
 
 
 def test_sign_flip_p_value_separates_a_clear_effect_from_none() -> None:
     """Every case improving gives a small p-value; differences that cancel out give a large one."""
-    import random
-
-    from tools.report import sign_flip_p_value
-
-    assert sign_flip_p_value([1.0] * 12, random.Random(0)) < 0.01
-    assert sign_flip_p_value([1.0, -1.0] * 6, random.Random(0)) > 0.5
+    assert report.sign_flip_p_value([1.0] * 12, random.Random(0)) < 0.01
+    assert report.sign_flip_p_value([1.0, -1.0] * 6, random.Random(0)) > 0.5
 
 
-def test_bootstrap_interval_contains_the_mean() -> None:
-    """The 95% interval of a mean difference contains that mean."""
-    import random
-
-    from tools.report import bootstrap_interval
-
-    differences = [1.0, 0.0, 1.0, 1.0, 0.0, 0.5]
-    low, high = bootstrap_interval(differences, random.Random(0))
-    assert low <= sum(differences) / len(differences) <= high
-
-
-def test_agreement_matches_the_labelled_run(tmp_path: Path) -> None:
-    """With several runs of a sample, a label is compared with the judge verdict of its own epoch."""
-    second = report.SampleResult(
-        "a-skill", "a", "skill", "1.1", 1, {}, 0.7, 0.1, 40, {"judge": {"verdict": True}}, epoch=2
-    )
-    labels = tmp_path / "labels.yaml"
-    labels.write_text("- {sample: a-skill, epoch: 1, grader: judge, verdict: FAIL}\n")
-    lines = report.agreement([*rows(), second], report.load_labels(labels))
-    assert lines[0].split()[-2:] == ["1/1", "agree"]
+def test_comparison_lines_and_category_rows_share_one_interval() -> None:
+    """Differences 1, 1, 1, 0 give the same t-interval, that crosses zero, in the full report and in the PR table."""
+    passed = {"skill": [1, 1, 1, 0], "no-skill": [0, 0, 0, 0]}
+    runs = [
+        result(sample_id=f"c{n}-{c}", case=f"c{n}", condition=c, passed=v)
+        for c, vs in passed.items()
+        for n, v in enumerate(vs)
+    ]
+    assert "[-0.045, +1.546]" in report.comparison_lines(runs)[1]
+    _, found = report.category_rows(runs, [{"name": "A", "does": "a", "cases": ["c0", "c1", "c2", "c3"]}])
+    assert (found[0].low, found[0].high) == pytest.approx(report.mean_interval([1, 1, 1, 0])[1:])
+    assert found[0].mark() == "="
 
 
 def test_condition_cost_lines() -> None:
@@ -101,31 +112,36 @@ def test_condition_cost_lines() -> None:
     assert lines[2].split()[:3] == ["skill", "1", "0.700"]
 
 
-def test_latest_keeps_the_newest_log_per_case_and_condition() -> None:
-    """A re-run replaces the earlier runs of the same case and condition and leaves the others."""
-    old = report.SampleResult("a-skill", "a", "skill", "1.1", 0, started="2026-01-01")
-    new = report.SampleResult("a-skill", "a", "skill", "1.1", 1, started="2026-01-02")
-    other = report.SampleResult("a-no-skill", "a", "no-skill", "1.1", 1, started="2026-01-01")
+def test_latest_keeps_the_newest_log_per_case_and_condition_and_agent_model() -> None:
+    """A re-run replaces the earlier runs of the same case and condition; other cases and agent models stay."""
+    old, new = result(passed=0, started="2026-01-01"), result(passed=1, started="2026-01-02")
+    other = result(sample_id="a-no-skill", condition="no-skill", started="2026-01-01")
     assert report.latest([old, new, other]) == [new, other]
+    opus, sonnet = result(agent_model="opus", started="2026-01-01"), result(agent_model="sonnet", started="2026-01-02")
+    assert report.latest([opus, sonnet]) == [opus, sonnet]
 
 
 def test_skill_read_lines() -> None:
     """Expected files count per run where expected; files no case expected are listed separately."""
-    tracked = [
-        {
-            "expected": ["modes/feature.md or modes/bug-fix.md", "agents/verifier.md"],
-            "missing": [],
-            "read": {"modes/bug-fix.md": "main", "agents/verifier.md": "sub-agent"},
-        },
-        {
-            "expected": ["modes/feature.md or modes/bug-fix.md", "agents/verifier.md"],
-            "missing": ["agents/verifier.md"],
-            "read": {"modes/feature.md": "main", "modes/coordinate.md": "main"},
-        },
-    ]
+    expected = [["modes/feature.md", "modes/bug-fix.md"], "agents/verifier.md"]
+    labels = ["modes/feature.md or modes/bug-fix.md", "agents/verifier.md"]
     results = [
-        report.SampleResult(f"{case}-skill", case, "skill", "1.1", 1, skill_reads=reads)
-        for case, reads in zip("ab", tracked, strict=True)
+        result(
+            expected_reads=expected,
+            skill_reads={
+                "expected": labels,
+                "missing": [],
+                "read": {"modes/bug-fix.md": "main", "agents/verifier.md": "sub-agent"},
+            },
+        ),
+        result(
+            expected_reads=expected,
+            skill_reads={
+                "expected": labels,
+                "missing": ["agents/verifier.md"],
+                "read": {"modes/feature.md": "main", "modes/coordinate.md": "main"},
+            },
+        ),
     ]
     lines = report.skill_read_lines([*results, *rows()])
     assert lines[0] == "Runs that read every expected file: 1/2"
@@ -135,35 +151,30 @@ def test_skill_read_lines() -> None:
     assert report.skill_read_lines(rows()) == ["No run tracked skill reads."]
 
 
+def scores_of(**fields: Any) -> SimpleNamespace:
+    """A log sample of case a in condition skill with the given scores and fields."""
+    metadata = {"case": "a", "condition": "skill", "rule": "5.1", **fields.pop("metadata", {})}
+    return SimpleNamespace(**{"id": "a-skill", "epoch": 1, "error": None, "scores": {}, "metadata": metadata, **fields})
+
+
 def test_missed_read_keeps_the_rule_only_score() -> None:
     """A skill run that missed a read fails, but keeps the rule scorer's `all` as its rule-only score."""
     rule = SimpleNamespace(value={"judge": 1, "all": 1}, metadata={})
     reads = SimpleNamespace(
         value=0, metadata={"expected": ["modes/bug-fix.md"], "read": {}, "missing": ["modes/bug-fix.md"]}
     )
-    sample = SimpleNamespace(
-        id="a-skill",
-        epoch=1,
-        error=None,
-        scores={"grade_cases": rule, "skill_reads": reads},
-        metadata={"case": "a", "condition": "skill", "rule": "5.1"},
-    )
-    result = report.read_result(sample)  # type: ignore[arg-type]
-    assert result.passed == 0 and result.rule_passed == 1
-    assert result.skill_reads["missing"] == ["modes/bug-fix.md"]
+    sample = scores_of(scores={"grade_cases": rule, "skill_reads": reads})
+    found = report.read_result(sample)  # type: ignore[arg-type]
+    assert found.passed == 0 and found.rule_passed == 1
+    assert found.skill_reads["missing"] == ["modes/bug-fix.md"]
     reads.value = 1
     assert report.read_result(sample).passed == 1  # type: ignore[arg-type]
 
 
 def test_lint_lines() -> None:
     """Lint counts are averaged per condition over runs that changed Python; others are left out."""
-    results = [
-        report.SampleResult("a-skill", "a", "skill", "1.1", 1, lint_issues=2),
-        report.SampleResult("b-skill", "b", "skill", "1.1", 1, lint_issues=0),
-        report.SampleResult("c-skill", "c", "skill", "1.1", 1),
-    ]
-    lines = report.lint_lines(results)
-    assert lines[1].split() == ["skill", "2", "1.00", "1"]
+    results = [result(lint_issues=2), result(lint_issues=0), result()]
+    assert report.lint_lines(results)[1].split() == ["skill", "2", "1.00", "1"]
     assert report.lint_lines(rows()) == ["No run counted lint issues."]
 
 
@@ -176,19 +187,15 @@ def test_rule_key_orders_invocation_then_names() -> None:
 def error_rows() -> list[report.SampleResult]:
     """One scored sample and one sample error of each cause, in two conditions."""
     return [
-        report.SampleResult("a-skill", "a", "skill", "1.1", 1, {"input_tokens": 5}, 0.5, 0.1, 30),
-        report.SampleResult(
-            "b-skill", "b", "skill", "1.1", math.nan, error="Grading error: judge: timed out after 600 seconds"
-        ),
-        report.SampleResult(
-            "c-no-skill",
-            "c",
-            "no-skill",
-            "1.1",
-            math.nan,
+        result(tokens={"input_tokens": 5}, cost=0.5, judge_cost=0.1, seconds=30),
+        result(case="b", passed=math.nan, error="Grading error: judge: timed out after 600 seconds"),
+        result(
+            case="c",
+            condition="no-skill",
+            passed=math.nan,
             error="RuntimeError: Claude Code timed out after 1800 seconds",
         ),
-        report.SampleResult("d-no-skill", "d", "no-skill", "1.1", math.nan, error="RuntimeError: 429"),
+        result(case="d", condition="no-skill", passed=math.nan, error="RuntimeError: 429"),
     ]
 
 
@@ -210,70 +217,8 @@ def test_sample_errors_are_left_out_of_rates_and_means_but_finished_runs_keep_co
 
 def test_read_result_keeps_the_error_text() -> None:
     """A sample error's message reaches the result, which the cause count reads."""
-    sample = SimpleNamespace(
-        id="x",
-        epoch=1,
-        error=SimpleNamespace(message="Grading error: judge: 429"),
-        scores={},
-        metadata={"case": "x", "condition": "skill"},
-    )
+    sample = scores_of(error=SimpleNamespace(message="Grading error: judge: 429"))
     assert report.read_result(sample).error == "Grading error: judge: 429"  # type: ignore[arg-type]
-
-
-def test_agreement_skips_a_judge_that_errored() -> None:
-    """A judge with no verdict because it could not run is not a disagreement."""
-    errored = report.SampleResult(
-        "a-skill", "a", "skill", "1.1", 0, judges={"judge": {"verdict": None, "error": "timed out"}}
-    )
-    lines = report.agreement([errored], [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}])
-    assert lines == ["no labelled judge verdicts in these logs"]
-
-
-def judged(passed: bool, started: str = "") -> report.SampleResult:
-    """One run of sample a-skill whose judge gave the verdict `passed`."""
-    return report.SampleResult(
-        "a-skill", "a", "skill", "1.1", 1, judges={"judge": {"verdict": passed}}, started=started
-    )
-
-
-def test_two_runs_with_the_same_key_stop_the_report() -> None:
-    """Two logs with the same (sample, epoch, grader) cannot say which run a label belongs to."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    with pytest.raises(ValueError, match="a-skill"):
-        report.resolve_labels([judged(True, "2026-01-01"), judged(False, "2026-01-02")], labels)
-
-
-def test_agreement_after_latest_uses_the_newest_run() -> None:
-    """`--latest` keeps one run per sample, so the label is compared with that run."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    newest = report.latest([judged(True, "2026-01-01"), judged(False, "2026-01-02")])
-    assert report.agreement(newest, labels)[0].split()[-2:] == ["0/1", "agree"]
-
-
-def test_label_matching_no_run_stops_and_is_named() -> None:
-    """A label whose sample is not in the logs, such as a typo, stops the report and is named."""
-    labels = [
-        {"sample": "a-skill", "grader": "judge", "verdict": "PASS"},
-        {"sample": "a-skil", "epoch": 2, "grader": "judge", "verdict": "FAIL"},
-    ]
-    with pytest.raises(ValueError, match=r"a-skil.*epoch 2.*no run") as stopped:
-        report.resolve_labels([judged(True)], labels)
-    assert "'a-skill'" not in str(stopped.value)
-    assert [run.sample_id for _, run in report.resolve_labels([judged(True)], labels[:1])] == ["a-skill"]
-
-
-def grouped(skill: str, model: str, passed: float, started: str = "") -> report.SampleResult:
-    """One scored skill-condition run of case a for a (skill, agent model) group."""
-    return report.SampleResult(
-        f"a-skill-{model}", "a", "skill", "1.1", passed, skill=skill, agent_model=model, started=started
-    )
-
-
-def test_latest_keeps_runs_of_different_agent_models_apart() -> None:
-    """A newer log of one agent model does not replace the runs of another agent model."""
-    opus = grouped("code-better", "opus", 1, "2026-01-01")
-    sonnet = grouped("code-better", "sonnet", 0, "2026-01-02")
-    assert report.latest([opus, sonnet]) == [opus, sonnet]
 
 
 def test_read_results_reads_the_run_description_from_the_log(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -286,39 +231,39 @@ def test_read_results_reads_the_run_description_from_the_log(monkeypatch: pytest
         "skill_commit": "abc1234def",
         "skill_dirty": True,
     }
-    sample = SimpleNamespace(id="x", epoch=1, error=None, scores={}, metadata={"case": "x", "condition": "skill"})
     log = SimpleNamespace(
-        eval=SimpleNamespace(metadata=metadata), stats=SimpleNamespace(started_at="t"), samples=[sample]
+        eval=SimpleNamespace(metadata=metadata), stats=SimpleNamespace(started_at="t"), samples=[scores_of()]
     )
     monkeypatch.setattr(report, "read_eval_log", lambda path: log)
-    (result,) = report.read_results([Path("x.eval")])
-    assert (result.skill, result.agent_model, result.judge_model) == ("code-better", "opus", "sonnet")
-    assert (result.agent_version, result.skill_commit, result.skill_dirty) == ("2.1.0", "abc1234def", True)
+    (found,) = report.read_results([Path("x.eval")])
+    assert (found.skill, found.agent_model, found.judge_model) == ("code-better", "opus", "sonnet")
+    assert (found.agent_version, found.skill_commit, found.skill_dirty) == ("2.1.0", "abc1234def", True)
     log.eval.metadata = {}
     assert report.read_results([Path("x.eval")])[0].skill_dirty is None
 
 
 def test_group_header_names_skill_models_version_and_commit_with_dirty_flag() -> None:
-    """The header names what the section ran on; a dirty skill folder is flagged."""
-    result = grouped("code-better", "opus", 1)
-    result.judge_model, result.agent_version = "sonnet", "2.1.0"
-    result.skill_commit, result.skill_dirty = "abc1234def", True
-    header = "\n".join(report.group_header([result]))
+    """The header names what the section ran on; a dirty skill folder is flagged, an unknown one is marked."""
+    run = result(skill="code-better", agent_model="opus", judge_model="sonnet", agent_version="2.1.0")
+    run.skill_commit, run.skill_dirty = "abc1234def", True
+    header = "\n".join(report.group_header([run]))
     assert "code-better" in header and "agent model opus" in header and "judge model sonnet" in header
     assert "Claude Code 2.1.0" in header and "abc1234 (dirty)" in header
-    result.skill_dirty = False
-    assert "dirty" not in "\n".join(report.group_header([result]))
+    run.skill_dirty = False
+    assert "dirty" not in "\n".join(report.group_header([run]))
+    run.skill_dirty = None
+    assert "abc1234 (dirty ?)" in "\n".join(report.group_header([run]))
 
 
 def test_two_groups_print_two_sections_without_mixing_pass_rates(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """One section per (skill, agent model), each with its own header and pass rate."""
-    monkeypatch.setattr(
-        report,
-        "read_results",
-        lambda paths: [grouped("code-better", "opus", 1), grouped("code-better", "sonnet", 0)],
-    )
+    runs = [
+        result(skill="code-better", agent_model="opus"),
+        result(skill="code-better", agent_model="sonnet", passed=0),
+    ]
+    monkeypatch.setattr(report, "read_results", lambda paths: runs)
     assert report.main(["x.eval"]) == 0
     out = capsys.readouterr().out
     first, second = out.split("# Skill code-better, agent model sonnet")[0], out.split("agent model sonnet")[1]
@@ -327,96 +272,26 @@ def test_two_groups_print_two_sections_without_mixing_pass_rates(
     assert "0/1" in second and "100%" not in second
 
 
-def two_model_runs() -> list[report.SampleResult]:
-    """The same sample id judged in an opus group and a sonnet group."""
-    a, b = judged(True), judged(False)
-    a.agent_model, b.agent_model = "opus", "sonnet"
-    return [a, b]
-
-
-def test_label_matching_runs_of_two_agent_models_is_an_error() -> None:
-    """A label has no agent model, so it cannot say which group's run it judged."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    runs = two_model_runs()
-    runs[0].log, runs[1].log = "first.eval", "second.eval"
-    with pytest.raises(ValueError, match=r"a-skill.*opus.*first\.eval.*sonnet.*second\.eval"):
-        report.resolve_labels(runs, labels)
-
-
-def test_label_with_agent_model_selects_one_group() -> None:
-    """An agent_model field picks the group; agreement ignores labels for other models."""
-    a, b = two_model_runs()
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS", "agent_model": "opus"}]
-    report.resolve_labels([a, b], labels)
-    assert report.unmatched_labels([a, b], labels) == []
-    assert [run.agent_model for _, run in report.resolve_labels([a, b], labels)] == ["opus"]
-    assert report.agreement([a], labels)[0].split()[-2:] == ["1/1", "agree"]
-    assert report.agreement([b], labels) == ["no labelled judge verdicts in these logs"]
-
-
-def test_label_naming_a_model_with_no_run_stops() -> None:
-    """A label for an agent model that has no such run matches no run."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS", "agent_model": "haiku"}]
-    with pytest.raises(ValueError, match=r"a-skill.*no run"):
-        report.resolve_labels(two_model_runs(), labels)
-
-
-def test_main_stops_before_printing_when_a_label_spans_groups(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """The ambiguity is found before the first section prints."""
-    labels = tmp_path / "labels.yaml"
-    labels.write_text("- {sample: a-skill, grader: judge, verdict: PASS}\n")
-    monkeypatch.setattr(report, "read_results", lambda paths: two_model_runs())
-    with pytest.raises(SystemExit, match="a-skill"):
-        report.main(["x.eval", "--labels", str(labels)])
-    assert capsys.readouterr().out == ""
-
-
-def test_duplicate_run_in_a_later_group_stops_before_printing(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """A label made ambiguous by a copy in the second group does not leave the first group printed."""
-    runs = two_model_runs()
-    twin = judged(False)
-    twin.agent_model = "sonnet"
-    labels = tmp_path / "labels.yaml"
-    labels.write_text("- {sample: a-skill, grader: judge, verdict: PASS, agent_model: sonnet}\n")
-    monkeypatch.setattr(report, "read_results", lambda paths: [*runs, twin])
-    with pytest.raises(SystemExit):
-        report.main(["x.eval", "--labels", str(labels)])
-    assert capsys.readouterr().out == ""
-
-
-def test_log_without_skill_dirty_shows_unknown() -> None:
-    """Only a log that says the skill folder was clean is shown clean."""
-    result = grouped("code-better", "opus", 1)
-    result.skill_commit = "abc1234def"
-    result.skill_dirty = None
-    assert "abc1234 (dirty ?)" in "\n".join(report.group_header([result]))
-
-
-def installed(case: str, loaded: float | None, passed: float) -> report.SampleResult:
-    """One skill-installed run of a case that did or did not load the skill."""
-    return report.SampleResult(f"{case}-skill-installed", case, "skill-installed", "r", passed, skill_loaded=loaded)
-
-
 def test_loaded_lines_per_case() -> None:
     """One row per case: runs, runs that loaded the skill, pass rate when loaded and when not."""
+
+    def installed(case: str, loaded: float | None, passed: float, **fields: Any) -> report.SampleResult:
+        return result(case=case, condition="skill-installed", skill_loaded=loaded, passed=passed, **fields)
+
     results = [
         installed("a", 1.0, 1),
         installed("a", 1.0, 0),
         installed("a", 0.0, 0),
         installed("b", 0.0, 1),
         installed("c", None, 1),  # not a skill-installed run
-        report.SampleResult("d-skill-installed", "d", "skill-installed", "r", math.nan, skill_loaded=1.0, error="x"),
+        installed("d", 1.0, math.nan, error="x"),
     ]
     lines = report.loaded_lines(results)
     assert lines[0].split() == ["case", "runs", "loaded", "pass", "loaded", "pass", "not", "loaded"]
-    rows_ = {line.split()[0]: line.split()[1:] for line in lines[1:]}
-    assert rows_["a"] == ["3", "2", "50%", "0%"]
-    assert rows_["b"] == ["1", "0", "-", "100%"]
-    assert "c" not in rows_ and "d" not in rows_
+    by_case = {line.split()[0]: line.split()[1:] for line in lines[1:]}
+    assert by_case["a"] == ["3", "2", "50%", "0%"]
+    assert by_case["b"] == ["1", "0", "-", "100%"]
+    assert "c" not in by_case and "d" not in by_case
     assert report.loaded_lines(rows()) == ["No skill-installed runs."]
 
 
@@ -428,175 +303,174 @@ def test_every_comparison_names_known_conditions() -> None:
     assert all(name in CONDITIONS for pair in report.COMPARISONS for name in pair)
 
 
-def test_comparisons_pinned() -> None:
-    """The comparisons stay as they are."""
-    assert report.COMPARISONS == (
-        ("skill", "no-skill"),
-        ("one-sentence", "no-skill"),
-        ("short-skill", "no-skill"),
-        ("skill", "one-sentence"),
-        ("skill", "short-skill"),
-        ("skill-installed", "no-skill"),
-        ("skill", "skill-installed"),
-    )
+def test_resolve_labels() -> None:
+    """A label must match exactly one run, by sample, epoch, grader and agent model; each row says what resolves or stops."""
+    label = {"sample": "a-skill", "grader": "judge", "verdict": "PASS"}
+    good = verdict(True)
+    broken_judge = verdict(None, error="timed out")
+    failed = {"passed": math.nan, "error": "RuntimeError: 429", "judges": {}}
+    two_graders = {"judge": {"verdict": True}, "judge_2": {"verdict": False}}
+    other = {"sample_id": "b-skill"}
 
+    def runs(*kinds: dict[str, Any]) -> list[report.SampleResult]:
+        return [result(started=f"t{n}", **kind) for n, kind in enumerate(kinds, 1)]
 
-def errored_judge(started: str = "") -> report.SampleResult:
-    """One run of sample a-skill whose judge could not run."""
-    run = judged(True, started)
-    run.judges = {"judge": {"verdict": None, "error": "timed out"}}
-    return run
-
-
-def sample_error(started: str = "") -> report.SampleResult:
-    """One run of sample a-skill that failed before any grader ran."""
-    return report.SampleResult("a-skill", "a", "skill", "1.1", math.nan, error="RuntimeError: 429", started=started)
-
-
-def test_duplicate_with_one_errored_judge_stops() -> None:
-    """The label cannot say which run it means, even when one copy's judge gave no verdict."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    with pytest.raises(ValueError, match="a-skill"):
-        report.resolve_labels([judged(True, "t1"), errored_judge("t2")], labels)
-
-
-def test_duplicate_with_a_sample_error_stops() -> None:
-    """A copy that errored before grading still makes the label ambiguous."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    with pytest.raises(ValueError, match="a-skill"):
-        report.resolve_labels([judged(True, "t1"), sample_error("t2")], labels)
-
-
-def test_sample_error_copy_of_another_sample_does_not_stop() -> None:
-    """Only a sample a label names makes a duplicate matter."""
-    labels = [{"sample": "other", "grader": "judge", "verdict": "PASS"}]
-    labelled = judged(True)
-    labelled.sample_id = "other"
-    report.resolve_labels([labelled, judged(True, "t1"), sample_error("t2")], labels)
-
-
-def test_latest_resolves_duplicates_with_errors() -> None:
-    """After `--latest` one run per sample is left, so the labels validate."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    for other in (errored_judge("t2"), sample_error("t2")):
-        report.resolve_labels(report.latest([judged(True, "t1"), other]), labels)
-
-
-def test_single_errored_judge_with_a_label_is_unmatched() -> None:
-    """A judge that could not run gives no verdict, so its label is listed, not compared."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    report.resolve_labels([errored_judge()], labels)
-    assert len(report.unmatched_labels([errored_judge()], labels)) == 2
-
-
-def model_run(model: str, kind: str) -> report.SampleResult:
-    """One run of sample a-skill by `model`: judged (True), `errored judge` or `sample error`."""
-    run = {"judged": judged(True), "errored judge": errored_judge(), "sample error": sample_error()}[kind]
-    run.agent_model = model
-    return run
-
-
-@pytest.mark.parametrize("kind", ["errored judge", "sample error"])
-def test_label_with_one_copy_errored_in_another_model_stops(kind: str) -> None:
-    """A copy with no verdict still counts as a match, so the label cannot be scored against the other model."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    with pytest.raises(ValueError, match=r"a-skill.*opus.*sonnet"):
-        report.resolve_labels([model_run("opus", kind), model_run("sonnet", "judged")], labels)
-    labels[0]["agent_model"] = "sonnet"
-    assert [
-        run.agent_model
-        for _, run in report.resolve_labels([model_run("opus", kind), model_run("sonnet", "judged")], labels)
-    ] == ["sonnet"]
-
-
-@pytest.mark.parametrize(("kind", "reason"), [("errored judge", "judge error"), ("sample error", "sample error")])
-def test_single_run_without_a_verdict_is_listed_with_its_reason(kind: str, reason: str) -> None:
-    """One matching run with no verdict is not compared; it is listed with why."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    lines = report.unmatched_labels([model_run("opus", kind)], labels)
-    assert len(lines) == 2 and reason in lines[1] and "a-skill" in lines[1]
-    assert report.agreement([model_run("opus", kind)], labels) == ["no labelled judge verdicts in these logs"]
-
-
-def test_duplicate_of_an_unlabelled_sample_does_not_stop() -> None:
-    """Only the samples labels name matter: a duplicate elsewhere, in any model, is ignored."""
-    other = judged(False, "t2")
-    other.sample_id = "b-skill"
-    twin = judged(True, "t1")
-    twin.sample_id = "b-skill"
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
-    assert len(report.resolve_labels([judged(True), twin, other], labels)) == 1
-
-
-def test_several_epochs_and_graders_do_not_stop() -> None:
-    """Runs of other epochs, and other graders of the same run, are not matches."""
-    first = judged(True)
-    first.judges = {"judge": {"verdict": True}, "judge_2": {"verdict": False}}
-    second = judged(False)
-    second.epoch = 2
-    second.judges = dict(first.judges)
-    labels = [
-        {"sample": "a-skill", "grader": "judge", "verdict": "PASS", "epoch": 2},
-        {"sample": "a-skill", "grader": "judge_2", "verdict": "FAIL"},
+    opus, sonnet = {"agent_model": "opus", "log": "first.eval"}, {"agent_model": "sonnet", "log": "second.eval"}
+    table = [
+        # (name, runs, labels, stops with this message or resolves to these (epoch, agent model); latest first)
+        ("same key twice", runs({"judges": good}, {"judges": good}), [label], "a-skill"),
+        ("a copy whose judge failed", runs({"judges": good}, {"judges": broken_judge}), [label], "a-skill"),
+        ("a copy that errored", runs({"judges": good}, failed), [label], "a-skill"),
+        (
+            "typo",
+            runs({"judges": good}),
+            [label, {**label, "sample": "a-skil", "epoch": 2}],
+            r"a-skil.*epoch 2.*no run",
+        ),
+        (
+            "two agent models",
+            runs({"judges": good, **opus}, {"judges": good, **sonnet}),
+            [label],
+            r"a-skill.*opus.*first\.eval.*sonnet.*second\.eval",
+        ),
+        (
+            "agent model picks one",
+            runs({"judges": good, **opus}, {"judges": good, **sonnet}),
+            [{**label, "agent_model": "opus"}],
+            [(1, "opus")],
+        ),
+        (
+            "agent model without a run",
+            runs({"judges": good, **opus}),
+            [{**label, "agent_model": "haiku"}],
+            r"a-skill.*no run",
+        ),
+        (
+            "failed copy in another model",
+            runs({"judges": good, **sonnet}, {**failed, **opus}),
+            [label],
+            r"a-skill.*(opus.*sonnet|sonnet.*opus)",
+        ),
+        (
+            "judge-failed copy in another model",
+            runs({"judges": good, **sonnet}, {"judges": broken_judge, **opus}),
+            [label],
+            r"a-skill.*(opus.*sonnet|sonnet.*opus)",
+        ),
+        (
+            "model picked past a failed copy",
+            runs({"judges": good, **sonnet}, {**failed, **opus}),
+            [{**label, "agent_model": "sonnet"}],
+            [(1, "sonnet")],
+        ),
+        (
+            "copy of an unlabelled sample",
+            runs({"judges": good}, {**other, "judges": good}, {**other, "judges": broken_judge}),
+            [label],
+            [(1, "?")],
+        ),
+        (
+            "other epochs and graders",
+            [result(judges=two_graders), result(judges=two_graders, epoch=2)],
+            [{**label, "epoch": 2}, {**label, "grader": "judge_2"}],
+            [(2, "?"), (1, "?")],
+        ),
     ]
-    resolved = report.resolve_labels([first, second], labels)
-    assert [run.epoch for _, run in resolved] == [2, 1]
-    assert report.agreement([first, second], labels)[-1].split()[-3:] == ["2/2", "agree", "(100%)"]
+    for name, found, labels, expected in table:
+        if isinstance(expected, str):
+            with pytest.raises(ValueError, match=expected):
+                report.resolve_labels(found, labels)
+        else:
+            assert [(run.epoch, run.agent_model) for _, run in report.resolve_labels(found, labels)] == expected, name
+    for second in ({"judges": broken_judge}, failed):  # --latest leaves the newest copy, so the label validates again
+        assert len(report.resolve_labels(report.latest(runs({"judges": good}, second)), [label])) == 1
 
 
-def test_duplicate_within_a_model_stops_unless_latest() -> None:
-    """Two copies in one model make the label ambiguous; `--latest` leaves the newest."""
-    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS", "agent_model": "opus"}]
-    copies = [model_run("opus", "judged"), model_run("opus", "errored judge")]
-    copies[0].started, copies[1].started = "t1", "t2"
-    with pytest.raises(ValueError, match="a-skill"):
-        report.resolve_labels(copies, labels)
-    assert len(report.resolve_labels(report.latest(copies), labels)) == 1
+def test_agreement_compares_each_label_with_its_own_run(tmp_path: Path) -> None:
+    """The label is compared with the run of its epoch, of the newest log after --latest, and of its agent model."""
+    label = {"sample": "a-skill", "grader": "judge", "verdict": "PASS"}
+    first, second = result(judges=verdict(False), started="t1"), result(judges=verdict(True), epoch=2, started="t1")
+    assert report.agreement([first, second], [{**label, "epoch": 1, "verdict": "FAIL"}])[0].split()[-2:] == [
+        "1/1",
+        "agree",
+    ]
+    old, new = result(judges=verdict(True), started="t1"), result(judges=verdict(False), started="t2")
+    assert report.agreement(report.latest([old, new]), [label])[0].split()[-2:] == ["0/1", "agree"]
+    opus, sonnet = result(judges=verdict(True), agent_model="opus"), result(judges=verdict(False), agent_model="sonnet")
+    picked = [{**label, "agent_model": "opus"}]
+    assert report.unmatched_labels([opus, sonnet], picked) == []
+    assert report.agreement([opus], picked)[0].split()[-2:] == ["1/1", "agree"]
+    assert report.agreement([sonnet], picked) == ["no labelled judge verdicts in these logs"]
+    other = result(sample_id="b-skill", judges=verdict(False), agent_model="sonnet")
+    elsewhere = [{**label, "sample": "b-skill", "verdict": "FAIL"}]
+    report.resolve_labels([opus, other], elsewhere)
+    assert report.agreement([other], elsewhere)[-1].split()[-3:] == ["1/1", "agree", "(100%)"]
+    assert report.agreement([opus], elsewhere) == ["no labelled judge verdicts in these logs"]
+    two = [
+        result(judges={"judge": {"verdict": True}, "judge_2": {"verdict": False}}),
+        result(epoch=2, judges=verdict(False)),
+    ]
+    both = [{**label, "epoch": 2, "verdict": "FAIL"}, {**label, "grader": "judge_2", "verdict": "FAIL"}]
+    assert report.agreement(two, both)[-1].split()[-3:] == ["2/2", "agree", "(100%)"]
 
 
-def test_resolution_across_groups_uses_the_one_resolved_run() -> None:
-    """A label without agent_model resolves to the one run, wherever it is; other groups see no label."""
-    opus, sonnet = model_run("opus", "judged"), model_run("sonnet", "judged")
-    sonnet.sample_id = "b-skill"
-    labels = [{"sample": "b-skill", "grader": "judge", "verdict": "FAIL"}]
-    report.resolve_labels([opus, sonnet], labels)
-    assert report.agreement([sonnet], labels)[-1].split()[-3:] == ["0/1", "agree", "(0%)"]
-    assert report.agreement([opus], labels) == ["no labelled judge verdicts in these logs"]
+def test_agreement_skips_a_judge_that_errored_and_lists_its_label() -> None:
+    """A judge with no verdict because it could not run, or a sample error, is listed with its reason, not compared."""
+    labels = [{"sample": "a-skill", "grader": "judge", "verdict": "PASS"}]
+    for run, reason in (
+        (result(judges=verdict(None, error="timed out")), "judge error"),
+        (result(passed=math.nan, error="RuntimeError: 429"), "sample error"),
+    ):
+        lines = report.unmatched_labels([run], labels)
+        assert len(lines) == 2 and reason in lines[1] and "a-skill" in lines[1]
+        assert report.agreement([run], labels) == ["no labelled judge verdicts in these logs"]
 
 
-def test_main_prints_labels_without_a_verdict_and_stops_on_an_unmatched_label(
+def test_main_checks_labels_before_printing(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """A lone errored judge is listed after the sections; a label with no run stops before any section."""
+    """A label that spans groups, or has no run, stops before any section prints; a lone failed judge is listed after."""
     labels = tmp_path / "labels.yaml"
-    labels.write_text("- {sample: a-skill, grader: judge, verdict: PASS}\n")
-    monkeypatch.setattr(report, "read_results", lambda paths: [errored_judge()])
-    assert report.main(["x.eval", "--labels", str(labels)]) == 0
-    assert "## Labels without a verdict" in capsys.readouterr().out
-    labels.write_text("- {sample: typo, grader: judge, verdict: PASS}\n")
-    with pytest.raises(SystemExit, match="typo"):
+
+    def run_main(text: str, found: list[report.SampleResult]) -> None:
+        labels.write_text(text)
+        monkeypatch.setattr(report, "read_results", lambda paths: found)
         report.main(["x.eval", "--labels", str(labels)])
-    assert capsys.readouterr().out == ""
+
+    good = verdict(True)
+    opus, sonnet = result(agent_model="opus", judges=good), result(agent_model="sonnet", judges=verdict(False))
+    twin = result(agent_model="sonnet", judges=verdict(False))
+    wrong = "- {sample: a-skill, grader: judge, verdict: PASS%s}\n"
+    for text, found, message in (
+        (wrong % "", [opus, sonnet], "a-skill"),
+        (wrong % ", agent_model: sonnet", [opus, sonnet, twin], "a-skill"),
+        (wrong.replace("a-skill", "typo") % "", [opus], "typo"),
+    ):
+        with pytest.raises(SystemExit, match=message):
+            run_main(text, found)
+        assert capsys.readouterr().out == ""
+    run_main(wrong % "", [result(judges=verdict(None, error="timed out"))])
+    assert "## Labels without a verdict" in capsys.readouterr().out
 
 
 def test_judge_cost_includes_the_skill_reads_judge() -> None:
     """The judge cost adds the reads judge's cost to the rule judges' cost."""
     rule = SimpleNamespace(value={"judge": 1, "all": 1}, metadata={"judges": {"judge": {"total_cost_usd": 0.25}}})
     reads = SimpleNamespace(value=1, metadata={"judge": {"total_cost_usd": 0.5}})
-    sample = SimpleNamespace(
-        id="a-skill",
-        epoch=1,
-        error=None,
-        scores={"grade_cases": rule, "skill_reads": reads},
-        metadata={"case": "a", "condition": "skill", "rule": "5.1"},
-    )
+    sample = scores_of(scores={"grade_cases": rule, "skill_reads": reads})
     assert report.read_result(sample).judge_cost == pytest.approx(0.75)  # type: ignore[arg-type]
 
 
 def run(case: str, condition: str, passed: float) -> report.SampleResult:
     """One scored run of a case, on Sonnet, from a log started on 2026-11-21."""
-    return report.SampleResult(
-        f"{case}-{condition}", case, condition, "r", passed, started="2026-11-21T10:00:00", agent_model="sonnet"
+    return result(
+        sample_id=f"{case}-{condition}",
+        case=case,
+        condition=condition,
+        rule="r",
+        passed=passed,
+        started="2026-11-21T10:00:00",
+        agent_model="sonnet",
     )
 
 
@@ -676,6 +550,8 @@ def test_chart_svg_draws_one_dot_per_category_and_an_interval_where_there_is_one
     ns = "{http://www.w3.org/2000/svg}"
     assert len(root.findall(f"{ns}circle")) == 2
     assert len([line for line in root.findall(f"{ns}line") if line.get("stroke-width") == "3"]) == 1
+    assert report.CHART_NOTE == "A 95% interval crossing zero means no clear change"
+    assert report.CHART_NOTE in [text.text for text in root.findall(f"{ns}text")]
 
 
 def test_load_priorities_checks_names_cases_and_duplicates(tmp_path: Path) -> None:
@@ -737,7 +613,8 @@ def test_chart_escapes_category_names() -> None:
 
 def test_before_without_runs_of_the_group_stops(monkeypatch: pytest.MonkeyPatch) -> None:
     """--before logs of another model or skill stop the report instead of showing no change."""
-    other = [report.SampleResult("a1-skill", "a1", "skill", "r", 1, agent_model="opus")]
+    other = [run("a1", "skill", 1)]
+    other[0].agent_model = "opus"
     monkeypatch.setattr(report, "read_results", lambda paths: scored() if paths == [Path("x.eval")] else other)
     monkeypatch.setattr(report, "load_priorities", lambda skill: CATEGORIES)
     with pytest.raises(SystemExit, match="no runs"):
@@ -746,5 +623,5 @@ def test_before_without_runs_of_the_group_stops(monkeypatch: pytest.MonkeyPatch)
 
 def test_tested_on_counts_only_cases_with_scored_runs() -> None:
     """A case whose every run errored is not counted as tested."""
-    runs = [*scored(), report.SampleResult("z-skill", "z", "skill", "r", math.nan, error="429", started="2026")]
+    runs = [*scored(), result(case="z", passed=math.nan, error="429", started="2026")]
     assert report.tested_on(runs)[0] == 4

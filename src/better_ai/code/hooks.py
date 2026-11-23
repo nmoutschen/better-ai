@@ -13,7 +13,7 @@ import json
 import os
 from pathlib import Path
 
-from .. import paths, records, resources, schema
+from .. import paths, records, schema
 from ..paths import Refused, Unit, refusal
 
 SPEC = "spec.jsonl"
@@ -70,7 +70,7 @@ def _checked_copy(unit: Unit, folder: str, head: dict) -> bytes:
         raise refusal(unit.label, f"{folder}/{SPEC} is not UTF-8 text", "fix the file in the design folder") from None
     target = unit.path / SPEC
     cache = {f"json:{os.path.normpath(target.resolve().parent / unit.kind.head)}": head}
-    docs = schema.load_schemas(*resources.schema_sources("code"))
+    docs = schema.docs_for("code")
     errors = schema.check_text(target, text, docs, cache)
     if errors:
         shown = [f"{folder}/{SPEC}:{e.line}: {e.field}: {e.message}" for e in errors[:10]]

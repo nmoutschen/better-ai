@@ -18,7 +18,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/design_written.py"
   files:
-    design_written.py: checks/design_written.py
+    design_written.py: ../_checks/design_written.py
 - type: judge
   rubric: 'Rule: before choosing an approach, list the options, including at least one that is not the familiar choice,
     compare them against the requirements that drive the decision, and record each decision in design.md with the

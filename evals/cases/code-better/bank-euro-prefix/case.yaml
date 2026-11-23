@@ -23,7 +23,7 @@ graders:
   cmd: python "$GRADE_FILES/keeps_except.py" bank_import.py 'AMOUNT = re.compile(r"-?\d+\.\d{2}")' 'cell = cell.strip()' 'if
     not AMOUNT.fullmatch(cell):' 'amount = Decimal(cell)'
   files:
-    keeps_except.py: checks/command_passes_2/keeps_except.py
+    keeps_except.py: ../_checks/keeps_except.py
 - type: file_keeps
   path: test_bank_import.py
 validation:

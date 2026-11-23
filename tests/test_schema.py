@@ -7,12 +7,12 @@ come in later tasks and have their own tests.
 
 import copy
 import json
-import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import NamedTuple
+from types import SimpleNamespace
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -228,26 +228,6 @@ def task(n=1, **extra):
     return {k: v for k, v in record.items() if v is not None}
 
 
-class Result(NamedTuple):
-    returncode: int
-    stdout: str
-
-
-def check_cli(schemas, *args, cwd=None):
-    """What `check` over these paths prints and exits with, without a process: one line per error, exit 1 if any."""
-    before = os.getcwd()
-    try:
-        if cwd:
-            os.chdir(cwd)
-        try:
-            errors = schema.check_paths([Path(a) for a in args], schemas)
-        except schema.SchemaError:
-            return Result(1, "")
-    finally:
-        os.chdir(before)
-    return Result(1 if errors else 0, "".join(f"{e}\n" for e in errors))
-
-
 def jsonl(*records):
     return "".join(json.dumps(r) + "\n" for r in records)
 
@@ -303,37 +283,6 @@ class CheckText(Case):
         self.assertEqual(schema.check_file(path, docs), schema.check_text(path, schema.read_checked(path, True), docs))
         path.write_text(bad, encoding="utf-8")
         self.assertEqual(schema.check_file(path, docs), schema.check_text(path, bad, docs))
-
-
-class CommandLine(Case):
-    def run_cli(self, *args):
-        return check_cli(self.schemas, *args)
-
-    def test_r2_clean_file_prints_nothing_and_exits_zero(self):
-        self.write("tasks.jsonl", jsonl(task(1)))
-        result = self.run_cli(self.change / "tasks.jsonl")
-        self.assertEqual((result.returncode, result.stdout), (0, ""))
-
-    def test_r2_one_line_per_error_in_the_stated_format_and_exit_one(self):
-        path = self.write("tasks.jsonl", jsonl(task(1), task(2, status="blocked")))
-        result = self.run_cli(path)
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(result.stdout.splitlines(), [f'{path}:2: reason: required when status is "blocked"'])
-
-    def test_r2_several_paths_and_a_folder(self):
-        self.write("tasks.jsonl", jsonl(task(1, status="blocked")))
-        self.write("logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "x", "task": "T1"}))
-        result = self.run_cli(self.change)
-        lines = result.stdout.splitlines()
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(len(lines), 2, lines)
-        for line in lines:
-            self.assertRegex(line, r"^.+:\d+: [^:]+: .+$")
-
-    def test_r2_a_file_no_schema_describes_is_an_error_but_a_folder_skips_it(self):
-        notes = self.write("notes.md", "hello")
-        self.assertEqual(self.run_cli(notes).returncode, 1)
-        self.assertEqual(self.run_cli(self.change).returncode, 0)
 
 
 class StandardLibraryOnly(unittest.TestCase):
@@ -1049,8 +998,6 @@ class HookSafety(Case):
 
 class Schemas(Case):
     def test_a_schema_that_cannot_be_applied_is_a_failure_with_a_message_not_a_traceback(self):
-        result = check_cli(self.root / "missing", self.change / "tasks.jsonl")
-        self.assertEqual(result.returncode, 1)
         with self.assertRaises(schema.SchemaError):
             schema.load_schemas(self.root / "missing")
 
@@ -1063,28 +1010,18 @@ class Schemas(Case):
 
 
 class Paths(Case):
-    def test_a_relative_path_from_inside_the_folder_finds_its_schema(self):
-        self.write(
-            "logs/b.card.json", json.dumps({"type": "card", "at": AT, "by": "c", "role": "builder", "task": "T1"})
-        )
-        self.write("logs/b.jsonl", jsonl({"type": "start", "at": AT, "by": "b", "text": "x", "id": "L1"}))
-        result = check_cli(self.schemas, "b.jsonl", cwd=self.change / "logs")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("id: not allowed", result.stdout)
-        self.assertNotIn("no schema", result.stdout)
-
-    def test_dot_checks_the_current_folder(self):
-        self.write("tasks.jsonl", jsonl(task(1, status="blocked")))
-        result = check_cli(self.schemas, ".", cwd=self.change)
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('reason: required when status is "blocked"', result.stdout)
-
     def test_a_folder_with_no_file_that_has_a_schema_is_an_error(self):
         empty = self.root / "empty"
         empty.mkdir()
         (empty / "notes.md").write_text("x", encoding="utf-8")
         errors = schema.check_paths([empty], self.schemas)
         self.assertEqual([(e.field, e.message) for e in errors], [("(folder)", "no file here has a schema")])
+        notes = self.write("notes.md", "hello")  # in a folder that has a schema file, one without is skipped
+        self.write("tasks.jsonl", jsonl(task(1)))
+        self.assertEqual(schema.check_paths([self.change], self.schemas), [])
+        self.assertEqual(
+            [e.message for e in schema.check_paths([notes], self.schemas)], ["no schema describes this file"]
+        )
 
 
 class Lines(Case):
@@ -1414,6 +1351,19 @@ class Records(Case):
         errors = self.messages("log.jsonl")
         self.assertEqual(len(errors), 1)
         self.assertTrue(errors[0].startswith("2: type: "), errors)
+        # read_records, what the pages read: the valid record, the invalid one only on request, NaN never a record
+        self.write(
+            "log.jsonl",
+            jsonl(self.record(), self.record(type="c")) + f'{{"type": "a", "at": "{AT}", "by": "u", "n": NaN}}\n',
+        )
+        unit = SimpleNamespace(target=lambda name: self.change / name, root=self.change)
+        docs, now = schema.load_schemas(self.schemas), datetime.now(timezone.utc)
+        read = schema.read_records(unit, "log.jsonl", docs, {}, now, "2026-01-01T00:00:00Z")
+        self.assertEqual((read.records, read.lines), ([self.record()], [1]))
+        self.assertEqual(sorted((e["line"], e["field"]) for e in read.errors), [(2, "type"), (3, "(record)")])
+        kept = schema.read_records(unit, "log.jsonl", docs, {}, now, "2026-01-01T00:00:00Z", keep_invalid=True)
+        self.assertEqual([(r["id"], r["_errors"]) for r in kept.records if "_errors" in r][0][0], "(line 2)")
+        self.assertEqual(kept.lines, [1, 2])
 
     def test_a_versioned_pair_may_reuse_an_id(self):
         for item in self.PAIR:

@@ -53,7 +53,7 @@ jobs:
         run: python -I tools/smoke.py
       - name: Tests
         # tests/ checks the build, the source in src/better_ai and the pages' shared code.
-        run: python -I -m unittest discover tests
+        run: python tests/run.py
         env:
           # Pull requests and pushes run a sample of the exhaustive tests; the scheduled and manual runs run every case.
           BETTER_AI_SWEEP: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'full' || '' }}

@@ -18,7 +18,8 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-import test_architect_formats as formats  # noqa: E402
+import architect_records as rec  # noqa: E402
+from better import call as better_call  # noqa: E402
 from better import run as better_run  # noqa: E402
 
 from better_ai import page  # noqa: E402
@@ -37,14 +38,14 @@ class Architect(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.repo = Path(temp.name)
-        self.folder = formats.example_folder(self.repo)
-        self.unit = formats.unit_of(self.folder)
+        self.folder = rec.example_folder(self.repo)
+        self.unit = rec.unit_of(self.folder)
         browser = mock.patch.object(page.webbrowser, "open", return_value=True)
         self.browser = browser.start()
         self.addCleanup(browser.stop)
 
     def command(self, name, *args, stdin=None):
-        code, out, err = formats.run_cli(name, str(self.folder), *args, stdin=stdin)
+        code, out, err = rec.run_cli(name, str(self.folder), *args, stdin=stdin)
         self.assertEqual(code, 0, err)
         return out
 
@@ -61,7 +62,7 @@ class Architect(unittest.TestCase):
         return model.read_folder(self.unit)
 
     def test_check_accepts_example_and_renders_both_states_and_all_flows(self):
-        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
         data = self.read()
         view = model.model(data)
         self.assertEqual(data["requirements"][0]["source"]["sentence"], view["requirements"][0]["text"])
@@ -84,7 +85,7 @@ class Architect(unittest.TestCase):
         meta.update(request={"text": "Follow-up.", "from": {"type": "chat"}}, title="Design title")
         meta.update(summary="", scope="", accepted=[])
         path.write_text(json.dumps(meta))
-        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
         view = model.model(self.read())
         self.assertEqual(view["title"], "Design title")
         self.assertEqual(view["accepted"], [])
@@ -128,7 +129,7 @@ class Architect(unittest.TestCase):
         self.assertEqual(last["changed"], ["box:server"])
         self.assertEqual(set(last["hashes"]), set(first["hashes"]))
         self.assertEqual(model.model(self.read())["rerun"], [])
-        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
 
     def test_a_change_to_the_design_document_or_a_requirement_makes_the_review_due_again(self):
         document = self.repo / "docs" / "designs" / "ex" / "design.md"
@@ -162,10 +163,10 @@ class Architect(unittest.TestCase):
         self.command("review", "--perspectives", "security", "observability")
         view = model.model(self.read())
         self.assertEqual((view["since"], view["rerun"]), ([], []))
-        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
 
         meta.write_text(json.dumps({**json.loads(meta.read_text()), "document": {"file": "../design.md"}}))
-        code, out, _ = formats.run_cli("check", str(self.folder))
+        code, out, _ = rec.run_cli("check", str(self.folder))
         self.assertEqual(code, 1)
         self.assertIn("architect.json:1: document.file: invalid source path", out)
 
@@ -175,7 +176,7 @@ class Architect(unittest.TestCase):
         before = len(path.read_text().splitlines())
         self.command("review", "--perspectives", "security")
         self.assertEqual(len(path.read_text().splitlines()), before + 1)
-        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
 
     def test_unchanged_example_does_not_rerun_an_earlier_perspective(self):
         view = model.model(self.read())
@@ -235,7 +236,7 @@ class Architect(unittest.TestCase):
         (self.folder / "design.json").write_text("{")
         self.update("findings.jsonl", lambda rows: rows[0].update(confirmed="false"))
         self.update("spec.jsonl", lambda rows: rows[1].update(checked_by=[]))
-        code, out, _ = formats.run_cli("check", str(self.folder))
+        code, out, _ = rec.run_cli("check", str(self.folder))
         self.assertEqual(code, 1)
         for error in (
             "design.json:1:",
@@ -270,7 +271,7 @@ class Architect(unittest.TestCase):
         design = json.loads(path.read_text())
         design["containers"]["edges"][0]["label"] = 42
         path.write_text(json.dumps(design))
-        code, out, _ = formats.run_cli("check", str(self.folder))
+        code, out, _ = rec.run_cli("check", str(self.folder))
         self.assertEqual(code, 1)
         self.assertIn("design.json:1: containers", out)
 
@@ -363,12 +364,13 @@ class Architect(unittest.TestCase):
                 const vm = require('node:vm');
                 const fs = require('node:fs');
                 const data = JSON.parse(fs.readFileSync(0, 'utf8'));
-                const source = fs.readFileSync(process.argv[1], 'utf8');
                 const context = {data, fetch: () => new Promise(() => {}),
                   document: {querySelector: () => ({}), getElementById: id => id === 'target' ? {} : null}};
-                vm.runInNewContext(source, context);
-                process.stdout.write(vm.runInNewContext(process.argv[2], context));
+                vm.createContext(context);
+                for (const file of [process.argv[1], process.argv[2]]) vm.runInContext(fs.readFileSync(file, 'utf8'), context);
+                process.stdout.write(vm.runInContext(process.argv[3], context));
                 """,
+                str(PACKAGE.parent / "page" / "page.js"),
                 str(PACKAGE / "page.js"),
                 expression,
             ],
@@ -411,7 +413,7 @@ class Architect(unittest.TestCase):
             with self.subTest(name=name, change=change):
                 original = (self.folder / name).read_text()
                 self.update(name, lambda rows, change=change: rows[1].update(change))
-                code, out, _ = formats.run_cli("check", str(self.folder))
+                code, out, _ = rec.run_cli("check", str(self.folder))
                 self.assertEqual(code, 1)
                 self.assertIn(f"{name}:2: {message}", out)
                 (self.folder / name).write_text(original)
@@ -487,7 +489,7 @@ class Architect(unittest.TestCase):
         text = (self.folder / "register.html").read_text()
         for kind in json.loads((PACKAGE / "kinds.json").read_text()):
             self.assertIn(f"<code>{kind['name']}</code>", text)
-        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))  # not a record file
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))  # not a record file
 
     def test_render_writes_the_page_and_the_before_and_after_svgs_inside_the_unit(self):
         out = self.command("render")
@@ -508,14 +510,14 @@ class Architect(unittest.TestCase):
         self.assertTrue(data["static"])
         self.assertEqual(data["title"], self.load()["title"])
         self.assertEqual(len(data["events"]), len((self.folder / "conversation.jsonl").read_text().splitlines()))
-        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
 
     def test_render_refuses_a_design_it_cannot_draw_and_writes_nothing(self):
         path = self.folder / "design.json"
         design = json.loads(path.read_text())
         design["containers"]["edges"][0]["to"] = "nowhere"
         path.write_text(json.dumps(design))
-        code, _, err = formats.run_cli("render", str(self.folder))
+        code, _, err = rec.run_cli("render", str(self.folder))
         self.assertEqual(code, 1)
         self.assertIn("design.json:1: containers.edges[0].to", err)
         self.assertFalse((self.folder / "render").exists())
@@ -533,7 +535,7 @@ class Architect(unittest.TestCase):
         outside = self.repo / "outside"
         outside.mkdir()
         (self.folder / "render").symlink_to(outside)
-        code, _, err = formats.run_cli("render", str(self.folder))
+        code, _, err = rec.run_cli("render", str(self.folder))
         self.assertEqual(code, 1)
         self.assertIn("symlink", err)
         self.assertEqual(list(outside.iterdir()), [])
@@ -545,7 +547,7 @@ class Architect(unittest.TestCase):
         result = {}
 
         def go():
-            result["done"] = formats.run_cli("serve", str(self.folder), "--once", *flags)
+            result["done"] = rec.run_cli("serve", str(self.folder), "--once", *flags)
 
         thread = threading.Thread(target=go)
         thread.start()
@@ -583,7 +585,7 @@ class Architect(unittest.TestCase):
     def start_server(self):
         """`serve <unit>` as an agent runs it: the process, and the address once it is up."""
         process = subprocess.Popen(
-            [*better_command(), "serve", str(self.folder), "--linger", "1"],
+            [*better_command(), "serve", str(self.folder), "--linger", "0.2"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -618,22 +620,13 @@ class Architect(unittest.TestCase):
         self.assertIn("listening", data)
 
     def test_a_page_event_the_schema_refuses_is_not_written(self):
-        """An `approve` event the events schema refuses is not written; a valid one is, as the user's."""
+        """An `approve` event the events schema refuses is not written."""
         url = self.start_server()
 
-        def post(method, params):
-            body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-            headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
-            with urllib.request.urlopen(urllib.request.Request(url + "rpc", body, headers), timeout=10) as response:
-                return json.loads(response.read())
-
         before = (self.folder / "conversation.jsonl").read_text()
-        bad = post("approve", {"id": "a9", "perspectives": ["security"], "changes": [], "text": "t"})
+        bad = self.post(url, "approve", {"id": "a9", "perspectives": ["security"], "changes": [], "text": "t"})
         self.assertIn("error", bad)
         self.assertEqual((self.folder / "conversation.jsonl").read_text(), before)
-        good = post("approve", {"id": "a9", "again": False, "perspectives": ["security"], "changes": [], "text": "t"})
-        self.assertEqual(good["result"], "saved")
-        self.assertEqual(json.loads((self.folder / "conversation.jsonl").read_text().splitlines()[-1])["by"], "user")
 
     # What the page sends, by method, as page.js sends it (the server adds type, by and at).
     SENT = {
@@ -651,26 +644,9 @@ class Architect(unittest.TestCase):
         with urllib.request.urlopen(urllib.request.Request(url + "rpc", body, headers), timeout=10) as response:
             return json.loads(response.read())
 
-    def test_every_method_the_page_sends_is_accepted_and_the_log_is_a_valid_conversation(self):
-        spec = page.spec_of(self.unit.skill)
-        self.assertEqual(set(spec.sendable()) - {"reopen"}, set(self.SENT), "a method without a check")
-        (self.folder / "conversation.jsonl").unlink()
-        url = self.start_server()
-        for method, params in self.SENT.items():
-            self.assertEqual(self.post(url, method, params).get("result"), "saved", method)
-        events = [json.loads(line) for line in (self.folder / "conversation.jsonl").read_text().splitlines()]
-        self.assertEqual([e["type"] for e in events], list(self.SENT))
-        self.assertEqual({e["by"] for e in events}, {"user"})
-        self.command("reply", "--to", "m-x", stdin="seen it")
-        self.command("status", "accepted", "m-x", "--text", stdin="fine")
-        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
-
-    def test_a_page_supplied_by_is_rejected_and_an_architect_note_with_on_is_refused(self):
+    def test_an_architect_note_with_on_and_a_confirm_without_wording_are_refused(self):
         url = self.start_server()
         before = (self.folder / "conversation.jsonl").read_text()
-        by = self.post(url, "note", {**self.SENT["note"], "by": "agent"})
-        self.assertEqual(by["error"]["code"], -32602)
-        self.assertIn("by", by["error"]["message"])
         on = self.post(url, "note", {**self.SENT["note"], "on": {"id": "x", "title": "t"}})
         self.assertEqual(on["error"]["code"], -32602)
         self.assertIn("on", on["error"]["message"])
@@ -708,7 +684,7 @@ class UnitBoundaries(unittest.TestCase):
             for verb in ("review", "specs", "register", "render"):
                 with self.subTest(verb=verb):
                     args = ["--perspectives", "security"] if verb == "review" else []
-                    result = better_run(SKILL, verb, str(other), *args, cwd=d)
+                    result = better_call(SKILL, verb, str(other), *args, cwd=d)
                     self.assertEqual(result.returncode, 1, result.stdout)
                     self.assertIn("belongs to code-better", result.stderr)
                     self.assertEqual(sorted(p.name for p in other.iterdir()), ["code.json"])

@@ -198,6 +198,14 @@ no case points to.
 `files` map gives paths relative to the case folder; `cases.py` reads them into
 the grader specs. `checks/` is never copied into the sandbox before grading.
 
+A hidden check that several cases of a skill use identically lives once in
+`cases/<skill>/_checks/` and each case names it in `files:` as
+`../_checks/<name>`, as the research-better cases do; the case's own `checks/`
+keeps only what is specific to it. A judge may take the rubric body it shares
+with other cases from a file under `cases/<skill>/_rubrics/`, named in
+`rubric_file:` the same way; `cases.py` puts the file's text first and the
+case's own `rubric` sentences after it.
+
 Write the request as a user would: keep the user's real constraints and put the
 facts the agent should find in the planted files. Each case scores one rule:
 its `all` value is the score for that rule, and a case fails an agent only for
@@ -284,8 +292,8 @@ score.
 
 A third scorer, `skill_loaded` (`grading/loaded.py`), scores the
 skill-installed condition only: 1 when the agent or a sub-agent called the
-harness's skill tool with the skill's name, or read the installed SKILL.md, and
-0 otherwise. The skill tool's name comes from `agent.py`. The report shows how
+harness's skill tool with the skill's name, or read the installed SKILL.md with
+the read tool, and 0 otherwise (a shell command that prints it does not count). The skill tool's name comes from `agent.py`. The report shows how
 many runs loaded the skill and the pass rate with and without it.
 
 ## Lint issues added
@@ -375,4 +383,6 @@ a do-nothing run, such as cases about asking first, set
 `validation.do_nothing_fails_only_by_judge`. Top-level judges are skipped; a
 judge inside `any_of` is assumed to pass, or to fail when the replay sets
 `judge: false`. Rubric wording is not checked by replays: that is what judge
-validation is for.
+validation is for. A good run's bash action that exits nonzero must carry
+`fails: true`, which marks a failure the case intends; add a comment when only
+the local replay hits it.

@@ -3,9 +3,10 @@
 The board is a unit, `.research/<slug>/`. `serve`, `wait`, `reply`, `status`, `pending` and `check` are the shared verbs; this
 module holds what only the board has:
 
-- `scan` and `load`: every record of the board, each file read once and checked on its own, so one bad record never hides
-  the rest. The page lists each problem with its file, line and field, and keeps a question, claim, source or the brief
-  that is not valid on the page, marked. A record in the format before this change is counted, not listed as an error.
+- `scan` and `load`: every record of the board, each file read once with `schema.read_records` and checked on its own, so
+  one bad record never hides the rest. The page lists each problem with its file, line and field, and keeps a question,
+  claim, source or the brief that is not valid on the page, marked. A record in the format before this change is counted,
+  not listed as an error. A bug in this code is not a record error: it reaches the page's bug path.
 - the `PageSpec` of the board's page: its main section, its own CSS and JS, the decisions the user answers, the comments
   on a question or an agent, and the one-line message each time a worker closes a question (`announce_closes`);
 - `render <board>`: the page as one file, `board.html` in the board, with the data embedded and no actions.
@@ -14,9 +15,6 @@ module holds what only the board has:
 from __future__ import annotations
 
 import argparse
-import contextlib
-import html
-import json
 import os
 import sys
 import time
@@ -33,26 +31,11 @@ LINES_SHOWN = 60  # the log lines of each agent the page gets; it gets every sea
 RENDERED = "board.html"
 CLOSED = ("answered", "contested", "not found", "unclear")  # the statuses a worker sets when it finishes a question
 
-_DOCS: dict = {}  # the schemas of a run, loaded once
-
-
-def docs() -> dict:
-    if not _DOCS:
-        _DOCS.update(schema.load_schemas(*resources.schema_sources("research")))
-    return _DOCS
-
-
-def _cutoff() -> str:
-    try:
-        return resources.build_info().cutoff
-    except LookupError:  # in-process, not run as better.pyz
-        return resources.DEFAULT_CUTOFF
-
 
 def at_time(record: dict) -> float:
     """When the record was first written, as seconds; 0 for a record whose `at` is missing or not a time."""
     try:
-        return float(timegm(time.strptime(record["at"], "%Y-%m-%dT%H:%M:%SZ")))
+        return float(timegm(time.strptime(record["at"], schema.TIME)))
     except (KeyError, ValueError, TypeError, OverflowError):
         return 0.0
 
@@ -76,68 +59,32 @@ def board_files(unit: Unit) -> list[str]:
 
 
 def scan_file(unit: Unit, name: str, data: dict, cache: dict, now: datetime) -> None:
-    """One file of the board into `data`: its records, and what is wrong with them."""
-    try:
-        path = unit.target(name)
-        text = schema.read_checked(path, path.suffix == ".jsonl")
-    except (OSError, UnicodeDecodeError, paths.Refused) as error:
-        data["errors"].append({"file": name, "line": 1, "field": "(file)", "message": f"cannot be read: {error}"})
-        return
-    # What is shown below is built from this text, the text that was checked.
-    old: list = []
-    found = schema.check_text(path, text, docs(), cache, now=now, cutoff=_cutoff(), notices=old)
-    if [(e.field, e.message) for e in found] == [("(file)", "no schema describes this file")]:
-        data["errors"].append({"file": name, "line": 1, "field": "(file)", "message": found[0].message})
-        return  # a file of another shape, such as an old Markdown one: listed, nothing to show from it
-    old_lines = {e.line for e in old}
-    pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
-    if path.suffix != ".jsonl":
-        pieces = [text]
-    elif pieces[-1] == "":
-        pieces.pop()
-    records = {}
-    for number, piece in enumerate(pieces, 1):
-        with contextlib.suppress(ValueError, RecursionError):
-            records[number] = json.loads(piece)
-    messages: dict = {}  # line -> its errors, the first of each field
-    reported: set = set()
-    for error in found:
-        if (error.line, error.field) in reported:  # one error per field of a line, the first
-            continue
-        reported.add((error.line, error.field))
-        entry = {"file": name, "line": error.line, "field": error.field, "message": error.message}
-        record = records.get(error.line)
-        if isinstance(record, dict) and isinstance(record.get("by"), str):
-            entry["by"] = schema.plain(record["by"])
-        data["errors"].append(entry)
-        messages.setdefault(error.line, []).append(error)
-    kept = {n: r for n, r in records.items() if isinstance(r, dict)}
-    valid = [r for n, r in kept.items() if n not in messages]
-    parent = path.parent.name
+    """One file of the board into `data`: its records, and what is wrong with them. A record that is not valid stays,
+    without the fields that failed, in the files whose records the page shows marked; the decisions and the logs keep
+    only the valid ones."""
+    folder, _, _ = name.partition("/")
+    shown = name in ("brief.json", "conversation.jsonl") or folder in FOLDERS
+    read = schema.read_records(
+        unit, name, schema.docs_for("research"), cache, now, resources.cutoff(), keep_invalid=shown
+    )
+    data["errors"] += read.errors
+    records = list(zip(read.lines, read.records, strict=True))
     if name == "brief.json":
-        data["brief"] = next(iter(kept.values()), {})  # an invalid brief is kept, marked like a question
-        if data["brief"] and 1 in messages:
-            data["brief"] = schema.strip_invalid(data["brief"], messages[1])
+        data["brief"] = records[0][1] if records else {}  # an invalid brief is kept, marked like a question
     elif name == "decisions.jsonl":
-        data["decisions"] += [
-            {**r, "_old": True} if n in old_lines else r for n, r in kept.items() if n not in messages
-        ]
+        data["decisions"] += [{**r, "_old": True} if n in read.old else r for n, r in records]
     elif name == "conversation.jsonl":
         # An invalid event still shows, without the fields that failed. Without a valid `type` no branch of the
         # schema checked its other fields, so it is only listed.
-        stripped = [schema.strip_invalid(r, messages[n]) if n in messages else r for n, r in kept.items()]
-        data["conversation"] += [r for r in stripped if "_errors" not in r or isinstance(r.get("type"), str)]
-    elif parent in FOLDERS:
-        for number, record in kept.items():
-            born = at_time(record)
-            if number in messages:
-                record = schema.strip_invalid(record, messages[number])
-            record["_born"] = born
-            if not isinstance(record.get("id"), str):
-                record["id"] = path.stem  # the file is named for its id
-            data[parent].append(record)
-    elif parent == "logs":
-        data["logs"][path.stem] = valid
+        data["conversation"] += [r for _, r in records if "_errors" not in r or isinstance(r.get("type"), str)]
+    elif folder in FOLDERS:
+        for number, record in records:
+            record["_born"] = at_time(record)
+            if record["id"] == f"(line {number})":
+                record["id"] = Path(name).stem  # the file is named for its id
+            data[folder].append(record)
+    elif folder == "logs":
+        data["logs"][Path(name).stem] = [r for _, r in records]
 
 
 def scan(unit: Unit) -> dict:
@@ -156,19 +103,10 @@ def scan(unit: Unit) -> dict:
         "logs": {},
         "errors": [],
     }
-    try:
-        docs()
-    except schema.SchemaError as error:
-        data["errors"].append({"file": "schemas", "line": 1, "field": "(schemas)", "message": str(error)})
-        return data
     cache: dict = {}
     now = datetime.now(timezone.utc)
     for name in board_files(unit):
-        try:
-            scan_file(unit, name, data, cache, now)
-        except Exception as error:  # for any reason: that file is an error entry and the rest of the board is shown
-            message = f"could not be shown: {paths.reason(error)}"
-            data["errors"].append({"file": name, "line": 1, "field": "(file)", "message": message})
+        scan_file(unit, name, data, cache, now)
     return data
 
 
@@ -189,17 +127,7 @@ def scan_cached(unit: Unit) -> dict:
 
 
 def load(unit: Unit) -> dict:
-    """The page's payload. It never raises, whatever the reason: a failure is an error entry."""
-    try:
-        return _load(unit)
-    except Exception as error:
-        message = f"could not be shown: {paths.reason(error)}"
-        errors = [{"file": "(board)", "line": 1, "field": "(board)", "message": message}]
-        empty = {"brief": {}, "decisions": [], "conversation": [], "questions": [], "claims": [], "sources": []}
-        return {**empty, "logs": {}, "errors": errors, "now": time.time()}
-
-
-def _load(unit: Unit) -> dict:
+    """The page's payload: the scan, each agent's log cut to its last lines and every search line."""
     data = scan_cached(unit)
     logs = {}
     for agent, records in data["logs"].items():
@@ -294,24 +222,6 @@ SPEC = page.register(
 # ---------- render ----------
 
 
-def static_page(data: dict) -> str:
-    """The page as one file: the shell with each file it links written into it, and the board's data embedded. The page
-    then has no server: it shows the data, without the actions."""
-    text = page.shell(SPEC)
-    table = SPEC.table()
-    for url in ("/page.css", *SPEC.css):
-        link = f'<link href="{html.escape(url)}" rel="stylesheet">'
-        text = text.replace(link, "<style>\n" + resources.read_text(table[url]).replace("</", "<\\/") + "\n</style>", 1)
-    embedded = json.dumps(data).replace("</", "<\\/")
-    for url in ("/page.js", *SPEC.js):
-        tag = f'<script src="{html.escape(url)}"></script>'
-        script = "<script>\n" + resources.read_text(table[url]).replace("</script", "<\\/script") + "\n</script>"
-        if url == "/page.js":
-            script = f"<script>var BOARD_SNAPSHOT = {embedded};</script>\n" + script
-        text = text.replace(tag, script, 1)
-    return text
-
-
 def _render_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("unit", help="the board, such as .research/my-topic")
 
@@ -324,8 +234,6 @@ def _render_arguments(parser: argparse.ArgumentParser) -> None:
 )
 def render(args: argparse.Namespace, run: cli.Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
-    if not unit.exists():
-        raise paths.refusal(unit.label, "it holds no board", f"run create {unit.label} first")
-    paths.write_atomic(unit, RENDERED, page.with_old_note(unit, static_page(load(unit))).encode("utf-8"))
+    paths.write_atomic(unit, RENDERED, page.with_old_note(unit, page.static_page(SPEC, load(unit))).encode("utf-8"))
     run.out(f"wrote {Path(unit.label) / RENDERED}")
     return cli.EXIT_DONE

@@ -18,7 +18,7 @@ registers with `register(SKILL, PageSpec(...))` when it is imported:
 - `events`: the file name of the page's own events schema, in its package's `schemas/` folder;
 - `load(unit)`: the page's data, a JSON object, served at `/data` (with `listening` and `now` added);
 - `revision(unit)`, `stopped(unit)`, `tick(unit, conversation)`: optional. A page reloads itself when `/rev` changes;
-  `serve` ends `--linger` seconds after `stopped` becomes true; `tick` runs once a second while serving.
+  `serve` ends `--linger` seconds after `stopped` becomes true; `tick` runs every TICK seconds (one) while serving.
 
 The shell (`shell.html`) is filled only with bundled files and `html.escape`d constants, never with record data.
 """
@@ -54,6 +54,8 @@ LOG, SEEN, ADDRESS = "conversation.jsonl", ".conversation-seen", ".server"
 MAX_BODY = 200_000
 LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the agent is not watching
 WAIT_DEFAULT = 600  # seconds `wait` waits, in every skill
+TICK = 1  # seconds between the ticks of a served page; tests set it shorter
+POLL = 0.05  # seconds serve_forever waits for a request before it looks whether it was told to stop
 STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is written as its own event, `accepted`
 REPLY_STATES = ("done", "asked", "working")
 BUG_TEXT = "The page hit a bug: ask the agent to restart it and report it"
@@ -211,15 +213,15 @@ def rpc_error(rid, code: int, message: str) -> dict:
 
 
 def load_docs(skill: Skill) -> dict[str, dict]:
-    """The schemas a run of this skill loads, shared and its own."""
-    return schema.load_schemas(*resources.schema_sources(skill.package))
+    """The schemas a run of this skill loads, shared and its own, loaded once per package."""
+    return schema.docs_for(skill.package)
 
 
 def old_format_count(unit: Unit, docs: dict[str, dict], cutoff: str | None) -> int:
     """How many lines of the unit are in the format before this change (kept as is): the one count a served page and a
     rendered page show. A unit that cannot be read counts none."""
     notices: list[schema.Error] = []
-    with contextlib.suppress(Exception):
+    with contextlib.suppress(OSError, Refused):
         schema.check_paths([unit.path], docs=docs, now=None, cutoff=cutoff, notices=notices)
     return len(notices)
 
@@ -550,12 +552,14 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
 @cli.verb("pending", help="list the user's items that are not done or accepted", arguments=_unit_argument)
 def pending(args: argparse.Namespace, run: cli.Run) -> int:
     """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so work can
-    resume after an interruption. Done waits for the user; an item edited after it was finished, or a follow-up from the
-    user under it, is work again."""
+    resume after an interruption. Done waits for the user. An answer under an item that waited for the user (`asked`)
+    makes it `replied`; a follow-up from the user under a finished item makes it `followup`. These are the page's rules:
+    page.js `pageThread` gives the same states, and tests/fixtures/threads.json holds the logs both are run on."""
     conv = _conversation(run, _unit(args, run))
-    items, order, state, reasons, thread, closes = {}, [], {}, {}, {}, {}
+    items, order, state, reasons, thread, closes, home = {}, [], {}, {}, {}, {}, {}
     for e in conv.events():
-        a, i, to = e.get("type"), e.get("id"), e.get("to")
+        a, i = e.get("type"), e.get("id")
+        to = home.get(e.get("to"), e.get("to"))  # a message under a reply belongs to the item that reply is under
         if a == "closed":  # a worker's message: the user can reply to it, and the reply goes to the agent
             closes[i] = e
         elif a == "note" and to and to not in items:  # an answer to the agent's own message is a new item
@@ -567,14 +571,16 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
         elif a == "note" and to:  # the user's answer belongs to the item it answers
             thread.setdefault(to, []).append({"from": "user", "at": e.get("at"), "text": e.get("text")})
             if state.get(to) == "asked":  # the answer ends the wait: the item is the agent's again
-                state[to] = "answered by the user"
+                state[to] = "replied"
             elif state.get(to) in ("done", "accepted"):  # a follow-up under a finished item is work again
-                state[to] = "follow-up from the user"
+                state[to] = "followup"
+            if i:
+                home[i] = to
         elif a == "reply" and to:
             thread.setdefault(to, []).append({"from": conv.agent, "at": e.get("at"), "text": e.get("text")})
-        elif a in conv.items and i:
-            if i in items and state.get(i) in ("done", "accepted"):
-                state[i] = "edited"
+            if i:
+                home[i] = to
+        elif a in conv.items and i:  # an item sent again, such as an edited comment, keeps its state
             if i not in items:
                 order.append(i)
             items[i] = e
@@ -630,6 +636,29 @@ def shell(spec: PageSpec) -> str:
         out.append(fills.get(marker, marker))
         out.append(parts[index + 1] if index + 1 < len(parts) else "")
     return "".join(out)
+
+
+def static_page(spec: PageSpec, data: Mapping[str, Any]) -> str:
+    """The page as one file that opens without a server: the shell with each style sheet and script it links written
+    into it, and `data`, what the page would fetch from /data, in a JSON element with the id `page-data`. What the user
+    writes in it stays in the page; nothing reaches the agent."""
+    text = shell(spec)
+    for url in ("/page.css", *spec.css, "/page.js", *spec.js):
+        body = resources.read_text(spec.table()[url])
+        if url.endswith(".css"):
+            if "</style" in body.lower():
+                raise ValueError(f"{url} holds a closing tag that would end its element")
+            tag, inline = f'<link href="{html.escape(url)}" rel="stylesheet">', f"<style>\n{body}\n</style>"
+        else:
+            script = body.replace("</", "<\\/")  # a script cannot end its own element
+            tag, inline = f'<script src="{html.escape(url)}"></script>', f"<script>\n{script}\n</script>"
+        if tag not in text:
+            raise ValueError(f"the shell does not link {url}")
+        text = text.replace(tag, inline, 1)
+    config = '<script type="application/json" id="page-config">'
+    return text.replace(
+        config, f'<script type="application/json" id="page-data">{_json_for_html(data)}</script>\n{config}', 1
+    )
 
 
 # ---------------------------------------------------------------- the server
@@ -876,7 +905,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
             "this address does not reach it."
         )
     stop_like_ctrl_c()
-    serving = threading.Thread(target=server.serve_forever, daemon=True)
+    serving = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": POLL}, daemon=True)
     try:
         if args.once:
             server.daemon_threads = False  # server_close then waits for the thread that answers, so the answer is sent
@@ -885,7 +914,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
         serving.start()
         stopped_at = None
         while True:
-            time.sleep(1)
+            time.sleep(TICK)
             try:  # a tick that fails is reported and the next one tries again
                 if spec.tick:
                     spec.tick(unit, conv)
@@ -929,4 +958,5 @@ __all__ = [
     "revision_of",
     "shell",
     "spec_of",
+    "static_page",
 ]

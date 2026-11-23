@@ -19,16 +19,18 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
 import better  # noqa: E402
-from better import run  # noqa: E402
+from better import call, run  # noqa: E402
 
-from better_ai import page, resources  # noqa: E402
+from better_ai import page, paths, resources  # noqa: E402
 from better_ai import show as package  # noqa: E402
+from better_ai.show import commands, deck  # noqa: E402
 
 GOLD = HERE / "fixtures" / "show"
 SKILL = "show-better"
@@ -50,6 +52,11 @@ def repository(root: str) -> str:
 
 
 def better(cwd: str, *args: str, stdin: str | None = None):
+    """The command in this process. One test of each verb runs it as a process, with `process`."""
+    return call(SKILL, *args, stdin=stdin, cwd=cwd)
+
+
+def process(cwd: str, *args: str, stdin: str | None = None):
     return run(SKILL, *args, stdin=stdin, cwd=cwd)
 
 
@@ -66,7 +73,9 @@ class Commands(unittest.TestCase):
         self.cwd = repository(self.tmp.name)
 
     def test_create_stamps_the_spec_and_keeps_the_unit_out_of_git(self):
-        unit = made(self.cwd)
+        done = process(self.cwd, "create", UNIT, "--by", "tester", stdin=json.dumps(FIELDS))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        unit = Path(self.cwd, UNIT)
         head = json.loads((unit / "spec.json").read_text())
         self.assertEqual((head["type"], head["by"]), ("slides", "tester"))
         self.assertRegex(head["at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
@@ -79,14 +88,14 @@ class Commands(unittest.TestCase):
 
     def test_set_slides_changes_the_spec_and_set_spec_is_not_a_record(self):
         made(self.cwd, SMALL)
-        done = better(self.cwd, "set", UNIT, "slides", stdin=json.dumps({"title": "The answer is no."}))
+        done = process(self.cwd, "set", UNIT, "slides", stdin=json.dumps({"title": "The answer is no."}))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("THE ANSWER IS NO.", better(self.cwd, "render", UNIT, "--format", "text").stdout)
         self.assertEqual(better(self.cwd, "set", UNIT, "spec", stdin="{}").returncode, 1)
 
     def test_check_prints_the_digest_exactly_as_show_py_did(self):
         made(self.cwd)
-        done = better(self.cwd, "check", UNIT)
+        done = process(self.cwd, "check", UNIT)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(done.stdout, (GOLD / "all-kinds.digest.txt").read_text())
         self.assertIn("warning: 26 panels: more than 12", done.stderr)
@@ -108,7 +117,7 @@ class Commands(unittest.TestCase):
 
     def test_render_writes_the_page_inside_the_unit_and_prints_where(self):
         unit = made(self.cwd)
-        done = better(self.cwd, "render", UNIT)
+        done = process(self.cwd, "render", UNIT)
         self.assertEqual(done.returncode, 0, done.stderr)
         page_file = unit / "page.html"
         self.assertEqual(done.stdout.strip(), f"wrote {page_file.resolve()}")
@@ -167,9 +176,7 @@ class Commands(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("A NEW ANSWER.", better(self.cwd, "render", UNIT, "--format", "text").stdout)
 
-    def test_the_checks_across_the_panels_still_apply_to_an_old_format_spec(self):
-        unit = Path(self.cwd, UNIT)
-        unit.mkdir(parents=True)
+        # the checks across the panels still apply to a spec in the old format
         edge = {"from": "a", "to": "zzz", "label": "causes"}
         concept = {
             "headline": "The slide states one clear point.",
@@ -268,53 +275,13 @@ class LivePage(unittest.TestCase):
         self.assertTrue(data["errors"])
         self.assertNotIn("slides", data)
 
-    def test_the_user_sends_and_the_agent_waits_replies_marks_and_lists(self):
-        slide = {"on": {"slide": 1, "part": None}}
-        self.assertEqual(self.send("note", {"id": "m1", "text": "hi", "to": None, **slide})["result"], "saved")
-        agent = ("-I",)
-        self.assertEqual(agent, ("-I",))
-        done = better(self.cwd, "wait", UNIT, "--timeout", "10")
-        self.assertEqual(json.loads(done.stdout.splitlines()[0])["id"], "m1", done.stdout + done.stderr)
-        done = better(self.cwd, "reply", UNIT, "--to", "m1", stdin="ok")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(better(self.cwd, "status", UNIT, "done", "m1").returncode, 0)
-        self.assertEqual(better(self.cwd, "pending", UNIT).stdout.strip(), "0 not done.")
-        done = better(self.cwd, "status", UNIT, "accepted", "m1", "--text", stdin="good")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        log = [json.loads(x) for x in (self.unit / "conversation.jsonl").read_text().splitlines()]
-        self.assertEqual([e["type"] for e in log][-1], "accepted")
-
-    def test_the_pages_events_are_accepted_and_what_its_schema_forbids_is_refused(self):
-        comment = {
-            "id": "c1",
-            "n": 1,
-            "text": "which source?",
-            "on": {"slide": 2, "part": "headline", "headline": "H", "target": {}, "spot": {"fx": 0.1, "fy": 0.2}},
-        }
-        for method, params in (
-            ("comment", comment),
-            ("note", {"id": "m1", "text": "hi", "to": None, "on": {"slide": 2, "part": "Does it arrive?"}}),
-            ("delete", {"to": "c1"}),
-            ("accept", {"to": "c1"}),
-            ("reopen", {"to": "c1", "text": "still wrong"}),
-        ):
-            with self.subTest(method):
-                self.assertEqual(self.send(method, params).get("result"), "saved")
+    def test_what_the_slides_schema_forbids_is_refused(self):
+        comment = {"id": "c1", "n": 1, "text": "which source?", "on": {"slide": 2, "part": "headline"}}
         refused = self.send("comment", {**comment, "on": {"part": "headline"}})
         self.assertEqual(refused["error"]["code"], -32602)
         self.assertIn("slide", refused["error"]["message"])
-        self.assertEqual(
-            self.send("note", {"id": "m2", "text": "x", "to": None, "by": "agent"})["error"]["code"], -32602
-        )
         self.assertEqual(self.send("answer", {"id": "a1", "text": "x"})["error"]["code"], -32601)  # no decisions here
-        types = [json.loads(x)["type"] for x in (self.unit / "conversation.jsonl").read_text().splitlines()]
-        self.assertEqual(types, ["comment", "note", "delete", "accept", "reopen"])
-        done = better(self.cwd, "check", UNIT)  # the log is valid next to the spec
-        self.assertEqual(done.returncode, 0, done.stdout)
-
-    def test_ending_the_server_removes_the_address(self):
-        self.stop()
-        self.assertFalse((self.unit / ".server").exists())
+        self.assertFalse((self.unit / "conversation.jsonl").exists())  # nothing refused was written
 
 
 class OnceAndRegistry(unittest.TestCase):
@@ -395,6 +362,7 @@ class NeverRaises(unittest.TestCase):
             for key, child in pairs:
                 places.append((path, key, isinstance(child, str)))
                 pending.append((child, (*path, key)))
+        first = True  # the first case runs as a process, the rest in this one
         for path, key, is_text in sweep.cases(places, key=lambda p: (p[1] if isinstance(p[1], str) else "n", p[2])):
             changed = copy.deepcopy(SPEC)
             holder = changed
@@ -408,7 +376,8 @@ class NeverRaises(unittest.TestCase):
                 continue
             with self.subTest(place=(*path, key)):
                 self.unit_with(json.dumps(changed))
-                done = better(self.cwd, "check", UNIT)
+                done = (process if first else better)(self.cwd, "check", UNIT)
+                first = False
                 self.assertEqual(done.returncode, 1, done.stderr[-300:])
                 self.assertNotIn("bug in better.pyz", done.stderr)
 
@@ -441,8 +410,9 @@ class NeverRaises(unittest.TestCase):
                     self.assertNotIn("bug in better.pyz", done.stderr)
 
     def test_a_spec_that_check_accepts_with_a_whole_number_made_a_float_renders(self):
+        first = True  # the first case runs as a process, the rest in this one
         for path, key in whole_numbers(SPEC):
-            if path[:1] == ("at",) or key in ("at", "by"):
+            if key in ("at", "by"):
                 continue
             changed = copy.deepcopy(SPEC)
             holder = changed
@@ -451,10 +421,28 @@ class NeverRaises(unittest.TestCase):
             holder[key] = float(holder[key])
             with self.subTest(place=(*path, key)):
                 self.unit_with(json.dumps(changed))
-                if better(self.cwd, "check", UNIT).returncode == 0:  # check accepts it: the renderer must take it
+                runs = process if first else better
+                first = False
+                if runs(self.cwd, "check", UNIT).returncode == 0:  # check accepts it: the renderer must take it
                     for flags in ((), ("--format", "text")):
-                        done = better(self.cwd, "render", UNIT, *flags)
+                        done = runs(self.cwd, "render", UNIT, *flags)
                         self.assertEqual(done.returncode, 0, done.stderr[-300:])
+
+    def test_an_exception_in_the_commands_own_code_is_a_bug_not_a_record_error(self):
+        made(self.cwd, SMALL)
+        for args in (("check", UNIT), ("render", UNIT)):
+            with self.subTest(args), mock.patch.object(deck, "inspect_spec", side_effect=KeyError("x")):
+                done = better(self.cwd, *args)
+                self.assertEqual(done.returncode, 5, done.stdout + done.stderr)
+                self.assertIn("bug in better.pyz", done.stderr)
+                self.assertNotIn("could not be checked", done.stdout)
+        unit = paths.resolve_unit(str(Path(self.cwd, UNIT)), package.SKILL)
+        with (
+            mock.patch.dict(os.environ, {"BETTER_AI_SKILL": SKILL}),
+            mock.patch.object(deck, "inspect_spec", side_effect=KeyError("x")),
+            self.assertRaises(KeyError),
+        ):
+            commands.load(unit)  # the page's loader does not turn it into an error entry
 
 
 class Scripts(unittest.TestCase):

@@ -36,16 +36,11 @@ def version_path(file: Any) -> str | None:
     return str(pure)
 
 
-def unit_of(directory) -> paths.Unit:
-    """The unit whose folder is `directory`, for the same file helpers `render` and `serve` read the versions with."""
+def unit_of(context: Context) -> paths.Unit:
+    """The unit whose folder is the checked file's, for the same file helpers `render` and `serve` read versions with."""
     from . import SKILL
 
-    root = directory
-    for folder in (directory, *directory.parents):
-        if (folder / ".git").exists():
-            root = folder
-            break
-    return paths.Unit(path=directory, root=root, kind=SKILL.kinds[0], skill=SKILL)
+    return paths.Unit(path=context.directory, root=context.root or context.directory, kind=SKILL.kinds[0], skill=SKILL)
 
 
 def version_problem(unit: paths.Unit, path: str) -> str | None:
@@ -85,7 +80,7 @@ def _canvas_versions(record: dict, context: Context) -> list[tuple[str, str]]:
         if path is None:
             problems.append((f"versions/{index}/file", "must be a path inside the unit's folder, without .."))
         else:
-            why = version_problem(unit_of(context.directory), path)
+            why = version_problem(unit_of(context), path)
             if why:
                 problems.append((f"versions/{index}/file", why))
     return problems

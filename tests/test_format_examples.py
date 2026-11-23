@@ -18,7 +18,7 @@ ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
 
-from better_ai import architect, code, design, paths, records, research, resources, schema, show  # noqa: E402
+from better_ai import architect, code, design, paths, records, research, schema, show  # noqa: E402
 
 SKILLS = {
     "architect-better": architect.SKILL,
@@ -37,7 +37,7 @@ UNUSED = {("show-better", "decision"), ("design-better", "decision")}
 
 def written_types(skill) -> dict[str, set[str]]:
     """The record types the commands of the skill write, by the unit kind that holds them."""
-    docs = schema.load_schemas(*resources.schema_sources(skill.package))
+    docs = schema.docs_for(skill.package)
     out = {}
     for kind in skill.kinds:
         unit = paths.Unit(Path("/x") / kind.folder / "u", Path("/x"), kind, skill)

@@ -124,38 +124,40 @@
         "sans": {"type": ["string", "null"], "pattern": "^[A-Za-z0-9 ,'\\\"-]+$"}
       }
     },
+    "kind": {
+      "description": "the kinds of a visual; a side of a compare takes the same",
+      "enum": [
+        "map",
+        "concept",
+        "flow",
+        "groups",
+        "tree",
+        "sets",
+        "matrix",
+        "effects",
+        "pairs",
+        "quadrant",
+        "numbers",
+        "units",
+        "bars",
+        "slope",
+        "dots",
+        "scatter",
+        "line",
+        "timeline",
+        "table",
+        "text",
+        "svg",
+        "lanes",
+        "fork"
+      ]
+    },
     "visual": {
       "description": "one visual: a kind and that kind's fields",
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": {
-          "enum": [
-            "map",
-            "concept",
-            "flow",
-            "groups",
-            "tree",
-            "sets",
-            "matrix",
-            "effects",
-            "pairs",
-            "quadrant",
-            "numbers",
-            "units",
-            "bars",
-            "slope",
-            "dots",
-            "scatter",
-            "line",
-            "timeline",
-            "table",
-            "text",
-            "svg",
-            "lanes",
-            "fork"
-          ]
-        }
+        "kind": {"$ref": "#/$defs/kind"}
       },
       "allOf": [
         {"if": {"required": ["kind"], "properties": {"kind": {"const": "map"}}}, "then": {"$ref": "#/$defs/kind_map"}},
@@ -252,33 +254,7 @@
       "required": ["label", "kind"],
       "properties": {
         "label": {"$ref": "#/$defs/text"},
-        "kind": {
-          "enum": [
-            "map",
-            "concept",
-            "flow",
-            "groups",
-            "tree",
-            "sets",
-            "matrix",
-            "effects",
-            "pairs",
-            "quadrant",
-            "numbers",
-            "units",
-            "bars",
-            "slope",
-            "dots",
-            "scatter",
-            "line",
-            "timeline",
-            "table",
-            "text",
-            "svg",
-            "lanes",
-            "fork"
-          ]
-        },
+        "kind": {"$ref": "#/$defs/kind"},
         "detail": {"$ref": "#/$defs/detail"}
       },
       "allOf": [

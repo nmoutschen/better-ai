@@ -14,8 +14,8 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/keep.py" "$GRADE_FILES/summary.md"
   files:
-    keep.py: checks/keep/keep.py
-    summary.md: checks/keep/summary.md
+    keep.py: ../_checks/summary_lines_kept.py
+    summary.md: ../_checks/planted_summary.md
 validation:
   hidden_checks_pass_untouched:
   - command_passes

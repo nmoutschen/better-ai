@@ -14,3 +14,4 @@ actions:
         return RATES[category]
 - bash: python -m unittest -q
 - bash: ruff check .
+  fails: true

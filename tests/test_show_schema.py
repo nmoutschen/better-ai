@@ -26,13 +26,12 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
 import better  # noqa: E402
 import sweep  # noqa: E402
-from better import run  # noqa: E402
+from better import call  # noqa: E402
 
 from better_ai import architect, design, resources, schema  # noqa: E402,F401  (their hooks, for their event schemas)
 from better_ai.show import deck as show  # noqa: E402
 
 SHOW_SRC = ROOT / "src" / "better_ai" / "show"
-CANVAS = ROOT / "skills" / "design-better"  # design-better's own tests take these over with its package
 AT = "2026-11-21T10:00:00Z"
 DOCS = schema.load_schemas(*resources.schema_sources("show"))
 
@@ -42,14 +41,25 @@ def shape_problems(spec):
     return list(dict.fromkeys(show.spec_problems(spec)))
 
 
+def check(spec):
+    """(errors, warnings, digest) of a spec: its schema's problems, then what the drawing knows, as `show check` finds
+    them in a spec that holds no nulls."""
+    try:
+        spec = show.without_nulls(spec)
+        errors = [f"{field}: {show.worded(field, message)}" for field, message in shape_problems(spec)]
+        return (errors, [], []) if errors else show.inspect(spec)
+    except RecursionError:
+        return ["(record): is nested too deeply to check"], [], []
+
+
 def check_in_a_unit(content: str, verb: str = "check"):
-    """`verb` (check) run as the agent runs it, on a unit in a new repository that holds `content` as its spec.json."""
+    """`verb` (check) run in this process, on a unit in a new repository that holds `content` as its spec.json."""
     with tempfile.TemporaryDirectory() as d:
         subprocess.run(["git", "init", "-q", d], check=True)
         unit = Path(d, ".show", "deck")
         unit.mkdir(parents=True)
         (unit / "spec.json").write_text(content)
-        return run("show-better", verb, ".show/deck", cwd=d)
+        return call("show-better", verb, ".show/deck", cwd=d)
 
 
 HEAD = "The slide states one clear point."
@@ -204,7 +214,7 @@ class ValidSpecs(unittest.TestCase):
     def test_the_spec_with_every_kind_and_template_passes_the_schema_and_show_py(self):
         spec = full_spec()
         self.assertEqual(shape_problems(spec), [])
-        errors, _, digest = show.check(spec)
+        errors, _, digest = check(spec)
         self.assertEqual(errors, [])
         self.assertTrue(digest)
         show.render(spec)
@@ -215,7 +225,7 @@ class ValidSpecs(unittest.TestCase):
             with self.subTest(kind=kind):
                 spec = spec_of(visual(kind))
                 self.assertEqual(shape_problems(spec), [])
-                self.assertEqual(show.check(spec)[0], [])
+                self.assertEqual(check(spec)[0], [])
 
     def test_the_optional_top_level_fields_pass(self):
         spec = spec_of(
@@ -228,13 +238,13 @@ class ValidSpecs(unittest.TestCase):
             by="agent",
         )
         self.assertEqual(shape_problems(spec), [])
-        self.assertEqual(show.check(spec)[0], [])
+        self.assertEqual(check(spec)[0], [])
 
     def test_an_item_with_a_detail_passes(self):
         panel = visual("bars")
         panel["items"][0]["detail"] = {"text": "why", "source": "s", "evidence": "strong"}
         self.assertEqual(shape_problems(spec_of(panel)), [])
-        self.assertEqual(show.check(spec_of(panel))[0], [])
+        self.assertEqual(check(spec_of(panel))[0], [])
 
     def test_a_spec_without_type_at_or_by_is_refused_and_a_spec_with_another_type_too(self):
         spec = spec_of(visual("text"))
@@ -243,7 +253,7 @@ class ValidSpecs(unittest.TestCase):
             with self.subTest(field):
                 short = {k: v for k, v in spec.items() if k != field}
                 self.assertIn((field, "required"), shape_problems(short))
-                self.assertTrue(show.check(short)[0])
+                self.assertTrue(check(short)[0])
         spec["type"] = "deck"
         self.assertIn("type", [f for f, _ in shape_problems(spec)])
 
@@ -364,10 +374,6 @@ def kind_break(kind, change, field):
 
 
 # One broken panel per rule of each kind.
-def item(key, index=0):
-    return lambda p: p[key][index]
-
-
 def set_in(path, key, value):
     """Set `key` on the object at `path` (a list of keys and indexes) in a panel."""
 
@@ -500,13 +506,9 @@ class BrokenSpecs(unittest.TestCase):
     def test_show_py_check_refuses_each_one_and_names_the_field(self):
         for name, spec, field in BROKEN:
             with self.subTest(name):
-                errors, _, _ = show.check(spec)
+                errors, _, _ = check(spec)
                 self.assertTrue(errors, "accepted")
                 self.assertTrue(any(field in e for e in errors), (field, errors))
-
-
-def tree_of(*children, value=None):
-    return {"label": "All", **({"value": value} if value is not None else {}), "children": list(children)}
 
 
 def deep_tree():
@@ -672,14 +674,14 @@ class RenderingChecks(unittest.TestCase):
         for name, spec, word in RENDERING_BREAKS:
             with self.subTest(name):
                 self.assertEqual(shape_problems(spec), [])
-                errors, _, _ = show.check(spec)
+                errors, _, _ = check(spec)
                 self.assertTrue(errors, "accepted")
                 self.assertTrue(any(word in e for e in errors), (word, errors))
 
     def test_a_note_or_read_on_a_panel_keeps_the_old_hint_to_move_it_into_source(self):
         for old in ("note", "read"):
             with self.subTest(old):
-                errors, _, _ = show.check(edited(BASE, lambda s, old=old: s["panels"][0].__setitem__(old, "x")))
+                errors, _, _ = check(edited(BASE, lambda s, old=old: s["panels"][0].__setitem__(old, "x")))
                 self.assertEqual(len(errors), 1)
                 self.assertTrue(
                     errors[0].startswith(f"panels[0].{old}: '{old}' is no longer used: move it into 'source'")
@@ -731,7 +733,7 @@ class RenderingChecks(unittest.TestCase):
         self.assertIn(("panels[0].kind", "required when template is absent"), shape_problems(spec))
 
     def test_a_shape_error_stops_the_rendering_checks_and_prints_no_digest(self):
-        errors, _, digest = show.check(edited(BASE, drop("title")))
+        errors, _, digest = check(edited(BASE, drop("title")))
         self.assertEqual(digest, [])
         self.assertTrue(all(e.startswith("title:") or ": " in e for e in errors))
 
@@ -739,12 +741,12 @@ class RenderingChecks(unittest.TestCase):
 class Warnings(unittest.TestCase):
     def test_the_readability_warnings_stay(self):
         spec = spec_of({**visual("bars"), "headline": "Topic"}, {**OTHER_PANELS["statement"], "compare": ""})
-        _, warnings, _ = show.check(spec)
+        _, warnings, _ = check(spec)
         self.assertTrue(any("full sentence" in w for w in warnings), warnings)
         self.assertTrue(any("no 'compare'" in w for w in warnings), warnings)
 
     def test_the_digest_lists_every_value(self):
-        _, _, digest = show.check(full_spec())
+        _, _, digest = check(full_spec())
         text = "\n".join(digest)
         for word in ("TITLE: The answer.", "[1] VISUAL MAP", "causes", "12% of users left.", "Read it"):
             self.assertIn(word, text)
@@ -781,20 +783,6 @@ class CommandLine(unittest.TestCase):
 
 def note(**more):
     return {"type": "note", "at": AT, "by": "user", "id": "m-1", "text": "hi", "to": None, **more}
-
-
-def canvas_schemas() -> Path:
-    """design-better's event schemas now live in src/better_ai/; this validator wants them in one folder, without x-old-format."""
-    folder = Path(tempfile.mkdtemp(prefix="canvas-schemas-"))
-    for source, name in (
-        (ROOT / "src" / "better_ai" / "schemas", "base.schema.json"),
-        (ROOT / "src" / "better_ai" / "schemas", "conversation.schema.json"),
-        (ROOT / "src" / "better_ai" / "design" / "schemas", "canvas-events.schema.json"),
-    ):
-        doc = json.loads((source / name).read_text(encoding="utf-8"))
-        doc.pop("x-old-format", None)
-        (folder / name).write_text(json.dumps(doc), encoding="utf-8")
-    return folder
 
 
 def note_problems(skill, events, event):
@@ -933,7 +921,7 @@ class WrongTypes(unittest.TestCase):
             with self.subTest(name):
                 fields = [f for f, _ in shape_problems(spec)]
                 self.assertTrue(any(f.startswith(field) for f in fields), (field, fields))
-                errors, _, _ = show.check(spec)
+                errors, _, _ = check(spec)
                 self.assertTrue(any(field in e for e in errors), (field, errors))
 
     def test_schema_py_check_on_the_file_does_not_raise_either(self):
@@ -947,31 +935,9 @@ class WrongTypes(unittest.TestCase):
     def test_every_leaf_of_every_valid_spec_set_to_a_wrong_value_gives_an_answer_and_no_exception(self):
         values = [None, "x", "", -1, 2.5, [], {}, True, ["x"], [{}], [[1]], {"label": None}, float("nan"), float("inf")]
 
-        def leaves(o, path=()):
-            yield path
-            if isinstance(o, dict):
-                for k, v in o.items():
-                    yield from leaves(v, (*path, k))
-            elif isinstance(o, list):
-                for i, v in enumerate(o):
-                    yield from leaves(v, (*path, i))
-
-        bases = [spec_of(visual(k)) for k in KIND_OK] + [spec_of(copy.deepcopy(p)) for p in OTHER_PANELS.values()]
-        every = [
-            (base, path, value) for base in bases for path in leaves(base) if path for value in [*values, "<delete>"]
-        ]
-        keys = [lambda t: panel_name(t[0]), lambda t: repr(t[2])]  # each kind of panel, each wrong value
-        for base, path, value in sweep.cases(every, key=keys):
-            spec = copy.deepcopy(base)
-            target = spec
-            for step in path[:-1]:
-                target = target[step]
-            if value == "<delete>":
-                target.pop(path[-1])
-            else:
-                target[path[-1]] = copy.deepcopy(value)
+        for label, spec in sampled_variants(values):
             try:
-                errors, _, _ = show.check(spec)
+                errors, _, _ = check(spec)
                 shape_problems(spec)
                 if not errors:
                     clean = show.without_nulls(spec)
@@ -979,7 +945,7 @@ class WrongTypes(unittest.TestCase):
                     show.render_text(clean)
                     show.render_screen_reader(clean)
             except Exception as error:
-                self.fail(f"{path} = {value!r} in a {base['panels'][0].get('kind')} panel raised {error!r}")
+                self.fail(f"{label} raised {error!r}")
 
 
 # Optional fields: (kind of panel, path to the field in the panel, or "top" and a path in the spec).
@@ -1093,8 +1059,8 @@ class Nulls(unittest.TestCase):
                 nulled = with_value(where, path, None)
                 self.assertEqual(shape_problems(nulled), [], "the schema")
                 absent = with_value(where, path, "<absent>")
-                self.assertEqual(show.check(nulled), show.check(absent))
-                self.assertEqual(show.check(nulled)[0], [])
+                self.assertEqual(check(nulled), check(absent))
+                self.assertEqual(check(nulled)[0], [])
 
     def test_a_null_means_the_same_to_the_page_and_to_the_text(self):
         for where, path in NULLABLE:
@@ -1108,7 +1074,7 @@ class Nulls(unittest.TestCase):
             with self.subTest(f"{where} {path}"):
                 spec = with_value(where, path, None)
                 self.assertTrue(shape_problems(spec), "the schema accepted it")
-                self.assertTrue(show.check(spec)[0], "show.py accepted it")
+                self.assertTrue(check(spec)[0], "show.py accepted it")
 
     def test_a_null_in_a_list_is_kept(self):
         spec = spec_of(visual("matrix"))
@@ -1128,12 +1094,12 @@ class TypeHint(unittest.TestCase):
     def test_a_spec_without_type_says_the_field_is_required(self):
         spec = spec_of(visual("text"))
         del spec["type"]
-        errors, _, _ = show.check(spec)
+        errors, _, _ = check(spec)
         self.assertEqual(errors, ["type: required"])
 
     def test_a_wrong_type_value_keeps_the_schemas_message(self):
         spec = {**spec_of(visual("text")), "type": "deck"}
-        self.assertEqual(show.check(spec)[0], ['type: must be "slides"'])
+        self.assertEqual(check(spec)[0], ['type: must be "slides"'])
 
 
 class OneKindOfAnswer(unittest.TestCase):
@@ -1160,7 +1126,7 @@ class Nesting(unittest.TestCase):
         for depth in (5, 50, 200, 300, 1200, 50000):
             with self.subTest(depth):
                 spec = deep_tree_spec(depth)
-                errors, _, _ = show.check(spec)
+                errors, _, _ = check(spec)
                 self.assertTrue(errors)
                 self.assertTrue(any("levels" in e or "nested too deeply" in e for e in errors), errors[:2])
                 shape_problems(spec)
@@ -1188,7 +1154,7 @@ class ChildrenAndRenderCrashes(unittest.TestCase):
             with self.subTest(name):
                 spec = self.tree(**node)
                 self.assertIn("panels[0].root.children[0].value", [f for f, _ in shape_problems(spec)])
-                self.assertTrue(show.check(spec)[0])
+                self.assertTrue(check(spec)[0])
                 self.assertEqual(
                     [
                         f
@@ -1201,7 +1167,7 @@ class ChildrenAndRenderCrashes(unittest.TestCase):
 
     def test_a_leaf_with_an_empty_children_list_and_a_value_renders(self):
         spec = self.tree(children=[], value=2)
-        self.assertEqual(show.check(spec)[0], [])
+        self.assertEqual(check(spec)[0], [])
         show.render(spec)
         show.render_text(spec)
 
@@ -1260,7 +1226,7 @@ class ChildrenAndRenderCrashes(unittest.TestCase):
         for name, spec, field in cases:
             with self.subTest(name):
                 self.assertTrue(any(f.startswith(field) for f, _ in shape_problems(spec)), shape_problems(spec))
-                self.assertTrue(show.check(spec)[0])
+                self.assertTrue(check(spec)[0])
 
     def test_the_values_the_renderer_can_draw_are_kept(self):
         for spec in (
@@ -1268,7 +1234,7 @@ class ChildrenAndRenderCrashes(unittest.TestCase):
             spec_of(edited(visual("map"), put("highlight", ["s1", 2]))),
             spec_of(edited(visual("matrix"), lambda p: p["columns"].__setitem__(0, {"label": "c"}))),
         ):
-            self.assertEqual(show.check(spec)[0], [])
+            self.assertEqual(check(spec)[0], [])
             show.render(spec)
             show.render_text(spec)
 
@@ -1320,7 +1286,7 @@ class SchemaAndShowAgree(unittest.TestCase):
 
     def test_a_spec_the_schema_refuses_is_refused_by_show_py_check_too(self):
         for label, spec in sampled_variants([5, {}, ["x"]]):
-            if shape_problems(spec) and not show.check(copy.deepcopy(spec))[0]:
+            if shape_problems(spec) and not check(copy.deepcopy(spec))[0]:
                 self.fail(f"schema.py refuses {label} and show.py check accepts it")
 
     def test_a_null_is_judged_the_same_by_the_schema_file_check_and_by_show_py(self):
@@ -1330,7 +1296,7 @@ class SchemaAndShowAgree(unittest.TestCase):
             for label, spec in sampled_variants([None]):
                 path.write_text(json.dumps(spec))
                 refused_by_schema = bool(schema.check_paths([path], docs=DOCS))
-                if refused_by_schema != bool(show.check(copy.deepcopy(spec))[0]):
+                if refused_by_schema != bool(check(copy.deepcopy(spec))[0]):
                     self.fail(f"{label}: schema.py check says {refused_by_schema}, show.py check the opposite")
 
 
@@ -1382,7 +1348,7 @@ class FilesThatAreNotSpecs(unittest.TestCase):
     def test_a_bar_that_is_not_finite_is_refused_before_the_text_render(self):
         spec = json.loads(self.contents()["a bar value NaN"].replace("NaN", "1"))
         spec["panels"][0]["items"][0]["value"] = float("nan")
-        self.assertTrue(show.check(spec)[0])
+        self.assertTrue(check(spec)[0])
 
 
 class DesignBetterFixtures(unittest.TestCase):

@@ -300,3 +300,24 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 /* Lines in the format before this change are one count under the header, not one error each: kept as they are. */
 .oldnote { flex:none; margin:0; padding:var(--space-tight) var(--space-edge); font:var(--font-small); color:var(--muted); }
 .oldnote[hidden] { display:none; }
+
+/* The records that did not validate: listed above the work, never hiding the valid ones (pageErrors in page.js). */
+.errors { flex:none; max-height:30vh; overflow-y:auto; padding:var(--space-control) var(--space-edge); background:var(--linen); border-left:4px solid var(--error); border-bottom:1px solid var(--line); font:var(--font-message); color:var(--ink); }
+.errors[hidden] { display:none; }
+.errors h2 { margin:0 0 var(--space-tight); font:var(--font-small-strong); letter-spacing:.08em; text-transform:uppercase; color:var(--error); }
+.errors ul { list-style:none; margin:0; padding:0; }
+.errors li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
+.errors code { font:var(--font-code); }
+.errors .by { color:var(--muted); }
+
+/* A comment pin, coloured by the state of its item as the conversation shows it: one rule for every state page.js sets
+   (PAGE_STATES), for every page that has pins. A page sets where a pin sits. pagePinCss in page.js builds the same rules
+   for a pin drawn in a frame. */
+.pin { width:24px; height:24px; border-radius:50%; background:var(--terracotta); color:var(--heading); font:var(--font-small-strong);
+  line-height:24px; text-align:center; box-shadow:0 0 0 2px var(--cream); cursor:pointer; }
+.pin[data-state="new"], .pin[data-state="working"] { background:var(--terracotta); }
+.pin[data-state="seen"], .pin[data-state="replied"], .pin[data-state="followup"] { background:var(--sand); }
+.pin[data-state="asked"] { background:var(--cream); color:var(--umber); box-shadow:0 0 0 2px var(--umber); }
+.pin[data-state="done"] { background:var(--moss-dark); color:var(--cream); }
+.pin[data-state="accepted"] { display:none; background:var(--moss-dark); color:var(--cream); }
+.pin[data-state="reopened"] { background:var(--terracotta); box-shadow:0 0 0 2px var(--cream), 0 0 0 4px var(--error); }

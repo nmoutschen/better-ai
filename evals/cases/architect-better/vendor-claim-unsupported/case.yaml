@@ -17,7 +17,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/design_written.py"
   files:
-    design_written.py: checks/design_written.py
+    design_written.py: ../_checks/design_written.py
 - type: judge
   rubric: 'Rule: check the evidence for vendor claims, and flag options that rely on claims without supporting evidence.
     Planted facts: the user''s note n3 in docs/designs/2026-11-order-export/conversation.jsonl says "Mira suggested

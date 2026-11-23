@@ -3,7 +3,7 @@
 Reads one or more Inspect `.eval` logs from `eval.py`. A case scores only its rule, so the pass rate of
 a rule in a condition is the share of its samples whose `all` score passed. When a case ran several
 times (Inspect epochs), the comparisons first average its runs per condition, then compare conditions
-case by case (a paired design): mean difference, a bootstrap 95% interval, and a sign-flip permutation
+case by case (a paired design): mean difference, a 95% t-interval, and a sign-flip permutation
 p-value, with Holm's correction across the comparisons. Hand labels in `judge_labels/<skill>.yaml` (see
 that folder's README) give the human verdict for a judged grader of a sample; the report compares them
 with the judge's verdicts in the same logs. For the skill condition, it also counts which of the skill's own
@@ -36,6 +36,7 @@ from inspect_ai.log import EvalSample, read_eval_log
 from skill_evals.agent import AGENT_TIMEOUT_MESSAGE
 from skill_evals.cases import CONDITIONS, NO_SKILL, ONE_SENTENCE, SHORT_SKILL, SKILL_INSTALLED, WITH_SKILL
 from skill_evals.grading.files import GRADING_ERROR_MESSAGE
+from skill_evals.grading.reads import alternatives
 
 # Each comparison is (condition, baseline): the difference is condition minus baseline.
 COMPARISONS = (
@@ -49,6 +50,7 @@ COMPARISONS = (
 )
 RESAMPLES = 10_000
 RANDOM_SEED = 0
+CHART_NOTE = "A 95% interval crossing zero means no clear change"
 
 
 @dataclass
@@ -68,6 +70,7 @@ class SampleResult:
     error: str | None = None
     epoch: int = 1
     skill_reads: dict[str, Any] = field(default_factory=dict)
+    expected_reads: list[str | list[str]] = field(default_factory=list)
     rule_passed: float = math.nan
     lint_issues: float | None = None
     skill_loaded: float | None = None
@@ -111,6 +114,7 @@ def read_result(sample: EvalSample) -> SampleResult:
         seconds=(run.get("duration_ms") or 0) / 1000,
         judges=judges,
         skill_reads=(reads.metadata or {}) if reads is not None else {},
+        expected_reads=metadata.get("reads") or [],
         lint_issues=float(lint.value) if lint is not None and not math.isnan(float(lint.value)) else None,
         skill_loaded=float(loaded.value) if loaded is not None else None,
         error=sample.error.message[:120] if sample.error else None,
@@ -235,13 +239,6 @@ def case_means(results: list[SampleResult]) -> dict[str, dict[str, float]]:
     return means
 
 
-def bootstrap_interval(differences: list[float], generator: random.Random) -> tuple[float, float]:
-    """Return a 95% bootstrap interval for the mean of the per-case differences."""
-    count = len(differences)
-    means = sorted(sum(generator.choices(differences, k=count)) / count for _ in range(RESAMPLES))
-    return means[int(0.025 * RESAMPLES)], means[int(0.975 * RESAMPLES) - 1]
-
-
 def sign_flip_p_value(differences: list[float], generator: random.Random) -> float:
     """Return a two-sided p-value for a mean difference of zero by randomly flipping each case's sign.
 
@@ -274,12 +271,12 @@ def comparison_lines(results: list[SampleResult]) -> list[str]:
         if len(shared) < 2:
             continue
         differences = [means[condition][case] - means[baseline][case] for case in shared]
-        low, high = bootstrap_interval(differences, generator)
+        mean, low, high = mean_interval(differences)
         rows.append(
             (
                 f"{condition} − {baseline}",
                 len(shared),
-                sum(differences) / len(shared),
+                mean,
                 low,
                 high,
                 sign_flip_p_value(differences, generator),
@@ -356,8 +353,9 @@ def skill_read_lines(results: list[SampleResult]) -> list[str]:
         missing = set(sample.skill_reads.get("missing", []))
         for label in sample.skill_reads.get("expected", []):
             expected[label].append(label not in missing)
+        accepted = {path for entry in sample.expected_reads for path in alternatives(entry)}
         for path in sample.skill_reads.get("read", {}):
-            if not any(path in label.split(" or ") for label in sample.skill_reads.get("expected", [])):
+            if path not in accepted:
                 unexpected[path] += 1
     complete = sum(not sample.skill_reads.get("missing") for sample in runs)
     lines = [f"Runs that read every expected file: {complete}/{len(runs)}", f"{'expected file':52} {'read':>9}"]
@@ -683,16 +681,16 @@ def chart_svg(rows: list[CategoryRow]) -> str:
     def x(points: float) -> float:
         return label + (points + reach) / (2 * reach) * plot
 
-    height = top + step * len(rows) + 24
+    height = top + step * len(rows) + 44
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         'font-family="-apple-system, Segoe UI, sans-serif" font-size="13">',
         f'<rect width="{width}" height="{height}" fill="#FFFCF7"/>',
-        f'<line x1="{x(0):.1f}" y1="{top - 8}" x2="{x(0):.1f}" y2="{height - 22}" stroke="#33302B"/>',
+        f'<line x1="{x(0):.1f}" y1="{top - 8}" x2="{x(0):.1f}" y2="{height - 42}" stroke="#33302B"/>',
     ]
     for tick in (-reach, 0, reach):
         parts.append(
-            f'<text x="{x(tick):.1f}" y="{height - 6}" text-anchor="middle" fill="#78736B">'
+            f'<text x="{x(tick):.1f}" y="{height - 26}" text-anchor="middle" fill="#78736B">'
             f"{'+' if tick > 0 else '−' if tick < 0 else ''}{abs(tick)}</text>"
         )
     for index, row in enumerate(rows):
@@ -711,6 +709,7 @@ def chart_svg(rows: list[CategoryRow]) -> str:
         )
         colour = "#66795A" if row.mark().startswith("▲") else "#33302B"
         parts.append(f'<text x="{width - value + 10}" y="{y + 4:.1f}" fill="{colour}">{row.mark()}</text>')
+    parts.append(f'<text x="12" y="{height - 6}" fill="#78736B">{CHART_NOTE}</text>')
     parts.append("</svg>")
     return "\n".join(parts)
 

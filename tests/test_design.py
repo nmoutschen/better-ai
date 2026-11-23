@@ -50,31 +50,44 @@ def design_tokens(heading: str) -> dict:
     return dict(re.findall(r"^\| `(--[a-z0-9-]+)` \| `?([^`|]+?)`? \|", section, re.M))
 
 
-def board_css():
-    """The boards' own CSS, as (file, line number, line): page.css after its tokens, each board's styles, and show-better's
-    page up to its slides. Slides and drawings (the research map) keep their own sizes."""
-    page_css = PAGE_CSS.read_text(encoding="utf-8")
-    start = page_css[: page_css.index("\n}\n")].count("\n") + 2
-    yield from ((PAGE_CSS, n, line) for n, line in enumerate(page_css.splitlines(), 1) if n >= start)
-    board = ROOT / "src" / "better_ai" / "research" / "board.css"
-    for n, line in enumerate(board.read_text(encoding="utf-8").splitlines(), 1):
-        if ".map" not in line:
-            yield board, n, line
-    dashboard = ROOT / "src" / "better_ai" / "code" / "dashboard.css"
-    for n, line in enumerate(dashboard.read_text(encoding="utf-8").splitlines(), 1):
-        if ".map" not in line:
-            yield dashboard, n, line
-    architect = ROOT / "src" / "better_ai" / "architect" / "page.css"
-    for n, line in enumerate(architect.read_text(encoding="utf-8").splitlines(), 1):
-        yield architect, n, line
-    canvas = ROOT / "src" / "better_ai" / "design" / "canvas.css"
-    for n, line in enumerate(canvas.read_text(encoding="utf-8").splitlines(), 1):
-        yield canvas, n, line
-    show = ROOT / "src" / "better_ai" / "show" / "show.css"
-    for n, line in enumerate(show.read_text(encoding="utf-8").splitlines(), 1):
+# Every src/better_ai/*/*.css is held to the tokens, except these parts, which keep their own sizes.
+def _numbered(css, start=1):
+    return enumerate(css.splitlines(), start)
+
+
+def _without_map(css):
+    """A drawing, the research map, keeps its own sizes."""
+    return ((n, line) for n, line in _numbered(css) if ".map" not in line)
+
+
+def _after_tokens(css):
+    """page.css after its :root block, where the tokens themselves are defined with raw values."""
+    return _numbered(css, css[: css.index("\n}\n")].count("\n") + 2)
+
+
+def _before_slides(css):
+    """show.css up to its slides, which keep their own sizes."""
+    for n, line in _numbered(css):
         if line.startswith("/* ---------- A slide"):
-            break
-        yield show, n, line
+            return
+        yield n, line
+
+
+EXCEPTIONS = {
+    "page/page.css": _after_tokens,
+    "research/board.css": _without_map,
+    "code/dashboard.css": _without_map,
+    "show/show.css": _before_slides,
+}
+
+
+def board_css():
+    """The lines of every skill CSS file that must write spaces and type sizes with tokens, as (file, line number, line)."""
+    for path in sorted((ROOT / "src" / "better_ai").glob("*/*.css")):
+        css = path.read_text(encoding="utf-8")
+        name = path.relative_to(ROOT / "src" / "better_ai").as_posix()
+        for n, line in EXCEPTIONS.get(name, _numbered)(css):
+            yield path, n, line
 
 
 # A px value in a padding, margin or gap, or as the size in a font or font-size; 0 and 1px (a hairline) are allowed.
@@ -124,6 +137,11 @@ class Design(unittest.TestCase):
             if RAW_SPACE.search(line) or RAW_TEXT.search(line) or RAW_FONT.search(line)
         ]
         self.assertEqual(raw, [], "values where DESIGN.md asks for --space-*, --text-* or --font-* tokens")
+        # register.css has no page.css: its own :root holds copies of the tokens it uses, and they must match
+        register = (ROOT / "src" / "better_ai" / "architect" / "register.css").read_text(encoding="utf-8")
+        copies = dict(re.findall(r"(--[a-z-]+):\s*([^;]+);", register.split("}", 1)[0]))
+        self.assertEqual(copies, {name: page_css_tokens()[name] for name in copies})
+        self.assertLessEqual(set(re.findall(r"var\((--[a-z-]+)\)", register)), copies.keys())
 
     def test_pages_use_only_named_colours(self):
         allowed = {hex6(c) for v in design_table().values() for c in COLOUR.findall(v)}

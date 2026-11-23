@@ -22,3 +22,4 @@ actions:
         main(sys.argv[1])
 - bash: python -m unittest -q
 - bash: ruff check .
+  fails: true

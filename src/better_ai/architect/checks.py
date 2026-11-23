@@ -7,8 +7,10 @@ import json
 import re
 from pathlib import Path
 
-from .. import resources
+from .. import paths, resources
+from ..paths import Unit
 from ..schema import Context, hook
+from . import SKILL
 
 _ONE_KEY = r"(?:(?:box|edge):[^\s:+/]+|step:[^\s:+/]+/[^\s:+/]+)"
 PART_KEY = re.compile(_ONE_KEY)
@@ -220,21 +222,21 @@ def _source_file_exists(record: dict, context: Context) -> list[tuple[str, str]]
     path = record.get("file") if isinstance(record, dict) else None
     if not isinstance(path, str) or not path:
         return []
-    _, problem = repo_file(context.repo_root() or context.directory, path)
-    return [("file", problem)] if problem else []
+    try:
+        read_repo_file(context.repo_root() or context.directory, path)
+    except paths.Refused:
+        return [("file", f"invalid source path {path!r}")]
+    except PermissionError:
+        return [("file", f"cannot read source {path!r}")]
+    except OSError:
+        return [("file", f"missing or out-of-scope source {path!r}")]
+    return []
 
 
-def repo_file(root: Path, path: str) -> tuple[Path | None, str | None]:
-    """The file `path` names in the repository at `root`, or why it names none: an absolute path, one through `..` or
-    .git, or one that leaves the repository or is not a file."""
-    name = Path(path)
-    if name.is_absolute() or {"..", ".git"} & set(name.parts):
-        return None, f"invalid source path {path!r}"
-    root = root.resolve()
-    target = (root / name).resolve()
-    if not (target.is_relative_to(root) and target.is_file()):
-        return None, f"missing or out-of-scope source {path!r}"
-    return target, None
+def read_repo_file(root: Path, path: str) -> bytes:
+    """The bytes of the file `path` names in the repository at `root`, by the rules of `paths.read_repo_file`. Raises
+    `paths.Refused` or an OSError if it names none."""
+    return paths.read_repo_file(Unit(root, root, SKILL.kinds[0], SKILL), path)
 
 
 @hook("design-flow-ids")

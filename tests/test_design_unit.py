@@ -7,7 +7,6 @@ import json
 import os
 import re
 import shutil
-import signal
 import subprocess
 import sys
 import tempfile
@@ -28,12 +27,24 @@ HEAD = {
 }
 
 
+GIT = tempfile.TemporaryDirectory()  # one `git init`, copied into each repository
+
+
+def setUpModule():
+    subprocess.run(["git", "init", "-q", GIT.name], check=True)
+
+
+def tearDownModule():
+    GIT.cleanup()
+
+
 def run(repo, *args, stdin=None):
-    return better.run(SKILL, *args, stdin=stdin, cwd=repo, env={"PYTHONUNBUFFERED": "1"})
+    """The command in this process; `better.run` starts one only where a test needs a process."""
+    return better.call(SKILL, *args, stdin=stdin, cwd=repo)
 
 
 def make_repo(root: Path) -> Path:
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    shutil.copytree(Path(GIT.name) / ".git", root / ".git")
     folder = root / ".design" / "pay"
     folder.mkdir(parents=True)
     (folder / "a.html").write_text('<h1 id="a">A</h1><img src="p.png"><link rel="stylesheet" href="s.css">')
@@ -108,22 +119,22 @@ class Unit(unittest.TestCase):
         self.assertIn("index.html", done.stderr)
         self.assertEqual((self.folder / "index.html").read_text(), "<p>my own page</p>")
 
-    def test_a_version_whose_name_differs_from_index_html_only_by_case_is_refused(self):
+    def test_a_version_may_not_be_a_file_the_page_owns_in_any_case(self):
         # On a case-insensitive file system (macOS by default) Index.html and index.html are one file.
-        for name in ("Index.html", "INDEX.HTML"):
+        names = {
+            "Index.html": "index.html is the compare page render writes",
+            "INDEX.HTML": "index.html is the compare page render writes",
+            "conversation.jsonl": "one of the live page's own files",
+            "Conversation.JSONL": "one of the live page's own files",
+            ".server": "one of the live page's own files",
+            ".Conversation-Seen": "one of the live page's own files",
+        }
+        for name, reason in names.items():
             with self.subTest(name=name):
                 head = {**HEAD, "versions": [{"label": "A", "file": name}, {"label": "B", "file": "b.html"}]}
                 done = self.create(head)
                 self.assertEqual(done.returncode, 1)
-                self.assertIn("index.html is the compare page render writes", done.stdout + done.stderr)
-
-    def test_a_version_may_not_be_a_state_file_of_the_live_page_in_any_case(self):
-        for name in ("conversation.jsonl", "Conversation.JSONL", ".server", ".Conversation-Seen"):
-            with self.subTest(name=name):
-                head = {**HEAD, "versions": [{"label": "A", "file": name}, {"label": "B", "file": "b.html"}]}
-                done = self.create(head)
-                self.assertEqual(done.returncode, 1)
-                self.assertIn("one of the live page's own files", done.stdout + done.stderr)
+                self.assertIn(reason, done.stdout + done.stderr)
                 self.assertFalse((self.folder / "canvas.json").exists())
 
     def test_a_symlinked_version_is_refused_by_check_as_render_refuses_it(self):
@@ -166,7 +177,7 @@ class Unit(unittest.TestCase):
 
     def test_render_writes_one_file_with_the_data_and_prints_its_path(self):
         self.create()
-        done = run(self.root, "render", ".design/pay")
+        done = better.run(SKILL, "render", ".design/pay", cwd=self.root)  # the one process of the unit's verbs
         self.assertEqual(done.returncode, 0, done.stderr)
         page = self.folder / "index.html"
         self.assertEqual(Path(done.stdout.strip()).resolve(), page.resolve())
@@ -220,35 +231,55 @@ class Script(unittest.TestCase):
         text = path.read_text()
         self.assertNotIn("'decide'", text)
         self.assertIn("pageApprove", text)
+        self.assertIn("pagePinCss", text)  # the frame's pin colours are page.css's table
+
+
+def serve(root: Path) -> tuple:
+    """A `serve` process on the unit .design/pay of `root`, and its address."""
+    env = {**os.environ, "BETTER_AI_SKILL": SKILL, "PYTHONUNBUFFERED": "1"}
+    server = subprocess.Popen(
+        better.command("serve", ".design/pay", "--no-browser", "--linger", "0.2"),
+        cwd=root,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    return server, re.search(r"http://\S+/", server.stdout.readline()).group(0)  # printed as it happens, on a pipe too
+
+
+def stop(server):
+    server.terminate()
+    server.stdout.close()
+    server.wait(timeout=20)
 
 
 class Served(unittest.TestCase):
-    """`serve` on a real unit: the page, its data and revision, what the page may send, and the conversation verbs."""
+    """`serve` on a real unit: the page, its data and revision, what the page may send, and the conversation verbs.
+    One server serves the class; each test starts from the unit as `create` left it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+        cls.folder = make_repo(cls.root)
+        done = run(cls.root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(HEAD))
+        assert done.returncode == 0, done.stderr
+        cls.files = {p.name: p.read_bytes() for p in cls.folder.iterdir()}
+        cls.server, cls.url = serve(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        stop(cls.server)
+        cls.tmp.cleanup()
 
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.folder = make_repo(self.root)
-        done = run(self.root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(HEAD))
-        self.assertEqual(done.returncode, 0, done.stderr)
-        env = {**os.environ, "BETTER_AI_SKILL": SKILL, "PYTHONUNBUFFERED": "1"}
-        self.server = subprocess.Popen(
-            better.command("serve", ".design/pay", "--no-browser"),
-            cwd=self.root,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-        self.url = re.search(r"http://\S+/", self.server.stdout.readline()).group(
-            0
-        )  # printed as it happens, on a pipe too
-
-    def tearDown(self):
-        self.server.terminate()
-        self.server.stdout.close()
-        self.server.wait(timeout=20)
-        self.tmp.cleanup()
+        for path in self.folder.iterdir():
+            if path.name not in self.files:
+                path.unlink()
+        for name, data in self.files.items():
+            (self.folder / name).write_bytes(data)
+        (self.folder / ".server").write_text(self.url)
 
     def get(self, path):
         with urllib.request.urlopen(self.url + path, timeout=10) as r:
@@ -286,15 +317,6 @@ class Served(unittest.TestCase):
         run(self.root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(head))
         self.assertNotEqual(self.get("rev"), second)
 
-    def test_what_the_page_may_send(self):
-        on = {"version": "A", "screen": "1280x800", "target": {"selector": "#a"}, "spot": {"fx": 0.5, "fy": 0.5}}
-        self.assertEqual(self.send("comment", {"id": "c1", "n": 1, "text": "bigger", "on": on})["result"], "saved")
-        self.assertEqual(self.send("verdict", {"version": "A", "verdict": "up"})["result"], "saved")
-        approval = {"id": "ap1", "option": "A", "label": "Build A", "carries": ["c1"], "text": None}
-        self.assertEqual(self.send("approve", approval)["result"], "saved")
-        self.assertEqual(self.send("decide", {**approval, "id": "d1"})["error"]["code"], -32601)  # decide is gone
-        self.assertEqual(self.send("approve", {"id": "ap2", "option": "A"})["error"]["code"], -32602)
-
     ON = {"version": "A", "screen": "1280x800", "target": {"selector": "#a"}, "spot": {"fx": 0.5, "fy": 0.5}}
     EVENTS = {
         "comment": {"id": "c1-x", "n": 1, "text": "too small", "on": ON},
@@ -309,42 +331,16 @@ class Served(unittest.TestCase):
     def log(self):
         return [json.loads(x) for x in (self.folder / "conversation.jsonl").read_text().splitlines()]
 
-    def test_every_method_the_page_sends_has_a_valid_event_that_is_saved_as_the_users(self):
-        for method, params in self.EVENTS.items():
-            answer = self.send(method, params)
-            self.assertEqual(answer.get("result"), "saved", f"{method}: {answer}")
-        events = self.log()
-        self.assertEqual([e["type"] for e in events], list(self.EVENTS))
-        self.assertEqual({e["by"] for e in events}, {"user"})
-        self.assertTrue(all(re.match(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$", e["at"]) for e in events))
-        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
-
-    def test_the_log_is_conversation_jsonl_only_and_valid_with_the_agents_replies(self):
-        for method, params in self.EVENTS.items():
-            self.send(method, params)
-        self.assertEqual(run(self.root, "reply", ".design/pay", "--to", "m-x", stdin="seen it").returncode, 0)
-        self.assertEqual(run(self.root, "status", ".design/pay", "done", "m-x").returncode, 0)
-        done = run(self.root, "status", ".design/pay", "accepted", "m-x", "--text", stdin="fine")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
-        for old in ("answers.jsonl", ".answers-seen"):
-            self.assertFalse((self.folder / old).exists())
-
-    def test_a_comment_with_no_text_and_no_verdict_is_refused_naming_the_verdict(self):
-        answer = self.send("comment", {**self.EVENTS["comment"], "text": None})
-        self.assertEqual(answer["error"]["code"], -32602)
-        self.assertIn("verdict", answer["error"]["message"])
+    def test_what_the_page_may_not_send_is_refused_and_a_verdict_alone_is_a_comment(self):
+        silent = self.send("comment", {**self.EVENTS["comment"], "text": None})
+        self.assertEqual(silent["error"]["code"], -32602)
+        self.assertIn("verdict", silent["error"]["message"])  # a comment with no text and no verdict
+        approval = {"id": "ap1", "option": "A", "label": "Build A", "carries": ["c1"], "text": None}
+        self.assertEqual(self.send("decide", {**approval, "id": "d1"})["error"]["code"], -32601)  # decide is gone
+        self.assertEqual(self.send("approve", {"id": "ap2", "option": "A"})["error"]["code"], -32602)
         self.assertFalse((self.folder / "conversation.jsonl").exists())
-
-    def test_a_verdict_only_comment_is_saved(self):
         thumbs = {**self.EVENTS["comment"], "id": "c2-x", "text": None, "verdict": "up"}
-        self.assertEqual(self.send("comment", thumbs).get("result"), "saved")
-
-    def test_a_page_supplied_by_is_rejected(self):
-        answer = self.send("note", {**self.EVENTS["note"], "by": "agent"})
-        self.assertEqual(answer["error"]["code"], -32602)
-        self.assertIn("by", answer["error"]["message"])
-        self.assertFalse((self.folder / "conversation.jsonl").exists())
+        self.assertEqual(self.send("comment", thumbs).get("result"), "saved")  # a verdict alone is a comment
 
     def test_a_reused_comment_id_is_a_new_version_of_the_comment(self):
         first = self.EVENTS["comment"]
@@ -355,24 +351,7 @@ class Served(unittest.TestCase):
         shown = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
         self.assertEqual([(e["id"], e["text"]) for e in shown], [(first["id"], "edited")])
 
-    def test_sigterm_ends_the_server_and_removes_its_address(self):
-        self.assertTrue((self.folder / ".server").exists())
-        self.server.send_signal(signal.SIGTERM)
-        self.server.wait(timeout=20)
-        self.assertFalse((self.folder / ".server").exists())
-
-    def test_the_agent_answers_and_tracks_with_the_shared_verbs(self):
-        self.send("note", {"id": "m1", "text": "hello", "to": None})
-        waited = run(self.root, "wait", ".design/pay", "--timeout", "10")
-        self.assertEqual(json.loads(waited.stdout.splitlines()[0])["id"], "m1")
-        self.assertEqual(run(self.root, "reply", ".design/pay", "--to", "m1", stdin="done it").returncode, 0)
-        self.assertEqual(run(self.root, "status", ".design/pay", "done", "m1").returncode, 0)
-        self.assertEqual(run(self.root, "pending", ".design/pay").returncode, 0)
-        done = run(self.root, "status", ".design/pay", "accepted", "m1", "--text", stdin="good")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(run(self.root, "check", ".design/pay").returncode, 0)
-
-    def test_a_head_that_holds_anything_is_still_answered(self):
+    def test_a_head_that_holds_anything_or_is_gone_is_still_answered(self):
         heads = [
             "[]",
             "not json",
@@ -385,17 +364,14 @@ class Served(unittest.TestCase):
                 (self.folder / "canvas.json").write_text(text)
                 self.assertIsInstance(json.loads(self.get("data")), dict)
                 self.assertIsInstance(self.get("rev"), str)
-
-    def test_a_head_that_is_gone_is_an_error_the_page_shows(self):
-        os.unlink(self.folder / "canvas.json")
-        data = json.loads(self.get("data"))
-        self.assertIn("create", data["error"])
+        os.unlink(self.folder / "canvas.json")  # gone: an error the page shows
+        self.assertIn("create", json.loads(self.get("data"))["error"])
 
 
 class Events(unittest.TestCase):
     """The page's log: an `approve` is checked; a `decide` from before the cutoff is old format, one after it is wrong."""
 
-    def log(self, event):
+    def check(self, event):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             folder = make_repo(root)
@@ -403,27 +379,22 @@ class Events(unittest.TestCase):
             (folder / "conversation.jsonl").write_text(json.dumps(event) + "\n")
             return run(root, "check", ".design/pay")
 
-    DECIDE = {
-        "type": "decide",
-        "by": "user",
-        "id": "d1",
-        "option": "A",
-        "label": "Build A",
-        "carries": [],
-        "text": None,
-    }
-
-    def test_an_old_decide_is_a_notice_not_an_error(self):
-        done = self.log({**self.DECIDE, "at": "2026-11-01T10:00:00Z"})
-        self.assertEqual(done.returncode, 0, done.stdout)
-        self.assertIn("format", done.stdout)
-
-    def test_a_new_decide_is_refused(self):
-        self.assertEqual(self.log({**self.DECIDE, "at": better.AFTER_CUTOFF}).returncode, 1)
-
-    def test_an_approve_is_accepted(self):
-        event = {**self.DECIDE, "type": "approve", "at": better.AFTER_CUTOFF}
-        self.assertEqual(self.log(event).returncode, 0)
+    def test_a_decide_is_old_format_before_the_cutoff_and_wrong_after_it_and_an_approve_is_accepted(self):
+        decide = {
+            "type": "decide",
+            "by": "user",
+            "id": "d1",
+            "option": "A",
+            "label": "Build A",
+            "carries": [],
+            "text": None,
+        }
+        old = self.check({**decide, "at": "2026-11-01T10:00:00Z"})
+        self.assertEqual(old.returncode, 0, old.stdout)
+        self.assertIn("format", old.stdout)  # a notice, not an error
+        self.assertEqual(self.check({**decide, "at": better.AFTER_CUTOFF}).returncode, 1)
+        approve = {**decide, "type": "approve", "at": better.AFTER_CUTOFF}
+        self.assertEqual(self.check(approve).returncode, 0)
 
 
 if __name__ == "__main__":

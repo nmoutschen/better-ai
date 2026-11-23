@@ -2,6 +2,7 @@ reply: ''
 actions:
 - bash: git checkout -q -b prep
 - bash: cat accounts.py login.py test_accounts.py CONTRIBUTING.md missing.txt
+  fails: true
 - write: accounts.py
   content: |
     def register(users, name, user):

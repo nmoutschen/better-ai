@@ -28,6 +28,8 @@ from typing import Any
 import yaml
 from inspect_ai.dataset import Sample
 
+from skill_evals.grading.files import GRADERS
+
 EVALS = Path(__file__).resolve().parents[1]
 REPO = EVALS.parent
 CASES = EVALS / "cases"
@@ -62,13 +64,15 @@ GRADER_FIELDS: dict[str, tuple[str, ...]] = {
     "file_keeps": ("path",),
     "file_not_contains": ("path", "pattern"),
     "file_unchanged": ("path",),
-    "judge": ("rubric", "observe"),
+    "judge": ("rubric", "rubric_file", "observe"),
     "no_commit": (),
     "note_written": (),
     "notes_only": (),
     "planted_unchanged": ("except",),
     "ran_command": ("pattern",),
 }
+# The grader types that no function of grading/files.py implements: the scorer runs them itself.
+SCORER_GRADERS = ("any_of", "judge", "ran_command")
 
 
 def check_skill(skill: str) -> str:
@@ -102,22 +106,30 @@ def case_dirs(skill: str) -> list[Path]:
 
 
 def _resolve(specs: list[dict[str, Any]], directory: Path) -> list[dict[str, Any]]:
-    """Replace the case-relative paths in each spec's `files` map with the files' contents."""
+    """Replace the case-relative paths in each spec's `files` map with the files' contents.
+
+    A judge's `rubric_file` is read the same way: its text comes first, then the case's own `rubric` sentences.
+    """
     specs = copy.deepcopy(specs)
     for spec in specs:
         if "files" in spec:
             spec["files"] = {name: (directory / path).read_text() for name, path in spec["files"].items()}
+        if "rubric_file" in spec:
+            shared = (directory / spec.pop("rubric_file")).read_text().strip()
+            spec["rubric"] = f"{shared}\n\n{spec.get('rubric', '')}".strip()
         if "graders" in spec:
             spec["graders"] = _resolve(spec["graders"], directory)
     return specs
 
 
 def check_graders(name: str, specs: list[dict[str, Any]]) -> None:
-    """Raise unless every grader, also inside any_of, has a known type and only the fields of that type."""
+    """Raise unless every grader, also inside any_of, has a known, implemented type and only the fields of that type."""
     for spec in specs:
         kind = spec.get("type")
         if kind not in GRADER_FIELDS:
             raise ValueError(f"{name}: unknown grader type {kind!r}")
+        if kind not in GRADERS and kind not in SCORER_GRADERS:
+            raise ValueError(f"{name}: grader type {kind!r} has no implementation")
         for key in spec.keys() - {"type", *GRADER_FIELDS[kind]}:
             raise ValueError(f"{name}: {kind} has an unknown field {key!r}")
         if kind == "any_of":
@@ -143,7 +155,11 @@ def load_case(directory: Path) -> dict[str, Any]:
     case["reads"] = case.get("reads") or []
     case["graders"] = _resolve(case["graders"], directory)
     repo = directory / "repo"
-    case["files"] = {path.relative_to(repo).as_posix(): path for path in sorted(repo.rglob("*")) if path.is_file()}
+    case["files"] = {
+        path.relative_to(repo).as_posix(): path
+        for path in sorted(repo.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts
+    }
     earlier, history = directory / "earlier", directory / "history"
     if earlier.is_dir() and history.is_dir():
         raise ValueError(f"{directory.name}: a case has earlier/ or history/, not both")
@@ -247,7 +263,7 @@ def samples(
     """
     sentences = source_sentences(skill)
     found = []
-    loaded = [load_case(directory) for directory in case_dirs(skill)]
+    loaded = load_cases(skill)
     if unknown := sorted(set(case_ids or []) - {case["id"] for case in loaded}):
         raise ValueError(f"No case {', '.join(unknown)} in {skill!r}; cases are {', '.join(c['id'] for c in loaded)}")
     for directory, case in zip(case_dirs(skill), loaded, strict=True):

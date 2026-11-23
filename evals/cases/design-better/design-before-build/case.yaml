@@ -17,7 +17,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/check_built.py" approve
   files:
-    check_built.py: checks/check_built.py
+    check_built.py: ../_checks/check_built.py
 - type: any_of
   graders:
   - type: note_written

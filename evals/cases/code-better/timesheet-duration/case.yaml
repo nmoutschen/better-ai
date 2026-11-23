@@ -22,7 +22,7 @@ graders:
 - type: command_passes
   cmd: python "$GRADE_FILES/keeps_except.py" durations.py 'Total = int(amount)'
   files:
-    keeps_except.py: checks/command_passes_2/keeps_except.py
+    keeps_except.py: ../_checks/keeps_except.py
 - type: file_keeps
   path: test_durations.py
 validation:

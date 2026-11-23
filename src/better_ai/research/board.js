@@ -1,7 +1,11 @@
-// A page written by `render` carries its data in BOARD_SNAPSHOT and has no server; a served page reads /data.
-const SNAPSHOT = typeof BOARD_SNAPSHOT === "undefined" ? null : BOARD_SNAPSHOT;
+// A page written by `render` carries its data in #page-data and has no server; a served page reads /data.
+// What the board shows of an invalid record, said under the errors band.
+const ERRORS_NOTE = "Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here.";
+// The page's data, read before anything depends on it: the page is a read-only copy when it has any.
+const snapshotText = document.getElementById("page-data") && document.getElementById("page-data").textContent;
+const SNAPSHOT = typeof snapshotText === "string" && snapshotText ? JSON.parse(snapshotText) : null;
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const esc = pageEscape;
 const has = v => v && v !== "none";
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const mins = s => s < 90 ? "under 2 min" : `${Math.round(s / 60)} min`;
@@ -238,16 +242,19 @@ function drawAgents(d) {
 function setHTML(el, html) { if (el._html !== html) el.innerHTML = el._html = html; }
 
 // ---------- Pop-ups ----------
-function openPop(kind, id, anchor) {
-  closePop(); OPEN = {kind, id, anchor};
-  const el = document.createElement("div"); el.className = "qpop"; el.setAttribute("role", "dialog"); el.id = "pop";
-  document.body.append(el); fillPop(); placePop(anchor);
-  document.querySelectorAll(".map .q").forEach(g => g.classList.toggle("sel", kind === "question" && g.dataset.q === id));
-  const h3 = el.querySelector("h3"); if (h3) { h3.id = "pop-title"; el.setAttribute("aria-labelledby", "pop-title"); h3.setAttribute("tabindex", "-1"); h3.focus({preventScroll: true}); }
-  el.addEventListener("toggle", () => placePop(OPEN && OPEN.anchor), true);
-}
-function closePop() { const p = $("pop"); if (p) p.remove(); const back = OPEN && OPEN.anchor; OPEN = null;
-  document.querySelectorAll(".map .sel").forEach(g => g.classList.remove("sel")); if (back && document.contains(back)) back.focus({preventScroll: true}); }
+// pagePopup holds the pop-up's element, focus, Tab and Escape; the board says what it shows and where it goes.
+let PENDING = null;  // what openPop asks for, taken by fill once the pop-up is open
+const pop = pagePopup({
+  fill: () => { if (PENDING) { OPEN = PENDING; PENDING = null; } fillPop(); },
+  place: anchor => placePop(anchor),
+  opened: el => {
+    document.querySelectorAll(".map .q").forEach(g => g.classList.toggle("sel", OPEN.kind === "question" && g.dataset.q === OPEN.id));
+    el.addEventListener("toggle", () => placePop(OPEN && OPEN.anchor), true);
+  },
+  closed: () => { OPEN = null; document.querySelectorAll(".map .sel").forEach(g => g.classList.remove("sel")); },
+});
+const openPop = (kind, id, anchor) => { PENDING = {kind, id, anchor}; pop.open(anchor); };
+const closePop = () => pop.close();
 function placePop(anchor) {
   const el = $("pop"); if (!el || !anchor) return;
   const r = anchor.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
@@ -326,15 +333,14 @@ document.addEventListener("click", ev => {
   if (t.closest("#goal")) { $("goal").classList.toggle("open"); return; }
   if (t.closest("#to-waiting")) { const q = document.querySelector("#thread .open-q"); if (!q) return;
     q.scrollIntoView({block: "start"}); const b = q.querySelector(".change"); if (b) b.focus({preventScroll: true}); return; }
-  if (t.closest(".qpop .x")) return closePop();
-  if (t.closest(".qpop")) return;
+  if (pop.click(t)) return;
   const g = t.closest(".map .q"); if (g) return openPop("question", g.dataset.q, g);
   const a = t.closest("[data-a]"); if (a) return openPop("agent", a.dataset.a, a);
   const o = t.closest("[data-open]"); if (o) { const [kind, id] = o.dataset.open.split(/:(.*)/s); return openPop(kind, id, o); }
   if ($("pop") && !t.closest("form, .why")) closePop();
 });
 document.addEventListener("keydown", ev => {
-  if (ev.key === "Escape" && $("pop") && !(ev.target.closest && ev.target.closest(".why"))) { ev.preventDefault(); closePop(); }
+  if (pop.key(ev)) return;
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".map .q")) { ev.preventDefault(); openPop("question", ev.target.dataset.q, ev.target); }
   if (ev.key === "Enter" && !ev.shiftKey && ev.target.matches && ev.target.matches("form.popask textarea")) { ev.preventDefault(); ev.target.form.requestSubmit(); }
 });
@@ -374,28 +380,20 @@ function render(d) {
   if (OPEN) fillPop();
 }
 
-// errors:begin
-// The records the board could not show, each with where it is and what is wrong. The rest of the board is drawn anyway,
-// and the page is reachable, so this band and the closed notice never go together.
+// The records the board could not show are listed by page.js's band; the rest of the board is drawn anyway, and the page
+// is reachable, so this band and the closed notice never go together.
+// invalid:begin
 // A record the board still shows although it broke the schema says so, in the error colour, with its first message.
 const notValid = r => r && r._errors && r._errors.length ? `not valid: ${r._errors[0]}` : "";
 const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))}</span>` : "";
-const errorsHTML = errors => `<p><b>${plural(errors.length, "problem")} in the board's files.</b> Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here.</p><ul>`
-  + errors.map(e => `<li><code>${esc(e.file)}:${esc(e.line)}</code> ${esc(e.field)}: ${esc(e.message)}${e.by ? ` <span class="by">(by ${esc(e.by)})</span>` : ""}</li>`).join("") + "</ul>";
-// The band is written only when it changes: it is a live region, and a rewrite every poll would be read out every time.
-function showLoaded(d, els) {
-  const errors = d.errors || [];
-  const html = errors.length ? errorsHTML(errors) : "";
-  els.errors.hidden = !errors.length; if (els.errors.innerHTML !== html) els.errors.innerHTML = html;
-}
-// errors:end
-const bands = () => ({errors: $("errors")});
+// invalid:end
+// ---------- Polling ----------
 let fails = 0;
 function tick() {
   return fetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(d => { fails = 0; CLOSED_PAGE = false; showLoaded(d, bands()); render(d); },
+    .then(d => { fails = 0; CLOSED_PAGE = false; pageShowErrors($("errors"), d.errors, ERRORS_NOTE); render(d); },
       () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
 }
-if (SNAPSHOT) { showLoaded(SNAPSHOT, bands()); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
+if (SNAPSHOT) { pageShowErrors($("errors"), SNAPSHOT.errors, ERRORS_NOTE); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
 else { conv.start(); tick(); setInterval(tick, 2000); }
 setView();

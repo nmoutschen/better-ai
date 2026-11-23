@@ -75,19 +75,9 @@ AGENT_RECORD_RULE = (
 )
 # Fields the command stamps or assigns: a template line does not show them.
 STAMPED = {"at", "by", "id"}
-# The decision shape every skill shares: its statuses and its fields.
-DECISION_STATUSES = {"waiting", "defaulted", "answered"}
-DECISION_FIELDS = {
-    "type",
-    "raised_by",
-    "about",
-    "asked",
-    "status",
-    "default",
-    "deadline",
-    "answer",
-    "decision",
-}
+# `decided` is a decision the agent settled without asking: only code-better's coordinator writes it, so the research
+# board template does not show it.
+NOT_ON_A_BOARD = {"decided"}
 RECORD_FILES = {
     "brief": "brief.schema.json",
     "question": "questions.schema.json",
@@ -110,6 +100,10 @@ def schema_json(name: str) -> dict:
     """A research schema, or the shared one of that name."""
     path = SCHEMAS / name if (SCHEMAS / name).exists() else SHARED_SCHEMAS / name
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def decision_statuses() -> set[str]:
+    return set(schema_json("decisions.schema.json")["properties"]["status"]["enum"])
 
 
 class ResearchBetterText(unittest.TestCase):
@@ -216,7 +210,9 @@ class ResearchBetterText(unittest.TestCase):
         self.assertEqual(types, set(RECORD_FILES) | set(logs))
         for kind, name in RECORD_FILES.items():
             lines = {value.strip(" <>") for r in records if r["type"] == kind for value in str(r["status"]).split("|")}
-            statuses = DECISION_STATUSES if kind == "decision" else schema_json(name)["properties"]["status"]["enum"]
+            statuses = schema_json(name)["properties"]["status"]["enum"]
+            if kind == "decision":
+                statuses = set(statuses) - NOT_ON_A_BOARD
             for status in statuses:
                 with self.subTest(kind=kind, status=status):
                     self.assertIn(status, lines, f"no {kind} line for status {status}")
@@ -272,8 +268,7 @@ class ResearchBetterText(unittest.TestCase):
         for record in template_records():
             kind = record["type"]
             doc = schemas[kind] if kind in schemas else defs[shared.get(kind, kind)]
-            allowed = DECISION_FIELDS if kind == "decision" else set(doc["properties"])
-            required = {"type", "raised_by", "about", "asked", "status"} if kind == "decision" else set(doc["required"])
+            allowed, required = set(doc["properties"]), set(doc["required"])
             with self.subTest(type=kind, status=record.get("status")):
                 self.assertLessEqual(set(record), allowed)
                 self.assertLessEqual(required - STAMPED, set(record))
@@ -294,15 +289,12 @@ class ResearchBetterText(unittest.TestCase):
 CODE_BETTER = ROOT / "skills" / "code-better"
 SRC = ROOT / "src"
 CODE_SCHEMAS = SRC / "better_ai" / "code" / "schemas"
-SHARED_SCHEMAS = SRC / "better_ai" / "schemas"
 CASES = ROOT / "evals" / "cases" / "code-better"
 
 
-sys.path.insert(0, str(SRC))
 import better_ai.code  # noqa: E402,F401  (registers its hooks)
-from better_ai import schema  # noqa: E402
 
-CODE_DOCS = schema.load_schemas(*resources.schema_sources("code"))
+CODE_DOCS = better_schema.load_schemas(*resources.schema_sources("code"))
 
 CODE_TEXT_FILES = sorted(
     [CODE_BETTER / "SKILL.md"]
@@ -510,7 +502,9 @@ class CodeBetterTextTest(unittest.TestCase):
                     path = Path(temp) / relative
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(text)
-                problems += [f"{run}: {error}" for error in schema.check_paths([Path(temp) / ".code"], docs=CODE_DOCS)]
+                problems += [
+                    f"{run}: {error}" for error in better_schema.check_paths([Path(temp) / ".code"], docs=CODE_DOCS)
+                ]
         self.assertEqual(problems, [])
 
     def test_code_better_a_solo_mode_can_record_a_question_and_the_spec_always_exists(self):
@@ -533,8 +527,7 @@ class CodeBetterTextTest(unittest.TestCase):
         """The hidden checks that look for notes accept a `.code/` JSON working file, as a run of the skill writes."""
         cases = [
             ("record-session-constraint/checks/command_passes_3/recorded.py", [], "instructions.jsonl"),
-            ("shared-migration-plan/checks/command_passes_1/plan.py", ["sales", "stock"], "tasks.jsonl"),
-            ("oldlog-multi-session-plan/checks/command_passes/plan.py", ["billing", "search"], "tasks.jsonl"),
+            ("_checks/plan.py", ["sales", "stock"], "tasks.jsonl"),
         ]
         for script, arguments, name in cases:
             with self.subTest(script=script), tempfile.TemporaryDirectory() as temp:
@@ -788,7 +781,7 @@ class SkillTextCommands(unittest.TestCase):
     def test_the_decision_shape_is_the_shared_one(self):
         for path in (CODE_BETTER / "formats" / "decision.md", RESEARCH / "formats" / "board.md"):
             text = path.read_text()
-            for status in ("waiting", "defaulted", "answered"):
+            for status in decision_statuses() - NOT_ON_A_BOARD:
                 self.assertIn(f'"status": "{status}"', text, path.name)
             self.assertNotIn('"status": "pending"', text, path.name)
             self.assertNotIn('"status": "changed"', text, path.name)

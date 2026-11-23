@@ -18,7 +18,7 @@ graders:
 - type: command_passes
   cmd: PYTHONPATH=. python "$GRADE_FILES/same_code.py" weight.py header footer 'label[-1]'
   files:
-    same_code.py: checks/command_passes_1/same_code.py
+    same_code.py: ../_checks/same_code.py
 - type: command_passes
   cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
   files:

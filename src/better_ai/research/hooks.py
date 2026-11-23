@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from .. import paths, records
 
-TIME = "%Y-%m-%dT%H:%M:%SZ"
-
 
 @records.set_step("research-better")
 def stamp_changes(ctx: records.SetContext) -> None:
@@ -28,7 +26,7 @@ def stamp_changes(ctx: records.SetContext) -> None:
     new = changes[:fresh]
     if any(isinstance(entry, dict) and "at" in entry for entry in new):
         raise paths.refusal(ctx.unit.label, "a new entry in changes holds `at`", "remove 'at' from the new entries")
-    stamped = ctx.run.now().strftime(TIME)
+    stamped = ctx.run.now().strftime(records.TIME)
     ctx.patch["changes"] = [{"at": stamped, **e} if isinstance(e, dict) else e for e in new] + earlier
 
 

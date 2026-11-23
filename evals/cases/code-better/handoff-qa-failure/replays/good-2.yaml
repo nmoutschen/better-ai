@@ -4,4 +4,5 @@ actions:
   content: |
     OFF = "Arrêt"
 - bash: python test_switch.py
+  fails: true
 - bash: '[ "$(python -c "from switch import OFF; print(OFF)")" = "Arrêt" ] && echo match'

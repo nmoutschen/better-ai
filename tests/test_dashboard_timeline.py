@@ -12,8 +12,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from better import call  # noqa: E402
 from better import run as better  # noqa: E402
-from test_dashboard_formats import card, change, check, check_record, load, log, task, write  # noqa: E402
+from code_records import card, change, check, check_record, load, log, task, write  # noqa: E402
 
 AT = "2026-11-21T10:00:00Z"
 
@@ -90,9 +91,7 @@ class TaskTitle(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             change(Path(d))
             fields = {k: v for k, v in task("T2", task="y" * 41).items() if k not in ("type", "at", "by", "id")}
-            done = better(
-                "code-better", "add", ".code/c", "task", "--by", "coordinator", stdin=json.dumps(fields), cwd=d
-            )
+            done = call("code-better", "add", ".code/c", "task", "--by", "coordinator", stdin=json.dumps(fields), cwd=d)
             self.assertNotEqual(done.returncode, 0)
             self.assertIn("task", done.stdout + done.stderr)
 
@@ -225,7 +224,7 @@ class FoundByTheVerifier(unittest.TestCase):
     def test_add_refuses_a_typed_status_at(self):
         change(self.repo)
         fields = {k: v for k, v in task("T2", status_at=AT).items() if k not in ("type", "at", "by", "id")}
-        done = better(
+        done = call(
             "code-better", "add", ".code/c", "task", "--by", "coordinator", stdin=json.dumps(fields), cwd=self.repo
         )
         self.assertNotEqual(done.returncode, 0)

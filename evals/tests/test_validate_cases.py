@@ -4,19 +4,17 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from conftest import write_case
 
 from tools import validate_cases
 
 
-def write_case(root: Path, graders: str) -> Path:
+def graders_case(root: Path, graders: str) -> Path:
     """Write a one-file case whose graders are the given yaml, and return its folder."""
-    directory = root / "nested-check"
-    (directory / "repo").mkdir(parents=True)
-    (directory / "repo" / "main.py").write_text("x = 1\n")
-    (directory / "case.yaml").write_text(
+    text = (
         f"id: nested-check\nrule: some-behaviour\nsource: []\nsituation: A case.\nrequest: Do it.\ngraders:\n{graders}"
     )
-    return directory
+    return write_case(root, text, "nested-check")
 
 
 def test_unknown_case_id_fails(capsys: pytest.CaptureFixture[str]) -> None:
@@ -39,7 +37,7 @@ def test_command_passes_inside_any_of_must_fail_untouched(tmp_path: Path) -> Non
         "  - type: file_contains\n    path: main.py\n    pattern: NEVER\n"
         "  - type: any_of\n    graders:\n      - type: command_passes\n        cmd: 'true'\n"
     )
-    problems = asyncio.run(validate_cases.validate(write_case(tmp_path, graders), False))
+    problems = asyncio.run(validate_cases.validate(graders_case(tmp_path, graders), False))
     assert any("passes on the untouched repo" in problem and "any_of" in problem for problem in problems)
 
 
@@ -49,7 +47,15 @@ def test_nested_command_that_fails_untouched_is_fine(tmp_path: Path) -> None:
         "  - type: file_contains\n    path: main.py\n    pattern: NEVER\n"
         "  - type: any_of\n    graders:\n      - type: command_passes\n        cmd: 'false'\n"
     )
-    assert asyncio.run(validate_cases.validate(write_case(tmp_path, graders), False)) == []
+    case = graders_case(tmp_path, graders)
+    assert asyncio.run(validate_cases.validate(case, False)) == []
+    # A good replay's bash action that exits nonzero is reported, unless it says `fails: true`.
+    (case / "replays").mkdir()
+    replay = case / "replays" / "good-1.yaml"
+    replay.write_text("actions:\n  - bash: 'echo NEVER >> main.py; false'\n")
+    assert any("without `fails: true`" in problem for problem in asyncio.run(validate_cases.validate(case, False)))
+    replay.write_text("actions:\n  - bash: 'echo NEVER >> main.py; false'\n    fails: true\n")
+    assert not any("fails: true" in problem for problem in asyncio.run(validate_cases.validate(case, False)))
 
 
 def test_nested_any_of_key_equals_the_scorer_key() -> None:

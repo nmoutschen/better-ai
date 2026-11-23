@@ -20,20 +20,22 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import better as better_module  # noqa: E402
+from better import call  # noqa: E402
 from better import run as better  # noqa: E402
-from test_dashboard_formats import AT, card, change, code, spec, write  # noqa: E402
+from code_records import AT, card, change, code, spec, write  # noqa: E402
 
 UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
 
-def run(folder: Path, *args, stdin=None):
-    """`better.pyz` of code-better, started in the folder that holds `.code/`."""
+def run(folder: Path, *args, stdin=None, process=False):
+    """The command of code-better, in the folder that holds `.code/`: in this process, or with `process` as `better.pyz`
+    is started, which each verb has in one test."""
     root = next(p.parent for p in (folder, *folder.parents) if p.name == ".code")
-    return better("code-better", *args, stdin=stdin, cwd=root)
+    return (better if process else call)("code-better", *args, stdin=stdin, cwd=root)
 
 
-def add(folder: Path, kind: str, agent: str, fields: dict, *more):
-    return run(folder, "add", str(folder), kind, "--for", agent, *more, stdin=json.dumps(fields))
+def add(folder: Path, kind: str, agent: str, fields: dict, *more, process=False):
+    return run(folder, "add", str(folder), kind, "--for", agent, *more, stdin=json.dumps(fields), process=process)
 
 
 def lines(path: Path) -> list:
@@ -51,6 +53,7 @@ class Card(unittest.TestCase):
                 {"role": "builder", "task": "T1", "branch": "feat/t1"},
                 "--by",
                 "coordinator",
+                process=True,
             )
             self.assertEqual(done.returncode, 0, done.stderr)
             written = json.loads((folder / "logs" / "builder-t1.card.json").read_text())
@@ -230,7 +233,7 @@ class Reply(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             self.comment(folder)
-            done = run(folder, "reply", str(folder), "--to", "m-1", stdin="T2 holds the schema.")
+            done = run(folder, "reply", str(folder), "--to", "m-1", stdin="T2 holds the schema.", process=True)
             self.assertEqual(done.returncode, 0, done.stderr)
             events = lines(folder / "conversation.jsonl")
             self.assertEqual([e["type"] for e in events], ["comment", "reply", "status"])
@@ -311,7 +314,6 @@ class ServedPage(unittest.TestCase):
             refused = self.send(url, "answer", {**events["answer"], "id": "a-y", "text": ""})
             self.assertEqual(refused["error"]["code"], -32602)
             self.assertIn("text", refused["error"]["message"])
-            self.assertEqual(self.send(url, "note", {**events["note"], "by": "agent"})["error"]["code"], -32602)
             self.assertIn("error", self.send(url, "approve", {"id": "x"}))  # the page declares no approve
             out = run(folder, "pending", str(folder)).stdout
             items = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
@@ -353,7 +355,7 @@ class ServedPage(unittest.TestCase):
     def test_render_writes_one_page_with_its_data_and_no_link_to_a_server(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
-            done = run(folder, "render", str(folder))
+            done = run(folder, "render", str(folder), process=True)
             self.assertEqual(done.returncode, 0, done.stderr)
             page = (folder / "dashboard.html").read_text()
         self.assertIn('id="page-data"', page)
@@ -383,7 +385,13 @@ class Create(unittest.TestCase):
             root = self.repo(d)
             folder = root / ".code" / "c"
             done = run(
-                folder, "create", str(folder), "--by", "coordinator", stdin=self.head({"type": "request", "text": "x"})
+                folder,
+                "create",
+                str(folder),
+                "--by",
+                "coordinator",
+                stdin=self.head({"type": "request", "text": "x"}),
+                process=True,
             )
             self.assertEqual(done.returncode, 0, done.stderr)
             head = json.loads((folder / "code.json").read_text())

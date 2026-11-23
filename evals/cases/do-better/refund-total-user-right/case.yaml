@@ -12,4 +12,4 @@ graders:
 - type: command_passes
   cmd: PYTHONPATH=. python "$GRADE_FILES/check.py"
   files:
-    check.py: checks/command_passes_1/check.py
+    check.py: ../_checks/monthly_total.py

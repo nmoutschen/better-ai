@@ -5,7 +5,9 @@
 test runs on an older Python the helper looks for a newer interpreter on PATH and skips the test if there is none.
 """
 
+import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -13,8 +15,28 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+SRC = ROOT / "src"
 BUILD = ROOT / "tools" / "build.py"
 CANDIDATES = ["python3.15", "python3.14", "python3.13", "python3.12", "python3"]
+# The Python 3.10 the tests run a built .pyz on: BETTER_AI_PYTHON310, else python3.10 on PATH; None when there is none.
+PY310 = os.environ.get("BETTER_AI_PYTHON310") or shutil.which("python3.10")
+
+
+def verbs_of(skill: str) -> dict[str, argparse.ArgumentParser]:
+    """The command line of a skill ("code-better"), read from the argparse parser the .pyz runs: verb -> its parser."""
+    if str(SRC) not in sys.path:
+        sys.path.insert(0, str(SRC))
+    from better_ai import cli, resources
+
+    package = skill.removesuffix("-better")
+    info = resources.BuildInfo(skill, package, "source", resources.cutoff())
+    parser = cli._parser(cli.load(info), info)
+    (commands,) = [a for a in parser._actions if isinstance(a, argparse._SubParsersAction)]
+    return dict(commands.choices)
+
+
+def skill_names() -> list[str]:
+    return list(json.loads((SRC / "better_ai" / "skills.json").read_text())["skills"])
 
 
 def build_python() -> str:

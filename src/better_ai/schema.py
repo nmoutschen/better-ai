@@ -38,7 +38,7 @@ Extensions, which other JSON Schema tools ignore:
   of that type in that file. `file` is relative to the folder of the file being checked and may use `..`; a name that
   ends in `/` is a folder of `<id>.json` files; `type` may be a list. Otherwise the error says it is dangling.
   `file` may also be `{"from": "code.json", "field": "design.folder", "name": "spec.jsonl", "else": "spec.jsonl"}`:
-  `name` in the repo-relative folder (the repo root is the nearest folder up with `.git`) that `field`, a dotted path
+  `name` in the repo-relative folder (the repo root is the unit's, `Unit.root`) that `field`, a dotted path
   into the JSON file `from`, holds, as when `code.json` points to an architect folder; `else` when it holds none.
 - `x-mode-sets` (a string field): `{"file": "code.json", "field": "mode", "coordinate": [...], "other": [...]}`. The
   value must be in the set named by the `field` of the JSON file `file`: the key that equals that value, or `other`.
@@ -64,6 +64,7 @@ from __future__ import annotations
 
 import copy
 import fnmatch
+import functools
 import json
 import math
 import os
@@ -116,6 +117,7 @@ PAUSE = 0.05  # seconds before a file that failed to parse is read once more
 ROOT = "(record)"
 SKIPPED_FOLDERS = {"__pycache__", "node_modules"}
 CLOCK_SLACK = timedelta(minutes=5)  # how far ahead of this machine's clock an `at` may be (a typed time is a guess)
+TIME = "%Y-%m-%dT%H:%M:%SZ"  # the form of every `at`
 OLD_FORMAT = "written in the format before this change: kept as is, not converted"
 
 
@@ -187,8 +189,9 @@ def read_checked(path: Path, lines: bool) -> str:
 class Context:
     """The files around the one being checked, read once each: what pointers, mode sets and hooks look at."""
 
-    def __init__(self, directory: Path, name: str, cache: dict[str, Any]):
+    def __init__(self, directory: Path, name: str, cache: dict[str, Any], root: Path | None = None):
         self.directory = directory
+        self.root = root
         self.stem = name.removesuffix(".jsonl").removesuffix(".json")
         self.cache = cache
         self.line = 0  # the line being checked, for `pointers`
@@ -200,10 +203,10 @@ class Context:
         return Path(os.path.normpath(self.directory / relative.replace("{stem}", self.stem)))
 
     def repo_root(self) -> Path | None:
-        for folder in (self.directory, *self.directory.parents):
-            if (folder / ".git").exists():
-                return folder
-        return None
+        """The repository root the caller gave (`Unit.root`), else what `paths.repo_root` finds from the folder."""
+        from . import paths
+
+        return self.root or paths.repo_root(self.directory)
 
     def target(self, file: Any) -> tuple[str | None, str]:
         """The file a pointer looks in, and how to show it. A name is used as it is; an object
@@ -842,9 +845,10 @@ def check_file(
     now: datetime | None = None,
     cutoff: str | None = None,
     notices: list[Error] | None = None,
+    root: Path | None = None,
 ) -> list[Error]:
     """The errors of one file, in line order. The file's schema is found from the `x-files` of the schemas. See
-    `check_text` for `now`, `cutoff` and `notices`."""
+    `check_text` for `now`, `cutoff`, `notices` and `root`."""
     found = _match(path, docs)
     where = str(path)
     if not found:
@@ -853,7 +857,7 @@ def check_file(
         text = read_checked(path, path.suffix == ".jsonl")
     except (OSError, UnicodeDecodeError) as error:
         return [Error(where, 1, "(file)", f"cannot be read: {error}")]
-    return check_text(path, text, docs, cache, now=now, cutoff=cutoff, notices=notices)
+    return check_text(path, text, docs, cache, now=now, cutoff=cutoff, notices=notices, root=root)
 
 
 def _clock_skew(record: dict, now: datetime) -> str | None:
@@ -863,7 +867,7 @@ def _clock_skew(record: dict, now: datetime) -> str | None:
     if not isinstance(at, str):
         return None
     try:
-        written = datetime.strptime(at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        written = datetime.strptime(at, TIME).replace(tzinfo=timezone.utc)
     except ValueError:
         return None
     ahead = written - now
@@ -904,9 +908,11 @@ def check_text(
     cutoff: str | None = None,
     notices: list[Error] | None = None,
     pointers: list[tuple[int, Path, str]] | None = None,
+    root: Path | None = None,
 ) -> list[Error]:
     """The errors of a file's text, which the caller has read once: it validates that text and shows the same lines.
-    With `pointers`, each pointer that resolves is added to it as (line, file or folder it names, id).
+    With `pointers`, each pointer that resolves is added to it as (line, file or folder it names, id). `root` is the
+    repository's root (`Unit.root`), which a pointer into another folder of the repository starts from.
 
     With `now`, a record whose `at` is more than five minutes ahead of it is an error (a typed time, or a skewed
     clock). With `cutoff` (a UTC time like the `at`s) and `notices`, a record that fails its schema but has a shape the
@@ -916,7 +922,7 @@ def check_text(
     where = str(path)
     if not found:
         return [Error(where, 1, "(file)", "no schema describes this file")]
-    context = Context(path.resolve().parent, path.name, {} if cache is None else cache)
+    context = Context(path.resolve().parent, path.name, {} if cache is None else cache, root)
     context.pointers = pointers
     errors: list[Error] = []
     seen: dict[str, int] = {}
@@ -983,10 +989,123 @@ def strip_invalid(record: dict, errors: list[Error]) -> dict:
     return stripped
 
 
-def _default_docs() -> dict[str, dict]:
+MAX_DEPTH = 50  # no record of a unit's files nests deeper than a design.json step
+
+
+def _page_value(piece: str) -> Any:
+    """One JSON value as a page can show it: no NaN or Infinity (a browser cannot read them), and nothing nested so
+    deep that Python gives up. ValueError says why not."""
+
+    def refuse(word: str) -> Any:
+        raise ValueError(f"{word} is not a JSON value")
+
+    def finite(word: str) -> float:
+        value = float(word)
+        if math.isinf(value):
+            raise ValueError(f"{word} is too large")
+        return value
+
+    try:
+        value = json.loads(piece, parse_constant=refuse, parse_float=finite)
+    except RecursionError:
+        raise ValueError("nested too deeply") from None
+    pending = [(value, 1)]
+    while pending:  # no recursion: a line may be as deep as it likes
+        item, depth = pending.pop()
+        if isinstance(item, (dict, list)):
+            if depth > MAX_DEPTH:
+                raise ValueError(f"nested more than {MAX_DEPTH} levels deep")
+            pending.extend((inner, depth + 1) for inner in (item.values() if isinstance(item, dict) else item))
+    return value
+
+
+class Read(NamedTuple):
+    """What `read_records` found in one file."""
+
+    records: list[dict]  # in line order; a record with errors only with keep_invalid, marked by `_errors`
+    lines: list[int]  # the line of each record, in step with `records`
+    errors: list[dict]  # {file, line, field, message, by}: the first error of each field of a line; `by` if readable
+    old: set[int]  # the lines written in the format before this change (not errors)
+
+
+def read_records(
+    unit: Any, relative: str, docs: dict, cache: dict, now: datetime, cutoff: str, keep_invalid: bool = False
+) -> Read:
+    """The records of one file of a unit for a page, checked on the text that is shown, so a write in between is in
+    neither. A file that does not exist has none. A record with errors is left out, unless `keep_invalid`: then it
+    stays without the fields that failed, its messages in `_errors`, its `status` as written and an `id` of `(line n)`
+    if it has none. A line that is not JSON a page can show (NaN, too deep) is an error, never a record. A file that no
+    schema describes, or that cannot be read or checked, has only its error."""
+    from . import paths
+
+    def failed(message: str, line: int = 1, field: str = "(file)") -> Read:
+        return Read([], [], [{"file": relative, "line": line, "field": field, "message": message}], set())
+
+    try:
+        path = unit.target(relative)
+        if not path.is_file():
+            return Read([], [], [], set())
+        jsonl = path.suffix == ".jsonl"
+        text = read_checked(path, jsonl)
+    except (OSError, UnicodeDecodeError, paths.Refused) as error:
+        return failed(f"cannot be read: {error}")
+    notices: list[Error] = []
+    try:
+        found = check_text(path, text, docs, cache, now=now, cutoff=cutoff, notices=notices, root=unit.root)
+    except RecursionError:
+        return failed("cannot be checked: nested too deeply")
+    if [(e.field, e.message) for e in found] == [("(file)", "no schema describes this file")]:
+        return failed(found[0].message)
+    flagged = {e.line for e in found}
+    parsed: dict[int, dict | None] = {}
+    errors: list[dict] = []
+    for number, piece in enumerate(_lines(text) if jsonl else [text], 1):
+        try:
+            value = _page_value(piece)
+        except ValueError as error:
+            if number not in flagged:  # valid for the schema, but not for a page
+                errors.append({"file": relative, "line": number, "field": ROOT, "message": f"not valid JSON: {error}"})
+            continue
+        parsed[number] = value if isinstance(value, dict) else None
+    by_line: dict[int, list[Error]] = {}
+    for error in found:
+        if any(e.field == error.field for e in by_line.get(error.line, [])):
+            continue
+        record = parsed.get(error.line)
+        by = record.get("by") if record else None
+        entry = {"file": relative, "line": error.line, "field": error.field, "message": error.message}
+        errors.append({**entry, "by": plain(by)} if isinstance(by, str) and by else entry)
+        by_line.setdefault(error.line, []).append(error)
+    records: list[dict] = []
+    lines: list[int] = []
+    for number, record in parsed.items():
+        if record is None or (number in by_line and not keep_invalid):
+            continue
+        if number in by_line:
+            status = record.get("status")
+            record = strip_invalid(record, by_line[number])
+            if isinstance(status, str):
+                record["status"] = plain(status)  # a page shows only text, so a status that failed shows as written
+            if not isinstance(record.get("id"), str) or not record["id"]:
+                record["id"] = f"(line {number})"
+        records.append(record)
+        lines.append(number)
+    return Read(records, lines, errors, {e.line for e in notices})
+
+
+def docs_for(package: str | None = None) -> dict[str, dict]:
+    """The schemas of a skill package (the running skill's if none is named): the shared ones, then the package's own.
+    Loaded once per package; callers do not change what it returns."""
     from . import resources
 
-    return load_schemas(*resources.schema_sources())
+    return _loaded(package or resources.build_info().package)
+
+
+@functools.cache
+def _loaded(package: str) -> dict[str, dict]:
+    from . import resources
+
+    return load_schemas(*resources.schema_sources(package))
 
 
 def check_record(
@@ -997,7 +1116,7 @@ def check_record(
     around the record are not made: `check_paths` makes them on the file. With `cross`, the hooks (`x-check`) of the
     schemas run too, for a record whose rules look only at the record itself, such as a presentation spec. `schemas`
     is a folder; by default the shared schemas and the running skill's own."""
-    docs = load_schemas(schemas) if schemas else _default_docs()
+    docs = load_schemas(schemas) if schemas else docs_for()
     problems: list[tuple[str, str]] = []
     context = Context(Path.cwd(), "record", {}) if cross else None
     for name in names:
@@ -1015,12 +1134,13 @@ def check_paths(
     now: datetime | None = None,
     cutoff: str | None = None,
     notices: list[Error] | None = None,
+    root: Path | None = None,
 ) -> list[Error]:
     """The errors of each file, and of each file in each folder that a schema describes. `docs` (already loaded) or
-    `schemas` (a folder) say which schemas apply; by default the shared ones and the running skill's. `now`, `cutoff`
-    and `notices` are as for `check_text`."""
+    `schemas` (a folder) say which schemas apply; by default the shared ones and the running skill's. `now`, `cutoff`,
+    `notices` and `root` are as for `check_text`."""
     if docs is None:
-        docs = load_schemas(schemas) if schemas else _default_docs()
+        docs = load_schemas(schemas) if schemas else docs_for()
     cache: dict[str, Any] = {}
     errors: list[Error] = []
     for path in paths:
@@ -1038,7 +1158,7 @@ def check_paths(
                     found = _match(file, docs)
                     if found:
                         matched = True
-                        errors += check_file(file, docs, cache, now=now, cutoff=cutoff, notices=notices)
+                        errors += check_file(file, docs, cache, now=now, cutoff=cutoff, notices=notices, root=root)
                         needed += [n for _, doc in found for n in doc.get("x-required-files", []) if n not in needed]
                 errors += [
                     Error(str(Path(folder) / n), 1, "(file)", "missing file")
@@ -1048,7 +1168,7 @@ def check_paths(
             if not matched:
                 errors.append(Error(str(path), 1, "(folder)", "no file here has a schema"))
         elif path.exists():
-            errors += check_file(path, docs, cache, now=now, cutoff=cutoff, notices=notices)
+            errors += check_file(path, docs, cache, now=now, cutoff=cutoff, notices=notices, root=root)
         else:
             errors.append(Error(str(path), 1, "(file)", "does not exist"))
     return errors
