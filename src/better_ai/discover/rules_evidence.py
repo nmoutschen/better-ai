@@ -42,7 +42,7 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from .. import paths, records, schema
 
@@ -52,6 +52,8 @@ TIMEOUT_REASON = "verifier did not finish"
 MAX_TRIES = 2  # a `not reachable` evidence is tried again only while fewer verifiers than this were started
 CHECKED = ("checked_read", "span", "sha256")  # what `counts` holds and nothing else does
 SOURCE_ID = re.compile(r"S-[\w.-]+-\d+")
+NAT64 = ipaddress.ip_network("64:ff9b::/96")
+PLAIN_HOST = re.compile(r"[a-z0-9_.-]+")
 USER_ONLY = ("verifier", "tries", "since", *CHECKED)  # fields the user's own evidence never has
 
 
@@ -98,9 +100,17 @@ def _literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
         return _short_form(host)
     if ip.version == 6 and ip.ipv4_mapped is not None:
         return ip.ipv4_mapped
-    if ip.version == 6 and int(ip) >> 32 == 0:  # ::/96, an IPv4 address in IPv6 dress
-        return ipaddress.IPv4Address(int(ip))
+    if ip.version == 6 and (int(ip) >> 32 == 0 or ip in NAT64):  # ::/96 and 64:ff9b::/96 hold an IPv4 address
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     return ip
+
+
+def _is_ip(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
 
 
 def _host(host: str) -> str | None:
@@ -131,9 +141,12 @@ def url_problem(url: str) -> str | None:
         return f"must be an http or https address, not {parts.scheme or 'no scheme'}: give the page's http or https address"
     if not host:
         return "has no host: give the page's http or https address"
+    host = unquote(host)  # as a client reads it: the percent-encoded bytes first
+    if "%" in host:
+        return "has a percent sign in its host: write the host name or address plainly"
     host = _host(host.rstrip("."))
-    if not host:
-        return "is not a valid host name: give the page's http or https address"
+    if not host or not (PLAIN_HOST.fullmatch(host) or _is_ip(host)):
+        return "is not a plain host name or address: give the page's http or https address"
     if host == "localhost" or host.endswith(".localhost"):
         return "is localhost: read a public page, or give the page text as your own evidence"
     ip = _literal(host)
@@ -255,12 +268,18 @@ def _evidence_at_rest(record: dict, ctx: schema.Context) -> list[tuple[str, str]
             problems.append(("by", f"evidence from you is added by the coordinator, {coordinator}"))
         if isinstance(head, dict) and head.get("setting") == "internal" and not record.get("summary"):
             problems.append(("summary", "needed for evidence from you in an internal discovery: the words by role"))
-    elif kind == "web" and status == "counts":
-        problems += _counting(record, words, head.get("coordinator") if isinstance(head, dict) else None)
+    elif kind == "web":
+        coordinator = head.get("coordinator") if isinstance(head, dict) else None
+        if coordinator and record.get("verifier") == coordinator:
+            problems.append(("verifier", "the coordinator is never the verifier: a verifier agent reads the page"))
+        if "since" in record and not record.get("verifier"):
+            problems.append(("since", "since is set only while a verifier runs: set a verifier"))
+        if status == "counts":
+            problems += _counting(record, words)
     return problems
 
 
-def _counting(record: dict, words: dict, coordinator: str | None) -> list[tuple[str, str]]:
+def _counting(record: dict, words: dict) -> list[tuple[str, str]]:
     """Web evidence that counts: a verifier other than its analyst read the page raw and the span holds the quote."""
     problems = []
     verifier = record.get("verifier")
@@ -270,8 +289,6 @@ def _counting(record: dict, words: dict, coordinator: str | None) -> list[tuple[
         )
     elif verifier == record.get("by"):
         problems.append(("verifier", "the analyst that added the evidence cannot be the verifier that counts it"))
-    elif verifier == coordinator:
-        problems.append(("verifier", "the coordinator is never the verifier: a verifier agent reads the page"))
     if record.get("checked_read") != "raw":
         problems.append(("checked_read", "counts needs checked_read raw: a verifier reads the page itself"))
     span = record.get("span")
@@ -659,6 +676,8 @@ def _write_table(
                 )
             if new != "checking":
                 raise _refuse(unit, f"{name} is set only while {ident} is checking", f"{ident} is {new}")
+            if name == "since" and not (verifier or "verifier" in changes):
+                raise _refuse(unit, f"since is set only while a verifier runs on {ident}", "set a verifier first")
             if name == "verifier" and value == coordinator:
                 raise _refuse(
                     unit, "the coordinator is never the verifier", "start a verifier agent with a name of its own"
@@ -725,6 +744,8 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
             if by == verifier:
                 pass
             elif new == "unverified" and by == coordinator and patch.get("reason") == TIMEOUT_REASON:
+                if not verifier:
+                    raise _refuse(unit, f"no verifier runs on {ident}: nothing to wait for", "set a verifier first")
                 started = _since(record)
                 if started is None or (now - started).total_seconds() < TIMEOUT * 60:
                     waited = f"{int((now - started).total_seconds() // 60)} minutes ago" if started else "not at all"

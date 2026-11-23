@@ -469,6 +469,61 @@ class Urls(Rules):
                 self.assertTrue((done.stdout + done.stderr).strip(), url)
         self.assertEqual(sorted(p.name for p in (self.folder / "sources").iterdir()), ["S-a1-1.json"])
 
+    HOST_FORMS = (
+        # (address, refused?) the forms a client such as curl reads as another host than the one the text shows
+        ("http://%31%32%37.0.0.1/", True),
+        ("http://%31%32%37%2e%30%2e%30%2e%31/", True),
+        ("http://%6c%6f%63%61%6c%68%6f%73%74/", True),
+        ("http://%2531%2532%2537.0.0.1/", True),  # still a percent sign after one reading
+        ("http://example.com%2f@127.0.0.1/", True),
+        ("http://exa%mple.com/", True),
+        ("http://LocalHost/", True),
+        ("http://localhost./", True),
+        ("http://\uff11\uff12\uff17.0.0.1/", True),
+        ("http://0x7f000001/", True),
+        ("http://0X7F.0.0.1/", True),
+        ("http://0177.0.0.1/", True),
+        ("http://017700000001/", True),
+        ("http://2130706433/", True),
+        ("http://127.1/", True),
+        ("http://127.0.1/", True),
+        ("http://127.0.0.1./", True),
+        ("http://[::1]/", True),
+        ("http://[0:0:0:0:0:0:0:1]/", True),
+        ("http://[::ffff:7f00:1]/", True),
+        ("http://[::ffff:127.0.0.1]/", True),
+        ("http://[::127.0.0.1]/", True),
+        ("http://[::7f00:1]/", True),
+        ("http://[64:ff9b::7f00:1]/", True),
+        ("http://[64:ff9b::127.0.0.1]/", True),
+        ("http://[64:ff9b::a00:1]/", True),
+        ("http://[64:ff9b::c0a8:101]/", True),
+        ("http://[64:ff9b::a9fe:a9fe]/", True),
+        ("http://[fe80::1]/", True),
+        ("https://example.com/\n", True),
+        ("https://example.com", False),
+        ("https://EXAMPLE.com./x", False),
+        ("https://%65xample.com/", False),
+        ("https://exa\u3002mple.com/", False),
+        ("https://8.8.8.8/", False),
+        ("http://[64:ff9b::808:808]/", False),
+        ("http://[::ffff:808:808]/", False),
+        ("http://[2001:4860:4860::8888]/", False),
+        ("https://b\u00fccher.example/", False),
+        ("https://xn--bcher-kva.example/", False),
+    )
+
+    def test_s17_every_host_form_is_judged_as_a_client_reads_it(self):
+        for url, refused in self.HOST_FORMS:
+            with self.subTest(url=url):
+                self.assertEqual(rules_evidence.url_problem(url) is not None, refused, url)
+
+    def test_s17_the_same_forms_through_add(self):
+        for url, refused in self.HOST_FORMS[::3]:
+            with self.subTest(url=url):
+                done = self.source(url)
+                self.assertEqual(done.returncode, 1 if refused else 0, (url, done.stdout, done.stderr))
+
     def test_s17_the_refusal_says_what_to_do(self):
         done = self.source("http://localhost/")
         self.refused(done, "localhost", "public")
@@ -856,8 +911,10 @@ class FieldTable(Rules):
             return was == "checking" and writer in (COORD, "a1")
         if field == "summary":
             return writer == COORD and was in ("checking", "counts")
-        if field in ("verifier", "since"):
+        if field == "verifier":
             return writer == COORD and was == "checking"
+        if field == "since":  # only while a verifier runs
+            return writer == COORD and was == "checking" and "verifier" in present
         return False  # tries, sha256, reason, checked_read, span: set only by a change of status, or by better.pyz
 
     def test_every_field_as_every_writer_in_every_status(self):
@@ -1029,6 +1086,40 @@ class Hardening(Rules):
     def test_an_international_name_is_a_public_host(self):
         origin = {"type": "web", "url": "https://b\u00fccher.example/x", "read": "raw"}
         self.ok(self.add("source", {"origin": origin, "title": "x"}, "a1"))
+
+
+class Last(Rules):
+    def test_since_is_set_only_while_a_verifier_runs(self):
+        self.refused(self.set("E-a1-1", {"since": ago(2)}, COORD), "verifier")
+        self.ok(self.set("E-a1-1", {"verifier": "v1"}, COORD))
+        self.ok(self.set("E-a1-1", {"since": ago(2)}, COORD))
+
+    def test_the_timeout_needs_a_verifier(self):
+        self.put(status="checking", since=ago(60))
+        done = self.set("E-a1-1", {"status": "unverified", "reason": "verifier did not finish"}, COORD)
+        self.refused(done, "verifier")
+
+    def test_check_reports_the_coordinator_as_verifier_in_any_status(self):
+        for status, extra in (
+            ("checking", {}),
+            ("unverified", {"reason": "reworded"}),
+            ("not reachable", {"reason": "HTTP 503"}),
+        ):
+            with self.subTest(status):
+                self.put(
+                    status=status,
+                    verifier=COORD,
+                    tries=[COORD],
+                    **({"since": ago(1)} if status == "checking" else {}),
+                    **extra,
+                )
+                done = self.run_("check", self.unit)
+                self.assertEqual(done.returncode, 1, done.stdout)
+                self.assertIn("E-a1-1.json", done.stdout + done.stderr)
+
+    def test_check_reports_since_without_a_verifier(self):
+        self.put(status="checking", since=ago(1))
+        self.assertEqual(self.run_("check", self.unit).returncode, 1)
 
 
 class Hooks(unittest.TestCase):
