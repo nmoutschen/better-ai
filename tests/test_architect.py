@@ -30,7 +30,7 @@ PACKAGE = ROOT / "src" / "better_ai" / "architect"
 SKILL = "architect-better"
 
 # The review summary the page shows for the perspectives that run again, by name.
-RERUN_SUMMARY = "reviewSummary([], data.rerun.map(id => nameOf(data.perspectives, id)))"
+RERUN_SUMMARY = "reviewSummary([], {}, data.rerun.map(id => nameOf(data.perspectives, id)))"
 
 
 class Architect(unittest.TestCase):
@@ -155,7 +155,7 @@ class Architect(unittest.TestCase):
         self.assertEqual(view["removed"], [])
         self.assertEqual(
             self.render_javascript(
-                view, "reviewSummary(data.since.map(key => data.change_labels[key]), ['Security', 'Observability'])"
+                view, "reviewSummary(data.since, data.change_labels, ['Security', 'Observability'])"
             ),
             "Changed since the review: Requirement F1, Design section Command contract, Design section CI. "
             "Security, Observability run again.",
@@ -218,7 +218,7 @@ class Architect(unittest.TestCase):
         self.assertEqual(view["change_labels"]["edge:e3"], label)
         self.assertEqual(view["rerun"], ["security"])
         self.assertEqual(
-            self.render_javascript(view, "reviewSummary(data.since.map(key => data.change_labels[key]), ['Security'])"),
+            self.render_javascript(view, "reviewSummary(data.since, data.change_labels, ['Security'])"),
             f"Changed since the review: {label}. Security runs again.",
         )
         self.assertIn(
@@ -231,6 +231,39 @@ class Architect(unittest.TestCase):
         last = self.read()["reviews"][-1]
         self.assertEqual(last["changed"], ["edge:e3"])
         self.assertNotIn("edge:e3", last["hashes"])
+
+    def test_many_changes_give_counts_and_fold_the_full_list(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        for node in design["containers"]["nodes"]:
+            node["detail"] = "Revised"
+        for flow in design["flows"]:
+            for step in flow["steps"]:
+                step["label"] = "Revised step"
+        removed = self.read()["parts"]["edge:e3"]["label"]
+        design["containers"]["edges"] = [edge for edge in design["containers"]["edges"] if edge["id"] != "e3"]
+        path.write_text(json.dumps(design))
+        view = model.model(self.read())
+        boxes = sum(key.startswith("box:") for key in view["since"])
+        steps = sum(key.startswith("step:") for key in view["since"])
+        self.assertEqual(len(view["since"]), boxes + steps + 1)
+        self.assertEqual(
+            self.render_javascript(view, "reviewSummary(data.since, data.change_labels, ['Security'], data.removed)"),
+            f"{len(view['since'])} parts changed since the review: {boxes} boxes, 1 arrow, {steps} steps in 2 flows. "
+            "1 of them removed. Security runs again.",
+        )
+        folded = self.render_javascript(view, "changeList(data.since, data.change_labels, data.removed)")
+        self.assertIn(f"<summary>All {len(view['since'])} changes</summary>", folded)
+        self.assertEqual(folded.count("<li>"), len(view["since"]))
+        self.assertIn(removed + ' <span class="muted">(removed)</span>', folded)
+
+    def test_few_changes_are_listed_without_a_fold(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        design["containers"]["nodes"][0]["detail"] = "Revised"
+        path.write_text(json.dumps(design))
+        view = model.model(self.read())
+        self.assertEqual(self.render_javascript(view, "changeList(data.since, data.change_labels, data.removed)"), "")
 
     def test_check_collects_errors_across_files(self):
         (self.folder / "design.json").write_text("{")
