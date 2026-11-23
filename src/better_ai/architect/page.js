@@ -168,7 +168,7 @@ function reviewSummary(since, labels, names, removed = []) {
 function changeList(since, labels, removed = []) {
   if (since.length <= LISTED_CHANGES) return '';
   const items = since.map(key => '<li>' + text(labels[key]) + (removed.includes(key) ? ' <span class="muted">(removed)</span>' : '') + '</li>');
-  return '<details class="rej"><summary>All ' + since.length + ' changes</summary><ul class="alts">' + items.join('') + '</ul></details>';
+  return '<details class="rej"><summary>All ' + since.length + ' changes</summary><ul>' + items.join('') + '</ul></details>';
 }
 
 function threadComment(log, id) {
