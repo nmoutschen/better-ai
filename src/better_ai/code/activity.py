@@ -2,8 +2,10 @@
 what the agents log (design: .design/code-better-board/design.md, D3).
 
 For a branch, `branch_activity` counts the lines added and removed per 5-minute bucket since a time (when the task's
-first card was added): the commits of the branch since then, at their commit time, and the changes not yet committed in
-the branch's worktree, at their file's modification time. A branch git cannot read gives None, never an error.
+first card was added): the commits of the branch authored since then, at their commit time, and the changes not yet
+committed in the branch's worktree, at their file's modification time. A commit authored before then, as one a rebase
+brought in, is not the task's work. The change folders (`.code/`) are never counted: they are the agents' records, not
+their work. A branch git cannot read gives None, never an error.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from pathlib import Path
 BUCKET = 300  # seconds
 TIMEOUT = 5  # seconds per git call: the page asks every 2 seconds
 LARGEST = 2_000_000  # bytes of an untracked file counted; a larger one counts as one line
+NOT_WORK = ("--", ".", ":(exclude).code")  # pathspec: everything but the change folders
 
 
 def _git(cwd: Path, *args: str) -> str | None:
@@ -91,25 +94,32 @@ def branch_activity(root: Path, branch: str, since: float, trees: dict[str, Path
         "--first-parent",
         "--no-merges",
         "--numstat",
-        "--format=@%ct",
-        "--",
+        "--format=@%ct %at",
+        *NOT_WORK,
     )
     if log is None:
         return None
     when = None
     for line in log.splitlines():
-        if line.startswith("@") and line[1:].isdigit():
-            when, commits = int(line[1:]), commits + 1
-            last = when if last is None else max(last, when)
+        if line.startswith("@"):
+            stamps = line[1:].split()
+            if len(stamps) != 2 or not all(n.isdigit() for n in stamps):
+                when = None
+                continue
+            committed, authored = (int(n) for n in stamps)
+            when = committed if authored >= since else None
+            if when is not None:
+                commits += 1
+                last = when if last is None else max(last, when)
         elif when is not None and (stat := _numstat(line)):
             count(when, *stat)
     tree = (trees if trees is not None else worktrees(root)).get(branch)
     if tree is not None:
-        for line in (_git(tree, "diff", "--numstat", "HEAD", "--") or "").splitlines():
+        for line in (_git(tree, "diff", "--numstat", "HEAD", *NOT_WORK) or "").splitlines():
             stat = _numstat(line)
             if stat:
                 _uncommitted(tree, stat, since, count)
-        for name in (_git(tree, "ls-files", "--others", "--exclude-standard") or "").splitlines():
+        for name in (_git(tree, "ls-files", "--others", "--exclude-standard", *NOT_WORK) or "").splitlines():
             _uncommitted(tree, (_lines_of(tree / name), 0, name), since, count)
     return {
         "buckets": sorted([start, n] for start, n in buckets.items()),
@@ -125,7 +135,7 @@ def _uncommitted(tree: Path, stat: tuple[int, int, str], since: float, count) ->
     plus, minus, name = stat
     try:
         when = os.stat(tree / name).st_mtime
-    except OSError:  # a deleted file: counted now
+    except OSError:  # a deleted file has no time of its own: not counted until it is committed
         return
     if when >= since and plus + minus:
         count(when, plus, minus, name)

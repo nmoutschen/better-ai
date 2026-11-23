@@ -171,3 +171,10 @@ def stamp_status_time(ctx: records.SetContext) -> None:
     ctx.patch.pop("status_at", None)
     if "status" in ctx.patch and ctx.patch["status"] != ctx.record.get("status"):
         ctx.patch["status_at"] = ctx.run.now().strftime(records.TIME)
+
+
+@records.add_guard("code-better", "task")
+def status_time_is_stamped(ctx: records.AddContext) -> None:
+    """`status_at` is the command's to stamp, on `set`: an added task never holds one."""
+    if "status_at" in ctx.record:
+        raise refusal(ctx.unit.label, "status_at is stamped by set when the status changes", "leave status_at out")

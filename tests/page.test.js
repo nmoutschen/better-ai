@@ -916,7 +916,7 @@ test('a fix made after the merge ends after it starts, never before', () => {
 
 test('a build that never handed back ends where the next phase starts', () => {
   const d = fixture();
-  d.agents[2].lines = [line('start', '2026-11-23T10:21:00Z')];  // the round 2 builder, before a second one took over
+  d.agents[2].lines = [line('start', '2026-11-23T10:36:00Z')];  // the round 2 builder, before a second one took over
   d.agents.push({ name: 'builder-t4-3', role: 'builder', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:39:00Z',
     lines: [line('start', '2026-11-23T10:40:00Z')] });
   const p = TL.phasesOf(d.tasks[0], d);

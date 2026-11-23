@@ -84,11 +84,17 @@ function phasesOf(t, d) {
     out.push({kind: "f", start: sec(f.at), end: null, text: str(f.text), lines: []});
   }
   out.sort((x, y) => x.start - y.start);
-  let verifies = 0;
+  // A verify's round is the one its round record names, if the coordinator added one for its verifier; otherwise the
+  // count of verifies so far. A build's round follows the last verify before it.
+  let round = 0;
   out.forEach((p, i) => {
-    if (p.kind === "v") verifies += 1;
-    p.round = p.kind === "v" ? verifies : verifies + 1;
-    if (p.kind === "f") p.end = i + 1 < out.length ? out[i + 1].start : mergedAt(t) ?? now;
+    const next = i + 1 < out.length ? out[i + 1].start : null;
+    if (p.kind === "v") { const r = roundRecord(t, p.agent, null, d); round = r && Number.isInteger(r.round) ? r.round : round + 1; p.round = round; }
+    else p.round = round + 1;
+    // An agent that never handed back, as one stopped or lost, ends where the next phase starts.
+    if (p.end === null && p.kind !== "f" && next !== null) p.end = next;
+    // A fix lasts until the next phase or the merge, at least one bucket when it comes after both, as a fix after the merge does.
+    if (p.kind === "f") { const stop = next ?? mergedAt(t); p.end = stop !== null && stop > p.start ? stop : Math.min(now, p.start + BUCKET); }
   });
   return out;
 }
@@ -128,7 +134,12 @@ function statusOf(t, d) {
 const groupOf = (t, d) => isDone(t) ? "merged" : agentsOf(t, d).length ? "working" : "pending";
 const roundOf = (t, d) => { const p = phasesOf(t, d).at(-1); return p ? p.round : 1; };
 const failures = (t, d) => phasesOf(t, d).filter(p => p.kind === "v" && p.result === "fails" && p.end !== null);
-const findingsOf = (t, round, d) => { const r = list(d.rounds).find(x => x && x.task === t.id && x.round === round);
+// The round record of a verify: the one naming its verifier, else the one with its round number.
+function roundRecord(t, verifier, round, d) {
+  const mine = list(d.rounds).filter(x => x && typeof x === "object" && x.task === t.id);
+  return mine.find(x => verifier && x.verifier === verifier) || (round !== null ? mine.find(x => x.round === round) : undefined);
+}
+const findingsOf = (t, p, d) => { const r = roundRecord(t, p.agent, p.round, d);
   return list(r && r.findings).filter(f => f && typeof f.text === "string"); };
 function lastChange(t, d) {
   const branches = new Set(agentsOf(t, d).map(a => str(a.branch)));
@@ -160,7 +171,7 @@ const BASE = 24;
 function laneSVG(t, d, t0, t1, peak) {
   peak = peak || peakOf(d, t0, t1);
   const x = s => ((Math.min(Math.max(s, t0), t1) - t0) / 60).toFixed(3), out = [];
-  const bar = (a, b, fill, h) => b > t0 && a < t1 ? out.push(`<rect x="${x(a)}" y="${BASE - h}" width="${(x(b) - x(a)).toFixed(3)}" height="${h}" fill="${fill}"/>`) : 0;
+  const bar = (a, b, fill, h) => b > t0 && a < t1 ? out.push(`<rect x="${x(a)}" y="${BASE - h}" width="${Math.max(0, x(b) - x(a)).toFixed(3)}" height="${h}" fill="${fill}"/>`) : 0;
   const dots = (a, b) => b > t0 && a < t1 ? out.push(`<line x1="${x(a)}" x2="${x(b)}" y1="${BASE - 1.5}" y2="${BASE - 1.5}" stroke="var(--umber)" stroke-width="3" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`) : 0;
   for (const p of phasesOf(t, d)) {
     const end = p.end ?? d.now;
@@ -190,7 +201,7 @@ function marksHTML(t, d, t0, t1) {
   const side = s => pct(s) > 93 ? " flip" : "";
   for (const p of failures(t, d)) {
     if (p.end < t0 || p.end > t1) continue;
-    const blocking = findingsOf(t, p.round, d).filter(f => f.blocking === true).map(f => f.text);
+    const blocking = findingsOf(t, p, d).filter(f => f.blocking === true).map(f => f.text);
     const label = `Round ${p.round} verify failed at ${hm(p.end)}${blocking.length ? ": " + blocking.join("; ") : ""}`;
     // The findings open toward the middle of the lane, so they stay inside the view.
     out.push(`<button type="button" class="ev fail${side(p.end)}${pct(p.end) > 50 ? " tipleft" : ""}" style="left:${pct(p.end).toFixed(2)}%" aria-label="${esc(label)}">`
@@ -217,7 +228,7 @@ function popupHTML(t, d) {
   const reqs = reqsOf(t, d).map(([id, text]) => `<li dir="auto"><b>${esc(id)}</b><span>${typeof text === "string" ? esc(text) : '<span class="missing">not in the spec</span>'}</span></li>`).join("");
   const branch = [...new Set(agentsOf(t, d).map(a => str(a.branch)).filter(Boolean))].map(b => {
     const g = gitOf(b, d);
-    return g ? `<p class="muted">Branch <code>${esc(b)}</code>: +${Number(g.added) || 0} −${Number(g.removed) || 0} in ${Number(g.files) || 0} files, ${Number(g.commits) || 0} commits${last !== null ? `, last file change ${mins(d.now - last)} min ago` : ""}.</p>` : "";
+    return g ? `<p class="muted">Branch <code>${esc(b)}</code>: +${Number(g.added) || 0} −${Number(g.removed) || 0} in ${Number(g.files) || 0} files, ${Number(g.commits) || 0} commits${last !== null ? `, last file change ${mins(d.now - last)} min ago` : ""}.</p>` : `<p class="muted">No git data for <code>${esc(b)}</code>.</p>`;
   }).join("");
   const phases = phasesOf(t, d).reverse().map(p => {
     const to = p.end === null ? "now" : hm(p.end);
@@ -225,7 +236,7 @@ function popupHTML(t, d) {
     const head = p.kind === "b" ? `Build, round ${p.round}` : `Verify, round ${p.round}${p.result === "fails" ? ": failed" : p.result === "passes" ? ": passed" : ""}`;
     const lines = bucketsOf(p, d).reduce((n, b) => n + b[2], 0);
     const steps = p.lines.filter(l => sec(l.at) !== null).map(l => `<li dir="auto"><time>${hm(sec(l.at))}</time>${esc(stepWords(l))}</li>`).join("");
-    const found = p.kind === "v" ? findingsOf(t, p.round, d) : [];
+    const found = p.kind === "v" ? findingsOf(t, p, d) : [];
     const blocking = found.filter(f => f.blocking === true), other = found.filter(f => f.blocking !== true);
     return `<div class="sec rnd ${p.kind}${p.result === "fails" ? " fail" : ""}"><h4 class="section-h">${head}</h4>`
       + `<p dir="auto">${esc(p.agent)}${p.branch ? ` on <code>${esc(p.branch)}</code>` : ""}, ${hm(p.start)} to ${to}.</p>`
@@ -259,7 +270,7 @@ function tablesHTML(d, range) {
     return `<li class="row"><button type="button" class="lab" data-t="${esc(t.id)}" aria-haspopup="dialog" aria-label="${esc(rowName(t, d))}">`
       + `<span class="first"><span class="id">${esc(t.id)}</span>${modeTag(t.mode)}<span class="t" title="${esc(t.task)}">${esc(t.task)}</span></span>`
       + `<span class="ts ${s.cls}">${s.icon}<span class="w">${esc(s.word)}</span></span></button>`
-      + `<div class="lane">${axis.lines}${laneSVG(t, d, t0, t1, peak)}${marksHTML(t, d, t0, t1)}</div></li>`; };
+      + `<div class="lane" data-t="${esc(t.id)}">${axis.lines}${laneSVG(t, d, t0, t1, peak)}${marksHTML(t, d, t0, t1)}</div></li>`; };
   const before = range === "all" ? [] : tasks.filter(t => groupOf(t, d) === "merged" && (mergedAt(t) ?? t1) < t0);
   return [["working", "Working"], ["pending", "Pending"], ["merged", "Merged"]].map(([key, name]) => {
     const rows = tasks.filter(t => groupOf(t, d) === key);
@@ -351,7 +362,9 @@ document.addEventListener("click", ev => {
   if (r) { RANGE = r.dataset.range; drawRange(); if (D) drawTables(D); return; }
   if (t.closest(".qpop .x")) return closePop();
   if (t.closest(".qpop")) return;
-  const row = t.closest("[data-t]"); if (row) return openPop(row.dataset.t, row);
+  if (t.closest(".ev")) return;
+  // A row's label or its lane opens the task; focus comes back to the label, the row's keyboard target.
+  const row = t.closest("[data-t]"); if (row) return openPop(row.dataset.t, (row.closest(".row") || row).querySelector(".lab") || row);
   if ($("pop") && !t.closest("form, .why")) closePop();
 });
 document.addEventListener("keydown", ev => {

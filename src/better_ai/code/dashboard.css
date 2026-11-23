@@ -30,7 +30,7 @@
 .lab { display:flex; flex-direction:column; justify-content:center; gap:var(--space-tight); min-width:0; padding:var(--space-tight) var(--space-control) var(--space-tight) 0;
   border:0; background:none; text-align:left; font:var(--font-message); color:var(--ink); cursor:pointer; }
 .lab:hover .t { text-decoration:underline; }
-.row:has(.lab:hover) { background:var(--linen); }
+.row:has(.lab:hover), .row:has(.lane:hover) { background:var(--linen); }
 .lab .first { display:flex; align-items:baseline; gap:var(--space-tight); min-width:0; }
 .lab .id { flex:none; font:var(--font-message-strong); color:var(--muted); }
 .lab .t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:var(--font-message-strong); color:var(--heading); }
@@ -47,7 +47,7 @@
 .ts.warn { color:var(--error); } .ts.you { color:var(--umber); } .ts.merged { color:var(--moss-dark); }
 
 /* A lane: the bars as one SVG, gridlines at the axis times, the now line, and the events above the bars. */
-.lane { position:relative; }
+.lane { position:relative; cursor:pointer; }
 .lane .bars { position:absolute; left:0; right:0; bottom:8px; width:100%; height:28px; }
 .lane .grid { position:absolute; top:0; bottom:0; border-left:1px solid var(--line); }
 .lane .now { position:absolute; top:0; bottom:0; right:0; border-right:2px solid var(--ink); }

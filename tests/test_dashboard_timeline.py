@@ -201,7 +201,7 @@ class FoundByTheVerifier(unittest.TestCase):
 
         records = self.repo / ".code" / "c"
         records.mkdir(parents=True)
-        (records / "tasks.jsonl").write_text("".join(f"{{}}\n" for _ in range(50)))
+        (records / "tasks.jsonl").write_text("".join("{}\n" for _ in range(50)))
         found = activity.branch_activity(self.repo, "main", self.now - 3600)
         self.assertEqual((found["files"], found["added"]), (0, 0))
 
@@ -211,13 +211,22 @@ class FoundByTheVerifier(unittest.TestCase):
         authored, committed = f"{self.now - 3000} +0000", f"{self.now - 60} +0000"  # a rebase keeps the author date
         (self.repo / "b.py").write_text("y = 2\n")
         git(self.repo, "add", "b.py")
-        git(self.repo, "commit", "-q", "-m", "older work", env={"GIT_AUTHOR_DATE": authored, "GIT_COMMITTER_DATE": committed})
+        git(
+            self.repo,
+            "commit",
+            "-q",
+            "-m",
+            "older work",
+            env={"GIT_AUTHOR_DATE": authored, "GIT_COMMITTER_DATE": committed},
+        )
         found = activity.branch_activity(self.repo, "main", self.now - 1800)
         self.assertEqual((found["commits"], found["added"]), (0, 0))
 
     def test_add_refuses_a_typed_status_at(self):
         change(self.repo)
         fields = {k: v for k, v in task("T2", status_at=AT).items() if k not in ("type", "at", "by", "id")}
-        done = better("code-better", "add", ".code/c", "task", "--by", "coordinator", stdin=json.dumps(fields), cwd=self.repo)
+        done = better(
+            "code-better", "add", ".code/c", "task", "--by", "coordinator", stdin=json.dumps(fields), cwd=self.repo
+        )
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("status_at", done.stdout + done.stderr)
