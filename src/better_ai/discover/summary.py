@@ -24,11 +24,11 @@ from typing import Any
 from .. import cli, paths, schema
 from ..page import FINISHED, all_items
 from ..paths import Unit
-from . import SKILL, brief, derive
+from . import SKILL, derive
+from .brief import STATE as REDACT_STATE
 from .rules_moves import BRIEF_MOVES
 
 STALE = timedelta(minutes=30)  # how long a checker or verifier may go without a record
-REDACT_STATE = brief.STATE  # the state file `redact` keeps in the discovery's folder until it has finished
 PAGE_EVENTS = ("choose", "add_evidence", "add_result", "remove", "edit", "redact")  # discover's own events
 USER_EVENTS = (*PAGE_EVENTS, "answer", "comment")  # what the user sends that the agent tracks; a note with no `to` too
 SHOWN_ERRORS = 20  # how many error lines the `invalid` line carries

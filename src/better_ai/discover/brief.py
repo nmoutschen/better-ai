@@ -5,12 +5,15 @@
   temporary file, links that file to its name, and then sets the version final, so a run that stops at any point is
   finished by running it again.
 - `redact <unit> E-<agent>-<n> --request <id>` removes a person's words from the unit: from each final brief (in
-  place, by the marked block of the evidence), from the page event that holds them, from the source and from the
-  evidence itself. It works from a state file, `.redact`, so a run that stops is finished by running it again, and
+  place, by the marked block of the evidence), from a leftover draft file or temporary file of the brief folder that
+  holds the block (removed), from the page event that holds them, from the source, from the result text of each test
+  that cites the evidence, and from the evidence itself. It works from a state file, `.redact`, so a run that stops is finished by running it again, and
   the page does not start while that file exists.
 
 A person's words are stored in one field of one record and everything else points to the evidence by id; the brief is
-the one other place the words are copied to, and each copy sits in a block marked with the evidence id.
+the one other place the words are copied to, and each copy sits in a block marked with the evidence id (the text of a
+test result that cites only that evidence sits in the block too). Evidence from the user's files and tools is shown by
+role in any discovery, never by its words.
 """
 
 from __future__ import annotations
@@ -171,7 +174,9 @@ def _results(data: Data, ident: str, internal: bool) -> list[str]:
     for test in data.tests:
         result = test.get("result")
         if isinstance(result, dict) and result.get("evidence") == [ident] and not internal:
-            lines.append(f'  - Result of {inline(test.get("id"))} ({inline(result.get("outcome"))}): "{inline(result.get("text"))}"')
+            lines.append(
+                f'  - Result of {inline(test.get("id"))} ({inline(result.get("outcome"))}): "{inline(result.get("text"))}"'
+            )
     return lines
 
 

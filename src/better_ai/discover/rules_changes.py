@@ -6,9 +6,10 @@ Each rule is one function over lists of records, so the same code holds wherever
   evidence a change cites, an identical change, and a question asked twice;
 - the schema hook `risk-change` (named by `x-check` in change.schema.json): the risk rule, applied when a risk change is
   added and again by `check` to every risk change, because what it looks at cannot change;
-- `set` (a step): changes and moves are never edited, the coordinator-only writer rule, an answered decision keeps its
-  `about` and `answer`, `answered_at` and `updated_at` are stamped, a risk that a decision or change cites keeps its id
-  and text, and a test that is not planned keeps its `what`, `rule` and `settles`;
+- `set` (a step): changes and moves are never edited, the coordinator-only writer rule, the coordinator named
+  in the head and the move of a chosen option stay, an answered decision keeps its `about` and `answer`,
+  `answered_at` and `updated_at` are stamped, a risk that a decision or change cites keeps its id and text, and a test
+  that is not planned keeps its `what`, `rule` and `settles`; `add` of an answered decision stamps `answered_at` too;
 - `check` (a step): an item's latest state or importance change that no longer holds is a warning, "add a change",
   never an error, because the log cannot be edited.
 
@@ -341,6 +342,8 @@ def _same_words(text: Any) -> str:
 @records.add_guard(NAME, "decision")
 def _add_decision(ctx: records.AddContext) -> None:
     record = ctx.record
+    if record.get("status") == "answered":  # as in set, the time of the answer is the tool's, never the agent's
+        record["answered_at"] = ctx.run.now().strftime(schema.TIME)
     if record.get("status") != "waiting":
         return
     for other in _lines(ctx.unit, "decisions.jsonl"):
@@ -394,6 +397,18 @@ def _keep_cited_risks(ctx: records.SetContext, after: Mapping) -> None:
                 f"{ident} of {item} is cited by a decision or a change, so it stays once, with its id and text",
                 f"keep {ident} as it is and add a new risk",
             )
+
+
+def _keep_chosen_move(ctx: records.SetContext, after: Mapping) -> None:
+    """An option that a move chose keeps its kind of move: the move's rules and its brief read it."""
+    ident = _text(ctx.record.get("id"))
+    chosen = [m.get("id") for m in _lines(ctx.unit, "moves.jsonl") if m.get("option") == ident]
+    if chosen and after.get("move") != ctx.record.get("move"):
+        raise refusal(
+            ctx.unit.label,
+            f"{ident} was chosen by {chosen[0]}, so its move ({ctx.record.get('move')}) cannot change",
+            "add a new option for the other move",
+        )
 
 
 # What a locked record may become, by the status it has now: the one table every set is held to, as the patch and the
@@ -466,7 +481,14 @@ def _set(ctx: records.SetContext) -> None:
         _keep_cited_risks(ctx, after)
         ctx.patch["updated_at"] = _now(ctx)
     elif kind == "option":
+        _keep_chosen_move(ctx, after)
         ctx.patch["updated_at"] = _now(ctx)
+    elif kind == "discover" and after.get("coordinator") != ctx.record.get("coordinator"):
+        raise refusal(
+            ctx.unit.label,
+            "the coordinator of a discovery cannot change: what the user's evidence says it was added by stays true",
+            "start a new discovery for another coordinator",
+        )
 
 
 # ---------------------------------------------------------------- check: a latest change that no longer holds

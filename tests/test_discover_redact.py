@@ -233,7 +233,10 @@ class Removal(Fixture):
         self.assertIn("Dana's team", (self.unit / "tests.jsonl").read_text())
 
     def test_D21_evidence_from_a_file_or_a_tool_is_redactable_in_an_external_discovery(self):
-        for origin in ({"type": "file", "path": "notes/call.md", "read": "raw"}, {"type": "tool", "tool": "tickets", "ref": "T-1", "read": "raw"}):
+        for origin in (
+            {"type": "file", "path": "notes/call.md", "read": "raw"},
+            {"type": "tool", "tool": "tickets", "ref": "T-1", "read": "raw"},
+        ):
             with self.subTest(origin=origin["type"]):
                 self.setUp()
                 P.write_json(
