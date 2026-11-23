@@ -244,7 +244,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 | Class | Meaning | Look |
 |---|---|---|
 | `.ok` | done, confirmed | moss-dark border and word |
-| `.error` | blocked, contradicted | error border and word; the word starts with ⊘ |
+| `.error` | blocked, contradicted | error border and word; page.css puts ⊘ before the word |
 | `.working` | being worked on | terracotta border, terracotta-dark word, a pulsing bar |
 | `.wait` | waiting for the user | umber border and word |
 | `.plain` (or none) | anything else | sand border, ink on linen |
@@ -254,7 +254,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ### Table
 
-- Use for: records with the same fields, one per row (`.tbl`); its heads are in the label style and muted, its rows are separated by hairlines.
+- Use for: records with the same fields, one per row (`table.tbl`, on a `table` element only); its heads are in the label style and muted, its rows are separated by hairlines.
 - Markup: `<table class="tbl"><thead><tr><th>…` with `th` heads and `td` cells.
 - Name and role: a real `table` with `th` heads. A page-specific highlight, such as an outline on a row, belongs to that page's file.
 

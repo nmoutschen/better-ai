@@ -115,7 +115,7 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .tabs--wrap { flex-wrap:wrap; overflow:visible; }
 
 /* A chip: a short state word in a box. The colour follows the meaning: moss-dark done, terracotta working, umber waiting
-   for the user, error blocked; a plain chip is anything else. The word always says it; a blocked chip also starts with the ⊘. */
+   for the user, error blocked; a plain chip is anything else. The word always says it; this file puts the ⊘ before a blocked chip's word. */
 .chip { white-space:nowrap; display:inline-block; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase;
   padding:var(--space-tight) var(--space-control); border:1px solid var(--sand); color:var(--ink); background:var(--linen); }
 .chip.ok { border-color:var(--moss-dark); color:var(--moss-dark); background:var(--cream); }
@@ -123,13 +123,14 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .chip.working { border-color:var(--terracotta); color:var(--terracotta-dark); background:var(--cream); }
 .chip.working::before { content:""; display:inline-block; width:10px; height:4px; margin-right:var(--space-control); vertical-align:middle;
   background:var(--terracotta); animation:pulse-bar 1.2s ease-in-out infinite; }
+.chip.error::before { content:"\2298\00a0" / ""; }
 .chip.wait { border-color:var(--umber); color:var(--umber); background:var(--cream); }
 @media (prefers-reduced-motion: reduce) { .chip.working::before { animation:none; } }
 
 /* A table of records, its heads in the label style. */
-.tbl { border-collapse:collapse; width:100%; font-size:var(--text-message); }
-.tbl th, .tbl td { text-align:left; vertical-align:top; padding:var(--space-control) var(--space-item); border-bottom:1px solid var(--line); }
-.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+table.tbl { border-collapse:collapse; width:100%; font-size:var(--text-message); }
+table.tbl th, table.tbl td { text-align:left; vertical-align:top; padding:var(--space-control) var(--space-item); border-bottom:1px solid var(--line); }
+table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
 
 /* A decision the user is asked to make, on the page body. */
 .decide { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item); margin-bottom:var(--space-item); }

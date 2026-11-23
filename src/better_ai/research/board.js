@@ -12,7 +12,7 @@ const mins = s => s < 90 ? "under 2 min" : `${Math.round(s / 60)} min`;
 // A question's status is one of the schema's words; one this table lacks still counts as to do.
 const STATE = { "answered": ["answered", "ok"], "in progress": ["working", "working"], "open": ["to do", "plain"], "proposed": ["proposed", "plain"],
   "contested": ["contested", "error"], "not found": ["not found", "error"], "unclear": ["unclear", "error"] };
-const FILL = { ok: "#6B7F5E", working: "#5C4033", plain: "#C4B69C", error: "#E8725C" };
+const FILL = { ok: "#6B7F5E", working: "#E8725C", plain: "#C4B69C", error: "#9A3B2A" };
 const SIZE = { high: 10, medium: 7, low: 4.5 };  // dot radius by priority; a question without one is drawn as medium
 const CLOSED = new Set(["answered", "contested", "not found"]);
 let D = null, LAYOUT = "", OPEN = null, REPLIES = -1, SCROLLED = false, CLOSED_PAGE = false;  // OPEN: what the open pop-up shows, as {kind, id}
@@ -97,7 +97,7 @@ function drawMap(d) {
     const hollow = (stroke, dash) => `<circle class="dot" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r - 1}" fill="#FFFCF7" stroke="${stroke}" stroke-width="2.5"${dash ? ' stroke-dasharray="3 2"' : ""}/>`;
     const dot = q.view === "proposed" ? hollow("#78736B") : q.view === "not found" ? hollow("#9A3B2A") : q.view === "unclear" ? hollow("#9A3B2A", true)
       : `<circle class="dot filled" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r}" fill="${FILL[cls]}"/>`;
-    const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#5C4033" stroke-dasharray="3 2"/>` : "";
+    const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#E8725C" stroke-dasharray="3 2"/>` : "";
     const mark = q._errors ? `<text class="bang" x="${(x + r + 3).toFixed(0)}" y="${(y - r).toFixed(0)}">!</text>` : "";
     const right = x >= CX, far = dp > 1 ? `<text class="far" x="${(x + (r + 4) * (right ? 1 : -1)).toFixed(0)}" y="${(y + 4).toFixed(0)}" text-anchor="${right ? "start" : "end"}">${esc(q.label)}</text>` : "";
     const who = q.view === "in progress" && has(q.owner) ? `, ${q.owner} on it` : "";
