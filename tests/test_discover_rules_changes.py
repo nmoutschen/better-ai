@@ -585,7 +585,7 @@ class Writers(Unit):
             with self.subTest(kind):
                 self.refused(
                     self.add(kind, record, by="analyst-1"),
-                    f"only {R.COORD} (discover.json coordinator) writes {kind}: use --by {R.COORD}",
+                    f"only {R.COORD} writes {kind}: use --by {R.COORD}",
                 )
 
     def test_S31_nothing_is_written_when_the_writer_is_refused(self):
@@ -602,7 +602,7 @@ class Writers(Unit):
         self.ok(self.add("decision", R.DECISION))
         for ref, fields in (("P1", {"text": "x"}), ("K1", {"text": "x"}), ("D1", {"default": "No"})):
             with self.subTest(ref):
-                self.refused(self.set(ref, fields, by="analyst-1"), "only coord (discover.json coordinator) writes")
+                self.refused(self.set(ref, fields, by="analyst-1"), "only coord writes")
 
     def test_S31_a_set_without_by_is_refused_with_the_next_action(self):
         self.refused(self.set("P1", {"text": "x"}, by=None), "use --by coord")
@@ -612,14 +612,14 @@ class Writers(Unit):
         head = json.loads((self.unit / "discover.json").read_text())
         del head["coordinator"]
         (self.unit / "discover.json").write_text(json.dumps(head))
-        text = "discover.json names no coordinator: fix discover.json, then run again"
+        text = "only coordinator writes"  # the shared rule falls back to the name `coordinator`
         self.refused(self.add("decision", R.DECISION), text)
         self.refused(self.set("P1", {"text": "x"}), text)
         self.assertEqual(self.lines("decisions.jsonl"), [])
 
     def test_S31_a_head_that_does_not_parse_refuses_every_coordinator_write(self):
         (self.unit / "discover.json").write_text("{")
-        self.refused(self.add("decision", R.DECISION), "discover.json names no coordinator")
+        self.refused(self.add("decision", R.DECISION), "only coordinator writes")
 
     def test_S31_a_test_is_written_by_the_coordinator_only(self):
         self.ok(self.add("test", R.TEST))

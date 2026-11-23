@@ -4,6 +4,7 @@
   "title": "one line of changes.jsonl: one change to an item or to the discovery, with what caused it",
   "$comment": "Append only: a change is never edited or removed. An item's state and importance are the `to` of its last change for that field. `to: accepted` is only for a risk, and Risk accepted is never a state: it is derived once every risk of an item is accepted. A change has no id.",
   "x-files": ["changes.jsonl"],
+  "x-written-by": "coordinator",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "at", "by", "about", "field", "from", "to", "cause"],

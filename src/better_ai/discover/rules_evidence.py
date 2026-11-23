@@ -208,14 +208,6 @@ def _folder(unit: paths.Unit, name: str) -> Iterator[tuple[str, dict]]:
             yield f"{name}/{file.name}", value
 
 
-def _coordinator(unit: paths.Unit) -> str:
-    head = _json(unit, unit.kind.head)
-    name = head.get("coordinator") if isinstance(head, dict) else None
-    if not isinstance(name, str) or not name:
-        raise paths.refusal(unit.label, f"{unit.kind.head} does not name the coordinator", f"run check {unit.label}")
-    return name
-
-
 def _source(unit: paths.Unit, ident: Any) -> dict | None:
     if not isinstance(ident, str) or not SOURCE_ID.fullmatch(ident):
         return None
@@ -382,7 +374,7 @@ def _source_by_the_coordinator_if_from_you(ctx: records.AddContext) -> None:
     """A source from you holds the user's own words or event: only the coordinator adds it."""
     origin = ctx.record.get("origin")
     if isinstance(origin, dict) and origin.get("type") == "you":
-        coordinator = _coordinator(ctx.unit)
+        coordinator = records.written_by(ctx.unit, "coordinator")
         if ctx.by != coordinator:
             raise _refuse(
                 ctx.unit,
@@ -395,7 +387,7 @@ def _source_by_the_coordinator_if_from_you(ctx: records.AddContext) -> None:
 def _evidence_writer_and_start(ctx: records.AddContext) -> None:
     """Who adds evidence, how it starts, and that it is not repeated."""
     unit, record, by = ctx.unit, ctx.record, ctx.by
-    coordinator = _coordinator(unit)
+    coordinator = records.written_by(unit, "coordinator")
     kind = _origin(_source(unit, record.get("source")))
     if kind == "you" and by != coordinator:
         raise _refuse(
@@ -831,7 +823,7 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
     if record.get("type") != "evidence":
         return
     ident = record["id"]
-    coordinator = _coordinator(unit)
+    coordinator = records.written_by(unit, "coordinator")
     if by is None:
         raise _refuse(unit, f"setting {ident} needs --by", "run again with --by <your agent name>")
     verifier = record.get("verifier")
@@ -913,7 +905,7 @@ def source_write_table(ctx: records.SetContext) -> None:
     if record.get("type") != "source":
         return
     ident = record["id"]
-    coordinator = _coordinator(unit)
+    coordinator = records.written_by(unit, "coordinator")
     if by is None:
         raise _refuse(unit, f"setting {ident} needs --by", "run again with --by <your agent name>")
     for name, value in _changes(record, ctx.patch, ctx.unsets).items():

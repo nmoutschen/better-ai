@@ -29,7 +29,6 @@ from . import SKILL
 from .derive import ItemView, derive
 
 NAME = SKILL.name
-WRITTEN_BY_THE_COORDINATOR = ("item", "change", "option", "move", "brief", "decision", "test")
 
 Problem = tuple[str, str]  # what is wrong, and the next action
 
@@ -71,10 +70,6 @@ def _evidence(unit: Unit) -> dict[str, dict]:
     return found
 
 
-def _head(unit: Unit) -> dict:
-    return _object(_read(unit, unit.kind.head)) or {}
-
-
 def _text(value: Any) -> str:
     return value if isinstance(value, str) else ""
 
@@ -85,24 +80,6 @@ def _dict(value: Any) -> Mapping:
 
 def _list(value: Any) -> list:
     return value if isinstance(value, list) else []
-
-
-# ---------------------------------------------------------------- who writes what (the coordinator only)
-
-
-def _coordinator_only(unit: Unit, kind: str, by: str | None) -> None:
-    name = _text(_head(unit).get("coordinator"))
-    if not name:
-        raise Refused(f"{unit.label}: discover.json names no coordinator: fix discover.json, then run again")
-    if by != name:
-        raise Refused(
-            f"{unit.label}: only {name} (discover.json coordinator) writes {kind}: use --by {name}",
-        )
-
-
-@records.add_guard(NAME, *WRITTEN_BY_THE_COORDINATOR)
-def _add_by_the_coordinator(ctx: records.AddContext) -> None:
-    _coordinator_only(ctx.unit, ctx.type, ctx.by)
 
 
 # ---------------------------------------------------------------- the risk rule
@@ -478,8 +455,6 @@ def _set(ctx: records.SetContext) -> None:
         raise refusal(
             ctx.unit.label, f"a {kind} is never edited ({ident or 'it'} stays as written)", f"add a new {kind}"
         )
-    if kind in WRITTEN_BY_THE_COORDINATOR:
-        _coordinator_only(ctx.unit, kind, ctx.by)
     if kind == "decision" and ctx.record.get("status") == "waiting" and ctx.patch.get("status") == "answered":
         ctx.patch["answered_at"] = _now(ctx)
     after = _after(ctx)
@@ -493,7 +468,9 @@ def _set(ctx: records.SetContext) -> None:
         ctx.patch["updated_at"] = _now(ctx)
     elif kind == "discover":
         if after.get("named_sources") != ctx.record.get("named_sources"):
-            _coordinator_only(ctx.unit, "named_sources", ctx.by)
+            name = records.written_by(ctx.unit, "coordinator")
+            if ctx.by != name:
+                raise Refused(f"{ctx.unit.label}: only {name} writes named_sources: use --by {name}")
             kept = after.get("named_sources")
             lost = [n for n in _list(ctx.record.get("named_sources")) if not isinstance(kept, list) or n not in kept]
             if lost:

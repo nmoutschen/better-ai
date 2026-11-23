@@ -4,6 +4,7 @@
   "title": "one line of decisions.jsonl in a discovery: a question to the user, with the answer once they give it",
   "$comment": "Replaces the shared decisions.schema.json in this skill, as architect-better's does. The coordinator writes it. A question waits for the user: `default` is a suggestion the page offers and is never applied by silence, so there is no deadline and no status for a default that applied. A question closes only when it is answered: with the user's page answer, or with the words they typed in this session. A question about a risk has the fixed default \"Accept the risk\". The user's answer from the page is pointed to, not copied: it must be an answer event of the user in this unit's conversation.jsonl for this decision.",
   "x-files": ["decisions.jsonl"],
+  "x-written-by": "coordinator",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "at", "by", "id", "raised_by", "about", "asked", "default", "status"],
