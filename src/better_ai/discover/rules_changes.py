@@ -29,7 +29,6 @@ from .derive import ItemView, derive
 
 NAME = SKILL.name
 WRITTEN_BY_THE_COORDINATOR = ("item", "change", "option", "move", "brief", "decision")
-RISK_DEFAULT = "Accept the risk"
 
 Problem = tuple[str, str]  # what is wrong, and the next action
 
@@ -381,16 +380,15 @@ def _cited_risks(unit: Unit, item: str) -> set[str]:
     return cited
 
 
-def _keep_cited_risks(ctx: records.SetContext) -> None:
-    """A cited risk keeps its id and text: it stays in the list once, with the words it had."""
-    if "risks" not in ctx.patch:
-        return
+def _keep_cited_risks(ctx: records.SetContext, after: Mapping) -> None:
+    """A cited risk keeps its id and text: it stays in the list once, with the words it had, whether the set changes
+    the list, nulls it or unsets it."""
     item = _text(ctx.record.get("id"))
     cited = _cited_risks(ctx.unit, item)
-    after = [_dict(r) for r in _list(ctx.patch["risks"])]
+    now = [_dict(r) for r in _list(after.get("risks"))]
     for risk in _list(ctx.record.get("risks")):
         ident, words = _dict(risk).get("id"), _dict(risk).get("text")
-        if ident in cited and [r.get("text") for r in after if r.get("id") == ident] != [words]:
+        if ident in cited and [r.get("text") for r in now if r.get("id") == ident] != [words]:
             raise refusal(
                 ctx.unit.label,
                 f"{ident} of {item} is cited by a decision or a change, so it stays once, with its id and text",
@@ -398,34 +396,55 @@ def _keep_cited_risks(ctx: records.SetContext) -> None:
             )
 
 
-def _keep_answer(ctx: records.SetContext) -> None:
-    record, patch = ctx.record, ctx.patch
-    ident = _text(record.get("id"))
-    if record.get("status") == "answered":
-        locked = [f for f in ("about", "answer", "answered_at") if f in patch and patch[f] != record.get(f)]
-        if locked or patch.get("status", "answered") != "answered":
-            raise refusal(
-                ctx.unit.label,
-                f"{ident} is answered, so its {', '.join(locked) or 'status'} cannot change",
-                "ask a new question",
-            )
-    elif patch.get("status") == "answered":
-        patch["answered_at"] = _now(ctx)
+# What a locked record may become, by the status it has now: the one table every set is held to, as the patch and the
+# unsets together leave the record. A status with no row has no rule here; the schema holds the rest.
+TRANSITIONS = {
+    "test": {
+        "planned": ("planned", "running", "done", "removed"),
+        "running": ("running", "done", "removed"),
+        "done": ("done", "removed"),
+        "removed": ("removed",),
+    },
+    "decision": {"waiting": ("waiting", "answered"), "answered": ("answered",)},
+}
+# The fields a record keeps once it has this status: they neither change nor go.
+LOCKED = {
+    "test": {status: ("what", "rule", "settles") for status in ("running", "done", "removed")},
+    "decision": {"answered": ("about", "answer", "answered_at")},
+}
+WHAT_NEXT = {
+    "test": lambda ident: f"add a new test and remove {ident} with a reason",
+    "decision": lambda ident: "ask a new question",
+}
 
 
-def _keep_test(ctx: records.SetContext) -> None:
+def _after(ctx: records.SetContext) -> dict:
+    """The record as the set leaves it: the patch merged (a null removes the field, as `set` may read it) and the
+    fields `--unset` names removed."""
+    new = dict(ctx.record)
+    for name, value in ctx.patch.items():
+        if value is None:
+            new.pop(name, None)
+        else:
+            new[name] = value
+    for name in ctx.unsets:
+        new.pop(name, None)
+    return new
+
+
+def _keep_locked(ctx: records.SetContext, kind: str, after: Mapping) -> None:
     record = ctx.record
     status = record.get("status")
-    if status == "planned":
-        return
-    locked = [f for f in ("what", "rule", "settles") if f in ctx.patch and ctx.patch[f] != record.get(f)]
-    if locked:
-        ident = _text(record.get("id"))
-        raise refusal(
-            ctx.unit.label,
-            f"{ident} is {status}, so its {', '.join(locked)} cannot change",
-            f"add a new test and remove {ident} with a reason",
-        )
+    ident = _text(record.get("id"))
+    allowed = TRANSITIONS[kind].get(status)
+    if allowed is not None and after.get("status") not in allowed:
+        what = f"status cannot become {after.get('status')}"
+    else:
+        changed = [f for f in LOCKED[kind].get(status, ()) if after.get(f) != record.get(f)]
+        if not changed:
+            return
+        what = f"{', '.join(changed)} cannot change"
+    raise refusal(ctx.unit.label, f"{ident} is {status}, so its {what}", WHAT_NEXT[kind](ident))
 
 
 @records.set_step(NAME)
@@ -438,15 +457,16 @@ def _set(ctx: records.SetContext) -> None:
         )
     if kind in WRITTEN_BY_THE_COORDINATOR:
         _coordinator_only(ctx.unit, kind, ctx.by)
-    if kind == "decision":
-        _keep_answer(ctx)
+    if kind == "decision" and ctx.record.get("status") == "waiting" and ctx.patch.get("status") == "answered":
+        ctx.patch["answered_at"] = _now(ctx)
+    after = _after(ctx)
+    if kind in TRANSITIONS:
+        _keep_locked(ctx, kind, after)
     elif kind == "item":
-        _keep_cited_risks(ctx)
+        _keep_cited_risks(ctx, after)
         ctx.patch["updated_at"] = _now(ctx)
     elif kind == "option":
         ctx.patch["updated_at"] = _now(ctx)
-    elif kind == "test":
-        _keep_test(ctx)
 
 
 # ---------------------------------------------------------------- check: a latest change that no longer holds
