@@ -37,7 +37,6 @@ import hashlib
 import ipaddress
 import json
 import re
-import socket
 import unicodedata
 from collections.abc import Iterator
 from datetime import datetime, timezone
@@ -52,7 +51,7 @@ TIMEOUT = 30  # minutes a verifier may run before the coordinator may give up on
 TIMEOUT_REASON = "verifier did not finish"
 MAX_TRIES = 2  # a `not reachable` evidence is tried again only while fewer verifiers than this were started
 CHECKED = ("checked_read", "span", "sha256")  # what `counts` holds and nothing else does
-SOURCE_ID = re.compile(r"^S-[\w.-]+-\d+$")
+SOURCE_ID = re.compile(r"S-[\w.-]+-\d+")
 USER_ONLY = ("verifier", "tries", "since", *CHECKED)  # fields the user's own evidence never has
 
 
@@ -65,17 +64,32 @@ def normalise(text: str) -> str:
     return re.sub(r"[\W_]+", " ", folded).strip()
 
 
+def _short_form(host: str) -> ipaddress.IPv4Address | None:
+    """An IPv4 address written the short ways a client reads: 127.1, 0x7f.0.0.1, 0177.0.0.1, 2130706433."""
+    parts = host.split(".")
+    if not 1 <= len(parts) <= 4 or not all(re.fullmatch(r"0[xX][0-9a-fA-F]+|[0-9]+", p) for p in parts):
+        return None
+    try:
+        numbers = [
+            int(p, 16) if p[:2] in ("0x", "0X") else int(p, 8) if p[0] == "0" and len(p) > 1 else int(p) for p in parts
+        ]
+    except ValueError:  # an octal part with an 8 or 9
+        return None
+    *head, last = numbers
+    if any(n > 255 for n in head) or last >= 256 ** (5 - len(parts)):
+        return None
+    value = last
+    for position, n in enumerate(head):
+        value += n << (8 * (3 - position))
+    return ipaddress.IPv4Address(value)
+
+
 def _literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     """The address a host names when it is an IP literal, in any form a client reads: dotted, short, octal, hex, decimal."""
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
-        if not re.fullmatch(r"[0-9a-fx.]+", host):
-            return None
-        try:
-            ip = ipaddress.IPv4Address(socket.inet_aton(host))
-        except (OSError, ValueError):
-            return None
+        return _short_form(host)
     if ip.version == 6 and ip.ipv4_mapped is not None:
         return ip.ipv4_mapped
     return ip
@@ -85,8 +99,8 @@ def url_problem(url: str) -> str | None:
     """Why a source's address is refused, or None. An http or https address of a public host only: not localhost, and
     not a loopback, private, link-local or otherwise non-public IP literal. Offline: a name that resolves to a private
     address is the verifier's to catch at each redirect."""
-    if "\\" in url:
-        return "has a backslash, which clients read as a slash: write the address with slashes"
+    if re.search(r"[\s\\\x00-\x1f]", url):
+        return "has a backslash, space or control character: write the plain address"
     try:
         parts = urlsplit(url)
         host = parts.hostname
@@ -155,7 +169,7 @@ def _coordinator(unit: paths.Unit) -> str:
 
 
 def _source(unit: paths.Unit, ident: Any) -> dict | None:
-    if not isinstance(ident, str) or not SOURCE_ID.match(ident):
+    if not isinstance(ident, str) or not SOURCE_ID.fullmatch(ident):
         return None
     value = _json(unit, f"sources/{ident}.json")
     return value if isinstance(value, dict) else None
@@ -193,7 +207,11 @@ def _evidence_at_rest(record: dict, ctx: schema.Context) -> list[tuple[str, str]
     problems: list[tuple[str, str]] = []
     head = ctx.read_json("../discover.json")
     source_id = record.get("source")
-    source = ctx.read_json(f"../sources/{source_id}.json") if isinstance(source_id, str) and SOURCE_ID.match(source_id) else None
+    source = (
+        ctx.read_json(f"../sources/{source_id}.json")
+        if isinstance(source_id, str) and SOURCE_ID.fullmatch(source_id)
+        else None
+    )
     kind = _origin(source)
     words = record.get("words") if isinstance(record.get("words"), dict) else {}
     status = record.get("status")
@@ -203,7 +221,9 @@ def _evidence_at_rest(record: dict, ctx: schema.Context) -> list[tuple[str, str]
             problems.append(("words", "event words need a source from you that points to the same page event"))
     if kind == "you":
         if status not in ("counts", "removed"):
-            problems.append(("status", "evidence from you counts at once: its status is counts, or removed once the user asks"))
+            problems.append(
+                ("status", "evidence from you counts at once: its status is counts, or removed once the user asks")
+            )
         for name in USER_ONLY:
             if name in record:
                 problems.append((name, "evidence from you is not checked by a verifier: leave it out"))
@@ -222,7 +242,9 @@ def _counting(record: dict, words: dict) -> list[tuple[str, str]]:
     problems = []
     verifier = record.get("verifier")
     if not verifier:
-        problems.append(("verifier", "counts only after a verifier read the page: set a verifier and have it set the outcome"))
+        problems.append(
+            ("verifier", "counts only after a verifier read the page: set a verifier and have it set the outcome")
+        )
     elif verifier == record.get("by"):
         problems.append(("verifier", "the analyst that added the evidence cannot be the verifier that counts it"))
     if record.get("checked_read") != "raw":
@@ -306,7 +328,7 @@ def _not_repeated(unit: paths.Unit, record: dict) -> None:
     if not isinstance(words, dict):
         return
     mine = _comparable(words)
-    for relative, other in _folder(unit, "evidence"):
+    for _, other in _folder(unit, "evidence"):
         if other.get("source") == record.get("source") and mine is not None and _comparable(other.get("words")) == mine:
             note = " (removed)" if other.get("status") == "removed" else ""
             raise _refuse(
@@ -361,7 +383,9 @@ def _a_page_event_backs_one_record(ctx: records.AddContext) -> None:
     if not events:
         return
     for relative, number, other in _unit_records(ctx.unit):
-        own_source = ctx.type == "evidence" and other.get("type") == "source" and other.get("id") == ctx.record.get("source")
+        own_source = (
+            ctx.type == "evidence" and other.get("type") == "source" and other.get("id") == ctx.record.get("source")
+        )
         if own_source:
             continue
         for event in events & set(_page_events(other)):
@@ -507,7 +531,15 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
         raise _refuse(unit, f"setting {ident} needs --by", "run again with --by <your agent name>")
     for name in ("sha256", "tries"):
         if name in patch:
-            raise _refuse(unit, f"{name} is kept by better.pyz", f"leave {name} out of the fields")
+            raise _refuse(
+                unit,
+                (
+                    f"{name} is computed by better.pyz from --raw"
+                    if name == "sha256"
+                    else f"{name} is kept by better.pyz"
+                ),
+                f"leave {name} out of the fields",
+            )
     old, new = record.get("status"), patch.get("status", record.get("status"))
     verifier = record.get("verifier")
     tries = list(record.get("tries") or ([verifier] if verifier else []))
@@ -548,9 +580,7 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
             elif new == "unverified" and by == coordinator and patch.get("reason") == TIMEOUT_REASON:
                 started = _since(record)
                 if started is None or (now - started).total_seconds() < TIMEOUT * 60:
-                    waited = (
-                        f"{int((now - started).total_seconds() // 60)} minutes ago" if started else "not at all"
-                    )
+                    waited = f"{int((now - started).total_seconds() // 60)} minutes ago" if started else "not at all"
                     raise _refuse(
                         unit,
                         f"the verifier of {ident} started {waited}: give it {TIMEOUT} minutes",
@@ -563,7 +593,7 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
                 if by == coordinator:
                     raise _refuse(
                         unit,
-                        f"{ident} was tried by {len(tries)} verifiers ({', '.join(tries)}): that is enough",
+                        f"{ident} was tried by {len(tries)} verifiers, two at most ({', '.join(tries)}): that is enough",
                         'set it unverified with a reason, such as "not reachable twice"',
                     )
                 raise _who(ctx, by, coordinator, old, new)

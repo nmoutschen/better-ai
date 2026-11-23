@@ -143,7 +143,7 @@ class Counts(Rules):
 
     def test_s13_a_typed_sha256_is_refused(self):
         self.started()
-        self.refused(self.counts(sha256="a" * 64), "sha256", "better.pyz computes")
+        self.refused(self.counts(sha256="a" * 64), "sha256", "computed by better.pyz")
 
     def test_s12_counts_needs_a_raw_file(self):
         self.started()
@@ -201,9 +201,7 @@ class Transitions(Rules):
         "checking, stale": dict(status="checking", verifier="v1", tries=["v1"], since=ago(40)),
         "checking, no verifier": dict(status="checking"),
         "not reachable, one try": dict(status="not reachable", verifier="v1", tries=["v1"], reason="HTTP 503"),
-        "not reachable, two tries": dict(
-            status="not reachable", verifier="v2", tries=["v1", "v2"], reason="HTTP 503"
-        ),
+        "not reachable, two tries": dict(status="not reachable", verifier="v2", tries=["v1", "v2"], reason="HTTP 503"),
         "counts": dict(status="counts", verifier="v1", tries=["v1"], checked_read="raw", span=SPAN, sha256="a" * 64),
         "unverified": dict(status="unverified", verifier="v1", tries=["v1"], reason="reworded"),
         "removed": dict(status="removed", verifier="v1", tries=["v1"], reason="the user asked: remove m1"),
@@ -231,7 +229,7 @@ class Transitions(Rules):
         fields = Transitions.STATES[state]
         was = fields["status"]
         same = {"counts": "counts", "unverified": "unverified", "not reachable": "not reachable", "removed": "removed"}
-        if same.get(name) == was and was != "counts":
+        if same.get("unverified" if name == "timeout" else name) == was and was != "counts":
             return None
         if was == "counts" and name == "counts":
             return False  # what counting wrote is never rewritten
@@ -460,6 +458,8 @@ class Urls(Rules):
             "http://user@127.0.0.1/",
             "https://example.com@localhost/",
             "http:///nohost",
+            "http://127.0.0.1\\@example.com/",
+            "https://example.com/\n",
         ):
             with self.subTest(url):
                 done = self.source(url)
@@ -556,7 +556,9 @@ class UserEvidence(Rules):
     def test_s14_the_coordinator_may_remove_user_evidence_with_the_users_request(self):
         self.ok(self.you())
         made = self.user_evidence().stdout.strip()
-        self.ok(self.set(made, {"status": "removed", "reason": "the user asked: remove m1"}, COORD))
+        with open(self.folder / "conversation.jsonl", "a") as out:
+            out.write(json.dumps(R.event("remove", id="m5", record=made)) + "\n")
+        self.ok(self.set(made, {"status": "removed", "reason": "the user asked: remove m5"}, COORD))
         self.assertEqual(self.evidence(made)["status"], "removed")
 
     def test_s14_user_evidence_cannot_move_to_checking_or_back(self):
@@ -667,7 +669,12 @@ class Duplicates(Rules):
         self.refused(self.add("evidence", self.fields(QUOTE), "a1"), "already recorded as E-a1-1")
 
     def test_s22_normalised_words_are_the_same_words(self):
-        for text in ("we lost a week to this", "  We   lost a week to  this!! ", "“We lost a week to this”", "We lost a week, to this."):
+        for text in (
+            "we lost a week to this",
+            "  We   lost a week to  this!! ",
+            "“We lost a week to this”",
+            "We lost a week, to this.",
+        ):
             with self.subTest(text):
                 self.refused(self.add("evidence", self.fields(text), "a1"), "E-a1-1")
 
@@ -767,15 +774,21 @@ class Web(Rules):
                 {"status": "counts", "verifier": "v1", "checked_read": "raw", "span": "x", "sha256": "a" * 64},
             ):
                 with self.subTest(who=who, extra=extra):
-                    done = self.add("evidence", self.fields(words={"type": "quote", "text": f"x {extra}"}, **extra), who)
+                    done = self.add(
+                        "evidence", self.fields(words={"type": "quote", "text": f"x {extra}"}, **extra), who
+                    )
                     self.assertEqual(done.returncode, 1, extra)
         self.assertEqual(len(list((self.folder / "evidence").iterdir())), 2)
 
     def test_s99_check_reports_web_evidence_that_counts_without_a_verifier_who_read_the_page(self):
         cases = {
             "E-a1-2": dict(status="counts"),
-            "E-a1-3": dict(status="counts", verifier="a1", tries=["a1"], checked_read="raw", span=SPAN, sha256="a" * 64),
-            "E-a1-4": dict(status="counts", verifier="v1", tries=["v1"], checked_read="raw", span="elsewhere", sha256="a" * 64),
+            "E-a1-3": dict(
+                status="counts", verifier="a1", tries=["a1"], checked_read="raw", span=SPAN, sha256="a" * 64
+            ),
+            "E-a1-4": dict(
+                status="counts", verifier="v1", tries=["v1"], checked_read="raw", span="elsewhere", sha256="a" * 64
+            ),
         }
         for ident, fields in cases.items():
             self.put(ident, words={"type": "quote", "text": f"{QUOTE} {ident}"}, **fields)
