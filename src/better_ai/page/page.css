@@ -193,6 +193,9 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .thread .reply + .foot { margin-top:var(--space-section); }
 .thread .reply:has(+ .foot) { padding-bottom:var(--space-tight); }
 .thread .foot .answer { margin-left:auto; }
+/* An open question's footer keeps its state and its two buttons on one row. */
+.thread .foot.question { flex-wrap:nowrap; }
+.thread .foot.question .progress { min-width:0; }
 .thread .foot .answer + .answer { margin-left:0; }
 .thread .foot .mini:first-of-type { margin-left:auto; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer;

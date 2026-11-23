@@ -253,6 +253,8 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 ### Decision in the conversation
 
 - An agent's decision or question is a `li.msg.decision`, with an umber edge and the agent's name and time in umber.
+- An open question's footer is its state, a filled ✓ (use the default) and a quiet Answer, on one row (`.foot.question`). Each control's accessible name includes the question. After ✓ the focus goes to the next open question, then to what waits next.
+- A page whose defaults never apply on a timer sets `pageDecision({suggested: true})`: the default reads "Suggested default" and no deadline shows.
 
 ### Notices
 

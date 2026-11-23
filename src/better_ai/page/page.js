@@ -678,6 +678,10 @@ function pageCan(name) { return (pageConfig().capabilities || []).indexOf(name) 
 //   o.conversation  the page's pageConversation()     o.now()  the page's clock in seconds (the server's)
 //   o.md(text)      Markdown to an HTML string        o.esc(text)  HTML-escaped text
 //   o.id(prefix)    a new event id
+//   o.suggested     true: the default is a suggestion, never applied on a timer: "Suggested default", no deadline words
+//   o.next()        the element that waits after the open questions, such as a move that is due (optional)
+// The footer of an open question is [✓] [Answer] on one row; each control's name includes the question. After ✓ the focus
+// goes to the next open question, then to what waits next.
 // pageDecisionEvents(decisions, conversation) is the log the thread draws: each decision as an entry of type `decision`
 // (the record in `x`), among the conversation's events, in the order things happened. Nothing comes before what it
 // answers: an answer never shows above its decision, a reply never above the answer it replies to.
@@ -695,9 +699,39 @@ function pageDecision(o) {
   function waiting(c, state) { return step(status(c.e.x), answerOf(c), state) === 0; }
   function left(x) { var t = Date.parse(x.deadline); return isNaN(t) ? null : t / 1000 - o.now(); }
   function deadlineWords(x) {
-    var s = left(x);
+    var s = o.suggested ? null : left(x);
     if (s === null) return '';
     return s > 0 ? 'default in ' + (s < 90 ? 'under 2 min' : Math.round(s / 60) + ' min') : 'default due now';
+  }
+  // What takes the focus after the question FROM is answered, found at the click, before the send: the thread may redraw
+  // before the send is done, and the answered question is then gone. The open question after it, else the first before
+  // it: {id}, found again by id afterwards. Else what the page says waits next, else another item the agent asked
+  // about: {el}. Nothing else waits: null.
+  function nextWaiting(from) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q')), i = -1, k;
+    for (k = 0; k < list.length; k++) if (list[k].dataset.d === from) i = k;
+    var others = list.slice(i + 1).concat(list.slice(0, Math.max(i, 0))).filter(function (q) { return q.dataset.d !== from; });
+    if (others.length) return { id: others[0].dataset.d };
+    var page = o.next && o.next();
+    if (page) return { el: page };
+    var asked = Array.prototype.slice.call(document.querySelectorAll('li[data-state="asked"]')).filter(function (q) { return q.dataset.d !== from && !/open-q/.test(q.className); });
+    if (!asked.length) return null;
+    asked[0].setAttribute('tabindex', '-1');
+    return { el: asked[0] };
+  }
+  function questionEl(id) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q'));
+    for (var k = 0; k < list.length; k++) if (list[k].dataset.d === id) return list[k].querySelector('.use') || list[k].querySelector('.answer') || list[k];
+    return null;
+  }
+  // A redraw after the answer replaces the nodes: the question's new ✓ is focused once drawn, only while the focus is
+  // still on the button that had it or on nothing, so a redraw never takes it from where the user went.
+  var want = null;
+  function focusTarget(n) {
+    if (!n) return;
+    var el = n.id ? questionEl(n.id) : n.el;
+    if (el && el.focus) el.focus({ preventScroll: true });
+    want = n.id ? { id: n.id, from: el } : null;
   }
   function head(who, label) {
     return '<div class="head"><span class="who">' + o.esc(who) + '</span><span class="when">' + o.esc(label) + '</span></div>';
@@ -711,30 +745,42 @@ function pageDecision(o) {
     li.className = 'msg decision ' + st + (asked ? ' open-q' : '');
     // The default shows under an open question, as what happens without an answer; the answer the agent copied shows
     // only when the user gave it in the chat: an answer from the page is in the thread.
-    var after = x.default && ((st === 'waiting' && n <= 0) || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? "If you don't answer: " : 'Default applied: ') + x.default
+    var after = x.default && ((st === 'waiting' && n <= 0) || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? (o.suggested ? 'Suggested default: ' : "If you don't answer: ") : 'Default applied: ') + x.default
       : st === 'answered' && x.answer && x.answer.type === 'chat' ? '\n\nYour answer:\n\n' + x.answer.text
       : st === 'decided' && x.decision ? '\n\nDecided:\n\n' + x.decision : '';
     li.innerHTML = head(pageRole().replace(/^./, function (ch) { return ch.toUpperCase(); }), label || pageTime(x.at)) + o.md(String(x.asked || '') + after);
     li.dataset.d = x.id;
     li.dataset.state = STEP ? STEP[0] : '';
     var foot = document.createElement('div');
-    foot.className = 'foot';
+    foot.className = 'foot' + (asked ? ' question' : '');
+    var q = String(x.asked || '').replace(/\s+/g, ' ').trim();
     if (STEP) foot.insertAdjacentHTML('beforeend', '<span class="progress ' + STEP[0] + '"><span class="bars" aria-hidden="true">' +
       [0, 1, 2].map(function (i) { return '<i class="' + (i <= n ? 'on' : '') + '"></i>'; }).join('') + '</span><span>' + STEP[1] + '</span></span>');
     else if (answer) foot.append(conv.progress(state[answer.id]));
     if (actions) {
       if (asked && x.default) {
         var use = document.createElement('button');
-        use.type = 'button'; use.className = 'btn btn--sm answer'; use.textContent = 'Use the default';
+        use.type = 'button'; use.className = 'btn btn--sm answer use'; use.textContent = '✓'; use.title = 'Use the default';
+        use.setAttribute('aria-label', 'Use the default for: ' + q);
         use.addEventListener('click', function () {
+          var target = nextWaiting(x.id);
           use.disabled = true;
-          conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer', null, function () { use.disabled = false; });
+          conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer',
+            function () { focusTarget(target); }, function () { use.disabled = false; });
         });
         foot.append(use);
+        if (want && want.id === x.id) {
+          var from = want.from; want = null;
+          Promise.resolve().then(function () {
+            var now = document.activeElement;
+            if (!now || now === document.body || now === from) use.focus({ preventScroll: true });
+          });
+        }
       }
       var change = document.createElement('button');
-      change.type = 'button'; change.className = 'btn btn--sm answer change' + (asked ? '' : ' btn--quiet');
+      change.type = 'button'; change.className = 'btn btn--sm btn--quiet answer change';
       change.textContent = asked ? 'Answer' : 'Reply';
+      change.setAttribute('aria-label', (asked ? 'Answer: ' : 'Reply to: ') + q);
       change.addEventListener('click', function () {
         conv.box(li, x.id, asked ? 'Your answer' : 'Your reply', change, function (text, done) {
           conv.send('answer', { id: o.id('a'), decision: x.id, text: text, default: false }, 'Answer', done);

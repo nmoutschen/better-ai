@@ -17,12 +17,16 @@ class Node {
   addEventListener(type, fn) { this.listeners[type] = fn; }
   setAttribute(k, v) { this.attrs[k] = v; }
   click() { this.listeners.click(); }
+  focus() { Node.focused = this; }
+  querySelector(sel) { return this.found && this.found[sel] || null; }
 }
 
 function load(config) {
   const document = {
     createElement: tag => new Node(tag),
     getElementById: id => id === 'page-config' && config ? { textContent: JSON.stringify(config) } : null,
+    get activeElement() { return Node.focused; },
+    querySelectorAll: sel => (load.thread && load.thread[sel]) || [],
   };
   return loadPage({ document, Date, JSON, Object, Math, String, Array, isNaN });
 }
@@ -96,16 +100,16 @@ test('decisions enter the log among the events, nothing before what it answers',
 
 // ---- the decision question, the same on every page that shows decisions
 
-function decision(page, overrides) {
+function decision(page, overrides, options) {
   const sent = [], boxes = [];
   const conversation = {
     send(method, params, what, done, fail) { sent.push({ method, params, what }); if (done) done(); },
     box(li, id, label, from, onSend) { boxes.push({ id, label, onSend }); },
     progress(st) { const n = new Node('span'); n.textContent = st; return n; },
   };
-  const d = page.pageDecision({
+  const d = page.pageDecision(Object.assign({
     conversation, now: () => Date.parse('2026-11-22T10:00:00Z') / 1000, md: t => '<p>' + t + '</p>', esc: t => String(t), id: p => p + '-1',
-  });
+  }, options));
   const x = Object.assign({ id: 'D1', at: '2026-11-22T09:00:00Z', asked: 'Which size?', status: 'waiting', default: 'Take the small one', deadline: '2026-11-22T10:10:00Z' }, overrides);
   const entry = { e: { x }, replies: [] };
   return { d, x, entry, sent, boxes, render: (state, actions) => d.item(entry, state || {}, actions !== false) };
@@ -122,7 +126,7 @@ test('a waiting decision shows its question, the default and the deadline, with 
   assert.match(li.className, /open-q/);
   assert.equal(li.dataset.state, 'asked');
   assert.match(foot.innerHTML, /Waiting for you/);
-  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Use the default', 'Answer']);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
   assert.equal(t.d.waiting(t.entry, {}), true);
 });
 
@@ -274,4 +278,126 @@ test('the research board and the code-better dashboard draw a decision question 
     assert.doesNotMatch(text, /['"`]Use the default['"`]/, rel + ' words the default button itself');
   }
   assert.match(source, /Use the default/);
+});
+
+// ---- the question footer, the accessible names and the focus (every page), and the suggested default (a page's option)
+
+test('the question footer is a filled check and a quiet Answer on one row, and each control names the question', () => {
+  const t = decision(load({ capabilities: ['decisions'] }));
+  const [, foot] = t.render();
+  const [use, answer] = buttons(foot);
+  assert.match(use.className, /btn--sm/);
+  assert.doesNotMatch(use.className, /btn--quiet/);
+  assert.match(answer.className, /btn--quiet/);
+  assert.match(foot.className, /\bquestion\b/);  // page.css keeps this footer on one row
+  assert.equal(use.attrs['aria-label'], 'Use the default for: Which size?');
+  assert.equal(answer.attrs['aria-label'], 'Answer: Which size?');
+  const applied = decision(load({ capabilities: ['decisions'] }), { status: 'decided', decision: 'Small' });
+  assert.equal(buttons(applied.render()[1])[0].attrs['aria-label'], 'Reply to: Which size?');
+});
+
+test('a page that sets suggested shows Suggested default and never a deadline or "If you don\'t answer"', () => {
+  const page = load({ capabilities: ['decisions'] });
+  const t = decision(page, { deadline: '2026-11-22T10:10:00Z' }, { suggested: true });
+  const [li, foot] = t.render();
+  assert.match(li.innerHTML, /Suggested default: Take the small one/);
+  assert.doesNotMatch(li.innerHTML, /default in|default due|If you don&#39;t answer|If you don't answer/);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
+  const late = decision(page, { deadline: '2026-11-22T09:00:00Z' }, { suggested: true });
+  assert.doesNotMatch(late.render()[0].innerHTML, /due now/);
+});
+
+function questions(page, ids) {
+  // Rendered questions in a thread: the stand-in document lists them, as page.js finds them in the page.
+  const items = ids.map(id => {
+    const t = decision(page, { id });
+    const [li, foot] = t.render();
+    li.dataset.d = id;
+    li.found = { '.use': buttons(foot)[0], '.answer': buttons(foot)[1] };
+    return { t, li, use: buttons(foot)[0], foot };
+  });
+  load.thread = { 'li.open-q': items.map(i => i.li), 'li[data-state="asked"]': items.map(i => i.li) };
+  return items;
+}
+
+test('after the check, the focus moves to the next open question, then to the next thing that waits', async () => {
+  const page = load({ capabilities: ['decisions'] });
+  const items = questions(page, ['D1', 'D2']);
+  Node.focused = null;
+  items[0].use.click();
+  assert.equal(Node.focused, items[1].use);
+  load.thread['li.open-q'] = [items[1].li];
+  load.thread['li[data-state="asked"]'] = [items[1].li];
+  items[1].use.click();  // the last question: nothing else waits, the focus stays where it is
+  assert.equal(Node.focused, items[1].use);
+  const note = new Node('li'); note.dataset.state = 'asked';
+  load.thread['li[data-state="asked"]'] = [items[1].li, note];
+  items[1].use.click();
+  assert.equal(Node.focused, note);
+  const move = new Node('button');
+  const withMove = decision(page, { id: 'D9' }, { next: () => move });
+  const [, f9] = withMove.render();
+  load.thread = {};
+  buttons(f9)[0].click();
+  assert.equal(Node.focused, move);  // the page's own next thing, such as a move that is due
+  load.thread = null;
+});
+
+test('when the redraw replaces the next question after the check, its new check takes the focus', async () => {
+  const page = load({ capabilities: ['decisions'] });
+  const items = questions(page, ['D1', 'D2']);
+  items[0].use.click();
+  const [, foot] = items[0].t.d.item(items[1].t.entry, {}, true);  // one pageDecision draws every question of a page  // the thread redraws the question
+  Node.focused = null;
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(Node.focused, buttons(foot)[0]);
+  load.thread = null;
+});
+
+// The decision records the code-better dashboard and the research board draw, as their schemas have them. A page that
+// does not set `suggested` draws them as it always did: the deadline, "If you don't answer" and the default.
+test('code-better and research-better decisions render as before, with the deadline and "If you don\'t answer"', () => {
+  const page = load({ agent: 'coordinator', capabilities: ['decisions'] });
+  const fixtures = [
+    { id: 'D1', at: '2026-11-22T09:00:00Z', asked: 'Keep the old endpoint?', status: 'waiting', default: 'Keep it', deadline: '2026-11-22T10:20:00Z' },
+    { id: 'Q-3', at: '2026-11-22T09:00:00Z', asked: 'Which source first?', status: 'waiting', default: 'The survey', deadline: '2026-11-22T10:01:00Z' },
+    { id: 'D2', at: '2026-11-22T09:00:00Z', asked: 'Wait for the audit?', status: 'waiting', default: 'No', deadline: '2026-11-22T09:30:00Z' },
+  ];
+  const seen = fixtures.map(x => decision(page, x, {}).render()[0].innerHTML);
+  assert.match(seen[0], /default in 20 min/);
+  assert.match(seen[1], /default in under 2 min/);
+  assert.match(seen[2], /default due now/);
+  seen.forEach(html => { assert.match(html, /If you don(&#39;|')t answer: /); assert.doesNotMatch(html, /Suggested default/); });
+});
+
+// The thread can be redrawn before `done` runs (a page that is not served redraws in send; a served one by its poll): the
+// answered question is then gone, and the target must come from what the click saw.
+test('after the check on the middle of three questions, the focus goes to the third, though the thread redrew first', () => {
+  const page = load({ capabilities: ['decisions'] });
+  let rows = [];
+  const conversation = { box() {}, progress: () => new Node('span'),
+    send(m, p, w, done) { load.thread['li.open-q'] = [rows[0].n, rows[2].n]; done(); } };
+  const d = page.pageDecision({ conversation, now: () => 0, md: t => t, esc: String, id: p => p + '-1' });
+  rows = ['D1', 'D2', 'D3'].map(id => {
+    const [n, foot] = d.item({ e: { x: { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' } }, replies: [] }, {}, true);
+    n.dataset.d = id; n.found = { '.use': buttons(foot)[0], '.answer': buttons(foot)[1] };
+    return { n, use: buttons(foot)[0] };
+  });
+  load.thread = { 'li.open-q': rows.map(r => r.n) };
+  Node.focused = null;
+  rows[1].use.click();
+  assert.equal(Node.focused, rows[2].use);
+  load.thread = null;
+});
+
+test('a later redraw does not take the focus from where the user went', async () => {
+  const page = load({ capabilities: ['decisions'] });
+  const items = questions(page, ['D1', 'D2']);
+  items[0].use.click();
+  const composer = new Node('textarea');
+  Node.focused = composer;
+  const [, foot] = items[0].t.d.item(items[1].t.entry, {}, true);
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(Node.focused, composer);
+  load.thread = null;
 });
