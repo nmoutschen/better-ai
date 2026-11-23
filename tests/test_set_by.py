@@ -106,5 +106,23 @@ class SetRaw(Unit):
         self.assertEqual((done[0], seen), (0, [None]))
 
 
+class SetUnsets(Unit):
+    """`set --unset <field>`: the fields to remove reach the set steps as `ctx.unsets`."""
+
+    def seen(self, *args):
+        seen = []
+        with mock.patch.dict(records.SET_STEPS, {"code-better": [lambda ctx: seen.append(ctx.unsets)]}):
+            done = call("code-better", "set", self.unit, "D1", *args, stdin={"asked": "which one?"})
+        return done, seen
+
+    def test_the_steps_see_the_unset_fields(self):
+        done, seen = self.seen("--unset", "decision", "--unset", "default")
+        self.assertEqual(seen, [("decision", "default")], done)
+
+    def test_no_unset_is_an_empty_tuple(self):
+        done, seen = self.seen()
+        self.assertEqual((done[0], seen), (0, [()]))
+
+
 if __name__ == "__main__":
     unittest.main()

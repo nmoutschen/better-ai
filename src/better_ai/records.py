@@ -101,6 +101,7 @@ class SetContext:
     by: str | None = None  # who makes the change (`set --by`); the record's own `by`, its creator, never changes
     raw: str | None = None  # a file path given as `set --raw`, for a step whose rule reads that file
     raw_read: bool = False  # a step that reads `raw` sets it; `set` refuses a `--raw` that no step read
+    unsets: tuple[str, ...] = ()  # the fields `set --unset` removes, which a step that guards a field must also see
 
 
 CREATE_STEPS: dict[str, list[Callable]] = {}
@@ -868,7 +869,7 @@ def set_(args: argparse.Namespace, run: Run) -> int:
         label = args.ref if args.ref in lay.forms else ""
     patch = _own_fields(_fields(run, unit, empty_ok=bool(args.unset)), unit, label)
     _deadline(patch, run, unit)
-    context = SetContext(run, unit, found.record, patch, by, args.raw)
+    context = SetContext(run, unit, found.record, patch, by, args.raw, False, tuple(args.unset))
     for step in SET_STEPS.get(run.skill.name, []):
         step(context)
     if args.raw is not None and not context.raw_read:
