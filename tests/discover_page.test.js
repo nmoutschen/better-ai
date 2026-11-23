@@ -528,7 +528,8 @@ test('A14: after the check on a risk\'s question, the next question is one in an
 });
 
 // ---------- A5 ----------
-// The text of every button that is not a tab, the header's count or a risks bar: those open a view, like More.
+// The text of every button that sends something to the agent: not a tab, the header's count or a risks bar, which only
+// open or close a view; Show and Hide are fine there (the user, on A5).
 const buttonLabels = html => [...html.matchAll(/<button\b([^>]*)>([^]*?)<\/button>/g)].filter(m => !/role="tab"|id="questions"|data-risks=/.test(m[1])).map(m => m[2].replace(/<[^>]*>/g, '').trim());
 
 test('A5: the page\'s own controls use five verbs, plus Send and Cancel, and the exit action reads Choose a move…', () => {
