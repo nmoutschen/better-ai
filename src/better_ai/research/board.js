@@ -234,9 +234,9 @@ function drawAgents(d) {
   const dry = name => { const l = ((d.logs || {})[name] || {}).searches || []; let n = 0;  // searches in a row that found no new term
     for (let i = l.length - 1; i >= 0 && !(l[i].new_terms || []).length; i--) n++; return n; };
   const rows = working.map(q => { const who = has(q.owner) ? q.owner : "unassigned", n = dry(who);
-    return `<li><button type="button" data-a="${esc(who)}" data-for="${esc(q.id)}"><b>${esc(who)}</b><span dir="auto">${esc(q.label)}</span>${n >= 5 ? `<em class="dry">${n} searches with nothing new</em>` : ""}</button></li>`; })
-    .concat(Object.keys(checkers).sort().map(v => `<li><button type="button" class="verifier" data-a="${esc(v)}"><b>${esc(v)}</b><span>Checking claims</span></button></li>`));
-  setHTML($("agents"), rows.join("") || `<li class="muted">${d.brief.status === "stopped" ? "The run has stopped." : "No agent is working right now."}</li>`);
+    return {who, what: q.label, data: {a: who, for: q.id}, note: n >= 5 ? `${n} searches with nothing new` : ""}; })
+    .concat(Object.keys(checkers).sort().map(v => ({who: v, what: "Checking claims", kind: "verifier", data: {a: v}})));
+  setHTML($("agents"), pageAgents(rows, {now: d.now, empty: d.brief.status === "stopped" ? "The run has stopped." : "No agent is working right now."}));
 }
 
 function setHTML(el, html) { if (el._html !== html) el.innerHTML = el._html = html; }
