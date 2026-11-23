@@ -90,11 +90,10 @@ function fold(text) {
 }
 
 // ---------- Open questions: one function for the header, the badges, the Moves tab and the conversation (S80) ----------
-// A decision is open while it waits and the user has not answered it on the page. A due move is a waiting decision
-// about the discovery, so it counts with the others. WAITING is the shared decision question's own test.
-function openQuestions(decisions, log, waiting) {
-  const model = pageThread(pageDecisionEvents(decisions || [], log || []), [], null);
-  const open = new Set(model.entries.filter(c => c.kind === 'decision' && waiting(c, model.state)).map(c => c.e.id));
+// A decision is open while it waits and the user has not answered it on the page, by the shared rule. A due move is a
+// waiting decision about the discovery, so it counts with the others.
+function openQuestions(decisions, log) {
+  const open = new Set(pageOpenDecisions(decisions, log, [], null).map(c => c.e.id));
   return (decisions || []).filter(x => open.has(x.id));
 }
 function aboutTab(decision, items) {
@@ -179,7 +178,7 @@ function agentRows(data, now) {
   (data.evidence || []).forEach(e => { if (e.status === 'checking' && s(e.verifier)) rows.push(row(e.verifier, 'Checking quote ' + e.id, e.since, e.id, { state: 'Checking', kind: 'verifier', second: (e.tries || []).length > 1 })); });
   return rows;
 }
-const atWork = (data, now) => pageAgents(agentRows(data, now), { now, empty: 'No agent is working right now.' });
+const atWork = (data, now) => pageAgents(agentRows(data, now), { now, quietAfter: data.quiet_after, empty: 'No agent is working right now.' });
 
 // ---------- The user's events ----------
 const uid = prefix => prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
@@ -478,7 +477,7 @@ const markdown = text => md(s(text).replace(/<!--[^]*?-->\n?/g, ''));
 
 let conv = null, decision = null;
 const waitingOf = (c, state) => c.kind === 'decision' ? decision.waiting(c, state) : c.kind === 'note' && state[c.e.id] === 'asked';
-const currentOpen = () => openQuestions(DATA.decisions, DATA.conversation, (c, state) => decision.waiting(c, state));
+const currentOpen = () => openQuestions(DATA.decisions, DATA.conversation);
 const ITEM_KINDS = ['note', 'choose', 'add_evidence', 'add_result', 'remove', 'edit', 'redact'];
 const threadState = () => pageThread(pageDecisionEvents(DATA.decisions, DATA.conversation), ITEM_KINDS, null).state;
 const currentPending = () => {

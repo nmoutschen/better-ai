@@ -12,13 +12,12 @@ const ago = minutes => new Date((NOW - minutes * 60) * 1000).toISOString().slice
 
 function pure(returns, over = {}) {
   const env = Object.assign({
-    document: stand(), pageEscape: shared.pageEscape, pageThread: shared.pageThread, pageDecisionEvents: shared.pageDecisionEvents,
+    document: stand(), pageEscape: shared.pageEscape, pageThread: shared.pageThread, pageDecisionEvents: shared.pageDecisionEvents, pageOpenDecisions: shared.pageOpenDecisions,
     pageDecision: shared.pageDecision, pageAgents: shared.pageAgents, pageTime: shared.pageTime,
     pageMarkdown: t => ({ outerHTML: '<p>' + shared.pageEscape(t) + '</p>' }), pageMarkdownText: String,
   }, over);
   return new Function(...Object.keys(env), `${between(source, '', '// ---------- Start ----------')}; return ${returns};`)(...Object.values(env));
 }
-const waitingOf = () => shared.pageDecision({ conversation: { progress: () => stand() }, now: () => NOW, md: String, esc: shared.pageEscape, id: p => p }).waiting;
 const api = () => pure('{TABS, openQuestions, aboutTab, badges, tabLabel, stateChip, safeLink, idLink, firstSentence, agentRows, ' +
   'chooseParams, removeFor, nextAfter, evidenceBlock, pendingChoose, headerHTML, movesPanel, itemsTable, evidencePanel, optionsPanel, testsPanel, briefPanel, ' +
   'choosePanel, addEvidenceForm, resultForm, removeForm, changeForm, atWork, briefLabel}');
@@ -31,7 +30,7 @@ function fixture(over = {}) {
     about: 'elsewhere', bears_on: [{ item: 'P1', direction: 'for' }], status: 'counts', origin: { type: 'web', url: 'https://example.com/a', read: 'raw' },
     source_title: 'A post', ...o });
   const data = {
-    now: NOW, errors: [],
+    now: NOW, quiet_after: 1800, errors: [],
     head: { idea: 'A page that shows where an idea stands.', appetite: 'two weeks', setting: 'external', brought: 'notes', step: '5', status: 'open', coordinator: 'coord' },
     items: [
       item('P1', 'problem', 'People lose track. They forget what they checked.', { state: 'supported', recorded_state: 'supported', importance: 'high' }),
@@ -68,7 +67,7 @@ function fixture(over = {}) {
 }
 const ctx = (data, over = {}) => {
   const a = api();
-  const open = a.openQuestions(data.decisions, data.conversation, waitingOf());
+  const open = a.openQuestions(data.decisions, data.conversation);
   return Object.assign({ open, now: NOW, pending: null, badges: a.badges(open, data.items) }, over);
 };
 
@@ -79,7 +78,7 @@ test('the tabs follow the work, in the designed order', () => {
 // ---------- S80, A2, S1: one count ----------
 test('S80: the header, the badges and the conversation count open questions through one function; a due move is a waiting decision about the discovery', () => {
   const a = api(), d = fixture();
-  const open = a.openQuestions(d.decisions, d.conversation, waitingOf());
+  const open = a.openQuestions(d.decisions, d.conversation);
   assert.deepEqual(open.map(x => x.id), ['D1', 'D2', 'D3']);
   assert.equal(a.aboutTab(d.decisions[2], d.items), 'moves');
   const badges = a.badges(open, d.items);
@@ -93,12 +92,12 @@ test('S80: the header, the badges and the conversation count open questions thro
 test('S1, A2: an answer from the page drops the question from the header, the Moves badge and the item badge together; so does an answer in the chat', () => {
   const a = api(), d = fixture();
   const answer = { type: 'answer', at: ago(1), by: 'user', id: 'a1', decision: 'D1', text: 'Yes', default: true };
-  const open = a.openQuestions(d.decisions, [answer], waitingOf());
+  const open = a.openQuestions(d.decisions, [answer]);
   assert.deepEqual(open.map(x => x.id), ['D2', 'D3']);
   assert.equal(a.badges(open, d.items).moves, 2);
   assert.equal(a.badges(open, d.items).problems || 0, 0);
   const chat = d.decisions.map(x => x.id === 'D2' ? { ...x, status: 'answered', answer: { type: 'chat', text: 'ok' }, answered_at: ago(1) } : x);
-  assert.deepEqual(a.openQuestions(chat, [answer], waitingOf()).map(x => x.id), ['D3']);
+  assert.deepEqual(a.openQuestions(chat, [answer]).map(x => x.id), ['D3']);
 });
 
 test('A2: a tab with open questions has a badge with an accessible name; with none, no badge', () => {
