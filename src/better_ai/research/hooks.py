@@ -72,7 +72,7 @@ def claim_starts_unchecked(ctx: records.AddContext) -> None:
 
 @records.set_step("research-better")
 def verified_needs_the_page_read(ctx: records.SetContext) -> None:
-    """A claim set `verified`, or a verified claim whose span or quote changes, needs `--raw`: the text of the page the
+    """A claim set `verified`, or a verified claim whose span, quote or source changes, needs `--raw`: the text of the page the
     verifier read. Each passage of the span (joined by " ... ") must occur in it, and the quote in the span; the
     command keeps the file's `sha256`. A claim that stops being verified loses its `sha256`."""
     record, patch = ctx.record, ctx.patch
@@ -85,7 +85,8 @@ def verified_needs_the_page_read(ctx: records.SetContext) -> None:
         if "sha256" in record and "sha256" not in ctx.unsets:
             ctx.unsets = (*ctx.unsets, "sha256")
         return
-    if record.get("status") == "verified" and "span" not in patch and "quote" not in patch:
+    rechecked = ("span", "quote", "source")  # a claim that keeps its page and passage keeps its check
+    if record.get("status") == "verified" and ctx.raw is None and not any(k in patch for k in rechecked):
         return
     span = patch.get("span", record.get("span"))
     if not isinstance(span, str) or not span.strip():

@@ -48,7 +48,7 @@ The first line is a seed question that is proposed, open or out of scope, and th
 
 ## claim
 
-A verifier, not the agent that added the claim, sets everything after `status` `unchecked`. SET a claim `verified` with `set --raw <file>`, the file of the page text the verifier read: the command refuses unless each passage of the `span` occurs in that file and the `quote`'s words occur in the `span`, and it adds the file's `sha256`. GIVE no `sha256` yourself.
+A verifier, not the agent that added the claim, sets everything after `status` `unchecked`. SET a claim `verified` with `set --raw <file>`, the file of the page text the verifier read: the command refuses unless each passage of the `span` occurs in that file and the `quote`'s words occur in one passage of the `span`, and it adds the file's `sha256`. GIVE no `sha256` yourself.
 
 ```
 {"type": "claim", "claim": "<one sentence>", "question": "<Q-...>", "source": "<S-...>", "quote": "<verbatim passage from the source>", "status": "unchecked"}

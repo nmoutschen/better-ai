@@ -1,7 +1,7 @@
 """The check of a quote against the page a verifier read, shared by the skills whose verifiers check quotes.
 
 A verifier saves the text it read to a file and passes it to `set` with `--raw <file>`. `check_read` refuses unless
-each passage of the span the verifier copied occurs in that file, and the quote occurs in the span, and it returns the
+each passage of the span the verifier copied occurs in that file, and the quote occurs in one passage, and it returns the
 file's `sha256` for the record to keep. It makes no network call and reads no file but that one.
 """
 
@@ -54,8 +54,8 @@ def raw_text(ctx: records.SetContext, then: str) -> tuple[str, str]:
 
 
 def check_read(ctx: records.SetContext, passages: list[str], quote: object, then: str) -> str:
-    """Refuse unless each passage occurs in the `--raw` file (whitespace aside) and the quote occurs in the passages
-    joined; return the file's sha256. `then` is as for `raw_text`."""
+    """Refuse unless each passage occurs in the `--raw` file (whitespace aside) and the quote occurs within one
+    passage; return the file's sha256. `then` is as for `raw_text`."""
     text, digest = raw_text(ctx, then)
     page = _spaced(text)
     for passage in passages:
@@ -65,7 +65,7 @@ def check_read(ctx: records.SetContext, passages: list[str], quote: object, then
                 f"the span does not occur in {ctx.raw}: {passage[:80]!r}",
                 "copy the span from the saved page exactly, or set the outcome that says why you could not",
             )
-    if not isinstance(quote, str) or not quote_in_span(quote, " ".join(passages)):
+    if not isinstance(quote, str) or not any(quote_in_span(quote, passage) for passage in passages):
         raise paths.refusal(
             ctx.unit.label,
             "the quote does not occur in the span",

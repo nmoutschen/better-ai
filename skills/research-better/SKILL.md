@@ -181,7 +181,7 @@ WHILE workers run, RE-READ the board and REVIEW new entries. READ worker entries
 
    DO NOT reject a question because you expect its answer.
 2. **Review verification**: DO NOT open source pages to verify claims yourself; verifiers do it (step 6.1).
-   - FOR each `unverified` claim, READ its `reason`. CORRECT the claim to match the span, WITHDRAW it (`status` `withdrawn`, `replaced_by` the claim that replaces it, or `null`), or REOPEN its question. IF the reason is that the quote is reworded, CORRECT the `quote` to the span's words and SET the claim back to `unchecked`, so a verifier checks it again.
+   - FOR each `unverified` claim, READ its `reason`. CORRECT the claim to match the span, WITHDRAW it (`status` `withdrawn`, `replaced_by` the claim that replaces it, or `null`), or REOPEN its question. IF the reason is that the quote is reworded, CORRECT the `quote` to the span's words and SET the claim back to `unchecked` with `--unset` for its `checker`, `span`, `hard`, `reason` and any `blocked`, so a verifier checks it again.
    - FOR each `verified` claim the conclusion depends on, COMPARE the claim with the span the verifier copied. Verifiers catch claims that contradict their span, but miss many that say more than it, such as a dropped hedge or a wider scope. A claim with no span cannot be checked: SEND it to a verifier.
    - IF the claim and the span disagree, or `hard` is `true`, CHECK that the span states each number and condition in the claim. OPEN the page only if the span is not enough to decide.
    - CORRECT source fields that a verifier listed in `differs`, or in the `reason` of an unverified claim, as differing from the page.

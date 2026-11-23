@@ -86,6 +86,30 @@ class ResearchRaw(unittest.TestCase):
         span = "Release notes ... we've added an address confirmation step before payment."
         self.assertEqual(self.verify(span=span).returncode, 0)
 
+    def test_the_quote_must_fall_within_one_passage(self):
+        span = "we've added an address ... confirmation step before payment."
+        self.refused(self.verify(span=span), "quote does not occur")
+
+    def test_a_verified_claim_that_changes_source_needs_raw_again(self):
+        self.assertEqual(self.verify().returncode, 0)
+        done = call(SKILL, "set", self.board, "C-w1-1", "--by", "w1", stdin=json.dumps({"source": "S-w1-1"}))
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertIn("--raw", done.stdout + done.stderr)
+
+    def test_raw_on_a_verified_claim_is_checked_again(self):
+        self.assertEqual(self.verify().returncode, 0)
+        done = self.set({"differs": "date: the page says 2026-10-03"}, self.page)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        other = self.root / "other.txt"
+        other.write_text("nothing here")
+        self.assertEqual(self.set({"differs": "x"}, other).returncode, 1)
+
+    def test_a_reworded_claim_goes_back_to_unchecked_with_unsets(self):
+        self.set({"status": "unverified", "hard": False, "reason": "reworded: x", "span": SPAN})
+        unset = [a for f in ("checker", "span", "hard", "reason") for a in ("--unset", f)]
+        done = call(SKILL, "set", self.board, "C-w1-1", "--by", "coordinator", *unset, stdin='{"status": "unchecked"}')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_a_raw_file_inside_the_board_is_refused(self):
         inside = self.board / "page.txt"
         inside.write_text(PAGE)
