@@ -1,8 +1,8 @@
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const esc = pageEscape;
 const has = v => v && v !== "none";
 const STATIC = !!document.getElementById("page-data");  // a page written by `render`: its data is in it, and nothing is served
-let D = null, OPEN = null, REPLIES = -1, RANGE = "2h";  // OPEN: the task the pop-up shows, as {id, anchor}
+let D = null, REPLIES = -1, RANGE = "2h";
 
 // status:begin
 // A task's mode as a tag, one colour per mode.
@@ -30,14 +30,6 @@ function taskStatus(t, tasks) {
   return {key, word};
 }
 // status:end
-
-// errors:begin
-// The records that did not validate, as a band above the work: where each is, its field, why, and who wrote it. A file
-// can hold anything, so every part is text. The valid records are on the page as usual; this band never replaces them.
-const errorsHTML = errors => !errors || !errors.length ? "" :
-  `<h2 id="errors-h">${errors.length} ${errors.length === 1 ? "record is" : "records are"} not valid</h2><ul>${errors.map(e =>
-    `<li><code>${esc(e.file)}:${esc(e.line)}</code> <b>${esc(e.field)}</b>: ${esc(e.message)}${e.by ? ` <span class="by">written by ${esc(e.by)}</span>` : ""}</li>`).join("")}</ul>`;
-// errors:end
 
 // timeline:begin
 // The task timeline (design: .design/code-better-board/design.md). Every value comes from the records the server sends:
@@ -319,13 +311,10 @@ const conv = pageConversation({
 const dec = pageDecision({conversation: conv, now: () => D.now, md, esc, id: uid});
 
 // ---------- The pop-up for a task: its detail and a box to ask about it ----------
-function openPop(id, anchor) {
-  closePop(); OPEN = {id, anchor};
-  const el = document.createElement("div"); el.className = "qpop"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.id = "pop";
-  document.body.append(el); fillPop(); placePop(anchor);
-  const h3 = el.querySelector("h3"); if (h3) { h3.id = "pop-title"; el.setAttribute("aria-labelledby", "pop-title"); h3.setAttribute("tabindex", "-1"); h3.focus({preventScroll: true}); }
-}
-function closePop() { const p = $("pop"); if (p) p.remove(); const back = OPEN && OPEN.anchor; OPEN = null; if (back && document.contains(back)) back.focus({preventScroll: true}); }
+// The pop-up itself is page.js's (pagePopup); the task it shows is OPENID, and `$("pop")` says whether it is open.
+const popup = pagePopup({modal: true, fill: () => fillPop(), place: anchor => placePop(anchor)});
+let OPENID = null;
+function openPop(id, anchor) { OPENID = id; popup.open(anchor); }
 // The pop-up stays inside the view column, under its row if it fits, never over the conversation; its body scrolls.
 function placePop(anchor) {
   const el = $("pop"), main = document.querySelector("main.view"); if (!el || !anchor || !main) return;
@@ -338,7 +327,7 @@ function placePop(anchor) {
 }
 function fillPop() {
   const el = $("pop"); if (!el || !D) return;
-  const t = tasksOf(D).find(x => x.id === OPEN.id); if (!t) return closePop();
+  const t = tasksOf(D).find(x => x.id === OPENID); if (!t) return popup.close();
   const ta = el.querySelector("textarea"), typed = ta ? ta.value : "", focused = ta && document.activeElement === ta;
   const html = `<button type="button" class="x" aria-label="Close">×</button>` + popupHTML(t, D);
   const mine = conv.nodes(e => e.on && e.on.kind === "task" && e.on.id === t.id), key = html + mine.map(n => n.outerHTML).join("");
@@ -355,8 +344,8 @@ document.addEventListener("submit", ev => {
   ev.preventDefault();
   const f = ev.target; if (!f.classList.contains("popask")) return;
   const ta = f.querySelector("textarea"), text = ta.value.trim(); if (!text) return ta.focus();
-  const t = tasksOf(D).find(x => x.id === OPEN.id) || {};
-  conv.send("comment", {id: uid("c"), on: {kind: "task", id: OPEN.id, title: `${OPEN.id} ${str(t.task)}`.trim()}, text}, "Comment", () => { ta.value = ""; fillPop(); });
+  const t = tasksOf(D).find(x => x.id === OPENID) || {};
+  conv.send("comment", {id: uid("c"), on: {kind: "task", id: OPENID, title: `${OPENID} ${str(t.task)}`.trim()}, text}, "Comment", () => { ta.value = ""; fillPop(); });
 });
 document.addEventListener("click", ev => {
   const t = ev.target;
@@ -364,21 +353,14 @@ document.addEventListener("click", ev => {
     q.scrollIntoView({block: "start"}); const b = q.querySelector(".change"); if (b) b.focus({preventScroll: true}); return; }
   const r = t.closest("[data-range]");
   if (r) { RANGE = r.dataset.range; drawRange(); if (D) drawTables(D); return; }
-  if (t.closest(".qpop .x")) return closePop();
-  if (t.closest(".qpop")) return;
+  if (popup.click(t)) return;
   if (t.closest(".ev")) return;
   // A row's label or its lane opens the task; focus comes back to the label, the row's keyboard target.
   const row = t.closest("[data-t]"); if (row) return openPop(row.dataset.t, (row.closest(".row") || row).querySelector(".lab") || row);
-  if ($("pop") && !t.closest("form, .why")) closePop();
+  if ($("pop") && !t.closest("form, .why")) popup.close();
 });
 document.addEventListener("keydown", ev => {
-  // Tab stays inside the open pop-up, so focus never goes to the rows hidden under it.
-  if (ev.key === "Tab" && $("pop") && $("pop").contains(ev.target)) {
-    const f = [...$("pop").querySelectorAll("button, textarea, [tabindex]")], i = f.indexOf(ev.target);
-    if (ev.shiftKey && i <= 0) { ev.preventDefault(); f[f.length - 1].focus(); }
-    else if (!ev.shiftKey && i === f.length - 1) { ev.preventDefault(); f[0].focus(); }
-  }
-  if (ev.key === "Escape" && $("pop") && !(ev.target.closest && ev.target.closest(".why"))) { ev.preventDefault(); closePop(); }
+  if (popup.key(ev)) return;
   if (ev.key === "Enter" && !ev.shiftKey && ev.target.matches && ev.target.matches("form.popask textarea")) { ev.preventDefault(); ev.target.form.requestSubmit(); }
 });
 
@@ -391,7 +373,7 @@ function drawTables(d) {
   setHTML($("tables"), tablesHTML(d, RANGE));
   // A refresh every two seconds redraws the rows: focus stays on the row it was on.
   if (focused && !document.contains(focused)) { const again = $("tables").querySelector(`[data-t="${CSS.escape(focused.dataset.t)}"]`); if (again) again.focus({preventScroll: true}); }
-  if (OPEN) { const again = $("tables").querySelector(`[data-t="${CSS.escape(OPEN.id)}"]`); if (again) OPEN.anchor = again; }
+  if ($("pop")) { const again = $("tables").querySelector(`[data-t="${CSS.escape(OPENID)}"]`); if (again) popup.anchor = again; }
 }
 function render(d) {
   D = d;
@@ -409,14 +391,13 @@ function render(d) {
     + (waitingN ? `<button type="button" class="stat" id="to-waiting"><b>${waitingN}</b>${waitingN === 1 ? "open question" : "open questions"}</button>`
       : stat(0, "open questions"))
     + (d.start ? stat(esc(runningWord(d)), "running") : ""));
-  const band = errorsHTML(d.errors);
-  $("errors").hidden = !band; setHTML($("errors"), band);
+  pageShowErrors($("errors"), d.errors);
   drawRange();
   drawTables(d);
   const replies = (d.conversation || []).filter(e => e.type === "reply");
   if (REPLIES >= 0 && replies.length > REPLIES) conv.flash("Coordinator: " + pageMarkdownText(replies[replies.length - 1].text).slice(0, 120), "ok");
   REPLIES = replies.length;
-  if (OPEN) { fillPop(); placePop(OPEN.anchor); }
+  if ($("pop")) { fillPop(); placePop(popup.anchor); }
 }
 
 // load:begin
