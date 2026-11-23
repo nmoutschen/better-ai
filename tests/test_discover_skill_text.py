@@ -521,6 +521,25 @@ class Rules(unittest.TestCase):
             "PUT each value you fill into a command, such as a path, an id or a name, in single quotes", skill
         )
 
+    def test_a_numeric_host_is_read_strictly_and_the_port_is_always_filled(self):
+        # L6: curl reads 0177.0.0.1 as 127.0.0.1 while getaddrinfo on macOS reads 177.0.0.1.
+        verifier = flat(read(AGENTS["quote-verifier"]))
+        self.assertIn("ipaddress.IPv4Address(sys.argv[1])", verifier)
+        self.assertIn("whose last label holds a letter", verifier)
+        self.assertNotIn("or a plain dotted IPv4 address", verifier)
+        self.assertIn("or 443 for https and 80 for http when it has none", verifier)
+        import ipaddress
+
+        for host in ("0177.0.0.1", "127.0.0.01", "012.0.0.1"):
+            with self.subTest(host), self.assertRaises(ValueError):
+                ipaddress.IPv4Address(host)
+
+    def test_json_newlines_are_escaped_and_the_analyst_reads_only_public_pages(self):
+        for path in (SKILL, AGENTS["analyst"], AGENTS["quote-verifier"]):
+            with self.subTest(path.name):
+                self.assertIn("ESCAPE every newline in a JSON string as `\\n`", flat(read(path)))
+        self.assertIn("DO NOT read a URL whose host is not public", flat(read(AGENTS["analyst"])))
+
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
         for path in [*skill_texts(), DOCS]:
