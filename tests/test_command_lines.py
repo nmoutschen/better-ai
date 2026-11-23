@@ -1,50 +1,43 @@
-"""Every `better.pyz <verb> ...` line in the text of every skill matches the command contract.
+"""Every `better.pyz <verb> ...` line in the text of every skill matches the command line the .pyz parses.
 
-The contract is design.md's command contract, D4 and D5: the verbs each skill offers, each verb's positional
-arguments and flags, and that the words of `reply` and `status --text` come on stdin, as `add`'s JSON does, never as
-a quoted argument.
+The verbs each skill offers, each verb's positional arguments, flags and the values a flag or argument may take come
+from the argparse parser of the skill (cli._parser, through pyz.verbs_of). Only the stdin rules are kept here: the
+words of `reply` and `status --text` come on stdin, as `add`'s JSON does, never as a quoted argument.
 """
 
+import argparse
 import re
 import shlex
+import sys
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pyz  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
 
-COMMON = {"create", "add", "set", "check", "serve", "wait", "reply", "status", "pending", "render"}
-VERBS = {
-    "architect-better": COMMON | {"review", "specs", "register"},
-    "code-better": COMMON,
-    "design-better": COMMON,
-    "research-better": COMMON,
-    "show-better": COMMON,
-}
-STATES = {"seen", "asked", "working", "done", "accepted"}
 
-# verb: (fewest and most positional arguments, flags and whether each takes a value, flags that are required)
-GRAMMAR = {
-    "create": (1, 1, {"--by": True}, {"--by"}),
-    "add": (2, 2, {"--by": True, "--for": True, "--id": True}, set()),
-    "set": (2, 2, {"--unset": True, "--by": True}, set()),
-    "check": (1, 1, {}, set()),
-    "serve": (1, 1, {"--open": False, "--no-browser": False, "--linger": False, "--once": False}, set()),
-    "wait": (1, 1, {"--timeout": True}, set()),
-    "reply": (1, 1, {"--to": True, "--state": True}, set()),
-    "status": (3, 99, {"--text": False}, set()),
-    "pending": (1, 1, {}, set()),
-    "render": (
-        1,
-        1,
-        {"--format": True, "--ascii": False, "--width": True, "--screen-reader": False},
-        set(),
-    ),
-    "review": (1, 1, {"--perspectives": True}, {"--perspectives"}),
-    "specs": (1, 1, {}, set()),
-    "register": (1, 1, {}, set()),
-}
-FORMATS = {"text", "md", "html"}
+def grammar(skill: str) -> dict[str, dict]:
+    """verb -> its positional actions, its flags (option string -> action) and its required flags, from the parser."""
+    out = {}
+    for verb, parser in pyz.verbs_of(skill).items():
+        actions = [a for a in parser._actions if not isinstance(a, argparse._HelpAction)]
+        out[verb] = {
+            "positional": [a for a in actions if not a.option_strings],
+            "flags": {flag: a for a in actions for flag in a.option_strings},
+            "required": {a.option_strings[0] for a in actions if a.option_strings and a.required},
+        }
+    return out
+
+
+GRAMMAR = {skill: grammar(skill) for skill in pyz.skill_names()}
+
+
+def wrong_choice(action, value: str) -> bool:
+    """Whether `value`, one word or alternatives as a|b, is outside the action's choices; a <placeholder> is not."""
+    return bool(action.choices) and any(part != "<X>" and part not in action.choices for part in value.split("|"))
 
 
 def command_texts(path: Path):
@@ -59,12 +52,12 @@ def command_texts(path: Path):
 
 
 def problems(skill: str, text: str):
-    """What is wrong with one command line, as a list of words; empty when it matches the contract."""
+    """What is wrong with one command line, as a list of words; empty when the skill's parser accepts it."""
     if not text or text.startswith("<verb>"):
         return []
     verb = text.split()[0]
-    if verb not in VERBS[skill]:
-        return [f"verb {verb!r} is not one of {sorted(VERBS[skill])}"]
+    if verb not in GRAMMAR[skill]:
+        return [f"verb {verb!r} is not one of {sorted(GRAMMAR[skill])}"]
     text = re.sub(r"\s*<<-?\s*'?\w+'?\s*$", "", text)  # a heredoc's opener is stdin, not an argument
     if verb in ("reply", "status") and re.search(r"[\"']", text):
         return ["the words of reply and status come on stdin, not as a quoted argument"]
@@ -74,46 +67,48 @@ def problems(skill: str, text: str):
         tokens = shlex.split(cleaned)[1:]
     except ValueError as error:
         return [str(error)]
-    low, high, flags, required = GRAMMAR[verb]
-    positional, found, found_values, out = [], set(), {}, []
+    shape = GRAMMAR[skill][verb]
+    positional, found, out = [], set(), []
     i = 0
     while i < len(tokens):
         token = tokens[i]
         if token.startswith("--"):
-            if token not in flags:
-                out.append(f"flag {token} is not one of {sorted(flags)}")
+            action = shape["flags"].get(token)
+            if action is None:
+                out.append(f"flag {token} is not one of {sorted(shape['flags'])}")
             else:
                 found.add(token)
-                if flags[token]:
+                if action.nargs != 0:
                     values = []
                     while i + 1 < len(tokens) and not tokens[i + 1].startswith("--"):
                         values.append(tokens[i + 1])
                         i += 1
-                        if token != "--perspectives":
+                        if action.nargs != "+":
                             break
                     if not values:
                         out.append(f"flag {token} needs a value")
-                    found_values[token] = values
+                    out += [
+                        f"{token} value {v!r} is not one of {list(action.choices)}"
+                        for v in values
+                        if wrong_choice(action, v)
+                    ]
         else:
             positional.append(token)
         i += 1
+    wanted = shape["positional"]
+    low = len(wanted)
+    high = 99 if any(a.nargs == "+" for a in wanted) else low
     if not low <= len(positional) <= high:
         out.append(f"{len(positional)} positional arguments, the verb takes {low} to {high}")
-    out += [f"flag {flag} is required" for flag in sorted(required - found)]
+    for n, value in enumerate(positional):
+        action = wanted[min(n, len(wanted) - 1)]
+        if wrong_choice(action, value):
+            out.append(f"{action.dest} {value!r} is not one of {list(action.choices)}")
+    out += [f"flag {flag} is required" for flag in sorted(shape["required"] - found)]
     if verb == "add" and not found & {"--by", "--for"}:
         out.append("flag --by is required, unless --for names the agent")
     if verb == "status" and "--text" in found and tokens[-1] != "--text":
         out.append("--text takes no value: the user's words come on stdin")
-    if verb == "status" and positional[1:2] and not all(s in STATES or s == "<X>" for s in positional[1].split("|")):
-        out.append(f"state {positional[1]!r} is not one of {sorted(STATES)}")
-    if verb == "render" and "--format" in found_values:
-        out += [
-            f"format {v!r}"
-            for v in found_values["--format"]
-            if v != "<X>" and not all(p in FORMATS for p in v.split("|"))
-        ]
-    if verb == "reply" and "--state" in found_values:
-        out += [f"state {v!r}" for v in found_values["--state"] if v not in ("asked", "working", "<X>")]
     return out
 
 
@@ -122,7 +117,7 @@ class CommandLines(unittest.TestCase):
         seen = 0
         for path in sorted(SKILLS.rglob("*.md")):
             relative = path.relative_to(SKILLS)
-            if "scripts" in relative.parts or relative.parts[0] not in VERBS:
+            if "scripts" in relative.parts or relative.parts[0] not in GRAMMAR:
                 continue
             for number, text in command_texts(path):
                 seen += bool(text)
@@ -157,12 +152,15 @@ class CommandLines(unittest.TestCase):
             "status <unit> accepted <id>... --text <words>": "stdin",
             "add <unit> <type>": "--by",
             "render <unit> --format text|pdf": "format",
+            "set <unit> <ref> --by me": "flag",
+            "serve <unit> --port": "value",
         }
         for text, word in bad.items():
             with self.subTest(text):
                 found = problems("show-better", text)
                 self.assertTrue(found and word in " ".join(found), found)
         self.assertTrue(problems("show-better", "review <unit> --perspectives a b"))
+        self.assertTrue(problems("code-better", "render <unit> --format text"))
         good = [
             "add <unit> <type> --by <your name>",
             "reply <unit> --to <id>",
@@ -174,6 +172,8 @@ class CommandLines(unittest.TestCase):
             "reply <unit> --to <id> <<'EOF'",
             "add <unit> spec --by me <<'EOF'",
             "render <unit> --format text|md",
+            "set <unit> <ref> --for x",
+            "serve <unit> --linger 5 --once",
         ]
         for text in good:
             with self.subTest(text):

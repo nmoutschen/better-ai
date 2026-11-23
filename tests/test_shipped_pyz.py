@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import subprocess
@@ -12,17 +11,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-PY310 = os.environ.get("BETTER_AI_PYTHON310", "python3.10")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pyz  # noqa: E402
 
-COMMON = {"create", "add", "set", "check", "serve", "wait", "reply", "status", "pending"}
-VERBS = {
-    "architect-better": COMMON | {"render", "review", "specs", "register"},
-    "code-better": COMMON | {"render"},
-    "design-better": COMMON | {"render"},
-    "research-better": COMMON | {"render"},
-    "show-better": COMMON | {"render"},
-}
+ROOT = Path(__file__).resolve().parent.parent
+VERBS = {skill: set(pyz.verbs_of(skill)) for skill in pyz.skill_names()}
 
 
 class ShippedPyz(unittest.TestCase):
@@ -48,12 +41,11 @@ class ShippedPyz(unittest.TestCase):
                 self.assertEqual(listed, verbs)
 
     def test_each_runs_on_python_3_10_from_a_copy_of_its_skill_folder_alone(self):
-        found = shutil.which(PY310) or (PY310 if Path(PY310).exists() else None)
-        if not found:
+        if not pyz.PY310:
             self.skipTest("no Python 3.10; set BETTER_AI_PYTHON310")
         for skill, verbs in VERBS.items():
             with self.subTest(skill=skill):
-                done = self.help_of(found, skill)
+                done = self.help_of(pyz.PY310, skill)
                 self.assertEqual(done.returncode, 0, done.stderr)
                 self.assertEqual(set(re.findall(r"^    ([a-z]+) {2,}\S", done.stdout, re.M)), verbs)
 
