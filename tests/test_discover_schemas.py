@@ -22,7 +22,7 @@ import better  # noqa: E402
 import discover_records as R  # noqa: E402
 import pyz  # noqa: E402
 
-from better_ai import resources, schema, skill  # noqa: E402
+from better_ai import cli, resources, schema, skill  # noqa: E402
 from better_ai.discover import SKILL  # noqa: E402
 
 PACKAGE = ROOT / "src" / "better_ai" / "discover"
@@ -126,7 +126,14 @@ class Package(unittest.TestCase):
         smoke = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(smoke)
         fixture = json.loads((ROOT / "tests" / "fixtures" / "units" / "discover-better" / "smoke.json").read_text())
-        self.assertEqual(smoke.coverage_problems(fixture), [])
+        offered = {v.name for v in cli._verbs_of(SKILL)}
+        self.assertNotIn("render", offered)  # live only: a static copy would keep words a redact removes
+        self.assertEqual(smoke.coverage_problems(fixture, offered), [])
+        research = ROOT / "skills" / "research-better" / "scripts" / "better.pyz"
+        help_text = subprocess.run(
+            [sys.executable, "-I", str(research), "--help"], capture_output=True, text=True
+        ).stdout
+        self.assertIn("render", smoke.offered_verbs(help_text))
         self.assertEqual(fixture["steps"][0]["args"][:2], ["create", ".discover/demo"])
 
 

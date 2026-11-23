@@ -60,13 +60,6 @@
   },
   {
    "args": [
-    "render",
-    ".discover/demo"
-   ],
-   "stdout_matches": "index.html"
-  },
-  {
-   "args": [
     "serve",
     ".discover/demo",
     "--no-browser",

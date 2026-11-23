@@ -102,11 +102,19 @@ def run_serve(args: list[str], cwd: Path, label: str) -> str | None:
 REQUIRED_VERBS = ("create", "add", "set", "check", "render")
 
 
-def coverage_problems(spec: dict) -> list[str]:
-    """S41: the fixture must exercise create, add, set, check, render, serve and an add from a second worktree."""
+def offered_verbs(help_text: str) -> set[str]:
+    """The verbs a better.pyz lists under `verbs:` in its --help."""
+    found = re.findall(r"^    ([a-z]+) ", help_text.split("verbs:", 1)[-1], re.M)
+    return set(found)
+
+
+def coverage_problems(spec: dict, offered: set[str] | None = None) -> list[str]:
+    """S41: the fixture must exercise create, add, set, check, render (when the skill offers it, as `offered`, the verbs
+    of its --help, says), serve and an add from a second worktree."""
     steps = spec.get("steps", [])
     verbs = {step["args"][0] for step in steps if step.get("args")}
-    missing = [v for v in REQUIRED_VERBS if v not in verbs]
+    required = [v for v in REQUIRED_VERBS if offered is None or v != "render" or v in offered]
+    missing = [v for v in required if v not in verbs]
     if not any(step.get("serve") for step in steps):
         missing.append('serve (a step with "serve": true)')
     if not any(step.get("args", [""])[0] == "add" for step in spec.get("worktree_steps", [])):
@@ -123,7 +131,6 @@ def smoke_skill(skill: str, skills: Path, fixtures: Path) -> list[str]:
     if not spec_path.is_file():
         return [f"{skill}: no fixture unit: add {spec_path}"]
     spec = json.loads(spec_path.read_text())
-    problems: list[str] = [f"{skill}: {p}" for p in coverage_problems(spec)]
     try:
         info = json.loads(zipfile.ZipFile(pyz).read("better_ai/_build.json"))
     except (OSError, KeyError, ValueError, zipfile.BadZipFile) as err:
@@ -132,6 +139,7 @@ def smoke_skill(skill: str, skills: Path, fixtures: Path) -> list[str]:
         [sys.executable, "-I", str(pyz), "--help"], capture_output=True, text=True, timeout=STEP_TIMEOUT
     )
     first = help_run.stdout.splitlines()[0] if help_run.stdout else ""
+    problems: list[str] = [f"{skill}: {p}" for p in coverage_problems(spec, offered_verbs(help_run.stdout))]
     if help_run.returncode != 0 or first != f"better.pyz {info['skill']} {info['hash']}":
         problems.append(f"{skill}: --help: exit {help_run.returncode}, first line {first!r}")
     with tempfile.TemporaryDirectory(prefix="better-smoke-") as scratch:

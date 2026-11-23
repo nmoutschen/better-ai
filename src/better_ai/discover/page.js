@@ -160,7 +160,6 @@ const countsFor = (data, id, about, direction) => (data.evidence || []).filter(e
 const checkingOn = (data, id) => (data.evidence || []).filter(e => e.status === 'checking' && (e.bears_on || []).some(b => b.item === id)).length;
 const lastChange = (data, id, field) => { let found = null; (data.changes || []).forEach(c => { if (c.field === field && (c.about || {}).item === id) found = c; }); return found; };
 
-// The latest record that carries an agent: its `by`, or its name in an evidence or source id. After 30 quiet minutes a row says so.
 // The agent's latest record, as the page's Python serves it from summary's rule: one rule, not a copy here (L4).
 function lastWord(data, name) {
   const t = Date.parse((data.last_word || {})[name]);

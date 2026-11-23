@@ -767,7 +767,8 @@ def static_page(spec: PageSpec, data: Mapping[str, Any]) -> str:
     "render",
     help="write the unit's page as one static file, with its data in it, so it opens without a server",
     arguments=_unit_argument,
-    skills=("architect-better", "code-better", "design-better", "discover-better", "research-better"),
+    # discover-better is live only: a static copy would keep words a redact removes.
+    skills=("architect-better", "code-better", "design-better", "research-better"),
 )
 def render(args: argparse.Namespace, run: cli.Run) -> int:
     unit = _unit(args, run)

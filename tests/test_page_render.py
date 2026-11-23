@@ -14,6 +14,7 @@ from better_ai import architect, cli, code, design, discover, page, research, sh
 SKILLS = (architect, code, design, discover, research, show)  # imported so each registers its page
 
 OWN_RENDER = {"show-better"}  # its `render` checks a slide spec and also prints text
+LIVE_ONLY = {"discover-better"}  # a static copy would keep words a redact removes, and its page reads only /data
 
 
 class RenderEveryPage(unittest.TestCase):
@@ -22,12 +23,15 @@ class RenderEveryPage(unittest.TestCase):
         for name in page.PAGES:
             skill = next(s for s in SKILLS if s.SKILL.name == name).SKILL
             renders = [v for v in cli._verbs_of(skill) if v.name == "render"]
+            if name in LIVE_ONLY:
+                self.assertEqual(renders, [], name)
+                continue
             self.assertEqual(len(renders), 1, name)
             self.assertEqual(renders[0].run is page.render, name not in OWN_RENDER, name)
 
     def test_the_file_of_every_page_stands_alone(self):
         for name, spec in page.PAGES.items():
-            if name in OWN_RENDER:
+            if name in OWN_RENDER | LIVE_ONLY:
                 continue
             with self.subTest(skill=name):
                 text = page.static_page(spec, {})
