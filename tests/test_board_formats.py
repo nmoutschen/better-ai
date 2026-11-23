@@ -32,12 +32,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import better  # noqa: E402
 import sweep  # noqa: E402
 import wrong_types  # noqa: E402
+from research_records import EXAMPLES, example, made_board  # noqa: E402
 
 from better_ai import cli, page, paths, research, resources, schema  # noqa: E402
 from better_ai.research import board  # noqa: E402
 
 DOCS = schema.docs_for("research")
-EXAMPLES = json.loads((Path(__file__).parent / "fixtures" / "research_board_examples.json").read_text())
 FILES = {
     "brief.json": "brief.json",
     "decisions.jsonl": "decisions.jsonl",
@@ -80,10 +80,6 @@ def check_in_process(folder: Path) -> int:
     for error in errors:
         print(error)
     return 1 if errors else 0
-
-
-def example(file: str, label: str) -> dict:
-    return copy.deepcopy(next(e["record"] for e in EXAMPLES[file] if e["label"] == label))
 
 
 def write_json(folder: Path, name: str, record: dict) -> None:
@@ -942,22 +938,6 @@ class BoardsOfSize(unittest.TestCase):
         self.assertEqual(data["errors"], [])
         self.assertIn("C-w2-9", [c["id"] for c in data["claims"]])
         wrong_types.render("render-board-payloads.js", [{"label": "merged into out of scope", "data": data}], self)
-
-
-def board_head() -> str:
-    """The brief as an agent gives it to `create`: its own fields, as JSON on stdin."""
-    brief = example("brief.json", "brief")
-    for key in ("type", "at", "by"):
-        brief.pop(key)
-    brief["changes"] = []
-    return json.dumps(brief)
-
-
-def made_board(root: Path) -> Path:
-    """A board made by `create`, in a folder that is not a repository."""
-    done = better.call(SKILL, "create", ".research/b", "--by", "coordinator", stdin=board_head(), cwd=root)
-    assert done.returncode == 0, done.stderr
-    return root / ".research" / "b"
 
 
 class Verbs(unittest.TestCase):

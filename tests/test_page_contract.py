@@ -1,9 +1,9 @@
 """The contract every skill's live page shares, tested once over every page in `page.PAGES`.
 
 For each skill one `serve` process runs on a real unit. Every method the page may send (`spec.sendable()`) is saved as
-the user's event, a `by` the page supplies is refused, the conversation is still a valid log, and SIGTERM takes the
-server's address away. A skill's own event semantics stay in its own test file; the shell's wait, reply, status and
-pending are tested in test_page_shell.py.
+the user's event, a `by` the page supplies is refused, the agent's wait, reply, status and pending work with the skill's
+events schema, the conversation is still a valid log, and SIGTERM takes the server's address away. A skill's own event
+semantics stay in its own test file; the shell's details are tested in test_page_shell.py.
 """
 
 import json
@@ -23,7 +23,7 @@ sys.path.insert(0, str(HERE.parent / "src"))
 import architect_records  # noqa: E402
 import better  # noqa: E402
 import code_records  # noqa: E402
-from test_board_formats import made_board  # noqa: E402
+import research_records  # noqa: E402
 
 from better_ai import architect, code, design, page, research, show  # noqa: E402
 
@@ -70,7 +70,7 @@ def code_unit(root: Path) -> Path:
 
 
 def research_unit(root: Path) -> Path:
-    return made_board(root)
+    return research_records.made_board(root)
 
 
 PINS = {"id": "c1-x", "n": 1, "text": "unclear"}
@@ -178,6 +178,7 @@ class PageContract(unittest.TestCase):
                 self.assertEqual(set(samples) - set(spec.sendable()), set(), "a sample the page cannot send")
                 process = serve(root, folder, skill)
                 self.addCleanup(process.stdout.close)
+                self.addCleanup(process.kill)
                 url = (folder / ".server").read_text().strip()
                 kept = [m for m in samples if m not in UNSAVED.get(skill, ())]
                 for method, params in samples.items():
@@ -195,7 +196,16 @@ class PageContract(unittest.TestCase):
                 saved = log.read_text()
                 refused = rpc(url, "note", {**NOTE, "by": "agent"})
                 self.assertEqual(refused["error"]["code"], -32602)
+                self.assertIn("by", refused["error"]["message"])
                 self.assertEqual(log.read_text(), saved)
+                for verb, extra, text in (
+                    ("wait", ["--timeout", "10"], None),
+                    ("reply", ["--to", "m-x"], "seen it"),
+                    ("status", ["accepted", "m-x", "--text"], "fine"),
+                    ("pending", [], None),
+                ):  # the agent's side, with this skill's events schema
+                    done = better.call(skill, verb, str(folder), *extra, stdin=text, cwd=root)
+                    self.assertEqual(done.returncode, 0, f"{verb}: {done.stdout}{done.stderr}")
                 self.assertEqual(better.call(skill, "check", str(folder), cwd=root).returncode, 0)
                 process.send_signal(signal.SIGTERM)
                 process.communicate(timeout=20)
