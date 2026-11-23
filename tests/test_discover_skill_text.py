@@ -445,6 +445,16 @@ class Rules(unittest.TestCase):
 
 
 class Terms(unittest.TestCase):
+    def test_a_quote_not_on_the_page_is_not_found_and_a_reworded_one_is_corrected(self):
+        verifier, skill, recs = (flat(read(x)) for x in (AGENTS["quote-verifier"], SKILL, RECORDS))
+        self.assertIn('SET `status` `not found` with the reason "not on the page"', verifier)
+        self.assertIn('SET `status` `reworded` with the reason "reworded" and `page_words`', verifier)
+        self.assertNotIn('"reworded: " and the page', verifier)
+        self.assertIn("ADD the corrected quote as new evidence", skill)
+        self.assertIn("`corrects`", skill)
+        self.assertIn("`checking | counts | unverified | not reachable | not found | reworded | removed`", recs)
+        self.assertIn('"corrects": "<E-... the reworded evidence>"', recs)
+
     def test_the_agreed_terms_are_used(self):
         text = flat(read(SKILL))
         for term in ("about your users", "from elsewhere", "reality check", "test"):
@@ -553,7 +563,7 @@ class Records(unittest.TestCase):
             "say | did | commit | data | desk",
             "your users | elsewhere",
             "probe | proof of concept | pilot",
-            "checking | counts | unverified | not reachable | removed",
+            "checking | counts | unverified | not reachable | not found | reworded | removed",
             "unverified | checking | supported | contradicted | needs a test | waiting for you",
         ):
             self.assertIn(value, text)

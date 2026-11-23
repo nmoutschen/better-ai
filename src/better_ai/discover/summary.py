@@ -247,6 +247,16 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
                     f"{e.get('id')} is checking and no verifier has it: start a quote verifier",
                 )
             )
+    corrected = {e.get("corrects") for e in d.evidence}
+    for e in d.evidence:
+        if e.get("status") == "reworded" and e.get("id") not in corrected:
+            found.append(
+                Warning_(
+                    "reworded-without-correction",
+                    e.get("id", ""),
+                    f"{e.get('id')} is reworded: add the corrected quote, its page_words, as evidence that corrects it",
+                )
+            )
     for kind, group, status in (
         ("item", d.items, None),
         ("evidence", d.evidence, "checking"),

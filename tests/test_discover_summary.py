@@ -254,6 +254,16 @@ class Warnings(Discovery):
         self.evidence(R.record(R.EVIDENCE, verifier="v1", since=ago(1), tries=["v1"]))
         self.quiet("evidence-without-verifier")
 
+    def test_a_reworded_quote_with_no_correction_yet(self):
+        reworded = R.record(
+            R.EVIDENCE, status="reworded", verifier="v1", tries=["v1"], reason="reworded", page_words="x y"
+        )
+        self.evidence(reworded)
+        self.warns("reworded-without-correction", "E-a1-1")
+        self.assertIn("E-a1-1 is reworded: add the corrected quote", self.summary()[1][-1]["text"])
+        self.evidence(R.record(R.EVIDENCE, id="E-coord-1", by=R.COORD, corrects="E-a1-1"))
+        self.quiet("reworded-without-correction")
+
     def test_S55_an_item_checker_with_no_record_for_30_minutes(self):
         put(self.unit, "items.jsonl", [R.record(R.ITEM, checker="analyst-1", since=ago(120))])
         self.warns("no-word-from-agent", "P1")

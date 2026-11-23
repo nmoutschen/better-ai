@@ -462,7 +462,8 @@ test('S7, A19: each evidence gets one of eleven labels from its status, origin a
   ];
   for (const [e, label] of cases) assert.equal(a.evidenceLabel({ id: 'E-x-1', ...e }, d), label, JSON.stringify(e));
   assert.equal(a.evidenceLabel({ id: 'E-x-1', ...web, status: 'unverified', reason: 'not confirmed by you' }, d), 'Not checked');  // the reason never decides
-  assert.doesNotMatch(source.slice(source.indexOf('function evidenceLabel'), source.indexOf('function evidenceLabel') + 1500), /\.reason/);
+  const body = source.slice(source.indexOf('function evidenceLabel'));
+  assert.doesNotMatch(body.slice(0, body.indexOf('\n}\n')), /\.reason/);
 });
 
 test('S7: under a label only a reason, never Used, Not used or It does not count', () => {
@@ -507,8 +508,8 @@ test('a corrected quote shows the page\'s words, the mark, and the analyst\'s wo
 });
 
 // ---------- A5 ----------
-// The text of every button that is not a tab or the header's count.
-const buttonLabels = html => [...html.matchAll(/<button\b([^>]*)>([^]*?)<\/button>/g)].filter(m => !/role="tab"|id="questions"/.test(m[1])).map(m => m[2].replace(/<[^>]*>/g, '').trim());
+// The text of every button that is not a tab, the header's count or a risks bar: those open a view, like More.
+const buttonLabels = html => [...html.matchAll(/<button\b([^>]*)>([^]*?)<\/button>/g)].filter(m => !/role="tab"|id="questions"|data-risks=/.test(m[1])).map(m => m[2].replace(/<[^>]*>/g, '').trim());
 
 test('A5: the page\'s own controls use five verbs, plus Send and Cancel, and the exit action reads Choose a move…', () => {
   const a = api(), d = fixture();

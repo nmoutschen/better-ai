@@ -50,3 +50,18 @@ table.items td:nth-child(2) { min-width:12rem; }
 table.items td:nth-child(5) { min-width:8rem; }
 .view a[data-goto] { white-space:nowrap; }
 .evq { margin:var(--space-control) 0; padding:var(--space-control) var(--space-item); border-left:3px solid var(--sand); background:var(--linen); white-space:pre-line; }
+
+/* Risks: a full-width bar under an item opens its risks as sub-rows. The bar's text stays inside the visible
+   width of a table that scrolls sideways, and wraps when it runs out. */
+.tablewrap { container-type:inline-size; }
+.tbl tr.riskbar > td { padding:0; border-top:0; }
+.riskbar-btn { position:sticky; left:0; box-sizing:border-box; display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--space-tight) var(--space-control);
+  width:100%; max-width:100cqw; padding:var(--space-tight) var(--space-control); background:var(--cream); border:0; border-top:1px dashed var(--sand);
+  color:var(--umber); font:var(--font-small-strong); text-align:left; cursor:pointer; }
+.riskbar-btn:hover { background:var(--linen); }
+.riskbar-btn .muted { font:var(--font-small); }
+.riskbar-btn .none { margin-left:auto; }
+.tbl tr.risk > td { font:var(--font-small); border-top:1px solid var(--sand); vertical-align:top; }
+.tbl tr.risk > td:nth-child(2) { border-left:2px solid var(--sand); }
+.rq p { margin:var(--space-tight) 0; }
+.norisk { margin:var(--space-tight) 0 0; font:var(--font-small); }

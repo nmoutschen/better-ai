@@ -44,8 +44,8 @@ FOR each evidence in EVIDENCE:
 4. FIND the passage of the text that holds the quote. COMPARE them with whitespace and punctuation normalised.
    - A quote counts only when its exact words are on a `raw` read. IF the quote occurs in the passage of a `raw` read, SET `status` `counts`, `checked_read` `raw`, and `span`: the passage copied word for word from the text file, on one line. GIVE that file with `--raw`: the command checks the span against it.
    - IF the page was read only as `extracted`, SET `status` `unverified` with the reason "page read only as an extraction", even when the quote seems to occur in it.
-   - IF the page says the same in other words, SET `status` `unverified` with the reason "reworded: " and the page's passage.
-   - IF the page does not say it, SET `status` `unverified` with the reason "not on the page".
+   - IF the page says the same in other words, SET `status` `reworded` with the reason "reworded" and `page_words`: the page's passage, copied word for word, on one line. The coordinator adds it as a corrected quote.
+   - IF the page does not say it, SET `status` `not found` with the reason "not on the page".
 5. GO to the next evidence.
 
 ## Rules

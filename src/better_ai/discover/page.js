@@ -56,17 +56,24 @@ function safeLink(url, label) {
   }
   return esc(label);
 }
-// Every ID shown outside its own row is a link to that row.
+// Every ID shown outside its own row is a link to that row; a risk's row is its sub-row under its item.
+const isRisk = id => /^R\d+$/.test(s(id));
 function idLink(id, known) {
-  return known.has(id) ? '<a href="#row-' + esc(id) + '" data-goto="' + esc(id) + '">' + esc(id) + '</a>' : esc(id);
+  return known.has(id) ? '<a href="#' + (isRisk(id) ? 'risk-' : 'row-') + esc(id) + '" data-goto="' + esc(id) + '">' + esc(id) + '</a>' : esc(id);
 }
 function knownIds(data) {
   const ids = new Set();
   [data.items, data.evidence, data.tests, data.options, data.decisions, data.moves, data.briefs].forEach(list => (list || []).forEach(r => { if (r && s(r.id)) ids.add(r.id); }));
+  (data.items || []).forEach(i => (i.risks || []).forEach(r => { if (r && s(r.id)) ids.add(r.id); }));
   return ids;
 }
+// The item a risk belongs to; null when no item lists it.
+function riskItem(id, data) {
+  const item = (data.items || []).find(i => (i.risks || []).some(r => r && r.id === id));
+  return item ? item.id : null;
+}
 function tabOf(id, data) {
-  const item = (data.items || []).find(i => i.id === id);
+  const item = (data.items || []).find(i => i.id === (isRisk(id) ? riskItem(id, data) : id));
   if (item) return KIND_TAB[item.kind] || 'moves';
   if (/^E-/.test(id)) return 'evidence';
   if (/^X\d/.test(id)) return 'tests';
@@ -122,7 +129,7 @@ function nextAfter(open, id) {
   return null;
 }
 const dueMove = open => open.find(d => (d.about || {}).type === 'discovery') || null;
-const hasQuestion = (open, id) => open.some(d => (d.about || {}).item === id);
+const hasQuestion = (open, id) => open.some(d => (d.about || {}).type === 'item' && d.about.item === id);
 
 // ---------- What the records say ----------
 const lastOf = list => list[list.length - 1];
@@ -225,10 +232,6 @@ function itemRow(item, data, ctx, known) {
   if (firstSentence(item.text).more) more.push('<p>' + esc(s(item.text)) + '</p>');
   if (item.testable && s(item.testable.text)) more.push('<p><b>Testable form (' + esc(s(item.testable.form)) + '):</b> ' + esc(item.testable.text) + '</p>');
   if (s(item.ambiguity)) more.push('<p><b>Unclear:</b> ' + esc(item.ambiguity) + '</p>');
-  const accepted = item.accepted_risks || [];
-  if ((item.risks || []).length) {
-    more.push('<p><b>Risks</b></p><ul>' + item.risks.map(r => '<li>' + esc(s(r.id)) + ', ' + esc(s(r.kind)) + ': ' + esc(s(r.text)) + (accepted.includes(r.id) ? ' (accepted)' : '') + '</li>').join('') + '</ul>');
-  }
   const change = lastChange(data, item.id, 'state'), cause = change && change.cause || {};
   const settled = [].concat((cause.evidence || []).map(e => idLink(e, known)), cause.test ? [idLink(cause.test, known)] : [],
     cause.answer && cause.answer.type === 'decision' ? [idLink(cause.answer.id, known)] : cause.answer ? ['you, ' + (cause.answer.type === 'chat' ? 'in the chat' : 'on the page')] : [],
@@ -243,11 +246,62 @@ function itemRow(item, data, ctx, known) {
     '<td><span class="first">' + esc(firstSentence(item.text).first) + '</span>' + (item.alternative ? ' ' + chip('Alternative idea') : '') +
     (more.length ? '<details class="more"><summary>More</summary>' + more.join('') + '</details>' : '') + invalidNote(item) + '</td>' +
     '<td>' + importance + '</td>' +
-    '<td>' + stateChip(view, { minutes }) + (hasQuestion(ctx.open, item.id) ? ' ' + chip('Question open', 'wait') : '') + '</td>' +
+    '<td>' + stateChip(view, { minutes }) + (hasQuestion(ctx.open, item.id) ? ' ' + chip('Question open', 'wait') : '') +
+    ((item.risks || []).length ? '' : '<p class="muted norisk">No risk listed</p>') + '</td>' +
     '<td>' + evidence + '</td>' +
     '<td>' + (settled.length ? settled.join(', ') : '<span class="muted">Nothing yet</span>') + (tests.length ? '<br><span class="muted">Tests: ' + tests.join(', ') + '</span>' : '') + '</td>' +
     '<td>' + link(data, item.rests_on || [], known) + '</td>' +
-    '<td><div class="row-actions">' + button('Change', 'data-open-form="change" data-record="' + esc(item.id) + '"') + '</div></td></tr>';
+    '<td><div class="row-actions">' + button('Change', 'data-open-form="change" data-record="' + esc(item.id) + '"') + '</div></td></tr>' + risksOf(item, data, ctx, known);
+}
+
+// ---------- Risks: a bar under each item that has risks, and one sub-row per risk while it is open ----------
+const RISK_KINDS = [['value', 'Value'], ['usability', 'Usability'], ['feasibility', 'Feasibility'], ['viability', 'Viability']];
+// The bar's counts: "1 risk", no zero counts, and the questions for you only when one waits.
+function riskCounts(n, open, accepted, questions) {
+  const head = plural(n, 'risk', 'risks');
+  const both = n === 2 ? 'both' : 'all';
+  let text = !accepted ? (n === 1 ? head + ', open' : head + ', ' + both + ' open') : !open ? (n === 1 ? head + ', accepted' : head + ', ' + both + ' accepted')
+    : head + ': ' + open + ' open, ' + accepted + ' accepted';
+  if (questions) text += ', ' + plural(questions, 'question', 'questions') + ' for you';
+  return text;
+}
+// What settled an accepted risk: the question its risk change cites, else who said so.
+function riskSettled(item, risk, data, known) {
+  let found = null;
+  (data.changes || []).forEach(c => { if (c.field === 'risk' && c.risk === risk.id && (c.about || {}).item === item.id && c.to === 'accepted') found = c; });
+  const answer = found && (found.cause || {}).answer;
+  if (!answer) return '<span class="muted">Nothing yet</span>';
+  return answer.type === 'decision' ? idLink(s(answer.id), known) : 'You, ' + (answer.type === 'chat' ? 'in the chat' : 'on the page');
+}
+// A waiting question about a risk, in the risk's State cell: its ID, its first sentence, its default, and ✓ and Answer.
+function riskQuestion(d, known) {
+  return '<div class="rq" data-d="' + esc(d.id) + '"><p>' + idLink(d.id, known) + ': ' + esc(firstSentence(d.asked).first) + '</p>' +
+    (s(d.default) ? '<p class="muted">Suggested default: ' + esc(d.default) + '</p>' : '') +
+    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">✓</button>' : '') +
+    '<button type="button" class="btn btn--sm btn--quiet" data-answer="' + esc(d.id) + '" aria-label="Answer ' + esc(d.id) + '">Answer</button></div></div>';
+}
+function risksOf(item, data, ctx, known) {
+  const risks = (item.risks || []).filter(r => r && s(r.id));
+  if (!risks.length) return '';
+  const accepted = new Set(item.accepted_risks || []), open = !!(ctx.openRisks && ctx.openRisks.has(item.id));
+  const asks = id => ctx.open.filter(d => (d.about || {}).type === 'risk' && d.about.item === item.id && d.about.risk === id);
+  const questions = risks.reduce((n, r) => n + asks(r.id).length, 0);
+  const none = RISK_KINDS.filter(([k]) => !risks.some(r => r.kind === k)).map(([, l]) => l.toLowerCase());
+  const n = risks.filter(r => accepted.has(r.id)).length;
+  const label = (open ? 'Hide' : 'Show') + ' risks of ' + item.id;
+  const bar = '<tr class="riskbar" id="bar-' + esc(item.id) + '"><td colspan="8"><button type="button" class="riskbar-btn" aria-expanded="' + open + '" aria-controls="risks-' + esc(item.id) + '" aria-label="' + esc(label) + '" data-risks="' + esc(item.id) + '">' +
+    '<span aria-hidden="true">' + (open ? '▾' : '▸') + '</span> <span class="what">' + (open ? 'Hide risks' : 'Show risks') + '</span> <span class="muted">' + esc(riskCounts(risks.length, risks.length - n, n, questions)) + '</span>' +
+    (none.length ? '<span class="muted none">None listed: ' + esc(none.join(', ')) + '</span>' : '') + '</button></td></tr>';
+  const name = k => (RISK_KINDS.find(([key]) => key === k) || [k, cap(s(k))])[1];
+  const rows = risks.map(r => {
+    const done = accepted.has(r.id), waiting = asks(r.id);
+    return '<tr class="risk" id="risk-' + esc(r.id) + '"' + (open ? '' : ' hidden') + '><td class="muted">' + esc(r.id) + '</td>' +
+      '<td><b>' + esc(name(r.kind)) + ':</b> ' + esc(s(r.text)) + '</td><td></td>' +
+      '<td>' + (done ? 'Accepted' : 'Open') + waiting.map(d => riskQuestion(d, known)).join('') + '</td><td></td>' +
+      '<td>' + (done ? riskSettled(item, r, data, known) : '<span class="muted">Nothing yet</span>') + '</td><td></td>' +
+      '<td><div class="row-actions">' + button('Change', 'data-open-form="change" data-record="' + esc(r.id) + '" aria-label="Change ' + esc(r.id) + '"') + '</div></td></tr>';
+  }).join('');
+  return bar + '</tbody><tbody class="risks" id="risks-' + esc(item.id) + '">' + rows + '</tbody><tbody>';
 }
 function itemsTable(kind, data, ctx) {
   const known = knownIds(data), items = (data.items || []).filter(i => i.kind === kind);
@@ -259,17 +313,33 @@ function itemsTable(kind, data, ctx) {
 }
 
 // ---------- Evidence ----------
-function evidenceStatus(e, ctx) {
-  if (e.status === 'counts') return chip('Counts', 'ok');
-  if (e.status === 'checking') {
-    if ((ctx.open || []).some(d => (d.about || {}).type === 'evidence' && d.about.evidence === e.id)) return chip('Waiting for your confirmation', 'wait') + '<p class="muted">It does not count until you confirm it.</p>';
-    if (!s(e.verifier)) { const m = ageMin(e.at, ctx.now); return chip('Waiting for a verifier' + (m != null ? ', ' + m + ' min' : '')) + '<p class="muted">It does not count until the check passes.</p>'; }
-    const m = ageMin(e.since, ctx.now);
-    return chip('Checking quote' + (m != null ? ', ' + m + ' min' : ''), 'working') + '<p class="muted">It does not count until the check passes.</p>';
+// The label of a piece of evidence, from its status, its origin and its kind only, never from its reason. Found,
+// From you and Confirmed count; Queued, Checking and Needs you do not count yet; the rest do not count.
+const computedResult = e => e.kind === 'data' && ['file', 'tool'].includes((e.origin || {}).type);
+function evidenceLabel(e) {
+  const you = (e.origin || {}).type === 'you', computed = computedResult(e);
+  switch (e.status) {
+    case 'counts': return you ? 'From you' : computed ? 'Confirmed' : 'Found';
+    case 'checking': return computed ? 'Needs you' : s(e.verifier) ? 'Checking' : 'Queued';
+    case 'reworded': return 'Checking';
+    case 'not found': return 'Not found';
+    case 'not reachable': return 'Unreachable';
+    case 'unverified': return computed ? 'Not confirmed' : 'Not checked';
+    case 'removed': return 'Removed';
+    default: return cap(s(e.status)) || 'Unknown';
   }
-  if (e.status === 'not reachable') return chip('Source not reachable') + '<p class="muted">' + esc(s(e.reason)) + ' It does not count.</p>';
-  if (e.status === 'unverified') return chip('Not checked') + '<p class="muted">' + esc(s(e.reason)) + ' It does not count.</p>';
-  return chip(s(e.status) || 'Unknown');
+}
+const LABEL_CHIPS = { Found: 'ok', 'From you': 'ok', Confirmed: 'ok', Checking: 'working', 'Needs you': 'wait' };
+// The label, its age while it waits, and under it only a reason: the record's, or no word past the quiet time.
+function evidenceStatus(e, ctx, data) {
+  const label = evidenceLabel(e);
+  const since = e.status === 'checking' ? (s(e.verifier) ? e.since : e.at) : null, m = since ? ageMin(since, ctx.now) : null;
+  const word = label + (m != null && label !== 'Needs you' ? ', ' + m + ' min' : '');
+  const quiet = (data && data.quiet_after) || 1800;
+  const reason = e.status === 'reworded' ? 'Reworded on the page: being corrected'
+    : m != null && label !== 'Needs you' && m * 60 >= quiet ? 'No word for ' + m + ' min'
+    : ['not found', 'not reachable', 'unverified'].includes(e.status) ? s(e.reason) : '';
+  return chip(word, LABEL_CHIPS[label] || '') + (reason ? '<p class="muted">' + esc(reason) + '</p>' : '');
 }
 function evidenceSource(e) {
   const o = e.origin || {};
@@ -279,22 +349,30 @@ function evidenceSource(e) {
   if (o.type === 'you') return 'You, ' + (((o.given || {}).type === 'chat') ? 'in the chat' : 'on this page') + (s(e.said_by_role) ? ', ' + esc(e.said_by_role) : '');
   return esc(s(e.source_title) || s(e.source));
 }
+// A quote its verifier found reworded and the coordinator corrected to the page's words: the mark, and the analyst's
+// wording under More.
+function correctedNote(e, data) {
+  const old = s(e.corrects) && (data.evidence || []).find(x => x.id === e.corrects);
+  if (!old) return '';
+  return '<br><span class="muted chat">quote corrected to the page’s words</span><details class="more"><summary>More</summary><p>The analyst quoted: “' + esc(s(old.text)) + '”</p></details>';
+}
 function evidenceRow(e, data, ctx, known) {
   const chat = (e.origin || {}).type === 'you' && ((e.origin.given || {}).type === 'chat');
   const bears = (e.bears_on || []).map(b => idLink(b.item, known) + ' ' + esc(s(b.direction))).join(', ');
   return '<tr id="row-' + esc(e.id) + '"><td><strong>' + esc(e.id) + '</strong></td>' +
-    '<td>' + fold(e.text) + '<br><span class="muted">' + evidenceSource(e) + '</span>' + (chat ? '<br>' + chatMark : '') + invalidNote(e) + '</td>' +
-    '<td>' + esc(KINDS[e.kind] || s(e.kind)) + '</td><td>' + evidenceStatus(e, ctx) + ((e.tries || []).length > 1 ? ' <em class="second">second try</em>' : '') + '</td>' +
+    '<td>' + fold(e.text) + '<br><span class="muted">' + evidenceSource(e) + '</span>' + (chat ? '<br>' + chatMark : '') + correctedNote(e, data) + invalidNote(e) + '</td>' +
+    '<td>' + esc(KINDS[e.kind] || s(e.kind)) + '</td><td>' + evidenceStatus(e, ctx, data) + ((e.tries || []).length > 1 ? ' <em class="second">second try</em>' : '') + '</td>' +
     '<td>' + (bears || '<span class="muted">Nothing</span>') + '</td>' +
     '<td><div class="row-actions">' + button('Remove…', 'data-open-form="remove" data-record="' + esc(e.id) + '"') + '</div></td></tr>';
 }
 function evidencePanel(data, ctx) {
-  const known = knownIds(data), live = (data.evidence || []).filter(e => e.status !== 'removed');
+  const corrected = new Set((data.evidence || []).map(e => e.corrects).filter(Boolean));
+  const known = knownIds(data), live = (data.evidence || []).filter(e => e.status !== 'removed' && !corrected.has(e.id));
   const mine = live.filter(e => e.about === 'your users'), other = live.filter(e => e.about !== 'your users');
   const heads = ['ID', 'What you saw or were told', 'Kind', 'State', 'Bears on', 'Actions'];
   const unknown = (data.items || []).filter(i => live.some(e => e.about !== 'your users' && (e.bears_on || []).some(b => b.item === i.id)) &&
     !live.some(e => e.about === 'your users' && (e.bears_on || []).some(b => b.item === i.id)));
-  return '<h2>Evidence</h2>' + intro('Evidence is what you saw or were told, and what research found. Example: "Three of five owners re-ran the report by hand."') +
+  return '<h2>Evidence</h2>' + intro('Evidence is what you saw or were told, and what research found. Found, From you and Confirmed count. Queued, Checking and Needs you don’t count yet. The rest don’t count.') +
     '<p>' + button('Add evidence…', 'data-open-form="add-evidence"', '') + '</p><div id="slot-add-evidence"></div>' +
     (live.length ? '<h3>About your users</h3>' + (mine.length ? table(heads, mine.map(e => evidenceRow(e, data, ctx, known))) : '<p class="muted">None yet.</p>') +
       '<h3>Not yet known for your users</h3>' + (unknown.length ? '<ul class="plain">' + unknown.map(i => '<li>' + idLink(i.id, known) + ' ' + esc(firstSentence(i.text).first) + '</li>').join('') + '</ul>' : '<p class="muted">Nothing: every item with evidence has some from your users.</p>') +
@@ -367,7 +445,7 @@ function briefPanel(data, ctx) {
 function aboutHTML(d, data, known) {
   const about = d.about || {}, item = (data.items || []).find(i => i.id === about.item);
   if (about.type === 'item') return 'About ' + idLink(s(about.item), known) + (item ? ' ' + esc(firstSentence(item.text).first) : '');
-  if (about.type === 'risk') { const r = item && (item.risks || []).find(x => x.id === about.risk); return 'About ' + esc(s(about.risk)) + ' of ' + idLink(s(about.item), known) + (r ? ': ' + esc(s(r.text)) : ''); }
+  if (about.type === 'risk') { const r = item && (item.risks || []).find(x => x.id === about.risk); return 'About ' + idLink(s(about.risk), known) + ' of ' + idLink(s(about.item), known) + (r ? ': ' + esc(s(r.text)) : ''); }
   if (about.type === 'option') return 'About ' + idLink(s(about.option), known);
   if (about.type === 'evidence') return 'About ' + idLink(s(about.evidence), known);
   return 'About the whole idea';
@@ -445,7 +523,7 @@ function removeForm(record, head) {
   return form('remove', record.id, redact ? '<p>This removes the words from the page and from the briefs. The coordinator closes the page to do it.</p>' :
     field('rm-reason', 'Why remove ' + record.id + '?', '<textarea id="rm-reason" required></textarea>'), 'Remove');
 }
-const CHANGE_FIELDS = { item: [['text', 'Text'], ['importance', 'Importance (high or lower)']], test: [['what', 'What'], ['rule', 'Stop or change rule'], ['cost', 'Cost']] };
+const CHANGE_FIELDS = { item: [['text', 'Text'], ['importance', 'Importance (high or lower)']], risk: [['text', 'What could make it fail'], ['kind', 'Kind (value, usability, feasibility or viability)']], test: [['what', 'What'], ['rule', 'Stop or change rule'], ['cost', 'Cost']] };
 function changeForm(kind, record, fieldName) {
   const label = { appetite: 'Appetite', setting: 'Setting', brought: 'Brought' }[fieldName];
   const choose = fieldName ? '<input type="hidden" id="ch-field" value="' + esc(fieldName) + '">' : field('ch-field', 'What to change', '<select id="ch-field">' + (CHANGE_FIELDS[kind] || []).map(([k, l]) => '<option value="' + k + '">' + esc(l) + '</option>').join('') + '</select>');
@@ -460,6 +538,7 @@ const $$ = (selector, root) => Array.prototype.slice.call((root || document).que
 const byId = id => document.getElementById(id);
 const setHTML = (el, html) => { if (el && el._html !== html) { el.innerHTML = html; el._html = html; } };
 
+const OPEN_RISKS = new Set();  // the items whose risks bar is open: kept across redraws
 let DATA = null, TAB = 'moves', DIRTY = false, SENT = null, SELECTED = null, FOCUS_AFTER = null, OFFSET = 0, FAILS = 0;
 const nowSec = () => Date.now() / 1000 + OFFSET;
 const view = $('.view');
@@ -508,7 +587,7 @@ const eventKinds = {};
 
 function context() {
   const open = currentOpen();
-  return { open, now: nowSec(), pending: currentPending(), selected: SELECTED, markdown, badges: badges(open, DATA.items) };
+  return { open, now: nowSec(), pending: currentPending(), selected: SELECTED, markdown, badges: badges(open, DATA.items), openRisks: OPEN_RISKS };
 }
 
 function paint() {
@@ -549,7 +628,7 @@ function focusKey(el) {
   if (!el || el === document.body || !view.contains(el)) return null;
   const panelEl = el.closest('[role="tabpanel"]'), scope = panelEl ? '#' + panelEl.id + ' ' : '';
   if (el.id) return '#' + el.id;
-  for (const name of ['data-use', 'data-answer', 'data-goto', 'data-open-picker', 'data-open-form']) {
+  for (const name of ['data-use', 'data-answer', 'data-goto', 'data-open-picker', 'data-open-form', 'data-risks']) {
     if (el.hasAttribute(name)) {
       let sel = '[' + name + '="' + quoted(el.getAttribute(name)) + '"]';
       if (name === 'data-open-form') sel += '[data-record="' + quoted(s(el.dataset.record)) + '"]';
@@ -582,7 +661,9 @@ function showTab(key) {
 function goto(id) {
   showTab(tabOf(id, DATA));
   $$('.highlighted', view).forEach(r => r.classList.remove('highlighted'));
-  const row = byId('row-' + id);
+  const owner = isRisk(id) ? riskItem(id, DATA) : null;
+  if (owner && !OPEN_RISKS.has(owner)) { OPEN_RISKS.add(owner); paint(); }
+  const row = byId((owner ? 'risk-' : 'row-') + id);
   if (!row) return;
   row.classList.add('highlighted');
   row.tabIndex = -1;
@@ -650,7 +731,7 @@ function formFor(kind, id, fieldName) {
   if (kind === 'add-evidence') return addEvidenceForm(data);
   if (kind === 'result') return resultForm((data.tests || []).find(t => t.id === id));
   if (kind === 'remove') return removeForm((data.evidence || []).concat(data.tests || []).find(r => r.id === id) || { id }, data.head);
-  if (kind === 'change') return changeForm(id === 'discovery' ? '' : /^X/.test(id) ? 'test' : 'item', id, fieldName);
+  if (kind === 'change') return changeForm(id === 'discovery' ? '' : /^X/.test(id) ? 'test' : isRisk(id) ? 'risk' : 'item', id, fieldName);
   return '';
 }
 function closeForm(box, keepFocus) {
@@ -722,7 +803,12 @@ view.addEventListener('click', event => {
   if (target.matches('[data-open-form]')) return openForm(target);
   if (target.matches('[data-cancel-form]')) return closeForm(target.closest('.rec'));
   if (target.matches('[data-open-picker]')) return togglePicker(true);
-  const row = target.closest('li.q');
+  if (target.matches('[data-risks]')) {
+    const id = target.dataset.risks;
+    if (OPEN_RISKS.has(id)) OPEN_RISKS.delete(id); else OPEN_RISKS.add(id);
+    return paint();
+  }
+  const row = target.closest('li.q, .rq');
   if (target.matches('[data-use]') && row) {
     const id = target.dataset.use, next = nextAfter(currentOpen(), id);
     FOCUS_AFTER = next ? 'li.q[data-d="' + next.id + '"] [' + (next.use ? 'data-use' : 'data-answer') + ']' : '#open-picker';
