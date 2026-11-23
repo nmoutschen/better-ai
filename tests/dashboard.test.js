@@ -395,6 +395,13 @@ test('a resumed builder that logs a step but no start still opens its next round
   assert.deepEqual([last.kind, last.round, last.start, last.end], ['b', 2, E('2026-11-23T10:45:00Z'), null]);
 });
 
+test("a later round whose first line has no time starts at its first line that has one", () => {
+  const d = resumed();
+  d.agents[0].lines.splice(-2, 1, { type: 'start', text: 'no time' });
+  const last = TL.phasesOf(d.tasks[0], d).at(-1);
+  assert.deepEqual([last.kind, last.start, last.end], ['b', E('2026-11-23T10:50:00Z'), E('2026-11-23T10:50:00Z')]);
+});
+
 test('a resumed verifier shows its own findings in each round, never those of its earlier round', () => {
   const d = fixture();
   d.agents[1].lines.push(line('start', '2026-11-23T10:51:00Z'), line('handed_back', '2026-11-23T10:55:00Z', { result: 'passes' }));

@@ -77,7 +77,7 @@ function phasesOf(t, d) {
   const now = d.now, out = [];
   for (const a of agentsOf(t, d)) roundsOfAgent(a).forEach((lines, i) => {
     // The first round starts when the agent started, which the lines the page holds may no longer show.
-    const start = i === 0 ? sec(a.started) ?? sec((lines[0] || {}).at) ?? sec(a.at) : sec(lines[0].at);
+    const start = i === 0 ? sec(a.started) ?? sec((lines[0] || {}).at) ?? sec(a.at) : lines.map(l => sec(l.at)).find(x => x !== null) ?? null;
     if (start === null) return;
     const back = lines.find(l => l.type === "handed_back");
     out.push({kind: a.role === "verifier" ? "v" : "b", agent: str(a.name), branch: str(a.branch), start,
