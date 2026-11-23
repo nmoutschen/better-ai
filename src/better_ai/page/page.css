@@ -261,7 +261,8 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .progress .bars { display:inline-flex; gap:var(--space-tight); }
 .progress .bars i { width:10px; height:4px; background:var(--line); }
 .progress.seen .bars i.on, .progress.replied .bars i.on, .progress.followup .bars i.on { background:var(--sand); }
-.progress.asked, .progress.working { color:var(--umber); }
+.progress.asked { color:var(--umber); }
+.progress.working { color:var(--terracotta-dark); }
 .progress.asked .bars i.on { background:var(--umber); }
 .progress.working .bars i.on { background:var(--terracotta); }
 .progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }

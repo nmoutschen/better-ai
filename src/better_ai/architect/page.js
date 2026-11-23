@@ -99,9 +99,9 @@ function specTables(records) {
 
 function perspectiveTables(perspectives, findings, parts, reviewed, removedLabels = {}) {
   const summary = table(['Perspective', 'Applicability', 'Why', 'From'], perspectives.map(p =>
-    row(['<strong>' + text(p.name) + '</strong>', p.applies ? chip('Applies', 'ok') : chip('Does not apply'),
+    row(['<strong>' + text(p.name) + '</strong>', p.applies ? chip('Applies', 'plain') : chip('Does not apply'),
       text(p.why) + invalid(p), '<span class="muted">' + text(fromWords(p.from)) + '</span>'])));
-  if (!reviewed) return summary + '<p>' + chip('Review runs once you approve the design') + '</p>';
+  if (!reviewed) return summary + '<p>' + chip('Review runs once you approve the design', 'wait') + '</p>';
   return summary + perspectives.filter(p => p.applies).map(p => {
     const headers = ['ID', 'Part', 'Finding', 'Handled by'];
     const rows = findings.filter(f => f.perspective === p.id).map(f => {

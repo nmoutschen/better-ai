@@ -26,6 +26,8 @@ function load(config) {
     createElement: tag => new Node(tag),
     getElementById: id => id === 'page-config' && config ? { textContent: JSON.stringify(config) } : null,
     get activeElement() { return Node.focused; },
+    body: { tag: 'body' },
+    contains: () => true,
     querySelectorAll: sel => (load.thread && load.thread[sel]) || [],
   };
   return loadPage({ document, Date, JSON, Object, Math, String, Array, isNaN });
@@ -331,7 +333,7 @@ test('after the check, the focus moves to the next open question, then to the ne
   load.thread['li[data-state="asked"]'] = [items[1].li];
   items[1].use.click();  // the last question: nothing else waits, the focus stays where it is
   assert.equal(Node.focused, items[1].use);
-  const note = new Node('li'); note.dataset.state = 'asked';
+  const note = new Node('li'); note.dataset.state = 'asked'; note.dataset.id = 'M1';
   load.thread['li[data-state="asked"]'] = [items[1].li, note];
   items[1].use.click();
   assert.equal(Node.focused, note);
@@ -339,6 +341,7 @@ test('after the check, the focus moves to the next open question, then to the ne
   const withMove = decision(page, { id: 'D9' }, { next: () => move });
   const [, f9] = withMove.render();
   load.thread = {};
+  Node.focused = buttons(f9)[0];
   buttons(f9)[0].click();
   assert.equal(Node.focused, move);  // the page's own next thing, such as a move that is due
   load.thread = null;
@@ -347,6 +350,7 @@ test('after the check, the focus moves to the next open question, then to the ne
 test('when the redraw replaces the next question after the check, its new check takes the focus', async () => {
   const page = load({ capabilities: ['decisions'] });
   const items = questions(page, ['D1', 'D2']);
+  Node.focused = items[0].use;
   items[0].use.click();
   const [, foot] = items[0].t.d.item(items[1].t.entry, {}, true);  // one pageDecision draws every question of a page  // the thread redraws the question
   Node.focused = null;
@@ -410,7 +414,7 @@ const fragment = (hash, stored) => {
   return { kept, replaced, globals: {
     location: { hash, pathname: '/', search: '' },
     history: { replaceState: (...args) => replaced.push(args[2]) },
-    sessionStorage: { getItem: k => kept[k] ?? null, setItem: (k, v) => { kept[k] = v; } },
+    sessionStorage: { getItem: k => kept[k] ?? null, setItem: (k, v) => { kept[k] = v; }, removeItem: k => { delete kept[k]; } },
   } };
 };
 const answerWith = value => Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(value) });
@@ -442,7 +446,7 @@ test('a message the page sends goes with the token, and a refusal as out of date
   let finished = false, failed = false;
   const page = stripsOn({}, (url, init) => {
     sent.push({ url, init });
-    if (url === '/rpc') return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ error: { code: -32001, message: 'page out of date: reload' } }) });
+    if (url === '/rpc') return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ error: { code: -32001, message: 'page out of date: open the address the agent gave' } }) });
     return url.startsWith('/events') ? new Promise(() => {}) : answer(200);
   }, {}, where.globals);
   page.conversation.send('note', { id: 'm1', text: 'my long answer', to: null }, 'Reply', () => { finished = true; }, () => { failed = true; });
@@ -450,8 +454,11 @@ test('a message the page sends goes with the token, and a refusal as out of date
   assert.equal(sent.find(r => r.url === '/rpc').init.headers['X-Page-Token'], 'tok');
   assert.equal(finished, false);  // done is what clears the typed text: it is not called
   assert.equal(failed, true);
-  assert.equal(page.els['.toast'].textContent, 'Not sent: reply. page out of date: reload');
-  assert.equal(page.els['.notes .status'].textContent, 'Not sent: page out of date: reload');
+  assert.equal(page.els['.toast'].textContent, 'Not sent: reply. page out of date: open the address the agent gave');
+  assert.equal(page.els['.notes .status'].textContent, 'Not sent: page out of date: open the address the agent gave');
+  assert.equal(page.els['.offline'].textContent, 'page out of date: open the address the agent gave');
+  assert.equal(page.els['.offline'].hidden, false);
+  assert.equal(where.kept.pageToken, undefined);  // the saved token is dropped: a reload never fixes it
 });
 
 test('a read the server answers as out of date shows that on the page, and the stream does not retry', async () => {
@@ -464,7 +471,21 @@ test('a read the server answers as out of date shows that on the page, and the s
   await page.round(); await page.round();
   assert.equal(events, 1);
   assert.equal(page.els['.offline'].hidden, false);
-  assert.equal(page.els['.offline'].textContent, 'page out of date: reload');
+  assert.equal(page.els['.offline'].textContent, 'page out of date: open the address the agent gave');
+  assert.equal(where.kept.pageToken, undefined);  // the token it saved is dropped
+});
+
+test('the design canvas shows only the out of date message when its data is refused for the token', async () => {
+  const where = fragment('#t=old'), problem = { textContent: '', hidden: true };
+  const strip = { textContent: '', hidden: true };
+  const document = { querySelector: s => s === '.offline' ? strip : null, getElementById: id => id === 'canvas-problem' ? problem : null };
+  const context = loadPage({ document, Date, JSON, Object, Math, String, Array, isNaN, fetch: () => answer(401), ...where.globals });
+  const vm = require('node:vm');
+  vm.runInNewContext(read('design', 'canvas.js'), Object.assign(context, { document }));
+  await new Promise(resolve => setImmediate(resolve)); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(strip.textContent, 'page out of date: open the address the agent gave');
+  assert.equal(problem.hidden, true);  // not also "could not load its versions"
+  assert.equal(problem.textContent, '');
 });
 
 test('a page that does not stream stays out of date once any request was refused, whatever /listening says later', async () => {
@@ -473,5 +494,87 @@ test('a page that does not stream stays out of date once any request was refused
   await page.context.pageFetch('/data').catch(() => {});
   await page.round(); await page.round();
   assert.equal(page.els['.offline'].hidden, false);
-  assert.equal(page.els['.offline'].textContent, 'page out of date: reload');
+  assert.equal(page.els['.offline'].textContent, 'page out of date: open the address the agent gave');
+});
+
+// ---- the focus after the check, when the send takes time
+
+// A conversation whose send does not finish until the test says so.
+function slowRows(page, ids, options) {
+  const finish = [];
+  const conversation = { box() {}, progress: () => new Node('span'), send(m, p, w, done) { finish.push(done); } };
+  const d = page.pageDecision(Object.assign({ conversation, now: () => 0, md: t => t, esc: String, id: p => p + '-1' }, options));
+  const draw = id => {
+    const [n, foot] = d.item({ e: { x: { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' } }, replies: [] }, {}, true);
+    n.dataset.d = id; n.found = { '.use': buttons(foot)[0], '.answer': buttons(foot)[1] };
+    return { n, use: buttons(foot)[0] };
+  };
+  return { finish, draw };
+}
+
+test('the check does not take the focus when the user moved it during the send', () => {
+  const page = load({ capabilities: ['decisions'] });
+  const { finish, draw } = slowRows(page);
+  const rows = ['D1', 'D2'].map(draw);
+  load.thread = { 'li.open-q': rows.map(r => r.n) };
+  Node.focused = rows[0].use;
+  rows[0].use.click();
+  const composer = new Node('textarea');
+  Node.focused = composer;  // the user went to the message box while the answer was on its way
+  finish[0]();
+  assert.equal(Node.focused, composer);
+  load.thread = null;
+});
+
+test('the check moves the focus on when it is still on the clicked button, or nowhere', () => {
+  const page = load({ capabilities: ['decisions'] });
+  const { finish, draw } = slowRows(page);
+  const rows = ['D1', 'D2'].map(draw);
+  load.thread = { 'li.open-q': rows.map(r => r.n) };
+  Node.focused = rows[0].use;
+  rows[0].use.click();
+  finish[0]();
+  assert.equal(Node.focused, rows[1].use);
+  Node.focused = null;
+  rows[0].use.click();
+  finish[1]();
+  assert.equal(Node.focused, rows[1].use);
+  load.thread = null;
+});
+
+test('what the page says waits next is asked at focus time, not held from before a redraw', () => {
+  const page = load({ capabilities: ['decisions'] });
+  const before = new Node('button'), after = new Node('button');
+  let current = before;
+  const { finish, draw } = slowRows(page, [], { next: () => current });
+  const row = draw('D1');
+  load.thread = { 'li.open-q': [row.n] };
+  Node.focused = row.use;
+  row.use.click();
+  current = after;  // the redraw replaced the element
+  finish[0]();
+  assert.equal(Node.focused, after);
+  load.thread = null;
+});
+
+test('another item the agent asked about is found again by its id after a redraw', () => {
+  const page = load({ capabilities: ['decisions'] });
+  const { finish, draw } = slowRows(page);
+  const row = draw('D1');
+  const old = new Node('li'); old.dataset.id = 'M7'; old.dataset.state = 'asked';
+  load.thread = { 'li.open-q': [row.n], 'li[data-state="asked"]': [old] };
+  Node.focused = row.use;
+  row.use.click();
+  const redrawn = new Node('li'); redrawn.dataset.id = 'M7'; redrawn.dataset.state = 'asked';
+  load.thread = { 'li.open-q': [], 'li[data-state="asked"]': [redrawn] };
+  finish[0]();
+  assert.equal(Node.focused, redrawn);
+  load.thread = null;
+});
+
+test('the accessible names of a question carry its words without Markdown marks', () => {
+  const t = decision(load({ capabilities: ['decisions'] }), { asked: 'Which **size** of `box`, see [the guide](http://x)?' });
+  const [use, answer] = buttons(t.render()[1]);
+  assert.equal(use.attrs['aria-label'], 'Use the default for: Which size of box, see the guide?');
+  assert.equal(answer.attrs['aria-label'], 'Answer: Which size of box, see the guide?');
 });
