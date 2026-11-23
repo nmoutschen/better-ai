@@ -17,7 +17,9 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 import discover_records as R  # noqa: E402
 
-from better_ai import cli  # noqa: E402
+from better_ai import cli, paths  # noqa: E402
+from better_ai.discover import SKILL  # noqa: E402
+from better_ai.discover import rules_changes as rules  # noqa: E402
 
 BODY = ("type", "at", "by", "id")
 
@@ -47,6 +49,9 @@ class Unit(unittest.TestCase):
 
     def check(self):
         return self.verb("check", ".discover/d")
+
+    def as_unit(self):
+        return paths.Unit(self.unit.resolve(), self.repo.resolve(), SKILL.kinds[0], SKILL)
 
     # -- asserting
 
@@ -291,6 +296,13 @@ class Risks(Unit):
         self.refused(self.set("P1", {"risks": [risk("R1")]}), "R2")
         self.refused(self.set("P1", {"risks": [risk("R1"), risk("R2", "Changed.")]}), "R2")
 
+    def test_S4_a_cited_risk_id_cannot_appear_twice_or_with_a_second_text(self):
+        self.ok(self.ask_risk("R1"))
+        self.refused(self.set("P1", {"risks": [risk("R1"), risk("R1", "Other."), risk("R2")]}), "R1")
+        self.refused(self.set("P1", {"risks": [risk("R1", "Other."), risk("R1"), risk("R2")]}), "R1")
+        self.refused(self.set("P1", {"risks": [risk("R1"), risk("R1"), risk("R2")]}), "R1")
+        self.assertEqual([r["id"] for r in self.lines("items.jsonl")[0]["risks"]], ["R1", "R2"])
+
     def test_S4_a_risk_nothing_cites_can_be_removed(self):
         self.ok(self.set("P1", {"risks": [risk("R1")]}))
         self.assertEqual([r["id"] for r in self.lines("items.jsonl")[0]["risks"]], ["R1"])
@@ -442,20 +454,20 @@ class Changes(Unit):
             self.add("change", R.record(R.CHANGE, field="importance", to="high", cause={"reasoning": "y"})), "already"
         )
 
-    def test_S26_a_repeated_change_to_the_discovery_is_refused(self):
-        def appetite(to):
-            return R.record(
-                R.CHANGE,
-                about={"type": "discovery"},
-                field="appetite",
-                to=to,
-                cause={"answer": {"type": "chat", "text": "A month, not two weeks."}},
-                **{"from": "two weeks of one person"},
-            )
+    def test_S30_a_change_about_the_discovery_is_accepted_and_a_repeat_of_the_latest_is_refused(self):
+        def change(name, to, cause):
+            return R.record(R.CHANGE, about={"type": "discovery"}, field=name, to=to, cause=cause, **{"from": "x"})
 
-        self.ok(self.add("change", appetite("a month of one person")))
-        self.refused(self.add("change", appetite("a month of one person")), "already recorded: nothing to do")
-        self.ok(self.add("change", appetite("two weeks")))
+        said = {"answer": {"type": "chat", "text": "A month, not two weeks."}}
+        for name, first, second in (
+            ("appetite", "a month of one person", "two weeks"),
+            ("setting", "internal", "external"),
+        ):
+            with self.subTest(name):
+                self.ok(self.add("change", change(name, first, said)))
+                self.refused(self.add("change", change(name, first, {"reasoning": "Again."})), "already recorded")
+                self.ok(self.add("change", change(name, second, said)))
+                self.ok(self.add("change", change(name, first, said)))  # not the latest any more: accepted
 
     def test_S26_accepting_the_same_risk_twice_is_refused(self):
         self.ok(self.ask_risk())
@@ -488,6 +500,28 @@ class Changes(Unit):
         self.assertIn("warning", done.stderr)
         self.assertIn("P1's state is stale: add a change", done.stderr)
         self.assertNotIn("stale", done.stdout)
+
+    def test_S29_stale_and_identical_read_the_latest_change_as_derive_does(self):
+        """A state change to `risk accepted` is not a state (derive skips it): a hand-written one is not the latest."""
+        self.evidence()
+        self.ok(self.state("supported", {"evidence": ["E-a1-1"]}))
+        self.append(
+            "changes.jsonl",
+            R.record(R.CHANGE, to="risk accepted", cause={"reasoning": "Hand-written."}, **{"from": "supported"}),
+        )
+        self.refused(self.state("supported", {"reasoning": "Again."}), "already recorded")
+        self.assertEqual(rules.stale(self.as_unit()), [])
+        self.evidence("E-a1-1", status="removed")
+        (line,) = rules.stale(self.as_unit())
+        self.assertIn("P1's state is stale: add a change", line)
+
+    def test_S29_a_hand_written_change_with_a_to_that_is_not_text_is_not_the_latest(self):
+        self.evidence()
+        self.ok(self.state("supported", {"evidence": ["E-a1-1"]}))
+        self.append("changes.jsonl", R.record(R.CHANGE, to=3, cause={"reasoning": "Hand-written."}))
+        self.evidence("E-a1-1", status="removed")
+        (line,) = rules.stale(self.as_unit())
+        self.assertIn("state is stale", line)
 
     def test_S29_a_state_that_holds_gives_no_warning(self):
         self.evidence()
@@ -555,6 +589,19 @@ class Writers(Unit):
     def test_S31_a_set_without_by_is_refused_with_the_next_action(self):
         self.refused(self.set("P1", {"text": "x"}, by=None), "use --by coord")
         self.assertEqual(self.lines("items.jsonl")[0]["text"], R.ITEM["text"])
+
+    def test_S31_a_head_with_no_coordinator_refuses_every_coordinator_write(self):
+        head = json.loads((self.unit / "discover.json").read_text())
+        del head["coordinator"]
+        (self.unit / "discover.json").write_text(json.dumps(head))
+        text = "discover.json names no coordinator: fix discover.json, then run again"
+        self.refused(self.add("decision", R.DECISION), text)
+        self.refused(self.set("P1", {"text": "x"}), text)
+        self.assertEqual(self.lines("decisions.jsonl"), [])
+
+    def test_S31_a_head_that_does_not_parse_refuses_every_coordinator_write(self):
+        (self.unit / "discover.json").write_text("{")
+        self.refused(self.add("decision", R.DECISION), "discover.json names no coordinator")
 
     def test_S31_a_set_on_another_record_type_needs_no_coordinator(self):
         self.ok(self.add("test", R.TEST))
