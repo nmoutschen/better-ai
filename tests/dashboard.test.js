@@ -106,32 +106,29 @@ test('an invalid task marked done or merged does not count toward the done total
 });
 
 // ---------- The errors band: records that did not validate are listed, and the page stays live ----------
-const errorsCode = marked(html, 'errors');
-const realEsc = loadPage().pageEscape;
-const { errorsHTML } = new Function('esc', errorsCode + '; return {errorsHTML};')(realEsc);
+const shared = loadPage();
+const realEsc = shared.pageEscape;
 const badRecords = [
   { file: 'tasks.jsonl', line: 2, field: 'status', message: 'must be one of "todo", "building"', by: 'coordinator' },
   { file: 'logs/b1.jsonl', line: 7, field: 'result', message: 'required when type is "handed_back"' },
 ];
 
-// The band is the shared page.js's (pageErrors), which the dashboard is to use; both give the same text for now.
-for (const [which, errors] of [['the dashboard', errorsHTML], ['page.js', loadPage().pageErrors]]) {
-  test(`the errors band of ${which} lists each invalid record with its file and line, its field, the reason and who wrote it, and shows markup as text`, () => {
-    const band = errors(badRecords);
-    assert.match(band, /2 records are not valid/);
-    assert.match(band, /tasks\.jsonl:2/);
-    assert.match(band, /status/);
-    assert.match(band, /must be one of &quot;todo&quot;, &quot;building&quot;/);
-    assert.match(band, /coordinator/);
-    assert.match(band, /logs\/b1\.jsonl:7/);
-    assert.match(errors([badRecords[0]]), /1 record is not valid/);
-    assert.equal(errors([]), '');
-    assert.equal(errors(undefined), '');
-    const markup = errors([{ file: '<b>f</b>', line: 1, field: '<img src=x>', message: '<script>x</script>', by: '<i>' }]);
-    assert.doesNotMatch(markup, /<img|<script|<i>|<b>f/);
-    assert.match(markup, /&lt;b&gt;f&lt;\/b&gt;/);
-  });
-}
+const errors = shared.pageErrors;
+test(`the errors band lists each invalid record with its file and line, its field, the reason and who wrote it, and shows markup as text`, () => {
+  const band = errors(badRecords);
+  assert.match(band, /2 records are not valid/);
+  assert.match(band, /tasks\.jsonl:2/);
+  assert.match(band, /status/);
+  assert.match(band, /must be one of &quot;todo&quot;, &quot;building&quot;/);
+  assert.match(band, /coordinator/);
+  assert.match(band, /logs\/b1\.jsonl:7/);
+  assert.match(errors([badRecords[0]]), /1 record is not valid/);
+  assert.equal(errors([]), '');
+  assert.equal(errors(undefined), '');
+  const markup = errors([{ file: '<b>f</b>', line: 1, field: '<img src=x>', message: '<script>x</script>', by: '<i>' }]);
+  assert.doesNotMatch(markup, /<img|<script|<i>|<b>f/);
+  assert.match(markup, /&lt;b&gt;f&lt;\/b&gt;/);
+});
 
 // tick() is read out of dashboard.js between `// load:begin` and `// load:end`, with stubs for what a page has. The closed
 // notice is the shared page's: tests/page_shell.test.js.

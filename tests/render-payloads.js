@@ -6,8 +6,9 @@ const fs = require('node:fs');
 const { loadPage, loadDashboard } = require('./harness');
 
 const shared = loadPage();
-const names = ['tablesHTML', 'popupHTML', 'decisionItem', 'errorsHTML', 'isDone'];
-const page = loadDashboard(`{${names.join(', ')}, set: d => { D = d; }}`);
+const names = ['tablesHTML', 'popupHTML', 'decisionItem', 'isDone'];
+const { pageEscape, pagePopup, pageShowErrors } = shared;
+const page = loadDashboard(`{${names.join(', ')}, set: d => { D = d; }}`, { pageEscape, pagePopup, pageShowErrors });
 
 const payloads = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const failed = [];
@@ -18,7 +19,7 @@ for (const { label, data } of payloads) {
     for (const range of ['1h', '2h', 'all']) page.tablesHTML(d, range);
     for (const t of Array.isArray(d.tasks) ? d.tasks : []) if (t && typeof t === 'object') page.popupHTML(t, d);
     shared.pageDecisionEvents(data.decisions, data.conversation);
-    page.errorsHTML(data.errors);
+    shared.pageErrors(data.errors);
     data.tasks.filter(page.isDone);
     for (const x of data.decisions) page.decisionItem({ e: { x }, replies: [] }, {}, true);
   } catch (error) {
