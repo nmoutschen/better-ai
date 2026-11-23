@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import functools
 import re
 from html.parser import HTMLParser
 from pathlib import Path
@@ -47,15 +46,9 @@ def without_nulls(value):
     return value
 
 
-@functools.lru_cache(maxsize=1)
-def schemas() -> dict[str, dict]:
-    """The schemas of a run of show-better: the shared ones and the package's own."""
-    return schema.load_schemas(*resources.schema_sources("show"))
-
-
 def spec_problems(spec) -> list[tuple[str, str]]:
     """(field, message) of each problem the spec's schema finds, its cross-checks (`show_spec`) included."""
-    docs = schemas()
+    docs = schema.docs_for("show")
     context = schema.Context(Path.cwd(), "spec.json", {})
     return [(p.field, p.message) for p in schema.validate_instance(spec, docs["spec.schema.json"], docs, context)]
 
@@ -71,40 +64,13 @@ def worded(field: str, message: str) -> str:
     )
 
 
-def shape_errors(spec) -> list[str]:
-    """What the schema finds wrong with the spec's shape, one line each, the field first."""
-    found = []
-    for field, message in dict.fromkeys(spec_problems(spec)):
-        found.append(f"{field}: {worded(field, message)}")
-    return found
-
-
-def guarded(function, spec: dict) -> tuple[list[str], list[str], list[str]]:
-    """What `function` answers for the spec; whatever the spec holds, errors and never a traceback."""
+def inspect(spec: dict) -> tuple[list[str], list[str], list[str]]:
+    """What the drawing knows about a spec whose shape was checked and which holds no nulls: (errors, warnings, digest
+    lines). A spec nested too deeply to walk is an error; any other exception is a bug and goes on."""
     try:
-        return function(spec)
+        return inspect_spec(spec)
     except RecursionError:
         return ["(record): is nested too deeply to check"], [], []
-    except Exception as error:
-        return [f"(record): could not be checked: {type(error).__name__}"], [], []
-
-
-def check(spec: dict) -> tuple[list[str], list[str], list[str]]:
-    """Return (errors, warnings, digest lines). The shape is the schema's; the rest needs the rendering's knowledge."""
-    return guarded(check_spec, spec)
-
-
-def inspect(spec: dict) -> tuple[list[str], list[str], list[str]]:
-    """The same for a spec whose shape was checked and which holds no nulls."""
-    return guarded(inspect_spec, spec)
-
-
-def check_spec(spec: dict) -> tuple[list[str], list[str], list[str]]:
-    spec = without_nulls(spec)
-    errors = shape_errors(spec)
-    if errors:
-        return errors, [], []
-    return inspect_spec(spec)
 
 
 def inspect_spec(spec: dict) -> tuple[list[str], list[str], list[str]]:

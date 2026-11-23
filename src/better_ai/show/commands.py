@@ -38,7 +38,8 @@ def _shown(unit: Unit) -> Path:
 
 def examine(unit: Unit, now: datetime, cutoff: str) -> Examined:
     """Read `spec.json` and check it: its schema (a spec from before `at` and `by` is the old format, kept as is), and
-    what the drawing knows. Whatever the file holds, the answer is lines, never a traceback."""
+    what the drawing knows. Whatever the file holds, the answer is lines; an exception of our own code is a bug, not a
+    line."""
     where = _shown(unit)
     try:
         text = paths.read_bytes(unit, HEAD).decode("utf-8")
@@ -46,16 +47,18 @@ def examine(unit: Unit, now: datetime, cutoff: str) -> Examined:
         raise refusal(unit.label, f"it has no {HEAD}", f"create it: create {unit.label} --by <name>") from None
     except UnicodeDecodeError:
         return Examined([f"{where}:1: (record): is not UTF-8 text"], None, [], [])
-    found = schema.check_text(where, text, deck.schemas(), {}, now=now, cutoff=cutoff, notices=[])
+    old: list[schema.Error] = []
+    found = schema.check_text(where, text, schema.docs_for("show"), {}, now=now, cutoff=cutoff, notices=old)
     if found:
         return Examined([str(e) for e in found], None, [], [])
     spec = deck.without_nulls(json.loads(text))
-    # A spec in the old format is not an error for what it lacks, but the checks across its panels still apply to it:
-    # they run on the spec with the fields it lacks filled in.
-    stamped = {**spec, "type": "slides", "at": "2000-01-01T00:00:00Z", "by": "old"}
-    errors = [f"{f}: {m}" for f, m in dict.fromkeys(deck.spec_problems(stamped))]
-    if errors:
-        return Examined([f"{where}:1: {e}" for e in errors], None, [], [])
+    if old:
+        # A spec in the old format is not an error for what it lacks, but the checks across its panels still apply to
+        # it: they run on the spec with the fields it lacks filled in. A spec in the new format had them in check_text.
+        stamped = {**spec, "type": "slides", "at": "2000-01-01T00:00:00Z", "by": "old"}
+        errors = [f"{f}: {m}" for f, m in dict.fromkeys(deck.spec_problems(stamped))]
+        if errors:
+            return Examined([f"{where}:1: {e}" for e in errors], None, [], [])
     errors, warnings, digest = deck.inspect(spec)
     return Examined([f"{where}:1: {e}" for e in errors], None if errors else spec, warnings, digest)
 
