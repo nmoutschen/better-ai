@@ -185,7 +185,6 @@ addEventListener("pointerup", () => { drag = null; wrapEl.classList.remove("drag
 // change has the old words; it is read as the new ones, and the page counts it.
 const OLD_STATUS = {pending: "waiting", default: "defaulted", changed: "answered"};
 const decisions = d => (d.decisions || []).map(x => x._old && OLD_STATUS[x.status] ? {...x, status: OLD_STATUS[x.status]} : x);
-const decisionStatus = x => String(x.status || "decided").trim().toLowerCase();
 const clock = at => pageTime(at);
 const headHTML = (who, at, extra) => `<div class="head"><span class="who">${who}</span><span class="when">${esc(extra || clock(at))}</span></div>`;
 function li(cls, html) { const x = document.createElement("li"); x.className = cls; x.innerHTML = html; return x; }
@@ -223,9 +222,9 @@ const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).
 // The decision question is the shared one: default, deadline, Use the default, Answer.
 const decision = pageDecision({conversation: conv, now: () => D.now, md, esc, id: uid});
 kinds.decision = decision.item;
-// The decisions waiting for the user: asked, and not yet answered on the page.
-const waitingCount = d => { const answered = new Set((d.conversation || []).filter(e => e.type === "answer").map(e => e.decision));
-  return decisions(d).filter(x => decisionStatus(x) === "waiting" && !answered.has(x.id)).length; };
+// The decisions waiting for the user, by the rule every page shares: asked and not yet answered on the page, or asked
+// back about the answer.
+const waitingCount = d => pageOpenDecisions(decisions(d), d.conversation).length;
 
 // ---------- The right column ----------
 function drawAgents(d) {
@@ -233,10 +232,11 @@ function drawAgents(d) {
   const checkers = {}; d.claims.forEach(c => { if (c.status === "checking") checkers[c.checker] = c; });
   const dry = name => { const l = ((d.logs || {})[name] || {}).searches || []; let n = 0;  // searches in a row that found no new term
     for (let i = l.length - 1; i >= 0 && !(l[i].new_terms || []).length; i--) n++; return n; };
+  const heard = who => (d.last_word || {})[who] || null;  // the agent's last word, which the board's server reads
   const rows = working.map(q => { const who = has(q.owner) ? q.owner : "unassigned", n = dry(who);
-    return {who, what: q.label, data: {a: who, for: q.id}, note: n >= 5 ? `${n} searches with nothing new` : ""}; })
-    .concat(Object.keys(checkers).sort().map(v => ({who: v, what: "Checking claims", kind: "verifier", data: {a: v}})));
-  setHTML($("agents"), pageAgents(rows, {now: d.now, empty: d.brief.status === "stopped" ? "The run has stopped." : "No agent is working right now."}));
+    return {who, what: q.label, last: heard(who), data: {a: who, for: q.id}, note: n >= 5 ? `${n} searches with nothing new` : ""}; })
+    .concat(Object.keys(checkers).sort().map(v => ({who: v, what: "Checking claims", last: heard(v), kind: "verifier", data: {a: v}})));
+  setHTML($("agents"), pageAgents(rows, {now: d.now, quietAfter: d.quiet_after, empty: d.brief.status === "stopped" ? "The run has stopped." : "No agent is working right now."}));
 }
 
 function setHTML(el, html) { if (el._html !== html) el.innerHTML = el._html = html; }

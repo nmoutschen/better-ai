@@ -166,8 +166,9 @@ const E = s => Date.parse(s) / 1000;
 const NOW = E('2026-11-23T10:58:00Z');
 const line = (type, at, more) => ({ type, at, text: type, ...more });
 // T4: built 09:52–10:20, verified 10:20–10:35 and failed, round 2 build from 10:36 with its last step at 10:40.
+// The page's quiet threshold is the server's (page.QUIET_AFTER, 30 minutes); the fixture sets 15 so T4 is quiet at NOW.
 const fixture = () => ({
-  now: NOW, start: '2026-11-23T09:30:00Z',
+  now: NOW, quiet_after: 15 * 60, start: '2026-11-23T09:30:00Z',
   requirements: { S1: 'one', S2: 'two', S3: 'three', S4: 'four', S5: 'The export writes one CSV row per late order.', S6: 'six', S7: 'seven', S8: 'eight', S9: 'nine' },
   tasks: [
     { id: 'T4', task: 'CSV export', mode: 'feature', requirements: ['S5'], check: 'pytest tests/test_export.py', status: 'building' },
@@ -183,9 +184,9 @@ const fixture = () => ({
     { name: 'verifier-t4', role: 'verifier', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:19:00Z', state: 'finished',
       lines: [line('start', '2026-11-23T10:20:00Z'), line('handed_back', '2026-11-23T10:35:00Z', { result: 'fails' })] },
     { name: 'builder-t4-2', role: 'builder', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:35:30Z', state: 'working',
-      lines: [line('start', '2026-11-23T10:36:00Z'), line('step', '2026-11-23T10:40:00Z', { text: 'running the full suite' })] },
+      last_word: '2026-11-23T10:40:00Z', lines: [line('start', '2026-11-23T10:36:00Z'), line('step', '2026-11-23T10:40:00Z', { text: 'running the full suite' })] },
     { name: 'builder-t7', role: 'builder', task: 'T7', branch: 'task/t7', at: '2026-11-23T10:25:00Z', state: 'working',
-      lines: [line('start', '2026-11-23T10:26:00Z'), line('step', '2026-11-23T10:56:00Z', { text: 'fixed the cutoff' })] },
+      last_word: '2026-11-23T10:56:00Z', lines: [line('start', '2026-11-23T10:26:00Z'), line('step', '2026-11-23T10:56:00Z', { text: 'fixed the cutoff' })] },
     { name: 'builder-t5', role: 'builder', task: 'T5', branch: 'task/t5', at: '2026-11-23T09:39:00Z', state: 'waiting',
       lines: [line('start', '2026-11-23T09:40:00Z'), line('asked', '2026-11-23T10:40:00Z', { text: 'which timezone?' })] },
     { name: 'builder-t2', role: 'builder', task: 'T2', branch: 'task/t2', at: '2026-11-23T09:34:00Z', state: 'finished',
@@ -224,6 +225,17 @@ test('a quiet build says so in the error colour; waiting on you is umber with a 
   assert.match(s('T5').icon, /\?/);
   assert.deepEqual([s('T6').cls, s('T6').word], ['', 'waiting on T5']);
   assert.equal(s('T2').cls, 'merged');
+});
+
+test('a build is quiet from the threshold the page is given, after the last word of its agent or the last file change', () => {
+  const d = fixture();
+  const word = over => TL.statusOf(d.tasks[0], { ...d, ...over }).word;
+  assert.equal(word({ quiet_after: 30 * 60 }), 'building');  // 16 min since the file change at 10:42: under the shared 30
+  assert.equal(word({ quiet_after: undefined }), 'building');  // no threshold given: nothing to say
+  const later = fixture(); later.agents[2].last_word = '2026-11-23T10:50:00Z';  // a record at 10:50, later than the file change
+  assert.equal(TL.statusOf(later.tasks[0], later).word, 'building');
+  later.agents[2].last_word = '2026-11-23T10:43:00Z';
+  assert.equal(TL.statusOf(later.tasks[0], later).word, 'building, quiet 15 min');
 });
 
 test('phases come from the cards, the log times and the fix records, in order, with their rounds', () => {

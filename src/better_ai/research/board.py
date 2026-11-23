@@ -127,8 +127,12 @@ def scan_cached(unit: Unit) -> dict:
 
 
 def load(unit: Unit) -> dict:
-    """The page's payload: the scan, each agent's log cut to its last lines and every search line."""
+    """The page's payload: the scan, each agent's log cut to its last lines and every search line, and each agent's last
+    word (page.last_word), from which the page says an agent has gone quiet."""
     data = scan_cached(unit)
+    written = [*data["questions"], *data["claims"], *data["sources"], *data["decisions"], *data["conversation"]]
+    written += [r for records in data["logs"].values() for r in records]
+    agents = {r.get("by") for r in written} | set(data["logs"])
     logs = {}
     for agent, records in data["logs"].items():
         logs[agent] = {
@@ -136,7 +140,8 @@ def load(unit: Unit) -> dict:
             # The page counts searches per question from these, so it gets every search line, not only the last 60.
             "searches": [r for r in records if r["type"] == "search"],
         }
-    return {**data, "logs": logs, "now": time.time()}
+    last_word = page.last_words(written, sorted(a for a in agents if isinstance(a, str) and a))
+    return {**data, "logs": logs, "last_word": last_word, "now": time.time()}
 
 
 def board_stopped(unit: Unit, data: dict | None = None) -> bool:

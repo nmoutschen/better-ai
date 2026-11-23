@@ -14,7 +14,7 @@ function wholeBoard(snapshot) {
   const seen = { conversation: null, bands: [] };
   const page = loadPage();
   const document = new Proxy(stand(), { get: (t, k) => (k === 'getElementById' ? id => (id === 'page-data' ? (snapshot ? { textContent: JSON.stringify(snapshot) } : null) : stand()) : t[k]) });
-  const env = { document, pageConversation: o => { seen.conversation = o; return stand(); }, pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents,
+  const env = { document, pageConversation: o => { seen.conversation = o; return stand(); }, pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents, pageOpenDecisions: page.pageOpenDecisions,
     pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime, pageEscape: page.pageEscape, pageAgents: page.pageAgents, pagePopup: page.pagePopup,
     pageShowErrors: (band, errors, note) => seen.bands.push([errors, note]), addEventListener: () => {}, innerWidth: 1000, innerHeight: 800,
     getComputedStyle: stand(), pageFetch: () => new Promise(() => {}), setInterval: () => {} };
@@ -63,6 +63,15 @@ test('a waiting decision counts as open until the user answers it', () => {
     conversation: [{ type: 'answer', id: 'a-1', decision: 'D2', text: 'go', default: false }] };
   assert.equal(p.waitingCount(d), 1);
   assert.equal(p.waitingCount({ ...d, conversation: [] }), 2);
+});
+
+test('a decision the coordinator asked back about after the answer counts as open again, as on every page', () => {
+  const p = page();
+  const d = { decisions: [decision('D1', 'waiting', { at: '2026-11-21T10:00:00Z' })],
+    conversation: [{ type: 'answer', id: 'a-1', decision: 'D1', text: 'go', default: false, at: '2026-11-21T10:05:00Z' },
+      { type: 'status', to: 'a-1', status: 'asked', at: '2026-11-21T10:06:00Z' }] };
+  assert.equal(p.waitingCount(d), 1);
+  assert.equal(p.waitingCount({ ...d, conversation: d.conversation.slice(0, 1) }), 0);
 });
 
 test('a decision in the old format is read as the new words, and a new one is left as it is', () => {
@@ -202,6 +211,14 @@ test('five searches in a row with nothing new are listed under the agent', () =>
   const searches = n => Array.from({ length: n }, () => ({ new_terms: [] }));
   assert.match(agentsList({ brief: {}, logs: { w2: { searches: searches(5) } }, qs: [working('Q-1', 'w2')], claims: [] }), /5 searches with nothing new/);
   assert.doesNotMatch(agentsList({ brief: {}, logs: { w2: { searches: searches(4) } }, qs: [working('Q-1', 'w2')], claims: [] }), /nothing new/);
+});
+
+test('an agent quiet for the threshold of the page says so, from the last word the board gives for it', () => {
+  const now = Date.parse('2026-11-23T12:00:00Z') / 1000;
+  const d = last => ({ now, quiet_after: 1800, last_word: { w2: last, v1: '2026-11-23T11:55:00Z' }, brief: {}, logs: {},
+    qs: [working('Q-1', 'w2')], claims: [{ status: 'checking', checker: 'v1' }] });
+  assert.match(agentsList(d('2026-11-23T11:20:00Z')), /No word from w2 for 40 min/);
+  assert.doesNotMatch(agentsList(d('2026-11-23T11:40:00Z')), /No word/);
 });
 
 test('the board has no list of its own: it feeds the shared one', () => {

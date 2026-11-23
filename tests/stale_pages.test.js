@@ -10,7 +10,7 @@ const staleError = () => Object.assign(new Error('page out of date: open the add
 // All of board.js, polling included, with PAGEFETCH as the page's fetch; the poll and the board's closed state come back.
 function wholeBoard(pageFetch) {
   const page = loadPage();
-  const env = { document: stand(), pageConversation: () => stand(), pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents,
+  const env = { document: stand(), pageConversation: () => stand(), pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents, pageOpenDecisions: page.pageOpenDecisions,
     pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime, pageEscape: page.pageEscape,
     pageAgents: page.pageAgents, pagePopup: page.pagePopup, pageShowErrors: () => {}, addEventListener: () => {}, innerWidth: 1000,
     innerHeight: 800, getComputedStyle: stand(), pageFetch, setInterval: () => {} };

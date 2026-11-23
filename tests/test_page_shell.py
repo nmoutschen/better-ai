@@ -230,7 +230,7 @@ class ShellTest(Fixture):
         self.assertIn("function pageConversation", text)
         element = text.split('id="page-data">')[1].split("</script>")[0]
         self.assertNotIn("<", element)
-        self.assertEqual(json.loads(element), data)
+        self.assertEqual(json.loads(element), {**data, "quiet_after": 1800})  # every page's data holds the threshold
         self.assertLess(text.index('id="page-data"'), text.index('id="page-config"'))
         with (
             mock.patch.object(page, "shell", return_value="<p>no links</p>"),
