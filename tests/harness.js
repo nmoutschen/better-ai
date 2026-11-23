@@ -52,10 +52,11 @@ function loadBoard(returns, over = {}) {
   const env = Object.assign({
     document: stand(), pageConversation: () => stand(), pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents,
     pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime,
+    pageEscape: page.pageEscape, pagePopup: page.pagePopup, pageShowErrors: page.pageShowErrors,
     addEventListener: () => {}, innerWidth: 1000, innerHeight: 800, getComputedStyle: stand(),
     fetch: () => new Promise(() => {}), setInterval: () => {},
   }, over);
-  return run(between(read('research', 'board.js'), '', 'const bands = '), returns, env);
+  return run(between(read('research', 'board.js'), '', '// ---------- Polling ----------'), returns, env);
 }
 
 // The dashboard's code, up to where it draws, in the same way.

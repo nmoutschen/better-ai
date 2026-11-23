@@ -7,11 +7,11 @@ each kind must be reported with its file, line and field while the rest of the b
 
 import contextlib
 import copy
+import functools
 import io
 import json
 import os
 import re
-import shutil
 import signal
 import subprocess
 import sys
@@ -22,6 +22,7 @@ import unittest
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
 from unittest import mock
 
@@ -35,6 +36,7 @@ import wrong_types  # noqa: E402
 from better_ai import cli, page, paths, research, resources, schema  # noqa: E402
 from better_ai.research import board  # noqa: E402
 
+DOCS = schema.docs_for("research")
 EXAMPLES = json.loads((Path(__file__).parent / "fixtures" / "research_board_examples.json").read_text())
 FILES = {
     "brief.json": "brief.json",
@@ -47,6 +49,17 @@ FILES = {
 SKILL = "research-better"
 
 
+def setUpModule():
+    """A served board checks its brief every 0.05 s, not every second, so a test that waits for a tick waits briefly."""
+    global _tick
+    _tick = mock.patch.object(page, "TICK", 0.05)
+    _tick.start()
+
+
+def tearDownModule():
+    _tick.stop()
+
+
 def unit_folder(root: str) -> Path:
     """A board inside `root`, at `.research/b`, where a unit lives; `unit(folder)` is the unit the board reads."""
     folder = Path(root) / ".research" / "b"
@@ -55,13 +68,15 @@ def unit_folder(root: str) -> Path:
     return folder
 
 
+@functools.cache
 def unit(folder: Path) -> paths.Unit:
+    """The unit of a board folder, resolved once (resolving asks git for the repository)."""
     return paths.resolve_unit(str(folder), research.SKILL)
 
 
 def check_in_process(folder: Path) -> int:
     """What `check` does, without a process: print each error, 1 if there is any."""
-    errors = schema.check_paths([folder], docs=board.docs(), now=datetime.now(timezone.utc))
+    errors = schema.check_paths([folder], docs=DOCS, now=datetime.now(timezone.utc))
     for error in errors:
         print(error)
     return 1 if errors else 0
@@ -81,9 +96,11 @@ def write_lines(folder: Path, name: str, records: list) -> None:
     (folder / name).write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
 
 
+FOLDER_OF = {"question": "questions", "claim": "claims", "source": "sources"}
+
+
 def write_entry(folder: Path, record: dict) -> None:
-    kind = {"question": "questions", "claim": "claims", "source": "sources"}[record["type"]]
-    write_json(folder, f"{kind}/{record['id']}.json", record)
+    write_json(folder, f"{FOLDER_OF[record['type']]}/{record['id']}.json", record)
 
 
 def question(id: str, **over) -> dict:
@@ -136,15 +153,44 @@ def serve_until_stopped(folder: Path, stderr: io.StringIO) -> threading.Thread:
     info = resources.BuildInfo(SKILL, "research", "source", resources.cutoff())
     run = cli.Run(research.SKILL, info, stdout=io.StringIO(), stderr=stderr)
     args = mock.Mock(unit=str(folder), port=0, open=False, no_browser=True, linger=0.2, once=False)
-    from better_ai import page
-
     runner = threading.Thread(target=page.serve, args=(args, run), daemon=True)
     runner.start()
     return runner
 
 
+def survives(folder: Path) -> dict:
+    """`load` and `check` do not raise on the board, and what `load` returns is JSON a browser reads."""
+    board.SCANS.clear()
+    data = board.load(unit(folder))
+    json.dumps(data, allow_nan=False)
+    with contextlib.redirect_stdout(io.StringIO()):
+        check_in_process(folder)
+    return data
+
+
 def check(folder: Path) -> subprocess.CompletedProcess:
-    return better.run(SKILL, "check", str(folder))
+    return better.call(SKILL, "check", str(folder))
+
+
+class Scripts(HTMLParser):
+    """The script elements of a page, as (attributes, text), the way a browser splits them."""
+
+    def __init__(self):
+        super().__init__()
+        self.found, self.open = [], None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "script":
+            self.open = (dict(attrs), [])
+
+    def handle_data(self, data):
+        if self.open:
+            self.open[1].append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "script" and self.open:
+            self.found.append((self.open[0], "".join(self.open[1])))
+            self.open = None
 
 
 class Examples(unittest.TestCase):
@@ -379,6 +425,9 @@ class Invalid(unittest.TestCase):
             write_entry(folder, claim("C-w2-9"))
             self.assertEqual(len(board.scan_cached(unit(folder))["claims"]), 3)
             self.assertEqual(len(calls), 2)
+            board.SCANS.clear()
+            with mock.patch.object(board, "scan", side_effect=KeyError("bug")), self.assertRaises(KeyError):
+                board.load(unit(folder))  # a bug in the board's own code is not a record error: it reaches the bug path
 
     def test_an_invalid_brief_is_kept_marked_and_its_status_still_stops_the_watch(self):
         with tempfile.TemporaryDirectory() as d:
@@ -433,14 +482,22 @@ class Invalid(unittest.TestCase):
             self.assertEqual([r["type"] for r in data["logs"]["w2"]["records"]], ["search", "gap"])
             self.assertEqual({e["line"] for e in data["errors"]}, {2})
 
-    def test_a_claim_whose_checker_is_its_author_is_reported(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = unit_folder(d)
-            support(folder)
-            write_entry(folder, claim("C-w2-9", status="checking", checker="w2"))
-            errors = board.load(unit(folder))["errors"]
-            self.assertEqual([(e["file"], e["field"]) for e in errors], [("claims/C-w2-9.json", "checker")])
-            self.assertIn("must differ from by", errors[0]["message"])
+    def test_a_wrong_pointer_or_checker_is_reported_with_its_file_and_field(self):
+        for label, record, expected, said in (
+            ("a claim checked by its author", claim("C-w2-9", status="checking", checker="w2"), "checker", "must differ from by"),
+            ("a claim of no question", claim("C-w2-9", question="Q-w9-1"), "question", "dangling"),
+            ("a merge without its target", {**seeded("Q-w3-2"), "status": "merged"}, "merged_into", 'required when status is "merged"'),
+        ):  # fmt: skip
+            with self.subTest(label), tempfile.TemporaryDirectory() as d:
+                folder = unit_folder(d)
+                support(folder)
+                write_entry(folder, record)
+                errors = board.load(unit(folder))["errors"]
+                self.assertEqual(
+                    [(e["file"], e["field"]) for e in errors],
+                    [(f"{FOLDER_OF[record['type']]}/{record['id']}.json", expected)],
+                )
+                self.assertIn(said, errors[0]["message"])
 
     def test_a_withdrawn_claim_still_resolves_pointers_to_it(self):
         with tempfile.TemporaryDirectory() as d:
@@ -451,24 +508,6 @@ class Invalid(unittest.TestCase):
             lines = [{"type": "checked", "at": "2026-11-21T10:00:00Z", "by": "v1", "claim": "C-w3-1"}]
             write_lines(folder, "logs/v1.jsonl", lines)
             self.assertEqual(board.load(unit(folder))["errors"], [])
-
-    def test_a_question_merged_without_merged_into_is_reported(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = unit_folder(d)
-            support(folder)
-            write_entry(folder, {**seeded("Q-w3-2"), "status": "merged"})
-            errors = board.load(unit(folder))["errors"]
-            self.assertEqual([(e["file"], e["field"]) for e in errors], [("questions/Q-w3-2.json", "merged_into")])
-            self.assertIn('required when status is "merged"', errors[0]["message"])
-
-    def test_a_dangling_claim_question_is_reported(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = unit_folder(d)
-            support(folder)
-            write_entry(folder, claim("C-w2-9", question="Q-w9-1"))
-            errors = board.load(unit(folder))["errors"]
-            self.assertEqual([(e["file"], e["field"]) for e in errors], [("claims/C-w2-9.json", "question")])
-            self.assertIn("dangling", errors[0]["message"])
 
     def test_a_file_named_for_another_id_and_an_old_markdown_file_are_reported(self):
         with tempfile.TemporaryDirectory() as d:
@@ -481,10 +520,7 @@ class Invalid(unittest.TestCase):
 
     def test_a_note_with_on_is_refused_by_the_board_events_schema(self):
         def check_record(record: dict) -> list:
-            return [
-                p.field
-                for p in schema.validate_instance(record, board.docs()["board-events.schema.json"], board.docs())
-            ]
+            return [p.field for p in schema.validate_instance(record, DOCS["board-events.schema.json"], DOCS)]
 
         note = {"type": "note", "at": "2026-11-21T10:00:00Z", "by": "user", "id": "m-1", "text": "hi", "to": None}
         on = {"kind": "question", "id": "Q-w2-4", "title": "t"}
@@ -519,50 +555,11 @@ class Reading(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = unit_folder(d)
             support(folder)
-            self.assertEqual(check(folder).returncode, 0)
+            self.assertEqual(better.run(SKILL, "check", str(folder)).returncode, 0)  # the one process run of `check`
             write_entry(folder, claim("C-w2-9", question="Q-w9-1"))
             result = check(folder)
             self.assertEqual(result.returncode, 1)
             self.assertIn("claims/C-w2-9.json:1: question: dangling", result.stdout)
-
-    def test_the_served_board_json_answers_with_errors_not_with_a_failure(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = unit_folder(d)
-            support(folder)
-            write_entry(folder, claim("C-w2-9", question="Q-w9-1"))
-            server = subprocess.Popen(
-                better.command("serve", str(folder), "--no-browser"),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                env={**os.environ, "BETTER_AI_SKILL": SKILL},
-            )
-            try:
-                for _ in range(80):
-                    if (folder / ".server").exists():
-                        break
-                    time.sleep(0.1)
-                url = (folder / ".server").read_text().strip()
-                with urllib.request.urlopen(url + "data", timeout=5) as r:
-                    self.assertEqual(r.status, 200)
-                    data = json.loads(r.read())
-                self.assertEqual([e["file"] for e in data["errors"]], ["claims/C-w2-9.json"])
-                self.assertEqual(len(data["claims"]), 3)
-            finally:
-                server.send_signal(signal.SIGTERM)
-                server.communicate(timeout=10)
-
-
-def render(payloads: list) -> subprocess.CompletedProcess:
-    """The research board's page drawn, in node, for each {label, data}; None where node is not installed."""
-    node = shutil.which("node")
-    if not node:
-        return None
-    with tempfile.TemporaryDirectory() as d:
-        path = Path(d) / "payloads.json"
-        path.write_text(json.dumps(payloads))
-        script = ROOT / "tests" / "render-board-payloads.js"
-        return subprocess.run([node, str(script), str(path)], capture_output=True, text=True, timeout=300)
 
 
 class Stripped(unittest.TestCase):
@@ -604,28 +601,25 @@ class Stripped(unittest.TestCase):
             write_entry(folder, claim("C-w2-9", question=["Q-w2-4"]))
             write_entry(folder, claim("C-w2-6", question={"k": 1}, source=5))
             data = board.load(unit(folder))
-        result = render([{"label": "list question", "data": data}])
-        if result:
-            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+        wrong_types.render("render-board-payloads.js", [{"label": "list question", "data": data}], self)
+
+
+COUNT = 2000 if sweep.full() else 500  # questions in the linear-work tests: the bounds are in COUNT, not in the speed
 
 
 class MergeCycles(unittest.TestCase):
     """A question merged into itself, or two merged into each other, stays on the page with its claims."""
 
-    def test_a_question_merged_into_itself_is_reported(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = unit_folder(d)
-            support(folder)
-            write_entry(folder, seeded("Q-w2-9", status="merged", merged_into="Q-w2-9"))
-            errors = [e for e in board.load(unit(folder))["errors"] if e["file"] == "questions/Q-w2-9.json"]
-        self.assertEqual([e["field"] for e in errors], ["merged_into"])
-
-    def test_a_merge_into_another_question_is_valid(self):
+    def test_a_question_merged_into_itself_is_reported_and_into_another_is_valid(self):
         with tempfile.TemporaryDirectory() as d:
             folder = unit_folder(d)
             support(folder)
             write_entry(folder, seeded("Q-w2-9", status="merged", merged_into="Q-w2-4"))
             self.assertEqual(board.load(unit(folder))["errors"], [])
+            write_entry(folder, seeded("Q-w2-9", status="merged", merged_into="Q-w2-9"))
+            board.SCANS.clear()
+            errors = [e for e in board.load(unit(folder))["errors"] if e["file"] == "questions/Q-w2-9.json"]
+        self.assertEqual([e["field"] for e in errors], ["merged_into"])
 
     def merged(self, folder: Path, links: dict) -> list:
         """Write a question for each id of `links`, merged into the id it maps to (None: not merged), and a claim
@@ -641,10 +635,10 @@ class MergeCycles(unittest.TestCase):
         """Patch the merge hook's one-file-a-step read, keeping it, and count the calls."""
         return mock.patch.object(board.checks, "_next_merge", wraps=board.checks._next_merge)
 
-    def test_a_loop_of_2000_questions_is_reported_for_each_member_in_linear_work(self):
+    def test_a_loop_of_questions_is_reported_for_each_member_in_linear_work(self):
         with tempfile.TemporaryDirectory() as d:
             folder = unit_folder(d)
-            count = 2000
+            count = COUNT
             links = {f"Q-w2-{100 + k}": f"Q-w2-{100 + (k + 1) % count}" for k in range(count)}
             with self.counting() as steps:
                 data = self.merged(folder, links)
@@ -652,10 +646,10 @@ class MergeCycles(unittest.TestCase):
         self.assertEqual(len(loops), count)
         self.assertLess(steps.call_count, 4 * count)  # one read a question, not one a question a step
 
-    def test_a_chain_of_2000_questions_reports_nothing_in_linear_work(self):
+    def test_a_chain_of_questions_reports_nothing_in_linear_work(self):
         with tempfile.TemporaryDirectory() as d:
             folder = unit_folder(d)
-            count = 2000
+            count = COUNT
             links = {f"Q-w2-{100 + k}": f"Q-w2-{100 + k + 1}" for k in range(count)}
             with self.counting() as steps:
                 data = self.merged(folder, links)
@@ -665,7 +659,7 @@ class MergeCycles(unittest.TestCase):
 
     def test_misnamed_copies_that_link_elsewhere_are_linear_too(self):
         """Each question has its own file, and a copy named otherwise that merges two further on."""
-        count = 2000 if sweep.full() else 500  # the bounds are in `count`; one of the slowest tests
+        count = COUNT // 2
         for loop in (False, True):
             with self.subTest(loop=loop), tempfile.TemporaryDirectory() as d:
                 folder = unit_folder(d)
@@ -707,9 +701,7 @@ class MergeCycles(unittest.TestCase):
             result = check(folder)
             self.assertEqual(result.returncode, 1)
             self.assertEqual(result.stdout.count("merge loop"), 2)
-        result = render([{"label": "mutual merge", "data": data}])
-        if result:
-            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+        wrong_types.render("render-board-payloads.js", [{"label": "mutual merge", "data": data}], self)
 
     def test_a_loop_of_three_reports_each_member_and_not_a_question_merged_into_it(self):
         with tempfile.TemporaryDirectory() as d:
@@ -736,17 +728,17 @@ class MergeCycles(unittest.TestCase):
             files = {e["file"] for e in board.load(unit(folder))["errors"] if "merge loop" in e["message"]}
         self.assertEqual(files, {"questions/Q-w2-1.json", "questions/Q-w2-2.json"})
 
-    def test_two_thousand_questions_merged_into_one_load_quickly(self):
+    def test_many_questions_merged_into_one_load_quickly(self):
         with tempfile.TemporaryDirectory() as d:
             folder = unit_folder(d)
             support(folder)
-            for n in range(100, 2100):
+            for n in range(100, 100 + COUNT):
                 write_entry(folder, seeded(f"Q-w2-{n}", status="merged", merged_into="Q-w2-4"))
             board.SCANS.clear()
             with self.counting() as steps:
                 errors = board.load(unit(folder))["errors"]
         self.assertEqual(errors, [])
-        self.assertLess(steps.call_count, 4 * 2000)
+        self.assertLess(steps.call_count, 4 * COUNT)
 
     def test_a_long_chain_that_ends_is_not_a_loop(self):
         with tempfile.TemporaryDirectory() as d:
@@ -785,48 +777,37 @@ class WrongTypes(unittest.TestCase):
 
     def test_no_wrong_type_breaks_check_load_or_the_page(self):
         """Each file on a board of its own (the records its pointers need, and that file), so a scan reads few files."""
-        payloads = []
-        total = 0
-
-        def put_file(folder, relative, records, as_json):
-            (write_json if as_json else write_lines)(folder, relative, records[0] if as_json else records)
-
         files = self.records()
-        pairs = [(relative, raw) for relative in files for raw in wrong_types.RAW_LINES]
-        picked = sweep.cases(pairs, key=lambda pair: pair[1])  # each raw line once, across the files
-        for relative, (records, as_json) in files.items():
-            with tempfile.TemporaryDirectory() as d:
-                folder = unit_folder(d)
-                support(folder)
-                put_file(folder, relative, records, as_json)
-                every = list(wrong_types.variants(records, self.WRONG))
-                total += len(every)
-                for label, changed in sweep.cases(every, key=lambda v: wrong_types.wrong_kind(v[0])):
-                    with self.subTest(f"{relative}: {label}"):
-                        put_file(folder, relative, changed, as_json)
-                        payloads.append({"label": f"{relative}: {label}", "data": self.survives(folder)})
-                put_file(folder, relative, records, as_json)
-                total += len(wrong_types.RAW_LINES)
-                for raw in [raw for name, raw in picked if name == relative]:
-                    with self.subTest(f"{relative}: raw {raw[:10]}"):
-                        # a single-JSON file holds the raw text alone; a JSONL file, the raw line before its records
-                        (folder / relative).write_text(
-                            raw + "\n" + ("" if as_json else "".join(json.dumps(r) + "\n" for r in records))
-                        )
-                        payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": self.survives(folder)})
-        self.assertGreater(total, 1000)
-        result = render(payloads)
-        if result:
-            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+        boards: dict = {}  # file name -> its board folder, made when the file is first written
 
-    def survives(self, folder: Path) -> dict:
-        """`load` and `check` do not raise, and what `load` returns is JSON a browser reads."""
-        board.SCANS.clear()
-        data = board.load(unit(folder))
-        json.dumps(data, allow_nan=False)
-        with contextlib.redirect_stdout(io.StringIO()):
-            check_in_process(folder)
-        return data
+        def put_file(name, records):
+            if name not in boards:
+                root = tempfile.TemporaryDirectory()
+                self.addCleanup(root.cleanup)
+                boards[name] = unit_folder(root.name)
+                support(boards[name])
+            as_json = files[name][1]
+            (write_json if as_json else write_lines)(boards[name], name, records[0] if as_json else records)
+            self.current = boards[name]
+
+        payloads, total = wrong_types.fuzz(
+            self,
+            {name: records for name, (records, _) in files.items()},
+            put_file,
+            lambda label: survives(self.current),
+            wrong=self.WRONG,
+        )
+        pairs = [(relative, raw) for relative in files for raw in wrong_types.RAW_LINES]
+        for relative, raw in sweep.cases(pairs, key=lambda pair: pair[1]):  # each raw line once, across the files
+            records, as_json = files[relative]
+            with self.subTest(f"{relative}: raw {raw[:10]}"):
+                # a single-JSON file holds the raw text alone; a JSONL file, the raw line before its records
+                body = raw + "\n" + ("" if as_json else "".join(json.dumps(r) + "\n" for r in records))
+                (boards[relative] / relative).write_text(body)
+                self.current = boards[relative]
+                payloads.append({"label": f"{relative}: raw {raw[:10]}", "data": survives(boards[relative])})
+        self.assertGreater(total + len(pairs), 1000)
+        wrong_types.render("render-board-payloads.js", payloads, self)
 
 
 class ConversationEvents(unittest.TestCase):
@@ -859,30 +840,18 @@ class ConversationEvents(unittest.TestCase):
         self.assertEqual([e["type"] for e in data["conversation"]], [e["type"] for e in self.events()])
 
     def test_no_wrong_type_in_any_event_breaks_load_check_or_the_thread(self):
-        payloads = []
         with tempfile.TemporaryDirectory() as d:
             folder = unit_folder(d)
             support(folder)
-            every = list(wrong_types.variants(self.events()))
-            keys = [lambda v: wrong_types.wrong_kind(v[0]), lambda v: wrong_types.field_of(v[0])]
-            for label, changed in sweep.cases(every, key=keys):
-                with self.subTest(label):
-                    write_lines(folder, "conversation.jsonl", changed)
-                    board.SCANS.clear()
-                    data = board.load(unit(folder))
-                    json.dumps(data, allow_nan=False)
-                    with contextlib.redirect_stdout(io.StringIO()):
-                        check_in_process(folder)
-                    payloads.append({"label": label, "data": data})
-        self.assertGreater(len(every), 500)
-        node = shutil.which("node")
-        if node:
-            with tempfile.TemporaryDirectory() as d:
-                path = Path(d) / "payloads.json"
-                path.write_text(json.dumps(payloads))
-                script = ROOT / "tests" / "render-board-thread.js"
-                run = subprocess.run([node, str(script), str(path)], capture_output=True, text=True, timeout=300)
-            self.assertEqual(run.returncode, 0, run.stderr[:3000])
+
+            payloads, total = wrong_types.fuzz(
+                self,
+                {"conversation.jsonl": self.events()},
+                lambda n, r: write_lines(folder, n, r),
+                lambda label: survives(folder),
+            )
+        self.assertGreater(total, 500)
+        wrong_types.render("render-board-thread.js", payloads, self)
 
 
 class RawFiles(unittest.TestCase):
@@ -926,16 +895,10 @@ class RawFiles(unittest.TestCase):
                 folder = unit_folder(d)
                 support(folder)
                 self.put_text(folder, relative, text)
-                board.SCANS.clear()
-                data = board.load(unit(folder))
-                json.dumps(data, allow_nan=False)
-                with contextlib.redirect_stdout(io.StringIO()):
-                    check_in_process(folder)
+                data = survives(folder)
                 self.assertTrue([e for e in data["errors"] if e["file"] == relative], "the bad file is listed")
                 payloads.append({"label": label, "data": json.loads(json.dumps(data, allow_nan=False))})
-        result = render(payloads)
-        if result:
-            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+        wrong_types.render("render-board-payloads.js", payloads, self)
 
 
 class BoardsOfSize(unittest.TestCase):
@@ -978,9 +941,7 @@ class BoardsOfSize(unittest.TestCase):
             data = board.load(unit(folder))
         self.assertEqual(data["errors"], [])
         self.assertIn("C-w2-9", [c["id"] for c in data["claims"]])
-        result = render([{"label": "merged into out of scope", "data": data}])
-        if result:
-            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+        wrong_types.render("render-board-payloads.js", [{"label": "merged into out of scope", "data": data}], self)
 
 
 def board_head() -> str:
@@ -994,7 +955,7 @@ def board_head() -> str:
 
 def made_board(root: Path) -> Path:
     """A board made by `create`, in a folder that is not a repository."""
-    done = better.run(SKILL, "create", ".research/b", "--by", "coordinator", stdin=board_head(), cwd=root)
+    done = better.call(SKILL, "create", ".research/b", "--by", "coordinator", stdin=board_head(), cwd=root)
     assert done.returncode == 0, done.stderr
     return root / ".research" / "b"
 
@@ -1057,31 +1018,42 @@ class Verbs(unittest.TestCase):
         self.assertTrue(all(x["_old"] for x in data["decisions"]))
         self.assertEqual(checked.returncode, 0)
         self.assertEqual(checked.stdout.count("(format)"), 3)
-        result = render([{"label": "old decisions", "data": data}])
-        if result:
-            self.assertEqual(result.returncode, 0, result.stderr[:3000])
+        wrong_types.render("render-board-payloads.js", [{"label": "old decisions", "data": data}], self)
 
     def test_render_writes_one_page_into_the_board_with_the_data_in_it(self):
+        quoted = "Quoting <!--<script> and </script> in a question"  # markup in a record must not end a script element
         with tempfile.TemporaryDirectory() as d:
             board_dir = made_board(Path(d))
+            write_entry(board_dir, seeded("Q-w2-9", question=quoted))
             done = better.run(SKILL, "render", ".research/b", cwd=d)
             self.assertEqual(done.returncode, 0, done.stderr)
-            page = (board_dir / "board.html").read_text()
+            text = (board_dir / "board.html").read_text()
             self.assertIn(".research/b/board.html", done.stdout)
-            self.assertIn("BOARD_SNAPSHOT", page)
-            self.assertIn(example("brief.json", "brief")["topic"], page)
-            self.assertNotIn('src="/', page)  # no file is linked: the page stands alone
-            self.assertNotIn('href="/', page)
-            self.assertEqual(better.run(SKILL, "check", ".research/b", cwd=d).returncode, 0)  # the page is not a record
+            self.assertNotIn("BOARD_SNAPSHOT", text)
+            self.assertNotIn('src="/', text)  # no file is linked: the page stands alone
+            self.assertNotIn('href="/', text)
+            scripts = Scripts()
+            scripts.feed(text)
+            carried = [body for attrs, body in scripts.found if attrs.get("id") == "page-data"]
+            data = json.loads(carried[0])
+            self.assertEqual([q["question"] for q in data["questions"]], [quoted])
+            self.assertEqual(data["brief"]["topic"], example("brief.json", "brief")["topic"])
+            code = [body for attrs, body in scripts.found if "src" not in attrs and "type" not in attrs]
+            self.assertEqual(len(code), 2)  # page.js and board.js, both whole
+            self.assertIn("function pageErrors", code[0])
+            self.assertIn("pagePopup({", code[1])
+            self.assertEqual(
+                better.call(SKILL, "check", ".research/b", cwd=d).returncode, 0
+            )  # the page is not a record
             empty = Path(d) / ".research" / "none"
             empty.mkdir()
-            refused = better.run(SKILL, "render", ".research/none", cwd=d)
+            refused = better.call(SKILL, "render", ".research/none", cwd=d)
             self.assertEqual(refused.returncode, 1)
             self.assertFalse((empty / "board.html").exists())
 
     def served(self, board_dir: Path):
         process = subprocess.Popen(
-            better.command("serve", str(board_dir), "--no-browser"),
+            better.command("serve", str(board_dir), "--no-browser", "--linger", "0.2"),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -1115,7 +1087,10 @@ class Verbs(unittest.TestCase):
     def test_the_served_page_has_the_boards_files_takes_its_events_and_refuses_the_rest(self):
         with tempfile.TemporaryDirectory() as d:
             board_dir = made_board(Path(d))
-            _, url = self.served(board_dir)
+            write_entry(
+                board_dir, claim("C-w2-9", question="Q-w9-1")
+            )  # a bad record: the page is served, with its error
+            process, url = self.served(board_dir)
             status, text = self.get(url)
             self.assertEqual(status, 200)
             for linked in ('href="/board.css"', 'src="/board.js"', 'src="/page.js"', 'href="/page.css"', 'id="map"'):
@@ -1126,8 +1101,12 @@ class Verbs(unittest.TestCase):
             self.assertEqual(self.get(url + "brief.json")[0], 404)
             status, text = self.get(url + "data")
             data = json.loads(text)
-            self.assertEqual((status, data["errors"], data["brief"]["status"]), (200, [], "running"))
+            self.assertEqual((status, data["brief"]["status"]), (200, "running"))
+            self.assertEqual(({e["file"] for e in data["errors"]}, len(data["claims"])), ({"claims/C-w2-9.json"}, 1))
             self.assertIn("listening", data)
+            closed = self.rpc(url, "closed", id="c-0", question="Q-w2-4", status="answered")  # the page may not send it
+            self.assertEqual(closed["error"]["code"], -32601)
+            self.assertFalse((board_dir / "conversation.jsonl").exists())
             on = {"kind": "question", "id": "Q-w2-4", "title": "t"}
             self.assertEqual(self.rpc(url, "comment", id="c-1", text="why?", on=on)["result"], "saved")
             self.assertEqual(self.rpc(url, "note", id="m-1", text="hello", to=None)["result"], "saved")
@@ -1141,36 +1120,44 @@ class Verbs(unittest.TestCase):
             )
             for line in (board_dir / "conversation.jsonl").read_text().splitlines():
                 self.assertRegex(json.loads(line)["at"], self.UTC)
+            process.send_signal(signal.SIGTERM)
+            process.communicate(timeout=20)
+            self.assertFalse((board_dir / ".server").exists())  # it stopped like Ctrl+C and took its address away
 
     def test_a_worker_closing_a_question_is_announced_once_and_the_board_stopped_ends_serve(self):
         with tempfile.TemporaryDirectory() as d:
             board_dir = made_board(Path(d))
-            process, url = self.served(board_dir)
-            time.sleep(2.5)  # the first tick takes the questions already closed as old news
-            question = {
-                **seeded("Q-w2-4"),
-                "status": "answered",
-                "owner": "w2",
-                "summary": "It fell.",
-                "gist": "It fell.",
-            }
-            question.pop("id"), question.pop("type"), question.pop("at"), question.pop("by")
-            done = better.run(SKILL, "add", str(board_dir), "question", "--by", "w2", stdin=json.dumps(question), cwd=d)
-            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-            log = board_dir / "conversation.jsonl"
-            for _ in range(60):
-                if log.exists() and "closed" in log.read_text():
-                    break
-                time.sleep(0.25)
-            closed = [json.loads(x) for x in log.read_text().splitlines() if '"closed"' in x]
-            self.assertEqual([(e["question"], e["by"], e["status"]) for e in closed], [("Q-w2-1", "w2", "answered")])
-            time.sleep(2.5)
-            self.assertEqual(log.read_text().count('"closed"'), 1)  # once, not on every tick
-            done = better.run(SKILL, "set", str(board_dir), "brief", stdin='{"status": "stopped"}', cwd=d)
-            self.assertEqual(done.returncode, 0, done.stderr)
-            output, _ = process.communicate(timeout=30)  # it ends by itself, after its linger
-            self.assertEqual(process.returncode, 0)
-            self.assertIn("exiting", output)
+            with mock.patch.object(board.page, "stop_like_ctrl_c"):
+                runner = serve_until_stopped(board_dir, io.StringIO())
+                time.sleep(0.3)  # the first tick takes the questions already closed as old news
+                question = {
+                    **seeded("Q-w2-4"),
+                    "status": "answered",
+                    "owner": "w2",
+                    "summary": "It fell.",
+                    "gist": "It fell.",
+                }
+                for key in ("id", "type", "at", "by"):
+                    question.pop(key)
+                done = better.call(
+                    SKILL, "add", str(board_dir), "question", "--by", "w2", stdin=json.dumps(question), cwd=d
+                )
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                log = board_dir / "conversation.jsonl"
+                for _ in range(100):
+                    if log.exists() and "closed" in log.read_text():
+                        break
+                    time.sleep(0.05)
+                closed = [json.loads(x) for x in log.read_text().splitlines() if '"closed"' in x]
+                self.assertEqual(
+                    [(e["question"], e["by"], e["status"]) for e in closed], [("Q-w2-1", "w2", "answered")]
+                )
+                time.sleep(0.3)
+                self.assertEqual(log.read_text().count('"closed"'), 1)  # once, not on every tick
+                done = better.call(SKILL, "set", str(board_dir), "brief", stdin='{"status": "stopped"}', cwd=d)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                runner.join(15)
+            self.assertFalse(runner.is_alive())  # it ended by itself, after its linger
 
 
 class Changes(unittest.TestCase):
@@ -1185,7 +1172,7 @@ class Changes(unittest.TestCase):
         for text in ("Dropped the wiki", "Searched the archive"):
             earlier = json.loads((board_dir / "brief.json").read_text())["changes"]
             patch = json.dumps({"changes": [{"text": text}, *earlier]})
-            done = better.run(SKILL, "set", ".research/b", "brief", stdin=patch, cwd=d)
+            done = better.call(SKILL, "set", ".research/b", "brief", stdin=patch, cwd=d)
             assert done.returncode == 0, done.stdout + done.stderr
         return board_dir
 
@@ -1193,7 +1180,7 @@ class Changes(unittest.TestCase):
         return json.loads((board_dir / "brief.json").read_text())["changes"]
 
     def set(self, d, changes):
-        return better.run(SKILL, "set", ".research/b", "brief", stdin=json.dumps({"changes": changes}), cwd=d)
+        return better.call(SKILL, "set", ".research/b", "brief", stdin=json.dumps({"changes": changes}), cwd=d)
 
     def test_a_new_board_is_created_with_no_changes_so_no_agent_types_their_time(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1227,41 +1214,27 @@ class Changes(unittest.TestCase):
             now = self.changes(board_dir)
             self.assertEqual(now[1:], earlier)
             self.assertRegex(now[0]["at"], self.UTC)
-            self.assertEqual(better.run(SKILL, "check", ".research/b", cwd=d).returncode, 0)
+            self.assertEqual(better.call(SKILL, "check", ".research/b", cwd=d).returncode, 0)
 
-    def test_a_time_typed_on_a_new_entry_is_refused(self):
-        for typed in ("2020-01-01T00:00:00Z", "2099-01-01T00:00:00Z"):
-            with self.subTest(typed=typed), tempfile.TemporaryDirectory() as d:
-                board_dir = self.board_with_history(d)
-                before = (board_dir / "brief.json").read_text()
-                done = self.set(d, [{"text": "x", "at": typed}, *self.changes(board_dir)])
-                self.assertEqual(done.returncode, 1)
-                self.assertIn("remove 'at' from the new entries", done.stderr + done.stdout)
-                self.assertEqual((board_dir / "brief.json").read_text(), before)
-
-    def test_sending_only_the_new_entry_is_refused_and_the_history_stays(self):
-        with tempfile.TemporaryDirectory() as d:
-            board_dir = self.board_with_history(d)
-            before = (board_dir / "brief.json").read_text()
-            done = self.set(d, [{"text": "Only this"}])
-            self.assertEqual(done.returncode, 1)
-            self.assertIn(self.WHY, done.stderr + done.stdout)
-            self.assertIn("Give the earlier entries back unchanged after the new ones", done.stderr + done.stdout)
-            self.assertEqual((board_dir / "brief.json").read_text(), before)
-
-    def test_a_rewritten_earlier_entry_is_refused(self):
+    def test_a_change_that_does_not_keep_the_history_is_refused_and_the_brief_stays(self):
         with tempfile.TemporaryDirectory() as d:
             board_dir = self.board_with_history(d)
             before = (board_dir / "brief.json").read_text()
             earlier = self.changes(board_dir)
-            for rewrite in ({**earlier[0], "text": "Rewritten"}, {**earlier[0], "at": "2020-01-01T00:00:00Z"}):
-                with self.subTest(rewrite=rewrite):
-                    done = self.set(d, [{"text": "new"}, rewrite, *earlier[1:]])
+            refused = [
+                ("a time typed on a new entry", [{"text": "x", "at": "2020-01-01T00:00:00Z"}, *earlier], "remove 'at' from the new entries"),
+                ("a time ahead", [{"text": "x", "at": "2099-01-01T00:00:00Z"}, *earlier], "remove 'at' from the new entries"),
+                ("only the new entry", [{"text": "Only this"}], "Give the earlier entries back unchanged after the new ones"),
+                ("a rewritten text", [{"text": "new"}, {**earlier[0], "text": "Rewritten"}, *earlier[1:]], self.WHY),
+                ("a rewritten time", [{"text": "new"}, {**earlier[0], "at": "2020-01-01T00:00:00Z"}, *earlier[1:]], self.WHY),
+                ("a reordered history", [{"text": "new"}, earlier[1], earlier[0]], self.WHY),
+            ]  # fmt: skip
+            for label, changes, said in refused:
+                with self.subTest(label):
+                    done = self.set(d, changes)
                     self.assertEqual(done.returncode, 1)
-                    self.assertIn(self.WHY, done.stderr + done.stdout)
+                    self.assertIn(said, done.stderr + done.stdout)
                     self.assertEqual((board_dir / "brief.json").read_text(), before)
-            reordered = self.set(d, [{"text": "new"}, earlier[1], earlier[0]])
-            self.assertEqual(reordered.returncode, 1)
 
     def test_a_patch_that_is_not_a_list_of_objects_is_left_to_the_schema(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1282,25 +1255,21 @@ class OldDecisions(unittest.TestCase):
         write_lines(board_dir, "decisions.jsonl", [self.OLD])
         return board_dir
 
-    def test_set_on_an_old_decision_names_the_missing_fields_as_the_fix(self):
+    def test_set_on_an_old_decision_names_the_missing_fields_and_works_once_it_gives_them(self):
         with tempfile.TemporaryDirectory() as d:
             board_dir = self.board(d)
             before = (board_dir / "decisions.jsonl").read_text()
-            done = better.run(SKILL, "set", ".research/b", "D1", stdin='{"status": "defaulted"}', cwd=d)
+            done = better.call(SKILL, "set", ".research/b", "D1", stdin='{"status": "defaulted"}', cwd=d)
             self.assertEqual(done.returncode, 1)
             said = done.stdout + done.stderr
             self.assertIn("written before this change", said)
             self.assertIn("raised_by", said)
             self.assertIn("about", said)
             self.assertEqual((board_dir / "decisions.jsonl").read_text(), before)
-
-    def test_set_on_an_old_decision_works_once_it_gives_the_new_fields(self):
-        with tempfile.TemporaryDirectory() as d:
-            self.board(d)
             patch = {"status": "defaulted", "raised_by": "coordinator", "about": {"type": "board"}}
-            done = better.run(SKILL, "set", ".research/b", "D1", stdin=json.dumps(patch), cwd=d)
+            done = better.call(SKILL, "set", ".research/b", "D1", stdin=json.dumps(patch), cwd=d)
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-            self.assertEqual(better.run(SKILL, "check", ".research/b", cwd=d).returncode, 0)
+            self.assertEqual(better.call(SKILL, "check", ".research/b", cwd=d).returncode, 0)
 
     def test_the_old_status_words_are_refused_on_a_decision(self):
         for word in ("default", "pending", "changed"):
@@ -1308,11 +1277,11 @@ class OldDecisions(unittest.TestCase):
                 made_board(Path(d))
                 decision = {"raised_by": "coordinator", "about": {"type": "board"}, "asked": "Use it?"}
                 decision |= {"status": "waiting", "default": "Skip", "deadline": "+30m"}
-                added = better.run(
+                added = better.call(
                     SKILL, "add", ".research/b", "decision", "--by", "coordinator", stdin=json.dumps(decision), cwd=d
                 )
                 self.assertEqual(added.returncode, 0, added.stdout)
-                done = better.run(SKILL, "set", ".research/b", "D1", stdin=json.dumps({"status": word}), cwd=d)
+                done = better.call(SKILL, "set", ".research/b", "D1", stdin=json.dumps({"status": word}), cwd=d)
                 self.assertEqual(done.returncode, 1)
                 self.assertIn("status", done.stdout + done.stderr)
 
@@ -1321,33 +1290,43 @@ class Malformed(unittest.TestCase):
     """`render` and `check` on boards that are not what they should be: a clean exit and no bug line, whatever is there."""
 
     def files(self) -> list:
+        """(file, its bytes) pairs; a lone surrogate is written as the bytes the OS would not decode, and some files are
+        not UTF-8 at all."""
         deep = "[" * 100000 + "]" * 100000
         question = json.dumps(seeded("Q-w9-1"))
-        return [
+        text = [
             ("questions/Q-w9-1.json", deep),
             ("questions/Q-w9-1.json", '{"a":' * 50000 + "1" + "}" * 50000),
             ("questions/Q-w9-1.json", question.replace("high", "\ud800")),  # a lone surrogate, escaped
             ("questions/Q-w9-1.json", '{"type": "question", "\ud800": 1}'),
-            ("claims/C-w9-1.json", "\xff"),
             ("brief.json", '{"title": "\ud800", "status": "\ud800"}'),
             ("decisions.jsonl", '{"id": "D1", "asked": "\ud800"}\n' + "[" * 100000 + "\n"),
             ("logs/w9.jsonl", '{"type": "search", "query": "\ud800"}\n'),
             ("conversation.jsonl", '{"type": "note", "text": "\ud800"}\n' + "[" * 100000 + "\n"),
-            ("sources/S-w9-1.json", "\x00\x00"),
         ]
+        raw = [
+            ("claims/C-w9-1.json", b"\xff\xfe"),  # not UTF-8
+            ("sources/S-w9-1.json", b"\x00\x00"),
+            ("brief.json", question.encode() + b"\xff"),  # JSON, then a byte that is not UTF-8
+            ("logs/w9.jsonl", b'{"type": "search"}\n\xc3\x28\n'),
+        ]
+        return [(name, body.encode("utf-8", "surrogatepass")) for name, body in text] + raw
 
     def test_render_and_check_never_raise_on_a_malformed_file(self):
-        for relative, text in self.files():
-            with self.subTest(file=relative, start=text[:12]), tempfile.TemporaryDirectory() as d:
+        for relative, body in self.files():
+            with self.subTest(file=relative, start=body[:12]), tempfile.TemporaryDirectory() as d:
                 board_dir = made_board(Path(d))
                 target = board_dir / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(text.encode("utf-8", "surrogatepass") if "\\x" not in text else b"\xff\xfe")
+                target.write_bytes(body)
                 for verb in ("check", "render"):
-                    done = better.run(SKILL, verb, ".research/b", cwd=d)
+                    done = better.call(SKILL, verb, ".research/b", cwd=d)
                     self.assertIn(done.returncode, (0, 1), f"{verb}: {done.stderr[:300]}")
                     self.assertNotIn("bug in better.pyz", done.stderr)
                     self.assertNotIn("Traceback", done.stderr)
+                    if verb == "check" and not body.isascii():
+                        self.assertEqual(done.returncode, 1, relative)  # the file that cannot be read is reported
+                        self.assertIn(relative, done.stdout)
 
     def test_a_lone_surrogate_in_a_record_is_reported_and_the_page_still_renders_it(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1355,10 +1334,10 @@ class Malformed(unittest.TestCase):
             text = json.dumps(seeded("Q-w9-1")).replace("high", "\\ud800")
             (board_dir / "questions").mkdir(exist_ok=True)
             (board_dir / "questions" / "Q-w9-1.json").write_text(text, encoding="utf-8")
-            checked = better.run(SKILL, "check", ".research/b", cwd=d)
+            checked = better.call(SKILL, "check", ".research/b", cwd=d)
             self.assertEqual(checked.returncode, 1)
             self.assertIn("Q-w9-1.json", checked.stdout)
-            self.assertEqual(better.run(SKILL, "render", ".research/b", cwd=d).returncode, 0)
+            self.assertEqual(better.call(SKILL, "render", ".research/b", cwd=d).returncode, 0)
             data = board.load(unit(board_dir))
             json.dumps(data)  # what the page is given is plain JSON
 
@@ -1399,7 +1378,7 @@ class Surrogates(unittest.TestCase):
     in a message that can be printed, and the record can still be stripped and serialised for the page."""
 
     def test_every_example_with_a_lone_surrogate_is_reported_and_stripped(self):
-        docs = board.docs()
+        docs = DOCS
         every = []
         for file, items in EXAMPLES.items():
             sample = file.replace("<id>", "X-1").replace("<agent>", "agent")
@@ -1419,20 +1398,6 @@ class Surrogates(unittest.TestCase):
                 for error in errors:
                     str(error).encode("utf-8")  # printable
                 json.dumps(schema.strip_invalid(changed, errors), ensure_ascii=False).encode("utf-8")
-
-
-class PageRefusals(unittest.TestCase):
-    def test_a_closed_event_sent_from_the_page_is_refused_and_nothing_is_written(self):
-        with tempfile.TemporaryDirectory() as d:
-            board_dir = made_board(Path(d))
-            verbs = Verbs()
-            process, url = verbs.served(board_dir)
-            body = {"id": "c-1", "question": "Q-w2-4", "status": "answered"}
-            refused = verbs.rpc(url, "closed", **body)
-            self.assertEqual(refused["error"]["code"], -32601)
-            self.assertFalse((board_dir / "conversation.jsonl").exists())
-            process.send_signal(signal.SIGTERM)
-            process.communicate(timeout=20)
 
 
 class Replies(unittest.TestCase):

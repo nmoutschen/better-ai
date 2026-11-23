@@ -55,13 +55,6 @@ svg.map { display:block; width:100%; height:100%; }
 .agents .dry { display:block; font-style:normal; font-size:var(--text-small); color:var(--error); }
 .agents b { font-size:var(--text-small); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--space-control); }
 
-/* The records the board could not show: a band above the map, in the error colour, so it is seen without taking the
-   page away from the user. */
-.errors { flex:none; margin:0 0 var(--space-item); padding:var(--space-control) var(--space-edge); max-height:25vh; overflow-y:auto; background:var(--cream); color:var(--ink); border-left:4px solid var(--error); font:var(--font-message); }
-.errors[hidden] { display:none; }
-.errors p { margin:0 0 var(--space-tight); font:var(--font-message-strong); color:var(--error); }
-.errors ul { margin:0; padding-left:var(--space-edge); }
-.errors .by { color:var(--muted); }
 .invalid { color:var(--error); font-weight:700; }
 .invalid[hidden] { display:none; }
 .map .bang { fill:var(--error); font-weight:700; font-size:calc(14px * var(--z, 1)); }
