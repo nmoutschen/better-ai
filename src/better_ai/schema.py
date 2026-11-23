@@ -452,7 +452,7 @@ class Validator:
         if "enum" in schema and not any(_equal(value, v) for v in schema["enum"]):
             problems.append(Problem(at, f"must be one of {', '.join(show(v) for v in schema['enum'])}"))
         if isinstance(value, str):
-            if "pattern" in schema and not re.search(schema["pattern"], value):
+            if "pattern" in schema and not _search(schema["pattern"], value):
                 problems.append(Problem(at, f"must match {schema['pattern']}"))
             if "minLength" in schema and len(value) < schema["minLength"]:
                 n = schema["minLength"]
@@ -792,6 +792,31 @@ def _audit(node: Any, where: str, boolean_ok: bool = False) -> None:
             _audit(node[keyword], f"{where}/{keyword}")
     if "additionalProperties" in node:
         _audit(node["additionalProperties"], f"{where}/additionalProperties", boolean_ok=True)
+
+
+@functools.cache
+def _strict(pattern: str) -> str:
+    """The pattern with each `$` outside a character class turned into `\\Z`. In Python `$` also matches just before a
+    final newline, so `^[a-z]+$` would accept "abc\\n"; JSON Schema's `$` is the end of the string."""
+    out, i, inside = [], 0, False
+    while i < len(pattern):
+        c = pattern[i]
+        if c == "\\" and i + 1 < len(pattern):
+            out.append(pattern[i : i + 2])
+            i += 2
+            continue
+        if c == "[" and not inside:
+            inside = True
+        elif c == "]" and inside:
+            inside = False
+        out.append("\\Z" if c == "$" and not inside else c)
+        i += 1
+    return "".join(out)
+
+
+def _search(pattern: str, value: str) -> bool:
+    """JSON Schema `pattern`: found anywhere in the value, with `$` meaning the very end."""
+    return re.search(_strict(pattern), value) is not None
 
 
 def load_schemas(*sources: Any) -> dict[str, dict]:
