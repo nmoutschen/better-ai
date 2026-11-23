@@ -7,16 +7,13 @@ spec.jsonl must say it is generated and match the records.
 """
 
 import copy
-import io
 import json
-import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -24,192 +21,37 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import sweep  # noqa: E402
 import wrong_types  # noqa: E402
+from architect_records import (  # noqa: E402
+    AT,
+    DIGEST,
+    DOCS,
+    JSON_FILES,
+    KINDS,
+    PACKAGE,
+    ROOT,
+    SCHEMAS,
+    SKILL,
+    base,
+    check,
+    check_record,
+    design,
+    example_folder,
+    examples,
+    folder_records,
+    load,
+    make_folder,
+    planted_cases,
+    planted_unit,
+    read,
+    read_folder,
+    run_check,
+    run_cli,
+    unit_of,
+    write,
+)
 
-from better_ai import cli, paths, resources, schema  # noqa: E402
-from better_ai.architect import SKILL as ARCHITECT  # noqa: E402
+from better_ai import schema  # noqa: E402
 from better_ai.architect import commands, diagram, model  # noqa: E402
-
-ROOT = Path(__file__).resolve().parents[1]
-SKILL = ROOT / "skills" / "architect-better"
-PACKAGE = ROOT / "src" / "better_ai" / "architect"
-SCHEMAS = PACKAGE / "schemas"
-EXAMPLES = json.loads((Path(__file__).parent / "fixtures" / "architect-better-examples.json").read_text())
-AT = "2026-11-21T10:00:00Z"
-DIGEST = "3a7f" * 16  # the spec page shows a digest as 3a7f…, cut short; the schema wants all 64 hex digits
-DOCS = schema.load_schemas(*resources.schema_sources("architect"))
-
-
-def unit_of(folder: Path) -> paths.Unit:
-    """The unit a change folder is: it sits at `.architect/<slug>` of a repository."""
-    return paths.resolve_unit(str(folder), ARCHITECT)
-
-
-def load(folder: Path) -> dict:
-    return model.load(unit_of(folder))
-
-
-def read_folder(folder: Path) -> dict:
-    return model.read_folder(unit_of(folder))
-
-
-def run_cli(*args: str, stdin: str | None = None):
-    """One command of architect-better's `better.pyz`, in this process: (exit code, stdout, stderr)."""
-    out, err = io.StringIO(), io.StringIO()
-    with (
-        mock.patch.dict(os.environ, {"BETTER_AI_SKILL": "architect-better"}),
-        redirect_stdout(out),
-        redirect_stderr(err),
-    ):
-        code = cli.main(list(args), stdin=io.StringIO(stdin) if stdin is not None else None)
-    return code, out.getvalue(), err.getvalue()
-
-
-def check_record(record, names):
-    problems = []
-    for name in names:
-        problems += [(p.field, p.message) for p in schema.validate_instance(record, DOCS[name], DOCS)]
-    return list(dict.fromkeys(problems))
-
-
-# The spec page's file kinds, and the schema each is checked against.
-KINDS = {
-    "architect.json": "architect.schema.json",
-    "design.json": "design.schema.json",
-    "requirements.jsonl": "requirements.schema.json",
-    "perspectives.jsonl": "perspectives.schema.json",
-    "findings.jsonl": "findings.schema.json",
-    "decisions.jsonl": "decisions.schema.json",
-    "reviews.jsonl": "reviews.schema.json",
-    "spec.jsonl": "spec.schema.json",
-}
-JSON_FILES = ("architect.json", "design.json")
-
-
-def examples(kind):
-    out = []
-    for e in EXAMPLES[kind]:
-        record = json.loads(e["line"])
-        if kind == "reviews.jsonl":
-            record["hashes"] = {key: DIGEST for key in record["hashes"]}
-        out.append((e["title"], record))
-    return out
-
-
-def write(folder: Path, name: str, records):
-    path = folder / name
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if name in JSON_FILES:
-        path.write_text(json.dumps(records[0], indent=1) + "\n", encoding="utf-8")
-    else:
-        path.write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
-    return path
-
-
-def read(folder: Path, name: str):
-    text = (folder / name).read_text(encoding="utf-8")
-    return json.loads(text) if name in JSON_FILES else [json.loads(line) for line in text.splitlines()]
-
-
-def base(type_, **more):
-    return {"type": type_, "at": AT, "by": "architect", **more}
-
-
-def design():
-    node = lambda ident, label, kind: {"id": ident, "label": label, "kind": kind}  # noqa: E731
-    return base(
-        "design",
-        containers={
-            "nodes": [node("user", "You", "person"), node("page", "Page", "page"), node("server", "Server", "service")],
-            "edges": [
-                {"id": "e1", "from": "user", "to": "page", "label": "reads"},
-                {"id": "e3", "from": "page", "to": "server", "label": "POST /rpc"},
-                {"id": "e4", "from": "server", "to": "page", "label": "answer"},
-            ],
-            "groups": [],
-        },
-        flows=[
-            {
-                "id": "ask",
-                "name": "A builder asks",
-                "participants": [{"id": "page", "box": "page"}, {"id": "server", "box": "server"}],
-                "steps": [
-                    {"id": "s6", "from": "page", "to": "server", "label": "POST"},
-                    {"id": "s7", "from": "server", "to": "page", "label": "answer", "kind": "response"},
-                ],
-            }
-        ],
-    )
-
-
-def folder_records():
-    """A consistent folder: every pointer resolves, built from the spec page's examples."""
-    request = "Add a dashboard that shows each agent's task, mode and state.\nShow each agent's task, mode and state."
-    requirements = [r for _, r in examples("requirements.jsonl")]
-    for ident, kind in (("F3", "functional"), ("Q1", "quality"), ("C1", "constraint")):
-        requirements.append(base("requirement", id=ident, kind=kind, text=f"{ident} text.", source={"type": "guessed"}))
-    review = examples("reviews.jsonl")[0][1]
-    review["hashes"] = {"box:user": DIGEST, "edge:e1": DIGEST}
-    review["labels"] = {"box:user": "You", "edge:e1": "You to Page: reads"}
-    return {
-        "architect.json": [
-            {**examples("architect.json")[0][1], "request": {"text": request, "from": {"type": "chat"}}}
-        ],
-        "design.json": [design()],
-        "requirements.jsonl": requirements,
-        "perspectives.jsonl": [r for _, r in examples("perspectives.jsonl")],
-        "findings.jsonl": [r for _, r in examples("findings.jsonl")],
-        "decisions.jsonl": [r for _, r in examples("decisions.jsonl")],
-        "reviews.jsonl": [review],
-        "spec.jsonl": [r for _, r in examples("spec.jsonl")],
-    }
-
-
-def make_folder(root: Path, **changes):
-    """A change folder in a repo (a .git next to it); `changes` replaces a file's records, or None leaves it out."""
-    (root / ".git").mkdir(exist_ok=True)
-    folder = root / ".architect" / "c"
-    files = folder_records()
-    files.update(changes)
-    for name, records in files.items():
-        if records is not None:
-            write(folder, name, records)
-    return folder
-
-
-def example_folder(root: Path) -> Path:
-    """The fixture change folder as `.architect/ex` of a repository: its file sources are files of that repository."""
-    root.mkdir(parents=True, exist_ok=True)
-    (root / ".git").mkdir(exist_ok=True)
-    folder = root / ".architect" / "ex"
-    shutil.copytree(ROOT / "tests" / "fixtures" / "architect-example", folder)
-    for name in ("PRINCIPLES.md", "src/better_ai/page/__init__.py"):
-        (root / name).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ROOT / name, root / name)
-    return folder
-
-
-def planted_cases():
-    """The eval cases' architect folders: (case name, repo, the folder in its repo)."""
-    found = sorted((ROOT / "evals" / "cases" / "architect-better").glob("*/repo/docs/designs/*/architect.json"))
-    return [(f.parents[4].name, f.parents[3], f.parent) for f in found]
-
-
-def planted_unit(root: Path, repo: Path, folder: Path) -> Path:
-    """A case's repository, checked out as a repository of its own, with its change folder also at `.architect/<slug>`."""
-    copy = root / "repo"
-    shutil.copytree(repo, copy)
-    (copy / ".git").mkdir()
-    unit = copy / ".architect" / folder.name
-    shutil.copytree(copy / folder.relative_to(repo), unit)
-    return unit
-
-
-def check(folder: Path):
-    return schema.check_paths([folder], docs=DOCS)
-
-
-def run_check(folder: Path):
-    return run_cli("check", str(folder))
 
 
 class Examples(unittest.TestCase):
@@ -220,6 +62,10 @@ class Examples(unittest.TestCase):
             for title, record in examples(kind):
                 with self.subTest(kind=kind, example=title):
                     self.assertEqual(check_record(record, [name]), [])
+        # code-better's change spec is the same format: the two skills carry one file, twice (the shared folder would
+        # apply it to every skill's units)
+        code = ROOT / "src" / "better_ai" / "code" / "schemas" / "spec.schema.json"
+        self.assertEqual((SCHEMAS / "spec.schema.json").read_bytes(), code.read_bytes())
 
     def test_a_folder_built_from_the_examples_checks_clean(self):
         with tempfile.TemporaryDirectory() as d:
@@ -594,55 +440,26 @@ class WrongTypes(unittest.TestCase):
     """For every field of every record the package reads, each wrong type, one at a time: `check` and `load` do not
     fail, the payload serialises, and the page's own code draws it."""
 
-    WRONG = [[1], {"k": 1}, 5, True, None, "x"]
-
-    def variants(self, records):
-        for index, record in enumerate(records):
-            for key, value in record.items():
-                options = [(key,), *([(key, inner) for inner in value] if isinstance(value, dict) else [])]
-                for path in options:
-                    original = value if len(path) == 1 else value[path[1]]
-                    for wrong in self.WRONG:
-                        if wrong == original and type(wrong) is type(original):
-                            continue
-                        changed = json.loads(json.dumps(records))
-                        target = changed[index][key] if len(path) == 2 else changed[index]
-                        target[path[-1]] = wrong
-                        yield f"{'.'.join(path)}[{index}]={wrong!r}", changed
-
     def test_no_wrong_type_breaks_check_load_or_the_page(self):
-        node = shutil.which("node")
-        payloads = []
-        total = 0
         with tempfile.TemporaryDirectory() as d:
             folder = make_folder(Path(d))
-            base_files = {name: read(folder, name) for name in KINDS}
-            base_files["architect.json"] = [base_files["architect.json"]]
-            base_files["design.json"] = [base_files["design.json"]]
-            for name, records in base_files.items():
-                every = list(self.variants(records))
-                total += len(every)
-                for label, changed in sweep.cases(
-                    every, key=[lambda v: wrong_types.wrong_kind(v[0]), lambda v: wrong_types.field_of(v[0])]
-                ):
-                    key = f"{name}: {label}"
-                    with self.subTest(key):
-                        write(folder, name, changed)
-                        data = load(folder)
-                        json.dumps(data)
-                        self.assertIn(run_cli("check", str(folder))[0], (0, 1))
-                        payloads.append({"label": key, "data": data})
-                write(folder, name, records)
-            self.assertGreater(total, 500)
-            if node:
-                path = Path(d) / "payloads.json"
-                path.write_text(json.dumps(payloads))
-                run = subprocess.run(
-                    [node, str(ROOT / "tests" / "render-architect-payloads.js"), str(path)],
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertEqual(run.returncode, 0, run.stderr[:3000])
+            files = {name: read(folder, name) for name in KINDS}
+            for name in JSON_FILES:
+                files[name] = [files[name]]
+
+            unit = unit_of(folder)
+
+            def survives(label):
+                data = model.load(unit)
+                json.dumps(data, allow_nan=False)
+                check(folder)  # raises on a bug; the verb's own exit codes are tested above
+                return data
+
+            payloads, total = wrong_types.fuzz(
+                self, files, lambda name, records: write(folder, name, records), survives
+            )
+        self.assertGreater(total, 500)
+        wrong_types.render("render-architect-payloads.js", payloads, self)
 
     def test_an_invalid_record_shows_without_the_fields_that_failed(self):
         with tempfile.TemporaryDirectory() as d:
@@ -684,6 +501,7 @@ class RawLines(unittest.TestCase):
                 "conversation.jsonl",
                 [{"type": "note", "at": AT, "by": "user", "id": "n1", "text": "hi", "to": None}],
             )
+            unit = unit_of(folder)
             for name in (*KINDS, "conversation.jsonl"):
                 original = (folder / name).read_text()
                 for line in sweep.cases(self.LINES, key=lambda line: line[:2]):
@@ -692,9 +510,8 @@ class RawLines(unittest.TestCase):
                             (folder / name).write_text(line + "\n")
                         else:
                             (folder / name).write_text(original + line + "\n")
-                        data = load(folder)
-                        json.dumps(data, allow_nan=False)
-                        self.assertIn(run_cli("check", str(folder))[0], (0, 1))
+                        json.dumps(model.load(unit), allow_nan=False)
+                        check(folder)
                 (folder / name).write_text(original)
 
     def test_a_value_the_schema_accepts_but_the_page_cannot_read_is_an_error_on_its_line(self):
@@ -729,7 +546,6 @@ class EveryAcceptedExampleRenders(unittest.TestCase):
         write(folder, "findings.jsonl", findings)
 
     def test_the_example_the_planted_folders_and_odd_ids_render(self):
-        node = shutil.which("node")
         payloads = []
         with tempfile.TemporaryDirectory() as d:
             data = load(example_folder(Path(d) / "example"))
@@ -749,15 +565,7 @@ class EveryAcceptedExampleRenders(unittest.TestCase):
             self.assertEqual(data["errors"], [])
             self.assertIn("&lt;b&gt;", data["containers"]["after"])
             payloads.append({"label": "odd ids", "data": data})
-            if node:
-                path = Path(d) / "payloads.json"
-                path.write_text(json.dumps(payloads))
-                run = subprocess.run(
-                    [node, str(ROOT / "tests" / "render-architect-payloads.js"), str(path)],
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertEqual(run.returncode, 0, run.stderr[:3000])
+        wrong_types.render("render-architect-payloads.js", payloads, self)
 
 
 class MovedChecks(unittest.TestCase):
@@ -1059,6 +867,8 @@ class LoadNeverRaises(unittest.TestCase):
             json.dumps(data, allow_nan=False)
             self.assertEqual([e["file"] for e in data["errors"]], ["findings.jsonl"])
             self.assertEqual(data["findings"], [])
+            with mock.patch.object(model, "model", side_effect=KeyError("bug")), self.assertRaises(KeyError):
+                load(folder)  # a failure in the code is the page's bug path, not an error entry
 
 
 class SpecsNeedRecords(unittest.TestCase):

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "spec.schema.json",
   "title": "one line of spec.jsonl: a requirement, a gap the design leaves open, or something with no requirement",
-  "$comment": "The spec format of code-better and architect-better; the two skills carry identical copies of this file. A decision or requirement source points to decisions.jsonl or requirements.jsonl next to the file.",
+  "$comment": "The spec of one code-better change, or of one architect-better design: the two skills carry byte-identical copies of this file, and tests/test_architect_formats.py checks it (a schema in the shared folder would apply to every skill's units). When code.json names an architect folder, spec.jsonl is the copy `create` made of that folder's, and a requirement or decision source, and a gap's decision, point to requirements.jsonl and decisions.jsonl in that folder; with no code.json, as in an architect-better folder, or no design folder, they point to the unit's own.",
   "x-files": [
     "spec.jsonl"
   ],
@@ -209,7 +209,12 @@
                     "type": "string",
                     "pattern": "^D\\d+$",
                     "x-points-to": {
-                      "file": "decisions.jsonl",
+                      "file": {
+                        "from": "code.json",
+                        "field": "design.folder",
+                        "name": "decisions.jsonl",
+                        "else": "decisions.jsonl"
+                      },
                       "type": "decision"
                     }
                   }
@@ -242,7 +247,12 @@
                     "type": "string",
                     "minLength": 1,
                     "x-points-to": {
-                      "file": "requirements.jsonl",
+                      "file": {
+                        "from": "code.json",
+                        "field": "design.folder",
+                        "name": "requirements.jsonl",
+                        "else": "requirements.jsonl"
+                      },
                       "type": "requirement"
                     }
                   }
@@ -301,7 +311,12 @@
           "type": "string",
           "pattern": "^D\\d+$",
           "x-points-to": {
-            "file": "decisions.jsonl",
+            "file": {
+              "from": "code.json",
+              "field": "design.folder",
+              "name": "decisions.jsonl",
+              "else": "decisions.jsonl"
+            },
             "type": "decision"
           }
         },

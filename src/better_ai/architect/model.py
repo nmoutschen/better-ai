@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .. import paths, resources, schema
@@ -37,108 +39,24 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def lines_of(text: str, jsonl: bool) -> list:
-    """The lines of a JSONL file, split on newlines only, without the empty piece after the last; a JSON file is one."""
-    if not jsonl:
-        return [text]
-    pieces = [piece.removesuffix("\r") for piece in text.split("\n")]
-    return pieces[:-1] if pieces and pieces[-1] == "" else pieces
-
-
-MAX_DEPTH = 50  # no record of these files nests deeper than a design.json step
-
-
-def parse(piece: str):
-    """One JSON value as the page can show it: no NaN or Infinity (the browser cannot read them), and nothing nested
-    so deep that Python gives up."""
-
-    def refuse(word):
-        raise ValueError(f"{word} is not a JSON value")
-
-    def finite(word):
-        value = float(word)
-        if value in (float("inf"), float("-inf")):
-            raise ValueError(f"{word} is too large")
-        return value
-
-    try:
-        value = json.loads(piece, parse_constant=refuse, parse_float=finite)
-    except RecursionError:
-        raise ValueError("nested too deeply") from None
-    pending = [(value, 1)]
-    while pending:  # no recursion: a line may be as deep as it likes
-        item, depth = pending.pop()
-        if isinstance(item, (dict, list)):
-            if depth > MAX_DEPTH:
-                raise ValueError(f"nested more than {MAX_DEPTH} levels deep")
-            pending.extend((inner, depth + 1) for inner in (item.values() if isinstance(item, dict) else item))
-    return value
-
-
 class Reader:
-    """Reads the files of one change folder record by record through the schema module: the records come back, and each
-    invalid one goes to `errors` with its file, line, field, reason and, if it parsed, its `by`."""
+    """Reads the files of one change folder record by record through `schema.read_records`: the records come back, and
+    each invalid one goes to `errors` with its file, line, field, reason and, if it parsed, its `by`."""
 
     def __init__(self, unit: Unit):
         self.unit, self.errors, self.cache = unit, [], {}
-        self.docs = schema.load_schemas(*resources.schema_sources("architect"))
+        self.docs = schema.docs_for("architect")
+        self.now, self.cutoff = datetime.now(timezone.utc), resources.cutoff()
 
-    def error(self, name, line, field, message, by=None):
-        entry = {"file": name, "line": line, "field": field, "message": message}
-        self.errors.append({**entry, "by": schema.plain(by)} if isinstance(by, str) and by else entry)
+    def error(self, name, line, field, message):
+        self.errors.append({"file": name, "line": line, "field": field, "message": message})
 
     def records(self, name: str, keep_invalid: bool = False) -> list:
-        """What `_records` reads; whatever else goes wrong with one file, for any reason, is that file's error."""
-        try:
-            return self._records(name, keep_invalid)
-        except Exception as exc:
-            self.error(name, 1, "(file)", f"could not be shown: {paths.reason(exc)}")
-            return []
-
-    def _records(self, name: str, keep_invalid: bool = False) -> list:
-        """The records of one file, in line order; none if it does not exist. The file is read once and that text is
-        validated and shown, so a write in between is in neither. A record with errors is left out, unless
-        `keep_invalid`: then it stays without the fields that failed, and its messages in `_errors`, so the page can
-        show what it can of it. A line that is not JSON is never a record."""
-        path = self.unit.target(name)  # refuses a symlink on the way
-        if not path.is_file():
-            return []
-        jsonl = path.suffix == ".jsonl"
-        try:
-            text = schema.read_checked(path, jsonl)
-        except (OSError, UnicodeDecodeError) as exc:
-            self.error(name, 1, "(file)", f"cannot be read: {exc}")
-            return []
-        try:
-            found = schema.check_text(path, text, self.docs, self.cache)
-        except (RecursionError, ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
-            self.error(name, 1, "(file)", f"cannot be checked: {exc}")
-            return []
-        flagged = {problem.line for problem in found}
-        parsed = {}
-        for number, piece in enumerate(lines_of(text, jsonl), 1):
-            try:
-                value = parse(piece)
-            except ValueError as exc:
-                if number not in flagged:  # valid for the schema, but not for the page
-                    self.error(name, number, "(record)", f"not valid JSON: {exc}")
-                continue
-            parsed[number] = value if isinstance(value, dict) else None
-        by_line: dict = {}
-        for problem in found:
-            record = parsed.get(problem.line)
-            self.error(name, problem.line, problem.field, problem.message, record.get("by") if record else None)
-            by_line.setdefault(problem.line, []).append(problem)
-        kept = []
-        for number, record in parsed.items():
-            if record is None or (number in by_line and not keep_invalid):
-                continue
-            if number in by_line:
-                record = schema.strip_invalid(record, by_line[number])
-                if not isinstance(record.get("id"), str) or not record["id"]:
-                    record["id"] = f"(line {number})"
-            kept.append(record)
-        return kept
+        """The records of one file, in line order; with `keep_invalid`, a record with errors stays without the fields
+        that failed, so the page can show what it can of it."""
+        read = schema.read_records(self.unit, name, self.docs, self.cache, self.now, self.cutoff, keep_invalid)
+        self.errors += read.errors
+        return read.records
 
 
 def blank(name: str, errors: list) -> dict:
@@ -162,7 +80,7 @@ def blank(name: str, errors: list) -> dict:
 def read_design(reader: Reader):
     """The design as far as it is usable, with its parts and their fingerprints; no design if it cannot be drawn."""
     records = reader.records("design.json", keep_invalid=True)
-    if not (reader.unit.target("design.json")).is_file():
+    if not os.path.lexists(reader.unit.path / "design.json"):
         reader.error("design.json", 1, "(file)", "missing file")
     design = records[0] if records else None
     if design is None:
@@ -185,7 +103,7 @@ def read_folder(unit: Unit) -> dict:
     except schema.SchemaError as exc:
         return blank(unit.slug, [{"file": "schemas", "line": 1, "field": "(schemas)", "message": str(exc)}])
     meta = reader.records("architect.json", keep_invalid=True)
-    if not unit.target("architect.json").is_file():
+    if not os.path.lexists(unit.path / "architect.json"):
         reader.error("architect.json", 1, "(file)", "missing file")
     architect = meta[0] if meta else {}
     design, parts, hashes = read_design(reader)
@@ -232,16 +150,20 @@ def text_label(key: str) -> str:
     return f"Requirement {name}" if kind == "requirement" else f"Design section {name}"
 
 
-def document_path(unit: Unit, architect: dict) -> Path | None:
-    """The design document architect.json names, as the source-file-exists check accepts it; None if it names none or
-    one that check refuses (the check reports why)."""
+def document_text(unit: Unit, architect: dict, reader: Reader) -> str | None:
+    """The text of the design document architect.json names; None if it names none, or one the source-file-exists
+    check refuses (that check reports why)."""
     document = architect.get("document")
     name = document.get("file") if isinstance(document, dict) else None
     if not isinstance(name, str) or not name:
         return None
-    root = next((folder for folder in (unit.path, *unit.path.parents) if (folder / ".git").exists()), unit.path)
-    target, problem = checks.repo_file(root, name)
-    return None if problem else target
+    try:
+        return checks.read_repo_file(unit.root, name).decode("utf-8")
+    except (paths.Refused, FileNotFoundError, IsADirectoryError):
+        return None
+    except (OSError, UnicodeDecodeError) as exc:
+        reader.error("architect.json", 1, "document.file", f"cannot be read: {paths.reason(exc)}")
+        return None
 
 
 def text_hashes(unit: Unit, architect: dict, requirements: list, reader: Reader) -> dict[str, str]:
@@ -252,14 +174,9 @@ def text_hashes(unit: Unit, architect: dict, requirements: list, reader: Reader)
         for r in requirements
         if isinstance(r.get("id"), str)
     }
-    path = document_path(unit, architect)
-    if path is not None:
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            reader.error("architect.json", 1, "document.file", f"cannot be read: {paths.reason(exc)}")
-        else:
-            texts.update((f"section:{heading}", fingerprint(body)) for heading, body in document_sections(text).items())
+    text = document_text(unit, architect, reader)
+    if text is not None:
+        texts.update((f"section:{heading}", fingerprint(body)) for heading, body in document_sections(text).items())
     return texts
 
 
@@ -474,35 +391,5 @@ def model(data):
 
 
 def load(unit: Unit) -> dict:
-    """The page's payload for a unit. It never raises for a bad file: what is wrong is in `errors`."""
-    try:
-        return model(read_folder(unit))
-    except Exception as exc:  # for any reason: the page shows its errors band, not a failure
-        message = f"could not be shown: {paths.reason(exc)}"
-        error = {"file": "(unit)", "line": 1, "field": "(unit)", "message": message}
-        return empty_model(unit.slug, error)
-
-
-def empty_model(name: str, error: dict) -> dict:
-    """What `model` makes of a folder with nothing readable, written out so that no failure can reach it."""
-    return {
-        "errors": [error],
-        "title": name,
-        "summary": "",
-        "scope": "",
-        "accepted": [],
-        "requirements": [],
-        "perspectives": [],
-        "findings": [],
-        "reviews": [],
-        "decisions": [],
-        "spec": [],
-        "parts": {},
-        "since": [],
-        "removed": [],
-        "change_labels": {},
-        "removed_labels": {},
-        "rerun": [],
-        "containers": {state: "" for state in ("before", "after")},
-        "flows": [],
-    }
+    """The page's payload for a unit. A bad file is in `errors`; a failure in this code is a bug, not an error."""
+    return model(read_folder(unit))
