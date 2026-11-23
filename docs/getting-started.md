@@ -22,6 +22,7 @@ See [`/interview-me`](interview-me.md).
 
 | You want to | Use |
 |---|---|
+| Shape a product idea into a brief for design | [`/discover-better`](discover-better.md) |
 | Build or change code | [`/code-better`](code-better.md) |
 | Design or build a page or screen | [`/design-better`](design-better.md) |
 | Research a topic from sources | [`/research-better`](research-better.md) |

@@ -64,7 +64,7 @@ class RecordWording(unittest.TestCase):
 
     def test_no_format_holds_a_fill_in_block_or_a_document_heading(self):
         formats = sorted(SKILLS.glob("*/formats/*.md"))
-        self.assertEqual(len(formats), 12)
+        self.assertEqual(len(formats), 13)  # discover-better adds formats/records.md
         for path in formats:
             text = path.read_text()
             with self.subTest(path.relative_to(ROOT)):
