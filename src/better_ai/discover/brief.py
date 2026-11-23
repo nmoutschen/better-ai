@@ -38,6 +38,7 @@ BRIEF_FOLDER = "brief"
 STATE = ".redact"  # the state file of a redact that has not finished
 SERVER = ".server"  # where the page says it is served
 REMOVED = "[removed]"
+WORDS_EVENTS = ("add_evidence", "add_result")  # the page events whose text evidence words may name
 VERSION = re.compile(r"^v\d+$")
 EVIDENCE_ID = re.compile(r"^E-[\w.-]+-\d+$")
 POINTS = ("rendered", "linked", "recorded")  # where a `brief` run may stop; a test stops it at each
@@ -155,11 +156,7 @@ def _sort_key(ident: str) -> tuple:
 
 def _event_text(data: Data, ident: str) -> str:
     for event in data.conversation:
-        if (
-            event.get("id") == ident
-            and event.get("type") in ("add_evidence", "add_result")
-            and isinstance(event.get("text"), str)
-        ):
+        if event.get("id") == ident and event.get("type") in WORDS_EVENTS and isinstance(event.get("text"), str):
             return event["text"]
     return "words not found"
 
@@ -229,6 +226,7 @@ def _item_lines(item: dict, view: derive.ItemView) -> list[str]:
 
 
 def _said(result: dict, cited: list) -> str:
+    cited = list(dict.fromkeys(cited))  # one marker pair per evidence, even if cited twice
     """The text of a result in the tests section. A result that cites one evidence has its text in that evidence's block;
     one that cites several has it here, inside the markers of each, so redacting any one of them removes it; one that
     cites none has it plain."""
@@ -642,7 +640,7 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
     if kind == "event":
 
         def emptied(found: dict) -> dict | None:
-            if found.get("id") != ref or found.get("type") not in ("add_evidence", "add_result"):
+            if found.get("id") != ref or found.get("type") not in WORDS_EVENTS:
                 return None
             words = {"text": REMOVED, **({"source": REMOVED} if found["type"] == "add_evidence" else {})}
             return {**found, **words}

@@ -25,6 +25,7 @@ from .. import cli, paths, schema
 from ..page import FINISHED, all_items
 from ..paths import Unit
 from . import SKILL, derive
+from .brief import REMOVED
 from .brief import STATE as REDACT_STATE
 from .rules_moves import BRIEF_MOVES
 
@@ -196,7 +197,15 @@ def _evidence_texts(d: Discovery, evidence: dict) -> list[str]:
             texts.append(event["text"])
     if isinstance(evidence.get("summary"), str):
         texts.append(evidence["summary"])
-    return [t for t in (_norm(t) for t in texts) if t]
+    return [t for t in (_norm(t) for t in texts) if t and t != _norm(REMOVED)]  # a redact's mark is not a copy
+
+
+def _without_cited_text(test: dict, ident: Any) -> dict:
+    """A test whose result cites the evidence keeps its text by design (D16): it is not a copy."""
+    result = test.get("result")
+    if isinstance(result, dict) and ident in (result.get("evidence") or []):
+        return {**test, "result": {k: v for k, v in result.items() if k != "text"}}
+    return test
 
 
 def _holders(d: Discovery, evidence: dict) -> list[tuple[str, str, dict]]:
@@ -211,7 +220,7 @@ def _holders(d: Discovery, evidence: dict) -> list[tuple[str, str, dict]]:
         ("moves.jsonl", d.moves),
         ("briefs.jsonl", d.briefs),
         ("decisions.jsonl", d.decisions),
-        ("tests.jsonl", d.tests),
+        ("tests.jsonl", [_without_cited_text(t, evidence.get("id")) for t in d.tests]),
         ("evidence", [e for e in d.evidence if e is not evidence]),
         ("sources", [s for s in d.sources if s.get("id") != evidence.get("source")]),
     ):

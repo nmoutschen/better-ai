@@ -511,3 +511,73 @@ class CheckPrintsWarnings(Discovery):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoFalseCopyWarning(unittest.TestCase):
+    """A result text that cites its evidence (D16) and the [removed] marks a redact leaves are not copies."""
+
+    def assertNoCopyWarning(self, done):
+        self.assertNotIn("also occur in", done.stdout + done.stderr)
+
+    def test_a_page_result_and_its_redact_raise_no_copy_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unit = P.populated(root)
+            label = str(unit.relative_to(root))
+            with (unit / "conversation.jsonl").open("a") as log:
+                log.write(json.dumps(R.event("add_result", id="r1", text="A team found it fast.")) + "\n")
+            R.run(root, "set", label, "X1", "--by", "coord", stdin=json.dumps({"status": "running"}))
+            src = {
+                "origin": {"type": "you", "given": {"type": "page", "event": "r1"}},
+                "title": "You",
+                "said_by_role": "a teammate",
+            }
+            self.assertEqual(R.run(root, "add", label, "source", "--by", "coord", stdin=json.dumps(src)).returncode, 0)
+            sid = next(
+                p.stem
+                for p in (unit / "sources").glob("*.json")
+                if json.loads(p.read_text())["origin"].get("given", {}).get("event") == "r1"
+            )
+            ev = {
+                "source": sid,
+                "words": {"type": "event", "event": "r1"},
+                "summary": "a team found it fast",
+                "kind": "did",
+                "about": "your users",
+                "bears_on": [{"item": "P1", "direction": "for"}],
+                "status": "counts",
+            }
+            self.assertEqual(R.run(root, "add", label, "evidence", "--by", "coord", stdin=json.dumps(ev)).returncode, 0)
+            eid = next(
+                p.stem for p in (unit / "evidence").glob("*.json") if json.loads(p.read_text()).get("source") == sid
+            )
+            result = {"text": "A team found it fast.", "outcome": "holds", "evidence": [eid]}
+            self.assertEqual(
+                R.run(
+                    root, "set", label, "X1", "--by", "coord", stdin=json.dumps({"status": "done", "result": result})
+                ).returncode,
+                0,
+            )
+            self.assertNoCopyWarning(R.run(root, "check", label))
+            with (unit / "conversation.jsonl").open("a") as log:
+                log.write(json.dumps(R.event("redact", id="d9", evidence=eid)) + "\n")
+            self.assertEqual(R.run(root, "redact", label, eid, "--request", "d9").returncode, 0)
+            self.assertNoCopyWarning(R.run(root, "check", label))
+
+    def test_two_redacts_raise_no_copy_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unit = P.populated(root)
+            label = str(unit.relative_to(root))
+            for i, e in enumerate(("E-coord-1", "E-coord-2")):
+                with (unit / "conversation.jsonl").open("a") as log:
+                    log.write(json.dumps(R.event("redact", id=f"d{i}", evidence=e)) + "\n")
+                self.assertEqual(R.run(root, "redact", label, e, "--request", f"d{i}").returncode, 0)
+            self.assertNoCopyWarning(R.run(root, "check", label))
+
+
+class SaidOnce(unittest.TestCase):
+    def test_an_evidence_cited_twice_gets_one_marker_pair(self):
+        said = brief._said({"text": "words"}, ["E-a1-1", "E-a1-2", "E-a1-1"])
+        self.assertEqual(said.count("<!-- E-a1-1 -->"), 1)
+        self.assertEqual(said.count("<!-- /E-a1-1 -->"), 1)
