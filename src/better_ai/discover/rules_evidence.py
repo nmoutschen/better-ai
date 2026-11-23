@@ -15,6 +15,11 @@ Who may change an evidence's status:
 | `checking` | `unverified` ("verifier did not finish") | the coordinator | `since` is older than 30 minutes |
 | any | `removed` | the coordinator | the reason names the user's request (a `remove` or `redact` event, or an answered decision about the evidence) |
 
+A source may also be a file or a connector item (origin `file`, `tool`); an analyst adds one only for a named source
+(`named_problem`), and its quotes follow the same flow with no URL rule. Evidence of kind `data` from such a source is
+a computed result: no verifier, and the coordinator sets it `counts` once the user took the default of a question about
+it (`confirmation_problem`), or `unverified` with the reason "not confirmed by you".
+
 Every other change is refused, with its next action. Evidence from the user (a source with origin `you`) counts at once:
 only the coordinator adds it, with a `given` that points to the user's `add_evidence` event or holds their typed words.
 
@@ -55,6 +60,9 @@ CHECKED = ("checked_read", "span", "sha256")  # what `counts` holds and nothing 
 SOURCE_ID = re.compile(r"S-[\w.-]+-\d+")
 NAT64 = ipaddress.ip_network("64:ff9b::/96")
 PLAIN_HOST = re.compile(r"[a-z0-9_.-]+")
+READ_KINDS = ("web", "file", "tool")  # origins an analyst read and a verifier reads again, as against `you`
+CONFIRM = "Confirm this result"  # the default of the question that makes a computed result count
+NOT_CONFIRMED = "not confirmed by you"
 USER_ONLY = ("verifier", "tries", "since", *CHECKED)  # fields the user's own evidence never has
 
 
@@ -218,7 +226,57 @@ def _source(unit: paths.Unit, ident: Any) -> dict | None:
 def _origin(source: dict | None) -> str | None:
     origin = source.get("origin") if isinstance(source, dict) else None
     kind = origin.get("type") if isinstance(origin, dict) else None
-    return kind if kind in ("web", "you") else None
+    return kind if kind in (*READ_KINDS, "you") else None
+
+
+def named_problem(head: Any, origin: dict) -> str | None:
+    """Why an analyst may not add a file or tool source, or None: a file must be a named path or inside a named folder
+    (by path segments), and a tool must be a named tool."""
+    named = [n for n in (head.get("named_sources") if isinstance(head, dict) else None) or [] if isinstance(n, dict)]
+    if origin.get("type") == "tool":
+        if any(n.get("type") == "tool" and n.get("tool") == origin.get("tool") for n in named):
+            return None
+        return f"the tool {origin.get('tool')} is not named: ask the coordinator to name it, or add no source from it"
+    path = os.path.normpath(str(origin.get("path")))
+    for n in named:
+        if n.get("type") == "file" and isinstance(n.get("path"), str):
+            base = os.path.normpath(n["path"])
+            if path == base or path.startswith(base.rstrip("/") + "/"):
+                return None
+    return f"{origin.get('path')} is not a named file or inside a named folder: add no source from it, and tell the coordinator"
+
+
+def _computed(source: dict | None, record: dict) -> bool:
+    """Evidence of kind data from a file or a tool: the user confirms it, nothing re-reads it."""
+    return record.get("kind") == "data" and _origin(source) in ("file", "tool")
+
+
+def confirmation_problem(decisions: list, events: list, ident: str) -> str | None:
+    """Why a computed result may not count yet, or None: a question about it with the default "Confirm this result"
+    that the user answered with that default (the page's default click, or those words in the chat)."""
+    asked = [
+        d
+        for d in decisions
+        if isinstance(d, dict)
+        and isinstance(d.get("about"), dict)
+        and d["about"].get("type") == "evidence"
+        and d["about"].get("evidence") == ident
+        and d.get("default") == CONFIRM
+    ]
+    if not asked:
+        return f'no question about {ident} with the default "{CONFIRM}": ask the user, and wait for their answer'
+    for d in asked:
+        answer = d.get("answer") if isinstance(d.get("answer"), dict) else {}
+        if d.get("status") != "answered":
+            continue
+        if answer.get("type") == "chat" and answer.get("text") == CONFIRM:
+            return None
+        event = next((e for e in reversed(events) if isinstance(e, dict) and e.get("id") == answer.get("event")), None)
+        if answer.get("type") == "page" and event and event.get("type") == "answer" and event.get("default") is True:
+            return None
+    if all(d.get("status") != "answered" for d in asked):
+        return f"the question about {ident} is not answered: wait for the user's answer"
+    return f'the user did not take the default "{CONFIRM}": set {ident} unverified with the reason "{NOT_CONFIRMED}"'
 
 
 # ---------------------------------------------------------------- hooks: what a record at rest must be
@@ -235,6 +293,10 @@ def _source_at_rest(record: dict, ctx: schema.Context) -> list[tuple[str, str]]:
         if why:
             return [("origin.url", why)]
     head = ctx.read_json("../discover.json")
+    if origin.get("type") in ("file", "tool") and record.get("by") != (head or {}).get("coordinator"):
+        why = named_problem(head, origin)
+        if why:
+            return [("origin", why)]
     internal = isinstance(head, dict) and head.get("setting") == "internal"
     if origin.get("type") == "you" and internal and not record.get("said_by_role"):
         return [("said_by_role", "needed for a source from you in an internal discovery: say who said it, by role")]
@@ -272,13 +334,18 @@ def _evidence_at_rest(record: dict, ctx: schema.Context) -> list[tuple[str, str]
             problems.append(("by", f"evidence from you is added by the coordinator, {coordinator}"))
         if isinstance(head, dict) and head.get("setting") == "internal" and not record.get("summary"):
             problems.append(("summary", "needed for evidence from you in an internal discovery: the words by role"))
-    elif kind == "web":
+    elif kind in READ_KINDS:
         coordinator = head.get("coordinator") if isinstance(head, dict) else None
         if coordinator and record.get("verifier") == coordinator:
             problems.append(("verifier", "the coordinator is never the verifier: a verifier agent reads the page"))
         if "since" in record and not record.get("verifier"):
             problems.append(("since", "since is set only while a verifier runs: set a verifier"))
-        if status == "counts":
+        if status == "counts" and _computed(source, record):
+            decisions = ctx.read_jsonl("../decisions.jsonl") or []
+            why = confirmation_problem(decisions, ctx.read_jsonl("../conversation.jsonl") or [], str(record.get("id")))
+            if why:
+                problems.append(("status", why))
+        elif status == "counts":
             problems += _counting(record, words)
     return problems
 
@@ -336,13 +403,13 @@ def _evidence_writer_and_start(ctx: records.AddContext) -> None:
             f"only the coordinator ({coordinator}) adds evidence from you",
             "stop: tell the coordinator what the user gave, in your hand-back",
         )
-    if kind == "web":
+    if kind in READ_KINDS:
         started = [n for n in (*USER_ONLY, "reason") if n in record]
         if record.get("status") != "checking" or started:
             what = "status " + str(record.get("status")) if record.get("status") != "checking" else ", ".join(started)
             raise _refuse(
                 unit,
-                f"new evidence from a web page starts checking, with no verifier fields ({what})",
+                f"new evidence from a page, file or connector starts checking, with no verifier fields ({what})",
                 'add it with "status": "checking" and without verifier, tries, since, checked_read, span, sha256 or '
                 "reason; the coordinator starts a verifier",
             )
@@ -568,6 +635,28 @@ def _count(ctx: records.SetContext, by: str) -> None:
     patch["sha256"] = digest
 
 
+def _computed_outcome(ctx: records.SetContext, by: str, coordinator: str, new: str) -> None:
+    """The outcome of a computed result: the coordinator alone sets it, `counts` once the user confirmed it, or
+    `unverified` with the reason that they did not. No verifier reads it again and no --raw file is used."""
+    ident = ctx.record["id"]
+    if by != coordinator:
+        raise _refuse(
+            ctx.unit,
+            f"{ident} is a computed result: only the coordinator ({coordinator}) sets it, once the user confirms it",
+            "stop: tell the coordinator, in your hand-back",
+        )
+    if new == "counts":
+        why = confirmation_problem(_lines(ctx.unit, "decisions.jsonl"), _lines(ctx.unit, "conversation.jsonl"), ident)
+        if why:
+            raise _refuse(ctx.unit, f"{ident} cannot count yet: {why}")
+    elif new != "unverified" or ctx.patch.get("reason") != NOT_CONFIRMED:
+        raise _refuse(
+            ctx.unit,
+            f'a computed result is set counts, or unverified with the reason "{NOT_CONFIRMED}" (not {new})',
+            "ask the user to confirm it",
+        )
+
+
 def _who(ctx: records.SetContext, by: str, coordinator: str, old: str, new: str) -> paths.Refused:
     """The refusal of a change of status the writer may not make."""
     record = ctx.record
@@ -754,6 +843,7 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
     old, new = record.get("status"), patch.get("status", record.get("status"))
     tries = list(record.get("tries") or ([verifier] if verifier else []))
     now = ctx.run.now()
+    computed = _computed(_source(unit, record.get("source")), record)
     _write_table(ctx, changes, by, coordinator, old, new)
 
     if new != old:
@@ -771,6 +861,8 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
             for name in CHECKED:
                 if name in record:
                     patch[name] = None
+        elif old == "checking" and new in ("counts", "unverified", "not reachable") and computed:
+            _computed_outcome(ctx, by, coordinator, new)
         elif old == "checking" and new in ("counts", "unverified", "not reachable"):
             if by == verifier:
                 pass
@@ -802,7 +894,7 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
         else:
             raise _who(ctx, by, coordinator, old, new)
 
-    if new == "counts" and old == "checking":
+    if new == "counts" and old == "checking" and not computed:
         _count(ctx, by)
     elif ctx.raw is not None:
         raise _refuse(unit, "--raw is for setting counts", "leave --raw out")

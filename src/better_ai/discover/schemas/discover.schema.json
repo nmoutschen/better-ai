@@ -16,6 +16,33 @@
     "setting": {"description": "internal: for the user's own organisation; external: for people outside it", "enum": ["internal", "external"]},
     "brought": {"description": "what the user brought with them, such as notes or links", "type": "string"},
     "coordinator": {"description": "the agent that runs the discovery; the only one that writes items, changes, options, moves, briefs and decisions", "type": "string", "minLength": 1},
+    "named_sources": {
+      "description": "the files, folders and read-only connector tools the user named for analysts to read; only the coordinator writes it",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {"type": {"enum": ["file", "tool"]}},
+        "allOf": [
+          {
+            "if": {"required": ["type"], "properties": {"type": {"const": "file"}}},
+            "then": {
+              "additionalProperties": false,
+              "required": ["type", "path"],
+              "properties": {"type": {"const": "file"}, "path": {"description": "a file or a folder", "type": "string", "minLength": 1}}
+            }
+          },
+          {
+            "if": {"required": ["type"], "properties": {"type": {"const": "tool"}}},
+            "then": {
+              "additionalProperties": false,
+              "required": ["type", "tool"],
+              "properties": {"type": {"const": "tool"}, "tool": {"type": "string", "minLength": 1}}
+            }
+          }
+        ]
+      }
+    },
     "step": {"description": "the step the discovery is in, 1 to 10", "enum": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]},
     "status": {"enum": ["open", "finished"]},
     "handed": {

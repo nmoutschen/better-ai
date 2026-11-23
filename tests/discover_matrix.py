@@ -41,6 +41,10 @@ def build(root: Path) -> Path:
     unit = R.made_unit(root)
     head = json.loads((unit / "discover.json").read_text())
     head["brought"] = "Some notes."
+    head["named_sources"] = [
+        {"type": "file", "path": "/data/tickets"},
+        {"type": "tool", "tool": "mcp__desk__get_ticket"},
+    ]
     head["handed"] = {"brief": "brief/v1.md", "to": "design-better", "at": R.AT}
     P.write_json(unit / "discover.json", head)
     problem = R.record(
@@ -99,6 +103,10 @@ def build(root: Path) -> Path:
     )
     P.write_json(unit / "sources" / "S-a1-1.json", R.record(R.SOURCE, by=ANALYST))
     P.write_json(unit / "sources" / "S-coord-1.json", R.record(R.YOU_SOURCE, said_by_role="a teammate"))
+    file_origin = {"type": "file", "path": "/data/tickets/q3.csv", "read": "raw"}
+    P.write_json(unit / "sources" / "S-a1-2.json", R.record(R.SOURCE, id="S-a1-2", by=ANALYST, origin=file_origin))
+    tool_origin = {"type": "tool", "tool": "mcp__desk__get_ticket", "ref": "T-1", "read": "extracted"}
+    P.write_json(unit / "sources" / "S-a1-3.json", R.record(R.SOURCE, id="S-a1-3", by=ANALYST, origin=tool_origin))
 
     def evidence(number, words, **fields):
         return R.record(
@@ -116,6 +124,26 @@ def build(root: Path) -> Path:
         if fields["status"] == "counts":
             fields = {**fields, "span": words, "sha256": "a" * 64}
         P.write_json(unit / "evidence" / f"E-a1-{number}.json", evidence(number, words, **fields))
+    for number, status in ((6, "checking"), (7, "counts")):  # results computed from a file: counts once confirmed
+        words = f"wc -l q3.csv => {number}"
+        P.write_json(
+            unit / "evidence" / f"E-a1-{number}.json",
+            evidence(number, words, source="S-a1-2", kind="data", status=status),
+        )
+    confirmed = R.record(
+        R.DECISION,
+        id="D3",
+        about={"type": "evidence", "evidence": "E-a1-7"},
+        asked="Is the result of E-a1-7 right?",
+        default="Confirm this result",
+        status="answered",
+        answer={"type": "page", "event": "a9"},
+        answered_at=R.AT,
+    )
+    with (unit / "decisions.jsonl").open("a") as out:
+        out.write(json.dumps(confirmed) + "\n")
+    taken = {"type": "answer", "at": R.AT, "by": "user", "id": "a9", "decision": "D3", "text": "Confirm this result"}
+    P.write_lines(unit / "conversation.jsonl", [{**taken, "default": True}])
     you = R.record(
         R.EVIDENCE,
         id="E-coord-1",
@@ -193,6 +221,10 @@ def alternatives(kind: str, record: dict, field: str) -> list[dict]:
         ("option", "note"): [{"note": "ruled out by your appetite"}],
         ("source", "origin"): [{"origin": {"type": "web", "url": "https://example.org/other", "read": "raw"}}],
         ("discover", "coordinator"): [{"coordinator": "another"}],
+        ("discover", "named_sources"): [
+            {"named_sources": [*record.get("named_sources", []), {"type": "file", "path": "/other"}]},
+            {"named_sources": []},
+        ],
         ("discover", "setting"): [{"setting": "internal"}],
         ("discover", "status"): [{"status": "finished"}],
         ("discover", "step"): [{"step": "2"}],
@@ -232,6 +264,14 @@ def must_be_refused(
         return f"only the coordinator writes {kind}"
     if kind == "discover" and "coordinator" in fields:
         return "the coordinator named in the head cannot change"
+    if kind == "discover" and "named_sources" in fields and writer != COORD:
+        return "only the coordinator writes named_sources"
+    if (
+        kind == "discover"
+        and "named_sources" in fields
+        and not all(n in (patch.get("named_sources") or []) for n in record["named_sources"])
+    ):
+        return "a named source stays named"
     if kind in ("change", "move"):
         return f"a {kind} is never edited"
     if kind == "option" and record["id"] == "K1" and fields - {"note", "updated_at"}:
@@ -248,8 +288,8 @@ def must_be_refused(
         if status != "planned" and moved != status and moved not in STATUS_FORWARD.get(status, ()):
             return "a test's status only moves forward"
     if kind == "decision" and status == "answered":
-        if fields & {"about", "answer", "answered_at"}:
-            return "an answered decision keeps its about, answer and answered_at"
+        if fields & {"about", "answer", "answered_at", "default"}:
+            return "an answered decision keeps its about, answer, answered_at and default"
         if patch.get("status") == "waiting":
             return "an answered decision stays answered"
     kept = any(r.get("id") == "R1" and r.get("text") == "Nobody pays." for r in patch.get("risks") or [])

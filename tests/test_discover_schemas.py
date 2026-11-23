@@ -242,6 +242,25 @@ class Head(Shape):
         self.valid(R.record(R.HEAD, setting="internal", status="finished"), "discover.schema.json")
 
 
+class NamedSources(Shape):
+    NAME = "discover.schema.json"
+
+    def test_S129_the_head_allows_named_files_and_tools(self):
+        self.valid(R.HEAD, self.NAME)
+        named = [{"type": "file", "path": "/data/tickets"}, {"type": "tool", "tool": "mcp__desk__get_ticket"}]
+        self.valid(R.record(R.HEAD, named_sources=named), self.NAME)
+        self.valid(R.record(R.HEAD, named_sources=[]), self.NAME)
+        for bad in (
+            [{"type": "web", "url": "https://x.org"}],
+            [{"type": "file"}],
+            [{"type": "tool"}],
+            [{"type": "file", "path": "/data", "tool": "x"}],
+            ["/data/tickets"],
+        ):
+            with self.subTest(named=bad):
+                self.refused(R.record(R.HEAD, named_sources=bad), self.NAME, "named_sources")
+
+
 class Items(Shape):
     NAME = "item.schema.json"
 
@@ -374,6 +393,23 @@ class Sources(Shape):
             {"type": "web", "read": "raw"},
             {"type": "web", "url": "ftp://x.org/a", "read": "raw"},
             {"type": "web", "url": "javascript:alert(1)", "read": "raw"},
+        ):
+            with self.subTest(origin=origin):
+                self.refused(R.record(R.SOURCE, origin=origin), self.NAME, "origin")
+
+    def test_S125_a_file_or_tool_source_has_a_path_or_a_tool_with_ref_and_how_it_was_read(self):
+        file = {"type": "file", "path": "/data/tickets.csv", "read": "raw"}
+        tool = {"type": "tool", "tool": "mcp__desk__get_ticket", "ref": "T-1042", "read": "extracted"}
+        self.valid(R.record(R.SOURCE, origin=file), self.NAME)
+        self.valid(R.record(R.SOURCE, origin=tool), self.NAME)
+        for origin in (
+            {"type": "file", "path": "/data/tickets.csv"},
+            {"type": "file", "read": "raw"},
+            {"type": "file", "path": "/data/tickets.csv", "read": "snippet"},
+            {"type": "file", "path": "/data/tickets.csv", "read": "raw", "url": "https://x.org"},
+            {"type": "tool", "tool": "mcp__desk__get_ticket", "read": "raw"},
+            {"type": "tool", "ref": "T-1042", "read": "raw"},
+            {"type": "tool", "tool": "mcp__desk__get_ticket", "ref": "T-1042"},
         ):
             with self.subTest(origin=origin):
                 self.refused(R.record(R.SOURCE, origin=origin), self.NAME, "origin")
