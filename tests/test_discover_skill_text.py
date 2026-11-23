@@ -201,7 +201,7 @@ class Rules(unittest.TestCase):
         "S113 queue": [r"START a verifier for each evidence `checking` with no verifier"],
         "S114 wait": [r"at most 30 minutes", r"as not counting"],
         "S114 no sub-agents": [r"run the analysts in turn", r"moves do not wait for quotes"],
-        "S114 no web": [r"items stay `unverified`", r"the brief says so"],
+        "S114 no web": [r"stay `unverified`, the reality check does not run", r"the brief says so"],
         "S114 no raw read": [
             r"allow network for the shell",
             r"paste the page text",
@@ -313,6 +313,65 @@ class Rules(unittest.TestCase):
         found = steps(read(SKILL))
         self.assertIn("files and connectors the user points to, such as MCP servers", flat(found[4][1]))
         self.assertIn("files and connectors", flat(found[7][1]))
+
+    def test_named_sources_and_computed_results(self):
+        """D21-D23: named, read-only sources; redact in any discovery; computed results re-run by the verifier."""
+        skill = flat(read(SKILL))
+        analyst = flat(read(AGENTS["analyst"]))
+        verifier = read(AGENTS["quote-verifier"])
+        records = flat(read(RECORDS))
+        self.assertIn("evidence from the user's files or connectors, in any discovery", skill)
+        self.assertIn(
+            "READ only the files and the connectors in WHERE, and only with tools that read. "
+            "NEVER call a connector tool that sends, creates, changes or deletes anything.",
+            analyst,
+        )
+        self.assertIn("- NAMED SOURCES:", section(verifier, "## Input"))
+        self.assertIn('"not a named source"', verifier)
+        self.assertIn("NAMED SOURCES", flat(steps(read(SKILL))[3][1]))
+        self.assertIn("A connector the user named is not available to sub-agents", skill)
+        self.assertIn("export the items to a file the analysts can read", skill)
+        self.assertIn("the command or query and its result", analyst)
+        self.assertIn("RE-RUN the same command or query on the named source", flat(verifier))
+        self.assertIn("the command or query and its result", records)
+
+    def test_round_4_wording(self):
+        skill = read(SKILL)
+        verifier = flat(read(AGENTS["quote-verifier"]))
+        self.assertIn("no quote from a web page counts", flat(skill))
+        self.assertIn("the items no file or connector evidence bears on stay `unverified`", flat(skill))
+        outside = flat(section(read(RECORDS), "## Outside text"))
+        self.assertIn("`summary`", outside)
+        self.assertIn("`ref`", outside)
+        self.assertTrue(
+            any(
+                '"type": "evidence"' in line and '"summary"' in line and '"words": {"type": "quote"' in line
+                for line in read(RECORDS).splitlines()
+            )
+        )
+        self.assertIn(
+            'IF the file is not text, EXTRACT its text with a command, or SET the evidence `not reachable` with the reason "no text tool"',
+            verifier,
+        )
+        self.assertIn("redirect host not plain", verifier)
+        self.assertIn("Analysts read the web, and the files and connectors you name", flat(read(DOCS)))
+
+    def test_principles_state_findings_without_describing_the_research(self):
+        """PRINCIPLES 1: no effect sizes or statements of where evidence comes from or how strong it is."""
+        skill = read(SKILL)
+        for word in (
+            r"\d+ ?%",
+            r"\ba fifth\b",
+            r"\btrials?\b",
+            r"randomi[sz]ed",
+            r"\bstud(?:y|ies)\b",
+            r"\bmeasured\b",
+            r"common practice",
+            r"trial runs",
+        ):
+            with self.subTest(word):
+                self.assertNotRegex(skill, word)
+        self.assertGreaterEqual(skill.count("TREAT this as a guide, not a rule"), 2)
 
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
