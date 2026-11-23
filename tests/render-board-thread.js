@@ -6,7 +6,7 @@ const { stand, loadPage, loadBoard } = require('./harness');
 
 const shared = loadPage({ setTimeout: () => 0, clearTimeout: () => {}, requestAnimationFrame: () => 0,
   fetch: () => new Promise(() => {}), addEventListener: () => {}, getComputedStyle: () => stand(), console });
-const page = loadBoard('{render, conv, showLoaded}',
+const page = loadBoard('{render, conv}',
   { pageConversation: shared.pageConversation, pageMarkdown: shared.pageMarkdown, pageMarkdownText: shared.pageMarkdownText });
 
 const payloads = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));

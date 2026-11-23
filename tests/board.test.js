@@ -1,11 +1,11 @@
-// What the research board's page (board.js) writes: for a record whose field is null, its errors band, and how it shapes
-// the new record fields. board.js runs against stand-in elements, up to its polling (tests/harness.js); the pop-up's text
+// What the research board's page (board.js) writes: for a record whose field is null, and how it shapes the new record
+// fields. board.js runs against stand-in elements, up to its polling (tests/harness.js); the pop-up's text
 // is read from the element it fills. Run with `node --test tests/*.test.js`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { read, stand, marked, between, loadPage, loadBoard } = require('./harness');
 
-const realEsc = loadPage().pageEscape;
+const { pageEscape: realEsc, pageShowErrors } = loadPage();
 
 // The page with `getElementById('pop')` giving one element that keeps what is written into it.
 function page() {
@@ -59,35 +59,11 @@ test('a decision in the old format is read as the new words, and a new one is le
   assert.equal(p.waitingCount({ decisions: [decision('D1', 'pending', { _old: true })], conversation: [] }), 1);
 });
 
-// The research board's page: its errors band and how it shapes the new record fields. Both are read out of board.js,
+// The research board's page: how it shapes the new record fields, and its errors band (page.js's). Both are read out of board.js,
 // between marker comments and between `const has =` and the map's layout, so the test runs the shipped code.
 const boardJs = read('research', 'board.js');
-const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-const { showLoaded, notValid } = new Function('esc', 'plural', marked(boardJs, 'errors') + '; return {showLoaded, notValid};')(realEsc, plural);
+const { notValid } = new Function('esc', marked(boardJs, 'invalid') + '; return {notValid};')(realEsc);
 const { prepare } = new Function('const has =' + between(boardJs, 'const has =', '// ---------- Slices') + '; return {prepare};')();
-const band = () => ({ errors: { hidden: true, innerHTML: '' } });
-
-test('a board with invalid records shows its errors band', () => {
-  const els = band();
-  showLoaded({ listening: true, errors: [
-    { file: 'claims/C-w2-9.json', line: 1, field: 'question', message: 'dangling: "Q-w9-1" is not a question record in ../questions/', by: 'w2' },
-    { file: 'logs/w2.jsonl', line: 2, field: 'query', message: 'required' },
-  ] }, els);
-  assert.equal(els.errors.hidden, false);
-  assert.match(els.errors.innerHTML, /2 problems/);
-  assert.match(els.errors.innerHTML, /<code>claims\/C-w2-9\.json:1<\/code> question: dangling/);
-  assert.match(els.errors.innerHTML, /\(by w2\)/);
-  assert.match(els.errors.innerHTML, /<code>logs\/w2\.jsonl:2<\/code> query: required/);
-});
-
-test('the errors band is hidden when the board has no errors, and shows a message as text, never as HTML', () => {
-  const els = band();
-  showLoaded({ listening: true, errors: [] }, els);
-  assert.deepEqual([els.errors.hidden, els.errors.innerHTML], [true, '']);
-  showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: '<u>', message: '<img src=x>' }] }, els);
-  assert.ok(!els.errors.innerHTML.includes('<img'));
-  assert.ok(!els.errors.innerHTML.includes('<u>'));
-});
 
 test("the board's map reads the new fields: claims by question, merged and withdrawn records, where a question was raised", () => {
   const q = (id, over) => ({ id, status: 'open', title: id, priority: 'high', origin: { type: 'user' }, _born: 1, ...over });
@@ -110,17 +86,6 @@ test('searches on a merged question count for the question it was merged into', 
     logs: { w2: { searches: [{ question: 'Q-3', query: 'a', new_terms: [] }, { question: 'Q-1', query: 'b', new_terms: [] }] } },
     questions: [q('Q-1'), q('Q-3', { status: 'merged', merged_into: 'Q-1' })] });
   assert.equal(d.byId['Q-1'].searches, 2);
-});
-
-test('the errors band is written only when its text changes, so a screen reader is not read it every poll', () => {
-  let writes = 0, html = '';
-  const els = { old: { hidden: true, textContent: '' },
-    errors: { hidden: true, get innerHTML() { return html; }, set innerHTML(v) { writes++; html = v; } } };
-  const d = { listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] };
-  showLoaded(d, els); showLoaded(d, els); showLoaded({ ...d }, els);
-  assert.equal(writes, 1);
-  showLoaded({ listening: true, errors: [] }, els);
-  assert.equal(writes, 2);
 });
 
 test('an invalid record the board still shows is marked with its first message, and the map copes with missing fields', () => {
@@ -171,10 +136,14 @@ test('a kept invalid claim with a list for its question does not stop the board 
   assert.deepEqual(d.byId['Q-1'].claimsList, []);
 });
 
-test('the errors band says which records are shown marked and which are only listed', () => {
-  const els = band();
-  showLoaded({ listening: true, errors: [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }] }, els);
-  assert.match(els.errors.innerHTML, /Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here\./);
+test('the errors band is written only when its text changes, so a screen reader is not read it every poll', () => {
+  let writes = 0, html = '';
+  const band = { hidden: true, get innerHTML() { return html; }, set innerHTML(v) { writes++; html = v; } };
+  const errors = [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }];
+  pageShowErrors(band, errors); pageShowErrors(band, errors); pageShowErrors(band, [...errors]);
+  assert.equal(writes, 1);
+  pageShowErrors(band, []);
+  assert.deepEqual([writes, band.hidden], [2, true]);
 });
 
 test('the board marks an invalid brief like any other record', () => {

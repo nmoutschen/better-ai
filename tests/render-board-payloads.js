@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const { stand, loadPage, loadBoard } = require('./harness');
 
 const shared = loadPage();
-const names = ['render', 'showLoaded', 'openPop', 'closedItem', 'decision', 'decisions', 'drawAgents'];
+const names = ['render', 'openPop', 'closedItem', 'decision', 'decisions', 'drawAgents'];
 const page = loadBoard(`{${names.join(', ')}, get D() { return D; }}`);
 
 const payloads = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -13,7 +13,7 @@ const failed = [];
 for (const { label, data } of payloads) {
   try {
     data.now = data.now || 1e9;
-    page.showLoaded(data, { errors: stand(), old: stand() });
+    shared.pageShowErrors(stand(), data.errors);
     page.render(data);
     const d = page.D;
     for (const q of d.qs) { page.openPop('question', q.id, stand()); page.closedItem({ e: { question: q.id, by: 'w', status: 'answered' } }); }
