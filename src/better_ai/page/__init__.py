@@ -120,6 +120,18 @@ class PageSpec:
 
 
 PAGES: dict[str, PageSpec] = {}
+SERVE_GUARDS: dict[str, list[Callable[[Unit], None]]] = {}
+
+
+def serve_guard(skill: str):
+    """Register a check a skill makes before `serve` starts its page (discover-better: no page while a redact is half
+    done). The function takes the `Unit` and raises `Refused` to refuse."""
+
+    def register(function):
+        SERVE_GUARDS.setdefault(skill, []).append(function)
+        return function
+
+    return register
 
 
 def register(skill: Skill, spec: PageSpec) -> PageSpec:
@@ -892,6 +904,8 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     """Check every record, then serve the page until the unit stops (or Ctrl+C). A record that is not valid is a warning
     on stderr: the page still opens and shows it."""
     unit = _unit(args, run)
+    for guard in SERVE_GUARDS.get(run.skill.name, []):
+        guard(unit)
     spec = spec_of(run.skill)
     docs = load_docs(run.skill)
     notices: list[schema.Error] = []

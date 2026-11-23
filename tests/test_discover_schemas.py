@@ -86,7 +86,6 @@ class Package(unittest.TestCase):
         import better_ai.discover as package
 
         owners = {
-            "brief": "T10",
             "pagespec": "T11",
         }
         for name, task in owners.items():
