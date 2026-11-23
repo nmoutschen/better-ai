@@ -213,7 +213,8 @@ def check(args: argparse.Namespace, run: Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
     docs = schema.docs_for(run.info.package)
     shown = os.path.relpath(unit.path)
-    root = Path(shown if not shown.startswith("..") else unit.path)
+    typed = Path(os.path.abspath(args.unit))  # the path as given, which may reach the unit through a symlink
+    root = Path(shown) if not shown.startswith("..") else typed if typed.resolve() == unit.path else unit.path
     notices: list[schema.Error] = []
     errors = schema.check_paths(
         [root], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices, root=unit.root

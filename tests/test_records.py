@@ -709,6 +709,17 @@ class Follow(Repo):
         done = call("code-better", "set", unit, "D1", stdin={"about": {"type": "task", "task": "T1"}})
         self.assertEqual(done[0], 1, done)
         self.assertIn("it points to T1, whose line fails its schema", done[2])
+        # the same in a folder without git, reached through a symlinked path: the unit and the pointer agree on paths
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "real").mkdir()
+            (Path(tmp) / "link").symlink_to(Path(tmp) / "real")
+            loose = Path(tmp) / "link" / ".code" / "x"
+            self.assertEqual(call("code-better", "create", loose, "--by", "c", stdin=CODE_HEAD)[0], 0)
+            call("code-better", "add", loose, "task", "--by", "c", stdin=TASK)
+            self.corrupt_first_line(loose / "tasks.jsonl", status="bogus")
+            done = call("code-better", "add", loose, "decision", "--by", "c", stdin=pointing)
+            self.assertEqual(done[0], 1, done)
+            self.assertIn("it points to T1, whose line fails its schema", done[2])
 
     def test_a_pointer_to_an_old_format_line_does_not_block(self):
         unit = self.code_change()
@@ -1070,7 +1081,9 @@ class Concurrency(Repo):
 class Examples(Repo):
     """Every example line of the code-better format page, added through `add` in file order into a change that holds
     what the examples point to: the requirement Q1 and decisions D1-D3 of its architect design, specs S1-S8, tasks
-    T1-T3. `add` accepts each one."""
+    T1-T3. `add` accepts each one. Not added here: the code.json line (a head,
+    written by `create`), the decisions.jsonl lines (the "answered on the page" one points to a page event this unit does
+    not hold) and audit/* (another unit kind); the old test skipped them too."""
 
     def add(self, skill, unit, label, fields, *more):
         done = call(skill, "add", unit, label, "--by", "coordinator", *more, stdin=fields)

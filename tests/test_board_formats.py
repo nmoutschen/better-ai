@@ -133,7 +133,7 @@ def put(folder: Path, file: str, record: dict) -> None:
 def serve_until_stopped(folder: Path, stderr: io.StringIO) -> threading.Thread:
     """`serve` on the board in a thread (no signal handling, no browser, 0.2 s linger); it ends by itself once the board
     is stopped."""
-    info = resources.BuildInfo(SKILL, "research", "source", resources.DEFAULT_CUTOFF)
+    info = resources.BuildInfo(SKILL, "research", "source", resources.cutoff())
     run = cli.Run(research.SKILL, info, stdout=io.StringIO(), stderr=stderr)
     args = mock.Mock(unit=str(folder), port=0, open=False, no_browser=True, linger=0.2, once=False)
     from better_ai import page

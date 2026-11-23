@@ -186,7 +186,7 @@ def resolve_unit(argument: str, skill: Skill, *, creating: bool = False) -> Unit
             f"the unit must be at the top of its repository ({top}), not under {root_path}",
             f"use {top / kind.folder / slug}",
         )
-    root = top if top is not None else root_path
+    root = top if top is not None else Path(os.path.realpath(root_path))  # resolved here, in or outside git, once
     unit_path = root / kind.folder / slug
     shown = str(unit_path.relative_to(root))
     probe = root
