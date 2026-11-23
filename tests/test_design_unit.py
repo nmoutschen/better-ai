@@ -347,6 +347,14 @@ class Served(unittest.TestCase):
         thumbs = {**self.EVENTS["comment"], "id": "c2-x", "text": None, "verdict": "up"}
         self.assertEqual(self.send("comment", thumbs).get("result"), "saved")  # a verdict alone is a comment
 
+    def test_a_message_the_agent_posts_without_to_can_be_closed_with_status(self):
+        """Issue #120: such a message waited at the bottom of the page for good. page.test.js checks it leaves Open."""
+        self.assertEqual(run(self.root, "reply", ".design/pay", stdin="Which size first?").returncode, 0)
+        started = next(e["id"] for e in self.log() if e["type"] == "reply")
+        done = run(self.root, "status", ".design/pay", "done", started)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual((self.log()[-1]["type"], self.log()[-1]["to"]), ("status", started))
+
     def test_a_reused_comment_id_is_a_new_version_of_the_comment(self):
         first = self.EVENTS["comment"]
         self.send("comment", first)
