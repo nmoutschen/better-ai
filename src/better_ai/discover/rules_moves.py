@@ -10,7 +10,7 @@ confirmation (`CONFIRMED_MOVES`). The rules run where the design says:
 - the revision rule runs on `add` only (`revision_of`): what the option and the items looked like when the user chose is
   compared with what they are now. `check` cannot repeat it, because the items change after a move is recorded;
 - `brief-rules`, a schema check on `brief.schema.json`, runs on `add` and in `check`: a brief belongs to a move that
-  writes one, a move has one brief, and a final brief's file is there with the recorded `sha256`;
+  writes one, a move has one draft brief at a time (a final one may be followed by a new version), and a final brief's file is there with the recorded `sha256`;
 - `set` and `add` refuse `status: final` on a brief: only the `brief` verb makes one final.
 
 Every message names the existing record and the next action.
@@ -222,7 +222,7 @@ def _final_problems(record: dict, context: Context) -> list[tuple[str, str]]:
 
 @hook("brief-rules")
 def _brief_rules(record: dict, context: Context) -> list[tuple[str, str]]:
-    """The brief is for a move that writes one, it is the only brief of that move, and a final one has its file."""
+    """The brief is for a move that writes one, the move has no other draft brief, and a final one has its file."""
     problems: list[tuple[str, str]] = []
     move = _by_id(_rows(context, "moves.jsonl")).get(record.get("move"))
     option = _by_id(_rows(context, "options.jsonl")).get(move.get("option")) if move else None
@@ -234,8 +234,13 @@ def _brief_rules(record: dict, context: Context) -> list[tuple[str, str]]:
                 f"{', '.join(BRIEF_MOVES[:-1])} and {BRIEF_MOVES[-1]} do",
             )
         )
-    for other in _rows(context, "briefs.jsonl"):
-        if other.get("id") != record.get("id") and other.get("move") == record.get("move"):
+    earlier = []
+    for other in _rows(context, "briefs.jsonl"):  # the briefs before this one: all of them when it is being added
+        if other.get("id") == record.get("id"):
+            break
+        earlier.append(other)
+    for other in earlier:
+        if other.get("move") == record.get("move") and other.get("status") == "draft":
             problems.append(
                 ("move", f"{other.get('id')} is already the brief for {record.get('move')}: change it with set")
             )

@@ -260,9 +260,15 @@ class Briefs(Unit):
         self.accepted(self.brief("M2"))
         self.refused(self.brief("M2"), "v1 is already the brief for M2")
 
-    def test_S39_check_reports_two_briefs_for_one_move(self):
+    def test_S39_a_new_version_for_a_move_whose_brief_is_final_is_added(self):
+        self.final()
+        self.accepted(self.brief("M2"))
+        self.assertEqual(self.check().returncode, 0, self.check().stdout)
+        self.refused(self.brief("M2"), "v2 is already the brief for M2")
+
+    def test_S39_check_reports_a_second_brief_added_while_the_first_is_a_draft(self):
         put(self.unit, "briefs.jsonl", [R.record(R.BRIEF, move="M2"), R.record(R.BRIEF, id="v2", move="M2")])
-        self.refused(self.check(), "v1 is already the brief for M2", "v2 is already the brief for M2")
+        self.refused(self.check(), "briefs.jsonl:2: move", "v1 is already the brief for M2")
 
     def test_S42_set_refuses_status_final_and_names_the_brief_verb(self):
         self.accepted(self.brief("M2"))
