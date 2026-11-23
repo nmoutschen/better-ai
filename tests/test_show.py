@@ -467,7 +467,7 @@ class NeverRaises(unittest.TestCase):
     def test_an_exception_in_the_commands_own_code_is_a_bug_not_a_record_error(self):
         made(self.cwd, SMALL)
         for args in (("check", UNIT), ("render", UNIT)):
-            with self.subTest(args), mock.patch.object(deck, "inspect", side_effect=KeyError("x")):
+            with self.subTest(args), mock.patch.object(deck, "inspect_spec", side_effect=KeyError("x")):
                 done = better(self.cwd, *args)
                 self.assertEqual(done.returncode, 5, done.stdout + done.stderr)
                 self.assertIn("bug in better.pyz", done.stderr)
@@ -475,7 +475,7 @@ class NeverRaises(unittest.TestCase):
         unit = paths.resolve_unit(str(Path(self.cwd, UNIT)), package.SKILL)
         with (
             mock.patch.dict(os.environ, {"BETTER_AI_SKILL": SKILL}),
-            mock.patch.object(deck, "inspect", side_effect=KeyError("x")),
+            mock.patch.object(deck, "inspect_spec", side_effect=KeyError("x")),
             self.assertRaises(KeyError),
         ):
             commands.load(unit)  # the page's loader does not turn it into an error entry

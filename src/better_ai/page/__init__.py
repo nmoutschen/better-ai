@@ -213,8 +213,8 @@ def rpc_error(rid, code: int, message: str) -> dict:
 
 
 def load_docs(skill: Skill) -> dict[str, dict]:
-    """The schemas a run of this skill loads, shared and its own."""
-    return schema.load_schemas(*resources.schema_sources(skill.package))
+    """The schemas a run of this skill loads, shared and its own, loaded once per package."""
+    return schema.docs_for(skill.package)
 
 
 def old_format_count(unit: Unit, docs: dict[str, dict], cutoff: str | None) -> int:
