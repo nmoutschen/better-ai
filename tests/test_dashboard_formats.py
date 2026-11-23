@@ -630,7 +630,7 @@ class WrongTypes(unittest.TestCase):
 
             # What git says of a branch does not depend on the card's types: only the card's own fields are fuzzed here.
             with (
-                mock.patch.object(dashboard.activity, "worktrees", return_value=[]),
+                mock.patch.object(dashboard.activity, "worktrees", return_value={}),
                 mock.patch.object(dashboard.activity, "branch_activity", return_value=None),
             ):
                 payloads, total = wrong_types.fuzz(self, files, put, survives)
@@ -879,7 +879,8 @@ class LessonsWrongTypes(unittest.TestCase):
         for field in GOOD_LESSON:
             with self.subTest(field):
                 record = {k: v for k, v in GOOD_LESSON.items() if k != field}
-                self.assertTrue(self.run_all(json.dumps(record) + "\n")[1])
+                _, lessons, _, _ = self.run_all(json.dumps(record) + "\n")
+                self.assertEqual([f for _, f in lessons], [field])
 
     def test_the_same_id_twice_is_an_error_on_the_second_line(self):
         _, lessons, _, _ = self.run_all((json.dumps(GOOD_LESSON) + "\n") * 2)
