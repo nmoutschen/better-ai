@@ -92,7 +92,9 @@ def _list(value: Any) -> list:
 
 def _coordinator_only(unit: Unit, kind: str, by: str | None) -> None:
     name = _text(_head(unit).get("coordinator"))
-    if name and by != name:
+    if not name:
+        raise Refused(f"{unit.label}: discover.json names no coordinator: fix discover.json, then run again")
+    if by != name:
         raise Refused(
             f"{unit.label}: only {name} (discover.json coordinator) writes {kind}: use --by {name}",
         )
@@ -299,11 +301,9 @@ def _is_identical(change: Mapping, items: Sequence[Mapping], changes: Sequence[M
     view: ItemView | None = derive(items, changes).items.get(item)
     if view is None:
         return False
-    if name == "state":
-        has = any(_dict(c.get("about")).get("item") == item and c.get("field") == "state" for c in changes)
-        return has and view.recorded_state == to
-    if name == "importance":
-        return view.importance == to
+    if name in ("state", "importance"):
+        last = view.last_state_change if name == "state" else view.last_importance_change
+        return last is not None and last["to"] == to
     if name == "risk":
         return change.get("risk") in view.accepted_risks
     return False
@@ -382,17 +382,18 @@ def _cited_risks(unit: Unit, item: str) -> set[str]:
 
 
 def _keep_cited_risks(ctx: records.SetContext) -> None:
+    """A cited risk keeps its id and text: it stays in the list once, with the words it had."""
     if "risks" not in ctx.patch:
         return
     item = _text(ctx.record.get("id"))
     cited = _cited_risks(ctx.unit, item)
-    now = {_dict(r).get("id"): _dict(r).get("text") for r in _list(ctx.patch["risks"])}
+    after = [_dict(r) for r in _list(ctx.patch["risks"])]
     for risk in _list(ctx.record.get("risks")):
         ident, words = _dict(risk).get("id"), _dict(risk).get("text")
-        if ident in cited and (ident not in now or now[ident] != words):
+        if ident in cited and [r.get("text") for r in after if r.get("id") == ident] != [words]:
             raise refusal(
                 ctx.unit.label,
-                f"{ident} of {item} is cited by a decision or a change, so it keeps its id and text",
+                f"{ident} of {item} is cited by a decision or a change, so it stays once, with its id and text",
                 f"keep {ident} as it is and add a new risk",
             )
 
@@ -451,23 +452,18 @@ def _set(ctx: records.SetContext) -> None:
 # ---------------------------------------------------------------- check: a latest change that no longer holds
 
 
-def _latest(changes: Sequence[Mapping], item: str, name: str) -> Mapping | None:
-    found = None
-    for change in changes:
-        if change.get("field") == name and _dict(change.get("about")).get("item") == item:
-            found = change
-    return found
-
-
 def stale(unit: Unit) -> list[str]:
     """One line for each item whose latest state or importance change no longer holds."""
     items, changes = _lines(unit, "items.jsonl"), _lines(unit, "changes.jsonl")
     evidence, tests, decisions = _evidence(unit), _lines(unit, "tests.jsonl"), _lines(unit, "decisions.jsonl")
     lines = []
+    views = derive(items, changes).items
     for item in items:
         ident = item.get("id")
-        for name in ("state", "importance"):
-            change = _latest(changes, ident, name)
+        view = views.get(ident)
+        if view is None:
+            continue
+        for name, change in (("state", view.last_state_change), ("importance", view.last_importance_change)):
             if change is None:
                 continue
             problems = cited_problems(change, evidence)
