@@ -549,15 +549,18 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
     return 0
 
 
-@cli.verb("pending", help="list the user's items that are not done or accepted", arguments=_unit_argument)
-def pending(args: argparse.Namespace, run: cli.Run) -> int:
-    """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so work can
-    resume after an interruption. Done waits for the user. An answer under an item that waited for the user (`asked`)
-    makes it `replied`; a follow-up from the user under a finished item makes it `followup`. These are the page's rules:
-    page.js `pageThread` gives the same states, and tests/fixtures/threads.json holds the logs both are run on."""
-    conv = _conversation(run, _unit(args, run))
+def open_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
+    """The user's items that are neither done nor accepted: `all_items` without the finished ones."""
+    return [found for found in all_items(events, item_types, agent) if found[1] not in ("done", "accepted")]
+
+
+def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
+    """Every item of the user's, in its latest form, as (event, state, extra); `deleted` ones are left out. The state is
+    `new`, `asked`, `working`, `replied`, `followup` or `reopened`; `extra` holds `reopened_because` and the `thread` of
+    answers and replies under the item. These are the page's rules: page.js `pageThread` gives the same states, and
+    tests/fixtures/threads.json holds the logs both are run on. `pending` and a skill's own summary both call these."""
     items, order, state, reasons, thread, closes, home = {}, [], {}, {}, {}, {}, {}
-    for e in conv.events():
+    for e in events:
         a, i = e.get("type"), e.get("id")
         to = home.get(e.get("to"), e.get("to"))  # a message under a reply belongs to the item that reply is under
         if a == "closed":  # a worker's message: the user can reply to it, and the reply goes to the agent
@@ -577,10 +580,10 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
             if i:
                 home[i] = to
         elif a == "reply" and to:
-            thread.setdefault(to, []).append({"from": conv.agent, "at": e.get("at"), "text": e.get("text")})
+            thread.setdefault(to, []).append({"from": agent, "at": e.get("at"), "text": e.get("text")})
             if i:
                 home[i] = to
-        elif a in conv.items and i:  # an item sent again, such as an edited comment, keeps its state
+        elif a in item_types and i:  # an item sent again, such as an edited comment, keeps its state
             if i not in items:
                 order.append(i)
             items[i] = e
@@ -592,15 +595,28 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
             state[to] = "accepted"
         elif a == "reopen":
             state[to], reasons[to] = "reopened", e.get("text")
-    open_items = [items[i] for i in order if items.get(i) and state.get(i) not in ("done", "accepted")]
-    for e in open_items:
+    found = []
+    for e in (items[i] for i in order if items.get(i)):
         extra = {}
         if state.get(e["id"]) == "reopened" and reasons.get(e["id"]):
             extra["reopened_because"] = reasons[e["id"]]
         if thread.get(e["id"]):
             extra["thread"] = thread[e["id"]]
-        run.out(terminal_json({**e, "status": state.get(e["id"], "new"), **extra}))
-    run.out(f"{len(open_items)} not done.")
+        found.append((e, state.get(e["id"], "new"), extra))
+    return found
+
+
+@cli.verb("pending", help="list the user's items that are not done or accepted", arguments=_unit_argument)
+def pending(args: argparse.Namespace, run: cli.Run) -> int:
+    """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so work can
+    resume after an interruption. Done waits for the user. An answer under an item that waited for the user (`asked`)
+    makes it `replied`; a follow-up from the user under a finished item makes it `followup`. `open_items` holds the
+    rules."""
+    conv = _conversation(run, _unit(args, run))
+    found = open_items(conv.events(), conv.items, conv.agent)
+    for e, state, extra in found:
+        run.out(terminal_json({**e, "status": state, **extra}))
+    run.out(f"{len(found)} not done.")
     return 0
 
 

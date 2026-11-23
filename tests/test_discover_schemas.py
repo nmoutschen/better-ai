@@ -86,8 +86,6 @@ class Package(unittest.TestCase):
         import better_ai.discover as package
 
         owners = {
-            "rules_moves": "T9",
-            "summary": "T9",
             "brief": "T10",
             "pagespec": "T11",
         }
