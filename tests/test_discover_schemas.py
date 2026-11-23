@@ -86,7 +86,6 @@ class Package(unittest.TestCase):
         import better_ai.discover as package
 
         owners = {
-            "rules_changes": "T7",
             "rules_evidence": "T8",
             "rules_moves": "T9",
             "summary": "T9",

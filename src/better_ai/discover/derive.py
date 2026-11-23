@@ -38,6 +38,10 @@ class ItemView:
     risk_accepted: bool
     accepted_risks: tuple[str, ...]  # the item's risks that have an accepted risk change, in the item's order
     open_risks: tuple[str, ...]  # the others
+    last_state_change: Mapping[str, Any] | None = (
+        None  # the change `recorded_state` is the `to` of; None before the first
+    )
+    last_importance_change: Mapping[str, Any] | None = None  # likewise for `importance`
 
 
 @dataclass(frozen=True)
@@ -47,16 +51,17 @@ class Derived:
     moves_by_option: Mapping[str, tuple[str, ...]] = field(default_factory=dict)  # option id -> its move ids, in order
 
 
-def _last_to(changes: Iterable[Mapping[str, Any]], item: str, name: str) -> str | None:
-    """The `to` of the last change of `name` that names the item. A state change to `risk accepted` is skipped: that
-    state is derived from the risk changes, and `check` refuses a log that writes it."""
+def _last_change(changes: Iterable[Mapping[str, Any]], item: str, name: str) -> Mapping[str, Any] | None:
+    """The last change of `name` that names the item, and the only place that finds it: what `check` and the rules
+    compare with is this change. A state change to `risk accepted` is skipped: that state is derived from the risk
+    changes, and `check` refuses a log that writes it. So is a change whose `to` is not text."""
     found = None
     for change in changes:
         about = change.get("about")
         to = change.get("to")
         named = change.get("field") == name and isinstance(about, Mapping) and about.get("item") == item
         if named and isinstance(to, str) and not (name == "state" and to == RISK_ACCEPTED):
-            found = to
+            found = change
     return found
 
 
@@ -82,15 +87,19 @@ def _view(item: Mapping[str, Any], changes: list[Mapping[str, Any]]) -> ItemView
     done = tuple(r for r in dict.fromkeys(ids) if r in accepted)
     open_ = tuple(r for r in dict.fromkeys(ids) if r not in accepted)
     risk_accepted = bool(ids) and not open_
-    recorded = _last_to(changes, ident, "state") or UNVERIFIED
+    last_state = _last_change(changes, ident, "state")
+    last_importance = _last_change(changes, ident, "importance")
+    recorded = last_state["to"] if last_state else UNVERIFIED
     return ItemView(
         id=ident,
         state=RISK_ACCEPTED if risk_accepted else recorded,
         recorded_state=recorded,
-        importance=_last_to(changes, ident, "importance"),
+        importance=last_importance["to"] if last_importance else None,
         risk_accepted=risk_accepted,
         accepted_risks=done,
         open_risks=open_,
+        last_state_change=last_state,
+        last_importance_change=last_importance,
     )
 
 

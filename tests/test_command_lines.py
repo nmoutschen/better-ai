@@ -152,7 +152,7 @@ class CommandLines(unittest.TestCase):
             "status <unit> accepted <id>... --text <words>": "stdin",
             "add <unit> <type>": "--by",
             "render <unit> --format text|pdf": "format",
-            "set <unit> <ref> --by me": "flag",
+            "set <unit> <ref> --who me": "flag",
             "serve <unit> --port": "value",
         }
         for text, word in bad.items():
@@ -173,6 +173,7 @@ class CommandLines(unittest.TestCase):
             "add <unit> spec --by me <<'EOF'",
             "render <unit> --format text|md",
             "set <unit> <ref> --for x",
+            "set <unit> <ref> --by me",
             "serve <unit> --linger 5 --once",
         ]
         for text in good:

@@ -79,6 +79,30 @@ class State(unittest.TestCase):
         self.assertEqual(json.dumps([items, changes]), before)
 
 
+class Latest(unittest.TestCase):
+    """The latest state and importance change are found here and nowhere else."""
+
+    def test_each_view_holds_the_latest_change_of_each_field(self):
+        first, last, high = state("checking"), state("supported"), importance("high")
+        view = one([item()], [first, last, high, state("contradicted", "P2")])
+        self.assertIs(view.last_state_change, last)
+        self.assertIs(view.last_importance_change, high)
+
+    def test_none_before_the_first_change(self):
+        view = one([item()])
+        self.assertIsNone(view.last_state_change)
+        self.assertIsNone(view.last_importance_change)
+
+    def test_a_state_change_to_risk_accepted_and_a_to_that_is_not_text_are_not_the_latest(self):
+        supported = state("supported")
+        changes = [supported, state("risk accepted"), R.record(state("x"), to=3)]
+        self.assertIs(one([item()], changes).last_state_change, supported)
+
+    def test_the_to_of_the_latest_change_is_the_recorded_state(self):
+        view = one([item()], [state("checking"), state("supported")])
+        self.assertEqual(view.last_state_change["to"], view.recorded_state)
+
+
 class RiskAccepted(unittest.TestCase):
     def test_S3_an_item_with_no_risk_is_never_risk_accepted(self):
         view = one([item(risks=[])], [state("needs a test")])
