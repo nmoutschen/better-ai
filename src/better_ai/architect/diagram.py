@@ -91,8 +91,8 @@ def validate(design: dict) -> list[str]:
 
 
 def visible(item, state):
-    states = item.get("in", STATES)
-    return state == "after" or set(states) == set(STATES)
+    """Before draws what exists before the change; After draws everything, a removed part as removed."""
+    return state == "after" or state in item.get("in", STATES)
 
 
 def appearance(item, state):
@@ -200,12 +200,11 @@ def layout(design: dict) -> dict:
 
             slots[column].sort(key=barycenter)
 
+    # A flow box holds its own text; a container box also makes room for the labels of the arrows that reach it.
+    box_heights = {ident: 59 + 15 * len(wrap(node.get("detail", ""), 12.5, COLW - 28)) for ident, node in nodes.items()}
     heights = {
-        ident: max(
-            59 + 15 * len(wrap(node.get("detail", ""), 12.5, COLW - 28)),
-            sum(15 * len(labels[edge["id"]]) + 14 for edge in incoming[ident]) + 16,
-        )
-        for ident, node in nodes.items()
+        ident: max(box_heights[ident], sum(15 * len(labels[edge["id"]]) + 14 for edge in incoming[ident]) + 16)
+        for ident in nodes
     }
     x = {item: column * (COLW + GAP) for column, slot in enumerate(slots) for item in slot}
     y, bands, total = place_bands(slots, heights, groups, chains, x)
@@ -217,6 +216,7 @@ def layout(design: dict) -> dict:
         "x": x,
         "y": y,
         "heights": heights,
+        "box_heights": box_heights,
         "labels": labels,
         "routes": routes,
         "width": len(slots) * (COLW + GAP) - GAP,
@@ -481,6 +481,8 @@ def svg_containers(layout: dict, state: str) -> str:
         # horizontal leg so it remains inside the view even in column zero.
         x, y = points[2] if layout["x"][edge["from"]] >= layout["x"][edge["to"]] else points[-1]
         lines = layout["labels"][ident]
+        if edge.get("in") == ["before"] and status != "removed":
+            lines = lines[:-1]  # the removal tag the layout reserved room for
         for i, line in enumerate(lines):
             yy = y - 6 - 15 * (len(lines) - 1 - i)
             out.append(
@@ -567,7 +569,7 @@ def svg_flow(flow: dict, state: str, layout: dict, view: str) -> str:
     """Render a flow. Pass a distinct view name such as flow1 for each flow on a page."""
     prefix = f"{quote(view, safe='')}-{state}"
     participants = flow["participants"]
-    nodes, heights = layout["nodes"], layout["heights"]
+    nodes, heights = layout["nodes"], layout["box_heights"]
     steps = flow["steps"]
     column = COLW + 30
     centers = {p["id"]: 100 + column / 2 + i * column for i, p in enumerate(participants)}

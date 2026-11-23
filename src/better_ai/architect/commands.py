@@ -1,7 +1,8 @@
 """architect-better's own verbs: `review`, `specs`, `register` and `render`, and the guard that keeps `reviews.jsonl`
 for `review`.
 
-- `review <unit> --perspectives <id>...` records the fingerprints of the diagram's parts a review covered;
+- `review <unit> --perspectives <id>...` records the fingerprints of the diagram's parts, the requirements and the
+  design document's sections a review covered;
 - `specs <unit>` prints `specs.md`, made from `spec.jsonl` and marked as generated, on stdout;
 - `register <unit>` writes the register of box kinds into the unit;
 - `render <unit>` writes the page as one static file, and the Before and After SVGs, into the unit's `render/` folder.
@@ -82,6 +83,7 @@ def review(args: argparse.Namespace, run: cli.Run) -> int:
         "changed": model.changed_parts(data["hashes"], previous),
         "hashes": data["hashes"],
         "labels": {key: data["parts"][key]["label"] for key in data["hashes"]},
+        "texts": data["texts"],
     }
     problems = schema.check_record(record, ["reviews.schema.json"])
     if problems:

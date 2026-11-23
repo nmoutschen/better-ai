@@ -130,6 +130,45 @@ class Architect(unittest.TestCase):
         self.assertEqual(model.model(self.read())["rerun"], [])
         self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
 
+    def test_a_change_to_the_design_document_or_a_requirement_makes_the_review_due_again(self):
+        document = self.repo / "docs" / "designs" / "ex" / "design.md"
+        document.parent.mkdir(parents=True)
+        document.write_text("# Ex\n\nIntro.\n\n## Command contract\n\nOld.\n\n```\n## not a heading\n```\n")
+        meta = self.folder / "architect.json"
+        meta.write_text(json.dumps({**json.loads(meta.read_text()), "document": {"file": "docs/designs/ex/design.md"}}))
+        self.command("review", "--perspectives", "security", "observability")
+        last = self.read()["reviews"][-1]
+        self.assertEqual(
+            {key for key in last["texts"] if key.startswith("section:")},
+            {"section:(start)", "section:Command contract"},
+        )
+        self.assertIn("requirement:F1", last["texts"])
+        view = model.model(self.read())
+        self.assertEqual((view["since"], view["rerun"]), ([], []))
+
+        document.write_text(document.read_text().replace("Old.", "New.") + "\n## CI\n\nRuns the tests.\n")
+        self.update("requirements.jsonl", lambda reqs: reqs[0].update(text="A new wording."))
+        view = model.model(self.read())
+        self.assertEqual(view["since"], ["requirement:F1", "section:Command contract", "section:CI"])
+        self.assertEqual(view["rerun"], ["security", "observability"])
+        self.assertEqual(view["removed"], [])
+        self.assertEqual(
+            self.render_javascript(
+                view, "reviewSummary(data.since.map(key => data.change_labels[key]), ['Security', 'Observability'])"
+            ),
+            "Changed since the review: Requirement F1, Design section Command contract, Design section CI. "
+            "Security, Observability run again.",
+        )
+        self.command("review", "--perspectives", "security", "observability")
+        view = model.model(self.read())
+        self.assertEqual((view["since"], view["rerun"]), ([], []))
+        self.assertEqual(formats.run_cli("check", str(self.folder)), (0, "", ""))
+
+        meta.write_text(json.dumps({**json.loads(meta.read_text()), "document": {"file": "../design.md"}}))
+        code, out, _ = formats.run_cli("check", str(self.folder))
+        self.assertEqual(code, 1)
+        self.assertIn("architect.json:1: document.file: invalid source path", out)
+
     def test_review_appends_after_a_file_that_lacks_its_final_newline(self):
         path = self.folder / "reviews.jsonl"
         path.write_text(path.read_text().rstrip("\n"))
@@ -262,6 +301,38 @@ class Architect(unittest.TestCase):
         self.assertEqual(html.count('<span class="chip guess">Unconfirmed</span>'), 1)
         self.assertIn("Dashboard page to dashboard.py: POST /rpc (Flows, step 2c)", html)
         self.assertIn("Coordinator agent to dashboard.py: wait ends with the answer (Flows, step 2d)", html)
+
+    def test_requirements_are_grouped_by_kind_and_sorted_by_id_number(self):
+        def shuffle(records):
+            f1 = records[0]
+            records.reverse()
+            records.extend(
+                {**f1, "id": ident, "kind": kind, "text": f"Requirement {ident}."}
+                for ident, kind in (("F10", "functional"), ("C11", "constraint"), ("F8", "functional"))
+            )
+
+        self.update("requirements.jsonl", shuffle)
+        view = model.model(self.read())
+        self.assertEqual(view["errors"], [])
+        self.assertEqual(
+            [req["id"] for req in view["requirements"]],
+            ["F1", "F2", "F3", "F4", "F8", "F10", "Q1", "Q2", "Q3", "C1", "C2", "C11"],
+        )
+        # A record whose id is not valid goes after the valid ones, whatever its kind.
+        self.update("requirements.jsonl", lambda reqs: reqs.insert(0, {**reqs[0], "id": "F-1"}))
+        view = model.model(self.read())
+        self.assertEqual(view["requirements"][-1]["id"], "(line 1)")
+        self.assertEqual(view["requirements"][0]["id"], "F1")
+
+    def test_a_flow_the_change_removes_is_drawn_in_both_states_and_marked_removed(self):
+        path = self.folder / "design.json"
+        design = json.loads(path.read_text())
+        design["flows"][0]["in"] = ["before"]
+        path.write_text(json.dumps(design))
+        flow = model.model(self.read())["flows"][0]
+        self.assertEqual((flow["new"], flow["removed"]), (False, True))
+        self.assertTrue(flow["versions"]["before"])
+        self.assertIn("REMOVED", flow["versions"]["after"])
 
     def test_a_requirement_source_is_shown_as_words_and_no_link_to_an_endpoint(self):
         view = model.model(self.read())

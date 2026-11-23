@@ -1,5 +1,6 @@
 """What the architecture page shows, read from a change folder: the records of each file, checked one by one, the
-diagram's parts and their fingerprints, what changed since the last review, and which perspectives must run again.
+diagram's parts and their fingerprints, the fingerprints of the requirements and of each section of the design document,
+what changed since the last review, and which perspectives must run again.
 
 `load(unit)` is the page's payload and never raises for a bad file: what is wrong is in `errors`, each with its file,
 line, field and reason, and a bad record stays on the page without the fields that failed. `read_folder` is the same
@@ -10,11 +11,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from .. import paths, resources, schema
 from ..paths import Unit
-from . import diagram
+from . import checks, diagram
 
 FILES = (
     "architect.json",
@@ -152,6 +154,7 @@ def blank(name: str, errors: list) -> dict:
         "reviews": [],
         "decisions": [],
         "spec": [],
+        "texts": {},
         "name": name,
     }
 
@@ -192,7 +195,72 @@ def read_folder(unit: Unit) -> dict:
         data[Path(name).stem] = reader.records(name, keep_invalid=True)
     for name in CHECKED_ONLY:
         reader.records(name)
+    data["texts"] = text_hashes(unit, architect, data["requirements"], reader)
     return data
+
+
+def fingerprint(value) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+
+def document_sections(text: str) -> dict[str, str]:
+    """The sections of a Markdown document by their `## ` heading; what comes before the first is under `(start)`. A
+    heading inside a fenced code block is text, and a heading used twice is numbered from its second use: `Risks (2)`."""
+    sections: dict[str, list[str]] = {"(start)": []}
+    current, fence = "(start)", None
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if fence is None and stripped[:3] in ("```", "~~~"):
+            fence = stripped[:3]
+        elif fence is not None and stripped.startswith(fence):
+            fence = None
+        elif fence is None and line.startswith("## "):
+            heading = line[3:].strip().rstrip("#").strip() or "(untitled)"
+            current, n = heading, 1
+            while current in sections:
+                n += 1
+                current = f"{heading} ({n})"
+            sections[current] = []
+            continue
+        sections[current].append(line)
+    return {heading: "\n".join(lines).strip() for heading, lines in sections.items()}
+
+
+def text_label(key: str) -> str:
+    """A text key in words: `section:<heading>` of the design document, or `requirement:<id>`."""
+    kind, _, name = key.partition(":")
+    return f"Requirement {name}" if kind == "requirement" else f"Design section {name}"
+
+
+def document_path(unit: Unit, architect: dict) -> Path | None:
+    """The design document architect.json names, as the source-file-exists check accepts it; None if it names none or
+    one that check refuses (the check reports why)."""
+    document = architect.get("document")
+    name = document.get("file") if isinstance(document, dict) else None
+    if not isinstance(name, str) or not name:
+        return None
+    root = next((folder for folder in (unit.path, *unit.path.parents) if (folder / ".git").exists()), unit.path)
+    target, problem = checks.repo_file(root, name)
+    return None if problem else target
+
+
+def text_hashes(unit: Unit, architect: dict, requirements: list, reader: Reader) -> dict[str, str]:
+    """The fingerprint of each requirement, without when and by whom it was written, and of each section of the design
+    document: a review records them, so a change to either makes the review due again."""
+    texts = {
+        f"requirement:{r['id']}": fingerprint({k: v for k, v in r.items() if k not in ("at", "by")})
+        for r in requirements
+        if isinstance(r.get("id"), str)
+    }
+    path = document_path(unit, architect)
+    if path is not None:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            reader.error("architect.json", 1, "document.file", f"cannot be read: {paths.reason(exc)}")
+        else:
+            texts.update((f"section:{heading}", fingerprint(body)) for heading, body in document_sections(text).items())
+    return texts
 
 
 def diagram_parts(design):
@@ -263,6 +331,14 @@ def changed_parts(hashes, review):
     return [key for key in dict.fromkeys((*hashes, *previous)) if hashes.get(key) != previous.get(key)]
 
 
+def changed_texts(texts, review):
+    """The requirements and design sections that changed since a review; none for a review that recorded no texts."""
+    previous = review.get("texts") if review else None
+    if previous is None:
+        return []
+    return [key for key in dict.fromkeys((*texts, *previous)) if texts.get(key) != previous.get(key)]
+
+
 def render_diagrams(design, marks):
     try:
         layout = diagram.layout({**design, "findings": marks})
@@ -271,6 +347,7 @@ def render_diagrams(design, marks):
             {
                 "name": flow["name"],
                 "new": flow.get("in") == ["after"],
+                "removed": flow.get("in") == ["before"],
                 "versions": {
                     s: diagram.svg_flow(flow, s, layout, f"flow{i}") if diagram.visible(flow, s) else ""
                     for s in diagram.STATES
@@ -299,15 +376,30 @@ def shown(record, **defaults):
     return {**{k: v for k, v in defaults.items() if k not in record}, **record}
 
 
+REQUIREMENT_KINDS = ("functional", "quality", "constraint")
+
+
+def requirement_order(requirement):
+    """Where a requirement sits on the page: by kind, then by the number in its ID (F2 before F10), whatever the order of
+    the lines; a record whose kind or ID is not valid goes after the valid ones, in line order."""
+    kind, ident = requirement["kind"], requirement.get("id", "")
+    number = re.fullmatch(r"[A-Z]+([0-9]+)", ident) if isinstance(ident, str) else None
+    if kind not in REQUIREMENT_KINDS or number is None:
+        return len(REQUIREMENT_KINDS), float("inf")
+    return REQUIREMENT_KINDS.index(kind), int(number[1])
+
+
 def model(data):
     """What the page shows: the records, the diagrams with the findings marked, what changed since the last review and
     which perspectives must run again, and `errors`. It draws what it is given: a record that is not valid arrives
     without the fields that failed."""
     errors = list(data["errors"])
     design, parts = data["design"], data["parts"]
-    reviews = [shown(r, perspectives=[], changed=[], hashes={}, labels={}) for r in data["reviews"]]
+    reviews = [shown(r, perspectives=[], changed=[], hashes={}, labels={}, texts=None) for r in data["reviews"]]
     review = reviews[-1] if reviews else None
+    texts = data.get("texts", {})
     changes = dict.fromkeys(changed_parts(data["hashes"], review) if design else [])
+    changes.update(dict.fromkeys(changed_texts(texts, review)))
     known = set(parts)
     for recorded in reviews:
         known.update(recorded["hashes"])
@@ -345,9 +437,10 @@ def model(data):
             if last
             else []
         )
-        if last is None or affected:
+        rewritten = changed_texts(texts, last)
+        if last is None or affected or rewritten:
             rerun.append(ident)
-            changes.update(dict.fromkeys(affected))
+            changes.update(dict.fromkeys(affected + rewritten))
     containers, flows = {state: "" for state in diagram.STATES}, []
     if design:
         try:
@@ -356,6 +449,7 @@ def model(data):
             errors.append({"file": "design.json", "line": 1, "field": "(diagram)", "message": str(exc)})
     meta = data["architect"]
     requirements = [shown(r, kind="", text="", source={"type": "missing"}) for r in data["requirements"]]
+    requirements.sort(key=requirement_order)  # stable: equal keys keep their line order
     return {
         "errors": errors,
         "title": text_of(meta, "title", data["name"]),
@@ -370,8 +464,8 @@ def model(data):
         "spec": [shown(r, statement="", source=None, checked_by="") for r in data["spec"]],
         "parts": parts,
         "since": list(changes),
-        "removed": [key for key in changes if key not in parts],
-        "change_labels": {key: labels.get(key, key) for key in changes},
+        "removed": [key for key in changes if key not in parts and key not in texts],
+        "change_labels": {key: labels.get(key) or text_label(key) for key in changes},
         "removed_labels": {key: labels.get(key, key) for key in known if key not in parts},
         "rerun": rerun,
         "containers": containers,

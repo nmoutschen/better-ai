@@ -51,6 +51,8 @@ code { font:var(--font-code); background:var(--linen); padding:1px var(--space-t
 .fig svg.focused > :not(.highlighted, defs, style, rect:first-child) { opacity:.18; }
 .fig svg .highlighted > :is(rect, path, line):first-child { stroke:var(--terracotta); stroke-width:3.5; }
 .fig svg .mark.highlighted > rect { stroke:none; }
+.fig svg g.mark, .fig svg g.mark * { cursor:pointer; }
+.tbl tr.highlighted { outline:2px solid var(--terracotta); outline-offset:-2px; }
 .boxref svg { flex:none; }
 
 .decide { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item) var(--space-item); margin-bottom:var(--space-item); }
