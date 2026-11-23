@@ -131,7 +131,8 @@ function perspectiveTables(perspectives, findings, parts, reviewed, removedLabel
           icon + '<span>' + text(label) + '</span></a>';
       }).join('<br>');
       return row(['<strong>' + text(f.id) + '</strong>', links, text(f.text) +
-        (f.confirmed ? '' : ' ' + chip('Unconfirmed', 'guess')) + invalid(f), text(f.handled_by ?? 'Open')]);
+        (f.confirmed ? '' : ' ' + chip('Unconfirmed', 'guess')) + invalid(f), text(f.handled_by ?? 'Open')],
+        'data-finding="' + text(f.id) + '" data-perspective="' + text(p.id) + '"');
     });
     return '<h3>' + text(p.name) + '</h3>' + (rows.length ? table(headers, rows) : '<p class="muted">No findings.</p>');
   }).join('');
@@ -220,7 +221,8 @@ function start(data) {
   const diagramControls = controls(applicable, review);
   section('containers', 'Containers', diagramControls + figures(data.containers, 'The containers are not drawn: see the errors above.'));
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
-    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'open') : '') + '</h3>' +
+    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'open') : '') +
+    (flow.removed ? ' ' + chip('Removed') : '') + '</h3>' +
     figures(flow.versions)).join(''));
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
   section('decisions', 'Decision records', decisionRecords(data.decisions));
@@ -238,6 +240,11 @@ function start(data) {
     }
   }
   all('.fig svg').forEach(svg => svg.setAttribute('role', 'group'));
+  all('.fig .mark').forEach(mark => {
+    mark.setAttribute('tabindex', '0');
+    mark.setAttribute('role', 'button');
+    mark.setAttribute('aria-label', 'Show finding ' + $('text', mark).textContent + ' under Perspectives');
+  });
 
   function showTab(key) {
     if (!panel(key)) key = 'overview';
@@ -289,6 +296,19 @@ function start(data) {
       if (mark.dataset.p === findings && $('text', mark).textContent === link.dataset.badge) mark.classList.add('highlighted');
     });
     first?.scrollIntoView({block: 'center'});
+  }
+
+  // A finding's mark on a diagram opens its row under Perspectives, as the row's part link opens the diagram.
+  function showFinding(mark) {
+    clearHighlight();
+    showTab('perspectives');
+    const id = $('text', mark).textContent;
+    const target = all('[data-finding]').find(r => r.dataset.finding === id && r.dataset.perspective === mark.dataset.p);
+    if (!target) return;
+    target.classList.add('highlighted');
+    target.tabIndex = -1;
+    target.focus({preventScroll: true});
+    target.scrollIntoView({block: 'center'});
   }
 
   function crumb(event) {
@@ -445,6 +465,8 @@ function start(data) {
     }
     const fig = event.target.closest('.fig');
     if (!fig) return;
+    const mark = event.target.closest('.mark');
+    if (mark) { showFinding(mark); return; }
     clearHighlight();
     const element = event.target.closest('g[data-id]');
     if (partByElement.has(element) || event.target.closest('.pin')) {
@@ -477,6 +499,10 @@ function start(data) {
       const next = {ArrowLeft: (i + tabs.length - 1) % tabs.length, ArrowRight: (i + 1) % tabs.length,
         Home: 0, End: tabs.length - 1}[event.key];
       if (next !== undefined) { event.preventDefault(); tabs[next].click(); tabs[next].focus(); }
+    }
+    if (element.matches('.mark') && ['Enter', ' '].includes(event.key)) {
+      event.preventDefault();
+      showFinding(element);
     }
     if (!readOnly && partByElement.has(element) && ['Enter', ' '].includes(event.key)) {
       event.preventDefault();

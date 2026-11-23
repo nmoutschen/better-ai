@@ -650,12 +650,13 @@ class WrongTypes(unittest.TestCase):
             records[0] = {**records[0], "kind": 5, "text": ["x"]}
             folder = make_folder(Path(d), **{"requirements.jsonl": records})
             data = load(folder)
-        first = data["requirements"][0]
+        # The record whose kind is not valid goes after the valid ones.
+        first = data["requirements"][-1]
         self.assertTrue(first["_errors"])
         self.assertEqual(first["id"], "F1")
         self.assertEqual({e["field"] for e in data["errors"]}, {"kind", "text"})
-        self.assertEqual(data["requirements"][1]["id"], "F3")
-        self.assertNotIn("_errors", data["requirements"][1])
+        self.assertEqual(data["requirements"][0]["id"], "F3")
+        self.assertNotIn("_errors", data["requirements"][0])
 
 
 class RawLines(unittest.TestCase):

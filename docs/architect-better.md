@@ -25,7 +25,7 @@ Use it to design a feature or a structural change, such as adding a module, chan
 
 Switch between Before and After in Containers and Flows. Click a box, arrow or step to comment. Confirm a guessed requirement or choose Change to correct a row. The agent replies under your message.
 
-Choose **Approve…** to start perspective reviews. When a finding appears, select its linked part to see where it applies. After a revision, **Review again…** shows what changed and reruns the perspectives those changes affect.
+Choose **Approve…** to start perspective reviews. When a finding appears, select its linked part to see where it applies. After a revision, **Review again…** shows what changed in the diagrams, the requirements or `design.md`, and reruns the perspectives those changes affect.
 
 ## What you get
 

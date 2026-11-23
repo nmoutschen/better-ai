@@ -73,15 +73,22 @@ class DiagramTests(unittest.TestCase):
         for i in range(1, 6):
             self.assertIn(str(i), content(svg, f"flow2-after-step-f2s{i}"))
 
-    def test_removed_parts_only_show_in_after(self):
+    def test_removed_parts_show_plain_in_before_and_marked_in_after(self):
         layout = diagram.layout(self.design)
         for render, prefix, ids in (
             (lambda state: diagram.svg_containers(layout, state), "c", ("box-notes", "edge-e13")),
             (lambda state: diagram.svg_flow(self.design["flows"][0], state, layout, "flow1"), "flow1", ("step-s8",)),
         ):
             for part in ids:
-                self.assertEqual(content(render("before"), f"{prefix}-before-{part}"), [])
+                before = content(render("before"), f"{prefix}-before-{part}")
+                self.assertTrue(before, part)
+                self.assertNotIn("REMOVED", before)
                 self.assertIn("REMOVED", content(render("after"), f"{prefix}-after-{part}"))
+
+    def test_new_parts_only_show_in_after(self):
+        layout = diagram.layout(self.design)
+        self.assertEqual(content(diagram.svg_containers(layout, "before"), "c-before-box-page"), [])
+        self.assertIn("NEW", content(diagram.svg_containers(layout, "after"), "c-after-box-page"))
 
     def test_group_bands_exclude_non_members(self):
         root = ET.fromstring(diagram.svg_containers(diagram.layout(self.design), "after"))
@@ -126,6 +133,34 @@ class DiagramTests(unittest.TestCase):
             content(after, "flow1-after-box-user"),
             content(diagram.svg_containers(positions, "after"), "c-after-box-user"),
         )
+
+    def test_flow_boxes_keep_their_text_height_when_many_arrows_reach_the_container(self):
+        design = {
+            "containers": {
+                "nodes": [{"id": name, "kind": "service", "label": name} for name in ("a", "b", "c", "d", "hub")],
+                "edges": [
+                    {"id": f"to-{name}", "from": name, "to": "hub", "label": "sends a fairly long message label"}
+                    for name in ("a", "b", "c", "d")
+                ],
+            },
+            "flows": [
+                {
+                    "id": "f",
+                    "name": "Flow",
+                    "participants": [{"id": "a", "box": "a"}, {"id": "hub", "box": "hub"}],
+                    "steps": [{"id": "s1", "from": "a", "to": "hub", "label": "sends"}],
+                }
+            ],
+        }
+        layout = diagram.layout(design)
+
+        def height(svg, ident):
+            return float(ET.fromstring(svg).find(f".//*[@id='{ident}']/svg:rect", NS).get("height"))
+
+        containers = diagram.svg_containers(layout, "after")
+        self.assertGreater(height(containers, "c-after-box-hub"), height(containers, "c-after-box-a"))
+        flow = diagram.svg_flow(design["flows"][0], "after", layout, "flow1")
+        self.assertEqual(height(flow, "flow1-after-box-hub"), height(flow, "flow1-after-box-a"))
 
     def test_step_findings_can_target_one_of_two_flows_with_the_same_step_id(self):
         first = self.design["flows"][0]
