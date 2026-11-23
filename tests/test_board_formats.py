@@ -1035,6 +1035,7 @@ class Verbs(unittest.TestCase):
             scripts = Scripts()
             scripts.feed(text)
             carried = [body for attrs, body in scripts.found if attrs.get("id") == "page-data"]
+            self.assertNotIn("<", carried[0])  # no record text can open or end a script element
             data = json.loads(carried[0])
             self.assertEqual([q["question"] for q in data["questions"]], [quoted])
             self.assertEqual(data["brief"]["topic"], example("brief.json", "brief")["topic"])

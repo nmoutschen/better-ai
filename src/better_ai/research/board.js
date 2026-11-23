@@ -1,4 +1,6 @@
 // A page written by `render` carries its data in #page-data (read at the end) and has no server; a served page reads /data.
+// What the board shows of an invalid record, said under the errors band.
+const ERRORS_NOTE = "Questions and the brief are shown marked not valid, claims and sources under the question they name, and messages without the parts that failed; other records are only listed here.";
 let SNAPSHOT = null;
 const $ = id => document.getElementById(id);
 const esc = pageEscape;
@@ -387,10 +389,10 @@ const invalidHTML = r => notValid(r) ? `<span class="invalid">${esc(notValid(r))
 let fails = 0;
 function tick() {
   return fetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(d => { fails = 0; CLOSED_PAGE = false; pageShowErrors($("errors"), d.errors); render(d); },
+    .then(d => { fails = 0; CLOSED_PAGE = false; pageShowErrors($("errors"), d.errors, ERRORS_NOTE); render(d); },
       () => { if (++fails >= 2 && !CLOSED_PAGE) { CLOSED_PAGE = true; $("errors").hidden = true; if (D) render(D); } });
 }
 const embedded = $("page-data");
-if (embedded) { SNAPSHOT = JSON.parse(embedded.textContent); pageShowErrors($("errors"), SNAPSHOT.errors); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
+if (embedded) { SNAPSHOT = JSON.parse(embedded.textContent); pageShowErrors($("errors"), SNAPSHOT.errors, ERRORS_NOTE); render(SNAPSHOT); document.querySelectorAll("#noteform").forEach(f => f.remove()); }
 else { conv.start(); tick(); setInterval(tick, 2000); }
 setView();

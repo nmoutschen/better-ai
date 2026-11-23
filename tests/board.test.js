@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { read, stand, marked, between, loadPage, loadBoard } = require('./harness');
 
 const { pageEscape: realEsc, pageShowErrors } = loadPage();
+const NOTE = loadBoard('{ERRORS_NOTE}').ERRORS_NOTE;
 
 // The page with `getElementById('pop')` giving one element that keeps what is written into it.
 function page() {
@@ -144,6 +145,9 @@ test('the errors band is written only when its text changes, so a screen reader 
   assert.equal(writes, 1);
   pageShowErrors(band, []);
   assert.deepEqual([writes, band.hidden], [2, true]);
+
+  pageShowErrors(band, errors, NOTE);
+  assert.ok(html.includes('<p>' + NOTE + '</p>'), 'the board says what it shows of an invalid record');
 });
 
 test('the board marks an invalid brief like any other record', () => {

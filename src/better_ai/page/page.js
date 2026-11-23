@@ -796,10 +796,11 @@ function pageEscape(text) {
 
 // The records that did not validate, as the band above the work: how many, then where each is, its field, why, and who
 // wrote it. A file can hold anything, so every part is text. The valid records are on the page as usual; this band never
-// replaces them. The page has `<section class="errors" id="errors" aria-labelledby="errors-h" hidden></section>`.
-function pageErrors(errors) {
+// replaces them. NOTE, if given, says what the page shows of an invalid record. The page has
+// `<section class="errors" id="errors" role="status" aria-labelledby="errors-h" hidden></section>`.
+function pageErrors(errors, note) {
   if (!errors || !errors.length) return '';
-  return '<h2 id="errors-h">' + errors.length + (errors.length === 1 ? ' record is' : ' records are') + ' not valid</h2><ul>' +
+  return '<h2 id="errors-h">' + errors.length + (errors.length === 1 ? ' record is' : ' records are') + ' not valid</h2>' + (note ? '<p>' + pageEscape(note) + '</p>' : '') + '<ul>' +
     errors.map(function (e) {
       return '<li><code>' + pageEscape(e.file) + ':' + pageEscape(e.line) + '</code> <b>' + pageEscape(e.field) + '</b>: ' +
         pageEscape(e.message) + (e.by ? ' <span class="by">written by ' + pageEscape(e.by) + '</span>' : '') + '</li>';
@@ -807,8 +808,8 @@ function pageErrors(errors) {
 }
 // Shows the band in EL, and hides it when there is none. It is written only when its text changes: it is a live
 // region, and a rewrite at every poll would be read out every time.
-function pageShowErrors(el, errors) {
-  var html = pageErrors(errors);
+function pageShowErrors(el, errors, note) {
+  var html = pageErrors(errors, note);
   el.hidden = !html;
   if (el.innerHTML !== html) el.innerHTML = html;
 }
