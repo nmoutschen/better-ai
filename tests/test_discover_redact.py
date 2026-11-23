@@ -199,7 +199,7 @@ class Removal(Fixture):
         source["origin"]["given"]["event"] = "r1"
         P.write_json(self.unit / "sources" / "S-coord-2.json", source)
         evidence = json.loads((self.unit / "evidence" / f"{PAGE}.json").read_text())
-        evidence["words"] = {"type": "quote", "text": "A team found it fast."}  # event words must be an add_evidence
+        evidence["words"] = {"type": "event", "event": "r1"}
         P.write_json(self.unit / "evidence" / f"{PAGE}.json", evidence)
         with (self.unit / "conversation.jsonl").open("a") as log:
             log.write(json.dumps(R.event("add_result", text="Dana's team found it fast.")) + "\n")
@@ -225,6 +225,19 @@ class Removal(Fixture):
         self.assertEqual(test["result"], {"text": "[removed]", "outcome": "holds", "evidence": [CHAT]})
         self.assertIn("tests.jsonl:1", done.stdout)
         self.assertEqual(R.run(self.root, "check", str(self.unit.relative_to(self.root))).returncode, 0)
+
+    def test_D16_redacting_either_of_two_evidence_a_result_cites_removes_its_text_from_the_brief(self):
+        for evidence in (CHAT, "E-a1-1"):
+            with self.subTest(evidence=evidence):
+                self.setUp()
+                self.result(evidence=("E-a1-1", CHAT))
+                self.brief_final()
+                self.assertIn("Dana's team", (self.unit / "brief" / "v1.md").read_text())
+                self.ask_on_the_page(evidence=evidence)
+                done = self.redact(evidence=evidence)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertNotIn("Dana's team", self.everything())
+                self.assertEqual(self.verb("brief", "v1").returncode, 0)
 
     def test_D16_a_result_that_cites_other_evidence_is_left_alone(self):
         self.result(evidence=("E-a1-1",))

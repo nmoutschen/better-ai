@@ -162,6 +162,15 @@ class PageMoves(Unit):
         self.accepted(self.move(self.page(), option="K1"))
         self.refused(self.move(self.page(), option="K1"), "page event c1 is already used by M1", "use another event")
 
+    def test_S36_check_reports_two_moves_on_one_event(self):
+        self.choose_now("K1")
+        put(
+            self.unit,
+            "moves.jsonl",
+            [R.record(R.MOVE, answer=self.page()), R.record(R.MOVE, id="M2", answer=self.page())],
+        )
+        self.refused(self.check(), "page event c1 is already used by M1", "use another event")
+
 
 class ChatMoves(Unit):
     def setUp(self):

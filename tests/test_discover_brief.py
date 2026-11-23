@@ -333,8 +333,21 @@ class Outside(Fixture):
         self.assertNotIn("Dana's team", tests.split("## Open questions", 1)[0])
         self.assertIn("E-a1-1", tests)  # the result still names the evidence it rests on
 
-    def test_D16_a_result_that_cites_several_evidence_keeps_its_text_out_of_the_brief(self):
+    def test_D16_a_result_that_cites_several_evidence_shows_its_text_under_its_test_inside_each_evidence_marker(self):
         unit = self.unit()
+        self.done_test(unit, ["E-a1-1", "E-coord-1"])
+        self.assertEqual(run_brief(self.root, unit).returncode, 0)
+        text = self.text(unit)
+        tests = text.split("## Tests\n", 1)[1]
+        self.assertIn(
+            f'<!-- E-a1-1 --><!-- E-coord-1 -->"{self.SAID}"<!-- /E-coord-1 --><!-- /E-a1-1 -->',
+            tests,
+        )
+        self.assertEqual(text.count("Dana's team"), 1)
+
+    def test_D16_a_result_in_an_internal_discovery_is_not_shown_even_when_it_cites_several_evidence(self):
+        unit = self.unit()
+        P.set_setting(unit, "internal")
         self.done_test(unit, ["E-a1-1", "E-coord-1"])
         self.assertEqual(run_brief(self.root, unit).returncode, 0)
         self.assertNotIn("Dana's team", self.text(unit))
@@ -345,6 +358,15 @@ class Outside(Fixture):
         self.done_test(unit, ["E-a1-1"])
         self.assertEqual(run_brief(self.root, unit).returncode, 0)
         self.assertNotIn("Dana's team", self.text(unit))
+
+    def test_D21_a_file_source_without_a_title_reads_from_your_files(self):
+        unit = self.unit()
+        source = R.record(R.SOURCE, id="S-a1-2", origin={"type": "file", "path": "n.md", "read": "raw"}, title="")
+        P.write_json(unit / "sources" / "S-a1-2.json", source)
+        found = R.record(R.COUNTING, id="E-a1-2", source="S-a1-2", summary="a customer lost a week")
+        P.write_json(unit / "evidence" / "E-a1-2.json", found)
+        self.assertEqual(run_brief(self.root, unit).returncode, 0)
+        self.assertIn("From your files: a customer lost a week", self.block(self.text(unit), "E-a1-2"))
 
     def test_D21_evidence_from_a_file_or_a_tool_shows_its_summary_by_role_in_any_discovery(self):
         for origin in (
@@ -367,8 +389,10 @@ class Outside(Fixture):
                 P.write_json(unit / "evidence" / "E-a1-2.json", found)
                 self.assertEqual(run_brief(root, unit).returncode, 0)
                 block = self.block((unit / "brief" / "v1.md").read_text(), "E-a1-2")
-                self.assertIn("a customer in support", block)
                 self.assertIn("a customer lost a week", block)
+                self.assertNotIn("Reported by you", block)
+                self.assertNotIn("a person", block)
+                self.assertTrue(block.lstrip("- ").startswith("From A post about the problem: "), block)
                 self.assertNotIn("Acme", block)
 
 

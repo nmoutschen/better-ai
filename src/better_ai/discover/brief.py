@@ -155,7 +155,11 @@ def _sort_key(ident: str) -> tuple:
 
 def _event_text(data: Data, ident: str) -> str:
     for event in data.conversation:
-        if event.get("id") == ident and event.get("type") == "add_evidence" and isinstance(event.get("text"), str):
+        if (
+            event.get("id") == ident
+            and event.get("type") in ("add_evidence", "add_result")
+            and isinstance(event.get("text"), str)
+        ):
             return event["text"]
     return "words not found"
 
@@ -187,8 +191,11 @@ def _evidence_block(ident: str, evidence: dict, data: Data, internal: bool) -> s
     bears = ", ".join(f"{b['direction']} {b['item']}" for b in evidence.get("bears_on") or []) or "bears on no item"
     facts = f"({inline(evidence.get('kind'))}, {about}; {inline(evidence.get('status'))}; {inline(bears)})"
     if _by_role(origin, internal):
-        role = inline(source.get("said_by_role") or "a person")
-        line = f"Reported by you, from {role}: {inline(evidence.get('summary') or 'no summary given')} {facts}."
+        summary = inline(evidence.get("summary") or "no summary given")
+        if origin.get("type") == "you":
+            line = f"Reported by you, from {inline(source.get('said_by_role') or 'a person')}: {summary} {facts}."
+        else:  # a file or a tool: the summary, under the source's own title
+            line = f"From {inline(source.get('title') or 'your files')}: {summary} {facts}."
     else:
         words = evidence.get("words") or {}
         text = _event_text(data, words.get("event")) if words.get("type") == "event" else words.get("text")
@@ -221,6 +228,18 @@ def _item_lines(item: dict, view: derive.ItemView) -> list[str]:
     return lines
 
 
+def _said(result: dict, cited: list) -> str:
+    """The text of a result in the tests section. A result that cites one evidence has its text in that evidence's block;
+    one that cites several has it here, inside the markers of each, so redacting any one of them removes it; one that
+    cites none has it plain."""
+    text = f'"{inline(result.get("text"))}"'
+    if not cited:
+        return f" {text}"
+    if len(cited) == 1 or not all(isinstance(e, str) and EVIDENCE_ID.fullmatch(e) for e in cited):
+        return ""
+    return " " + "".join(f"<!-- {e} -->" for e in cited) + text + "".join(f"<!-- /{e} -->" for e in reversed(cited))
+
+
 def _test_lines(test: dict, internal: bool) -> list[str]:
     head = (
         f"- {inline(test.get('id'))} ({inline(test.get('kind'))}, {inline(test.get('status'))}): "
@@ -231,7 +250,7 @@ def _test_lines(test: dict, internal: bool) -> list[str]:
     result = test.get("result")
     if isinstance(result, dict):
         cited = result.get("evidence") or []
-        said = "" if internal or cited else f' "{inline(result.get("text"))}"'  # a cited result's words sit in a block
+        said = "" if internal else _said(result, cited)
         ids = ", ".join(inline(e) for e in result.get("evidence") or [])
         lines.append(f"  - Result ({inline(result.get('outcome'))}):{said}" + (f" Evidence: {ids}." if ids else ""))
     if test.get("status") == "removed":
@@ -578,13 +597,15 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
     if kind == "brief":
         record = next(b for b in data.briefs if b.get("id") == ref)
         text = paths.read_bytes(unit, record["file"]).decode("utf-8")
-        found = _block(evidence_id).search(text)
+        found = list(_block(evidence_id).finditer(text))
         if not found:
             return [], None
-        line = text[: found.start()].count("\n") + 1
-        new = text[: found.start()] + REMOVED + text[found.end() :]
+        new = _block(evidence_id).sub(REMOVED, text)
         return (
-            [f"{record['file']}:{line}: replaced the block for {evidence_id} with {REMOVED}"],
+            [
+                f"{record['file']}:{text[: m.start()].count(chr(10)) + 1}: replaced the block for {evidence_id} with {REMOVED}"
+                for m in found
+            ],
             lambda: paths.write_atomic(unit, record["file"], new.encode("utf-8")),
         )
     if kind == "leftover":

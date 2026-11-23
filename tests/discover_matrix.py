@@ -221,10 +221,12 @@ def alternatives(kind: str, record: dict, field: str) -> list[dict]:
     return [{field: "x"}]
 
 
-def must_be_refused(kind: str, record: dict, op: str, patch: dict, writer: str | None) -> str | None:
+def must_be_refused(
+    kind: str, record: dict, op: str, patch: dict, writer: str | None, unset: str | None = None
+) -> str | None:
     """The rule that refuses this write, or None when the rules do not say it is refused."""
-    field = next(iter(patch)) if patch else None
-    fields = set(patch)
+    field = unset or (next(iter(patch)) if patch else None)
+    fields = set(patch) | ({unset} if unset else set())
     status = record.get("status")
     if kind in COORDINATOR_ONLY and writer != COORD:
         return f"only the coordinator writes {kind}"
@@ -232,6 +234,8 @@ def must_be_refused(kind: str, record: dict, op: str, patch: dict, writer: str |
         return "the coordinator named in the head cannot change"
     if kind in ("change", "move"):
         return f"a {kind} is never edited"
+    if kind == "option" and record["id"] == "K1" and fields - {"note", "updated_at"}:
+        return "an option a move chose keeps every field but note and updated_at"
     if kind == "brief":
         if status == "final":
             return "a final brief is never changed by set"
@@ -364,7 +368,7 @@ class MatrixCase(unittest.TestCase):
                     )
                     if done.returncode == 0 and who == COORD and files_of(self.unit) != before:
                         self.accepted[kind] = self.accepted.get(kind, 0) + 1
-                    self.judge(label, done, before, must_be_refused(kind, record, op, patch, who), keeps, found)
+                    self.judge(label, done, before, must_be_refused(kind, record, op, patch, who, unset), keeps, found)
         return found
 
     def matrix(self, kinds, changing):

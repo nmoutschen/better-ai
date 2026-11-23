@@ -85,7 +85,7 @@
             "required": ["type", "event"],
             "properties": {
               "type": {"const": "event"},
-              "event": {"type": "string", "minLength": 1, "x-points-to": {"file": "../conversation.jsonl", "type": "add_evidence"}}
+              "event": {"type": "string", "minLength": 1, "x-points-to": {"file": "../conversation.jsonl", "type": ["add_evidence", "add_result"]}}
             }
           }
         }
