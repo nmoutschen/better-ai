@@ -299,7 +299,7 @@ class Architect(unittest.TestCase):
     def test_perspective_table_marks_unconfirmed_findings(self):
         view = model.model(self.read())
         html = self.render_javascript(view, "perspectiveTables(data.perspectives, data.findings, data.parts, true)")
-        self.assertEqual(html.count('<span class="chip guess">Unconfirmed</span>'), 1)
+        self.assertEqual(html.count('<span class="chip plain">Unconfirmed</span>'), 1)
         self.assertIn("Dashboard page to dashboard.py: POST /rpc (Flows, step 2c)", html)
         self.assertIn("Coordinator agent to dashboard.py: wait ends with the answer (Flows, step 2d)", html)
 

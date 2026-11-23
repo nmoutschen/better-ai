@@ -10,9 +10,9 @@ const has = v => v && v !== "none";
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const mins = s => s < 90 ? "under 2 min" : `${Math.round(s / 60)} min`;
 // A question's status is one of the schema's words; one this table lacks still counts as to do.
-const STATE = { "answered": ["answered", "ok"], "in progress": ["working", "now"], "open": ["to do", "todo"], "proposed": ["proposed", "todo"],
-  "contested": ["contested", "bad"], "not found": ["not found", "bad"], "unclear": ["unclear", "bad"] };
-const FILL = { ok: "#6B7F5E", now: "#5C4033", todo: "#C4B69C", bad: "#E8725C" };
+const STATE = { "answered": ["answered", "ok"], "in progress": ["working", "working"], "open": ["to do", "plain"], "proposed": ["proposed", "plain"],
+  "contested": ["contested", "error"], "not found": ["not found", "error"], "unclear": ["unclear", "error"] };
+const FILL = { ok: "#6B7F5E", working: "#E8725C", plain: "#C4B69C", error: "#9A3B2A" };
 const SIZE = { high: 10, medium: 7, low: 4.5 };  // dot radius by priority; a question without one is drawn as medium
 const CLOSED = new Set(["answered", "contested", "not found"]);
 let D = null, LAYOUT = "", OPEN = null, REPLIES = -1, SCROLLED = false, CLOSED_PAGE = false;  // OPEN: what the open pop-up shows, as {kind, id}
@@ -97,7 +97,7 @@ function drawMap(d) {
     const hollow = (stroke, dash) => `<circle class="dot" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r - 1}" fill="#FFFCF7" stroke="${stroke}" stroke-width="2.5"${dash ? ' stroke-dasharray="3 2"' : ""}/>`;
     const dot = q.view === "proposed" ? hollow("#78736B") : q.view === "not found" ? hollow("#9A3B2A") : q.view === "unclear" ? hollow("#9A3B2A", true)
       : `<circle class="dot filled" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r}" fill="${FILL[cls]}"/>`;
-    const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#5C4033" stroke-dasharray="3 2"/>` : "";
+    const ring = q.view === "in progress" ? `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r + 4}" fill="none" stroke="#E8725C" stroke-dasharray="3 2"/>` : "";
     const mark = q._errors ? `<text class="bang" x="${(x + r + 3).toFixed(0)}" y="${(y - r).toFixed(0)}">!</text>` : "";
     const right = x >= CX, far = dp > 1 ? `<text class="far" x="${(x + (r + 4) * (right ? 1 : -1)).toFixed(0)}" y="${(y + 4).toFixed(0)}" text-anchor="${right ? "start" : "end"}">${esc(q.label)}</text>` : "";
     const who = q.view === "in progress" && has(q.owner) ? `, ${q.owner} on it` : "";
@@ -290,7 +290,7 @@ function fillPop() {
   } else if (D.claims.some(c => c.checker === id)) {
     const mine = D.claims.filter(c => c.checker === id), v = x => x.status;
     const holding = mine.filter(c => v(c) === "checking"), failed = mine.filter(c => v(c) === "unverified");
-    html = `<div class="hd"><p class="kind">Verifier, <span class="chip now">checking</span></p><h3>${esc(id)}</h3></div>
+    html = `<div class="hd"><p class="kind">Verifier, <span class="chip working">checking</span></p><h3>${esc(id)}</h3></div>
       <div class="bd"><p>Checked ${plural(mine.length - holding.length, "claim")}: ${mine.filter(c => v(c) === "verified").length} verified, ${failed.length} failed.</p>
       ${holding.length ? `<div class="sec"><h4 class="section-h">Checking now</h4><ul>${holding.map(c => `<li dir="auto">${esc(c.claim)}</li>`).join("")}</ul></div>` : ""}
       ${failed.length ? `<div class="sec"><h4 class="section-h">Failed</h4><ul>${failed.map(c => `<li dir="auto">${esc(c.claim)} <span class="muted">${esc(c.reason)}</span></li>`).join("")}</ul></div>` : ""}
@@ -302,7 +302,7 @@ function fillPop() {
     const counts = new Map();
     (log.searches || []).slice().reverse().forEach(r => counts.set(r.query, (counts.get(r.query) || 0) + 1));
     const s = [...counts].slice(0, 5).map(([q, n]) => n > 1 ? `${q} (${n} times)` : q);
-    html = `<div class="hd"><p class="kind">Agent, <span class="chip now">working</span></p><h3>${esc(id)}${q ? " on " + esc(q.label) : ""}</h3></div>
+    html = `<div class="hd"><p class="kind">Agent, <span class="chip working">working</span></p><h3>${esc(id)}${q ? " on " + esc(q.label) : ""}</h3></div>
       <div class="bd"><div class="sec"><h4 class="section-h">Latest searches</h4>
       <ul>${s.map(x => `<li dir="auto">${esc(x)}</li>`).join("") || "<li>None logged yet.</li>"}</ul></div>
       <div class="sec"><h4 class="section-h">Conversation</h4><ul class="thread"></ul>`;

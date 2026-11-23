@@ -4,9 +4,9 @@
   font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; }
 .seg button.ico[aria-pressed="true"] { opacity:1; }
 .seg button.ico svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
-.seg button.sw .chip { width:14px; height:14px; border:1px solid var(--sand); display:block; }
-.chip--light { background:var(--surround); }
-.chip--dark { background:var(--surround-dark); }
+.seg button.sw .swatch { width:14px; height:14px; border:1px solid var(--sand); display:block; }
+.swatch--light { background:var(--surround); }
+.swatch--dark { background:var(--surround-dark); }
 /* Settings changed rarely sit in the Display menu. */
 .more { position:relative; }
 .morebtn { display:inline-flex; align-items:center; gap:var(--space-control); border:1px solid var(--cream); background:transparent; color:var(--cream);

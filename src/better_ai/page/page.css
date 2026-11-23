@@ -111,6 +111,43 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .tabs .count { flex:none; white-space:nowrap;
   font:var(--font-label); font-variant-numeric:tabular-nums; background:var(--umber); color:var(--cream); padding:1px var(--space-control); }
 .tabs .count.ok { background:var(--moss-dark); }
+/* A tab row with many tabs wraps onto more lines instead of scrolling. */
+.tabs--wrap { flex-wrap:wrap; overflow:visible; }
+
+/* A chip: a short state word in a box. The colour follows the meaning: moss-dark done, terracotta working, umber waiting
+   for the user, error blocked; a plain chip is anything else. The word always says it; this file puts the ⊘ before a blocked chip's word. */
+.chip { white-space:nowrap; display:inline-block; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase;
+  padding:var(--space-tight) var(--space-control); border:1px solid var(--sand); color:var(--ink); background:var(--linen); }
+.chip.ok { border-color:var(--moss-dark); color:var(--moss-dark); background:var(--cream); }
+.chip.error { border-color:var(--error); color:var(--error); background:var(--cream); }
+.chip.working { border-color:var(--terracotta); color:var(--terracotta-dark); background:var(--cream); }
+.chip.working::before { content:""; display:inline-block; width:10px; height:4px; margin-right:var(--space-control); vertical-align:middle;
+  background:var(--terracotta); animation:pulse-bar 1.2s ease-in-out infinite; }
+.chip.error::before { content:"\2298\00a0" / ""; }
+.chip.wait { border-color:var(--umber); color:var(--umber); background:var(--cream); }
+@media (prefers-reduced-motion: reduce) { .chip.working::before { animation:none; } }
+
+/* A table of records, its heads in the label style. */
+table.tbl { border-collapse:collapse; width:100%; font-size:var(--text-message); }
+table.tbl th, table.tbl td { text-align:left; vertical-align:top; padding:var(--space-control) var(--space-item); border-bottom:1px solid var(--line); }
+table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+
+/* A decision the user is asked to make, on the page body. */
+.decide { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item); margin-bottom:var(--space-item); }
+.decide p { margin:0 0 var(--space-control); }
+
+/* One line under a section's title that says what the section is for. */
+.intro { font:var(--font-message); color:var(--ink); max-width:72ch; margin:0 0 var(--space-section); }
+
+/* An inline form that adds, changes or removes one record: labelled fields, one button. */
+.rec { border:1px solid var(--sand); background:var(--cream); padding:var(--space-item) var(--space-section); margin:var(--space-control) 0 var(--space-section);
+  max-width:700px; display:grid; gap:var(--space-tight); }
+.rec label { font:var(--font-small-strong); margin-top:var(--space-control); }
+.rec textarea, .rec input, .rec select { font:var(--font-message); padding:var(--space-tight) var(--space-control); border:1px solid var(--ink); background:var(--white); }
+.rec textarea { min-height:4em; }
+.rec fieldset { border:0; padding:0; margin:var(--space-control) 0 0; display:grid; gap:var(--space-tight); }
+.rec fieldset label { font:var(--font-message); margin:0; }
+.rec .btn { justify-self:start; }
 
 .scroll-setting { display:grid; gap:var(--space-tight); }
 .scroll-setting[hidden] { display:none; }
