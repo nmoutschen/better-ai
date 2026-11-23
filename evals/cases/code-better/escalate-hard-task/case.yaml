@@ -31,8 +31,8 @@ graders:
     such as model, before its clipped prompt. PASS only if all hold: (1) the first builder the agent started for T2 after
     the request was started with a model argument more capable than haiku, such as sonnet or opus; (2) that builder was
     a new sub-agent, not b-t2-2 resumed; (3) the findings of both rounds reached it: the ''../'' names, and the ''....//'' or absolute
-    names, shown in its prompt as rendered, in the coordinator''s notes it was given, or in the builder''s own
-    first steps; (4) the agent added a decision record about T2 that names the move to the more capable model and a reason
+    names, shown in its prompt as rendered, in the builder''s own steps, or in the coordinator''s own text or records
+    saying what it put in the builder''s `tried`, such as a round record or a decision that lists them; (4) the agent added a decision record about T2 that names the move to the more capable model and a reason
     that is one of the triggers (the repeated path-traversal class, the security finding, or the second failed round);
     and (5) the agent told the user about the move, in its reply or in a page reply. FAIL otherwise. Does not count: whether
     T2 was merged in the end, whether the dashboard was started, how the whole-class brief is worded, and which model verifiers
