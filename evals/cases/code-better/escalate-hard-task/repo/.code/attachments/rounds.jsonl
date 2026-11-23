@@ -1,0 +1,1 @@
+{"type": "round", "at": "2026-11-23T16:56:45Z", "by": "coordinator", "task": "T2", "round": 1, "verifier": "v-t2-1", "findings": [{"text": "Security: read_attachment(\"42\", \"../../config/secrets.env\") returns config/secrets.env: the name is joined without checking that the result stays inside attachments/ (S3).", "blocking": true}]}

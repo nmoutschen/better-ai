@@ -1,0 +1,1 @@
+{"type": "lesson", "at": "2026-11-23T16:56:46Z", "by": "coordinator", "id": "L1", "class": "path traversal", "rule": "Resolve every path built from client input and refuse it unless it stays inside the allowed folder.", "found_in": [{"task": "T2", "finding": "../ in an attachment name"}]}

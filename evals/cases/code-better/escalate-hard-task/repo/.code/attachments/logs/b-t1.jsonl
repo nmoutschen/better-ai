@@ -1,0 +1,2 @@
+{"type": "start", "at": "2026-11-23T16:56:37Z", "by": "b-t1", "text": "Build T1: list attachments."}
+{"type": "handed_back", "at": "2026-11-23T16:56:38Z", "by": "b-t1", "result": "done", "text": "list_attachments returns sorted names; test_list passes."}

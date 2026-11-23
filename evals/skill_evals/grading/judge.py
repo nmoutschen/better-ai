@@ -45,7 +45,8 @@ def clip(text: str, head: int = HEAD_CHARS, tail: int = TAIL_CHARS) -> str:
     """Keep the start and end of a long text, marking what was cut."""
     if len(text) <= head + tail:
         return text
-    return f"{text[:head]}\n[... {len(text) - head - tail} characters cut ...]\n{text[-tail:]}"
+    end = text[len(text) - tail :]
+    return f"{text[:head]}\n[... {len(text) - head - tail} characters cut ...]\n{end}"
 
 
 def describe_call(name: str, args: dict[str, Any]) -> str:
@@ -65,7 +66,11 @@ def describe_call(name: str, args: dict[str, Any]) -> str:
         return (
             f"Write {args.get('file_path', '')}\n{clip(str(args.get('content', '')), ARGUMENT_CHARS, ARGUMENT_CHARS)}"
         )
-    return f"{name}: {clip(json.dumps(args, ensure_ascii=False), ARGUMENT_CHARS, 0)}"
+    # A sub-agent's prompt goes last, so that its short settings, such as its model, survive the clip.
+    ordered = {key: value for key, value in args.items() if key != "prompt"} | (
+        {"prompt": args["prompt"]} if "prompt" in args else {}
+    )
+    return f"{name}: {clip(json.dumps(ordered, ensure_ascii=False), ARGUMENT_CHARS, 0)}"
 
 
 def describe_result(message: ChatMessageTool) -> str:

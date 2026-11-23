@@ -1,0 +1,2 @@
+{"type": "start", "at": "2026-11-23T16:56:47Z", "by": "b-t2-2", "text": "Round 2 of T2: strip ../ from names."}
+{"type": "handed_back", "at": "2026-11-23T16:56:48Z", "by": "b-t2-2", "result": "done", "text": "read_attachment now strips ../ from names; tests pass."}

@@ -1,0 +1,1 @@
+{"type": "decision", "at": "2026-11-23T16:56:30Z", "by": "coordinator", "id": "D1", "raised_by": "coordinator", "about": {"type": "change"}, "asked": "Which models do the builders and verifiers run on?", "status": "decided", "decision": "Builders run on haiku, verifiers on opus."}
