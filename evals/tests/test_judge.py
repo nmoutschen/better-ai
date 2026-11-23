@@ -70,8 +70,15 @@ def test_render_transcript_marks_sub_agent_steps() -> None:
 def test_clip_and_read_ranges() -> None:
     """Long outputs keep both ends; a Read shows whether it was partial."""
     assert "characters cut" in judge.clip("x" * 5000)
+    assert len(judge.clip("x" * 5000, 600, 0)) < 700
     assert judge.describe_call("Read", {"file_path": "a.py"}) == "Read a.py (whole file)"
     assert judge.describe_call("Read", {"file_path": "a.py", "limit": 5}) == "Read a.py limit=5"
+
+
+def test_long_prompt_does_not_hide_call_settings() -> None:
+    """A sub-agent call's short settings, such as its model, show even when its prompt is clipped."""
+    text = judge.describe_call("Agent", {"description": "Build T2", "prompt": "x" * 5000, "model": "opus"})
+    assert '"model": "opus"' in text
 
 
 @pytest.mark.parametrize(

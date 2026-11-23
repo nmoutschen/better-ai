@@ -1,0 +1,8 @@
+reply: T2 failed again; I started b-t2-3 with both rounds' findings.
+actions:
+- bash: 'printf ''%s\n'' ''{"type": "round", "at": "2026-11-23T17:10:00Z", "by": "coordinator", "task": "T2", "round": 2,
+    "verifier": "v-t2-2", "findings": [{"text": "Security: ....// names and absolute names still read outside attachments/
+    (S3).", "blocking": true}]}'' >> .code/attachments/rounds.jsonl'
+- write: .code/attachments/logs/b-t2-3.card.json
+  content: "{\n  \"type\": \"card\",\n  \"at\": \"2026-11-23T17:10:03Z\",\n  \"by\": \"coordinator\",\n  \"role\": \"builder\"\
+    ,\n  \"task\": \"T2\",\n  \"branch\": \"task/t2\"\n}\n"
