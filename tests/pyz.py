@@ -29,7 +29,7 @@ def verbs_of(skill: str) -> dict[str, argparse.ArgumentParser]:
     from better_ai import cli, resources
 
     package = skill.removesuffix("-better")
-    info = resources.BuildInfo(skill, package, "source", resources.DEFAULT_CUTOFF)
+    info = resources.BuildInfo(skill, package, "source", resources.cutoff())
     parser = cli._parser(cli.load(info), info)
     (commands,) = [a for a in parser._actions if isinstance(a, argparse._SubParsersAction)]
     return dict(commands.choices)
