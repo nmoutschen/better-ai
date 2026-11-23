@@ -31,7 +31,7 @@
 
 /* The picker sits over the composer: its options scroll inside it, so Choose this move is always in view. */
 #noteform { position:relative; }
-.picker { position:absolute; left:0; right:0; bottom:100%; margin:0 var(--space-edge); max-height:calc(100vh - 20rem); min-height:12rem; display:flex; flex-direction:column;
+.picker { position:absolute; left:0; right:0; bottom:100%; margin:0 var(--space-edge);  display:flex; flex-direction:column;
   box-shadow:var(--shadow); z-index:3; }
 .picker .options { overflow:auto; min-height:0; flex:1 1 auto; }
 .picker fieldset { border:0; padding:0; margin:0 0 var(--space-item); }
@@ -49,3 +49,4 @@ table.items th, table.items td { padding-left:var(--space-control); padding-righ
 table.items td:nth-child(2) { min-width:12rem; }
 table.items td:nth-child(5) { min-width:8rem; }
 .view a[data-goto] { white-space:nowrap; }
+.evq { margin:var(--space-control) 0; padding:var(--space-control) var(--space-item); border-left:3px solid var(--sand); background:var(--linen); white-space:pre-line; }

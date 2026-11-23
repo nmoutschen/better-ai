@@ -22,7 +22,6 @@ const STEP_NAMES = { 1: 'your idea and appetite', 2: 'the draft', 3: 'the realit
   6: 'plan the test', 7: 'run the test', 8: 'write the brief', 9: 'design and build', 10: 'learn from real use' };
 const KINDS = { say: 'Something said', did: 'Something done', commit: 'Something committed to', data: 'Numbers', desk: 'Something read' };
 const WORDS = { 'your users': 'Your users', elsewhere: 'Elsewhere' };
-const STALE_MINUTES = 30;
 
 // A chip is a state word, coloured by what it means (page.css): done is moss, being worked terracotta, waiting for you
 // umber, and only Contradicted is red.
@@ -113,6 +112,16 @@ function badges(open, items) {
   return counts;
 }
 const tabLabel = (label, n) => n ? label + ', ' + plural(n, 'open question', 'open questions') : label;
+// Where the focus goes after the check on question ID: the next open question after it, wrapping, on its check or, with no
+// default, its Answer; null when no other question is open (then the move, if one is due).
+function nextAfter(open, id) {
+  const i = open.findIndex(d => d.id === id);
+  for (let k = 1; k < open.length; k++) {
+    const d = open[(i + k) % open.length];
+    if (d.id !== id) return { id: d.id, use: !!s(d.default) };
+  }
+  return null;
+}
 const dueMove = open => open.find(d => (d.about || {}).type === 'discovery') || null;
 const hasQuestion = (open, id) => open.some(d => (d.about || {}).item === id);
 
@@ -178,8 +187,8 @@ const atWork = (data, now) => pageAgents(agentRows(data, now), { now, empty: 'No
 // ---------- The user's events ----------
 const uid = prefix => prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 // The choose event: the option, the revision of it as the page showed it, and whether the second click was made.
-function chooseParams(option, revisions, confirmed) {
-  return { id: uid('c'), option: option.id, revision: s((revisions || {})[option.id]), confirmed: !!confirmed };
+function chooseParams(option, revision, confirmed) {
+  return { id: uid('c'), option: option.id, revision: s(revision), confirmed: !!confirmed };
 }
 // Remove… on evidence from the user, or in an internal discovery, asks for the words to be redacted everywhere; any other
 // removal is a plain remove with its reason.
@@ -262,6 +271,7 @@ function itemsTable(kind, data, ctx) {
 function evidenceStatus(e, ctx) {
   if (e.status === 'counts') return chip('Counts', 'ok');
   if (e.status === 'checking') {
+    if ((ctx.open || []).some(d => (d.about || {}).type === 'evidence' && d.about.evidence === e.id)) return chip('Waiting for your confirmation', 'wait') + '<p class="muted">It does not count until you confirm it.</p>';
     if (!s(e.verifier)) { const m = ageMin(e.at, ctx.now); return chip('Waiting for a verifier' + (m != null ? ', ' + m + ' min' : '')) + '<p class="muted">It does not count until the check passes.</p>'; }
     const m = ageMin(e.since, ctx.now);
     return chip('Checking quote' + (m != null ? ', ' + m + ' min' : ''), 'working') + '<p class="muted">It does not count until the check passes.</p>';
@@ -305,7 +315,7 @@ function evidencePanel(data, ctx) {
 const optionsInOrder = data => (data.options || []).slice().sort((a, z) => MOVES.indexOf(a.move) - MOVES.indexOf(z.move));
 function optionNote(o, data, ctx) {
   return (o.note === 'proposed' ? chip('Proposed', 'wait') : o.note ? '<span class="muted">' + esc(cap(s(o.note))) + '</span>' : '') +
-    (data.chosen === o.id ? ' ' + chip('Chosen') : '') + (ctx.pending && ctx.pending.option === o.id ? ' ' + chip('Waiting for the agent', 'wait') : '');
+    (data.chosen === o.id ? ' ' + chip('Chosen') : '') + (ctx.pending && ctx.pending.option === o.id ? ' ' + chip('Waiting for the agent', 'working') : '');
 }
 function optionsPanel(data, ctx) {
   const options = optionsInOrder(data);
@@ -318,14 +328,14 @@ function choosePanel(data, ctx) {
   const options = optionsInOrder(data), n = ctx.open.length, pending = ctx.pending;
   const selected = ctx.selected && options.some(o => o.id === ctx.selected) ? ctx.selected : (options.find(o => o.note === 'proposed') || options.find(o => o.note !== 'ruled out by your appetite') || options[0] || {}).id;
   const groups = MOVES.filter(m => options.some(o => o.move === m)).map(m => '<fieldset><legend>' + esc(cap(m)) + '</legend>' + options.filter(o => o.move === m).map(o =>
-    '<label class="opt"><input type="radio" name="option" value="' + esc(o.id) + '"' + (o.id === selected ? ' checked' : '') + '> <span><b>' + esc(s(o.text)) + '</b> ' + optionNote(o, data, { pending: null }) +
+    '<label class="opt"><input type="radio" name="option" value="' + esc(o.id) + '" data-revision="' + esc(s((data.revisions || {})[o.id])) + '"' + (o.id === selected ? ' checked' : '') + '> <span><b>' + esc(s(o.text)) + '</b> ' + optionNote(o, data, { pending: null }) +
     '<br><span class="muted">Cost ' + esc(s(o.cost)) + ' · speed ' + esc(s(o.speed)) + ' · upkeep ' + esc(s(o.upkeep)) + ' · undo ' + esc(s(o.undo)) + '</span></span></label>').join('') + '</fieldset>').join('');
   const confirms = options.filter(o => CONFIRMED.includes(o.move)).map(o => '<div class="confirm" data-confirm-for="' + esc(o.id) + '" hidden><p><b>' + esc(cap(o.move)) + ' is costly or hard to undo.</b></p>' +
-    '<p>Cost: ' + esc(s(o.cost)) + '. How hard to undo: ' + esc(s(o.undo)) + '.</p><div class="row-actions"><button type="button" class="btn btn--sm" data-confirm-choose="' + esc(o.id) + '"' + (pending ? ' disabled' : '') + '>Choose ' + esc(cap(o.move)) + '</button>' +
+    '<p>Cost: ' + esc(s(o.cost)) + '. How hard to undo: ' + esc(s(o.undo)) + '.</p><div class="row-actions"><button type="button" class="btn btn--sm" data-confirm-choose="' + esc(o.id) + '" data-revision="' + esc(s((data.revisions || {})[o.id])) + '"' + (pending ? ' disabled' : '') + '>Choose ' + esc(cap(o.move)) + '</button>' +
     '<button type="button" class="btn btn--quiet btn--sm" data-cancel-confirm>Cancel</button></div></div>').join('');
   return '<p class="menu-h">Choose a move</p>' +
     '<p class="muted" id="open-line"' + (n ? '' : ' hidden') + '>' + (n === 1 ? '1 question is still open: answer it first, or take its default' : n + ' questions are still open: answer them first, or take their defaults') + '</p>' +
-    '<p id="pending-line"' + (pending ? '' : ' hidden') + '>' + chip('Waiting for the agent', 'wait') + ' Your choice was sent: the agent writes it down before you can choose again.</p>' +
+    '<p id="pending-line"' + (pending ? '' : ' hidden') + '>' + chip('Waiting for the agent', 'working') + ' Your choice was sent: the agent writes it down before you can choose again.</p>' +
     (options.length ? '<div class="options">' + groups + '</div>' + confirms +
       '<div class="row-actions pickfoot"><button type="button" class="btn" data-choose' + (pending ? ' disabled' : '') + '>Choose this move</button><button type="button" class="btn btn--quiet" data-cancel-picker>Cancel</button></div>'
       : '<p class="muted">Options appear once the evidence is in.</p>');
@@ -379,10 +389,17 @@ function answerOf(d, data) {
   const e = answer.type === 'page' ? (data.conversation || []).find(x => x.id === (answer.event)) || event : event;
   return e ? { text: s(e.text), chat: false, byDefault: e.default === true } : null;
 }
+// The evidence a decision is about, so a question such as "Is the result right?" shows what it asks about: its words
+// (a command or query and its result) and where they come from.
+function evidenceBlock(d, data) {
+  const about = d.about || {};
+  const e = about.type === 'evidence' ? (data.evidence || []).find(x => x.id === about.evidence) : null;
+  return e ? '<blockquote class="evq">' + esc(s(e.text)) + '<br><span class="muted">' + evidenceSource(e) + '</span></blockquote>' : '';
+}
 function questionRow(d, data, ctx, known) {
   const due = (d.about || {}).type === 'discovery';
   return '<li class="q" id="row-' + esc(d.id) + '" data-d="' + esc(d.id) + '"><div><strong>' + esc(d.id) + '</strong> <span class="muted">' + aboutHTML(d, data, known) + '</span></div>' +
-    '<div class="ask">' + fold(d.asked) + '</div>' + (s(d.default) ? '<p class="muted">Suggested default: ' + esc(d.default) + '</p>' : '') +
+    '<div class="ask">' + fold(d.asked) + '</div>' + evidenceBlock(d, data) + (s(d.default) ? '<p class="muted">Suggested default: ' + esc(d.default) + '</p>' : '') +
     '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">✓</button>' : '') +
     '<button type="button" class="btn btn--sm btn--quiet" data-answer="' + esc(d.id) + '" aria-label="Answer ' + esc(d.id) + '">Answer</button>' +
     (due ? '<button type="button" class="btn btn--sm" data-open-picker' + (ctx.pending ? ' disabled' : '') + '>Choose a move…</button>' : '') + '</div></li>';
@@ -390,7 +407,7 @@ function questionRow(d, data, ctx, known) {
 function answeredRow(d, data, known) {
   const a = answerOf(d, data);
   return '<li class="q" id="row-' + esc(d.id) + '"><div><strong>' + esc(d.id) + '</strong> <span class="muted">' + aboutHTML(d, data, known) + '</span></div>' +
-    '<div class="ask">' + fold(d.asked) + '</div>' + (a ? '<p>' + (a.byDefault ? 'Default taken: ' : 'Your answer: ') + esc(a.text) + (a.chat ? ' ' + chatMark : '') + (d.status !== 'answered' ? ' <span class="muted">(waiting for the coordinator)</span>' : '') + '</p>' : '') + '</li>';
+    '<div class="ask">' + fold(d.asked) + '</div>' + evidenceBlock(d, data) + (a ? '<p>' + (a.byDefault ? 'Default taken: ' : 'Your answer: ') + esc(a.text) + (a.chat ? ' ' + chatMark : '') + (d.status !== 'answered' ? ' <span class="muted">(waiting for the coordinator)</span>' : '') + '</p>' : '') + '</li>';
 }
 function moveRow(m, data) {
   const o = optionOf(data, m.option), chat = (m.answer || {}).type === 'chat';
@@ -407,7 +424,7 @@ function movesPanel(data, ctx) {
   return '<h2>Moves</h2>' + intro('Where the idea stands, what waits for you, and the moves you have made. Example: "Shrink: owners only, because three of five asked for it."') +
     '<h3>The idea</h3><p>' + esc(s(head.idea)) + '</p>' +
     '<h3>Waiting for you</h3>' + (open.length ? '<ul class="qs">' + open.map(d => questionRow(d, data, ctx, known)).join('') + '</ul>' : '<p class="muted">Nothing waits for you.</p>') +
-    (ctx.pending ? '<p>' + chip('Waiting for the agent', 'wait') + ' You chose ' + idLink(s(ctx.pending.option), known) + '.</p>' : '') +
+    (ctx.pending ? '<p>' + chip('Waiting for the agent', 'working') + ' You chose ' + idLink(s(ctx.pending.option), known) + '.</p>' : '') +
     (answered.length ? '<h3>Answered</h3><ul class="qs">' + answered.map(d => answeredRow(d, data, known)).join('') + '</ul>' : '') +
     '<h3>Decision log</h3>' + (moves.length ? '<ul class="log">' + shown.map(m => moveRow(m, data)).join('') + '</ul>' +
       (older.length ? '<details class="more"><summary>Earlier moves (' + older.length + ')</summary><ul class="log">' + older.map(m => moveRow(m, data)).join('') + '</ul></details>' : '') : '<p class="muted">No move yet.</p>') +
@@ -522,7 +539,7 @@ function paint() {
   setHTML(panel('tests'), testsPanel(data, c));
   setHTML(panel('brief'), briefPanel(data, c));
   setHTML(byId('agents'), atWork(data, c.now));
-  if (picker.hidden) setHTML(picker, choosePanel(data, c)); else syncPicker(c);
+  if (picker.hidden) setHTML(picker, choosePanel(data, c)); else { syncPicker(c); fitPicker(); }
   tabs.forEach(button => {
     const key = button.id.slice(4), n = c.badges[key] || 0, label = TABS.find(t => t[0] === key)[1];
     button.setAttribute('aria-label', tabLabel(label, n));
@@ -593,8 +610,15 @@ pickerButton.id = 'open-picker';
 pickerButton.textContent = 'Choose a move…';
 pickerButton.setAttribute('aria-controls', 'picker');
 pickerButton.setAttribute('aria-expanded', 'false');
+function fitPicker() {
+  const top = (document.querySelector('header') || { getBoundingClientRect: () => ({ bottom: 0 }) }).getBoundingClientRect().bottom;
+  const bottom = byId('noteform').getBoundingClientRect().top;
+  picker.style.maxHeight = Math.max(0, bottom - top - 8) + 'px';
+}
+addEventListener('resize', () => { if (!picker.hidden) fitPicker(); });
 function togglePicker(on) {
   picker.hidden = !on;
+  if (on) fitPicker();
   pickerButton.setAttribute('aria-expanded', String(on));
   if (on) { const first = $('input[name="option"]:checked', picker) || $('input[name="option"]', picker); if (first) first.focus(); } else pickerButton.focus();
 }
@@ -602,8 +626,8 @@ function chosenOption() {
   const input = $('input[name="option"]:checked', picker);
   return input ? optionOf(DATA, input.value) : null;
 }
-function sendChoose(option, confirmed, buttons) {
-  const params = chooseParams(option, DATA.revisions, confirmed);
+function sendChoose(option, revision, confirmed, buttons) {
+  const params = chooseParams(option, revision, confirmed);
   buttons.forEach(b => { b.disabled = true; });
   conv.send('choose', params, 'Choice', () => { SENT = Object.assign({ type: 'choose', by: 'user', at: new Date().toISOString().slice(0, 19) + 'Z' }, params); togglePicker(false); paint(); },
     () => buttons.forEach(b => { b.disabled = false; }));
@@ -622,9 +646,9 @@ picker.addEventListener('click', event => {
       step.hidden = false; target.hidden = true;
       return $('[data-confirm-choose]', step).focus();
     }
-    return sendChoose(option, false, [target]);
+    return sendChoose(option, $('input[name="option"]:checked', picker).dataset.revision, false, [target]);
   }
-  if (target.matches('[data-confirm-choose]')) sendChoose(optionOf(DATA, target.dataset.confirmChoose), true, [target]);
+  if (target.matches('[data-confirm-choose]')) sendChoose(optionOf(DATA, target.dataset.confirmChoose), target.dataset.revision, true, [target]);
 });
 picker.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); togglePicker(false); } });
 pickerButton.addEventListener('click', () => togglePicker(picker.hidden));
@@ -638,16 +662,17 @@ function formFor(kind, id, fieldName) {
   if (kind === 'change') return changeForm(id === 'discovery' ? '' : /^X/.test(id) ? 'test' : 'item', id, fieldName);
   return '';
 }
-function closeForm(box) {
+function closeForm(box, keepFocus) {
   const opener = box._opener;
   (box.closest('tr') && box.closest('tr').classList.contains('formrow') ? box.closest('tr') : box).remove();
-  if (opener && document.contains(opener)) opener.focus();
+  if (opener && !keepFocus && document.contains(opener)) opener.focus();
   if (DIRTY) paint();
 }
 function openForm(button) {
   const kind = button.dataset.openForm, row = button.closest('tr');
   const open = row && row.nextElementSibling && row.nextElementSibling.classList.contains('formrow') ? row.nextElementSibling : null;
   if (open) return closeForm(open.querySelector('.rec'));
+  $$('.rec', view).forEach(other => closeForm(other, true));  // one form at a time: no duplicate ids
   const html = formFor(kind, button.dataset.record, button.dataset.field);
   let box;
   if (kind === 'add-evidence') {
@@ -706,8 +731,8 @@ view.addEventListener('click', event => {
   if (target.matches('[data-open-picker]')) return togglePicker(true);
   const row = target.closest('li.q');
   if (target.matches('[data-use]') && row) {
-    const id = target.dataset.use, rest = $$('li.q[data-d]', view).filter(q => q.dataset.d !== id && $('[data-use]', q));
-    FOCUS_AFTER = rest.length ? 'li.q[data-d="' + rest[0].dataset.d + '"] [data-use]' : '#open-picker';
+    const id = target.dataset.use, next = nextAfter(currentOpen(), id);
+    FOCUS_AFTER = next ? 'li.q[data-d="' + next.id + '"] [' + (next.use ? 'data-use' : 'data-answer') + ']' : '#open-picker';
     const d = DATA.decisions.find(x => x.id === id);
     target.disabled = true;
     return answerHere(row, id, s(d && d.default), true, () => tick(), () => { target.disabled = false; FOCUS_AFTER = null; });
@@ -738,7 +763,11 @@ conv = pageConversation({
   waiting, afterSend: () => tick(), busy: formOpen,
 });
 decision = pageDecision({ conversation: conv, now: nowSec, md, esc, id: uid, suggested: true, next: () => { const open = DATA && currentOpen(); return open && dueMove(open) ? pickerButton : null; } });
-eventKinds.decision = decision.item;
+eventKinds.decision = (c, state, actions) => {
+  const made = decision.item(c, state, actions), block = evidenceBlock(c.e.x, DATA);
+  if (block) made[0].querySelector('.head').insertAdjacentHTML('afterend', block);
+  return made;
+};
 (function mount() {
   const noteForm = byId('noteform');
   if (!noteForm) return;

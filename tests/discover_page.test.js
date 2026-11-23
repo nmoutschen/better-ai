@@ -20,7 +20,7 @@ function pure(returns, over = {}) {
 }
 const waitingOf = () => shared.pageDecision({ conversation: { progress: () => stand() }, now: () => NOW, md: String, esc: shared.pageEscape, id: p => p }).waiting;
 const api = () => pure('{TABS, openQuestions, aboutTab, badges, tabLabel, stateChip, safeLink, idLink, firstSentence, agentRows, ' +
-  'chooseParams, removeFor, pendingChoose, headerHTML, movesPanel, itemsTable, evidencePanel, optionsPanel, testsPanel, briefPanel, ' +
+  'chooseParams, removeFor, nextAfter, evidenceBlock, pendingChoose, headerHTML, movesPanel, itemsTable, evidencePanel, optionsPanel, testsPanel, briefPanel, ' +
   'choosePanel, addEvidenceForm, resultForm, removeForm, changeForm, atWork, briefLabel}');
 
 const rec = (type, over) => ({ type, at: ago(60), by: 'coord', ...over });
@@ -191,11 +191,11 @@ test('S103: red means only Contradicted: no other chip is an error chip', () => 
 // ---------- S37, S104, S105, S57 ----------
 test('S37: the choose event holds an id, the option, the revision as shown, and confirmed', () => {
   const a = api(), d = fixture();
-  const p = a.chooseParams(d.options[1], d.revisions, false);
+  const p = a.chooseParams(d.options[1], 'r2', false);
   assert.deepEqual(Object.keys(p).sort(), ['confirmed', 'id', 'option', 'revision']);
   assert.equal(p.option, 'K2'); assert.equal(p.revision, 'r2'); assert.equal(p.confirmed, false);
   assert.match(p.id, /^c-/);
-  assert.equal(a.chooseParams(d.options[2], d.revisions, true).confirmed, true);
+  assert.equal(a.chooseParams(d.options[2], 'r3', true).confirmed, true);
 });
 
 test('S104: Remove on evidence from you, or in an internal discovery, posts redact; elsewhere it posts remove with the reason', () => {
@@ -224,7 +224,7 @@ test('S105, S57: after a choose event the option shows Waiting for the agent and
 
 test('A13, A15: the picker groups options by move with the proposal chosen; a costly move has a confirming step; the open-question line is live', () => {
   const a = api(), d = fixture(), html = a.choosePanel(d, ctx(d));
-  assert.match(html, /name="option" value="K1" checked/);
+  assert.match(html, /name="option" value="K1" data-revision="r1" checked/);
   assert.match(html, /data-confirm-for="K3"/);  // expand
   assert.doesNotMatch(html, /data-confirm-for="K2"/);  // shrink needs no second click
   assert.match(html, /3 questions are still open: answer them first, or take their defaults/);
@@ -412,3 +412,51 @@ test('A1: tabs are the first thing in the page and follow the tabs pattern', () 
   }
   assert.match(source, /ArrowLeft/); assert.match(source, /Home/); assert.match(source, /End/);
 });
+
+// ---------- round 2 ----------
+test('S37, L1: the revision is the one the picker showed: it is on each radio and each confirming button, and the click does not read the data again', () => {
+  const a = api(), d = fixture(), html = a.choosePanel(d, ctx(d));
+  assert.match(html, /name="option" value="K2" data-revision="r2"/);
+  assert.match(html, /data-confirm-choose="K3" data-revision="r3"/);
+  d.revisions.K2 = 'changed-while-open';
+  assert.match(html, /value="K2" data-revision="r2"/);  // the built picker keeps what it showed
+  assert.doesNotMatch(source, /DATA\.revisions/);  // sendChoose takes the shown one
+  assert.equal(a.chooseParams(d.options[1], 'r2', false).revision, 'r2');
+});
+
+test('a decision about evidence shows that evidence\'s words and source in the Moves row and in the answered row; its evidence row waits for your confirmation, not a verifier', () => {
+  const a = api(), d = fixture();
+  d.evidence.push({ ...d.evidence[0], id: 'E-a1-9', status: 'checking', kind: 'data', text: 'count users => 12', words: { type: 'quote', text: 'count users => 12' }, source_title: 'The users table', origin: { type: 'file', path: 'db.csv' }, at: ago(5) });
+  d.decisions.push(rec('decision', { id: 'D5', about: { type: 'evidence', evidence: 'E-a1-9' }, asked: 'Is the result of E-a1-9 right?', default: 'Confirm this result', status: 'waiting', raised_by: 'coord' }));
+  const c = ctx(d);
+  assert.match(a.evidenceBlock(d.decisions[4], d), /count users =&gt; 12/);
+  assert.match(a.evidenceBlock(d.decisions[4], d), /db\.csv/);
+  assert.equal(a.evidenceBlock(d.decisions[0], d), '');
+  const moves = a.movesPanel(d, c);
+  assert.match(moves, /Is the result of E-a1-9 right\?[^]*count users =&gt; 12/);
+  const answered = fixture(); answered.evidence = d.evidence; answered.decisions = [{ ...d.decisions[4], status: 'answered', answer: { type: 'chat', text: 'yes' }, answered_at: ago(1) }];
+  assert.match(a.movesPanel(answered, ctx(answered)), /count users =&gt; 12/);
+  const panel = a.evidencePanel(d, c);
+  const row = panel.slice(panel.indexOf('id="row-E-a1-9"'));
+  assert.match(row.slice(0, row.indexOf('</tr>')), /Waiting for your confirmation/);
+  assert.doesNotMatch(row.slice(0, row.indexOf('</tr>')), /Waiting for a verifier/);
+  assert.match(row.slice(0, row.indexOf('</tr>')), /chip wait">Waiting for your confirmation/);
+});
+
+test('A14: after the check the focus goes to the next open question after the current one, wrapping; its Answer when it has no default; the move when none remain', () => {
+  const a = api(), q = (id, def) => ({ id, default: def });
+  const open = [q('D1', 'Yes'), q('D2', 'Yes'), q('D3', null)];
+  assert.deepEqual(a.nextAfter(open, 'D1'), { id: 'D2', use: true });
+  assert.deepEqual(a.nextAfter(open, 'D2'), { id: 'D3', use: false });
+  assert.deepEqual(a.nextAfter(open, 'D3'), { id: 'D1', use: true });  // wraps
+  assert.equal(a.nextAfter([q('D1', 'Yes')], 'D1'), null);
+});
+
+test('L2: Waiting for the agent is the agent working: a working chip, never the umber waiting-for-you one', () => {
+  const a = api(), d = fixture(), c = ctx(d, { pending: { type: 'choose', id: 'c1', option: 'K2' } });
+  const html = a.choosePanel(d, c) + a.optionsPanel(d, c) + a.movesPanel(d, c);
+  assert.match(html, /chip working">Waiting for the agent/);
+  assert.doesNotMatch(html, /chip wait">Waiting for the agent/);
+});
+
+test('the unused stale-minutes constant is gone', () => { assert.doesNotMatch(source, /STALE_MINUTES/); });
