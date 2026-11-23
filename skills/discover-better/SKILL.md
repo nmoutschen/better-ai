@@ -82,7 +82,7 @@ IF the idea no longer holds, because its core is contradicted or something that 
 
 ### 4. Gather evidence about your users
 
-FIND what holds for the user's own users, not for users in general. ASK the user for what they have, such as records, data, notes from conversations or tickets, and ADD what they give as evidence of their own, as formats/records.md shows: it counts at once. START analysts, as in step 3, on data or documents the user points to.
+FIND what holds for the user's own users, not for users in general. ASK the user for what they have, such as records, data, notes from conversations or tickets, and ADD what they give as evidence of their own, as formats/records.md shows: it counts at once. START analysts, as in step 3, on the files and connectors the user points to, such as MCP servers, and on the web.
 
 CHECK what each piece of evidence covers: which groups, which setting, and for data, the population and the denominator. PREFER what people did or committed to over what they said they would do. WHEN you ask the user about people, ASK about the last concrete episode, the workaround and what it cost, not whether they would use it.
 
@@ -122,7 +122,7 @@ MATCH the test to the claim: a prototype shows whether someone can complete a ta
 IF a test is `planned` and the user agreed to run it, SET it `running`, THEN run it by its runner:
 
 - `you`: TELL the user what to do and how to add the result, on the page with Add result…, or in the chat.
-- `analyst`: SET the analyst's name as `checker` of the test and of each item in its `settles`, with `since`, and START an analyst on it, as in step 3. CLEAR them when the analyst ends.
+- `analyst`: SET the analyst's name as `checker` of the test and of each item in its `settles`, with `since`, and START an analyst on it, as in step 3, with the files and connectors that hold the test's data. CLEAR them when the analyst ends.
 - `code-better`: USE `/code-better` to build the probe or the proof of concept, with the test's `what` and `rule` as its request. IF it is not available, the general rule [Missing capabilities](#missing-capabilities) applies.
 
 WAIT for the result: the analysts', the quote verifiers' and `/code-better`'s hand-backs, or the user's. Meanwhile, questions to the user go on. DO NOT choose a move or write a brief until they hand back.
@@ -234,7 +234,7 @@ THEN CONTINUE from the step the head names.
 IF you cannot do a step, because a call was denied or the harness lacks a tool, SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done.
 
 - **No sub-agents:** run the analysts in turn yourself, each by [agents/analyst.md](agents/analyst.md). READ the behaviours yourself by [agents/behaviour-verifier.md](agents/behaviour-verifier.md), and SAY in the brief that no separate reader checked them. No quote verifier runs, so no quote counts, and moves do not wait for quotes.
-- **No web access:** analysts do not run, the items stay `unverified`, and the brief says so.
+- **No web access:** analysts read only the files and connectors the user named, the other items stay `unverified`, and the brief says so.
 - **No raw read of pages from the shell:** no quote counts. The first time two verifiers fail to connect to different hosts, TELL the user once, and offer three ways on: allow network for the shell; paste the page text as evidence of their own; or go on with the items unverified, which the brief says.
 - **No shell:** KEEP the records in your working notes, MARK the discovery **not finished**, and NAME the records you did not add.
 - **No page:** HOLD the conversation in the chat.

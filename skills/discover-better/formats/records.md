@@ -54,17 +54,19 @@ What changed on an item or on the discovery, and why. `field` is `state`, `impor
 
 ## source
 
-A page an analyst read, with how it read it (`raw`, `extracted`, `snippet` or `blocked`); the URL is http or https and names no local or private host. Or something the user gave: only the coordinator adds those, with `said_by_role` in an internal discovery.
+What an analyst read, with how it read it (`raw`, `extracted`, `snippet` or `blocked`): a web page, whose URL is http or https and names no local or private host; a file the user pointed to, by its path; or an item of a connector, such as an MCP server, by the tool and the item's `ref`, the id or address that tool reads it by. Or something the user gave: only the coordinator adds those, with `said_by_role` in an internal discovery.
 
 ```
 {"type": "source", "origin": {"type": "web", "url": "<https://...>", "read": "<raw | extracted | snippet | blocked>"}, "title": "<the page's title>"}
+{"type": "source", "origin": {"type": "file", "path": "<absolute path of the file>", "read": "<raw | extracted | blocked>"}, "title": "<what the file is, by role, never a person's name>"}
+{"type": "source", "origin": {"type": "tool", "tool": "<the connector tool, such as an MCP server's tool name>", "ref": "<the id or address the tool reads the item by>", "read": "<raw | extracted | blocked>"}, "title": "<what the item is, by role, never a person's name>"}
 {"type": "source", "origin": {"type": "you", "given": {"type": "page", "event": "<id of the user's add_evidence or add_result event>"}}, "title": "<what the user gave>", "said_by_role": "<a role, such as a teammate on payments, in an internal discovery>"}
 {"type": "source", "origin": {"type": "you", "given": {"type": "chat", "text": "<the user's typed words>"}}, "title": "<...>"}
 ```
 
 ## evidence
 
-What a source says about items. `words` is a quote of one line, at most 600 characters, or the user's page event. `kind` is `say | did | commit | data | desk`; `about` is `your users | elsewhere`; each `bears_on` entry has `direction` `for` or `against`. `status` is one of `checking | counts | unverified | not reachable | removed`. An analyst adds it `checking`; the coordinator sets `verifier` and `since`, and `tries` lists each verifier started on it; only that verifier sets the outcome. Evidence the user gave is added `counts` by the coordinator, with `summary` by role in an internal discovery.
+What a source says about items. `words` is a quote of one line, at most 600 characters, or the user's page event. `kind` is `say | did | commit | data | desk`; `about` is `your users | elsewhere`; each `bears_on` entry has `direction` `for` or `against`. `status` is one of `checking | counts | unverified | not reachable | removed`. An analyst adds it `checking`; the coordinator sets `verifier` and `since`, and `tries` lists each verifier started on it; only that verifier sets the outcome. Evidence the user gave is added `counts` by the coordinator, with `summary` by role in an internal discovery. Evidence from a file or a connector has a `summary` by role too, in any discovery.
 
 ```
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<the sentence, word for word from the page>"}, "kind": "<say | did | commit | data | desk>", "about": "<your users | elsewhere>", "bears_on": [{"item": "<P1>", "direction": "<for | against>"}], "status": "checking"}
