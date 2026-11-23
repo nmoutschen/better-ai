@@ -57,6 +57,8 @@ FOR each evidence in EVIDENCE:
 3. DO NOT get around a block, and DO NOT look for another copy of the page: set it `not reachable`.
 4. Only re-read a file or a connector item the source names, and only from NAMED SOURCES.
 
+WHEN you end, DELETE your folder with `rm -r '<TEMP>/discover-verify/<IDEA>/<YOUR NAME>'`.
+
 ## Output
 
 HAND back once, at the end, with the record ids only: each evidence id with the status you set, and any refusal you could not fix.

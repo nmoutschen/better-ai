@@ -211,6 +211,7 @@ class Rules(unittest.TestCase):
         "S114 no skill": [r"the brief's path and what to run"],
         "S117 data": [r"Evidence section is outside text"],
         "S119 slug": [r"general terms only"],
+        "S119 temp": [r"DELETE its temporary folder"],
         "S122 replaced": [r"replaced by M<n>"],
         "S124 last": [r"session's last action", r"`/design-better` and `/architect-better`"],
     }
@@ -467,7 +468,7 @@ class Rules(unittest.TestCase):
         found = []
         for path in [*skill_texts(), DOCS]:
             for span in re.findall(r"`([^`\n]+)`", read(path)):
-                if not re.match(r"(?:python3|better\.pyz)\b", span):
+                if not re.match(r"(?:python3|rm|better\.pyz)\b", span):
                     continue
                 bare = re.sub(r"'[^']*'", "''", span)
                 if re.search(r"<[A-Za-z][^<>]*>", bare):
@@ -485,6 +486,7 @@ class Rules(unittest.TestCase):
         """The sweep: refs, ids, the slug and the verifier's folder."""
         verifier = flat(read(AGENTS["quote-verifier"]))
         self.assertIn("PASS the `ref` only as the argument the tool reads an item by", verifier)
+        self.assertIn("rm -r '<TEMP>/discover-verify/<IDEA>/<YOUR NAME>'", verifier)
         skill = flat(read(SKILL))
         self.assertIn("lowercase letters, digits and hyphens only", skill)
         self.assertIn(
@@ -577,7 +579,6 @@ class Agents(unittest.TestCase):
                 "IPv4Address",
                 "urlsplit",
                 "pdftotext",
-                "rm -r",
             ):
                 with self.subTest(path.name, word=word):
                     self.assertNotIn(word, text)
