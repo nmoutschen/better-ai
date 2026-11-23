@@ -418,7 +418,7 @@ function render(d) {
 // load:begin
 function tick() {
   if (STATIC) return Promise.resolve();
-  return fetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(render, () => {});
+  return pageFetch("/data", {cache: "no-store"}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(render, () => {});
 }
 // load:end
 if (STATIC) render(JSON.parse($("page-data").textContent));

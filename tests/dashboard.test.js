@@ -135,7 +135,7 @@ test(`the errors band lists each invalid record with its file and line, its fiel
 const loadCode = marked(html, 'load');
 function pageWith(answer, isStatic) {
   const drawn = [];
-  const body = new Function('fetch', 'render', 'STATIC', loadCode + '; return {tick};')(() => answer(), d => drawn.push(d), !!isStatic);
+  const body = new Function('pageFetch', 'render', 'STATIC', loadCode + '; return {tick};')(() => answer(), d => drawn.push(d), !!isStatic);
   return { ...body, drawn };
 }
 const served = data => () => Promise.resolve({ ok: true, json: () => Promise.resolve(data) });

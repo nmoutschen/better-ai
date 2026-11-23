@@ -34,29 +34,12 @@ svg.map { display:block; width:100%; height:100%; }
 .qpop .claims li { padding-left:1.3em; text-indent:-1.3em; }
 /* A static copy has no message box: an empty conversation drops its label too. */
 .qpop .sec:has(> .thread:empty):not(:has(form)) { display:none; }
-.chip { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
-.chip.ok { color:var(--moss-dark); }
-.chip.todo { color:var(--muted); }
-.chip.bad { color:var(--terracotta-dark); }
-.chip.now { color:var(--cream); background:var(--umber); padding:1px var(--space-control); }
 .muted { color:var(--muted); }
 
 /* A worker's message when it closes a question: white like the user's, with a sand edge, so the coordinator's stay distinct. */
 .thread > li.msg.worker { border-left:4px solid var(--sand); }
 .msg .qlink { border:0; background:none; padding:0; font:inherit; color:var(--ink); text-decoration:underline; cursor:pointer; text-align:left; }
 .msg .added { margin:var(--space-tight) 0 0; font-size:var(--text-small); color:var(--muted); }
-/* The agents at work, at the top of the side column: a run can have twenty, and a list there scrolls on its own
-   (at most 30% of the height) without taking room from the map. */
-.agentsec { flex:none; max-height:30vh; overflow-y:auto; border-bottom:1px solid var(--line); padding:0 var(--space-edge) var(--space-item); margin-bottom:var(--space-section); }
-.agentsec h2 { margin:0 0 var(--space-control); }
-.agents { list-style:none; margin:0; padding:0; }
-.agents button { display:block; width:100%; text-align:left; border:0; border-left:4px solid var(--terracotta); background:none;
-  padding:var(--space-tight) var(--space-control); margin:0 0 var(--space-control); font:var(--font-message); color:var(--ink); cursor:pointer; }
-.agents button.verifier { border-color:var(--moss-dark); }
-.agents button:hover span { text-decoration:underline; }
-.agents .dry { display:block; font-style:normal; font-size:var(--text-small); color:var(--error); }
-.agents b { font-size:var(--text-small); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--space-control); }
-
 .invalid { color:var(--error); font-weight:700; }
 .invalid[hidden] { display:none; }
 .map .bang { fill:var(--error); font-weight:700; font-size:calc(14px * var(--z, 1)); }

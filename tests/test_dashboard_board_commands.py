@@ -276,11 +276,12 @@ class ServedPage(unittest.TestCase):
             if (folder / ".server").exists():
                 break
             time.sleep(0.1)
+        self.token = (folder / ".server-token").read_text().strip()  # what `serve` leaves for the page's requests
         return (folder / ".server").read_text().strip()
 
     def send(self, url, method, params):
         body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-        headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
+        headers = {"Content-Type": "application/json", "Origin": url.rstrip("/"), "X-Page-Token": self.token}
         request = urllib.request.Request(url + "rpc", data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(request, timeout=5) as r:
             return json.loads(r.read())
@@ -298,7 +299,9 @@ class ServedPage(unittest.TestCase):
             for part in ("/dashboard.js", "/page.js", 'id="tables"'):
                 self.assertIn(part, page)
             self.assertNotIn("__PAGE_", page)
-            with urllib.request.urlopen(url + "data", timeout=5) as r:
+            with urllib.request.urlopen(
+                urllib.request.Request(url + "data", headers={"X-Page-Token": self.token}), timeout=5
+            ) as r:
                 data = json.loads(r.read())
             self.assertEqual(data["decisions"][0]["status"], "waiting")
             for asset in ("dashboard.js", "dashboard.css", "page.js", "page.css"):

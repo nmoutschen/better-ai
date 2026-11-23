@@ -38,7 +38,7 @@ DRAW the current containers and flows as the `design` record, from the code or e
 
 RUN `python3 <skill dir>/scripts/better.pyz check <unit>` and `python3 <skill dir>/scripts/better.pyz render <unit>`.
 
-RUN `python3 <skill dir>/scripts/better.pyz serve <unit>` to start the page and GIVE the user its address.
+RUN `python3 <skill dir>/scripts/better.pyz serve <unit>` to start the page and GIVE the user its address as it prints it, whole, with its `#t=` part.
 
 ASK the user to confirm or correct Before in the page. IF the change introduces a system or flow, NAME it in your question as not existing yet, and DO NOT add it to the `design` record before step 4. WAIT for the user's confirmation or correction and APPLY any corrections. DO NOT start step 3 before the user confirms or corrects Before: HANDLE other actions and START `wait` again; IF `wait` times out before they answer, END your turn with the question, in the chat as well as the page.
 

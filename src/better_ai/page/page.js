@@ -2,6 +2,37 @@
 var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied',
   working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
 
+// The page token. `serve` gives it in the fragment of the address it opens (#t=...), which a browser never sends. The page
+// keeps it for the tab, so a reload still has it, and takes it out of the address bar. Every request to /rpc, /data,
+// /events and /wait goes through pageFetch, which sends it; the server answers a page without it as out of date. The
+// page then drops the token it saved: a reload cannot fix it, only the address the agent gave.
+var PAGE_STALE = 'page out of date: open the address the agent gave', pageIsStale = false;
+var pageToken = (function () {
+  var found = typeof location === 'undefined' ? null : /[#&]t=([\w-]+)/.exec(location.hash || '');
+  try {
+    if (found) { sessionStorage.setItem('pageToken', found[1]); history.replaceState(null, '', location.pathname + location.search); }
+    return found ? found[1] : sessionStorage.getItem('pageToken') || '';
+  } catch (e) { return found ? found[1] : ''; }
+})();
+function pageStale() {
+  var strip = document.querySelector('.offline');
+  pageIsStale = true; pageToken = '';
+  try { sessionStorage.removeItem('pageToken'); } catch (e) {}
+  if (strip) { strip.textContent = PAGE_STALE; strip.hidden = false; }
+  var stale = new Error(PAGE_STALE);
+  stale.stale = true;
+  return stale;
+}
+function pageFetch(url, init) {
+  if (pageIsStale) return Promise.reject(pageStale());  // the server refused this page's token: asking again cannot help
+  init = Object.assign({}, init);
+  init.headers = Object.assign({}, init.headers, { 'X-Page-Token': pageToken });
+  return fetch(url, init).then(function (r) {
+    if (r.status !== 401) return r;
+    throw pageStale();
+  });
+}
+
 // The element-comment layer. A page supplies its target metadata, pin coordinates and navigation;
 // this owns the editor, the numbered pins and their actions.
 function pageElementComments(o) {
@@ -175,11 +206,11 @@ function pageConversation(o) {
     if (o.apply) o.apply(event, true);
     if (!o.served) { log.push(event); renderThread(); flash(what + ' saved on this page. ' + (o.unsent || ''), 'ok'); if (done) done(); return; }
     flash('Sending ' + what.toLowerCase() + '…', 'busy');
-    fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    pageFetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
       .then(function (r) { return r.json(); })
       .then(function (r) {
-        if (r.error) { var refused = new Error(r.error.message); refused.refused = true; throw refused; }
+        if (r.error) { if (r.error.code === -32001) pageStale(); var refused = new Error(r.error.message); refused.refused = true; throw refused; }
         return r;
       })
       .then(function () {
@@ -413,16 +444,17 @@ function pageConversation(o) {
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
     // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
-    function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
+    // Once a request was refused as out of date the strip stays: no later poll or stream event clears it.
+    function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = !pageIsStale && (on || misses < 2); }
     if (streaming) (function stream(after) {
-      fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
+      pageFetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
         // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
         if (after > 0) r.events.forEach(function (e) { if (e.type === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
         if (r.events.length) renderThread();
         stream(r.total);
-      }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
+      }).catch(function (e) { if (e && e.stale) return; connected(false); setTimeout(function () { stream(after); }, 2000); });
     })(0);
     // A new render from the agent loads by itself, as soon as the user is not typing: a comment, a message or an answer
     // in progress would be lost. The page keeps its place through o.beforeReload.
@@ -678,6 +710,10 @@ function pageCan(name) { return (pageConfig().capabilities || []).indexOf(name) 
 //   o.conversation  the page's pageConversation()     o.now()  the page's clock in seconds (the server's)
 //   o.md(text)      Markdown to an HTML string        o.esc(text)  HTML-escaped text
 //   o.id(prefix)    a new event id
+//   o.suggested     true: the default is a suggestion, never applied on a timer: "Suggested default", no deadline words
+//   o.next()        the element that waits after the open questions, such as a move that is due (optional)
+// The footer of an open question is [✓] [Answer] on one row; each control's name includes the question. After ✓ the focus
+// goes to the next open question, then to what waits next.
 // pageDecisionEvents(decisions, conversation) is the log the thread draws: each decision as an entry of type `decision`
 // (the record in `x`), among the conversation's events, in the order things happened. Nothing comes before what it
 // answers: an answer never shows above its decision, a reply never above the answer it replies to.
@@ -695,9 +731,46 @@ function pageDecision(o) {
   function waiting(c, state) { return step(status(c.e.x), answerOf(c), state) === 0; }
   function left(x) { var t = Date.parse(x.deadline); return isNaN(t) ? null : t / 1000 - o.now(); }
   function deadlineWords(x) {
-    var s = left(x);
+    var s = o.suggested ? null : left(x);
     if (s === null) return '';
     return s > 0 ? 'default in ' + (s < 90 ? 'under 2 min' : Math.round(s / 60) + ' min') : 'default due now';
+  }
+  // What takes the focus after the question FROM is answered, found at the click, before the send: the thread may redraw
+  // before the send is done, and the answered question is then gone. It is kept as a name, never as an element, which a
+  // redraw replaces: {id} the open question after it, else the first before it; {next} what the page says waits next,
+  // asked again at focus time; {asked} another item the agent asked about, found again by its id. Nothing else waits: null.
+  function nextWaiting(from) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q')), i = -1, k;
+    for (k = 0; k < list.length; k++) if (list[k].dataset.d === from) i = k;
+    var others = list.slice(i + 1).concat(list.slice(0, Math.max(i, 0))).filter(function (q) { return q.dataset.d !== from; });
+    if (others.length) return { id: others[0].dataset.d };
+    if (o.next && o.next()) return { next: true };
+    var asked = Array.prototype.slice.call(document.querySelectorAll('li[data-state="asked"]')).filter(function (q) { return q.dataset.d !== from && !/open-q/.test(q.className); });
+    return asked.length && asked[0].dataset.id ? { asked: asked[0].dataset.id } : null;
+  }
+  function questionEl(id) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li.open-q'));
+    for (var k = 0; k < list.length; k++) if (list[k].dataset.d === id) return list[k].querySelector('.use') || list[k].querySelector('.answer') || list[k];
+    return null;
+  }
+  function askedEl(id) {
+    var list = Array.prototype.slice.call(document.querySelectorAll('li[data-state="asked"]'));
+    for (var k = 0; k < list.length; k++) if (list[k].dataset.id === id) { list[k].setAttribute('tabindex', '-1'); return list[k]; }
+    return null;
+  }
+  // The focus moves on only while it is still on the button that was clicked, on the page or on nothing: where the user
+  // went during the send stays. A redraw after the answer replaces the nodes: the question's new ✓ is focused once drawn,
+  // under the same rule.
+  var want = null;
+  function focusFree(from) {
+    var now = document.activeElement;
+    return !now || now === document.body || now === from || !document.contains(now);
+  }
+  function focusTarget(n, from) {
+    if (!n || !focusFree(from)) return;
+    var el = n.id ? questionEl(n.id) : n.next ? (o.next && o.next()) : askedEl(n.asked);
+    if (el && el.focus) el.focus({ preventScroll: true });
+    want = n.id ? { id: n.id, from: el } : null;
   }
   function head(who, label) {
     return '<div class="head"><span class="who">' + o.esc(who) + '</span><span class="when">' + o.esc(label) + '</span></div>';
@@ -711,30 +784,42 @@ function pageDecision(o) {
     li.className = 'msg decision ' + st + (asked ? ' open-q' : '');
     // The default shows under an open question, as what happens without an answer; the answer the agent copied shows
     // only when the user gave it in the chat: an answer from the page is in the thread.
-    var after = x.default && ((st === 'waiting' && n <= 0) || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? "If you don't answer: " : 'Default applied: ') + x.default
+    var after = x.default && ((st === 'waiting' && n <= 0) || st === 'defaulted') ? '\n\n' + (st === 'waiting' ? (o.suggested ? 'Suggested default: ' : "If you don't answer: ") : 'Default applied: ') + x.default
       : st === 'answered' && x.answer && x.answer.type === 'chat' ? '\n\nYour answer:\n\n' + x.answer.text
       : st === 'decided' && x.decision ? '\n\nDecided:\n\n' + x.decision : '';
     li.innerHTML = head(pageRole().replace(/^./, function (ch) { return ch.toUpperCase(); }), label || pageTime(x.at)) + o.md(String(x.asked || '') + after);
     li.dataset.d = x.id;
     li.dataset.state = STEP ? STEP[0] : '';
     var foot = document.createElement('div');
-    foot.className = 'foot';
+    foot.className = 'foot' + (asked ? ' question' : '');
+    var q = pageMarkdownText(x.asked);
     if (STEP) foot.insertAdjacentHTML('beforeend', '<span class="progress ' + STEP[0] + '"><span class="bars" aria-hidden="true">' +
       [0, 1, 2].map(function (i) { return '<i class="' + (i <= n ? 'on' : '') + '"></i>'; }).join('') + '</span><span>' + STEP[1] + '</span></span>');
     else if (answer) foot.append(conv.progress(state[answer.id]));
     if (actions) {
       if (asked && x.default) {
         var use = document.createElement('button');
-        use.type = 'button'; use.className = 'btn btn--sm answer'; use.textContent = 'Use the default';
+        use.type = 'button'; use.className = 'btn btn--sm answer use'; use.textContent = '✓'; use.title = 'Use the default';
+        use.setAttribute('aria-label', 'Use the default for: ' + q);
         use.addEventListener('click', function () {
+          var target = nextWaiting(x.id);
           use.disabled = true;
-          conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer', null, function () { use.disabled = false; });
+          conv.send('answer', { id: o.id('a'), decision: x.id, text: x.default, default: true }, 'Answer',
+            function () { focusTarget(target, use); }, function () { use.disabled = false; });
         });
         foot.append(use);
+        if (want && want.id === x.id) {
+          var from = want.from; want = null;
+          Promise.resolve().then(function () {
+            var now = document.activeElement;
+            if (!now || now === document.body || now === from) use.focus({ preventScroll: true });
+          });
+        }
       }
       var change = document.createElement('button');
-      change.type = 'button'; change.className = 'btn btn--sm answer change' + (asked ? '' : ' btn--quiet');
+      change.type = 'button'; change.className = 'btn btn--sm btn--quiet answer change';
       change.textContent = asked ? 'Answer' : 'Reply';
+      change.setAttribute('aria-label', (asked ? 'Answer: ' : 'Reply to: ') + q);
       change.addEventListener('click', function () {
         conv.box(li, x.id, asked ? 'Your answer' : 'Your reply', change, function (text, done) {
           conv.send('answer', { id: o.id('a'), decision: x.id, text: text, default: false }, 'Answer', done);
@@ -812,6 +897,37 @@ function pageShowErrors(el, errors, note) {
   var html = pageErrors(errors, note);
   el.hidden = !html;
   if (el.innerHTML !== html) el.innerHTML = html;
+}
+
+// The agents at work, as the list items of `<ul class="agents" id="agents">`: one row for each agent in ROWS, from any
+// board; the page reads no log, the board says what each agent does. A row is
+//   who      the agent's name            what    what it works on
+//   state    the word of its chip, "Working" when none     since   when the work began: the chip adds its age
+//   last     when the agent last wrote a record: from 30 minutes on, the row says there was no word from it
+//   second   true for a second try      note    one more line for the row, in the error colour
+//   data     data attributes (name to value): the row is then a button that carries them
+//   kind     "verifier" for an agent that checks what others wrote: its edge is moss, not terracotta
+// A time is an ISO string or a number of milliseconds. O.now is the page's clock in seconds (the server's), O.empty the
+// line when there are no rows.
+function pageAgents(rows, o) {
+  var now = o.now * 1000;
+  // The whole minutes since AT, or null when AT or the clock is not a time: the row then leaves that part out.
+  function minutes(at) {
+    var n = Math.floor((now - (typeof at === 'number' ? at : Date.parse(at))) / 60000);
+    return isFinite(n) ? Math.max(0, n) : null;
+  }
+  if (!rows.length) return '<li class="muted">' + pageEscape(o.empty) + '</li>';
+  return rows.map(function (r) {
+    var attrs = Object.keys(r.data || {}).map(function (k) { return ' data-' + pageEscape(k) + '="' + pageEscape(r.data[k]) + '"'; }).join('');
+    var tag = (r.data ? 'button type="button"' : 'div') + (r.kind ? ' class="' + pageEscape(r.kind) + '"' : '') + attrs;
+    var age = r.since != null ? minutes(r.since) : null, quiet = r.last != null ? minutes(r.last) : null;
+    return '<li><' + tag + '><b>' + pageEscape(r.who) + '</b><span dir="auto">' + pageEscape(r.what) + '</span>' +
+      (age !== null ? '<span class="chip working">' + pageEscape(r.state || 'Working') + ', ' + age + ' min</span>' : '') +
+      (r.second ? '<em class="second">second try</em>' : '') +
+      (quiet !== null && quiet >= 30 ? '<em class="dry">No word from ' + pageEscape(r.who) + ' for ' + quiet + ' min</em>' : '') +
+      (r.note ? '<em class="dry">' + pageEscape(r.note) + '</em>' : '') +
+      '</' + (r.data ? 'button' : 'div') + '></li>';
+  }).join('');
 }
 
 // The details pop-up (.qpop) of a page, one at a time, over the page: it opens with its title in focus, keeps Tab inside
