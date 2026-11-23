@@ -192,3 +192,12 @@ class FullString(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StrictPatterns(unittest.TestCase):
+    """L3: a `$` in a schema pattern ends the string; it does not match before a final newline."""
+
+    def test_a_pattern_refuses_a_trailing_newline(self):
+        rule = {"type": "string", "pattern": "^D\\d+$"}
+        self.assertEqual(schema.validate_instance("D1", rule, {}), [])
+        self.assertNotEqual(schema.validate_instance("D1\n", rule, {}), [])
