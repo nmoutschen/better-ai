@@ -230,3 +230,13 @@ class FoundByTheVerifier(unittest.TestCase):
         )
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("status_at", done.stdout + done.stderr)
+
+
+class LongLogs(unittest.TestCase):
+    def test_a_phase_starts_at_its_first_log_line_even_past_40_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = change(Path(d), tasks=[task("T1", status="building")])
+            write(folder, "logs/builder-t1.card.json", [card("builder", "T1", at="2026-11-21T09:59:00Z")], as_json=True)
+            steps = [log("step", "builder-t1", at=f"2026-11-21T10:{m:02d}:00Z") for m in range(1, 46)]
+            write(folder, "logs/builder-t1.jsonl", [log("start", "builder-t1", at="2026-11-21T10:00:00Z"), *steps])
+            self.assertEqual(load(folder)["agents"][0]["started"], "2026-11-21T10:00:00Z")

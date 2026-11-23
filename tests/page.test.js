@@ -938,3 +938,18 @@ test("a failed round takes its number and findings from the round record that na
 test("a task's lane opens the task's pop-up, as its label does", () => {
   assert.match(TL.tablesHTML(fixture(), '2h'), /<div class="lane" data-t="T4"/);
 });
+
+test('a phase starts when its agent started, even when the page holds only its latest log lines', () => {
+  const d = fixture();
+  d.agents[0].started = '2026-11-23T09:50:00Z';  // the builder's first line, before the 40 lines the page holds
+  assert.equal(TL.phasesOf(d.tasks[0], d)[0].start, E('2026-11-23T09:50:00Z'));
+});
+
+test("a verify that passed never shows the findings of another verifier's failed round", () => {
+  const d = fixture();
+  d.agents.splice(1, 0, { name: 'verifier-t4-a', role: 'verifier', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:19:00Z',
+    lines: [line('start', '2026-11-23T10:19:10Z'), line('handed_back', '2026-11-23T10:19:50Z', { result: 'passes' })] });
+  const pop = TL.popupHTML(d.tasks[0], d);
+  const passed = pop.split('Verify, round 1: passed')[1].split('</div>')[0];
+  assert.doesNotMatch(passed, /Empty export/);
+});
