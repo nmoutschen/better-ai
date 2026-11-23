@@ -23,10 +23,8 @@ import re
 import secrets
 import subprocess
 import urllib.parse
-import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from .. import cli, page, paths, records, resources, schema
@@ -83,7 +81,9 @@ def _folder(unit: Unit, folder: str) -> dict[str, dict]:
         try:
             record = json.loads(paths.read_bytes(unit, relative).decode("utf-8"))
         except (ValueError, OSError):
-            raise refusal(f"{unit.label}/{relative}", "does not parse", f"fix it, then run check {unit.label}") from None
+            raise refusal(
+                f"{unit.label}/{relative}", "does not parse", f"fix it, then run check {unit.label}"
+            ) from None
         if isinstance(record, dict) and isinstance(record.get("id"), str):
             found[record["id"]] = record
     return found
@@ -131,7 +131,11 @@ def _last_change(data: Data, item: str, name: str) -> dict | None:
     for change in data.changes:
         about = change.get("about")
         named = change.get("field") == name and isinstance(about, dict) and about.get("item") == item
-        if named and isinstance(change.get("to"), str) and not (name == "state" and change["to"] == derive.RISK_ACCEPTED):
+        if (
+            named
+            and isinstance(change.get("to"), str)
+            and not (name == "state" and change["to"] == derive.RISK_ACCEPTED)
+        ):
             found = change
     return found
 
@@ -160,9 +164,9 @@ def _why_not(data: Data, item: dict, name: str) -> str | None:
         return "supported needs counting evidence for it and none against"
     if to == "contradicted" and not con:
         return "contradicted needs counting evidence against it"
-    if to == "checking" and not (item.get("checker") or any(
-        e.get("status") == "checking" and _bears(e, ident) for e in data.evidence.values()
-    )):
+    if to == "checking" and not (
+        item.get("checker") or any(e.get("status") == "checking" and _bears(e, ident) for e in data.evidence.values())
+    ):
         return "checking needs a checker or evidence that is being checked"
     if to == "waiting for you" and not any(_about(d, ident) for d in data.decisions if d.get("status") == "waiting"):
         return "waiting for you needs an open question about it"
@@ -297,7 +301,9 @@ def render(unit: Unit, data: Data, version: str) -> str:
     move = next((m for m in data.moves if m.get("id") == record.get("move")), None)
     if move is None:
         raise refusal(
-            unit.label, f"{version} is for move {record.get('move')}, which is not in moves.jsonl", "fix the brief's move"
+            unit.label,
+            f"{version} is for move {record.get('move')}, which is not in moves.jsonl",
+            "fix the brief's move",
         )
     option = next((o for o in data.options if o.get("id") == move.get("option")), {})
     internal = _internal(data)
@@ -314,7 +320,12 @@ def render(unit: Unit, data: Data, version: str) -> str:
         f"Decision: {inline(record.get('decision') or 'none recorded')}",
         f"Why: {inline(why or 'none recorded')}",
     ]
-    items = [line for item in data.items if item.get("id") in derived.items for line in _item_lines(item, derived.items[item["id"]])]
+    items = [
+        line
+        for item in data.items
+        if item.get("id") in derived.items
+        for line in _item_lines(item, derived.items[item["id"]])
+    ]
     blocks = []
     for ident in sorted(data.evidence, key=_sort_key):
         found = data.evidence[ident]
@@ -374,7 +385,9 @@ def _rewritten(
 def _valid(unit: Unit, record: dict, name: str) -> dict:
     problems = schema.check_record(record, [name])
     if problems:
-        raise refusal(unit.label, f"the new {record.get('type')} is not valid: " + "; ".join(f"{f}: {m}" for f, m in problems))
+        raise refusal(
+            unit.label, f"the new {record.get('type')} is not valid: " + "; ".join(f"{f}: {m}" for f, m in problems)
+        )
     return record
 
 
@@ -481,14 +494,15 @@ def _is_request(data: Data, evidence: str, request: str) -> bool:
     return False
 
 
-def _server_pid(port: str, lines: list[str]) -> int | None:
-    for line in lines[1:]:
-        found = re.fullmatch(r"\s*pid\s*[:= ]?\s*(\d+)\s*", line)
-        if found:
-            return int(found.group(1))
-    try:  # best effort: whoever listens on the port
+def _server_pid(port: str) -> int | None:
+    """The process that listens on the port, as `lsof` says; None where it cannot be found out."""
+    try:
         done = subprocess.run(
-            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"], capture_output=True, text=True, timeout=5, check=False
+            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -503,17 +517,14 @@ def _server_answering(unit: Unit) -> str | None:
         text = paths.read_bytes(unit, SERVER).decode("utf-8", errors="replace")
     except FileNotFoundError:
         return None
-    lines = text.split("\n")
-    address = lines[0].strip()
+    address = text.strip()
     found = re.fullmatch(r"http://127\.0\.0\.1:(\d+)/", address)
     if not found:
         return None
-    try:
-        with urllib.request.urlopen(f"{address}listening", timeout=2):
-            pass
-    except (OSError, ValueError):
+    asker = page.Conversation(unit, page.PageSpec(title="", agent="coordinator", main="", load=lambda _: {}), {})
+    if not asker.answering():
         return None
-    pid = _server_pid(found.group(1), lines)
+    pid = _server_pid(found.group(1))
     return f"the page server answers at {address} ({'pid ' + str(pid) if pid else 'pid not known'})"
 
 
@@ -524,10 +535,14 @@ def _read_state(unit: Unit) -> dict | None:
         return None
     try:
         state = json.loads(raw)
-        if not (isinstance(state, dict) and isinstance(state.get("evidence"), str) and isinstance(state.get("steps"), list)):
+        if not (
+            isinstance(state, dict) and isinstance(state.get("evidence"), str) and isinstance(state.get("steps"), list)
+        ):
             raise ValueError
     except ValueError:
-        raise refusal(f"{unit.label}/{STATE}", "is not a redact state file", "fix or remove it, then run redact again") from None
+        raise refusal(
+            f"{unit.label}/{STATE}", "is not a redact state file", "fix or remove it, then run redact again"
+        ) from None
     return state
 
 
@@ -616,9 +631,10 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
     if kind == "event":
 
         def emptied(found: dict) -> dict | None:
-            if found.get("id") != ref or found.get("type") != "add_evidence":
+            if found.get("id") != ref or found.get("type") not in ("add_evidence", "add_result"):
                 return None
-            return {**found, "text": REMOVED, "source": REMOVED}
+            words = {"text": REMOVED, **({"source": REMOVED} if found["type"] == "add_evidence" else {})}
+            return {**found, **words}
 
         lines, write = _rewritten(unit, "conversation.jsonl", emptied, ascii_only=True)
         return [f"conversation.jsonl:{n}: emptied the words of event {ref}" for n in lines], write
@@ -644,7 +660,9 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
     if new == current:
         return [], None
     text = records._json_file(new)
-    return [f"{relative}:{_line_of(text, key)}: {shown}"], lambda: paths.write_atomic(unit, relative, records._encode(text))
+    return [f"{relative}:{_line_of(text, key)}: {shown}"], lambda: paths.write_atomic(
+        unit, relative, records._encode(text)
+    )
 
 
 def _copies(data: Data) -> list[str]:
@@ -680,7 +698,9 @@ def redact(args: argparse.Namespace, run: cli.Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)
     evidence_id, request = args.evidence, args.request
     if not EVIDENCE_ID.fullmatch(evidence_id):
-        raise refusal(unit.label, f"{evidence_id!r} is not an evidence id", "name it as E-<agent>-<n>, such as E-coord-1")
+        raise refusal(
+            unit.label, f"{evidence_id!r} is not an evidence id", "name it as E-<agent>-<n>, such as E-coord-1"
+        )
     data = _load(unit)
     if evidence_id not in data.evidence:
         raise refusal(unit.label, f"no evidence {evidence_id}", f"see the ids in {unit.label}/evidence")
@@ -702,7 +722,12 @@ def redact(args: argparse.Namespace, run: cli.Run) -> int:
         raise refusal(unit.label, answering, "close the page, then run again")
     if state is None:
         before = sorted(stale_items(data))
-        state = {"evidence": evidence_id, "request": request, "stale_before": before, "steps": _plan(unit, data, evidence_id)}
+        state = {
+            "evidence": evidence_id,
+            "request": request,
+            "stale_before": before,
+            "steps": _plan(unit, data, evidence_id),
+        }
         _write_state(unit, state)
     try:
         _after_place("plan")
@@ -722,7 +747,9 @@ def _work(unit: Unit, run: cli.Run, state: dict, request: str) -> None:
             continue
         data = _load(unit)
         lines, write = _prepare(unit, data, {**step, "evidence": evidence_id}, request)
-        if "lines" not in step:  # what the place prints is kept first, so a run that stops after the write still prints it
+        if (
+            "lines" not in step
+        ):  # what the place prints is kept first, so a run that stops after the write still prints it
             step["lines"] = lines
             _write_state(unit, state)
         if write:

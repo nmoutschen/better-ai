@@ -7,6 +7,8 @@ brief is made by the `brief` verb, as it is in use.
 import hashlib
 import http.server
 import json
+import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -131,12 +133,12 @@ class Request(Fixture):
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         address = f"http://127.0.0.1:{server.server_address[1]}/"
-        (self.unit / ".server").write_text(f"{address}\npid 4242\n")
+        (self.unit / ".server").write_text(address)
         before = P.files_under(self.unit)
         done = self.redact()
         self.assertEqual(done.returncode, 1)
         self.assertIn("close the page, then run again", done.stderr)
-        self.assertIn("4242", done.stderr)
+        self.assertIn(f"pid {os.getpid()}" if shutil.which("lsof") else "pid not known", done.stderr)
         self.assertEqual(P.files_under(self.unit), before)
         server.shutdown()  # the page is closed; the file it leaves behind does not stop a redact
         done = self.redact()
@@ -176,7 +178,9 @@ class Removal(Fixture):
     def test_S49_the_event_that_holds_the_words_is_emptied_and_its_line_stays(self):
         self.ask_on_the_page(evidence=PAGE)
         with (self.unit / "conversation.jsonl").open("a") as log:
-            log.write(json.dumps({"type": "note", "at": R.AT, "by": "user", "id": "n1", "text": "hello", "to": None}) + "\n")
+            log.write(
+                json.dumps({"type": "note", "at": R.AT, "by": "user", "id": "n1", "text": "hello", "to": None}) + "\n"
+            )
         before = lines_of(self.unit / "conversation.jsonl")
         done = self.redact(evidence=PAGE)
         self.assertEqual(done.returncode, 0, done.stderr)
@@ -188,6 +192,22 @@ class Removal(Fixture):
         raw = (self.unit / "conversation.jsonl").read_text()
         self.assertNotIn("Dana", raw)
         self.assertEqual(R.run(self.root, "check", str(self.unit.relative_to(self.root))).returncode, 0)
+
+    def test_S49_words_held_by_a_result_event_are_emptied_too(self):
+        source = json.loads((self.unit / "sources" / "S-coord-2.json").read_text())
+        source["origin"]["given"]["event"] = "r1"
+        P.write_json(self.unit / "sources" / "S-coord-2.json", source)
+        evidence = json.loads((self.unit / "evidence" / f"{PAGE}.json").read_text())
+        evidence["words"] = {"type": "event", "event": "r1"}
+        P.write_json(self.unit / "evidence" / f"{PAGE}.json", evidence)
+        with (self.unit / "conversation.jsonl").open("a") as log:
+            log.write(json.dumps(R.event("add_result", text="Dana's team found it fast.")) + "\n")
+        self.ask_on_the_page(evidence=PAGE)
+        self.assertEqual(self.redact(evidence=PAGE).returncode, 0)
+        self.assertNotIn("Dana's team", self.everything())
+
+    def test_L3_an_evidence_id_with_a_trailing_newline_is_refused(self):
+        self.assertEqual(self.redact(evidence=CHAT + "\n").returncode, 1)
 
     def test_S49_each_final_brief_gets_the_block_replaced_in_place_and_a_new_hash(self):
         self.brief_final()

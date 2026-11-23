@@ -90,7 +90,6 @@ class Package(unittest.TestCase):
             "rules_evidence": "T8",
             "rules_moves": "T9",
             "summary": "T9",
-            "brief": "T10",
             "pagespec": "T11",
         }
         for name, task in owners.items():
