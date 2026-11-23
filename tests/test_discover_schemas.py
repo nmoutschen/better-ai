@@ -19,9 +19,9 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
 import better  # noqa: E402
 import discover_records as R  # noqa: E402
+from better_ai.discover import SKILL  # noqa: E402
 
 from better_ai import resources, schema, skill  # noqa: E402
-from better_ai.discover import SKILL  # noqa: E402
 
 PACKAGE = ROOT / "src" / "better_ai" / "discover"
 EVENTS = ["conversation.schema.json", "discover-events.schema.json"]

@@ -14,7 +14,6 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 import discover_records as R  # noqa: E402
-
 from better_ai.discover import derive  # noqa: E402
 
 
