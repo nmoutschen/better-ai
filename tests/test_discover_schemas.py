@@ -7,6 +7,7 @@ run on one record at a time with `schema.check_record`; where a pointer or a fil
 import ast
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
 import better  # noqa: E402
 import discover_records as R  # noqa: E402
+import pyz  # noqa: E402
 
 from better_ai import resources, schema, skill  # noqa: E402
 from better_ai.discover import SKILL  # noqa: E402
@@ -63,6 +65,15 @@ class Package(unittest.TestCase):
         self.assertEqual(listed["discover-better"], {"package": "discover"})
         self.assertEqual(skill.OWNER_BY_ROOT[".discover"], "discover-better")
         self.assertEqual(skill.OWNER_BY_HEAD["discover.json"], "discover-better")
+
+    def test_S96_the_build_accepts_the_package_and_the_pyz_it_makes_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            built = pyz.build_into(tmp)
+            done = subprocess.run(
+                [sys.executable, "-I", str(built["discover-better"]), "--help"], capture_output=True, text=True
+            )
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertTrue(done.stdout.startswith("better.pyz discover-better "), done.stdout[:80])
 
     def test_a_unit_of_another_skill_is_refused_with_the_owner_named(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -658,16 +669,16 @@ class Events(Shape):
         self.refused(R.event("add_evidence", about="all"), EVENTS[1], "about")
         self.refused(R.event("add_evidence", bears_on=[{"item": "P1", "direction": "up"}]), EVENTS[1], "bears_on")
 
-    def test_S98_add_result_remove_change_and_redact(self):
+    def test_S98_add_result_remove_edit_and_redact(self):
         for kind, key in (
             ("add_result", "test"),
             ("add_result", "text"),
             ("add_result", "outcome"),
             ("remove", "record"),
             ("remove", "reason"),
-            ("change", "record"),
-            ("change", "field"),
-            ("change", "value"),
+            ("edit", "record"),
+            ("edit", "field"),
+            ("edit", "value"),
             ("redact", "evidence"),
         ):
             with self.subTest(event=kind, missing=key):

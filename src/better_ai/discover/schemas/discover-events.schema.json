@@ -7,14 +7,14 @@
   "x-versioned": true,
   "type": "object",
   "properties": {
-    "type": {"enum": ["comment", "note", "answer", "accept", "accepted", "delete", "reopen", "reply", "status", "choose", "add_evidence", "add_result", "remove", "change", "redact"]}
+    "type": {"enum": ["comment", "note", "answer", "accept", "accepted", "delete", "reopen", "reply", "status", "choose", "add_evidence", "add_result", "remove", "edit", "redact"]}
   },
   "allOf": [
     {"if": {"required": ["type"], "properties": {"type": {"const": "choose"}}}, "then": {"$ref": "#/$defs/choose"}},
     {"if": {"required": ["type"], "properties": {"type": {"const": "add_evidence"}}}, "then": {"$ref": "#/$defs/add_evidence"}},
     {"if": {"required": ["type"], "properties": {"type": {"const": "add_result"}}}, "then": {"$ref": "#/$defs/add_result"}},
     {"if": {"required": ["type"], "properties": {"type": {"const": "remove"}}}, "then": {"$ref": "#/$defs/remove"}},
-    {"if": {"required": ["type"], "properties": {"type": {"const": "change"}}}, "then": {"$ref": "#/$defs/change"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "edit"}}}, "then": {"$ref": "#/$defs/edit"}},
     {"if": {"required": ["type"], "properties": {"type": {"const": "redact"}}}, "then": {"$ref": "#/$defs/redact"}}
   ],
   "$defs": {
@@ -90,13 +90,13 @@
         "reason": {"type": "string", "minLength": 1}
       }
     },
-    "change": {
-      "description": "the user changed a field of a record, such as an item's text or the appetite",
+    "edit": {
+      "description": "the user changed a field of a record, such as an item's text or the appetite. It is not called `change`: a `change` is a record of changes.jsonl, and a record type names one file",
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "at", "by", "id", "record", "field", "value"],
       "properties": {
-        "type": {"const": "change"},
+        "type": {"const": "edit"},
         "at": {"$ref": "base.schema.json#/$defs/at"},
         "by": {"const": "user"},
         "id": {"$ref": "base.schema.json#/$defs/id"},

@@ -149,7 +149,7 @@ EVENTS = {
     },
     "add_result": {"id": "r1", "test": "X1", "text": "Three of five found it.", "outcome": "holds"},
     "remove": {"id": "m1", "record": "E-a1-1", "reason": "Wrong person."},
-    "change": {"id": "h1", "record": "P1", "field": "text", "value": "People lose track."},
+    "edit": {"id": "h1", "record": "P1", "field": "text", "value": "People lose track."},
     "redact": {"id": "d1", "evidence": "E-a1-1"},
 }
 
