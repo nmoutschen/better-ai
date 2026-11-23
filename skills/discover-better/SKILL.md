@@ -86,7 +86,7 @@ FIND what holds for the user's own users, not for users in general. ASK the user
 
 CHECK what each piece of evidence covers: which groups, which setting, and for data, the population and the denominator. PREFER what people did or committed to over what they said they would do. WHEN you ask the user about people, ASK about the last concrete episode, the workaround and what it cost, not whether they would use it.
 
-AN item whose evidence is all from elsewhere is not yet known for your users: SAY so in the question you ask about it, or plan a test for it at step 6.
+An item whose evidence is all from elsewhere is not yet known for your users: SAY so in the question you ask about it, or plan a test for it at step 6.
 
 WAIT for the analysts' and the quote verifiers' hand-backs. Meanwhile, questions to the user go on. DO NOT choose a move or write a brief until they hand back.
 
@@ -173,7 +173,7 @@ DO NOT accept a risk yourself, and DO NOT record Risk accepted as an item's stat
 
 TO accept a risk, ASK a question about that risk, with the fixed default "Accept the risk". ONCE the user takes it with ✓, or accepts in the chat in their own typed words, ADD a change with `field` `risk`, the risk's id, `to` `accepted`, and that question as its cause. IF the change is refused because the user typed their answer on the page, CONFIRM with the user in the chat and record their words.
 
-DO NOT change a risk's text or id once a question or a change cites it.
+DO NOT change a risk's text or id once a question or a change cites it: ADD a new risk instead.
 
 ### Keep the checks honest
 
@@ -233,7 +233,7 @@ THEN CONTINUE from the step the head names.
 
 IF you cannot do a step, because a call was denied or the harness lacks a tool, SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done.
 
-- **No sub-agents:** run the analysts in turn yourself, each by [agents/analyst.md](agents/analyst.md). No quote verifier runs, so no quote counts, and moves do not wait for quotes.
+- **No sub-agents:** run the analysts in turn yourself, each by [agents/analyst.md](agents/analyst.md). READ the behaviours yourself by [agents/behaviour-verifier.md](agents/behaviour-verifier.md), and SAY in the brief that no separate reader checked them. No quote verifier runs, so no quote counts, and moves do not wait for quotes.
 - **No web access:** analysts do not run, the items stay `unverified`, and the brief says so.
 - **No raw read of pages from the shell:** no quote counts. The first time two verifiers fail to connect to different hosts, TELL the user once, and offer three ways on: allow network for the shell; paste the page text as evidence of their own; or go on with the items unverified, which the brief says.
 - **No shell:** KEEP the records in your working notes, MARK the discovery **not finished**, and NAME the records you did not add.

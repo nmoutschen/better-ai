@@ -48,7 +48,7 @@ What changed on an item or on the discovery, and why. `field` is `state`, `impor
 {"type": "change", "about": {"type": "item", "item": "<P1>"}, "field": "importance", "from": null, "to": "<high | lower>", "cause": {"reasoning": "<why, in one sentence>"}}
 {"type": "change", "about": {"type": "item", "item": "<B1>"}, "field": "state", "from": "<...>", "to": "needs a test", "cause": {"test": "<X1>"}}
 {"type": "change", "about": {"type": "item", "item": "<B1>"}, "field": "risk", "risk": "<R1>", "from": null, "to": "accepted", "cause": {"answer": {"type": "decision", "id": "<D<n> the question about that risk>"}}}
-{"type": "change", "about": {"type": "discovery"}, "field": "<appetite | setting>", "from": "<the old value>", "to": "<the new value>", "cause": {"answer": {"type": "page", "event": "<id of the user's change event>"}}}
+{"type": "change", "about": {"type": "discovery"}, "field": "<appetite | setting>", "from": "<the old value>", "to": "<the new value>", "cause": {"answer": {"type": "page", "event": "<id of the user's edit event>"}}}
 {"type": "change", "about": {"type": "discovery"}, "field": "<appetite | setting>", "from": "<...>", "to": "<...>", "cause": {"answer": {"type": "chat", "text": "<the user's typed words>"}}}
 ```
 
@@ -58,7 +58,7 @@ A page an analyst read, with how it read it (`raw`, `extracted`, `snippet` or `b
 
 ```
 {"type": "source", "origin": {"type": "web", "url": "<https://...>", "read": "<raw | extracted | snippet | blocked>"}, "title": "<the page's title>"}
-{"type": "source", "origin": {"type": "you", "given": {"type": "page", "event": "<id of the user's add_evidence event>"}}, "title": "<what the user gave>", "said_by_role": "<a role, such as a teammate on payments, in an internal discovery>"}
+{"type": "source", "origin": {"type": "you", "given": {"type": "page", "event": "<id of the user's add_evidence or add_result event>"}}, "title": "<what the user gave>", "said_by_role": "<a role, such as a teammate on payments, in an internal discovery>"}
 {"type": "source", "origin": {"type": "you", "given": {"type": "chat", "text": "<the user's typed words>"}}, "title": "<...>"}
 ```
 
@@ -72,7 +72,7 @@ What a source says about items. `words` is a quote of one line, at most 600 char
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<...>"}, "kind": "<...>", "about": "<...>", "bears_on": [], "status": "counts", "verifier": "<...>", "tries": ["<...>"], "checked_read": "raw", "span": "<the passage copied from the raw page>", "sha256": "<added by the command from --raw>"}
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<...>"}, "kind": "<...>", "about": "<...>", "bears_on": [], "status": "<unverified | not reachable>", "verifier": "<...>", "tries": ["<...>"], "reason": "<why, such as reworded, or the HTTP status>"}
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<...>"}, "kind": "<...>", "about": "<...>", "bears_on": [], "status": "removed", "reason": "<the user's remove event, by its id>"}
-{"type": "evidence", "source": "<S-... of a you source>", "words": {"type": "event", "event": "<id of the user's add_evidence event>"}, "summary": "<what was said, reported by you and by role, in an internal discovery>", "kind": "<...>", "about": "your users", "bears_on": [], "status": "counts"}
+{"type": "evidence", "source": "<S-... of a you source>", "words": {"type": "event", "event": "<id of the user's add_evidence or add_result event>"}, "summary": "<what was said, reported by you and by role, in an internal discovery>", "kind": "<...>", "about": "your users", "bears_on": [], "status": "counts"}
 ```
 
 The quote verifier sets an outcome with `set <unit> <evidence id> --by <its name> --raw <file of the raw page>`. The coordinator sets any evidence `removed` when the user removes it, with `reason` naming their event; the evidence keeps its words. `redact` also sets `removed`, and erases a person's words.
@@ -133,7 +133,7 @@ The page adds each user action to the conversation with an `id`; `pending` lists
 - an answer to a question: `set` the question `answered`, with `{"type": "page", "event": "<id>"}`;
 - `choose`: ADD a move with the event as its answer;
 - `add_evidence`: ADD a `you` source and evidence whose `words` name the event;
-- `add_result`: `set` the test's `result`;
+- `add_result`: ADD a `you` source and evidence whose `given` and `words` name the event, THEN `set` the test `done` with its `result`;
 - `edit`: `set` the record's `field` to `value`, or ADD a change about the discovery for the appetite or the setting;
 - `remove`: `set` a test `removed` with the user's reason, or `set` the evidence `removed`, with a `reason` naming the event, and ADD the changes this causes for the items it bore on;
 - `redact`: RUN `redact` for the evidence.
