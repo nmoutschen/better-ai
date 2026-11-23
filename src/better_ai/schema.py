@@ -1052,8 +1052,8 @@ def read_records(
     notices: list[Error] = []
     try:
         found = check_text(path, text, docs, cache, now=now, cutoff=cutoff, notices=notices, root=unit.root)
-    except (RecursionError, ValueError, TypeError, KeyError, AttributeError, OverflowError) as error:
-        return failed(f"cannot be checked: {error}")
+    except RecursionError:
+        return failed("cannot be checked: nested too deeply")
     if [(e.field, e.message) for e in found] == [("(file)", "no schema describes this file")]:
         return failed(found[0].message)
     flagged = {e.line for e in found}

@@ -312,13 +312,13 @@ def test_run_continues_when_events_follow_a_result(tmp_path: Path) -> None:
     fake.write_text(
         "#!/bin/sh\n"
         'echo \'{"type":"result","stop_reason":"end_turn"}\'\n'
-        "sleep 0.4\n"
+        "sleep 0.2\n"
         'echo \'{"type":"assistant","text":"a background task finished"}\'\n'
-        "sleep 1.4\n"
+        "sleep 1.9\n"
         'echo \'{"type":"result","stop_reason":"end_turn","turn":2}\'\n'
     )
     fake.chmod(0o755)
     out = tmp_path / "run.out"
-    script = agent.end_after_result(f"{fake} > {out} < /dev/null", str(out), quiet=1, poll=0.2, grace=0.5)
+    script = agent.end_after_result(f"{fake} > {out} < /dev/null", str(out), quiet=1.5, poll=0.2, grace=0.5)
     subprocess.run(["sh", "-c", script], check=False, timeout=30)
     assert out.read_text().splitlines()[-1] == '{"type":"result","stop_reason":"end_turn","turn":2}'

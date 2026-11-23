@@ -51,7 +51,7 @@ def without_nulls(value):
 
 @functools.lru_cache(maxsize=1)
 def _docs() -> dict:
-    return schema.load_schemas(*resources.schema_sources("architect"))
+    return schema.docs_for("architect")
 
 
 def shape_problems(design: dict) -> list[str]:

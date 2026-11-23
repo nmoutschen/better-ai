@@ -354,6 +354,13 @@ class Dashboard(unittest.TestCase):
             data = load(folder)
         self.assertEqual([t["id"] for t in data["tasks"]][:1], ["T1"])
         self.assertTrue(any(e["line"] == 2 for e in data["errors"]))
+        # A bug in the check is not a record's error: it stops the load.
+        with (
+            tempfile.TemporaryDirectory() as d,
+            mock.patch.object(schema, "check_text", side_effect=KeyError("x")),
+            self.assertRaises(KeyError),
+        ):
+            load(change(Path(d)))
 
     def test_the_dashboard_reads_each_file_it_shows(self):
         with tempfile.TemporaryDirectory() as d:

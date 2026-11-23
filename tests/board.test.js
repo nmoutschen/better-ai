@@ -8,6 +8,20 @@ const { read, stand, marked, between, loadPage, loadBoard } = require('./harness
 const { pageEscape: realEsc, pageShowErrors } = loadPage();
 const NOTE = loadBoard('{ERRORS_NOTE}').ERRORS_NOTE;
 
+// All of board.js, to its end, on a document whose #page-data holds SNAPSHOT (none for a served page): what the page
+// asked of the conversation, and what it wrote to the errors band.
+function wholeBoard(snapshot) {
+  const seen = { conversation: null, bands: [] };
+  const page = loadPage();
+  const document = new Proxy(stand(), { get: (t, k) => (k === 'getElementById' ? id => (id === 'page-data' ? (snapshot ? { textContent: JSON.stringify(snapshot) } : null) : stand()) : t[k]) });
+  const env = { document, pageConversation: o => { seen.conversation = o; return stand(); }, pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents,
+    pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime, pageEscape: page.pageEscape, pagePopup: page.pagePopup,
+    pageShowErrors: (band, errors, note) => seen.bands.push([errors, note]), addEventListener: () => {}, innerWidth: 1000, innerHeight: 800,
+    getComputedStyle: stand(), fetch: () => new Promise(() => {}), setInterval: () => {} };
+  new Function(...Object.keys(env), read('research', 'board.js'))(...Object.values(env));
+  return seen;
+}
+
 // The page with `getElementById('pop')` giving one element that keeps what is written into it.
 function page() {
   const pop = { innerHTML: '', querySelector: s => (s === 'ul.thread' ? { append() {} } : null), remove() {}, style: {}, setAttribute() {} };
@@ -137,7 +151,7 @@ test('a kept invalid claim with a list for its question does not stop the board 
   assert.deepEqual(d.byId['Q-1'].claimsList, []);
 });
 
-test('the errors band is written only when its text changes, so a screen reader is not read it every poll', () => {
+test('the errors band is written only when its text changes, and the board gives it its note; a rendered board is read-only', () => {
   let writes = 0, html = '';
   const band = { hidden: true, get innerHTML() { return html; }, set innerHTML(v) { writes++; html = v; } };
   const errors = [{ file: 'a.json', line: 1, field: 'x', message: 'bad' }];
@@ -148,6 +162,13 @@ test('the errors band is written only when its text changes, so a screen reader 
 
   pageShowErrors(band, errors, NOTE);
   assert.ok(html.includes('<p>' + NOTE + '</p>'), 'the board says what it shows of an invalid record');
+
+  // The page itself passes that note to the band, and a rendered copy offers no answer, default or reply.
+  const rendered = wholeBoard({ ...board({ id: 'S-w2-2' }), errors });
+  assert.deepEqual([rendered.conversation.served, rendered.conversation.readOnly], [false, true]);
+  assert.deepEqual(rendered.bands, [[errors, NOTE]]);
+  const served = wholeBoard(null);
+  assert.deepEqual([served.conversation.served, served.conversation.readOnly], [true, false]);
 });
 
 test('the board marks an invalid brief like any other record', () => {
