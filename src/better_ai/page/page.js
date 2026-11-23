@@ -463,15 +463,23 @@ function pageTime(at) {
 // LATESTLAST puts the entries in the order of their newest message, replies included, not of their first; the waiting
 // ones still come last.
 function pageThread(log, itemKinds, waiting, latestLast) {
-  var entries = [], byKey = {}, state = {};
+  var entries = [], byKey = {}, state = {}, items = {}, home = {};
+  // The state of each item. A message under a reply belongs to the item that reply is under (HOME). pending in
+  // src/better_ai/page/__init__.py follows the same rules; tests/fixtures/threads.json holds the logs both are run on.
   log.forEach(function (e) {
+    var to = home[e.to] || e.to;
     if (e.type === 'status') state[e.to] = e.status;
     else if (e.type === 'accept' || e.type === 'accepted') state[e.to] = 'accepted';
     else if (e.type === 'reopen') state[e.to] = 'reopened';
-    // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
-    else if (e.type === 'note' && e.to && state[e.to] === 'asked') state[e.to] = 'replied';
-    // A reply under a finished item is a follow-up: the item goes back to the agent.
-    else if (e.type === 'note' && e.to && (state[e.to] === 'done' || state[e.to] === 'accepted')) state[e.to] = 'followup';
+    else if (e.type === 'note' && to) {
+      // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
+      if (state[to] === 'asked') state[to] = 'replied';
+      // A reply under a finished item is a follow-up: the item goes back to the agent.
+      else if (state[to] === 'done' || state[to] === 'accepted') state[to] = 'followup';
+      // An answer under an item is part of it; an answer to the agent's own message is an item.
+      if (e.id) { if (items[to]) home[e.id] = to; else items[e.id] = true; }
+    } else if (e.type === 'reply' && to && e.id) home[e.id] = to;
+    else if (e.id && itemKinds.indexOf(e.type) >= 0) items[e.id] = true;
   });
   log.forEach(function (e, i) {
     // What an event answers: an answer to a decision names the decision; the rest name it in `to`.
