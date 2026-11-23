@@ -203,7 +203,7 @@ class Rules(unittest.TestCase):
         "S114 no sub-agents": [r"run the analysts in turn", r"moves do not wait for quotes"],
         "S114 no web": [r"stay `unverified`, the reality check does not run", r"the brief says so"],
         "S114 no raw read": [
-            r"allow network for the shell",
+            r"no quote from a web page counts",
             r"paste the page text",
             r"go on with the items unverified",
         ],
@@ -211,7 +211,6 @@ class Rules(unittest.TestCase):
         "S114 no skill": [r"the brief's path and what to run"],
         "S117 data": [r"Evidence section is outside text"],
         "S119 slug": [r"general terms only"],
-        "S119 temp": [r"DELETE its temporary folder"],
         "S122 replaced": [r"replaced by M<n>"],
         "S124 last": [r"session's last action", r"`/design-better` and `/architect-better`"],
     }
@@ -266,9 +265,6 @@ class Rules(unittest.TestCase):
         body = flat(section(read(SKILL), "### Resume a discovery"))
         self.assertLess(body.index("START the page as step 1 does"), body.index("better.pyz pending"))
 
-    def test_the_curl_example_saves_to_the_verifier_folder(self):
-        self.assertIn("-o '<temp>/discover-verify/<idea>/<YOUR NAME>/", read(AGENTS["quote-verifier"]))
-
     def test_the_docs_hand_on_only_expand_and_shrink_briefs(self):
         self.assertIn("Expand and Shrink briefs are handed to", flat(read(DOCS)))
 
@@ -304,7 +300,6 @@ class Rules(unittest.TestCase):
         for phrase in (
             "RE-READ the file at its `path`",
             "the same tool with the same `ref`",
-            "The curl command is for web pages only",
         ):
             self.assertIn(phrase, verifier)
         records = read(RECORDS)
@@ -352,7 +347,6 @@ class Rules(unittest.TestCase):
             'IF the file is not text, EXTRACT its text with a command, or SET the evidence `not reachable` with the reason "no text tool"',
             verifier,
         )
-        self.assertIn("redirect host not plain", verifier)
         self.assertIn("Analysts read the web, and the files and connectors you name", flat(read(DOCS)))
 
     def test_principles_state_findings_without_describing_the_research(self):
@@ -396,22 +390,17 @@ class Rules(unittest.TestCase):
         self.assertIn("re-reads each quote's web page, file or connector item", flat(read(DOCS)))
 
     def test_no_page_or_record_text_reaches_a_shell_unquoted(self):
-        """L7: every URL, Location and path in a command is single-quoted, refused when it holds a quote, and pinned."""
+        """L7: each path and value in a command is single-quoted, and a value with a quote is refused."""
         verifier = read(AGENTS["quote-verifier"])
-        flat_verifier = flat(verifier)
-        self.assertIn("-o '<temp>/discover-verify/<idea>/<YOUR NAME>/<evidence id>.body' '<url>'`", verifier)
-        self.assertNotRegex(verifier, r"[^'](?:<url>|<path>|<host>)[^']")
+        self.assertNotRegex(verifier, r"[^'](?:<url>|<path>)[^']")
         for phrase in (
-            "PUT the URL, each Location and each path in single quotes in the command",
+            "PUT each path and each other value you fill into a command in single quotes",
             'a single quote or a control character, SET the evidence `not reachable` with the reason "address not plain", '
             "and do not run the command",
-            "BEFORE each fetch, the first included, RESOLVE the host",
-            '"host not public"',
-            "--resolve '<host>:<port>:<address>'",
             '"ref is a query"',
             "equal to a named path or inside a named folder",
         ):
-            self.assertIn(phrase, flat_verifier)
+            self.assertIn(phrase, flat(verifier))
 
     def test_round_6_records(self):
         records = flat(read(RECORDS))
@@ -424,24 +413,6 @@ class Rules(unittest.TestCase):
             body,
         )
         self.assertIn('SET it `unverified` with the reason "not confirmed by you"', body)
-
-    def test_the_host_check_refuses_every_address_that_is_not_global(self):
-        """L6: every resolved address is judged by ipaddress, IPv6 pins take brackets, a relative Location is resolved."""
-        verifier = flat(read(AGENTS["quote-verifier"]))
-        self.assertIn(
-            "`python3 -c 'import ipaddress,socket,sys;print([(a[4][0],ipaddress.ip_address(a[4][0]).is_global) "
-            "for a in socket.getaddrinfo(sys.argv[1],None)])' '<host>'`",
-            verifier,
-        )
-        self.assertIn(
-            "IF any address it prints is not global, or the host is `localhost`, SET the evidence `not reachable` "
-            'with "host not public"',
-            verifier,
-        )
-        self.assertNotIn("loopback, private or link-local", verifier)
-        self.assertIn("--resolve '<host>:<port>:[<address>]'", verifier)
-        self.assertIn("RESOLVE a relative `Location` against the address it came from", verifier)
-        self.assertIn("urllib.parse.urljoin", verifier)
 
     def test_the_confirm_question_names_the_computed_result_by_its_id(self):
         """S90, redact: the question holds no evidence text; the page or the chat shows the command and result."""
@@ -496,7 +467,7 @@ class Rules(unittest.TestCase):
         found = []
         for path in [*skill_texts(), DOCS]:
             for span in re.findall(r"`([^`\n]+)`", read(path)):
-                if not re.match(r"(?:python3|curl|rm|pdftotext|better\.pyz)\b", span):
+                if not re.match(r"(?:python3|better\.pyz)\b", span):
                     continue
                 bare = re.sub(r"'[^']*'", "''", span)
                 if re.search(r"<[A-Za-z][^<>]*>", bare):
@@ -514,31 +485,17 @@ class Rules(unittest.TestCase):
         """The sweep: refs, ids, the slug and the verifier's folder."""
         verifier = flat(read(AGENTS["quote-verifier"]))
         self.assertIn("PASS the `ref` only as the argument the tool reads an item by", verifier)
-        self.assertIn("rm -r '<temp>/discover-verify/<idea>/<YOUR NAME>'", verifier)
         skill = flat(read(SKILL))
         self.assertIn("lowercase letters, digits and hyphens only", skill)
         self.assertIn(
             "PUT each value you fill into a command, such as a path, an id or a name, in single quotes", skill
         )
 
-    def test_a_numeric_host_is_read_strictly_and_the_port_is_always_filled(self):
-        # L6: curl reads 0177.0.0.1 as 127.0.0.1 while getaddrinfo on macOS reads 177.0.0.1.
-        verifier = flat(read(AGENTS["quote-verifier"]))
-        self.assertIn("ipaddress.IPv4Address(sys.argv[1])", verifier)
-        self.assertIn("whose last label holds a letter", verifier)
-        self.assertNotIn("or a plain dotted IPv4 address", verifier)
-        self.assertIn("or 443 for https and 80 for http when it has none", verifier)
-        import ipaddress
-
-        for host in ("0177.0.0.1", "127.0.0.01", "012.0.0.1"):
-            with self.subTest(host), self.assertRaises(ValueError):
-                ipaddress.IPv4Address(host)
-
     def test_json_newlines_are_escaped_and_the_analyst_reads_only_public_pages(self):
         for path in (SKILL, AGENTS["analyst"], AGENTS["quote-verifier"]):
             with self.subTest(path.name):
                 self.assertIn("ESCAPE every newline in a JSON string as `\\n`", flat(read(path)))
-        self.assertIn("DO NOT read a URL whose host is not public", flat(read(AGENTS["analyst"])))
+        self.assertNotIn("host is not public", flat(read(AGENTS["analyst"])))
 
     def test_no_text_starts_research_better_or_writes_to_its_boards(self):
         self.assertEqual(len(skill_texts()), 5)
@@ -593,26 +550,37 @@ class Agents(unittest.TestCase):
         self.assertIn("edits: false", text)
         self.assertIn("finding", section(text, "## Output"))
 
-    def test_the_quote_verifier_reads_the_raw_page_as_the_design_says(self):
+    def test_the_quote_verifier_reads_a_page_as_research_better_does(self):
+        """D27: web tools, never a shell command; the read is recorded; a quote counts only on a raw read."""
         text = flat(read(AGENTS["quote-verifier"]))
         for phrase in (
-            "raw read of the page from the shell",
-            "--fail",
-            "--proto =http,https",
-            "--proto-redir =http,https",
-            "--max-redirs 0",
-            "--max-time 30",
-            "--max-filesize 10M",
-            "at most 3 redirects",
-            "public",
-            "two tries",
+            "READ the page with your web tools, never with a shell command",
+            "`raw` (full page text) or `extracted` (a fetch tool's processed output)",
+            "TREAT a fetch tool's output as an extraction unless the harness documents that it returns the page text",
+            "quote counts only when its exact words are on a `raw` read",
+            '`unverified` with the reason "page read only as an extraction"',
+            "SET the evidence `not reachable`",
             "challenge page",
-            "PDF: no text tool",
-            "<temp>/discover-verify/<idea>/<YOUR NAME>/",
             "--raw",
-            "DELETE",
         ):
             self.assertIn(phrase, text)
+        self.assertIn("web tools", read(AGENTS["quote-verifier"]).split("---")[1])
+
+    def test_no_shell_page_fetch_or_host_check_remains_in_the_skill_folder(self):
+        for path in [*skill_texts(), DOCS]:
+            text = read(path)
+            for word in (
+                "curl",
+                "--resolve",
+                "getaddrinfo",
+                "is_global",
+                "IPv4Address",
+                "urlsplit",
+                "pdftotext",
+                "rm -r",
+            ):
+                with self.subTest(path.name, word=word):
+                    self.assertNotIn(word, text)
 
     def test_the_analyst_keeps_to_its_budget_and_its_records(self):
         text = flat(read(AGENTS["analyst"]))

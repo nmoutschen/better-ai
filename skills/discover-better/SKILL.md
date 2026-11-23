@@ -199,7 +199,7 @@ RUN at most 4 analysts and at most 4 verifiers at once. GIVE each a new, short n
 
 WAIT for checks at most 30 minutes, then go on, treating evidence still `checking` as not counting, and TELL the user.
 
-WHEN a sub-agent ends with work still under its name, RUN `check`, THEN restart it once under a new name: `tries` holds at most two. OTHERWISE, SET its evidence `unverified` with the reason "verifier did not finish", or CLEAR the item's `checker`, and SAY so. WHEN you replace a quote verifier, DELETE its temporary folder with `rm -r '<temp>/discover-verify/<idea>/<its name>'`. START a verifier for each evidence `checking` with no verifier, except a computed result, which the user confirms as step 3 says.
+WHEN a sub-agent ends with work still under its name, RUN `check`, THEN restart it once under a new name: `tries` holds at most two. OTHERWISE, SET its evidence `unverified` with the reason "verifier did not finish", or CLEAR the item's `checker`, and SAY so. START a verifier for each evidence `checking` with no verifier, except a computed result, which the user confirms as step 3 says.
 
 ### Add the records
 
@@ -239,7 +239,7 @@ IF you cannot do a step, because a call was denied or the harness lacks a tool, 
 
 - **No sub-agents:** run the analysts in turn yourself, each by [agents/analyst.md](agents/analyst.md). READ the behaviours yourself by [agents/behaviour-verifier.md](agents/behaviour-verifier.md), and SAY in the brief that no separate reader checked them. No quote verifier runs, so no quote counts, and moves do not wait for quotes.
 - **No web access:** analysts read only the files and connectors the user named; the items no file or connector evidence bears on stay `unverified`, the reality check does not run, and the brief says so.
-- **No raw read of pages from the shell:** no quote from a web page counts. The first time two verifiers fail to connect to different hosts, TELL the user once, and offer three ways on: allow network for the shell; paste the page text as evidence of their own; or go on with the items unverified, which the brief says.
+- **No raw read of pages:** a quote counts only on a `raw` read, so IF the web tools of the verifiers return only extractions, no quote from a web page counts. The first time two verifiers can read pages only as extractions, TELL the user once, and offer two ways on: paste the page text as evidence of their own; or go on with the items unverified, which the brief says.
 - **A connector the user named is not available to sub-agents:** TELL the user once, and offer: export the items to a file the analysts can read; paste them as evidence of their own; or go on with those items unverified, which the brief says.
 - **No shell:** KEEP the records in your working notes, MARK the discovery **not finished**, and NAME the records you did not add.
 - **No page:** HOLD the conversation in the chat.

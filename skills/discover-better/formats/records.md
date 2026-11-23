@@ -54,7 +54,7 @@ What changed on an item or on the discovery, and why. `field` is `state`, `impor
 
 ## source
 
-What an analyst read, with how it read it (`raw`, `extracted`, `snippet` or `blocked`): a web page, whose URL is http or https and names no local or private host; a file the user pointed to, by its path; or an item of a connector, such as an MCP server, by the tool and the item's `ref`, the id or address that tool reads it by. Or something the user gave: only the coordinator adds those, with `said_by_role` in an internal discovery.
+What an analyst read, with how it read it (`raw`, `extracted`, `snippet` or `blocked`): a web page, whose URL is http or https; a file the user pointed to, by its path; or an item of a connector, such as an MCP server, by the tool and the item's `ref`, the id or address that tool reads it by. Or something the user gave: only the coordinator adds those, with `said_by_role` in an internal discovery.
 
 ```
 {"type": "source", "origin": {"type": "web", "url": "<https://...>", "read": "<raw | extracted | snippet | blocked>"}, "title": "<the page's title>"}
