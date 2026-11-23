@@ -24,6 +24,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 
+import better  # noqa: E402
+
 from better_ai import cli, code, page, paths, resources, schema  # noqa: E402
 
 assert code  # imported so its own registration, if any, happens before the tests replace it
@@ -115,10 +117,8 @@ class Fixture(unittest.TestCase):
     # --- helpers
 
     def cli(self, *argv, stdin=""):
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code_ = cli.main(list(argv), stdin=io.StringIO(stdin))
-        return code_, out.getvalue(), err.getvalue()
+        done = better.call("code-better", *argv, stdin=stdin)
+        return done.returncode, done.stdout, done.stderr
 
     def unit(self):
         return paths.resolve_unit(self.unit_arg, cli.load(resources.build_info()))

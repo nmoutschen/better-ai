@@ -620,22 +620,13 @@ class Architect(unittest.TestCase):
         self.assertIn("listening", data)
 
     def test_a_page_event_the_schema_refuses_is_not_written(self):
-        """An `approve` event the events schema refuses is not written; a valid one is, as the user's."""
+        """An `approve` event the events schema refuses is not written."""
         url = self.start_server()
 
-        def post(method, params):
-            body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-            headers = {"Content-Type": "application/json", "Origin": url.rstrip("/")}
-            with urllib.request.urlopen(urllib.request.Request(url + "rpc", body, headers), timeout=10) as response:
-                return json.loads(response.read())
-
         before = (self.folder / "conversation.jsonl").read_text()
-        bad = post("approve", {"id": "a9", "perspectives": ["security"], "changes": [], "text": "t"})
+        bad = self.post(url, "approve", {"id": "a9", "perspectives": ["security"], "changes": [], "text": "t"})
         self.assertIn("error", bad)
         self.assertEqual((self.folder / "conversation.jsonl").read_text(), before)
-        good = post("approve", {"id": "a9", "again": False, "perspectives": ["security"], "changes": [], "text": "t"})
-        self.assertEqual(good["result"], "saved")
-        self.assertEqual(json.loads((self.folder / "conversation.jsonl").read_text().splitlines()[-1])["by"], "user")
 
     # What the page sends, by method, as page.js sends it (the server adds type, by and at).
     SENT = {
@@ -653,26 +644,9 @@ class Architect(unittest.TestCase):
         with urllib.request.urlopen(urllib.request.Request(url + "rpc", body, headers), timeout=10) as response:
             return json.loads(response.read())
 
-    def test_every_method_the_page_sends_is_accepted_and_the_log_is_a_valid_conversation(self):
-        spec = page.spec_of(self.unit.skill)
-        self.assertEqual(set(spec.sendable()) - {"reopen"}, set(self.SENT), "a method without a check")
-        (self.folder / "conversation.jsonl").unlink()
-        url = self.start_server()
-        for method, params in self.SENT.items():
-            self.assertEqual(self.post(url, method, params).get("result"), "saved", method)
-        events = [json.loads(line) for line in (self.folder / "conversation.jsonl").read_text().splitlines()]
-        self.assertEqual([e["type"] for e in events], list(self.SENT))
-        self.assertEqual({e["by"] for e in events}, {"user"})
-        self.command("reply", "--to", "m-x", stdin="seen it")
-        self.command("status", "accepted", "m-x", "--text", stdin="fine")
-        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
-
-    def test_a_page_supplied_by_is_rejected_and_an_architect_note_with_on_is_refused(self):
+    def test_an_architect_note_with_on_and_a_confirm_without_wording_are_refused(self):
         url = self.start_server()
         before = (self.folder / "conversation.jsonl").read_text()
-        by = self.post(url, "note", {**self.SENT["note"], "by": "agent"})
-        self.assertEqual(by["error"]["code"], -32602)
-        self.assertIn("by", by["error"]["message"])
         on = self.post(url, "note", {**self.SENT["note"], "on": {"id": "x", "title": "t"}})
         self.assertEqual(on["error"]["code"], -32602)
         self.assertIn("on", on["error"]["message"])

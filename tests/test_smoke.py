@@ -12,10 +12,10 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import build_fixture  # noqa: E402
 import pyz  # noqa: E402
-import test_build  # noqa: E402
 
-SMOKE = test_build.ROOT / "tools" / "smoke.py"
+SMOKE = build_fixture.ROOT / "tools" / "smoke.py"
 
 ENTRY = """import http.server
 import json
@@ -62,7 +62,7 @@ class TestSmoke(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.tmp = Path(tmp.name)
-        self.repo = test_build.Fixture(self.tmp)
+        self.repo = build_fixture.Fixture(self.tmp)
         self.repo.write("src/better_ai/_entry.py", ENTRY)
         self.repo.build()
         self.fixtures = self.tmp / "units"
