@@ -98,6 +98,7 @@ class SetContext:
     record: dict
     patch: dict
     by: str | None = None  # who makes the change (`set --by`); the record's own `by`, its creator, never changes
+    unsets: tuple[str, ...] = ()  # the fields `set --unset` removes, which a step that guards a field must also see
 
 
 CREATE_STEPS: dict[str, list[Callable]] = {}
@@ -865,7 +866,7 @@ def set_(args: argparse.Namespace, run: Run) -> int:
     patch = _own_fields(_fields(run, unit, empty_ok=bool(args.unset)), unit, label)
     _deadline(patch, run, unit)
     for step in SET_STEPS.get(run.skill.name, []):
-        step(SetContext(run, unit, found.record, patch, by))
+        step(SetContext(run, unit, found.record, patch, by, tuple(args.unset)))
     first = _merged(found.record, patch, args.unset, keep_null=True)
     candidates = [first]
     if any(v is None for v in patch.values()):
