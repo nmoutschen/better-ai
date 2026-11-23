@@ -23,6 +23,7 @@ PICK the perspectives that apply, from what the audit touches and the applicable
 | Data and privacy | data about people that it collects, derives, moves, keeps, logs or deletes | [../agents/data-and-privacy.md](../agents/data-and-privacy.md) |
 | Failure handling | a call, message or write that crosses a process or network boundary | [../agents/failure-handling.md](../agents/failure-handling.md) |
 | Observability | a flow, job or part that someone must operate | [../agents/observability.md](../agents/observability.md) |
+| Agent experience | something an agent calls, a call to an agent, or a workspace agents share with people | [../agents/agent-experience.md](../agents/agent-experience.md) |
 | API standards | an interface others depend on: an API, a library, a CLI, an event or a file format | [../agents/api-standards.md](../agents/api-standards.md) |
 | Each repo standard | what the standard covers | [../agents/repo-standards.md](../agents/repo-standards.md), one reviewer per standard |
 
