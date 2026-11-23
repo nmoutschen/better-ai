@@ -64,6 +64,12 @@ def normalise(text: str) -> str:
     return re.sub(r"[\W_]+", " ", folded).strip()
 
 
+def quote_in_span(quote: str, span: str) -> bool:
+    """The quote's words occur in the span as whole words, after whitespace and punctuation are normalised."""
+    words = normalise(quote)
+    return bool(words) and f" {words} " in f" {normalise(span)} "
+
+
 def _short_form(host: str) -> ipaddress.IPv4Address | None:
     """An IPv4 address written the short ways a client reads: 127.1, 0x7f.0.0.1, 0177.0.0.1, 2130706433."""
     parts = host.split(".")
@@ -92,7 +98,22 @@ def _literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
         return _short_form(host)
     if ip.version == 6 and ip.ipv4_mapped is not None:
         return ip.ipv4_mapped
+    if ip.version == 6 and int(ip) >> 32 == 0:  # ::/96, an IPv4 address in IPv6 dress
+        return ipaddress.IPv4Address(int(ip))
     return ip
+
+
+def _host(host: str) -> str | None:
+    """A host as a client reads it: an IP literal as it is, a name through IDNA (full-width digits and dots, other
+    scripts) in lower case. None if it is not a valid host."""
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        try:
+            return host.encode("idna").decode("ascii").lower()
+        except UnicodeError:
+            return None
+    return host.lower()
 
 
 def url_problem(url: str) -> str | None:
@@ -110,7 +131,9 @@ def url_problem(url: str) -> str | None:
         return f"must be an http or https address, not {parts.scheme or 'no scheme'}: give the page's http or https address"
     if not host:
         return "has no host: give the page's http or https address"
-    host = host.rstrip(".")
+    host = _host(host.rstrip("."))
+    if not host:
+        return "is not a valid host name: give the page's http or https address"
     if host == "localhost" or host.endswith(".localhost"):
         return "is localhost: read a public page, or give the page text as your own evidence"
     ip = _literal(host)
@@ -233,11 +256,11 @@ def _evidence_at_rest(record: dict, ctx: schema.Context) -> list[tuple[str, str]
         if isinstance(head, dict) and head.get("setting") == "internal" and not record.get("summary"):
             problems.append(("summary", "needed for evidence from you in an internal discovery: the words by role"))
     elif kind == "web" and status == "counts":
-        problems += _counting(record, words)
+        problems += _counting(record, words, head.get("coordinator") if isinstance(head, dict) else None)
     return problems
 
 
-def _counting(record: dict, words: dict) -> list[tuple[str, str]]:
+def _counting(record: dict, words: dict, coordinator: str | None) -> list[tuple[str, str]]:
     """Web evidence that counts: a verifier other than its analyst read the page raw and the span holds the quote."""
     problems = []
     verifier = record.get("verifier")
@@ -247,15 +270,15 @@ def _counting(record: dict, words: dict) -> list[tuple[str, str]]:
         )
     elif verifier == record.get("by"):
         problems.append(("verifier", "the analyst that added the evidence cannot be the verifier that counts it"))
+    elif verifier == coordinator:
+        problems.append(("verifier", "the coordinator is never the verifier: a verifier agent reads the page"))
     if record.get("checked_read") != "raw":
         problems.append(("checked_read", "counts needs checked_read raw: a verifier reads the page itself"))
     span = record.get("span")
     if words.get("type") != "quote" or not isinstance(words.get("text"), str):
         problems.append(("words", "web evidence counts as a quote"))
-    elif isinstance(span, str):
-        quote = normalise(words["text"])
-        if not quote or quote not in normalise(span):
-            problems.append(("span", "the quote does not occur in the span: a verifier copies the span that holds it"))
+    elif isinstance(span, str) and not quote_in_span(words["text"], span):
+        problems.append(("span", "the quote does not occur in the span: a verifier copies the span that holds it"))
     return problems
 
 
@@ -308,6 +331,12 @@ def _evidence_writer_and_start(ctx: records.AddContext) -> None:
 
 
 def _must_be_checker(unit: paths.Unit, by: str, record: dict) -> None:
+    if not record.get("bears_on"):
+        raise _refuse(
+            unit,
+            f"evidence added by {by} must bear on an item it checks: bears_on is empty",
+            "name the items it bears on, or leave the evidence to the coordinator",
+        )
     items = {i.get("id"): i for i in _lines(unit, "items.jsonl")}
     for bears in record.get("bears_on") or []:
         item = items.get(bears.get("item")) if isinstance(bears, dict) else None
@@ -323,13 +352,18 @@ def _must_be_checker(unit: paths.Unit, by: str, record: dict) -> None:
             )
 
 
-def _not_repeated(unit: paths.Unit, record: dict) -> None:
+def _not_repeated(unit: paths.Unit, record: dict, skip: str | None = None) -> None:
     words = record.get("words")
     if not isinstance(words, dict):
         return
     mine = _comparable(words)
     for _, other in _folder(unit, "evidence"):
-        if other.get("source") == record.get("source") and mine is not None and _comparable(other.get("words")) == mine:
+        if (
+            other.get("id") != skip
+            and other.get("source") == record.get("source")
+            and mine is not None
+            and _comparable(other.get("words")) == mine
+        ):
             note = " (removed)" if other.get("status") == "removed" else ""
             raise _refuse(
                 unit,
@@ -409,7 +443,7 @@ def _since(record: dict) -> datetime | None:
 
 def _names_the_request(unit: paths.Unit, ident: str, reason: Any) -> bool:
     """The reason names the user's request to remove this evidence: a `remove` or `redact` event of theirs, or a
-    decision about it that they answered."""
+    decision about it that they answered with exactly "remove <id>"."""
     if not isinstance(reason, str):
         return False
     wanted = [
@@ -423,7 +457,10 @@ def _names_the_request(unit: paths.Unit, ident: str, reason: Any) -> bool:
     ]
     for decision in _lines(unit, "decisions.jsonl"):
         about = decision.get("about")
-        if decision.get("status") == "answered" and isinstance(about, dict) and about.get("evidence") == ident:
+        answer = decision.get("answer")
+        said = answer.get("text") if isinstance(answer, dict) else None
+        asked = isinstance(about, dict) and about.get("type") == "evidence" and about.get("evidence") == ident
+        if decision.get("status") == "answered" and asked and said == f"remove {ident}":
             wanted.append(decision.get("id"))
     return any(isinstance(w, str) and re.search(rf"(?<![\w-]){re.escape(w)}(?![\w-])", reason) for w in wanted)
 
@@ -474,8 +511,7 @@ def _count(ctx: records.SetContext, by: str) -> None:
             "copy the span from the page file exactly, or set unverified or not reachable with a reason",
         )
     words = record.get("words") if isinstance(record.get("words"), dict) else {}
-    quote = normalise(words["text"]) if isinstance(words.get("text"), str) else ""
-    if not quote or quote not in normalise(span):
+    if not isinstance(words.get("text"), str) or not quote_in_span(words["text"], span):
         raise _refuse(
             ctx.unit,
             "the quote does not occur in the span",
@@ -519,9 +555,139 @@ def _who(ctx: records.SetContext, by: str, coordinator: str, old: str, new: str)
     )
 
 
+UNSET = object()  # a field `set` removes, with --unset or with null
+STAMPED = ("type", "at", "by", "id")
+# The write table of evidence: who may change each field, and in which status. Nothing else may be changed. A field
+# not here is refused. "analyst" is the analyst that added the evidence.
+FIXED_AFTER_CHECKING = ("source", "words", "bears_on", "kind", "about")  # coordinator or analyst, while checking, alone
+EVIDENCE_FIELDS = (
+    *FIXED_AFTER_CHECKING,
+    "summary",  # the coordinator, while checking or counting
+    "status",  # the quote flow's table
+    "verifier",  # the coordinator, as it starts a verifier, while checking
+    "since",  # the coordinator, with a verifier, while checking
+    "tries",  # better.pyz alone
+    "reason",  # only with the change of status that holds it
+    "checked_read",  # only with counts, from the verifier
+    "span",  # only with counts, from the verifier
+    "sha256",  # better.pyz alone, from --raw
+)
+SOURCE_FIELDS = ("origin", "title", "said_by_role")  # origin: never; title: coordinator or analyst; role: coordinator
+
+
+def _changes(record: dict, patch: dict, unsets: tuple[str, ...]) -> dict[str, Any]:
+    """The fields a set really changes, as new value or UNSET: a value the record has already is not a change, and
+    neither is removing a field it does not have."""
+    found: dict[str, Any] = {}
+    for name, value in patch.items():
+        if value is None:
+            value = UNSET
+        if value is UNSET:
+            if name in record:
+                found[name] = UNSET
+        elif name not in record or record[name] != value or name == "verifier":  # a verifier is always a start
+            found[name] = value
+    for name in unsets:
+        if name in record:
+            found[name] = UNSET
+    return found
+
+
+def _no_unset(ctx: records.SetContext, name: str) -> paths.Refused:
+    return _refuse(
+        ctx.unit,
+        f"{name} of {ctx.record['id']} cannot be removed",
+        "leave --unset and null out: better.pyz drops the fields a change of status makes stale",
+    )
+
+
+def _write_table(
+    ctx: records.SetContext, changes: dict[str, Any], by: str, coordinator: str, old: str, new: str
+) -> None:
+    """The write table of evidence, for every field the set changes but `status`: who, and in which status."""
+    unit, record = ctx.unit, ctx.record
+    ident, verifier = record["id"], record.get("verifier")
+    tries = list(record.get("tries") or ([verifier] if verifier else []))
+    for name, value in changes.items():
+        if name == "status":
+            continue
+        if name in STAMPED or name not in EVIDENCE_FIELDS:
+            raise _refuse(
+                unit, f"{name} of {ident} cannot be changed", "change only the fields the evidence's format lists"
+            )
+        if value is UNSET:
+            raise _no_unset(ctx, name)
+        if name == "sha256":
+            raise _refuse(unit, "sha256 is computed by better.pyz from --raw", "leave sha256 out of the fields")
+        if name == "tries":
+            raise _refuse(unit, "tries is kept by better.pyz", "leave tries out of the fields")
+        if name in FIXED_AFTER_CHECKING:
+            if old != "checking":
+                raise _refuse(
+                    unit,
+                    f"{name} of {ident} is fixed once the evidence leaves checking (it is {old})",
+                    "add new evidence with the new words, source or items",
+                )
+            if new != old:
+                raise _refuse(
+                    unit, f"{name} cannot change in the set that changes the status", f"set {name} on its own"
+                )
+            if by not in (coordinator, record.get("by")):
+                raise _refuse(
+                    unit,
+                    f"only the coordinator ({coordinator}) or {record.get('by')}, who added {ident}, changes {name}",
+                    "stop: tell the coordinator, in your hand-back",
+                )
+            merged = {**record, name: value}
+            if name in ("source", "words"):
+                _not_repeated(unit, merged, ident)
+            if name == "bears_on" and by != coordinator:
+                _must_be_checker(unit, by, merged)
+        elif name == "summary":
+            if by != coordinator or old not in ("checking", "counts"):
+                raise _refuse(
+                    unit,
+                    f"only the coordinator ({coordinator}) writes summary, while {ident} is checking or counts",
+                    "ask the coordinator",
+                )
+        elif name in ("verifier", "since"):
+            if by != coordinator:
+                raise _refuse(
+                    unit,
+                    f"only the coordinator ({coordinator}) sets verifier or since",
+                    "stop: you cannot start or replace a verifier",
+                )
+            if new != "checking":
+                raise _refuse(unit, f"{name} is set only while {ident} is checking", f"{ident} is {new}")
+            if name == "verifier" and value == coordinator:
+                raise _refuse(
+                    unit, "the coordinator is never the verifier", "start a verifier agent with a name of its own"
+                )
+            if name == "verifier" and value in tries:
+                raise _refuse(
+                    unit,
+                    f"{value} is already in tries of {ident} ({', '.join(tries)})",
+                    "start a verifier with a new name",
+                )
+        elif name == "reason":
+            if new == old or new not in ("unverified", "not reachable", "removed"):
+                raise _refuse(
+                    unit,
+                    f"reason of {ident} is set only with the change of status that needs it",
+                    "set the status and the reason together",
+                )
+        elif name in ("checked_read", "span") and not (old == "checking" and new == "counts"):
+            raise _refuse(
+                unit,
+                f"{name} is set only when a verifier counts the evidence",
+                "set counts with checked_read, the span and --raw",
+            )
+
+
 @records.set_step(SKILL)
 def evidence_status_rules(ctx: records.SetContext) -> None:
-    """The status table, who sets `verifier` and `since`, `tries`, and the check of `--raw`, on every set of evidence."""
+    """The write table and the status table, on every set of evidence: who changes which field in which status, how
+    the status changes, `tries`, `since` and the check of `--raw`."""
     record, patch, by, unit = ctx.record, ctx.patch, ctx.by, ctx.unit
     if record.get("type") != "evidence":
         return
@@ -529,37 +695,16 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
     coordinator = _coordinator(unit)
     if by is None:
         raise _refuse(unit, f"setting {ident} needs --by", "run again with --by <your agent name>")
-    for name in ("sha256", "tries"):
-        if name in patch:
-            raise _refuse(
-                unit,
-                (
-                    f"{name} is computed by better.pyz from --raw"
-                    if name == "sha256"
-                    else f"{name} is kept by better.pyz"
-                ),
-                f"leave {name} out of the fields",
-            )
-    old, new = record.get("status"), patch.get("status", record.get("status"))
     verifier = record.get("verifier")
+    if by != coordinator and verifier and by in (record.get("tries") or []) and by != verifier:
+        raise _refuse(unit, f"you were replaced by {verifier}: stop")
+    changes = _changes(record, patch, ctx.unsets)
+    if changes.get("status") is UNSET:
+        raise _no_unset(ctx, "status")
+    old, new = record.get("status"), patch.get("status", record.get("status"))
     tries = list(record.get("tries") or ([verifier] if verifier else []))
     now = ctx.run.now()
-
-    if "verifier" in patch or "since" in patch:
-        if by != coordinator:
-            raise _refuse(
-                unit,
-                f"only the coordinator ({coordinator}) sets verifier or since",
-                "stop: you cannot start or replace a verifier",
-            )
-        if "verifier" in patch and new != "checking":
-            raise _refuse(unit, f"verifier is set only while {ident} is checking", f"{ident} is {new}")
-        if "verifier" in patch and patch["verifier"] in tries:
-            raise _refuse(
-                unit,
-                f"{patch['verifier']} is already in tries of {ident} ({', '.join(tries)})",
-                "start a verifier with a new name",
-            )
+    _write_table(ctx, changes, by, coordinator, old, new)
 
     if new != old:
         if new == "removed":
@@ -569,7 +714,9 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
                 raise _refuse(
                     unit,
                     f"the reason must name the user's request to remove {ident}",
-                    "give a reason that holds the id of their remove event or of a decision they answered about it",
+                    'give a reason that holds the id of their remove or redact event, or of a decision they answered "remove '
+                    + ident
+                    + '"',
                 )
             for name in CHECKED:
                 if name in record:
@@ -602,12 +749,6 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
             patch["reason"] = None
         else:
             raise _who(ctx, by, coordinator, old, new)
-    elif old == "counts" and any(name in patch for name in CHECKED):
-        raise _refuse(
-            unit,
-            f"{ident} counts: what the verifier read stays as it is",
-            "add new evidence, or ask the user to remove this one",
-        )
 
     if new == "counts" and old == "checking":
         _count(ctx, by)
@@ -618,3 +759,33 @@ def evidence_status_rules(ctx: records.SetContext) -> None:
         patch.setdefault("since", now.strftime(records.TIME))
     if old == "checking" and new != "checking" and "since" in record | patch:
         patch["since"] = None
+
+
+@records.set_step(SKILL)
+def source_write_table(ctx: records.SetContext) -> None:
+    """The write table of a source: its origin is fixed once added; its title is the coordinator's or its analyst's;
+    the role of the user's source is the coordinator's. Nothing is removed."""
+    record, by, unit = ctx.record, ctx.by, ctx.unit
+    if record.get("type") != "source":
+        return
+    ident = record["id"]
+    coordinator = _coordinator(unit)
+    if by is None:
+        raise _refuse(unit, f"setting {ident} needs --by", "run again with --by <your agent name>")
+    for name, value in _changes(record, ctx.patch, ctx.unsets).items():
+        if name not in SOURCE_FIELDS:
+            raise _refuse(
+                unit, f"{name} of {ident} cannot be changed", "change only the fields the source's format lists"
+            )
+        if value is UNSET:
+            raise _refuse(unit, f"{name} of {ident} cannot be removed", "leave --unset out")
+        if name == "origin":
+            raise _refuse(unit, f"the origin of {ident} is fixed once added", "add a new source for the new page")
+        allowed = (coordinator,) if name == "said_by_role" else (coordinator, record.get("by"))
+        if by not in allowed:
+            raise _refuse(
+                unit,
+                f"only the coordinator ({coordinator}) changes {name} of {ident}"
+                + ("" if name == "said_by_role" else f" or {record.get('by')}, who added it"),
+                "stop: tell the coordinator, in your hand-back",
+            )

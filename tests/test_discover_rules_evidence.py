@@ -93,8 +93,10 @@ class Rules(unittest.TestCase):
     def add(self, kind, fields, by):
         return self.run_("add", self.unit, kind, "--by", by, stdin=fields)
 
-    def set(self, ident, fields, by=None, raw=None):
+    def set(self, ident, fields, by=None, raw=None, unset=()):
         args = ["set", self.unit, ident]
+        for name in unset:
+            args += ["--unset", name]
         if by:
             args += ["--by", by]
         if raw:
@@ -803,6 +805,230 @@ class Web(Rules):
         self.ok(self.counts())
         done = self.run_("check", self.unit)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+
+class FieldTable(Rules):
+    """One table of who may write each field of evidence and of a source, in which status, and that nothing else may:
+    every field, as a patch and as an unset, as every writer, in every status."""
+
+    STATES = {
+        k: Transitions.STATES[k]
+        for k in (
+            "checking, recent",
+            "checking, no verifier",
+            "not reachable, one try",
+            "counts",
+            "unverified",
+            "removed",
+        )
+    }
+    WRITERS = (None, "v1", "a1", "a2", COORD)
+    VALUES = {
+        "source": "S-a1-2",
+        "words": {"type": "quote", "text": "A wholly other sentence."},
+        "bears_on": [{"item": "P1", "direction": "against"}],
+        "kind": "did",
+        "about": "elsewhere",
+        "summary": "A summary.",
+        "verifier": "v9",
+        "since": ago(2),
+        "tries": ["x"],
+        "reason": "because",
+        "checked_read": "extracted",
+        "span": "another span",
+        "sha256": "b" * 64,
+    }
+
+    def setUp(self):
+        super().setUp()
+        origin = {"type": "web", "url": "https://example.com/two", "read": "raw"}
+        self.ok(self.add("source", {"origin": origin, "title": "two"}, "a1"))
+
+    @staticmethod
+    def allowed(field, mode, state, writer, present):
+        """The table, written out apart from the code. For evidence whose own analyst is a1."""
+        if writer is None:
+            return False
+        was = Transitions.STATES[state]["status"]
+        if mode == "unset":
+            return field not in present  # nothing to remove is not a change; anything present stays
+        if field in ("source", "words", "bears_on", "kind", "about"):
+            return was == "checking" and writer in (COORD, "a1")
+        if field == "summary":
+            return writer == COORD and was in ("checking", "counts")
+        if field in ("verifier", "since"):
+            return writer == COORD and was == "checking"
+        return False  # tries, sha256, reason, checked_read, span: set only by a change of status, or by better.pyz
+
+    def test_every_field_as_every_writer_in_every_status(self):
+        ran = 0
+        for state, fields in self.STATES.items():
+            for field, value in self.VALUES.items():
+                for mode in ("patch", "unset"):
+                    for writer in self.WRITERS:
+                        with self.subTest(state=state, field=field, mode=mode, by=writer):
+                            self.put(**fields)
+                            before = (self.folder / "evidence" / "E-a1-1.json").read_text()
+                            present = set(json.loads(before))
+                            if mode == "patch":
+                                done = self.set("E-a1-1", {field: value}, writer)
+                            else:
+                                done = self.set("E-a1-1", {}, writer, unset=[field])
+                            ran += 1
+                            wanted = self.allowed(field, mode, state, writer, present)
+                            self.assertEqual(done.returncode == 0, wanted, (done.stdout, done.stderr))
+                            after = (self.folder / "evidence" / "E-a1-1.json").read_text()
+                            if not wanted:
+                                self.assertEqual(after, before)
+        self.assertGreater(ran, 700)
+
+    def test_the_verifier_cannot_replace_the_words_in_the_set_that_counts_them(self):
+        self.started()
+        words = {"type": "quote", "text": "We lost a week to this. And more."}
+        self.refused(self.counts(words=words), "words")
+        self.assertEqual(self.evidence()["status"], "checking")
+
+    def test_the_coordinator_cannot_change_words_in_the_set_that_leaves_checking(self):
+        self.started()
+        fields = {"status": "unverified", "reason": "reworded", "words": self.VALUES["words"]}
+        self.refused(self.set("E-a1-1", fields, "v1"), "words")
+        fields = {"status": "removed", "reason": "the user asked (m1)", "words": self.VALUES["words"]}
+        self.refused(self.set("E-a1-1", fields, COORD), "words")
+
+    def test_the_words_that_will_be_stored_must_meet_the_rules(self):
+        self.started()
+        self.ok(self.set("E-a1-1", {"words": {"type": "quote", "text": "In the end, we lost a week"}}, COORD))
+        self.ok(self.counts(span=SPAN))
+        self.assertEqual(self.evidence()["status"], "counts")
+
+    def test_new_words_cannot_repeat_other_evidence(self):
+        fields = {
+            "source": "S-a1-1",
+            "words": {"type": "quote", "text": "Other words."},
+            "kind": "say",
+            "about": "your users",
+            "bears_on": [{"item": "P1", "direction": "for"}],
+            "status": "checking",
+        }
+        self.ok(self.add("evidence", fields, "a1"))
+        self.refused(self.set("E-a1-2", {"words": {"type": "quote", "text": QUOTE}}, "a1"), "E-a1-1")
+
+    def test_an_analyst_may_not_point_evidence_at_an_item_it_does_not_check(self):
+        both = [{"item": "P1", "direction": "for"}, {"item": "P2", "direction": "for"}]
+        self.refused(self.set("E-a1-1", {"bears_on": both}, "a1"), "P2")
+        self.ok(self.set("E-a1-1", {"bears_on": both}, COORD))
+
+    def test_the_evidence_must_bear_on_something_unless_the_coordinator_adds_it(self):
+        fields = {
+            "source": "S-a1-1",
+            "words": {"type": "quote", "text": "Other words."},
+            "kind": "say",
+            "about": "your users",
+            "bears_on": [],
+            "status": "checking",
+        }
+        self.refused(self.add("evidence", fields, "a1"), "bears")
+        self.ok(self.add("evidence", fields, COORD))
+        self.refused(self.set("E-a1-1", {"bears_on": []}, "a1"), "bears")
+
+    def test_a_source_has_its_own_table(self):
+        origin = {"type": "web", "url": "https://example.com/other", "read": "snippet"}
+        values = {"origin": origin, "title": "A new title", "said_by_role": "a role"}
+        for field, value in values.items():
+            for mode in ("patch", "unset"):
+                for writer in (None, "a1", "a2", "v1", COORD):
+                    with self.subTest(field=field, mode=mode, by=writer):
+                        path = self.folder / "sources" / "S-a1-1.json"
+                        before = path.read_text()
+                        if mode == "patch":
+                            done = self.set("S-a1-1", {field: value}, writer)
+                        else:
+                            done = self.set("S-a1-1", {}, writer, unset=[field])
+                        if mode == "unset":
+                            wanted = writer is not None and field == "said_by_role"  # nothing there to remove
+                        elif field == "origin":
+                            wanted = False
+                        elif field == "title":
+                            wanted = writer in ("a1", COORD)
+                        else:
+                            wanted = writer == COORD
+                        self.assertEqual(done.returncode == 0, wanted, (done.stdout, done.stderr))
+                        if not wanted:
+                            self.assertEqual(path.read_text(), before)
+                        else:
+                            path.write_text(before)
+
+
+class Hardening(Rules):
+    def test_removal_may_name_a_decision_answered_with_exactly_remove_the_id(self):
+        self.started()
+        line = R.record(
+            R.DECISION,
+            id="D1",
+            about={"type": "evidence", "evidence": "E-a1-1"},
+            status="answered",
+            answer={"type": "chat", "text": "remove E-a1-1"},
+            answered_at=R.AT,
+        )
+        with open(self.folder / "decisions.jsonl", "a") as out:
+            out.write(json.dumps(line) + "\n")
+        self.ok(self.set("E-a1-1", {"status": "removed", "reason": "the user answered D1"}, COORD))
+
+    def test_a_decision_answered_with_other_words_is_not_a_removal_request(self):
+        self.started()
+        line = R.record(
+            R.DECISION,
+            id="D1",
+            about={"type": "evidence", "evidence": "E-a1-1"},
+            status="answered",
+            answer={"type": "chat", "text": "keep it, but tell me more"},
+            answered_at=R.AT,
+        )
+        with open(self.folder / "decisions.jsonl", "a") as out:
+            out.write(json.dumps(line) + "\n")
+        self.refused(self.set("E-a1-1", {"status": "removed", "reason": "the user answered D1"}, COORD), "remove")
+
+    def test_the_quote_matches_the_span_on_word_boundaries(self):
+        self.page.write_text("Note: We lost a week to thisandthat.")
+        self.started()
+        self.refused(self.counts(span="We lost a week to thisandthat"), "quote")
+        self.page.write_text("Note: Why we lost a week to this, again?")
+        self.ok(self.counts(span="Why we lost a week to this, again"))
+
+    def test_the_coordinator_is_never_the_verifier(self):
+        self.refused(self.set("E-a1-1", {"verifier": COORD}, COORD), "coordinator")
+
+    def test_check_reports_counting_evidence_whose_verifier_is_the_coordinator(self):
+        self.put(status="counts", verifier=COORD, tries=[COORD], checked_read="raw", span=SPAN, sha256="a" * 64)
+        done = self.run_("check", self.unit)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertIn("E-a1-1.json", done.stdout + done.stderr)
+
+    def test_the_check_reports_a_quote_that_is_only_inside_a_word_of_the_span(self):
+        span = "We lost a week to thisandthat"
+        self.put(status="counts", verifier="v1", tries=["v1"], checked_read="raw", span=span, sha256="a" * 64)
+        self.assertEqual(self.run_("check", self.unit).returncode, 1)
+
+    def test_hosts_are_normalised_before_the_rule_reads_them(self):
+        for url in (
+            "http://\uff11\uff12\uff17.0.0.1/",
+            "http://\uff12\uff11\uff13\uff10\uff17\uff10\uff16\uff14\uff13\uff13/",
+            "http://a..b/",
+            "http://exa\u3002mple.com./x",
+            "http://[::127.0.0.1]/",
+            "http://[::7f00:1]/",
+            "http://[::10.1.2.3]/",
+        ):
+            with self.subTest(url):
+                origin = {"type": "web", "url": url, "read": "raw"}
+                done = self.add("source", {"origin": origin, "title": "x"}, "a1")
+                if "exa" in url:  # a full-width dot is an ordinary dot: a public name
+                    continue
+                self.assertEqual(done.returncode, 1, url)
+
+    def test_an_international_name_is_a_public_host(self):
+        origin = {"type": "web", "url": "https://b\u00fccher.example/x", "read": "raw"}
+        self.ok(self.add("source", {"origin": origin, "title": "x"}, "a1"))
 
 
 class Hooks(unittest.TestCase):
