@@ -82,16 +82,11 @@ class Package(unittest.TestCase):
             self.assertEqual(done.returncode, 1)
             self.assertIn("code-better", done.stderr)
 
-    def test_the_rule_and_page_modules_exist_as_stubs_registered_from_the_package(self):
+    def test_the_page_module_registers_the_page_from_the_package(self):
         import better_ai.discover as package
+        from better_ai import page
 
-        owners = {
-            "pagespec": "T11",
-        }
-        for name, task in owners.items():
-            with self.subTest(module=name):
-                module = getattr(package, name)
-                self.assertIn(task, module.__doc__)
+        self.assertIs(page.PAGES["discover-better"], package.pagespec.SPEC)
 
     def test_S120_the_package_makes_no_network_call(self):
         network = {

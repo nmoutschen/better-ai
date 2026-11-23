@@ -22,6 +22,7 @@ sys.path.insert(0, str(HERE.parent / "src"))
 import discover_populated as P  # noqa: E402
 import discover_records as R  # noqa: E402
 
+from better_ai import discover, page, paths  # noqa: E402
 from better_ai.discover import brief  # noqa: E402
 
 CHAT = "E-coord-1"
@@ -425,8 +426,10 @@ class Stopping(Fixture):
         self.assertIn("redact", stopped.stderr)
         self.assertIn(PAGE, stopped.stderr)
         self.assertEqual(self.redact(evidence=PAGE).returncode, 0)
-        after = self.verb("serve", "--once")
-        self.assertNotIn("redact", after.stderr)
+        for guard in page.SERVE_GUARDS[
+            discover.SKILL.name
+        ]:  # `serve` would now start the page and wait, so ask its guards
+            guard(paths.resolve_unit(str(self.unit), discover.SKILL))
 
 
 if __name__ == "__main__":
