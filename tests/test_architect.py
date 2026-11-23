@@ -139,7 +139,8 @@ class Architect(unittest.TestCase):
         self.command("review", "--perspectives", "security", "observability")
         last = self.read()["reviews"][-1]
         self.assertEqual(
-            {key for key in last["texts"] if key.startswith("section:")}, {"section:(start)", "section:Command contract"}
+            {key for key in last["texts"] if key.startswith("section:")},
+            {"section:(start)", "section:Command contract"},
         )
         self.assertIn("requirement:F1", last["texts"])
         view = model.model(self.read())
