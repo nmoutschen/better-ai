@@ -25,7 +25,8 @@ for (const {label, data} of payloads) {
     draw('pageErrors(data.errors)');
     draw('figures(data.containers)');
     draw('data.flows.map(flow => figures(flow.versions)).join("")');
-    draw('reviewSummary(data.since.map(key => data.change_labels[key]), data.rerun.map(id => nameOf(data.perspectives, id)))');
+    draw('reviewSummary(data.since, data.change_labels, data.rerun.map(id => nameOf(data.perspectives, id)))');
+    draw('changeList(data.since, data.change_labels, data.removed)');
   } catch (error) {
     failed.push(`${label}: ${error.stack.split('\n').slice(0, 2).join(' ')}`);
   }

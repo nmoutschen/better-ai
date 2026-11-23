@@ -24,6 +24,8 @@
 .boxref.step, .boxref.edge { background:var(--cream); border-style:solid; font-weight:500; }
 .boxref:hover { border-color:var(--terracotta); }
 .rej summary { cursor:pointer; font:var(--font-message-strong); color:var(--ink); }
+.review-changes details { margin:0 0 var(--space-control); }
+.review-changes ul { max-height:14rem; overflow:auto; margin:var(--space-control) 0 0; padding-left:1.2em; font-size:var(--text-message); }
 .drawback { margin:var(--space-item) 0 0; font-size:var(--text-message); }
 .drawback .lbl { display:inline; margin-right:var(--space-control); }
 code { font:var(--font-code); background:var(--linen); padding:1px var(--space-tight); }

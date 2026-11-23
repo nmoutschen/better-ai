@@ -130,14 +130,45 @@ function perspectiveTables(perspectives, findings, parts, reviewed, removedLabel
   }).join('');
 }
 
-function reviewSummary(changed, names, removed = []) {
+// Past this many changes the panel gives counts instead of names, and folds the names behind a control.
+const LISTED_CHANGES = 6;
+
+function changeCounts(keys) {
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const of = kind => keys.filter(key => key.startsWith(kind + ':'));
+  const steps = of('step');
+  const flows = new Set(steps.map(key => key.slice(5).split('/')[0])).size;
+  return [
+    of('box').length && plural(of('box').length, 'box', 'boxes'),
+    of('edge').length && plural(of('edge').length, 'arrow', 'arrows'),
+    steps.length && plural(steps.length, 'step', 'steps') + ' in ' + plural(flows, 'flow', 'flows'),
+    of('requirement').length && plural(of('requirement').length, 'requirement', 'requirements'),
+    of('section').length && plural(of('section').length, 'design section', 'design sections')
+  ].filter(Boolean).join(', ');
+}
+
+// What changed since the last review, from the change keys, their labels and the removed keys, and who runs again.
+function reviewSummary(since, labels, names, removed = []) {
   const rerun = names.join(', ') + (names.length === 1 ? ' runs' : ' run') + ' again';
-  if (changed.length || removed.length) {
+  const ending = names.length ? ' ' + rerun + '.' : '';
+  if (since.length > LISTED_CHANGES) {
+    return since.length + ' parts changed since the review: ' + changeCounts(since) + '.' +
+      (removed.length ? ' ' + removed.length + ' of them removed.' : '') + ending;
+  }
+  const changed = since.filter(key => !removed.includes(key)).map(key => labels[key]);
+  if (since.length) {
     return ((changed.length ? 'Changed since the review: ' + changed.join(', ') + '.' : '')
-      + (removed.length ? ' Removed: ' + removed.join(', ') + '.' : '') + (names.length ? ' ' + rerun + '.' : '')).trim();
+      + (removed.length ? ' Removed: ' + removed.map(key => labels[key]).join(', ') + '.' : '') + ending).trim();
   }
   if (names.length) return rerun + ': not reviewed yet.';
   return 'Nothing changed since the review.';
+}
+
+// The full list of changes, folded, when the summary gives only counts.
+function changeList(since, labels, removed = []) {
+  if (since.length <= LISTED_CHANGES) return '';
+  const items = since.map(key => '<li>' + text(labels[key]) + (removed.includes(key) ? ' <span class="muted">(removed)</span>' : '') + '</li>');
+  return '<details class="rej"><summary>All ' + since.length + ' changes</summary><ul>' + items.join('') + '</ul></details>';
 }
 
 function threadComment(log, id) {
@@ -158,7 +189,7 @@ function start(data) {
   reviewMenu.className = 'decide';
   reviewMenu.id = 'review-menu';
   reviewMenu.hidden = true;
-  reviewMenu.innerHTML = '<p class="menu-h"></p><p class="review-summary"></p><button type="button" class="btn" id="run-review"></button>';
+  reviewMenu.innerHTML = '<p class="menu-h"></p><p class="review-summary"></p><div class="review-changes"></div><button type="button" class="btn" id="run-review"></button>';
   const reviewToggle = document.createElement('button');
   reviewToggle.type = 'button';
   reviewToggle.className = 'btn btn--quiet';
@@ -521,10 +552,9 @@ function start(data) {
       if (!open) return;
       const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
       const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
-      const removedKeys = data.removed || [];
-      const changed = data.since.filter(key => !removedKeys.includes(key)).map(key => data.change_labels[key]);
-      const removed = removedKeys.map(key => data.change_labels[key]);
-      $('.review-summary', reviewMenu).textContent = review ? reviewSummary(changed, reviewNames, removed) : stats + scope;
+      const removed = data.removed || [];
+      $('.review-summary', reviewMenu).textContent = review ? reviewSummary(data.since, data.change_labels, reviewNames, removed) : stats + scope;
+      $('.review-changes', reviewMenu).innerHTML = review ? changeList(data.since, data.change_labels, removed) : '';
     }
   });
   if (approval) {
