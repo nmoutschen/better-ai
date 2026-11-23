@@ -1,90 +1,80 @@
-/* What only the dashboard shows; the shared look (bar, side column, conversation, buttons, toast) is page.css above. */
+/* What only the dashboard shows; the shared look (bar, side column, conversation, buttons, pop-up, toast) is page.css above. */
 
-/* The agents, on the untinted surround */
-/* The agents scroll; the task list stays pinned under them, five rows high, and scrolls on its own past five. */
-.view { min-height:0; display:flex; flex-direction:column; }
-.agents-pane { flex:1; min-height:0; overflow-y:auto; padding:var(--space-item) var(--space-edge); }
-.tasks-pane { flex:none; padding:var(--space-tight) var(--space-edge) var(--space-item); border-top:2px solid var(--line); }
-.tasks-pane[hidden] { display:none; }
-.view h2 { margin:var(--space-control) 0 var(--space-item); }
-.cards { list-style:none; margin:0 0 var(--space-group); padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(20rem, 1fr)); gap:var(--space-item); }
-/* A button centres its content vertically: a column keeps a short card's text at the top when its row is taller. */
-.card { display:flex; flex-direction:column; justify-content:flex-start; width:100%; height:100%; text-align:left; background:var(--cream); border:1px solid var(--line); border-left:4px solid var(--umber);
-  padding:var(--space-item) var(--space-item); font:var(--font-message); color:var(--ink); cursor:pointer; }
-.card:hover h3 { text-decoration:underline; }
-/* The card's edge is the mode of its task, in the mode tag's colour; the state is the chip's word. */
-.card.m-feature { border-left-color:var(--moss-dark); }
-.card.m-bugfix { border-left-color:var(--terracotta); }
-.card.m-refactor { border-left-color:var(--umber); }
-.card.m-tests { border-left-color:var(--sand); }
-.card.m-other { border-left-color:var(--line); }
-.card h3 { margin:var(--space-tight) 0 var(--space-control); font:var(--font-heading); color:var(--heading); }
-.card ol { list-style:none; margin:0; padding:0; }
-.card ol li { margin:var(--space-tight) 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.card ol li:last-child { white-space:normal; overflow-wrap:anywhere; }
-.meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-control); margin:0; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
-.chip { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
-.mode { display:inline-block; padding:1px var(--space-control); font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
+/* The view scrolls inside itself; the key and the range stay at its top. */
+.view { min-height:0; overflow-y:auto; padding:0 var(--space-edge) var(--space-wide); }
+.view .empty { color:var(--muted); font-style:italic; margin:var(--space-group) 0; }
+
+/* The key line, with the range control at its right */
+.keyrow { position:sticky; top:0; z-index:3; display:flex; align-items:center; gap:var(--space-item); padding:var(--space-item) 0 var(--space-control); background:var(--cream); }
+.key { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-item); font:var(--font-small); color:var(--muted); }
+.key li { display:inline-flex; align-items:center; gap:var(--space-tight); }
+.key i { display:inline-block; width:16px; height:6px; }
+.key .k-build { background:var(--sand); } .key .k-verify { background:var(--terracotta-dark); } .key .k-fix { background:var(--umber); }
+.key .k-more { width:6px; height:5px; background:var(--sand); } .key .k-more.tall { height:12px; }
+.key .k-none { height:3px; background:repeating-linear-gradient(90deg, var(--umber) 0 3px, transparent 3px 6px); }
+.key .k-fail { width:2px; height:12px; background:var(--error); } .key .k-merged { width:2px; height:12px; background:var(--moss-dark); }
+.keyrow .seg { margin-left:auto; flex:none; }
+
+/* The tables: Working, Pending, Merged. Each row is its label, a button that opens the task's pop-up, and its lane. */
+.tbl { margin:var(--space-item) 0 var(--space-group); }
+.tbl > h2 { margin:0 0 var(--space-tight); }
+.tbl .before { margin:0 0 var(--space-tight); font:var(--font-small); color:var(--muted); }
+.link { border:0; background:none; padding:0; font:inherit; color:var(--umber); text-decoration:underline; cursor:pointer; }
+.axisrow, .row { display:grid; grid-template-columns:19rem minmax(0, 1fr); }
+.axisrow { position:sticky; top:44px; z-index:2; background:var(--cream); }
+.axis { position:relative; height:18px; font:var(--font-small); color:var(--muted); border-bottom:1px solid var(--line); }
+.axis span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
+.axis span:last-child { transform:translateX(-100%); }
+.rows { list-style:none; margin:0; padding:0; }
+.row { border-bottom:1px solid var(--line); min-height:50px; }
+.lab { display:flex; flex-direction:column; justify-content:center; gap:var(--space-tight); min-width:0; padding:var(--space-tight) var(--space-control) var(--space-tight) 0;
+  border:0; background:none; text-align:left; font:var(--font-message); color:var(--ink); cursor:pointer; }
+.lab:hover .t { text-decoration:underline; }
+.row:has(.lab:hover), .row:has(.lane:hover) { background:var(--linen); }
+.lab .first { display:flex; align-items:baseline; gap:var(--space-tight); min-width:0; }
+.lab .id { flex:none; font:var(--font-message-strong); color:var(--muted); }
+.lab .t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:var(--font-message-strong); color:var(--heading); }
+.mode { flex:none; display:inline-block; padding:1px var(--space-tight); font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; }
 .mode.m-feature { background:var(--moss-dark); color:var(--cream); }
 .mode.m-bugfix { background:var(--terracotta); color:var(--heading); }
 .mode.m-refactor { background:var(--umber); color:var(--cream); }
 .mode.m-tests { background:var(--sand); color:var(--heading); }
 .mode.m-other { border:1px solid var(--muted); color:var(--ink); }
-.mode.r-verifier { background:var(--heading); color:var(--cream); }
-/* The state as an icon, named for screen readers and on hover; the key under the heading says what each means. */
-.state { display:inline-flex; align-items:center; gap:var(--space-tight); font:var(--font-small-strong); line-height:1; color:var(--ink); }
-.state svg { width:14px; height:14px; flex:none; }
-.state.blocked, .state.quiet { color:var(--error); }
-.legend { margin-bottom:var(--space-item); }
-.chip.finished { color:var(--moss-dark); }
-.ago { margin:var(--space-control) 0 0; font-size:var(--text-small); color:var(--muted); }
-.view .empty { color:var(--muted); font-style:italic; }
-/* What the agent must make true: the requirements of its task, one line each, in full in the pop-up and the task list. */
-.reqs { list-style:none; margin:0 0 var(--space-control); padding:0 0 var(--space-control); border-bottom:1px solid var(--line); font-size:var(--text-message); }
-.card .reqs li { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.card .reqs li:last-child { white-space:nowrap; }
-.reqs b, .req-list b { font:var(--font-label); letter-spacing:.06em; margin-right:var(--space-control); color:var(--umber); }
-.req-list { list-style:none; margin:var(--space-control) 0 var(--space-control); padding:0; }
-.req-list li { margin:var(--space-tight) 0; padding-left:3.2em; text-indent:-3.2em; overflow-wrap:anywhere; }
-.req-list .missing { color:var(--muted); font-style:italic; }
-.check { margin:var(--space-tight) 0 var(--space-control); font-size:var(--text-message); color:var(--ink); overflow-wrap:anywhere; }
-.check code { font:var(--font-code); }
+.ts { display:flex; align-items:center; gap:var(--space-tight); min-width:0; font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
+.ts svg { width:13px; height:13px; flex:none; }
+.ts .w { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ts .q { flex:none; width:13px; text-align:center; font:var(--font-small-strong); }
+.ts.warn { color:var(--error); } .ts.you { color:var(--umber); } .ts.merged { color:var(--moss-dark); }
 
-/* The task list: one folded row per task, opened to show its requirements, its check and its agents. */
-.tasks { list-style:none; margin:0; padding:0; border-top:1px solid var(--line); max-height:calc(5 * 37px); overflow-y:auto; }
-.tasks > li { border-bottom:1px solid var(--line); background:var(--cream); }
-.tasks summary { display:flex; align-items:center; gap:var(--space-item); padding:var(--space-control) var(--space-item); cursor:pointer; font:var(--font-message); color:var(--ink); }
-.tasks summary:hover .t { text-decoration:underline; }
-.tasks summary::-webkit-details-marker { display:none; }
-.tasks summary::before { content:"▸"; flex:none; width:1em; color:var(--muted); }
-.tasks details[open] summary::before { content:"▾"; }
-.tasks .n { flex:none; width:2em; font:var(--font-message-strong); color:var(--muted); }
-.tasks .t { flex:1; min-width:0; }
-.tasks .on { flex:none; font-size:var(--text-small); color:var(--muted); }
-.tasks .tstat { flex:none; width:11.5em; white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-tight); font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; color:var(--ink); }
-.tasks .tstat svg { width:13px; height:13px; flex:none; }
-.tasks .tstat .w { overflow:hidden; text-overflow:ellipsis; }
-.tasks .tstat.verified, .tasks .tstat.merged, .tasks .tstat.done { color:var(--moss-dark); }
-.tasks .tstat.changes { color:var(--terracotta-dark); }
-.tasks .tstat.blocked, .tasks .tstat.other { color:var(--error); }
-/* An unknown status is an error: its label takes the room it needs, so the status as written stays readable. */
-.tasks .tstat.other { width:auto; min-width:11.5em; max-width:50%; }
-/* Past five rows the list scrolls, with a scroll bar that stays visible. macOS hides scroll bars until you scroll,
-   and Firefox lets no page change that, so the page hides the browser's bar and draws its own track and thumb. */
-.tasks-box { display:flex; gap:var(--space-tight); }
-.tasks-box .tasks { flex:1; min-width:0; scrollbar-width:none; }
-.tasks-box .tasks::-webkit-scrollbar { display:none; }
-.sbar { flex:none; width:10px; position:relative; background:var(--linen); cursor:pointer; }
-.sbar[hidden] { display:none; }
-.sbar i { position:absolute; left:2px; right:2px; background:var(--muted); cursor:grab; }
-.sbar i:active { cursor:grabbing; }
-.tasks .body { padding:0 var(--space-item) var(--space-item) calc(var(--space-item) + 3em + var(--space-edge)); }
-.tasks .agents button { border:0; background:none; padding:0; margin-right:var(--space-item); font:var(--font-small-strong); color:var(--ink); text-decoration:underline; cursor:pointer; }
+/* A lane: the bars as one SVG, gridlines at the axis times, the now line, and the events above the bars. */
+.lane { position:relative; cursor:pointer; }
+.lane .bars { position:absolute; left:0; right:0; bottom:8px; width:100%; height:28px; }
+.lane .grid { position:absolute; top:0; bottom:0; border-left:1px solid var(--line); }
+.lane .now { position:absolute; top:0; bottom:0; right:0; border-right:2px solid var(--ink); }
+.ev { position:absolute; bottom:8px; height:30px; padding:0; border:0; border-left:2px solid; background:none; font:inherit; z-index:1; }
+.ev b { position:absolute; top:-2px; left:4px; white-space:nowrap; font:var(--font-label); letter-spacing:.04em; text-transform:uppercase; }
+.ev.flip b { left:auto; right:4px; }
+.ev.fail { border-color:var(--error); color:var(--error); cursor:help; }
+.ev.done { border-color:var(--moss-dark); color:var(--moss-dark); }
+.ev .tip { display:none; position:absolute; bottom:100%; left:0; z-index:4; width:max-content; max-width:22rem; padding:var(--space-control) var(--space-item);
+  background:var(--white); border:1px solid var(--line); box-shadow:var(--shadow); font:var(--font-small); color:var(--ink); text-align:left; }
+.ev.tipleft .tip { left:auto; right:0; }
+.ev:hover .tip, .ev:focus-visible .tip { display:block; }
 
-/* The pop-up for an agent */
-.qpop { width:min(36rem, calc(100vw - 24px)); }
-.qpop .sec > ul.req-list { padding-left:0; }
-.qpop .steps li { margin:var(--space-tight) 0; overflow-wrap:anywhere; }
+/* The task's pop-up: the shared .qpop, with each phase as a section with a bar in its timeline colour. */
+.qpop { width:min(34rem, calc(100vw - 24px)); }
+.qpop .sec.rnd { border-left:3px solid var(--line); padding-left:var(--space-item); }
+.qpop .sec.rnd.b { border-left-color:var(--sand); } .qpop .sec.rnd.v { border-left-color:var(--terracotta-dark); } .qpop .sec.rnd.f { border-left-color:var(--umber); }
+.qpop .sec > ol.tsteps { list-style:none; padding-left:0; }
+/* A long step or requirement wraps under its own text, not under its time or ID. */
+.qpop .tsteps li, .qpop .req-list li { display:grid; grid-template-columns:3.4em minmax(0, 1fr); }
+.qpop .req-list { list-style:none; margin:0; padding:0; }
+.qpop .req-list li { grid-template-columns:2.4em minmax(0, 1fr); margin:var(--space-tight) 0; overflow-wrap:anywhere; }
+.qpop .req-list b { font:var(--font-label); letter-spacing:.06em; color:var(--umber); }
+.qpop .req-list .missing { color:var(--muted); font-style:italic; }
+.qpop .tsteps time { font:var(--font-small); color:var(--muted); font-variant-numeric:tabular-nums; }
+.qpop code { font:var(--font-code); overflow-wrap:anywhere; }
+.check { margin:var(--space-tight) 0 var(--space-control); overflow-wrap:anywhere; }
 
 /* The records that did not validate: listed above the work, never hiding the valid ones */
 .errors { flex:none; max-height:30vh; overflow-y:auto; padding:var(--space-control) var(--space-edge); background:var(--linen); border-left:4px solid var(--error); border-bottom:1px solid var(--line); font:var(--font-message); color:var(--ink); }
@@ -95,4 +85,3 @@
 .errors code { font:var(--font-code); }
 .errors .by { color:var(--muted); }
 .what.invalid { color:var(--error); }
-

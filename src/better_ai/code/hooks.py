@@ -160,3 +160,21 @@ def _exists(unit: Unit, relative: str) -> bool:
         return Path(unit.target(relative)).is_file()
     except Refused:
         return True
+
+
+@records.set_step("code-better")
+def stamp_status_time(ctx: records.SetContext) -> None:
+    """A task's `status_at`: the command stamps it when `set` changes the status, so the board can place a merge or a
+    stage on its timeline. An agent never types it: a `status_at` in the patch is dropped."""
+    if ctx.record.get("type") != "task":
+        return
+    ctx.patch.pop("status_at", None)
+    if "status" in ctx.patch and ctx.patch["status"] != ctx.record.get("status"):
+        ctx.patch["status_at"] = ctx.run.now().strftime(records.TIME)
+
+
+@records.add_guard("code-better", "task")
+def status_time_is_stamped(ctx: records.AddContext) -> None:
+    """`status_at` is the command's to stamp, on `set`: an added task never holds one."""
+    if "status_at" in ctx.record:
+        raise refusal(ctx.unit.label, "status_at is stamped by set when the status changes", "leave status_at out")

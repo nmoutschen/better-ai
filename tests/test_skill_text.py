@@ -321,7 +321,7 @@ CODE_OLD_FILES = re.compile(
 # Which schemas each template covers.
 TEMPLATES = {
     "spec.md": ["code", "spec"],
-    "tasks.md": ["tasks", "progress"],
+    "tasks.md": ["tasks", "progress", "rounds"],
     "decision.md": ["decisions"],
     "next-steps.md": ["next-steps"],
     "instructions.md": ["instructions"],

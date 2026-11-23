@@ -11,7 +11,7 @@ The schemas are loaded from one or more sources, each a folder on disk or a fold
 (`resources.schema_sources`): the shared ones, then the running skill's own. A schema of the skill replaces a shared one
 of the same file name, so architect-better's decisions replace the shared `decisions.schema.json`. A schema describes one
 record: one line of a JSONL file, or one JSON file. These keywords of JSON Schema are supported, and any other keyword
-in a schema is an error, so a rule is never silently ignored: type, const, enum, pattern, minLength, minItems,
+in a schema is an error, so a rule is never silently ignored: type, const, enum, pattern, minLength, maxLength, minItems,
 maxItems, minimum, maximum, required, properties, additionalProperties, items, prefixItems, allOf, anyOf, not,
 if/then/else and $ref (to `#/...` in the same schema, or to `<name>.schema.json#/...` among the loaded schemas, such as
 the shared `base.schema.json`). `title`, `description`, `$schema`, `$id`, `$comment`, `$defs`, `examples` and `default`
@@ -81,6 +81,7 @@ KEYWORDS = {
     "enum",
     "pattern",
     "minLength",
+    "maxLength",
     "minItems",
     "maxItems",
     "minimum",
@@ -453,6 +454,9 @@ class Validator:
             if "minLength" in schema and len(value) < schema["minLength"]:
                 n = schema["minLength"]
                 problems.append(Problem(at, f"must have at least {n} character{'' if n == 1 else 's'}"))
+            if "maxLength" in schema and len(value) > schema["maxLength"]:
+                n = schema["maxLength"]
+                problems.append(Problem(at, f"must have at most {n} character{'' if n == 1 else 's'}"))
         if isinstance(value, list):
             if "minItems" in schema and len(value) < schema["minItems"]:
                 n = schema["minItems"]
@@ -759,7 +763,7 @@ def _audit(node: Any, where: str, boolean_ok: bool = False) -> None:
     for keyword in ("minimum", "maximum"):
         if keyword in node and (not isinstance(node[keyword], (int, float)) or isinstance(node[keyword], bool)):
             raise SchemaError(f"{where}: {keyword} must be a number")
-    for keyword in ("minItems", "maxItems", "minLength"):
+    for keyword in ("minItems", "maxItems", "minLength", "maxLength"):
         if keyword in node and (
             not isinstance(node[keyword], int) or isinstance(node[keyword], bool) or node[keyword] < 0
         ):

@@ -1,6 +1,8 @@
 // The thread model in page.js: how the log becomes each item's state, the entries and what Open lists.
 // Run with `node --test tests/*.test.js`. page.js is identical in every skill (the Scripts workflow checks it); this loads
 // the shared copy in src/better_ai/page/.
+// The timeline shows local times: the tests pin the zone, so a time written in UTC reads the same on every machine.
+process.env.TZ = 'UTC';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -334,7 +336,7 @@ test('element selectors use the nearest document-unique id in a page or slide', 
 
 // The dashboard's task status and agent tag, on the JSON the dashboard now reads: read out of dashboard.html between `// status:begin` and `// status:end`.
 const statusCode = html.split('// status:begin')[1].split('// status:end')[0];
-const { taskStatus, agentTag, agentClass, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, agentTag, agentClass, DONE, isDone};')(s => String(s));
+const { taskStatus, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, DONE, isDone};')(s => String(s));
 // A task record is tasks.jsonl's: a blocked task names `reason` (task, user or repair limit) and, for task, `waits_on`.
 const blockedFields = by => by === undefined || by === '' ? {} : by === 'user' || by === 'repair limit' ? { reason: by }
   : /^T\d+$/.test(by) ? { reason: 'task', waits_on: by } : { reason: by };
@@ -375,9 +377,10 @@ test('a task that did not validate shows as not valid with its first message; an
 
 test('a status or a blocked reason with markup shows as text, never as HTML', () => {
   const realEsc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-  const { statusLabel } = new Function('esc', statusCode + '; return {statusLabel};')(realEsc);
-  assert.doesNotMatch(statusLabel({ status: 'blocked', reason: '<img src=x onerror=alert(1)>' }, []), /<img/);
-  assert.match(statusLabel({ status: '<b>x</b>' }, []), /&lt;b&gt;x&lt;\/b&gt;/);
+  const { tablesHTML } = new Function('esc', statusCode + html.split('// timeline:begin')[1].split('// timeline:end')[0] + '; return {tablesHTML};')(realEsc);
+  const page = tablesHTML({ now: 1000, tasks: [{ id: 'T1', task: 'x', status: 'blocked', reason: '<img src=x onerror=alert(1)>' }, { id: 'T2', task: 'y', status: '<b>x</b>' }] }, '2h');
+  assert.doesNotMatch(page, /<img/);
+  assert.match(page, /&lt;b&gt;x&lt;\/b&gt;/);
 });
 
 test('an unknown status shows as an error, with the status as written', () => {
@@ -392,33 +395,17 @@ test('only merged and done tasks count as done, in any casing', () => {
   assert.equal([{ status: 'Merged' }, { status: ' DONE ' }, { status: 'verified' }, { status: '' }, {}].filter(isDone).length, 2);
 });
 
-test('a verifier shows as a verifier, a builder by its mode', () => {
-  const v = { role: 'verifier', mode: 'bug fix' }, b = { role: 'builder', mode: 'bug fix' }, n = { mode: 'feature' };
-  assert.match(agentTag(v), /class="mode r-verifier"[^>]*>verifier</);
-  assert.doesNotMatch(agentTag(v), /bug fix/);
-  assert.equal(agentClass(v), 'm-bugfix');  // the card edge is its task's mode colour; the tag says verifier
-  assert.match(agentTag(b), /class="mode m-bugfix"[^>]*>bug fix</);
-  assert.equal(agentClass(b), 'm-bugfix');
-  assert.equal(agentClass(n), 'm-feature');  // no role: shown as a builder
-  assert.match(agentTag({ role: ' Verifier ' }), />verifier</);
-});
-
 // A kept invalid record can hold any type in any field: the page draws what it can and never throws.
-test('a task with a wrongly typed requirements or mode still draws the task list', () => {
-  const rows = html.split("// A task's requirements with their text")[1].split('const taskLabel')[0];
-  const drawCode = html.split('const svg = body =>')[1].split("// The task list's own scroll bar")[0];
-  const el = { hidden: true, textContent: '', html: '' };
-  const OPENTASKS = new Set();
-  const setHTML = (e, h) => { e.html = h; };
-  const { drawTasks } = new Function('esc', 'has', 'D', '$', 'setHTML', 'OPENTASKS', 'ICON',
-    statusCode + ';const reqsOf' + rows.split('const reqsOf')[1] + ';const svg = body =>' + drawCode + '; return {drawTasks};')(
-    realEsc, v => v && v !== 'none', { requirements: { R1: 'text' }, tasks: [], agents: [] }, () => el, setHTML, OPENTASKS,
-    { working: '', finished: '', blocked: '' });
-  const bad = { id: 'T2', task: 'x', mode: 5, requirements: 'R1', check: 7, status: 'built', _errors: ['requirements: expected array'] };
-  drawTasks({ tasks: [{ id: 'T1', task: 'ok', mode: 'feature', requirements: ['R1'], status: 'todo' }, bad], agents: [] });
-  assert.match(el.html, /T1/);
-  assert.match(el.html, /T2/);
-  assert.match(el.html, /not valid: requirements: expected array/);
+test('a task with a wrongly typed requirements, mode or title still draws the tables', () => {
+  const TLb = new Function('esc', statusCode + html.split('// timeline:begin')[1].split('// timeline:end')[0] + '; return {tablesHTML, popupHTML};')(realEsc);
+  const bad = { id: 'T2', task: 7, mode: 5, requirements: 'R1', check: 7, status: 'built', _errors: ['requirements: expected array'] };
+  const d = { now: 100000, start: null, tasks: [{ id: 'T1', task: 'ok', mode: 'feature', requirements: ['R1'], status: 'todo' }, bad],
+    agents: [{ name: 'b', role: 'builder', task: 'T2', branch: 5, at: 3, lines: 'x' }], rounds: 'x', fixes: [{}], git: null, requirements: { R1: 'text' } };
+  const out = TLb.tablesHTML(d, '2h');
+  assert.match(out, />T1</);
+  assert.match(out, />T2</);
+  assert.match(out, /not valid: requirements: expected array/);
+  assert.doesNotThrow(() => TLb.popupHTML(bad, d));
 });
 
 test('a decision that did not validate says so, with its first message, and a question says where it is from', () => {
@@ -739,4 +726,230 @@ test('the errors band says which records are shown marked and which are only lis
 
 test('the board marks an invalid brief like any other record', () => {
   assert.equal(notValid({ title: 'T', _errors: ['stop_at: must be one of "high"'] }), 'not valid: stop_at: must be one of "high"');
+});
+
+// ---------- The task timeline (design: .design/code-better-board/design.md) ----------
+// Read out of dashboard.js between `// timeline:begin` and `// timeline:end`, with the status code it builds on.
+const timelineCode = html.split('// timeline:begin')[1].split('// timeline:end')[0];
+const TL = new Function('esc', statusCode + timelineCode +
+  '; return {groupOf, statusOf, phasesOf, bucketsOf, laneSVG, marksHTML, rowName, popupHTML, rangeOf, tablesHTML, runningWord};')(realEsc);
+const E = s => Date.parse(s) / 1000;
+const NOW = E('2026-11-23T10:58:00Z');
+const line = (type, at, more) => ({ type, at, text: type, ...more });
+// T4: built 09:52–10:20, verified 10:20–10:35 and failed, round 2 build from 10:36 with its last step at 10:40.
+const fixture = () => ({
+  now: NOW, start: '2026-11-23T09:30:00Z',
+  requirements: { S1: 'one', S2: 'two', S3: 'three', S4: 'four', S5: 'The export writes one CSV row per late order.', S6: 'six', S7: 'seven', S8: 'eight', S9: 'nine' },
+  tasks: [
+    { id: 'T4', task: 'CSV export', mode: 'feature', requirements: ['S5'], check: 'pytest tests/test_export.py', status: 'building' },
+    { id: 'T7', task: 'Timezone fix', mode: 'bug fix', requirements: ['S1'], check: 'pytest', status: 'building' },
+    { id: 'T5', task: 'Email digest', mode: 'feature', requirements: ['S2'], check: 'pytest', status: 'blocked', reason: 'user' },
+    { id: 'T6', task: 'Digest unsubscribe', mode: 'feature', requirements: ['S3'], check: 'pytest', status: 'blocked', reason: 'task', waits_on: 'T5' },
+    { id: 'T1', task: 'Order query', mode: 'feature', requirements: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9'], check: 'pytest', status: 'merged', status_at: '2026-11-23T09:52:00Z' },
+    { id: 'T2', task: 'Late flag', mode: 'bug fix', requirements: ['S4'], check: 'pytest', status: 'merged', status_at: '2026-11-23T10:14:00Z' },
+  ],
+  agents: [
+    { name: 'builder-t4', role: 'builder', task: 'T4', branch: 'task/t4', at: '2026-11-23T09:51:00Z', state: 'finished',
+      lines: [line('start', '2026-11-23T09:52:00Z'), line('handed_back', '2026-11-23T10:20:00Z', { result: 'done' })] },
+    { name: 'verifier-t4', role: 'verifier', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:19:00Z', state: 'finished',
+      lines: [line('start', '2026-11-23T10:20:00Z'), line('handed_back', '2026-11-23T10:35:00Z', { result: 'fails' })] },
+    { name: 'builder-t4-2', role: 'builder', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:35:30Z', state: 'working',
+      lines: [line('start', '2026-11-23T10:36:00Z'), line('step', '2026-11-23T10:40:00Z', { text: 'running the full suite' })] },
+    { name: 'builder-t7', role: 'builder', task: 'T7', branch: 'task/t7', at: '2026-11-23T10:25:00Z', state: 'working',
+      lines: [line('start', '2026-11-23T10:26:00Z'), line('step', '2026-11-23T10:56:00Z', { text: 'fixed the cutoff' })] },
+    { name: 'builder-t5', role: 'builder', task: 'T5', branch: 'task/t5', at: '2026-11-23T09:39:00Z', state: 'waiting',
+      lines: [line('start', '2026-11-23T09:40:00Z'), line('asked', '2026-11-23T10:40:00Z', { text: 'which timezone?' })] },
+    { name: 'builder-t2', role: 'builder', task: 'T2', branch: 'task/t2', at: '2026-11-23T09:34:00Z', state: 'finished',
+      lines: [line('start', '2026-11-23T09:35:00Z'), line('handed_back', '2026-11-23T10:00:00Z', { result: 'done' })] },
+    { name: 'verifier-t2', role: 'verifier', task: 'T2', branch: 'task/t2', at: '2026-11-23T09:59:00Z', state: 'finished',
+      lines: [line('start', '2026-11-23T10:00:00Z'), line('handed_back', '2026-11-23T10:08:00Z', { result: 'passes' })] },
+  ],
+  rounds: [{ task: 'T4', round: 1, verifier: 'verifier-t4', at: '2026-11-23T10:35:20Z',
+    findings: [{ text: 'Empty export writes no header row', blocking: true }, { text: 'Column order differs', blocking: false }] }],
+  fixes: [{ task: 'T2', at: '2026-11-23T10:09:00Z', text: 'renamed the flag' }],
+  git: {
+    'task/t4': { buckets: [[E('2026-11-23T09:50:00Z'), 80], [E('2026-11-23T09:55:00Z'), 40], [E('2026-11-23T10:00:00Z'), 30], [E('2026-11-23T10:05:00Z'), 20],
+      [E('2026-11-23T10:10:00Z'), 10], [E('2026-11-23T10:15:00Z'), 6], [E('2026-11-23T10:35:00Z'), 30], [E('2026-11-23T10:40:00Z'), 12]],
+      commits: 3, added: 212, removed: 38, files: 5, last: E('2026-11-23T10:42:00Z') },
+    'task/t7': { buckets: [[E('2026-11-23T10:55:00Z'), 20]], commits: 2, added: 164, removed: 41, files: 4, last: E('2026-11-23T10:57:00Z') },
+  },
+});
+
+test('tasks fall in three tables: working once an agent started, pending before, merged at the end', () => {
+  const d = fixture();
+  const groups = Object.fromEntries(d.tasks.map(t => [t.id, TL.groupOf(t, d)]));
+  assert.deepEqual(groups, { T4: 'working', T7: 'working', T5: 'working', T6: 'pending', T1: 'merged', T2: 'merged' });
+  const page = TL.tablesHTML(d, '2h');
+  const heads = [...page.matchAll(/<h2[^>]*>([^<]+)<\/h2>/g)].map(m => m[1]);
+  assert.deepEqual(heads, ['Working (3)', 'Pending (1)', 'Merged (2)']);
+  assert.ok(page.indexOf('>T4<') < page.indexOf('>T7<') && page.indexOf('>T7<') < page.indexOf('>T5<'));  // tasks.jsonl order
+});
+
+test('a quiet build says so in the error colour; waiting on you is umber with a question mark; a wait on a task is ink', () => {
+  const d = fixture();
+  const s = id => TL.statusOf(d.tasks.find(t => t.id === id), d);
+  assert.equal(s('T4').word, 'building, quiet 16 min');  // last activity: the file change at 10:42, later than the step at 10:40
+  assert.equal(s('T4').cls, 'warn');
+  assert.equal(s('T7').word, 'building');
+  assert.deepEqual([s('T5').cls, s('T5').word], ['you', 'waiting on you']);
+  assert.match(s('T5').icon, /\?/);
+  assert.deepEqual([s('T6').cls, s('T6').word], ['', 'waiting on T5']);
+  assert.equal(s('T2').cls, 'merged');
+});
+
+test('phases come from the cards, the log times and the fix records, in order, with their rounds', () => {
+  const d = fixture();
+  const p = TL.phasesOf(d.tasks[0], d).map(x => [x.kind, x.round, x.start, x.end, x.result || '']);
+  assert.deepEqual(p, [
+    ['b', 1, E('2026-11-23T09:52:00Z'), E('2026-11-23T10:20:00Z'), 'done'],
+    ['v', 1, E('2026-11-23T10:20:00Z'), E('2026-11-23T10:35:00Z'), 'fails'],
+    ['b', 2, E('2026-11-23T10:36:00Z'), null, ''],
+  ]);
+  const t2 = TL.phasesOf(d.tasks.find(t => t.id === 'T2'), d).map(x => [x.kind, x.start, x.end]);
+  assert.deepEqual(t2.at(-1), ['f', E('2026-11-23T10:09:00Z'), E('2026-11-23T10:14:00Z')]);  // a fix ends at the merge
+});
+
+test('a build phase takes the lines changed per 5 minutes on its branch, cut at its end, and a bucket with no change is zero', () => {
+  const d = fixture();
+  const [first, , second] = TL.phasesOf(d.tasks[0], d);
+  const b1 = TL.bucketsOf(first, d), b2 = TL.bucketsOf(second, d);
+  assert.deepEqual(b1.slice(0, 2), [[E('2026-11-23T09:52:00Z'), E('2026-11-23T09:55:00Z'), 80], [E('2026-11-23T09:55:00Z'), E('2026-11-23T10:00:00Z'), 40]]);
+  assert.deepEqual(b1.at(-1), [E('2026-11-23T10:15:00Z'), E('2026-11-23T10:20:00Z'), 6]);  // never past the phase's end
+  assert.deepEqual(b2.map(b => b[2]), [30, 12, 0, 0, 0]);
+  assert.equal(b2.at(-1)[1], NOW);
+});
+
+test('the lane is one SVG in minutes: sand builds, terracotta-dark verifies, umber fixes, one dotted line per quiet stretch', () => {
+  const d = fixture();
+  const [t0, t1] = TL.rangeOf(d, '2h');
+  const t4 = TL.laneSVG(d.tasks[0], d, t0, t1), t2 = TL.laneSVG(d.tasks.find(t => t.id === 'T2'), d, t0, t1);
+  assert.match(t4, /^<svg[^>]*aria-hidden="true"/);
+  assert.match(t4, /fill="var\(--sand\)"/);
+  assert.match(t4, /fill="var\(--terracotta-dark\)"/);
+  assert.equal((t4.match(/stroke-dasharray/g) || []).length, 1);  // 10:45 to now is one quiet stretch
+  assert.match(t2, /fill="var\(--umber\)"/);
+});
+
+test('a failed round is marked R and its number, with its blocking findings on hover and focus; a merge is marked', () => {
+  const d = fixture();
+  const [t0, t1] = TL.rangeOf(d, '2h');
+  const m = TL.marksHTML(d.tasks[0], d, t0, t1);
+  assert.match(m, /✕ R1/);
+  assert.match(m, /<button[^>]*class="ev fail/);
+  assert.match(m, /Empty export writes no header row/);
+  assert.doesNotMatch(m, /Column order differs/);  // not blocking: in the pop-up only
+  assert.match(TL.marksHTML(d.tasks.find(t => t.id === 'T2'), d, t0, t1), /MERGED/);
+  // within the last 7% of the axis, the word goes left of its rule
+  const late = fixture(); late.agents[1].lines[1].at = '2026-11-23T10:56:00Z';
+  assert.match(TL.marksHTML(late.tasks[0], late, t0, t1), /class="ev fail flip/);
+});
+
+test('a row is named for screen readers from the same records as the lane', () => {
+  const d = fixture();
+  assert.equal(TL.rowName(d.tasks[0], d),
+    'T4 CSV export, feature, building, quiet 16 min, round 2, round 1 verify failed at 10:35, last file change 16 min ago');
+});
+
+test('the pop-up holds every requirement, the check, each phase newest first with its steps and times, and the findings', () => {
+  const d = fixture();
+  const t1 = TL.popupHTML(d.tasks.find(t => t.id === 'T1'), d);
+  for (const id of ['S1', 'S5', 'S9']) assert.match(t1, new RegExp(`<b>${id}</b>`));
+  const pop = TL.popupHTML(d.tasks[0], d);
+  assert.match(pop, /Check: <code>pytest tests\/test_export.py<\/code>/);
+  const heads = [...pop.matchAll(/class="section-h">([^<]+)</g)].map(m => m[1]);
+  assert.deepEqual(heads, ['Must make true', 'Build, round 2', 'Verify, round 1: failed', 'Build, round 1', 'Conversation']);
+  assert.match(pop, /<time>10:40<\/time>running the full suite/);
+  assert.match(pop, /Blocking/);
+  assert.match(pop, /Not blocking: Column order differs/);
+  assert.match(pop, /\+212 −38 in 5 files, 3 commits/);
+  assert.doesNotMatch(pop, / · /);
+});
+
+test('no requirement text is drawn outside the pop-up, so a row stays one row whatever its requirements', () => {
+  const d = fixture();
+  const page = TL.tablesHTML(d, '2h');
+  assert.doesNotMatch(page, /seven|nine/);
+});
+
+test('the range ends now, starts at the run start when the run is shorter, and All spans the whole run', () => {
+  const d = fixture();
+  assert.deepEqual(TL.rangeOf(d, '1h'), [NOW - 3600, NOW]);
+  assert.deepEqual(TL.rangeOf(d, '2h'), [E('2026-11-23T09:30:00Z'), NOW]);
+  assert.deepEqual(TL.rangeOf(d, 'all'), [E('2026-11-23T09:30:00Z'), NOW]);
+  const long = fixture(); long.start = '2026-11-23T05:00:00Z';
+  assert.deepEqual(TL.rangeOf(long, '2h'), [NOW - 7200, NOW]);
+  assert.match(TL.tablesHTML(long, '1h'), /<button[^>]*data-range="all"[^>]*>Show all<\/button>/);  // T1 and T2 ended before 09:58
+});
+
+test('a change without tasks says the coordinator has not split it yet', () => {
+  const d = fixture(); d.tasks = []; d.agents = [];
+  assert.match(TL.tablesHTML(d, '2h'), /The coordinator has not split the change into tasks yet\./);
+});
+
+test('the header says how long the change has run, as research-better does', () => {
+  assert.equal(TL.runningWord(fixture()), '1h28m');
+  assert.equal(TL.runningWord({ ...fixture(), start: '2026-11-23T10:50:00Z' }), '8m');
+  assert.equal(TL.runningWord({ ...fixture(), start: '2026-11-23T10:57:30Z' }), '<2m');
+});
+
+test('markup in a title, a step or a finding shows as text', () => {
+  const d = fixture();
+  d.tasks[0].task = '<img src=x>';
+  d.agents[2].lines[1].text = '<script>x</script>';
+  d.rounds[0].findings[0].text = '<b>y</b>';
+  const [t0, t1] = TL.rangeOf(d, '2h');
+  const all = TL.tablesHTML(d, '2h') + TL.popupHTML(d.tasks[0], d) + TL.marksHTML(d.tasks[0], d, t0, t1);
+  assert.doesNotMatch(all, /<img|<script|<b>y/);
+});
+
+// ---------- Found by the verifier: a fix after the merge, a phase that never handed back, a verifier run again ----------
+test('a fix made after the merge ends after it starts, never before', () => {
+  const d = fixture();
+  d.fixes.push({ task: 'T2', at: '2026-11-23T10:30:00Z', text: 'late wording' });
+  const fix = TL.phasesOf(d.tasks.find(t => t.id === 'T2'), d).at(-1);
+  assert.equal(fix.kind, 'f');
+  assert.ok(fix.end > fix.start);
+  const [t0, t1] = TL.rangeOf(d, '2h');
+  assert.doesNotMatch(TL.laneSVG(d.tasks.find(t => t.id === 'T2'), d, t0, t1), /width="-/);
+  assert.doesNotMatch(TL.popupHTML(d.tasks.find(t => t.id === 'T2'), d), /10:30 to 10:14/);
+});
+
+test('a build that never handed back ends where the next phase starts', () => {
+  const d = fixture();
+  d.agents[2].lines = [line('start', '2026-11-23T10:36:00Z')];  // the round 2 builder, before a second one took over
+  d.agents.push({ name: 'builder-t4-3', role: 'builder', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:39:00Z',
+    lines: [line('start', '2026-11-23T10:40:00Z')] });
+  const p = TL.phasesOf(d.tasks[0], d);
+  for (let i = 0; i + 1 < p.length; i++) assert.ok(p[i].end !== null && p[i].end <= p[i + 1].start, `phase ${i} overlaps the next`);
+});
+
+test("a failed round takes its number and findings from the round record that names its verifier", () => {
+  const d = fixture();
+  // a verifier started and stopped before it logged a hand-back, then another one failed the task: the coordinator's record says round 1
+  d.agents.splice(1, 0, { name: 'verifier-t4-lost', role: 'verifier', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:19:30Z',
+    lines: [line('start', '2026-11-23T10:19:40Z')] });
+  const [t0, t1] = TL.rangeOf(d, '2h');
+  const m = TL.marksHTML(d.tasks[0], d, t0, t1);
+  assert.match(m, /✕ R1/);
+  assert.match(m, /Empty export writes no header row/);
+  assert.match(TL.popupHTML(d.tasks[0], d), /Verify, round 1: failed/);
+});
+
+test("a task's lane opens the task's pop-up, as its label does", () => {
+  assert.match(TL.tablesHTML(fixture(), '2h'), /<div class="lane" data-t="T4"/);
+});
+
+test('a phase starts when its agent started, even when the page holds only its latest log lines', () => {
+  const d = fixture();
+  d.agents[0].started = '2026-11-23T09:50:00Z';  // the builder's first line, before the 40 lines the page holds
+  assert.equal(TL.phasesOf(d.tasks[0], d)[0].start, E('2026-11-23T09:50:00Z'));
+});
+
+test("a verify that passed never shows the findings of another verifier's failed round", () => {
+  const d = fixture();
+  d.agents.splice(1, 0, { name: 'verifier-t4-a', role: 'verifier', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:19:00Z',
+    lines: [line('start', '2026-11-23T10:19:10Z'), line('handed_back', '2026-11-23T10:19:50Z', { result: 'passes' })] });
+  const pop = TL.popupHTML(d.tasks[0], d);
+  const passed = pop.split('Verify, round 1: passed')[1].split('</div>')[0];
+  assert.doesNotMatch(passed, /Empty export/);
 });

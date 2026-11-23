@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 from .. import cli, page, paths, resources, schema
 from ..paths import Unit
+from . import activity
 
 LOG = "conversation.jsonl"
 # What an agent's last log line says about it, as the page shows it: the line's type, and the state it leaves the agent in.
@@ -140,12 +141,31 @@ def agent(reader: Reader, name: str, modes: dict) -> dict:
     ]
     return {
         "name": name,
-        **{key: about.get(key) or "" for key in ("role", "task", "branch")},
+        **{key: about.get(key) or "" for key in ("role", "task", "branch", "at")},
         "mode": modes.get(about.get("task"), ""),
         "state": STATES.get(lines[-1]["type"], "working") if lines else "working",
         "lines": lines[-40:],
+        # when the agent started: its first line, which the 40 lines kept for the page may no longer hold
+        "started": lines[0]["at"] if lines and isinstance(lines[0].get("at"), str) else "",
         "_changed": mtime(reader.unit, card, log),
     }
+
+
+def git_activity(unit: Unit, agents: list) -> dict:
+    """The git activity of each branch an agent's card names, since the first card that names it; a branch git cannot
+    read is left out."""
+    since: dict[str, float] = {}
+    for a in agents:
+        branch, at = a.get("branch"), a.get("at")
+        if isinstance(branch, str) and branch and isinstance(at, str):
+            with contextlib.suppress(ValueError):
+                when = datetime.strptime(at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+                since[branch] = min(since.get(branch, when), when)
+    if not since:
+        return {}
+    trees = activity.worktrees(unit.root)
+    found = {branch: activity.branch_activity(unit.root, branch, when, trees) for branch, when in since.items()}
+    return {branch: data for branch, data in found.items() if data is not None}
 
 
 def decision(record: dict, changed: float) -> dict:
@@ -172,6 +192,9 @@ def collect(unit: Unit) -> dict:
             "tasks": [],
             "requirements": {},
             "agents": [],
+            "rounds": [],
+            "fixes": [],
+            "git": {},
             "decisions": [],
             "conversation": [],
             "errors": [{"file": "(folder)", "line": 1, "field": "(folder)", "message": message}],
@@ -187,6 +210,9 @@ def _collect(unit: Unit) -> dict:
             "tasks": [],
             "requirements": {},
             "agents": [],
+            "rounds": [],
+            "fixes": [],
+            "git": {},
             "decisions": [],
             "conversation": [],
             "errors": [{"file": "schemas", "line": 1, "field": "(schemas)", "message": str(error)}],
@@ -209,11 +235,18 @@ def _collect(unit: Unit) -> dict:
     agents = [agent(reader, name, modes) for name in names]
     for name in CHECKED_ONLY:
         reader.records(name)
+    rounds = reader.records("rounds.jsonl")
+    times = [r.get("at") for r in [*head, *tasks, *agents, *rounds] if isinstance(r.get("at"), str)]
+    times += [line["at"] for a in agents for line in a["lines"] if isinstance(line.get("at"), str)]
     return {
         "name": title,
+        "start": min(times) if times else None,
         "tasks": tasks,
         "requirements": {r["id"]: r["statement"] for r in spec if r.get("type") == "spec"},
         "agents": agents,
+        "rounds": [r for r in rounds if r.get("type") == "round"],
+        "fixes": [r for r in rounds if r.get("type") == "fix"],
+        "git": git_activity(unit, agents),
         "decisions": decisions,
         "conversation": conversation_events,
         "errors": reader.errors,
@@ -236,7 +269,7 @@ SPEC = page.PageSpec(
     capabilities=("decisions",),
     methods=("comment",),
     items=("comment", "note", "answer"),
-    empty="Nothing yet. Click an agent to ask about its work, or write to the coordinator below.",
+    empty="Nothing yet. Click a task to ask about it, or write to the coordinator below.",
 )
 
 

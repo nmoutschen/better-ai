@@ -37,8 +37,10 @@
       }
     },
     "task": {
+      "description": "the task's title, as the board shows it on one line",
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "maxLength": 40
     },
     "mode": {
       "enum": [
@@ -94,6 +96,10 @@
           "blocked"
         ]
       }
+    },
+    "status_at": {
+      "description": "when the status last changed; `set` stamps it",
+      "$ref": "base.schema.json#/$defs/at"
     },
     "reason": {
       "enum": [
