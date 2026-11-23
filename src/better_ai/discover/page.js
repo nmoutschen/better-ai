@@ -158,7 +158,12 @@ const step = head => STEP_NAMES[head.step] ? 'Step ' + head.step + ': ' + STEP_N
 // What an item is and what bears on it, read from the records.
 const countsFor = (data, id, about, direction) => (data.evidence || []).filter(e => e.status === 'counts' && e.about === about &&
   (e.bears_on || []).some(b => b.item === id && b.direction === direction)).length;
-const checkingOn = (data, id) => (data.evidence || []).filter(e => ['checking', 'reworded'].includes(e.status) && (e.bears_on || []).some(b => b.item === id)).length;
+// Evidence still being checked on an item: checking, or reworded and not corrected yet (a corrected one is replaced).
+const checkingOn = (data, id) => {
+  const fixed = new Set((data.evidence || []).map(e => e.corrects).filter(Boolean));
+  return (data.evidence || []).filter(e => (e.status === 'checking' || (e.status === 'reworded' && !fixed.has(e.id))) &&
+    (e.bears_on || []).some(b => b.item === id)).length;
+};
 const lastChange = (data, id, field) => { let found = null; (data.changes || []).forEach(c => { if (c.field === field && (c.about || {}).item === id) found = c; }); return found; };
 
 // The agent's latest record, as the page's Python serves it from summary's rule: one rule, not a copy here (L4).
@@ -812,7 +817,7 @@ view.addEventListener('click', event => {
   if (target.matches('[data-use]') && row) {
     const id = target.dataset.use, next = nextAfter(currentOpen(), id);
     // From a risk's State cell the next question is the next one shown in the same panel; from Moves, the next open one.
-    const shown = row.matches('.rq') ? $$('[role="tabpanel"]:not([hidden]) .rq', view).map(r => r.dataset.d).filter(d => d !== id) : null;
+    const shown = row.matches('.rq') ? $$('[role="tabpanel"]:not([hidden]) tr.risk:not([hidden]) .rq', view).map(r => r.dataset.d).filter(d => d !== id) : null;
     FOCUS_AFTER = shown ? (shown.length ? '.rq[data-d="' + shown[0] + '"] [data-answer]' : '#open-picker')
       : next ? 'li.q[data-d="' + next.id + '"] [' + (next.use ? 'data-use' : 'data-answer') + ']' : '#open-picker';
     const d = DATA.decisions.find(x => x.id === id);

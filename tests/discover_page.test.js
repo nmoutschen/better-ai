@@ -514,6 +514,19 @@ test('a reworded quote that waits for its correction counts as checking on its i
   assert.match(rowOf(a.itemsTable('problem', d, ctx(d)), 'row-P1'), /3 checking/);
 });
 
+test('a reworded quote that has a correction no longer counts as checking on its item', () => {
+  const a = api(), d = fixture();
+  d.evidence = d.evidence.filter(e => e.status !== 'checking');
+  d.evidence.push({ ...d.evidence[0], id: 'E-a9-1', status: 'reworded', reason: 'reworded', page_words: 'x', bears_on: [{ item: 'P1', direction: 'for' }] });
+  d.evidence.push({ ...d.evidence[0], id: 'E-coord-7', corrects: 'E-a9-1', status: 'counts', bears_on: [{ item: 'P1', direction: 'for' }] });
+  assert.doesNotMatch(rowOf(a.itemsTable('problem', d, ctx(d)), 'row-P1'), /checking/);
+});
+
+test('A14: after the check on a risk\'s question, the next question is one in an open bar, never one hidden under a closed bar', () => {
+  const body = source.slice(source.indexOf("target.matches('[data-use]') && row"));
+  assert.match(body.slice(0, 800), /tr\.risk:not\(\[hidden\]\) \.rq/);
+});
+
 // ---------- A5 ----------
 // The text of every button that is not a tab, the header's count or a risks bar: those open a view, like More.
 const buttonLabels = html => [...html.matchAll(/<button\b([^>]*)>([^]*?)<\/button>/g)].filter(m => !/role="tab"|id="questions"|data-risks=/.test(m[1])).map(m => m[2].replace(/<[^>]*>/g, '').trim());
