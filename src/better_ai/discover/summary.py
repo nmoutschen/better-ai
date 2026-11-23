@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .. import cli, paths, schema
+from ..page import open_items
 from ..paths import Unit
 from . import SKILL, derive
 from .rules_moves import BRIEF_MOVES
@@ -104,24 +106,23 @@ class Events:
     tracked: dict[str, dict]  # the user's events by id, in their latest version
     state: dict[str, str]  # id -> `done`, `accepted`, or the status last given
     replied: set[str]  # ids an agent replied to
-    open: list[dict]  # tracked and neither done nor accepted
+    open: list[tuple[dict, str, dict]]  # (event, state, extra) of each item not done or accepted: page.open_items
 
 
-def read_events(lines: list[dict]) -> Events:
+def read_events(lines: list[dict], agent: str = "coordinator") -> Events:
     tracked: dict[str, dict] = {}
     state: dict[str, str] = {}
     replied: set[str] = set()
-    gone: set[str] = set()
     for line in lines:
         kind, ident, to = line.get("type"), line.get("id"), line.get("to")
         if kind == "status" and isinstance(to, str):
             state[to] = str(line.get("status"))
         elif kind in ("accept", "accepted") and isinstance(to, str):
             state[to] = "accepted"
+        elif kind == "reopen" and isinstance(to, str):
+            state[to] = "reopened"
         elif kind == "reply" and isinstance(to, str):
             replied.add(to)
-        elif kind == "delete" and isinstance(to, str):
-            gone.add(to)
         elif (
             line.get("by") == "user"
             and isinstance(ident, str)
@@ -129,8 +130,7 @@ def read_events(lines: list[dict]) -> Events:
             and (kind in USER_EVENTS or (kind == "note" and not to))
         ):
             tracked[ident] = line
-    open_ = [e for i, e in tracked.items() if i not in gone and state.get(i) not in ("done", "accepted")]
-    return Events(tracked, state, replied, open_)
+    return Events(tracked, state, replied, open_items(lines, (*USER_EVENTS, "note"), agent))
 
 
 # ---------------------------------------------------------------- the warnings
@@ -156,6 +156,11 @@ def _strings(value: Any):
 
 def _norm(text: str) -> str:
     return " ".join(text.split()).casefold()
+
+
+def _occurs(text: str, value: str) -> bool:
+    """Whether the normalised text occurs in the value as whole words: `No` is not in `Nobody`."""
+    return re.search(r"(?<!\w)" + re.escape(text) + r"(?!\w)", _norm(value)) is not None
 
 
 def _agent_of(ident: Any) -> str | None:
@@ -363,7 +368,7 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
     for e in d.evidence:
         texts = _evidence_texts(d, e)
         for where, ident, record in _holders(d, e):
-            if any(t in _norm(s) for t in texts for s in _strings(record)):
+            if any(_occurs(t, s) for t in texts for s in _strings(record)):
                 found.append(
                     Warning_(
                         "evidence-text-copied",
@@ -372,7 +377,7 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
                         f"{e.get('id')} by id",
                     )
                 )
-    events = read_events(d.conversation)
+    events = read_events(d.conversation, str(d.head.get("coordinator")))
     pointed = {
         s
         for group in (d.items, d.changes, d.options, d.moves, d.briefs, d.decisions, d.tests, d.evidence, d.sources)
@@ -390,7 +395,7 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
                 )
             )
     later_moves = [m for m in d.moves if _at(m)]
-    for event in events.open:
+    for event, _, _ in events.open:
         when = _at(event)
         if event.get("type") not in ("choose", "answer") or when is None:
             continue
@@ -494,8 +499,8 @@ def summary(args: argparse.Namespace, run: cli.Run) -> int:
     )
     for decision in d.decisions:
         _line(run, "decision", **{k: decision.get(k) for k in ("id", "about", "asked", "default", "status", "answer")})
-    events = read_events(d.conversation)
-    for event in events.open:
+    events = read_events(d.conversation, str(head.get("coordinator")))
+    for event, state, extra in events.open:
         rest = {k: v for k, v in event.items() if k not in ("type", "at", "by", "id")}
         _line(
             run,
@@ -503,8 +508,9 @@ def summary(args: argparse.Namespace, run: cli.Run) -> int:
             id=event.get("id"),
             event=event.get("type"),
             at=event.get("at"),
-            state=events.state.get(event["id"], "new"),
+            state=state,
             fields=rest,
+            **extra,
         )
     for move in d.moves:
         _line(

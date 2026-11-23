@@ -170,6 +170,30 @@ class Summary(Discovery):
         self.assertEqual([x["id"] for x in lines if x["type"] == "event"], ["c1"])
         self.assertEqual([x["id"] for x in lines if x["type"] == "evidence"], ["E-a1-2"])
 
+    def events(self, *lines):
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), *lines])
+        _, out = self.summary()
+        return [x for x in out if x["type"] == "event"]
+
+    def test_S54_a_done_event_the_user_reopened_is_listed_as_reopened_with_the_reason(self):
+        self.assertEqual(self.events(), [])
+        reopen = {"type": "reopen", "at": R.AT, "by": "user", "to": "a1", "text": "You did not add it."}
+        (found,) = self.events(reopen)
+        self.assertEqual(
+            (found["id"], found["state"], found["reopened_because"]), ("a1", "reopened", "You did not add it.")
+        )
+
+    def test_S54_a_follow_up_note_under_a_done_event_makes_it_open_as_followup(self):
+        note = {"type": "note", "at": R.AT, "by": "user", "id": "n9", "to": "a1", "text": "Also this."}
+        (found,) = self.events(note)
+        self.assertEqual((found["id"], found["state"]), ("a1", "followup"))
+        self.assertEqual(found["thread"][0]["text"], "Also this.")
+
+    def test_S54_a_new_event_has_the_state_new(self):
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1")])
+        _, out = self.summary()
+        self.assertEqual([x["state"] for x in out if x["type"] == "event"], ["new"])
+
     def test_S54_the_moves_name_their_move_and_the_briefs_their_move(self):
         self.compacted()
         _, lines = self.summary()
@@ -396,6 +420,13 @@ class Warnings(Discovery):
         self.evidence()
         self.quiet("evidence-text-copied")
         put(self.unit, "items.jsonl", [R.record(R.ITEM, text="They said: we lost a  week to this.")])
+        self.warns("evidence-text-copied", "E-a1-1")
+
+    def test_S53_only_whole_words_count_as_a_copy(self):
+        self.evidence(R.record(R.COUNTING, summary="No"))
+        put(self.unit, "items.jsonl", [R.record(R.ITEM, text="Nobody would pay for it.")])
+        self.quiet("evidence-text-copied")
+        put(self.unit, "items.jsonl", [R.record(R.ITEM, text="Would they pay? No, they would not.")])
         self.warns("evidence-text-copied", "E-a1-1")
 
     def test_S53_a_summary_that_occurs_in_another_record_is_warned(self):
