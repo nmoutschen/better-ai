@@ -46,7 +46,9 @@
    "args": [
     "set",
     ".discover/demo",
-    "P1"
+    "P1",
+    "--by",
+    "coordinator"
    ],
    "stdin": "{\"text\": \"People lose track of what they already checked.\"}"
   },
