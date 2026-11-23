@@ -16,6 +16,7 @@
     "architect-better": {"package": "architect"},
     "code-better": {"package": "code"},
     "design-better": {"package": "design"},
+    "discover-better": {"package": "discover"},
     "research-better": {"package": "research"},
     "show-better": {"package": "show"}
   }

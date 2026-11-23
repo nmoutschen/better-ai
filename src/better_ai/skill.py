@@ -1,7 +1,7 @@
 """What a skill package says about itself, so the shared commands know the skill's units.
 
-Every skill package (`better_ai.architect`, `.code`, `.design`, `.research`, `.show`) exports `SKILL`, a `Skill`. The
-shared modules read it; they never import a skill package themselves except the one a run is for (`cli`).
+Every skill package (`better_ai.architect`, `.code`, `.design`, `.discover`, `.research`, `.show`) exports `SKILL`, a
+`Skill`. The shared modules read it; they never import a skill package themselves except the one a run is for (`cli`).
 """
 
 from __future__ import annotations
@@ -45,6 +45,7 @@ OWNER_BY_ROOT = {
     ".architect": "architect-better",
     ".code": "code-better",
     ".design": "design-better",
+    ".discover": "discover-better",
     ".research": "research-better",
     ".show": "show-better",
 }
@@ -53,6 +54,7 @@ OWNER_BY_HEAD = {
     "code.json": "code-better",
     "audit.json": "code-better",
     "canvas.json": "design-better",
+    "discover.json": "discover-better",
     "brief.json": "research-better",
     "spec.json": "show-better",
 }

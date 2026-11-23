@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "decisions.schema.json",
+  "title": "one line of decisions.jsonl in a discovery: a question to the user, with the answer once they give it",
+  "$comment": "Replaces the shared decisions.schema.json in this skill, as architect-better's does. The coordinator writes it. A question waits for the user: `default` is a suggestion the page offers and is never applied by silence, so there is no deadline and no status for a default that applied. A question closes only when it is answered: with the user's page answer, or with the words they typed in this session. A question about a risk has the fixed default \"Accept the risk\". The user's answer from the page is pointed to, not copied: it must be an answer event of the user in this unit's conversation.jsonl for this decision.",
+  "x-files": ["decisions.jsonl"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "at", "by", "id", "raised_by", "about", "asked", "default", "status"],
+  "properties": {
+    "type": {"const": "decision"},
+    "at": {"$ref": "base.schema.json#/$defs/at"},
+    "by": {"$ref": "base.schema.json#/$defs/by"},
+    "id": {"$ref": "base.schema.json#/$defs/id", "pattern": "^D\\d+$", "x-id": {"prefix": "D"}},
+    "raised_by": {"type": "string", "minLength": 1},
+    "about": {"$ref": "#/$defs/about"},
+    "asked": {"type": "string", "minLength": 1},
+    "default": {"description": "what the page suggests; null when nothing is suggested. It never applies without an answer", "type": ["string", "null"], "minLength": 1},
+    "status": {"enum": ["waiting", "answered"]},
+    "answer": {"$ref": "#/$defs/answer"},
+    "answered_at": {"description": "when the question was answered; a set step stamps it", "$ref": "base.schema.json#/$defs/at"}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["status"], "properties": {"status": {"const": "waiting"}}},
+      "then": {"not": {"anyOf": [{"required": ["answer"]}, {"required": ["answered_at"]}]}}
+    },
+    {
+      "if": {"required": ["status"], "properties": {"status": {"const": "answered"}}},
+      "then": {"required": ["answer", "answered_at"], "x-check": "decision-answer-event"}
+    },
+    {
+      "if": {"required": ["about"], "properties": {"about": {"required": ["type"], "properties": {"type": {"const": "risk"}}}}},
+      "then": {"properties": {"default": {"const": "Accept the risk"}}}
+    }
+  ],
+  "$defs": {
+    "about": {
+      "description": "what the question is about: an item, one risk of an item, an option, a piece of evidence, or the whole discovery",
+      "type": "object",
+      "required": ["type"],
+      "properties": {"type": {"enum": ["item", "risk", "option", "evidence", "discovery"]}},
+      "allOf": [
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "item"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "item"],
+            "properties": {
+              "type": {"const": "item"},
+              "item": {"type": "string", "minLength": 1, "x-points-to": {"file": "items.jsonl", "type": "item"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "risk"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "item", "risk"],
+            "properties": {
+              "type": {"const": "risk"},
+              "item": {"type": "string", "minLength": 1, "x-points-to": {"file": "items.jsonl", "type": "item"}},
+              "risk": {"type": "string", "pattern": "^R\\d+$"}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "option"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "option"],
+            "properties": {
+              "type": {"const": "option"},
+              "option": {"type": "string", "minLength": 1, "x-points-to": {"file": "options.jsonl", "type": "option"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "evidence"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "evidence"],
+            "properties": {
+              "type": {"const": "evidence"},
+              "evidence": {"type": "string", "minLength": 1, "x-points-to": {"file": "evidence/", "type": "evidence"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "discovery"}}},
+          "then": {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "discovery"}}}
+        }
+      ]
+    },
+    "answer": {
+      "description": "the user's answer: the answer event the page logged, or their words in the chat",
+      "type": "object",
+      "required": ["type"],
+      "properties": {"type": {"enum": ["page", "chat"]}},
+      "allOf": [
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "page"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "event"],
+            "properties": {
+              "type": {"const": "page"},
+              "event": {"type": "string", "minLength": 1, "x-points-to": {"file": "conversation.jsonl", "type": "answer"}}
+            }
+          }
+        },
+        {
+          "if": {"required": ["type"], "properties": {"type": {"const": "chat"}}},
+          "then": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "text"],
+            "properties": {"type": {"const": "chat"}, "text": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
+    }
+  }
+}

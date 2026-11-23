@@ -20,12 +20,27 @@ sys.path.insert(0, str(HERE.parent / "src"))
 import sweep  # noqa: E402
 from better import SRC, call, run  # noqa: E402
 
-from better_ai import _entry, architect, cli, code, design, paths, records, research, resources, schema, show, skill  # noqa: E402
+from better_ai import (  # noqa: E402
+    _entry,
+    architect,
+    cli,
+    code,
+    design,
+    discover,
+    paths,
+    records,
+    research,
+    resources,
+    schema,
+    show,
+    skill,
+)
 
 SKILLS = {
     "architect-better": architect.SKILL,
     "code-better": code.SKILL,
     "design-better": design.SKILL,
+    "discover-better": discover.SKILL,
     "research-better": research.SKILL,
     "show-better": show.SKILL,
 }
