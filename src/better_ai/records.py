@@ -2,7 +2,7 @@
 
     better.pyz create <unit> --by <agent>             the head record's fields as JSON on stdin
     better.pyz add <unit> <type> [--by] [--for] [--id]  the record's fields as JSON on stdin; prints the id
-    better.pyz set <unit> <id or type> [--for] [--unset <field>]   the fields to change as JSON on stdin
+    better.pyz set <unit> <id or type> [--by] [--for] [--unset <field>]   the fields to change as JSON on stdin
 
 The command stamps `type`, `at` and `by` (and `id`), picks the file from the schemas' `x-files`, validates the record as
 `check` does and writes nothing unless it is valid. It reads the target file, and refuses with exit 4 if the file's size
@@ -29,7 +29,10 @@ A skill package adds what is specific to its skill with three hooks, registered 
     def needs_card(ctx: records.AddContext): ...         # raise paths.Refused to refuse
 
     @records.set_step("research-better")             # before set merges a patch: change `ctx.patch`, such as to stamp a time
-    def stamp(ctx: records.SetContext): ...
+    def stamp(ctx: records.SetContext): ...          # `ctx.by` is the writer given as `--by`, or None
+
+`set --by <agent>` names who makes the change, for the steps that care; it is checked as `add` checks it and never
+changes the `by` the record was created with.
 """
 
 from __future__ import annotations
@@ -88,12 +91,13 @@ class AddContext:
 @dataclass
 class SetContext:
     """What a set step is given: the record as it is, and the fields `set` is about to merge into it (`patch`, which a
-    step may change, such as to stamp a time the agent does not type)."""
+    step may change, such as to stamp a time the agent does not type), and `by`, the writer if `--by` was given."""
 
     run: Run
     unit: Unit
     record: dict
     patch: dict
+    by: str | None = None  # who makes the change (`set --by`); the record's own `by`, its creator, never changes
 
 
 CREATE_STEPS: dict[str, list[Callable]] = {}
@@ -743,6 +747,7 @@ def _add_entry(run: Run, unit: Unit, form: Form, by: str, for_agent: str | None,
 def _set_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("unit", help="the unit, such as .code/my-change")
     parser.add_argument("ref", help="the id of a record (D3), or the type of a single-record file (code)")
+    parser.add_argument("--by", help="who makes the change: your agent name (the record's own by stays)")
     parser.add_argument("--for", dest="for_agent", metavar="AGENT", help="the agent, for a per-agent file such as card")
     parser.add_argument("--unset", action="append", default=[], metavar="FIELD", help="remove a field (repeatable)")
 
@@ -843,7 +848,7 @@ def _merged(record: dict, patch: dict, unsets: list[str], keep_null: bool) -> di
 
 @verb(
     "set",
-    help="change fields of a record, by id or by type (fields on stdin); at, by and id stay",
+    help="change fields of a record, by id or by type (fields on stdin); at, by and id stay; --by names the writer",
     arguments=_set_arguments,
 )
 @_unit_named
@@ -852,6 +857,7 @@ def set_(args: argparse.Namespace, run: Run) -> int:
     docs = schema.docs_for(run.info.package)
     lay = layout(unit, docs)
     for_agent = paths.check_agent(args.for_agent, "--for name") if args.for_agent is not None else None
+    by = paths.check_by(args.by) if args.by is not None else None
     found = _locate(unit, lay, args.ref, for_agent)
     label = found.record.get("type")
     if not isinstance(label, str):  # a record from before `type` existed is the type its place says
@@ -859,7 +865,7 @@ def set_(args: argparse.Namespace, run: Run) -> int:
     patch = _own_fields(_fields(run, unit, empty_ok=bool(args.unset)), unit, label)
     _deadline(patch, run, unit)
     for step in SET_STEPS.get(run.skill.name, []):
-        step(SetContext(run, unit, found.record, patch))
+        step(SetContext(run, unit, found.record, patch, by))
     first = _merged(found.record, patch, args.unset, keep_null=True)
     candidates = [first]
     if any(v is None for v in patch.values()):
