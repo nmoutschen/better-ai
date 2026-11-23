@@ -401,6 +401,8 @@ test('a later redraw does not take the focus from where the user went', async ()
   await Promise.resolve(); await Promise.resolve();
   assert.equal(Node.focused, composer);
   load.thread = null;
+});
+
 // ---- the page token
 
 const fragment = (hash, stored) => {
