@@ -145,6 +145,9 @@ def url_problem(url: str) -> str | None:
     if "%" in host:
         return "has a percent sign in its host: write the host name or address plainly"
     host = _host(host.rstrip("."))
+    numeric_end = bool(host) and re.fullmatch(r"[0-9]+|0[xX][0-9a-fA-F]*", host.rsplit(".", 1)[-1])
+    if numeric_end and not _is_ip(host) and _short_form(host) is None:  # a number a client would wrap or refuse
+        return "is not a plain host name or address: give the page's http or https address"
     if not host or not (PLAIN_HOST.fullmatch(host) or _is_ip(host)):
         return "is not a plain host name or address: give the page's http or https address"
     if host == "localhost" or host.endswith(".localhost"):
