@@ -102,10 +102,11 @@ def run_serve(args: list[str], cwd: Path, label: str) -> str | None:
 REQUIRED_VERBS = ("create", "add", "set", "check", "render")
 
 
-def offered_verbs(help_text: str) -> set[str]:
-    """The verbs a better.pyz lists under `verbs:` in its --help."""
-    found = re.findall(r"^    ([a-z]+) ", help_text.split("verbs:", 1)[-1], re.M)
-    return set(found)
+def offered_verbs(help_text: str) -> set[str] | None:
+    """The verbs a better.pyz lists under `verbs:` in its --help, or None when it lists none (then every verb is asked)."""
+    if "verbs:" not in help_text:
+        return None
+    return set(re.findall(r"^    ([a-z]+) ", help_text.split("verbs:", 1)[1], re.M)) or None
 
 
 def coverage_problems(spec: dict, offered: set[str] | None = None) -> list[str]:
