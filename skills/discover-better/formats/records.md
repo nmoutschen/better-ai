@@ -71,10 +71,11 @@ What a source says about items. `words` is a quote of one line, at most 600 char
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<...>"}, "kind": "<...>", "about": "<...>", "bears_on": [], "status": "checking", "verifier": "<verifier name>", "since": "<UTC time>", "tries": ["<verifier name>"]}
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<...>"}, "kind": "<...>", "about": "<...>", "bears_on": [], "status": "counts", "verifier": "<...>", "tries": ["<...>"], "checked_read": "raw", "span": "<the passage copied from the raw page>", "sha256": "<added by the command from --raw>"}
 {"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<...>"}, "kind": "<...>", "about": "<...>", "bears_on": [], "status": "<unverified | not reachable>", "verifier": "<...>", "tries": ["<...>"], "reason": "<why, such as reworded, or the HTTP status>"}
+{"type": "evidence", "source": "<S-...>", "words": {"type": "quote", "text": "<...>"}, "kind": "<...>", "about": "<...>", "bears_on": [], "status": "removed", "reason": "<the user's remove event, by its id>"}
 {"type": "evidence", "source": "<S-... of a you source>", "words": {"type": "event", "event": "<id of the user's add_evidence event>"}, "summary": "<what was said, reported by you and by role, in an internal discovery>", "kind": "<...>", "about": "your users", "bears_on": [], "status": "counts"}
 ```
 
-The quote verifier sets an outcome with `set <unit> <evidence id> --by <its name> --raw <file of the raw page>`. `removed` is set only by `redact`.
+The quote verifier sets an outcome with `set <unit> <evidence id> --by <its name> --raw <file of the raw page>`. The coordinator sets any evidence `removed` when the user removes it, with `reason` naming their event; the evidence keeps its words. `redact` also sets `removed`, and erases a person's words.
 
 ## test
 
@@ -134,7 +135,7 @@ The page adds each user action to the conversation with an `id`; `pending` lists
 - `add_evidence`: ADD a `you` source and evidence whose `words` name the event;
 - `add_result`: `set` the test's `result`;
 - `change`: `set` the record, or ADD a change about the discovery for the appetite or the setting;
-- `remove`: `set` a test `removed` with the user's reason, or REPLY with why the record cannot be removed;
+- `remove`: `set` a test `removed` with the user's reason, or `set` the evidence `removed`, with a `reason` naming the event, and ADD the changes this causes for the items it bore on;
 - `redact`: RUN `redact` for the evidence.
 
 ## summary

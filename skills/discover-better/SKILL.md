@@ -122,7 +122,7 @@ MATCH the test to the claim: a prototype shows whether someone can complete a ta
 IF a test is `planned` and the user agreed to run it, SET it `running`, THEN run it by its runner:
 
 - `you`: TELL the user what to do and how to add the result, on the page with Add result…, or in the chat.
-- `analyst`: SET the test's `checker` and `since`, and START an analyst on it, as in step 3.
+- `analyst`: SET the analyst's name as `checker` of the test and of each item in its `settles`, with `since`, and START an analyst on it, as in step 3. CLEAR them when the analyst ends.
 - `code-better`: USE `/code-better` to build the probe or the proof of concept, with the test's `what` and `rule` as its request. IF it is not available, the general rule [Missing capabilities](#missing-capabilities) applies.
 
 WAIT for the result: the analysts', the quote verifiers' and `/code-better`'s hand-backs, or the user's. Meanwhile, questions to the user go on. DO NOT choose a move or write a brief until they hand back.
