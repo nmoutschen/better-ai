@@ -73,7 +73,7 @@ function phasesOf(t, d) {
   const now = d.now, out = [];
   for (const a of agentsOf(t, d)) {
     const lines = list(a.lines).filter(l => l && typeof l === "object");
-    const start = sec((lines[0] || {}).at) ?? sec(a.at);
+    const start = sec(a.started) ?? sec((lines[0] || {}).at) ?? sec(a.at);
     if (start === null) continue;
     const back = lines.find(l => l.type === "handed_back");
     out.push({kind: a.role === "verifier" ? "v" : "b", agent: str(a.name), branch: str(a.branch), start,
@@ -89,7 +89,7 @@ function phasesOf(t, d) {
   let round = 0;
   out.forEach((p, i) => {
     const next = i + 1 < out.length ? out[i + 1].start : null;
-    if (p.kind === "v") { const r = roundRecord(t, p.agent, null, d); round = r && Number.isInteger(r.round) ? r.round : round + 1; p.round = round; }
+    if (p.kind === "v") { const r = roundRecord(t, p, d, false); round = r && Number.isInteger(r.round) ? r.round : round + 1; p.round = round; }
     else p.round = round + 1;
     // An agent that never handed back, as one stopped or lost, ends where the next phase starts.
     if (p.end === null && p.kind !== "f" && next !== null) p.end = next;
@@ -134,12 +134,16 @@ function statusOf(t, d) {
 const groupOf = (t, d) => isDone(t) ? "merged" : agentsOf(t, d).length ? "working" : "pending";
 const roundOf = (t, d) => { const p = phasesOf(t, d).at(-1); return p ? p.round : 1; };
 const failures = (t, d) => phasesOf(t, d).filter(p => p.kind === "v" && p.result === "fails" && p.end !== null);
-// The round record of a verify: the one naming its verifier, else the one with its round number.
-function roundRecord(t, verifier, round, d) {
+// The round record of a verify: the one naming its verifier; for a failed verify with none, the one of its round
+// number that names no verifier of this task, so a verify never shows another verifier's findings.
+function roundRecord(t, p, d, byNumber = true) {
   const mine = list(d.rounds).filter(x => x && typeof x === "object" && x.task === t.id);
-  return mine.find(x => verifier && x.verifier === verifier) || (round !== null ? mine.find(x => x.round === round) : undefined);
+  const own = mine.find(x => p.agent && x.verifier === p.agent);
+  if (own || !byNumber || p.result !== "fails") return own;
+  const named = new Set(agentsOf(t, d).filter(a => a.role === "verifier").map(a => a.name));
+  return mine.find(x => x.round === p.round && !named.has(x.verifier));
 }
-const findingsOf = (t, p, d) => { const r = roundRecord(t, p.agent, p.round, d);
+const findingsOf = (t, p, d) => { const r = roundRecord(t, p, d);
   return list(r && r.findings).filter(f => f && typeof f.text === "string"); };
 function lastChange(t, d) {
   const branches = new Set(agentsOf(t, d).map(a => str(a.branch)));
