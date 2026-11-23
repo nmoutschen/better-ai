@@ -39,7 +39,6 @@ record must be to count and `add` and `set` hold how it got there.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import unicodedata
@@ -49,6 +48,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import cli, paths, records, schema
+from . import derive
 
 SKILL = "discover-better"
 TIMEOUT = 30  # minutes a verifier may run before the coordinator may give up on it
@@ -80,29 +80,6 @@ def quote_in_span(quote: str, span: str) -> bool:
 # ---------------------------------------------------------------- reading the unit
 
 
-def _json(unit: paths.Unit, relative: str) -> Any:
-    try:
-        return json.loads(unit.target(relative).read_text(encoding="utf-8"))
-    except (OSError, ValueError, paths.Refused):
-        return None
-
-
-def _lines(unit: paths.Unit, relative: str) -> list[dict]:
-    try:
-        text = unit.target(relative).read_text(encoding="utf-8")
-    except (OSError, paths.Refused):
-        return []
-    found = []
-    for line in text.splitlines():
-        try:
-            value = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(value, dict):
-            found.append(value)
-    return found
-
-
 def _folder(unit: paths.Unit, name: str) -> Iterator[tuple[str, dict]]:
     """Each record file of a folder of the unit, as (relative path, record), in name order."""
     try:
@@ -113,7 +90,7 @@ def _folder(unit: paths.Unit, name: str) -> Iterator[tuple[str, dict]]:
     for file in files:
         if file.is_symlink():
             continue
-        value = _json(unit, f"{name}/{file.name}")
+        value = derive.read_object(unit.path, f"{name}/{file.name}")
         if isinstance(value, dict):
             yield f"{name}/{file.name}", value
 
@@ -121,8 +98,7 @@ def _folder(unit: paths.Unit, name: str) -> Iterator[tuple[str, dict]]:
 def _source(unit: paths.Unit, ident: Any) -> dict | None:
     if not isinstance(ident, str) or not SOURCE_ID.fullmatch(ident):
         return None
-    value = _json(unit, f"sources/{ident}.json")
-    return value if isinstance(value, dict) else None
+    return derive.read_object(unit.path, f"sources/{ident}.json")
 
 
 def _origin(source: dict | None) -> str | None:
@@ -324,7 +300,7 @@ def _must_be_checker(unit: paths.Unit, by: str, record: dict) -> None:
             f"evidence added by {by} must bear on an item it checks: bears_on is empty",
             "name the items it bears on, or leave the evidence to the coordinator",
         )
-    items = {i.get("id"): i for i in _lines(unit, "items.jsonl")}
+    items = {i.get("id"): i for i in derive.read_lines(unit.path, "items.jsonl")}
     for bears in record.get("bears_on") or []:
         item = items.get(bears.get("item")) if isinstance(bears, dict) else None
         if item is None:
@@ -389,7 +365,7 @@ def _unit_records(unit: paths.Unit) -> Iterator[tuple[str, int, dict]]:
     except OSError:
         files = []
     for file in files:
-        for number, record in enumerate(_lines(unit, file.name), 1):
+        for number, record in enumerate(derive.read_lines(unit.path, file.name), 1):
             yield file.name, number, record
     for folder in ("sources", "evidence"):
         for relative, record in _folder(unit, folder):
@@ -462,14 +438,14 @@ def _names_the_request(unit: paths.Unit, ident: str, reason: Any) -> bool:
         return False
     wanted = [
         e.get("id")
-        for e in _lines(unit, "conversation.jsonl")
+        for e in derive.read_lines(unit.path, "conversation.jsonl")
         if e.get("by") == "user"
         and (
             (e.get("type") == "remove" and e.get("record") == ident)
             or (e.get("type") == "redact" and e.get("evidence") == ident)
         )
     ]
-    for decision in _lines(unit, "decisions.jsonl"):
+    for decision in derive.read_lines(unit.path, "decisions.jsonl"):
         about = decision.get("about")
         answer = decision.get("answer")
         said = answer.get("text") if isinstance(answer, dict) else None
@@ -545,7 +521,11 @@ def _computed_outcome(ctx: records.SetContext, by: str, coordinator: str, new: s
             "stop: tell the coordinator, in your hand-back",
         )
     if new == "counts":
-        why = confirmation_problem(_lines(ctx.unit, "decisions.jsonl"), _lines(ctx.unit, "conversation.jsonl"), ident)
+        why = confirmation_problem(
+            derive.read_lines(ctx.unit.path, "decisions.jsonl"),
+            derive.read_lines(ctx.unit.path, "conversation.jsonl"),
+            ident,
+        )
         if why:
             raise _refuse(ctx.unit, f"{ident} cannot count yet: {why}")
     elif new != "unverified" or ctx.patch.get("reason") != NOT_CONFIRMED:

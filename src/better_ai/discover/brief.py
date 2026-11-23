@@ -72,7 +72,7 @@ class Data:
 
 
 def _lines(unit: Unit, relative: str) -> list[dict]:
-    return derive._read_lines(unit.target(relative))
+    return derive.read_lines(unit.path, relative)
 
 
 def _folder(unit: Unit, folder: str) -> dict[str, dict]:
@@ -82,24 +82,20 @@ def _folder(unit: Unit, folder: str) -> dict[str, dict]:
         return found
     for path in sorted(base.glob("*.json")):
         relative = f"{folder}/{path.name}"
-        try:
-            record = json.loads(paths.read_bytes(unit, relative).decode("utf-8"))
-        except (ValueError, OSError):
-            raise refusal(
-                f"{unit.label}/{relative}", "does not parse", f"fix it, then run check {unit.label}"
-            ) from None
-        if isinstance(record, dict) and isinstance(record.get("id"), str):
+        record = derive.read_object(unit.path, relative)
+        if record is None:
+            raise refusal(f"{unit.label}/{relative}", "does not parse", f"fix it, then run check {unit.label}")
+        if isinstance(record.get("id"), str):
             found[record["id"]] = record
     return found
 
 
 def _load(unit: Unit) -> Data:
-    try:
-        head = json.loads(paths.read_bytes(unit, unit.kind.head).decode("utf-8"))
-    except (ValueError, OSError):
-        raise refusal(unit.label, f"{unit.kind.head} does not parse", f"fix it, then run check {unit.label}") from None
+    head = derive.read_object(unit.path, unit.kind.head)
+    if head is None:
+        raise refusal(unit.label, f"{unit.kind.head} does not parse", f"fix it, then run check {unit.label}")
     return Data(
-        head=head if isinstance(head, dict) else {},
+        head=head,
         items=_lines(unit, "items.jsonl"),
         changes=_lines(unit, "changes.jsonl"),
         options=_lines(unit, "options.jsonl"),

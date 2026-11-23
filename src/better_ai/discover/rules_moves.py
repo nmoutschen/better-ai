@@ -79,10 +79,10 @@ def revision_of(option: dict, items: list[dict], changes: list[dict]) -> str:
 
 def revision_in(folder: Path, option: str) -> str | None:
     """`revision_of` for an option of a discovery's folder; None if the option is not there."""
-    chosen = next((o for o in derive._read_lines(folder / "options.jsonl") if o.get("id") == option), None)
+    chosen = next((o for o in derive.read_lines(folder, "options.jsonl") if o.get("id") == option), None)
     if chosen is None:
         return None
-    return revision_of(chosen, derive._read_lines(folder / "items.jsonl"), derive._read_lines(folder / "changes.jsonl"))
+    return revision_of(chosen, derive.read_lines(folder, "items.jsonl"), derive.read_lines(folder, "changes.jsonl"))
 
 
 # ---------------------------------------------------------------- moves
@@ -176,7 +176,7 @@ def _the_choice_is_current(ctx: records.AddContext) -> None:
     answer = ctx.record.get("answer")
     if not isinstance(answer, dict) or answer.get("type") != "page":
         return
-    events = [e for e in derive._read_lines(ctx.unit.path / "conversation.jsonl") if e.get("id") == answer.get("event")]
+    events = [e for e in derive.read_lines(ctx.unit.path, "conversation.jsonl") if e.get("id") == answer.get("event")]
     event = events[-1] if events else None
     if event is None or event.get("type") != "choose" or event.get("option") != ctx.record.get("option"):
         return  # the move rule says what is wrong
