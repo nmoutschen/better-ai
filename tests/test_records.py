@@ -4,8 +4,6 @@ The tests run the command in the process (`call`), with `BETTER_AI_SKILL` set an
 and a few of them as a real subprocess (`run`) where the exit code or the files on disk are the point.
 """
 
-import contextlib
-import io
 import json
 import os
 import subprocess
@@ -22,9 +20,10 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 
 import sweep  # noqa: E402
+from better import call as in_process  # noqa: E402
 from better import run  # noqa: E402
 
-from better_ai import architect, cli, code, design, paths, records, research, resources, schema, show  # noqa: E402
+from better_ai import architect, code, design, paths, records, research, schema, show  # noqa: E402
 
 SKILLS = {
     "architect-better": architect.SKILL,
@@ -86,17 +85,9 @@ def example(fixture, name, index=0):
 
 
 def call(skill, *args, stdin="", env=None):
-    """Run one command in this process: (exit code, stdout, stderr)."""
-    out, err = io.StringIO(), io.StringIO()
-    with (
-        mock.patch.dict(os.environ, {"BETTER_AI_SKILL": skill, **(env or {})}),
-        contextlib.redirect_stdout(out),
-        contextlib.redirect_stderr(err),
-    ):
-        code_ = cli.main(
-            [str(a) for a in args], stdin=io.StringIO(stdin if isinstance(stdin, str) else json.dumps(stdin))
-        )
-    return code_, out.getvalue(), err.getvalue()
+    """Run one command in this process: (exit code, stdout, stderr). A stdin that is not text is written as JSON."""
+    done = in_process(skill, *args, stdin=stdin if isinstance(stdin, str) else json.dumps(stdin), env=env)
+    return done.returncode, done.stdout, done.stderr
 
 
 def jsonl(*records_):
@@ -460,7 +451,7 @@ class Add(Repo):
         done = call("code-better", "add", unit, "decision", "--by", "c", stdin={**WAITING, "deadline": "+10m"})
         self.assertEqual(done[0], 0, done)
         (line,) = lines_of(unit / "decisions.jsonl")
-        stored = datetime.strptime(line["deadline"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        stored = datetime.strptime(line["deadline"], records.TIME).replace(tzinfo=timezone.utc)
         self.assertTrue(timedelta(minutes=10) <= stored - before <= timedelta(minutes=10, seconds=30), line)
 
     def test_s6_a_folder_entry_is_created_exclusively_and_retries_on_the_next_number(self):
@@ -718,6 +709,17 @@ class Follow(Repo):
         done = call("code-better", "set", unit, "D1", stdin={"about": {"type": "task", "task": "T1"}})
         self.assertEqual(done[0], 1, done)
         self.assertIn("it points to T1, whose line fails its schema", done[2])
+        # the same in a folder without git, reached through a symlinked path: the unit and the pointer agree on paths
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "real").mkdir()
+            (Path(tmp) / "link").symlink_to(Path(tmp) / "real")
+            loose = Path(tmp) / "link" / ".code" / "x"
+            self.assertEqual(call("code-better", "create", loose, "--by", "c", stdin=CODE_HEAD)[0], 0)
+            call("code-better", "add", loose, "task", "--by", "c", stdin=TASK)
+            self.corrupt_first_line(loose / "tasks.jsonl", status="bogus")
+            done = call("code-better", "add", loose, "decision", "--by", "c", stdin=pointing)
+            self.assertEqual(done[0], 1, done)
+            self.assertIn("it points to T1, whose line fails its schema", done[2])
 
     def test_a_pointer_to_an_old_format_line_does_not_block(self):
         unit = self.code_change()
@@ -958,7 +960,7 @@ class Set(Repo):
 class Layout(unittest.TestCase):
     def test_every_unit_kind_maps_each_type_to_one_file_and_ids_are_declared_for_the_counted_types(self):
         for name, skill in SKILLS.items():
-            docs = schema.load_schemas(*resources.schema_sources(skill.package))
+            docs = schema.docs_for(skill.package)
             for kind in skill.kinds:
                 unit = paths.Unit(Path("/x") / kind.folder / "u", Path("/x"), kind, skill)
                 lay = records.layout(unit, docs)
@@ -972,7 +974,7 @@ class Layout(unittest.TestCase):
 
     def test_a_nested_units_files_are_not_the_outer_units_and_the_audit_has_its_own(self):
         skill = SKILLS["code-better"]
-        docs = schema.load_schemas(*resources.schema_sources(skill.package))
+        docs = schema.docs_for(skill.package)
         change, audit = skill.kinds
         outer = records.layout(paths.Unit(Path("/x/.code/u"), Path("/x"), change, skill), docs)
         inner = records.layout(paths.Unit(Path("/x/.code/audit/d"), Path("/x"), audit, skill), docs)
@@ -986,7 +988,7 @@ class Layout(unittest.TestCase):
                 paths.Unit(
                     Path("/x/.research/b"), Path("/x"), SKILLS["research-better"].kinds[0], SKILLS["research-better"]
                 ),
-                schema.load_schemas(*resources.schema_sources("research")),
+                schema.docs_for("research"),
             )
             .forms["claim"]
             .folder
@@ -1077,35 +1079,54 @@ class Concurrency(Repo):
 
 
 class Examples(Repo):
-    """Every example line of the fixtures, added through `add` in file order into a unit of its skill: the command writes
-    what the schema accepts and refuses only what the unit cannot hold yet."""
+    """Every example line of the code-better format page, added through `add` in file order into a change that holds
+    what the examples point to: the requirement Q1 and decisions D1-D3 of its architect design, specs S1-S8, tasks
+    T1-T3. `add` accepts each one. Not added here: the code.json line (a head,
+    written by `create`), the decisions.jsonl lines (the "answered on the page" one points to a page event this unit does
+    not hold) and audit/* (another unit kind); the old test skipped them too."""
 
-    def test_every_example_line_is_accepted_by_add_or_refused_with_a_record_error(self):
+    def add(self, skill, unit, label, fields, *more):
+        done = call(skill, "add", unit, label, "--by", "coordinator", *more, stdin=fields)
+        self.assertEqual(done[0], 0, done)
+
+    def supporting(self):
+        design = self.architect()
+        request = {"type": "request", "sentence": "Add a dashboard that shows each agent's task, mode and state."}
+        quality = {"kind": "quality", "text": "Show a question within 2 seconds.", "source": request}
+        decision = {"title": "t", "drivers": ["Q1"], "chosen": "a", "rejected": [{"option": "b", "why": "c"}]}
+        spec = {"statement": "s", "source": {"type": "request", "sentence": "x"}, "checked_by": "c"}
+        self.add("architect-better", design, "requirement", quality)
+        for _ in range(3):
+            self.add("architect-better", design, "decision", {**decision, "drawback": "d"})
+        self.add("architect-better", design, "spec", {**spec, "source": {"type": "requirement", "requirement": "Q1"}})
+        unit = self.unit(".code/x")
+        head = {**CODE_HEAD, "design": {"type": "architect", "folder": ".architect/a"}}
+        done = call("code-better", "create", unit, "--by", "coordinator", stdin=head)
+        self.assertEqual(done[0], 0, done)
+        for label, fields, count in (("spec", spec, 7), ("task", TASK, 3)):
+            for _ in range(count):
+                self.add("code-better", unit, label, fields)
+        return unit
+
+    def test_every_example_line_is_accepted_by_add(self):
         data = json.loads((FIXTURES / "code-better-examples.json").read_text())
-        unit = self.code_change()
-        agent = {"logs/<agent>.card.json": ("card", "builder-1"), "logs/<agent>.jsonl": (None, "builder-1")}
-        results = []
+        unit = self.supporting()
         for name, entries in data.items():
             if name in ("code.json", "decisions.jsonl") or name.startswith("audit/"):
                 continue
             for entry in entries:
                 record = json.loads(entry["line"])
-                label = record.pop("type")
-                by = record.pop("by")
-                record.pop("at")
-                record.pop("id", None)
+                label, by = record.pop("type"), record.pop("by")
+                for stamped in ("at", "id"):
+                    record.pop(stamped, None)
                 args = ["add", unit, label, "--by", by]
-                if name in agent:
-                    args += ["--for", agent[name][1]]
-                done = call("code-better", *args, stdin=record)
-                results.append((name, entry["title"], done))
-                self.assertIn(done[0], (0, 1), (name, done))
-                if done[0] == 1:
-                    self.assertRegex(
-                        done[1] + done[2], r"new: |\.\. |has no card", (name, done)
-                    )  # a log line needs its card (S24)
-        accepted = {name for name, _, done in results if done[0] == 0}
-        self.assertGreaterEqual(len(accepted), 1, [(n, t, d) for n, t, d in results if d[0]])
+                if name == "logs/<agent>.card.json":
+                    args += ["--for", f"{record['role']}-t3"]
+                elif name == "logs/<agent>.jsonl":
+                    args += ["--for", by]
+                with self.subTest(name=name, title=entry["title"]):
+                    done = call("code-better", *args, stdin=record)
+                    self.assertEqual(done[0], 0, done)
 
 
 class Sweep(Repo):
@@ -1114,7 +1135,7 @@ class Sweep(Repo):
     def types(self):
         found = []
         for name, skill in SKILLS.items():
-            docs = schema.load_schemas(*resources.schema_sources(skill.package))
+            docs = schema.docs_for(skill.package)
             for kind in skill.kinds:
                 unit = paths.Unit(Path("/x") / kind.folder / "u", Path("/x"), kind, skill)
                 lay = records.layout(unit, docs)

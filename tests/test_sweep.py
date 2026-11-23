@@ -1,8 +1,12 @@
 import os
+import sys
 import unittest
+from pathlib import Path
 from unittest import mock
 
-import sweep
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import sweep  # noqa: E402
 
 ITEMS = [(kind, n) for kind in "abcdefgh" for n in range(500)]
 

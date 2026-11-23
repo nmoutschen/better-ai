@@ -186,7 +186,7 @@ def resolve_unit(argument: str, skill: Skill, *, creating: bool = False) -> Unit
             f"the unit must be at the top of its repository ({top}), not under {root_path}",
             f"use {top / kind.folder / slug}",
         )
-    root = top if top is not None else root_path
+    root = top if top is not None else Path(os.path.realpath(root_path))  # resolved here, in or outside git, once
     unit_path = root / kind.folder / slug
     shown = str(unit_path.relative_to(root))
     probe = root
@@ -229,11 +229,17 @@ def unit_guard(skill: str):
 def read_repo_file(unit: Unit, relative: str) -> bytes:
     """A file elsewhere in the unit's repository (a design folder's `spec.jsonl`), by its repo-relative path, under the
     same rules as a file of the unit: no `..`, no symlink on the way, still inside the repository, opened with
-    O_NOFOLLOW. FileNotFoundError if it is not there."""
+    O_NOFOLLOW, and never inside `.git`. FileNotFoundError if it is not there."""
     pure = PurePosixPath(relative)
-    if pure.is_absolute() or not pure.parts or {"..", "."} & set(pure.parts) or "\0" in relative:
+    if pure.is_absolute() or not pure.parts or {"..", ".", ".git"} & set(pure.parts) or "\0" in relative:
         raise refusal(relative, "not a path inside the repository")
     return read_bytes(Unit(unit.root, unit.root, unit.kind, unit.skill), relative)
+
+
+def repo_root(folder: Path) -> Path | None:
+    """The repository root above `folder` for a caller that has no `Unit` (its `.root` is the answer): the nearest
+    folder up that holds `.git`, or None."""
+    return next((f for f in (folder, *folder.parents) if (f / ".git").exists()), None)
 
 
 def _owner_by_location(parts: tuple[str, ...]) -> str | None:

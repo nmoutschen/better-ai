@@ -27,7 +27,6 @@ import argparse
 import contextlib
 import os
 import sys
-import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -36,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from . import paths, resources, schema
+from ._entry import report_bug
 from .paths import Refused, Unit
 from .skill import Skill
 
@@ -143,29 +143,6 @@ def _parser(skill: Skill, info: resources.BuildInfo) -> argparse.ArgumentParser:
     return parser
 
 
-def _plain(text: str) -> str:
-    return " ".join(text.split()).encode("ascii", "backslashreplace").decode("ascii")
-
-
-def _bug_line(skill: str, hash: str, error: BaseException) -> str:
-    """The one line for an internal error: what failed, and the module or file a missing piece names."""
-    what = f"{type(error).__name__}: {error}" if str(error) else type(error).__name__
-    missing = error.name if isinstance(error, ModuleNotFoundError) else None
-    if missing is None and isinstance(error, FileNotFoundError) and error.filename:
-        missing = error.filename
-    named = f" (missing: {missing})" if missing else ""
-    return _plain(f"bug in better.pyz {skill} {hash}: {what}{named}; set BETTER_AI_TRACEBACK=1 for the full trace")
-
-
-def report_bug(skill: str, hash: str, error: BaseException) -> int:
-    """Print the internal-error line (and the traceback when BETTER_AI_TRACEBACK is 1) and return exit code 5."""
-    with contextlib.suppress(Exception):  # stderr may be closed: the exit code still says it
-        print(_bug_line(skill, hash, error), file=sys.stderr)
-        if os.environ.get("BETTER_AI_TRACEBACK") == "1":
-            traceback.print_exception(error, file=sys.stderr)
-    return EXIT_BUG
-
-
 def main(argv: list[str] | None = None, *, stdin: Any = None) -> int:
     """Run one command and return its exit code. Whatever a verb raises that it did not mean to is an internal error."""
     for stream in (sys.stdout, sys.stderr):  # a value that is not text prints escaped, never as a failure
@@ -234,11 +211,14 @@ def check(args: argparse.Namespace, run: Run) -> int:
     this machine's clock is a problem. A record from before the build's cutoff in the format before this change is
     reported as such and is not a problem."""
     unit = paths.resolve_unit(args.unit, run.skill)
-    docs = schema.load_schemas(*resources.schema_sources(run.info.package))
+    docs = schema.docs_for(run.info.package)
     shown = os.path.relpath(unit.path)
-    root = Path(shown if not shown.startswith("..") else unit.path)
+    typed = Path(os.path.abspath(args.unit))  # the path as given, which may reach the unit through a symlink
+    root = Path(shown) if not shown.startswith("..") else typed if typed.resolve() == unit.path else unit.path
     notices: list[schema.Error] = []
-    errors = schema.check_paths([root], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices)
+    errors = schema.check_paths(
+        [root], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices, root=unit.root
+    )
     for error in errors:
         run.out(str(error))
     for notice in notices:

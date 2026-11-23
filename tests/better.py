@@ -9,10 +9,13 @@ skill (the hash is "source"). Tests that need a real `.pyz` build one with `tool
 
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import subprocess
 import sys
 from pathlib import Path
+from unittest import mock
 
 SRC = Path(__file__).resolve().parents[1] / "src"
 
@@ -46,3 +49,34 @@ def run(
     return subprocess.run(
         argv, input=stdin, capture_output=True, text=True, cwd=cwd, env=full, check=False, timeout=120
     )
+
+
+def call(
+    skill: str,
+    *args: str | Path,
+    stdin: str | None = None,
+    cwd: str | Path | None = None,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess:
+    """The same command as `run`, in this process: `cli.main` with the same environment and the result fields of `run`
+    (`returncode`, `stdout`, `stderr`). Several times faster, for the many cases a test loops over; keep one `run` for
+    what only a process shows, such as the exit code of a crash."""
+    if str(SRC) not in sys.path:
+        sys.path.insert(0, str(SRC))
+    from better_ai import cli
+
+    argv = [str(a) for a in args]
+    out, err = io.StringIO(), io.StringIO()
+    here = os.getcwd()
+    try:
+        with (
+            mock.patch.dict(os.environ, {"BETTER_AI_SKILL": skill, **(env or {})}),
+            contextlib.redirect_stdout(out),
+            contextlib.redirect_stderr(err),
+        ):
+            if cwd is not None:
+                os.chdir(cwd)
+            code = cli.main(argv, stdin=io.StringIO(stdin or ""))
+    finally:
+        os.chdir(here)
+    return subprocess.CompletedProcess(argv, code, out.getvalue(), err.getvalue())

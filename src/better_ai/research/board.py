@@ -46,7 +46,7 @@ def _cutoff() -> str:
     try:
         return resources.build_info().cutoff
     except LookupError:  # in-process, not run as better.pyz
-        return resources.DEFAULT_CUTOFF
+        return resources.cutoff()
 
 
 def at_time(record: dict) -> float:

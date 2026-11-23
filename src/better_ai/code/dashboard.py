@@ -44,7 +44,7 @@ def _cutoff() -> str:
     try:
         return resources.build_info().cutoff
     except LookupError:  # run in-process without a skill named: the shared default
-        return resources.DEFAULT_CUTOFF
+        return resources.cutoff()
 
 
 class Reader:
