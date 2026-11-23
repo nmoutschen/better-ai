@@ -375,4 +375,6 @@ a do-nothing run, such as cases about asking first, set
 `validation.do_nothing_fails_only_by_judge`. Top-level judges are skipped; a
 judge inside `any_of` is assumed to pass, or to fail when the replay sets
 `judge: false`. Rubric wording is not checked by replays: that is what judge
-validation is for.
+validation is for. A good run's bash action that exits nonzero must carry
+`fails: true`, for a failure the case intends or one that only the local
+replay hits, with a comment saying which.

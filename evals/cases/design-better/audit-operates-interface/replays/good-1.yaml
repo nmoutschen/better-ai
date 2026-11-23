@@ -39,6 +39,7 @@ actions:
         print("banner top:", page.locator("#banner").bounding_box()["y"], "phone top:", page.locator("#phone").bounding_box()["y"])
         browser.close()
     PY
+  # Playwright is only in the sandbox image, not where validate_cases runs; in the sandbox this succeeds.
   fails: true
 - write: .design/booking-review/findings.md
   content: |
