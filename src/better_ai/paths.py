@@ -317,12 +317,14 @@ def write_atomic(unit: Unit, relative: str, data: bytes) -> None:
         raise
 
 
-def write_state(unit: Unit, relative: str, data: bytes, mode: int = 0o644) -> None:
+def write_state(unit: Unit, relative: str, data: bytes, mode: int | None = None) -> None:
     """Write a small state file of the page (`.server`, `.server-token`, `.conversation-seen`), opened with O_NOFOLLOW;
-    `mode` is the file's, also when it was there before."""
-    fd = _open(unit, relative, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    `mode`, when given, is the file's,
+    also when it was there before; otherwise a new file gets the umask's."""
+    fd = _open(unit, relative, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644 if mode is None else mode)
     try:
-        os.fchmod(fd, mode)
+        if mode is not None:
+            os.fchmod(fd, mode)
         _write_all(fd, data)
     finally:
         os.close(fd)

@@ -5,7 +5,7 @@ var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied
 // The page token. `serve` gives it in the fragment of the address it opens (#t=...), which a browser never sends. The page
 // keeps it for the tab, so a reload still has it, and takes it out of the address bar. Every request to /rpc, /data,
 // /events and /wait goes through pageFetch, which sends it; the server answers a page without it as out of date.
-var PAGE_STALE = 'page out of date: reload';
+var PAGE_STALE = 'page out of date: reload', pageIsStale = false;
 var pageToken = (function () {
   var found = typeof location === 'undefined' ? null : /[#&]t=([\w-]+)/.exec(location.hash || '');
   try {
@@ -19,6 +19,7 @@ function pageFetch(url, init) {
   return fetch(url, init).then(function (r) {
     if (r.status !== 401) return r;
     var strip = document.querySelector('.offline'), stale = new Error(PAGE_STALE);
+    pageIsStale = true;
     if (strip) { strip.textContent = PAGE_STALE; strip.hidden = false; }
     stale.stale = true;
     throw stale;
@@ -436,7 +437,8 @@ function pageConversation(o) {
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
     // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
-    function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
+    // Once a request was refused as out of date the strip stays: no later poll or stream event clears it.
+    function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = !pageIsStale && (on || misses < 2); }
     if (streaming) (function stream(after) {
       pageFetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
