@@ -77,6 +77,11 @@
       "type": "string",
       "minLength": 1
     },
+    "sha256": {
+      "description": "the hash of the page text the verifier read, from set --raw; better.pyz computes it",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "blocked": {
       "description": "the page could not be read",
       "type": "boolean"
@@ -184,6 +189,13 @@
         "required": [
           "span"
         ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "sha256"
+          ]
+        }
       }
     },
     {
