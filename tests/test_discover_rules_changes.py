@@ -118,11 +118,13 @@ class Unit(unittest.TestCase):
         event = self.answer_event(ident, default)
         return self.ok(self.set(ident, {"status": "answered", "answer": {"type": "page", "event": event}}))
 
-    def accept(self, decision, risk_id="R1", item_id="P1"):
-        return self.add("change", risk_change(decision, risk_id, item_id))
+    def accept(self, decision, risk_id="R1", item_id="P1", **over):
+        return self.add("change", risk_change(decision, risk_id, item_id, **over))
 
     def state(self, to, cause, item_id="P1", **over):
-        return self.add("change", R.record(R.CHANGE, about={"type": "item", "item": item_id}, to=to, cause=cause, **over))
+        return self.add(
+            "change", R.record(R.CHANGE, about={"type": "item", "item": item_id}, to=to, cause=cause, **over)
+        )
 
 
 def item(ident="P1", kind="problem", risks=(), **over):
@@ -156,7 +158,11 @@ class Decisions(Unit):
         self.ok(
             self.set(
                 "D1",
-                {"status": "answered", "answer": {"type": "chat", "text": "Yes."}, "answered_at": "2020-01-01T00:00:00Z"},
+                {
+                    "status": "answered",
+                    "answer": {"type": "chat", "text": "Yes."},
+                    "answered_at": "2020-01-01T00:00:00Z",
+                },
             )
         )
         self.assertNotEqual(self.lines("decisions.jsonl")[0]["answered_at"], "2020-01-01T00:00:00Z")
@@ -168,7 +174,7 @@ class Decisions(Unit):
         self.assertEqual(self.lines("decisions.jsonl")[0]["answer"], {"type": "page", "event": "a1"})
         self.answer_event("D1", True, ident="a2")  # an event for D1 does not answer D2
         done = self.set("D2", {"status": "answered", "answer": {"type": "page", "event": "a2"}})
-        self.refused(done, "answers 'D1', not 'D2'")
+        self.refused(done, 'answers "D1", not "D2"')
         done = self.set("D2", {"status": "answered", "answer": {"type": "chat"}})
         self.assertEqual(done.returncode, 1)
 
@@ -240,17 +246,12 @@ class Risks(Unit):
 
     def test_S1_a_decision_an_earlier_change_cites_is_refused(self):
         self.ok(self.ask_risk())
-        self.answer_chat("D1")
-        self.ok(self.accept("D1"))
-        text = self.refused(self.accept("D1", "R2"), "D1")
-        self.assertIn("earlier change", text)
-        self.assertEqual(len(self.lines("changes.jsonl")), 1)
-
-    def test_S1_a_decision_an_earlier_state_change_cites_is_refused(self):
-        self.ok(self.ask_risk())
+        self.ok(self.ask({"type": "item", "item": "P1"}, asked="Plan a test?"))
         self.answer_chat("D1")
         self.ok(self.state("waiting for you", {"answer": {"type": "decision", "id": "D1"}}))
-        self.refused(self.accept("D1"), "earlier change")
+        text = self.refused(self.accept("D1"), "D1")
+        self.assertIn("earlier change", text)
+        self.assertEqual(len(self.lines("changes.jsonl")), 1)
 
     def test_S1_a_typed_page_answer_is_refused_with_the_next_action(self):
         self.ok(self.ask_risk())
@@ -316,7 +317,7 @@ class Risks(Unit):
         self.ok(self.ask_risk())
         self.answer_chat("D1")
         self.ok(self.accept("D1"))
-        self.append("changes.jsonl", R.record(risk_change("D1", "R2"), at="2026-11-23T10:05:00Z"))
+        self.append("changes.jsonl", R.record(risk_change("D1"), at="2026-11-23T10:05:00Z"))
         text = self.refused(self.check(), "earlier change")
         self.assertIn("changes.jsonl:2", text)
 
@@ -396,7 +397,9 @@ class Changes(Unit):
         self.ok(self.state("unverified", {"reasoning": "Back to the start."}))
         done = self.add(
             "change",
-            R.record(R.CHANGE, field="importance", to="high", cause={"reasoning": "The core of the idea."}, **{"from": None}),
+            R.record(
+                R.CHANGE, field="importance", to="high", cause={"reasoning": "The core of the idea."}, **{"from": None}
+            ),
         )
         self.ok(done)
 
@@ -435,7 +438,9 @@ class Changes(Unit):
         self.ok(self.state("unverified", {"reasoning": "x"}))
         done = self.add("change", R.record(R.CHANGE, field="importance", to="high", cause={"reasoning": "x"}))
         self.ok(done)
-        self.refused(self.add("change", R.record(R.CHANGE, field="importance", to="high", cause={"reasoning": "y"})), "already")
+        self.refused(
+            self.add("change", R.record(R.CHANGE, field="importance", to="high", cause={"reasoning": "y"})), "already"
+        )
 
     def test_S26_a_repeated_change_to_the_discovery_is_refused(self):
         def appetite(to):
@@ -456,7 +461,9 @@ class Changes(Unit):
         self.ok(self.ask_risk())
         self.answer_chat("D1")
         self.ok(self.accept("D1"))
-        self.ok(self.ask({"type": "risk", "item": "P1", "risk": "R1"}, asked="Accept R1 again?", default="Accept the risk"))
+        self.ok(
+            self.ask({"type": "risk", "item": "P1", "risk": "R1"}, asked="Accept R1 again?", default="Accept the risk")
+        )
         self.answer_chat("D2")
         self.refused(self.accept("D2"), "already recorded: nothing to do")
 
