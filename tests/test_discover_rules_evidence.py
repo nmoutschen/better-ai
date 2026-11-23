@@ -1130,6 +1130,267 @@ class Last(Rules):
         self.assertEqual(self.run_("check", self.unit).returncode, 1)
 
 
+class FileCase(Rules):
+    """What the tests of files and tools share: the named sources and the sources an analyst adds."""
+
+    NAMED = [{"type": "file", "path": "/data/tickets"}, {"type": "tool", "tool": "mcp__desk__get_ticket"}]
+
+    def name(self):
+        self.ok(self.set("discover", {"named_sources": self.NAMED}, COORD))
+
+    def file(self, path, by="a1"):
+        return self.add("source", {"origin": {"type": "file", "path": path, "read": "raw"}, "title": "Tickets"}, by)
+
+    def tool(self, tool="mcp__desk__get_ticket", by="a1"):
+        origin = {"type": "tool", "tool": tool, "ref": "T-1042", "read": "extracted"}
+        return self.add("source", {"origin": origin, "title": "A ticket"}, by)
+
+
+class Named(FileCase):
+    """Files and tools the user named (S129) and the sources an analyst may add from them (S125)."""
+
+    def test_s129_only_the_coordinator_sets_named_sources(self):
+        self.refused(self.set("discover", {"named_sources": self.NAMED}, "a1"), "named_sources", COORD)
+        self.refused(self.set("discover", {"named_sources": self.NAMED}), "named_sources")
+        self.name()
+        self.assertEqual(json.loads((self.folder / "discover.json").read_text())["named_sources"], self.NAMED)
+
+    def test_s129_no_other_way_to_change_them_gets_past_the_rule(self):
+        self.name()
+        before = (self.folder / "discover.json").read_bytes()
+        for by in ("a1", "v1", None):
+            with self.subTest(by=by):
+                self.refused(self.set("discover", {"named_sources": None}, by), "named_sources")
+                self.refused(self.set("discover", {}, by, unset=["named_sources"]), "named_sources")
+                self.refused(self.set("discover", {"named_sources": []}, by), "named_sources")
+        self.assertEqual((self.folder / "discover.json").read_bytes(), before)
+
+    def test_s129_the_coordinator_adds_named_sources_and_none_goes_once_named(self):
+        self.name()
+        more = [*self.NAMED, {"type": "file", "path": "/data/notes"}]
+        self.ok(self.set("discover", {"named_sources": more}, COORD))
+        self.refused(self.set("discover", {"named_sources": self.NAMED}, COORD), "stays named")
+        self.refused(self.set("discover", {"named_sources": None}, COORD), "stays named")
+        self.refused(self.set("discover", {}, COORD, unset=["named_sources"]), "stays named")
+
+    def test_s129_an_analyst_adds_a_file_source_only_for_a_named_path_or_inside_a_named_folder(self):
+        self.name()
+        for path in ("/data/tickets", "/data/tickets/q3.csv", "/data/tickets/2026/q3.csv"):
+            with self.subTest(path=path):
+                self.ok(self.file(path))
+        for path in ("/data/tickets-old/q3.csv", "/data", "/data/other.csv", "/data/tickets/../other.csv"):
+            with self.subTest(path=path):
+                self.refused(self.file(path), "named")
+
+    def test_s129_a_named_file_matches_by_path_segments(self):
+        self.ok(self.set("discover", {"named_sources": [{"type": "file", "path": "/data/q3.csv"}]}, COORD))
+        self.ok(self.file("/data/q3.csv"))
+        self.refused(self.file("/data/q3.csv.bak"), "named")
+
+    def test_s129_an_analyst_adds_a_tool_source_only_for_a_named_tool(self):
+        self.name()
+        self.ok(self.tool())
+        self.refused(self.tool("mcp__desk__delete_ticket"), "named")
+
+    def test_s129_nothing_is_named_so_nothing_is_added(self):
+        self.refused(self.file("/data/tickets/q3.csv"), "named")
+        self.refused(self.tool(), "named")
+
+    def test_s129_check_reports_a_file_source_written_by_hand_for_an_unnamed_path(self):
+        self.name()
+        record = R.record(
+            R.SOURCE,
+            id="S-a1-2",
+            by="a1",
+            origin={"type": "file", "path": "/elsewhere/q3.csv", "read": "raw"},
+            title="Tickets",
+        )
+        (self.folder / "sources" / "S-a1-2.json").write_text(json.dumps(record))
+        done = self.run_("check", self.unit)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertIn("S-a1-2.json", done.stdout + done.stderr)
+
+    def test_s125_the_coordinator_may_add_any_file_or_tool_source(self):
+        self.ok(self.file("/anywhere/q3.csv", by=COORD))
+
+
+class Sourced(FileCase):
+    """A file source S-a1-2 and a tool source S-a1-3, named, and a raw file to count against."""
+
+    RAW = "Ticket 1: the report took a week to find.\nTicket 2: nothing.\n"
+    QUOTE = "the report took a week to find"
+
+    def setUp(self):
+        super().setUp()
+        self.name()
+        self.ok(self.file("/data/tickets/q3.csv"))
+        self.ok(self.tool())
+        self.raw = self.repo.parent / "raw.txt"
+        self.raw.write_text(self.RAW)
+
+    def evidence_from(self, source, words=None, kind="say", **over):
+        fields = {
+            "source": source,
+            "words": {"type": "quote", "text": words or self.QUOTE},
+            "kind": kind,
+            "about": "your users",
+            "bears_on": [{"item": "P1", "direction": "for"}],
+            "status": "checking",
+            **over,
+        }
+        return self.add("evidence", fields, "a1")
+
+
+class FromFiles(Sourced):
+    """Evidence from a file or a tool: the quote flow of a web page, without the URL rule (S126)."""
+
+    def test_s126_a_verifier_counts_a_quote_from_a_file_or_a_tool_with_the_raw_file(self):
+        for source, ident in (("S-a1-2", "E-a1-2"), ("S-a1-3", "E-a1-3")):
+            with self.subTest(source=source):
+                self.ok(self.evidence_from(source, words=self.QUOTE + (" " if ident == "E-a1-3" else "")))
+                self.ok(self.set(ident, {"verifier": "v1"}, COORD))
+                done = self.set(
+                    ident, {"status": "counts", "checked_read": "raw", "span": self.RAW.splitlines()[0]}, "v1", self.raw
+                )
+                self.ok(done)
+                record = self.evidence(ident)
+                self.assertEqual(record["status"], "counts")
+                self.assertEqual(record["sha256"], hashlib.sha256(self.RAW.encode()).hexdigest())
+                self.ok(self.run_("check", self.unit))
+
+    def test_s126_the_span_must_occur_in_the_raw_file(self):
+        self.ok(self.evidence_from("S-a1-2"))
+        self.ok(self.set("E-a1-2", {"verifier": "v1"}, COORD))
+        done = self.set(
+            "E-a1-2",
+            {"status": "counts", "checked_read": "raw", "span": "the report took a week to find!"},
+            "v1",
+            self.raw,
+        )
+        self.refused(done, "span")
+        self.refused(self.set("E-a1-2", {"status": "counts", "checked_read": "raw", "span": self.QUOTE}, "v1"), "--raw")
+        self.assertEqual(self.evidence("E-a1-2")["status"], "checking")
+
+    def test_s126_counts_by_hand_without_the_checks_is_reported_by_check(self):
+        self.ok(self.evidence_from("S-a1-2"))
+        self.put(
+            "E-a1-2",
+            source="S-a1-2",
+            words={"type": "quote", "text": self.QUOTE},
+            status="counts",
+            verifier="v1",
+            checked_read="raw",
+            span="something else",
+            sha256="a" * 64,
+        )
+        self.assertEqual(self.run_("check", self.unit).returncode, 1)
+
+    def test_s126_the_url_rule_is_not_applied_to_a_file_or_tool(self):
+        origin = {"type": "tool", "tool": "mcp__desk__get_ticket", "ref": "http://localhost:8080/t/1", "read": "raw"}
+        self.ok(self.add("source", {"origin": origin, "title": "A ticket"}, "a1"))
+        self.ok(self.file("/data/tickets/localhost/127.0.0.1.csv"))
+
+    def test_s126_new_evidence_from_a_file_starts_checking_with_no_verifier_fields(self):
+        self.refused(self.evidence_from("S-a1-2", status="counts"), "checking")
+        self.refused(self.evidence_from("S-a1-2", verifier="v1"), "checking")
+
+
+class Computed(Sourced):
+    """A result computed from the user's data counts once the user takes the default of a question about it (S128)."""
+
+    WORDS = "wc -l tickets.csv => 37"
+    DEFAULT = "Confirm this result"
+
+    def setUp(self):
+        super().setUp()
+        self.ok(self.evidence_from("S-a1-2", words=self.WORDS, kind="data"))
+
+    def ask(self, evidence="E-a1-2", default=None, about=None):
+        about = about or {"type": "evidence", "evidence": evidence}
+        asked = f"Is the result of {evidence} right?"
+        fields = R.without(
+            R.record(R.DECISION, about=about, asked=asked, default=default or self.DEFAULT), "at", "by", "id"
+        )
+        return self.ok(self.add("decision", fields, COORD))
+
+    def answer(self, decision="D1", taken=True, event="a9"):
+        with (self.folder / "conversation.jsonl").open("a") as out:
+            line = {"type": "answer", "at": R.AT, "by": "user", "id": event, "decision": decision}
+            line |= {"text": self.DEFAULT if taken else "Not sure", "default": taken}
+            out.write(json.dumps(line) + "\n")
+        done = self.set(decision, {"status": "answered", "answer": {"type": "page", "event": event}}, COORD)
+        self.ok(done)
+
+    def confirm(self, by=COORD, raw=None):
+        return self.set("E-a1-2", {"status": "counts"}, by, raw)
+
+    def test_s128_the_coordinator_sets_counts_once_the_user_took_the_default_and_nothing_is_run(self):
+        self.ask()
+        self.answer()
+        self.ok(self.confirm())
+        record = self.evidence("E-a1-2")
+        self.assertEqual(record["status"], "counts")
+        for name in ("verifier", "sha256", "span"):
+            self.assertNotIn(name, record)
+        self.ok(self.run_("check", self.unit))
+
+    def test_s128_a_typed_default_in_the_chat_counts_too(self):
+        self.ask()
+        self.ok(self.set("D1", {"status": "answered", "answer": {"type": "chat", "text": self.DEFAULT}}, COORD))
+        self.ok(self.confirm())
+
+    def test_s128_no_question_a_waiting_question_or_another_answer_is_refused(self):
+        self.refused(self.confirm(), "Confirm this result")
+        self.ask()
+        self.refused(self.confirm(), "answered")
+        self.answer(taken=False)
+        self.refused(self.confirm(), "default")
+        self.assertEqual(self.evidence("E-a1-2")["status"], "checking")
+
+    def test_s128_a_chat_answer_in_other_words_is_refused(self):
+        self.ask()
+        self.ok(self.set("D1", {"status": "answered", "answer": {"type": "chat", "text": "yes"}}, COORD))
+        self.refused(self.confirm(), "default")
+
+    def test_s128_the_question_must_be_about_this_evidence(self):
+        self.ok(self.evidence_from("S-a1-3", words="grep -c late tickets.csv => 12", kind="data"))
+        self.ask(evidence="E-a1-3")
+        self.answer()
+        self.refused(self.confirm(), "E-a1-2")
+        self.ask(about={"type": "item", "item": "P1"})
+        self.answer("D2", event="a8")
+        self.refused(self.confirm(), "E-a1-2")
+
+    def test_s128_a_question_with_another_default_is_refused(self):
+        self.ask(default="Yes")
+        self.answer()
+        self.refused(self.confirm(), "Confirm this result")
+
+    def test_s128_a_verifier_or_an_analyst_never_counts_it_and_no_raw_file_helps(self):
+        self.ask()
+        self.answer()
+        self.refused(self.confirm("a1"), "coordinator")
+        self.ok(self.set("E-a1-2", {"verifier": "v1"}, COORD))
+        fields = {"status": "counts", "checked_read": "raw", "span": self.WORDS}
+        self.refused(self.set("E-a1-2", fields, "v1", self.raw), "coordinator")
+        self.refused(self.set("E-a1-2", {"status": "counts"}, COORD, self.raw), "--raw")
+
+    def test_s128_the_coordinator_sets_it_unverified_when_the_user_does_not_confirm(self):
+        self.refused(self.set("E-a1-2", {"status": "unverified", "reason": "no"}, COORD), "not confirmed by you")
+        self.ok(self.set("E-a1-2", {"status": "unverified", "reason": "not confirmed by you"}, COORD))
+
+    def test_s128_check_reports_computed_evidence_counting_with_no_confirmation(self):
+        self.put("E-a1-2", source="S-a1-2", words={"type": "quote", "text": self.WORDS}, kind="data", status="counts")
+        done = self.run_("check", self.unit)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertIn("E-a1-2.json", done.stdout + done.stderr)
+
+    def test_s128_a_quote_of_kind_data_from_a_web_page_still_needs_a_verifier(self):
+        self.ask(evidence="E-a1-1")
+        self.answer()
+        self.refused(self.set("E-a1-1", {"status": "counts"}, COORD), "verifier")
+
+
 class Hooks(unittest.TestCase):
     def test_normalise(self):
         n = rules_evidence.normalise

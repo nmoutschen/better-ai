@@ -433,7 +433,7 @@ TRANSITIONS = {
 # The fields a record keeps once it has this status: they neither change nor go.
 LOCKED = {
     "test": {status: ("what", "rule", "settles") for status in ("running", "done", "removed")},
-    "decision": {"answered": ("about", "answer", "answered_at")},
+    "decision": {"answered": ("about", "answer", "answered_at", "default")},  # default: a computed result counts by it
 }
 WHAT_NEXT = {
     "test": lambda ident: f"add a new test and remove {ident} with a reason",
@@ -491,12 +491,23 @@ def _set(ctx: records.SetContext) -> None:
     elif kind == "option":
         _keep_chosen_option(ctx, after)
         ctx.patch["updated_at"] = _now(ctx)
-    elif kind == "discover" and after.get("coordinator") != ctx.record.get("coordinator"):
-        raise refusal(
-            ctx.unit.label,
-            "the coordinator of a discovery cannot change: what the user's evidence says it was added by stays true",
-            "start a new discovery for another coordinator",
-        )
+    elif kind == "discover":
+        if after.get("named_sources") != ctx.record.get("named_sources"):
+            _coordinator_only(ctx.unit, "named_sources", ctx.by)
+            kept = after.get("named_sources")
+            lost = [n for n in _list(ctx.record.get("named_sources")) if not isinstance(kept, list) or n not in kept]
+            if lost:
+                raise refusal(
+                    ctx.unit.label,
+                    "a named source stays named: sources an analyst added from it rest on it",
+                    "keep every named source and add the new ones",
+                )
+        if after.get("coordinator") != ctx.record.get("coordinator"):
+            raise refusal(
+                ctx.unit.label,
+                "the coordinator of a discovery cannot change: what the user's evidence says it was added by stays true",
+                "start a new discovery for another coordinator",
+            )
 
 
 # ---------------------------------------------------------------- check: a latest change that no longer holds
