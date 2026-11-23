@@ -317,10 +317,12 @@ def write_atomic(unit: Unit, relative: str, data: bytes) -> None:
         raise
 
 
-def write_state(unit: Unit, relative: str, data: bytes) -> None:
-    """Write a small state file of the page (`.server`, `.conversation-seen`), opened with O_NOFOLLOW."""
-    fd = _open(unit, relative, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+def write_state(unit: Unit, relative: str, data: bytes, mode: int = 0o644) -> None:
+    """Write a small state file of the page (`.server`, `.server-token`, `.conversation-seen`), opened with O_NOFOLLOW;
+    `mode` is the file's, also when it was there before."""
+    fd = _open(unit, relative, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
     try:
+        os.fchmod(fd, mode)
         _write_all(fd, data)
     finally:
         os.close(fd)

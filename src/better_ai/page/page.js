@@ -2,6 +2,29 @@
 var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied',
   working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
 
+// The page token. `serve` gives it in the fragment of the address it opens (#t=...), which a browser never sends. The page
+// keeps it for the tab, so a reload still has it, and takes it out of the address bar. Every request to /rpc, /data,
+// /events and /wait goes through pageFetch, which sends it; the server answers a page without it as out of date.
+var PAGE_STALE = 'page out of date: reload';
+var pageToken = (function () {
+  var found = typeof location === 'undefined' ? null : /[#&]t=([\w-]+)/.exec(location.hash || '');
+  try {
+    if (found) { sessionStorage.setItem('pageToken', found[1]); history.replaceState(null, '', location.pathname + location.search); }
+    return found ? found[1] : sessionStorage.getItem('pageToken') || '';
+  } catch (e) { return found ? found[1] : ''; }
+})();
+function pageFetch(url, init) {
+  init = Object.assign({}, init);
+  init.headers = Object.assign({}, init.headers, { 'X-Page-Token': pageToken });
+  return fetch(url, init).then(function (r) {
+    if (r.status !== 401) return r;
+    var strip = document.querySelector('.offline'), stale = new Error(PAGE_STALE);
+    if (strip) { strip.textContent = PAGE_STALE; strip.hidden = false; }
+    stale.stale = true;
+    throw stale;
+  });
+}
+
 // The element-comment layer. A page supplies its target metadata, pin coordinates and navigation;
 // this owns the editor, the numbered pins and their actions.
 function pageElementComments(o) {
@@ -175,7 +198,7 @@ function pageConversation(o) {
     if (o.apply) o.apply(event, true);
     if (!o.served) { log.push(event); renderThread(); flash(what + ' saved on this page. ' + (o.unsent || ''), 'ok'); if (done) done(); return; }
     flash('Sending ' + what.toLowerCase() + '…', 'busy');
-    fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    pageFetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params }) })
       .then(function (r) { return r.json(); })
       .then(function (r) {
@@ -415,14 +438,14 @@ function pageConversation(o) {
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
     function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = on || misses < 2; }
     if (streaming) (function stream(after) {
-      fetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
+      pageFetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
         // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
         if (after > 0) r.events.forEach(function (e) { if (e.type === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
         if (r.events.length) renderThread();
         stream(r.total);
-      }).catch(function () { connected(false); setTimeout(function () { stream(after); }, 2000); });
+      }).catch(function (e) { if (e && e.stale) return; connected(false); setTimeout(function () { stream(after); }, 2000); });
     })(0);
     // A new render from the agent loads by itself, as soon as the user is not typing: a comment, a message or an answer
     // in progress would be lost. The page keeps its place through o.beforeReload.
