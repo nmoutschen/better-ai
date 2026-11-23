@@ -79,7 +79,7 @@ class SharedComponents(unittest.TestCase):
             states,
             {
                 "answered": "ok",
-                "in progress": "wait",
+                "in progress": "working",
                 "open": "plain",
                 "proposed": "plain",
                 "contested": "error",
@@ -88,11 +88,20 @@ class SharedComponents(unittest.TestCase):
             },
         )
         self.assertNotRegex(script, r'class="chip (now|todo|bad)')
+        self.assertNotIn("chip wait", script)  # work in progress is working; wait is for what waits for the user
+        fill = script.split("const FILL", 1)[1].split("};", 1)[0]
+        for kind in ("ok", "working", "plain", "error"):
+            self.assertIn(kind + ":", fill)
 
-    def test_architect_guess_and_open_become_plain_and_error(self):
+    def test_architect_chips_follow_what_the_state_means(self):
         script = (SRC / "architect" / "page.js").read_text(encoding="utf-8")
         self.assertIn("chip('guessed', 'plain')", script)
-        self.assertIn("chip('New', 'error')", script)
+        self.assertIn("chip('Unconfirmed', 'plain')", script)
+        self.assertIn("chip('Not valid', 'error')", script)
+        self.assertIn("chip('no valid source', 'error')", script)
+        self.assertIn("chip('New')", script)
+        self.assertIn("' comments'))", script)
+        self.assertNotRegex(script, r"chip\([^)]*'(open|guess)'\)")
 
     def test_design_md_documents_each_component(self):
         for heading in ("Chip", "Table", "Decision panel", "Section intro", "Inline record form"):

@@ -7,7 +7,7 @@ const text = pageEscape;
 const inlineCode = value => value.split(/(`[^`]+`)/).map((part, index) =>
   index % 2 ? '<code>' + text(part.slice(1, -1)) + '</code>' : text(part)).join('');
 const invalid = record => record._errors && record._errors.length ?
-  '<p class="invalid">' + chip('Not valid', 'plain') + ' ' + text(record._errors[0]) + '</p>' : '';
+  '<p class="invalid">' + chip('Not valid', 'error') + ' ' + text(record._errors[0]) + '</p>' : '';
 const nameOf = (perspectives, id) => (perspectives.find(p => p.id === id) || {}).name || id;
 // A perspective's origin as words: a sum type tagged by type, so no string mixes cases.
 const fromWords = from => from.type === 'built_in' ? 'built in' + (from.method ? ' (' + from.method + ')' : '') :
@@ -34,7 +34,7 @@ const changeButton = '<button class="btn btn--quiet btn--sm" type="button" data-
 function sourceLink(source) {
   if (source.type === 'guessed') return chip('guessed', 'plain');
   if (source.type === 'user') return 'You, on this page<br>' + text(String(source.at).slice(11, 16));
-  if (source.type !== 'request' && source.type !== 'file') return chip('no valid source', 'plain');
+  if (source.type !== 'request' && source.type !== 'file') return chip('no valid source', 'error');
   return source.sentence ? text(source.sentence) : text(source.file) + (source.symbol ? '<br>' + text(source.symbol) : '');
 }
 
@@ -211,7 +211,7 @@ function start(data) {
   const diagramControls = controls(applicable, review);
   section('containers', 'Containers', diagramControls + figures(data.containers, 'The containers are not drawn: see the errors above.'));
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
-    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New', 'error') : '') +
+    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New') : '') +
     (flow.removed ? ' ' + chip('Removed') : '') + '</h3>' +
     figures(flow.versions)).join(''));
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
@@ -384,7 +384,7 @@ function start(data) {
         $('.count', button)?.remove();
         if (count) button.insertAdjacentHTML('beforeend', '<span class="count">' + count + '</span>');
         const status = $('[data-section-status="' + key + '"]');
-        status.innerHTML = count ? chip(count + (count === 1 ? ' comment' : ' comments'), 'error') : chip('Draft');
+        status.innerHTML = count ? chip(count + (count === 1 ? ' comment' : ' comments')) : chip('Draft');
       }
       for (const event of log) {
         if (event.type !== 'confirm' || event.wording !== requirementWording.get(event.requirement)) continue;
