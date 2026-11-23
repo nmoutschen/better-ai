@@ -54,7 +54,7 @@ function loadBoard(returns, over = {}) {
     pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime,
     pageEscape: page.pageEscape, pagePopup: page.pagePopup, pageShowErrors: page.pageShowErrors,
     addEventListener: () => {}, innerWidth: 1000, innerHeight: 800, getComputedStyle: stand(),
-    fetch: () => new Promise(() => {}), setInterval: () => {},
+    pageFetch: () => new Promise(() => {}), setInterval: () => {},
   }, over);
   return run(between(read('research', 'board.js'), '', '// ---------- Polling ----------'), returns, env);
 }
