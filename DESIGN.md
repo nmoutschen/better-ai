@@ -280,7 +280,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 - Use for: the agents working now, one row each: who, what on, and how long (`.agentsec`, built by `pageAgents` in page.js). Put it at the top of the side column when a run can have many agents and the view shows something else (see Side column).
 - Markup: `<section class="agentsec" aria-labelledby="agents-h"><h2 class="section-h" id="agents-h">Agents</h2><ul class="agents" id="agents"></ul></section>`, then `pageAgents(rows, {now, empty})` gives the `li` rows. A row is who, what, since (when its work began), and last (when the agent last wrote a record). Nothing else is read: the board says what each agent does, and the list reads no log.
-- A row with since shows `.chip.working` with the age, "Checking, 12 min". From 30 minutes after its last record the row reads "No word from analyst-2 for 40 min" in the error colour. A second try reads "second try". A row that opens something is a `button`; an agent that checks what others wrote (`.verifier`) has a moss edge, the others a terracotta one.
+- A row with since shows `.chip.working` with the age, "Checking, 12 min". From 30 minutes after its last record (the server's `quiet_after`, the same for every page) the row reads "No word from analyst-2 for 40 min" in the error colour. A second try reads "second try". A row that opens something is a `button`; an agent that checks what others wrote (`.verifier`) has a moss edge, the others a terracotta one.
 - The section scrolls on its own, at most 30% of the height.
 - Name and role: a section named by its heading, a plain list; a row that is a button is named by its text.
 

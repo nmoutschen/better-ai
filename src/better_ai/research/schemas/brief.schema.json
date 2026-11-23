@@ -3,6 +3,7 @@
   "$id": "brief.schema.json",
   "title": "the research's contract: the topic, its confirmed meaning, the goal, the limits, where to search, and the state of the run",
   "x-files": ["brief.json"],
+  "x-written-by": "coordinator",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "at", "by", "topic", "title", "short", "meaning", "goal", "limit", "stop_at", "collections", "missing", "changes", "status"],

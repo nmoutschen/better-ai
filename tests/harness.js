@@ -50,7 +50,7 @@ const run = (code, returns, env) => new Function(...Object.keys(env), `${code}; 
 function loadBoard(returns, over = {}) {
   const page = loadPage();
   const env = Object.assign({
-    document: stand(), pageConversation: () => stand(), pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents,
+    document: stand(), pageConversation: () => stand(), pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents, pageOpenDecisions: page.pageOpenDecisions,
     pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime,
     pageEscape: page.pageEscape, pageAgents: page.pageAgents, pagePopup: page.pagePopup, pageShowErrors: page.pageShowErrors,
     addEventListener: () => {}, innerWidth: 1000, innerHeight: 800, getComputedStyle: stand(),

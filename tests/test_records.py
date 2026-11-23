@@ -809,7 +809,7 @@ class Set(Repo):
 
     def test_s8_set_by_type_changes_a_single_record_file_and_a_folder_entry(self):
         board = self.board()
-        done = call("research-better", "set", board, "brief", stdin={"status": "stopped"})
+        done = call("research-better", "set", board, "brief", "--by", "coordinator", stdin={"status": "stopped"})
         self.assertEqual(done[0], 0, done)
         self.assertEqual(json.loads((board / "brief.json").read_text())["status"], "stopped")
         call("research-better", "add", board, "question", "--by", "ana", stdin=QUESTION)

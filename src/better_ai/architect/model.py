@@ -66,6 +66,7 @@ def blank(name: str, errors: list) -> dict:
         "design": None,
         "parts": {},
         "hashes": {},
+        "before": {},
         "requirements": [],
         "perspectives": [],
         "findings": [],
@@ -84,16 +85,16 @@ def read_design(reader: Reader):
         reader.error("design.json", 1, "(file)", "missing file")
     design = records[0] if records else None
     if design is None:
-        return None, {}, {}
+        return None, {}, ({}, {})
     usable = diagram.without_nulls({"containers": design.get("containers"), "flows": design.get("flows") or []})
     if not isinstance(usable.get("containers"), dict):
-        return None, {}, {}
+        return None, {}, ({}, {})
     try:
-        parts, hashes = diagram_parts(usable)
-        return usable, parts, hashes
+        parts, hashes, before = diagram_parts(usable)
+        return usable, parts, (hashes, before)
     except (AttributeError, IndexError, KeyError, TypeError, ValueError) as exc:
         reader.error("design.json", 1, "(diagram)", str(exc))
-        return None, {}, {}
+        return None, {}, ({}, {})
 
 
 def read_folder(unit: Unit) -> dict:
@@ -106,18 +107,24 @@ def read_folder(unit: Unit) -> dict:
     if not os.path.lexists(unit.path / "architect.json"):
         reader.error("architect.json", 1, "(file)", "missing file")
     architect = meta[0] if meta else {}
-    design, parts, hashes = read_design(reader)
+    design, parts, (hashes, before) = read_design(reader)
     data = blank(unit.slug, reader.errors)
     data.update(architect=architect, design=design, parts=parts, hashes=hashes)
     for name in FILES[2:]:
         data[Path(name).stem] = reader.records(name, keep_invalid=True)
     for name in CHECKED_ONLY:
         reader.records(name)
-    data["texts"] = text_hashes(unit, architect, data["requirements"], reader)
+    data["texts"], before_texts = text_hashes(unit, architect, data["requirements"], reader)
+    data["before"] = {**before, **before_texts}
     return data
 
 
-def fingerprint(value) -> str:
+fingerprint = schema.fingerprint  # the shared one: canonical JSON without `at` and `by`
+
+
+def stored_fingerprint(value) -> str:
+    """The fingerprint as reviews recorded it before the shared one, kept only so that a review written then still
+    matches what it reviewed. Never written again."""
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
@@ -166,28 +173,36 @@ def document_text(unit: Unit, architect: dict, reader: Reader) -> str | None:
         return None
 
 
-def text_hashes(unit: Unit, architect: dict, requirements: list, reader: Reader) -> dict[str, str]:
+def text_hashes(
+    unit: Unit, architect: dict, requirements: list, reader: Reader
+) -> tuple[dict[str, str], dict[str, str]]:
     """The fingerprint of each requirement, without when and by whom it was written, and of each section of the design
-    document: a review records them, so a change to either makes the review due again."""
-    texts = {
-        f"requirement:{r['id']}": fingerprint({k: v for k, v in r.items() if k not in ("at", "by")})
+    document: a review records them, so a change to either makes the review due again. Also the same in the form
+    reviews stored before the shared fingerprint (`stored_fingerprint`)."""
+    values = {
+        f"requirement:{r['id']}": {k: v for k, v in r.items() if k not in ("at", "by")}
         for r in requirements
         if isinstance(r.get("id"), str)
     }
     text = document_text(unit, architect, reader)
     if text is not None:
-        texts.update((f"section:{heading}", fingerprint(body)) for heading, body in document_sections(text).items())
-    return texts
+        values.update((f"section:{heading}", body) for heading, body in document_sections(text).items())
+    return (
+        {key: fingerprint(value) for key, value in values.items()},
+        {key: stored_fingerprint(value) for key, value in values.items()},
+    )
 
 
 def diagram_parts(design):
-    """Index the same boxes, arrows and steps across both versions for links and comments."""
-    parts, hashes = {}, {}
+    """Index the same boxes, arrows and steps across both versions for links and comments, with each part's
+    fingerprint, and the same in the form reviews stored before the shared fingerprint."""
+    parts, hashes, before = {}, {}, {}
 
     def add(key, item, part):
         require(key not in parts, f"duplicate diagram part {key!r}")
         parts[key] = {**part, "key": key}
-        hashes[key] = hashlib.sha256(json.dumps(item, sort_keys=True).encode()).hexdigest()
+        hashes[key] = fingerprint(item, drop=())
+        before[key] = stored_fingerprint(item)
 
     def ids(view, kind, ident):
         return [diagram.part_id(f"{view}-{state}", kind, ident) for state in diagram.STATES]
@@ -240,20 +255,30 @@ def diagram_parts(design):
                     "mark": f"{view}:step:{ident}",
                 },
             )
-    return parts, hashes
+    return parts, hashes, before
 
 
-def changed_parts(hashes, review):
+def _changed(now: dict, previous: dict, before: dict | None) -> list[str]:
+    """The keys whose fingerprint differs from the one a review recorded, in either form it may have recorded."""
+    before = before or {}
+    return [
+        key
+        for key in dict.fromkeys((*now, *previous))
+        if previous.get(key) != now.get(key) and (key not in before or previous.get(key) != before[key])
+    ]
+
+
+def changed_parts(hashes, review, before=None):
     previous = review["hashes"] if review else {}
-    return [key for key in dict.fromkeys((*hashes, *previous)) if hashes.get(key) != previous.get(key)]
+    return _changed(hashes, previous, before)
 
 
-def changed_texts(texts, review):
+def changed_texts(texts, review, before=None):
     """The requirements and design sections that changed since a review; none for a review that recorded no texts."""
     previous = review.get("texts") if review else None
     if previous is None:
         return []
-    return [key for key in dict.fromkeys((*texts, *previous)) if texts.get(key) != previous.get(key)]
+    return _changed(texts, previous, before)
 
 
 def render_diagrams(design, marks):
@@ -315,8 +340,9 @@ def model(data):
     reviews = [shown(r, perspectives=[], changed=[], hashes={}, labels={}, texts=None) for r in data["reviews"]]
     review = reviews[-1] if reviews else None
     texts = data.get("texts", {})
-    changes = dict.fromkeys(changed_parts(data["hashes"], review) if design else [])
-    changes.update(dict.fromkeys(changed_texts(texts, review)))
+    before = data.get("before", {})
+    changes = dict.fromkeys(changed_parts(data["hashes"], review, before) if design else [])
+    changes.update(dict.fromkeys(changed_texts(texts, review, before)))
     known = set(parts)
     for recorded in reviews:
         known.update(recorded["hashes"])
@@ -350,11 +376,15 @@ def model(data):
         last = last_reviews.get(ident)
         own_findings = findings_by_perspective.get(ident, set())
         affected = (
-            [key for key in changed_parts(data["hashes"], last) if key in own_findings or key not in with_findings]
+            [
+                key
+                for key in changed_parts(data["hashes"], last, before)
+                if key in own_findings or key not in with_findings
+            ]
             if last
             else []
         )
-        rewritten = changed_texts(texts, last)
+        rewritten = changed_texts(texts, last, before)
         if last is None or affected or rewritten:
             rerun.append(ident)
             changes.update(dict.fromkeys(affected + rewritten))

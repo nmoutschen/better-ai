@@ -16,7 +16,7 @@ registers with `register(SKILL, PageSpec(...))` when it is imported:
 - `methods`, `items`: events a page may send that no capability names, and the events the agent tracks with a status
   (by default: notes, and the events of the declared capabilities that ask for an answer);
 - `events`: the file name of the page's own events schema, in its package's `schemas/` folder;
-- `load(unit)`: the page's data, a JSON object, served at `/data` (with `listening` and `now` added);
+- `load(unit)`: the page's data, a JSON object, served at `/data` (with `listening`, `now` and `quiet_after` added);
 - `revision(unit)`, `stopped(unit)`, `tick(unit, conversation)`: optional. A page reloads itself when `/rev` changes;
   `serve` ends `--linger` seconds after `stopped` becomes true; `tick` runs every TICK seconds (one) while serving.
 
@@ -48,8 +48,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .. import cli, paths, resources, schema
@@ -69,6 +70,7 @@ STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is writt
 REPLY_STATES = ("done", "asked", "working")
 FINISHED = ("done", "accepted")  # the states of an item that needs no more work, until a follow-up reopens it
 BUG_TEXT = "The page hit a bug: ask the agent to restart it and report it"
+QUIET_AFTER = timedelta(minutes=30)  # how long an agent at work may go without a record before its page says so
 # What each shared capability lets the page send, and which of those events the agent tracks with a status.
 CAPABILITIES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "pins": (("comment", "delete"), ("comment",)),  # numbered pins on the page, and taking a comment back
@@ -197,6 +199,34 @@ def terminal_text(text: str) -> str:
 def now() -> str:
     """The time as an event records it: UTC, with Z."""
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def last_word(records: Iterable[Any], agent: str) -> datetime | None:
+    """An agent's last word: the latest `at` among the records whose `by` is the agent, or None. Every page that says
+    an agent has gone quiet reads it from here, and compares it with QUIET_AFTER."""
+    latest = None
+    for record in records:
+        if not isinstance(record, Mapping) or record.get("by") != agent or not isinstance(record.get("at"), str):
+            continue
+        try:
+            at = datetime.strptime(record["at"], schema.TIME).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        if latest is None or at > latest:
+            latest = at
+    return latest
+
+
+def last_words(records: Iterable[Any], agents: Iterable[str]) -> dict[str, str | None]:
+    """Each agent's last word as a page's data gives it: the time in the form of `at`, or None."""
+    records = list(records)
+    found = {agent: last_word(records, agent) for agent in agents}
+    return {agent: at.strftime(schema.TIME) if at else None for agent, at in found.items()}
+
+
+def page_data(data: Mapping[str, Any]) -> dict:
+    """What every page's data holds besides its own: `quiet_after`, the seconds of QUIET_AFTER."""
+    return {**data, "quiet_after": int(QUIET_AFTER.total_seconds())}
 
 
 def clean(value, depth=0):
@@ -707,7 +737,9 @@ def static_page(spec: PageSpec, data: Mapping[str, Any]) -> str:
         text = text.replace(tag, inline, 1)
     config = '<script type="application/json" id="page-config">'
     return text.replace(
-        config, f'<script type="application/json" id="page-data">{_json_for_html(data)}</script>\n{config}', 1
+        config,
+        f'<script type="application/json" id="page-data">{_json_for_html(page_data(data))}</script>\n{config}',
+        1,
     )
 
 
@@ -845,7 +877,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in ("/data", "/events", "/wait") and not self.has_token():
             return self.send(401, f"{OUT_OF_DATE}\n".encode(), "text/plain; charset=utf-8")
         if path == "/data":
-            return self.send_json({**self.spec.load(self.unit), "listening": c.listening(), "now": time.time()})
+            return self.send_json(
+                page_data({**self.spec.load(self.unit), "listening": c.listening(), "now": time.time()})
+            )
         if path == "/old":
             return self.send_json(self.old_format_count())
         if path == "/rev":

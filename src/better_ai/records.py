@@ -55,7 +55,7 @@ from .paths import Refused, Unit, refusal
 from .skill import OWNER_BY_HEAD
 
 STAMPED = ("at", "by", "id")  # fields the command sets, which stdin may not hold
-DEADLINE = re.compile(r"^\+(\d{1,9})m$")
+DEADLINE = re.compile(r"\+(\d{1,9})m")  # the whole value: fullmatch
 TIME = schema.TIME
 BUSY = "the file changed while I worked; run the command again"
 TRIES = 1000  # numbers tried for a folder entry before giving up
@@ -158,6 +158,7 @@ class Form:
     id: dict | None  # the type's `x-id`
     folder: bool  # one file per record, named by its id (`x-id-from-filename`)
     fields: tuple[str, ...] = ()  # the fields the schema lists for the type, for the message about an unknown one
+    writer: str | None = None  # the schema's `x-written-by`: who alone writes the type ("coordinator"), or None
 
     @property
     def lines(self) -> bool:
@@ -231,7 +232,16 @@ def layout(unit: Unit, docs: dict[str, dict]) -> Layout:
                 continue
             for label, (spec, fields) in types.items():
                 result.forms.setdefault(
-                    label, Form(label, name, relative, spec, bool(doc.get("x-id-from-filename")), fields)
+                    label,
+                    Form(
+                        label,
+                        name,
+                        relative,
+                        spec,
+                        bool(doc.get("x-id-from-filename")),
+                        fields,
+                        doc.get("x-written-by"),
+                    ),
                 )
     return result
 
@@ -298,7 +308,7 @@ def _deadline(fields: dict, run: Run, unit: Unit) -> None:
     if "deadline" not in fields or fields["deadline"] is None:
         return
     value = fields["deadline"]
-    found = DEADLINE.match(value) if isinstance(value, str) else None
+    found = DEADLINE.fullmatch(value) if isinstance(value, str) else None
     if not found:
         raise refusal(
             unit.label,
@@ -495,8 +505,8 @@ def assign_id(spec: dict, fields: dict, agent: str | None, existing: list[str]) 
     else:
         prefix = spec["prefix"]
     stem = f"{prefix}-{agent}-" if spec.get("agent") else prefix
-    pattern = re.compile(re.escape(stem) + r"(\d+)$")
-    highest = max((int(m.group(1)) for i in existing if (m := pattern.match(i))), default=0)
+    pattern = re.compile(re.escape(stem) + r"(\d+)")
+    highest = max((int(m.group(1)) for i in existing if (m := pattern.fullmatch(i))), default=0)
     return f"{stem}{highest + 1}"
 
 
@@ -699,7 +709,29 @@ def _make_parent(unit: Unit, relative: str) -> None:
         paths.make_folder(unit, parent)
 
 
+def written_by(unit: Unit, writer: str) -> str:
+    """The name of the agent an `x-written-by` names: the `coordinator` field of the unit's head where it has one, else
+    the literal name (`coordinator`)."""
+    try:
+        head = json.loads(paths.read_bytes(unit, unit.kind.head))
+    except (OSError, ValueError, RecursionError, Refused):
+        head = None
+    name = head.get(writer) if isinstance(head, dict) else None
+    return name if isinstance(name, str) and name else writer
+
+
+def _writer(unit: Unit, form: Form | None, by: str | None) -> None:
+    """Refuse a writer other than the one the type's `x-written-by` names, for add, set and set --unset."""
+    if form is None or form.writer is None:
+        return
+    name = written_by(unit, form.writer)
+    if by != name:
+        raise Refused(f"{unit.label}: only {name} writes {form.type}: use --by {name}")
+
+
 def _guards(run, unit, form, record, relative, exists, by, for_agent) -> None:
+    if not (form.single and exists):  # an add on a file that is there is refused for that, naming set
+        _writer(unit, form, by)
     ctx = AddContext(run, unit, form.type, record, relative, exists, by, for_agent)
     for types, guard in ADD_GUARDS.get(run.skill.name, []):
         if not types or form.type in types:
@@ -867,6 +899,7 @@ def set_(args: argparse.Namespace, run: Run) -> int:
     label = found.record.get("type")
     if not isinstance(label, str):  # a record from before `type` existed is the type its place says
         label = args.ref if args.ref in lay.forms else ""
+    _writer(unit, lay.forms.get(label), by)
     patch = _own_fields(_fields(run, unit, empty_ok=bool(args.unset)), unit, label)
     _deadline(patch, run, unit)
     context = SetContext(run, unit, found.record, patch, by, args.raw, False, tuple(args.unset))

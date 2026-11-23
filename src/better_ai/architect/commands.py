@@ -78,7 +78,7 @@ def review(args: argparse.Namespace, run: cli.Run) -> int:
         "at": run.now().strftime(schema.TIME),
         "by": "architect",
         "perspectives": list(dict.fromkeys(args.perspectives)),
-        "changed": model.changed_parts(data["hashes"], previous),
+        "changed": model.changed_parts(data["hashes"], previous, data["before"]),
         "hashes": data["hashes"],
         "labels": {key: data["parts"][key]["label"] for key in data["hashes"]},
         "texts": data["texts"],

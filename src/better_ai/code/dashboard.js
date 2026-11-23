@@ -35,7 +35,7 @@ function taskStatus(t, tasks) {
 // The task timeline (design: .design/code-better-board/design.md). Every value comes from the records the server sends:
 // tasks, agents (card and log, each line with its `at`), rounds and fixes (rounds.jsonl), and each branch's git activity.
 // A record can hold anything, so every reader checks its type and every text is escaped. Times are epoch seconds.
-const QUIET_AFTER = 15 * 60, BUCKET = 300;
+const BUCKET = 300;
 const list = v => Array.isArray(v) ? v : [];
 const str = v => typeof v === "string" ? v : "";
 const sec = at => { const n = typeof at === "string" ? Date.parse(at) : NaN; return Number.isFinite(n) ? n / 1000 : null; };
@@ -113,13 +113,13 @@ function bucketsOf(p, d) {
   return out;
 }
 const openBuild = (t, d) => { const p = phasesOf(t, d).at(-1); return p && p.kind === "b" && p.end === null ? p : null; };
-// Minutes since an open build last changed a file or logged a line, if that is 15 minutes or more.
-function quietMinutes(t, d) {
+// When an open build was last heard from: its start, its agent's last word (the server's, by the rule every page shares)
+// or its branch's last file change, whichever is latest. Null when no build is open.
+function heardOf(t, d) {
   const p = openBuild(t, d);
   if (!p || isDone(t)) return null;
-  const g = gitOf(p.branch, d), logged = p.lines.map(l => sec(l.at)).filter(x => x !== null);
-  const last = Math.max(p.start, ...logged, g && Number(g.last) > p.start ? Number(g.last) : p.start);
-  return d.now - last >= QUIET_AFTER ? mins(d.now - last) : null;
+  const a = agentsOf(t, d).find(x => x.name === p.agent), g = gitOf(p.branch, d);
+  return Math.max(p.start, (a && sec(a.last_word)) ?? p.start, g && Number(g.last) > p.start ? Number(g.last) : p.start);
 }
 // What a task row says of its state: a class for its colour, an icon and a word.
 function statusOf(t, d) {
@@ -131,8 +131,10 @@ function statusOf(t, d) {
     if (r === "user") return {cls: "you", icon: '<span class="q" aria-hidden="true">?</span>', word};
     return {cls: r === "repair limit" ? "warn" : "", icon: ICONS.blocked, word};
   }
-  const quiet = quietMinutes(t, d);
-  if (quiet !== null) return {cls: "warn", icon: ICONS.quiet, word: `${word}, quiet ${quiet} min`};
+  const heard = heardOf(t, d);
+  // Quiet from the page's threshold on: `quiet_after`, the server's, the same for every page.
+  if (heard !== null && d.quiet_after > 0 && d.now - heard >= d.quiet_after)
+    return {cls: "warn", icon: ICONS.quiet, word: `${word}, quiet ${mins(d.now - heard)} min`};
   return {cls: "", icon: ICONS[key] || ICONS.other, word};
 }
 const groupOf = (t, d) => isDone(t) ? "merged" : agentsOf(t, d).length ? "working" : "pending";
@@ -397,9 +399,7 @@ function render(d) {
   // A question the user answered in the page no longer waits for them, even before the coordinator applies the answer.
   // It waits again when the coordinator asked back about the answer.
   conv.setLog(pageDecisionEvents(d.decisions, d.conversation), (d.decisions || []).map(x => [x.id, x.status, x.answer, x.decision, x._changed]));
-  const st = conv.state(), last = {};
-  (d.conversation || []).filter(e => e.type === "answer").forEach(e => { last[e.decision] = e; });
-  const waitingN = (d.decisions || []).filter(x => dec.step(dec.status(x), last[x.id], st) === 0).length;
+  const waitingN = pageOpenDecisions(d.decisions, d.conversation).length;
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   setHTML($("status"), (tasks.length ? `<span class="stat"><b>${done}<span class="of"> / ${tasks.length}</span></b>tasks done
       <span class="meter" aria-hidden="true"><i style="width:${(100 * done / tasks.length).toFixed(0)}%"></i></span></span>` : "")

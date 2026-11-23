@@ -458,12 +458,35 @@ test('a row without since shows no age, and one without a state word says Workin
   assert.match(agents([{ who: 'w2', what: 'Q-1', since: ago(3) }]), />Working, 3 min</);
 });
 
-test('thirty minutes without a record from the agent says so, and twenty-nine do not', () => {
-  const row = last => agents([{ who: 'analyst-2', what: 'E4', state: 'Checking', since: ago(90), last }]);
-  assert.match(row(ago(40)), /No word from analyst-2 for 40 min/);
-  assert.match(row(ago(30)), /No word from analyst-2 for 30 min/);
-  assert.doesNotMatch(row(ago(29)), /No word/);
-  assert.doesNotMatch(agents([{ who: 'a', what: 'x', since: ago(90) }]), /No word/);  // no last record given: nothing to say
+test('the quiet threshold comes from the data: from it on the row says no word came, and a minute less does not', () => {
+  const row = (last, quietAfter) => agents([{ who: 'analyst-2', what: 'E4', state: 'Checking', since: ago(90), last }], { quietAfter });
+  assert.match(row(ago(40), 1800), /No word from analyst-2 for 40 min/);
+  assert.match(row(ago(30), 1800), /No word from analyst-2 for 30 min/);
+  assert.doesNotMatch(row(ago(29), 1800), /No word/);
+  assert.match(row(ago(10), 600), /No word from analyst-2 for 10 min/);
+  assert.doesNotMatch(row(ago(90)), /No word/);  // no threshold given: nothing to say
+  assert.doesNotMatch(agents([{ who: 'a', what: 'x', since: ago(90) }], { quietAfter: 1800 }), /No word/);  // no last record given
+});
+
+// The questions open for the user, one rule for every page: a decision waits until the user answers it on the page, and
+// again once the agent asked back about that answer; any other entry waits when the page's WAITING says so.
+const dec = (id, status, more) => ({ type: 'decision', id, status, asked: 'Login?', default: 'Go on', deadline: '2026-11-21T10:30:00Z', at: '2026-11-21T10:00:00Z', ...more });
+const openIds = (decisions, log, kinds, waiting) => Array.from(context.pageOpenDecisions(decisions, log, kinds, waiting), c => c.e.id);
+
+test('a waiting decision is open until the user answers it, and open again when the agent asks back about the answer', () => {
+  const decisions = [dec('D1', 'waiting'), dec('D2', 'waiting'), dec('D3', 'defaulted'), dec('D4', 'decided', { decision: 'x' })];
+  const answer = { type: 'answer', id: 'a-1', decision: 'D2', text: 'go', default: false, at: '2026-11-21T10:05:00Z' };
+  assert.deepEqual(openIds(decisions, []), ['D1', 'D2']);
+  assert.deepEqual(openIds(decisions, [answer]), ['D1']);
+  const askedBack = { type: 'status', to: 'a-1', status: 'asked', at: '2026-11-21T10:06:00Z' };
+  assert.deepEqual(openIds(decisions, [answer, askedBack]), ['D1', 'D2']);
+});
+
+test('an entry that is not a decision is open only when the page says it waits', () => {
+  const log = [{ type: 'comment', id: 'c1', text: 'x', at: '2026-11-21T10:00:00Z' }, { type: 'status', to: 'c1', status: 'asked', at: '2026-11-21T10:01:00Z' },
+    { type: 'comment', id: 'c2', text: 'y', at: '2026-11-21T10:02:00Z' }];
+  assert.deepEqual(openIds([], log, ['comment']), []);
+  assert.deepEqual(openIds([], log, ['comment'], (c, state) => state[c.e.id] === 'asked'), ['c1']);
 });
 
 test('a second try says so, and a plain row does not', () => {

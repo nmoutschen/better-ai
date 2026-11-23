@@ -64,9 +64,9 @@ def agent(reader: Reader, name: str, modes: dict) -> dict:
     writes. Its mode is its task's."""
     card, log = f"logs/{name}.card.json", f"logs/{name}.jsonl"
     about = next(iter(reader.records(card)), {})
-    lines = [
-        {key: line[key] for key in ("type", "text", "result", "at") if key in line} for line in reader.records(log)
-    ]
+    written = reader.records(log)
+    lines = [{key: line[key] for key in ("type", "text", "result", "at") if key in line} for line in written]
+    heard = page.last_word(written, name)
     return {
         "name": name,
         **{key: about.get(key) or "" for key in ("role", "task", "branch", "at")},
@@ -79,6 +79,8 @@ def agent(reader: Reader, name: str, modes: dict) -> dict:
         ],
         # when the agent started: its first line, which the 40 lines kept for the page may no longer hold
         "started": lines[0]["at"] if lines and isinstance(lines[0].get("at"), str) else "",
+        # its last word, by the rule every page shares: the page says a build is quiet from it
+        "last_word": heard.strftime(records.TIME) if heard else None,
         "_changed": mtime(reader.unit, card, log),
     }
 
