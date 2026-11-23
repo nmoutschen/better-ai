@@ -901,3 +901,40 @@ test('markup in a title, a step or a finding shows as text', () => {
   const all = TL.tablesHTML(d, '2h') + TL.popupHTML(d.tasks[0], d) + TL.marksHTML(d.tasks[0], d, t0, t1);
   assert.doesNotMatch(all, /<img|<script|<b>y/);
 });
+
+// ---------- Found by the verifier: a fix after the merge, a phase that never handed back, a verifier run again ----------
+test('a fix made after the merge ends after it starts, never before', () => {
+  const d = fixture();
+  d.fixes.push({ task: 'T2', at: '2026-11-23T10:30:00Z', text: 'late wording' });
+  const fix = TL.phasesOf(d.tasks.find(t => t.id === 'T2'), d).at(-1);
+  assert.equal(fix.kind, 'f');
+  assert.ok(fix.end > fix.start);
+  const [t0, t1] = TL.rangeOf(d, '2h');
+  assert.doesNotMatch(TL.laneSVG(d.tasks.find(t => t.id === 'T2'), d, t0, t1), /width="-/);
+  assert.doesNotMatch(TL.popupHTML(d.tasks.find(t => t.id === 'T2'), d), /10:30 to 10:14/);
+});
+
+test('a build that never handed back ends where the next phase starts', () => {
+  const d = fixture();
+  d.agents[2].lines = [line('start', '2026-11-23T10:21:00Z')];  // the round 2 builder, before a second one took over
+  d.agents.push({ name: 'builder-t4-3', role: 'builder', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:39:00Z',
+    lines: [line('start', '2026-11-23T10:40:00Z')] });
+  const p = TL.phasesOf(d.tasks[0], d);
+  for (let i = 0; i + 1 < p.length; i++) assert.ok(p[i].end !== null && p[i].end <= p[i + 1].start, `phase ${i} overlaps the next`);
+});
+
+test("a failed round takes its number and findings from the round record that names its verifier", () => {
+  const d = fixture();
+  // a verifier started and stopped before it logged a hand-back, then another one failed the task: the coordinator's record says round 1
+  d.agents.splice(1, 0, { name: 'verifier-t4-lost', role: 'verifier', task: 'T4', branch: 'task/t4', at: '2026-11-23T10:19:30Z',
+    lines: [line('start', '2026-11-23T10:19:40Z')] });
+  const [t0, t1] = TL.rangeOf(d, '2h');
+  const m = TL.marksHTML(d.tasks[0], d, t0, t1);
+  assert.match(m, /✕ R1/);
+  assert.match(m, /Empty export writes no header row/);
+  assert.match(TL.popupHTML(d.tasks[0], d), /Verify, round 1: failed/);
+});
+
+test("a task's lane opens the task's pop-up, as its label does", () => {
+  assert.match(TL.tablesHTML(fixture(), '2h'), /<div class="lane" data-t="T4"/);
+});
