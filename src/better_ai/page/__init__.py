@@ -781,6 +781,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def has_token(self) -> bool:
         """Whether the request carries this server's token: what keeps another process on this machine from reading
         or writing the conversation as the user. Compared in constant time."""
+        if not self.token:
+            return False  # a server made without a token answers nobody
         given = self.headers.get(TOKEN_HEADER) or ""
         return hmac.compare_digest(given.encode("utf-8", "replace"), self.token.encode())
 

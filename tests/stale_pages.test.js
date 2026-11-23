@@ -55,3 +55,15 @@ test('the architecture page stops asking for its data once its token is refused'
   assert.equal(retries.length, 0);
   assert.doesNotMatch(status.textContent, /Could not load the design/);
 });
+
+test('once the page is out of date, pageFetch asks the server nothing more', async () => {
+  const sent = [];
+  const context = { document: stand(), sessionStorage: stand(), URLSearchParams,
+    fetch: url => { sent.push(url); return Promise.resolve({ status: 401 }); } };
+  vm.createContext(context);
+  vm.runInContext(read('page', 'page.js'), context);
+  await assert.rejects(context.pageFetch('/data'), e => e.stale);
+  await assert.rejects(context.pageFetch('/data'), e => e.stale);
+  await assert.rejects(context.pageFetch('/events'), e => e.stale);
+  assert.deepEqual(sent, ['/data']);
+});

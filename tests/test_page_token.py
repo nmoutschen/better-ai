@@ -169,3 +169,13 @@ class TokenTest(Served):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EmptyToken(unittest.TestCase):
+    def test_a_server_without_a_token_refuses_every_request(self):
+        from better_ai import page
+
+        handler = page.Handler.__new__(page.Handler)
+        handler.headers = {page.TOKEN_HEADER: ""}
+        handler.token = ""
+        self.assertFalse(handler.has_token())
