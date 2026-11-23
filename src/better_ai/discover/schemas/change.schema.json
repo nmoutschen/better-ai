@@ -30,7 +30,7 @@
     {
       "if": {"required": ["field"], "properties": {"field": {"const": "risk"}}},
       "then": {"required": ["risk"], "properties": {"to": {"const": "accepted"}}, "x-check": "risk-change"},
-      "else": {"not": {"required": ["risk"]}}
+      "else": {"not": {"required": ["risk"]}, "properties": {"to": {"not": {"const": "accepted"}}}}
     },
     {
       "if": {"required": ["field"], "properties": {"field": {"const": "state"}}},
