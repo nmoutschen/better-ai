@@ -29,7 +29,7 @@
     },
     {
       "if": {"required": ["field"], "properties": {"field": {"const": "risk"}}},
-      "then": {"required": ["risk"], "properties": {"to": {"const": "accepted"}}},
+      "then": {"required": ["risk"], "properties": {"to": {"const": "accepted"}}, "x-check": "risk-change"},
       "else": {"not": {"required": ["risk"]}}
     },
     {
