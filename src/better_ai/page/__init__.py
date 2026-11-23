@@ -17,6 +17,9 @@ registers with `register(SKILL, PageSpec(...))` when it is imported:
   (by default: notes, and the events of the declared capabilities that ask for an answer);
 - `events`: the file name of the page's own events schema, in its package's `schemas/` folder;
 - `load(unit)`: the page's data, a JSON object, served at `/data` (with `listening`, `now` and `quiet_after` added);
+- `rendered`, `static_data(unit, run)`: the `render` verb writes the page as one static file, `rendered` (a path
+  in the unit; it prints the file's path), with `static_data` (default: `load`) embedded; the hook may refuse, warn on `run.err` or write other
+  files first (the architect's SVGs);
 - `revision(unit)`, `stopped(unit)`, `tick(unit, conversation)`: optional. A page reloads itself when `/rev` changes;
   `serve` ends `--linger` seconds after `stopped` becomes true; `tick` runs every TICK seconds (one) while serving.
 
@@ -68,6 +71,7 @@ TICK = 1  # seconds between the ticks of a served page; tests set it shorter
 POLL = 0.05  # seconds serve_forever waits for a request before it looks whether it was told to stop
 STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is written as its own event, `accepted`
 REPLY_STATES = ("done", "asked", "working")
+FINISHED = ("done", "accepted")  # the states of an item that needs no more work, until a follow-up reopens it
 BUG_TEXT = "The page hit a bug: ask the agent to restart it and report it"
 QUIET_AFTER = timedelta(minutes=30)  # how long an agent at work may go without a record before its page says so
 # What each shared capability lets the page send, and which of those events the agent tracks with a status.
@@ -108,6 +112,8 @@ class PageSpec:
     methods: tuple[str, ...] = ()
     items: tuple[str, ...] | None = None
     empty: str | None = None
+    rendered: str = "index.html"
+    static_data: Callable[[Unit, cli.Run], Mapping[str, Any]] | None = None
     aside: str | None = None
     revision: Callable[[Unit], str] | None = None
     stopped: Callable[[Unit], bool] | None = None
@@ -131,6 +137,18 @@ class PageSpec:
 
 
 PAGES: dict[str, PageSpec] = {}
+SERVE_GUARDS: dict[str, list[Callable[[Unit], None]]] = {}
+
+
+def serve_guard(skill: str):
+    """Register a check a skill makes before `serve` starts its page (discover-better: no page while a redact is half
+    done). The function takes the `Unit` and raises `Refused` to refuse."""
+
+    def register(function):
+        SERVE_GUARDS.setdefault(skill, []).append(function)
+        return function
+
+    return register
 
 
 def register(skill: Skill, spec: PageSpec) -> PageSpec:
@@ -188,12 +206,26 @@ def now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def last_word(records: Iterable[Any], agent: str) -> datetime | None:
+def _named_in(ident: Any, prefixes: tuple[str, ...]) -> str | None:
+    """The agent an id carries after one of the prefixes: `analyst-2` in `E-analyst-2-3` for the prefix `E-`."""
+    if isinstance(ident, str):
+        for prefix in prefixes:
+            rest = ident[len(prefix) :]
+            if ident.startswith(prefix) and "-" in rest:
+                return rest.rsplit("-", 1)[0]
+    return None
+
+
+def last_word(records: Iterable[Any], agent: str, id_prefixes: tuple[str, ...] = ()) -> datetime | None:
     """An agent's last word: the latest `at` among the records whose `by` is the agent, or None. Every page that says
-    an agent has gone quiet reads it from here, and compares it with QUIET_AFTER."""
+    an agent has gone quiet reads it from here, and compares it with QUIET_AFTER. A board whose records another agent
+    rewrites names the agent in the id too: with `id_prefixes` (`("E-", "S-")`), a record whose id is a prefix, the
+    agent's name and a number counts as the agent's."""
     latest = None
     for record in records:
-        if not isinstance(record, Mapping) or record.get("by") != agent or not isinstance(record.get("at"), str):
+        if not isinstance(record, Mapping) or not isinstance(record.get("at"), str):
+            continue
+        if record.get("by") != agent and (not id_prefixes or _named_in(record.get("id"), id_prefixes) != agent):
             continue
         try:
             at = datetime.strptime(record["at"], schema.TIME).replace(tzinfo=timezone.utc)
@@ -600,15 +632,18 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
     return 0
 
 
-@cli.verb("pending", help="list the user's items that are not done or accepted", arguments=_unit_argument)
-def pending(args: argparse.Namespace, run: cli.Run) -> int:
-    """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so work can
-    resume after an interruption. Done waits for the user. An answer under an item that waited for the user (`asked`)
-    makes it `replied`; a follow-up from the user under a finished item makes it `followup`. These are the page's rules:
-    page.js `pageThread` gives the same states, and tests/fixtures/threads.json holds the logs both are run on."""
-    conv = _conversation(run, _unit(args, run))
+def open_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
+    """The user's items that are neither done nor accepted: `all_items` without the finished ones."""
+    return [found for found in all_items(events, item_types, agent) if found[1] not in FINISHED]
+
+
+def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
+    """Every item of the user's, in its latest form, as (event, state, extra); `deleted` ones are left out. The state is
+    `new`, `asked`, `working`, `replied`, `followup` or `reopened`; `extra` holds `reopened_because` and the `thread` of
+    answers and replies under the item. These are the page's rules: page.js `pageThread` gives the same states, and
+    tests/fixtures/threads.json holds the logs both are run on. `pending` and a skill's own summary both call these."""
     items, order, state, reasons, thread, closes, home = {}, [], {}, {}, {}, {}, {}
-    for e in conv.events():
+    for e in events:
         a, i = e.get("type"), e.get("id")
         to = home.get(e.get("to"), e.get("to"))  # a message under a reply belongs to the item that reply is under
         if a == "closed":  # a worker's message: the user can reply to it, and the reply goes to the agent
@@ -623,15 +658,15 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
             thread.setdefault(to, []).append({"from": "user", "at": e.get("at"), "text": e.get("text")})
             if state.get(to) == "asked":  # the answer ends the wait: the item is the agent's again
                 state[to] = "replied"
-            elif state.get(to) in ("done", "accepted"):  # a follow-up under a finished item is work again
+            elif state.get(to) in FINISHED:  # a follow-up under a finished item is work again
                 state[to] = "followup"
             if i:
                 home[i] = to
         elif a == "reply" and to:
-            thread.setdefault(to, []).append({"from": conv.agent, "at": e.get("at"), "text": e.get("text")})
+            thread.setdefault(to, []).append({"from": agent, "at": e.get("at"), "text": e.get("text")})
             if i:
                 home[i] = to
-        elif a in conv.items and i:  # an item sent again, such as an edited comment, keeps its state
+        elif a in item_types and i:  # an item sent again, such as an edited comment, keeps its state
             if i not in items:
                 order.append(i)
             items[i] = e
@@ -643,15 +678,28 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
             state[to] = "accepted"
         elif a == "reopen":
             state[to], reasons[to] = "reopened", e.get("text")
-    open_items = [items[i] for i in order if items.get(i) and state.get(i) not in ("done", "accepted")]
-    for e in open_items:
+    found = []
+    for e in (items[i] for i in order if items.get(i)):
         extra = {}
         if state.get(e["id"]) == "reopened" and reasons.get(e["id"]):
             extra["reopened_because"] = reasons[e["id"]]
         if thread.get(e["id"]):
             extra["thread"] = thread[e["id"]]
-        run.out(terminal_json({**e, "status": state.get(e["id"], "new"), **extra}))
-    run.out(f"{len(open_items)} not done.")
+        found.append((e, state.get(e["id"], "new"), extra))
+    return found
+
+
+@cli.verb("pending", help="list the user's items that are not done or accepted", arguments=_unit_argument)
+def pending(args: argparse.Namespace, run: cli.Run) -> int:
+    """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so work can
+    resume after an interruption. Done waits for the user. An answer under an item that waited for the user (`asked`)
+    makes it `replied`; a follow-up from the user under a finished item makes it `followup`. `open_items` holds the
+    rules."""
+    conv = _conversation(run, _unit(args, run))
+    found = open_items(conv.events(), conv.items, conv.agent)
+    for e, state, extra in found:
+        run.out(terminal_json({**e, "status": state, **extra}))
+    run.out(f"{len(found)} not done.")
     return 0
 
 
@@ -712,6 +760,23 @@ def static_page(spec: PageSpec, data: Mapping[str, Any]) -> str:
         f'<script type="application/json" id="page-data">{_json_for_html(page_data(data))}</script>\n{config}',
         1,
     )
+
+
+# show-better has its own `render`: it checks a slide spec and prints text as well as a page.
+@cli.verb(
+    "render",
+    help="write the unit's page as one static file, with its data in it, so it opens without a server",
+    arguments=_unit_argument,
+    # discover-better is live only: a static copy would keep words a redact removes.
+    skills=("architect-better", "code-better", "design-better", "research-better"),
+)
+def render(args: argparse.Namespace, run: cli.Run) -> int:
+    unit = _unit(args, run)
+    spec = spec_of(run.skill)
+    data = spec.static_data(unit, run) if spec.static_data else spec.load(unit)
+    paths.write_atomic(unit, spec.rendered, with_old_note(unit, static_page(spec, data)).encode("utf-8"))
+    run.out(str(unit.target(spec.rendered)))
+    return cli.EXIT_DONE
 
 
 # ---------------------------------------------------------------- the server
@@ -956,6 +1021,8 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     """Check every record, then serve the page until the unit stops (or Ctrl+C). A record that is not valid is a warning
     on stderr: the page still opens and shows it."""
     unit = _unit(args, run)
+    for guard in SERVE_GUARDS.get(run.skill.name, []):
+        guard(unit)
     spec = spec_of(run.skill)
     docs = load_docs(run.skill)
     notices: list[schema.Error] = []

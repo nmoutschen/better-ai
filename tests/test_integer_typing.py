@@ -13,6 +13,7 @@ from better_ai import (  # noqa: E402, F401  (register their hooks)
     architect,
     code,
     design,
+    discover,
     research,
     schema,  # noqa: E402
     show,

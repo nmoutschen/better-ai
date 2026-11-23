@@ -14,7 +14,6 @@ module holds what only the board has:
 
 from __future__ import annotations
 
-import argparse
 import os
 import sys
 import time
@@ -22,7 +21,7 @@ from calendar import timegm
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .. import cli, page, paths, resources, schema
+from .. import page, resources, schema
 from ..paths import Unit
 from . import SKILL, checks  # noqa: F401  (checks registers the hooks the schemas name)
 
@@ -220,25 +219,6 @@ SPEC = page.register(
         empty="Nothing yet. Click a question or an agent to ask about it, or write to the coordinator below.",
         stopped=board_stopped,
         tick=tick,
+        rendered=RENDERED,
     ),
 )
-
-
-# ---------- render ----------
-
-
-def _render_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("unit", help="the board, such as .research/my-topic")
-
-
-@cli.verb(
-    "render",
-    help=f"write the board as one static page, {RENDERED} in the board",
-    arguments=_render_arguments,
-    skills=("research-better",),
-)
-def render(args: argparse.Namespace, run: cli.Run) -> int:
-    unit = paths.resolve_unit(args.unit, run.skill)
-    paths.write_atomic(unit, RENDERED, page.with_old_note(unit, page.static_page(SPEC, load(unit))).encode("utf-8"))
-    run.out(f"wrote {Path(unit.label) / RENDERED}")
-    return cli.EXIT_DONE

@@ -8,7 +8,6 @@ embedded in it, so the page needs no other file.
 
 from __future__ import annotations
 
-import argparse
 import base64
 import html
 import json
@@ -189,6 +188,19 @@ def revision(unit: Unit) -> str:
     return page.revision_of(*parts)
 
 
+def static_data(unit: Unit, run: cli.Run) -> dict:
+    """What `render` embeds: the page's data, once no version is a file the page itself owns; each warning is printed."""
+    data, warnings = data_of(unit)
+    listed = read_head(unit).get("versions")
+    for version in listed if isinstance(listed, list) else []:
+        named = version_path(version.get("file")) if isinstance(version, dict) else None
+        if is_page(named):
+            raise Refused(f"{unit.label}: {page_reason(named)}. set {unit.label} canvas")
+    for warning in warnings:
+        run.err(f"warning: {warning}")
+    return data
+
+
 SPEC = page.PageSpec(
     title="Versions",
     agent="agent",
@@ -202,36 +214,9 @@ SPEC = page.PageSpec(
     methods=("verdict",),
     empty="Nothing yet. Click any part of a version to comment on it, or write to the agent below.",
     revision=revision,
+    static_data=static_data,
 )
 
 
 def register(skill: Skill) -> None:
     page.register(skill, SPEC)
-
-
-# ---------------------------------------------------------------- render
-
-
-def _render_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("unit", help="the unit to render, such as .design/pay-screen")
-
-
-@cli.verb(
-    "render",
-    help="write the compare page as one file, index.html, in the unit; prints its path",
-    arguments=_render_arguments,
-    skills=("design-better",),
-)
-def render(args: argparse.Namespace, run: cli.Run) -> int:
-    unit = paths.resolve_unit(args.unit, run.skill)
-    data, warnings = data_of(unit)
-    listed = read_head(unit).get("versions")
-    for version in listed if isinstance(listed, list) else []:
-        named = version_path(version.get("file")) if isinstance(version, dict) else None
-        if is_page(named):
-            raise Refused(f"{unit.label}: {page_reason(named)}. set {unit.label} canvas")
-    paths.write_atomic(unit, "index.html", page.with_old_note(unit, page.static_page(SPEC, data)).encode("utf-8"))
-    for warning in warnings:
-        run.err(f"warning: {warning}")
-    run.out(str(unit.target("index.html")))
-    return 0

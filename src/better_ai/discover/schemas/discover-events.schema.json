@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "discover-events.schema.json",
+  "title": "what the discovery page adds to conversation.jsonl: its own events, each with an id",
+  "$comment": "A line must meet this schema and conversation.schema.json. `type` lists every event this page's log may hold; the page's own events are described here in full, and every one is the user's and has an `id`, so `pending` lists it until the coordinator marks it done. The coordinator turns an event into a record, or answers it and marks it done. `add_evidence.text`, `add_evidence.source` and `add_result.text` are the user's words.",
+  "x-files": ["conversation.jsonl"],
+  "x-versioned": true,
+  "type": "object",
+  "properties": {
+    "type": {"enum": ["comment", "note", "answer", "accept", "accepted", "delete", "reopen", "reply", "status", "choose", "add_evidence", "add_result", "remove", "edit", "redact"]}
+  },
+  "allOf": [
+    {"if": {"required": ["type"], "properties": {"type": {"const": "choose"}}}, "then": {"$ref": "#/$defs/choose"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "add_evidence"}}}, "then": {"$ref": "#/$defs/add_evidence"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "add_result"}}}, "then": {"$ref": "#/$defs/add_result"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "remove"}}}, "then": {"$ref": "#/$defs/remove"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "edit"}}}, "then": {"$ref": "#/$defs/edit"}},
+    {"if": {"required": ["type"], "properties": {"type": {"const": "redact"}}}, "then": {"$ref": "#/$defs/redact"}}
+  ],
+  "$defs": {
+    "choose": {
+      "description": "the user chose a move; `revision` is a hash of the option and the items it rests on as the page showed them, and `confirmed` is true after the second click for Expand, Adopt and Stop",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "option", "revision", "confirmed"],
+      "properties": {
+        "type": {"const": "choose"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "option": {"type": "string", "minLength": 1, "x-points-to": {"file": "options.jsonl", "type": "option"}},
+        "revision": {"type": "string", "minLength": 1},
+        "confirmed": {"type": "boolean"}
+      }
+    },
+    "add_evidence": {
+      "description": "the user gave evidence on the page",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "text", "source", "kind", "about", "bears_on"],
+      "properties": {
+        "type": {"const": "add_evidence"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "text": {"type": "string", "minLength": 1},
+        "source": {"description": "where it comes from, in the user's words", "type": "string", "minLength": 1},
+        "kind": {"enum": ["say", "did", "commit", "data", "desk"]},
+        "about": {"enum": ["your users", "elsewhere"]},
+        "bears_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["item", "direction"],
+            "properties": {
+              "item": {"type": "string", "minLength": 1, "x-points-to": {"file": "items.jsonl", "type": "item"}},
+              "direction": {"enum": ["for", "against"]}
+            }
+          }
+        }
+      }
+    },
+    "add_result": {
+      "description": "the user gave the result of a test they ran",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "test", "text", "outcome"],
+      "properties": {
+        "type": {"const": "add_result"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "test": {"type": "string", "minLength": 1, "x-points-to": {"file": "tests.jsonl", "type": "test"}},
+        "text": {"type": "string", "minLength": 1},
+        "outcome": {"enum": ["holds", "changes"]}
+      }
+    },
+    "remove": {
+      "description": "the user removed a test or a piece of evidence, with why",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "record", "reason"],
+      "properties": {
+        "type": {"const": "remove"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "record": {"description": "the id of the test or the evidence", "type": "string", "minLength": 1},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "edit": {
+      "description": "the user changed a field of a record, such as an item's text or the appetite. It is not called `change`: a `change` is a record of changes.jsonl, and a record type names one file",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "record", "field", "value"],
+      "properties": {
+        "type": {"const": "edit"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "record": {"description": "the id of the record, or discovery", "type": "string", "minLength": 1},
+        "field": {"type": "string", "minLength": 1},
+        "value": {"type": "string", "minLength": 1}
+      }
+    },
+    "redact": {
+      "description": "the user asked for a person's words to be removed from a piece of evidence",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "at", "by", "id", "evidence"],
+      "properties": {
+        "type": {"const": "redact"},
+        "at": {"$ref": "base.schema.json#/$defs/at"},
+        "by": {"const": "user"},
+        "id": {"$ref": "base.schema.json#/$defs/id"},
+        "evidence": {"type": "string", "minLength": 1, "x-points-to": {"file": "evidence/", "type": "evidence"}}
+      }
+    }
+  }
+}
