@@ -10,6 +10,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from subprocess import CompletedProcess
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -25,6 +26,14 @@ from better_ai.discover import brief, summary  # noqa: E402
 class Matrix(M.MatrixCase):
     def test_set_the_head_items_options_moves_changes_and_briefs(self):
         self.matrix(("item", "option", "move", "change", "brief", "discover"), ("item", "option", "brief", "discover"))
+
+    def test_an_internal_error_is_not_a_refusal(self):
+        for refused in (None, "only the coordinator writes item"):
+            with self.subTest(refused=refused):
+                problems = []
+                failed = CompletedProcess(["set"], 5, "", "bug in better.pyz")
+                self.judge("set an item", failed, self.start, refused, None, problems)
+                self.assertTrue(problems)
 
     def filled(self):
         """A new record of each type, every field filled, as the fields an agent gives to `add`."""
