@@ -117,11 +117,14 @@ class OldFormatCountTest(unittest.TestCase):
                 server = served(skill, repo, unit)
                 try:
                     address = folder / ".server"
+                    url = ""
                     for _ in range(100):
                         if address.exists():
-                            break
+                            url = address.read_text().strip()
+                            if url:
+                                break
                         time.sleep(0.1)
-                    url = address.read_text().strip()
+                    self.assertTrue(url, "serve did not publish its address")
                     with urllib.request.urlopen(url + "old", timeout=10) as response:  # noqa: S310
                         self.assertEqual(json.loads(response.read()), expected)
                     with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
