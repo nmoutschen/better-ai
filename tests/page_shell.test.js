@@ -510,6 +510,50 @@ test('the design canvas shows only the out of date message when its data is refu
   assert.equal(problem.textContent, '');
 });
 
+function unreadableCanvas(revision) {
+  const where = fragment('#t=old'), elements = { 'canvas-problem': { hidden: true }, status: {}, title: {} };
+  const strip = { hidden: true }, sent = [], timers = [];
+  let loads = 0, reloads = 0;
+  where.globals.location.reload = () => { reloads++; };
+  const document = { querySelector: s => s === '.offline' ? strip : null, getElementById: id => elements[id] || null };
+  const context = loadPage({ document, setTimeout: run => timers.push(run), fetch: url => {
+    sent.push(url);
+    return url === '/data' ? ++loads === 1 ? answerWith({ error: 'A version cannot be read' }) : answer(401) : revision();
+  }, ...where.globals });
+  require('node:vm').runInNewContext(read('design', 'canvas.js'), context);
+  const flush = () => new Promise(resolve => setImmediate(resolve));
+  return { context, sent, flush, strip, problem: elements['canvas-problem'], reloads: () => reloads,
+    round: async () => { timers.splice(0).forEach(run => run()); await flush(); } };
+}
+
+test('an unreadable design canvas reloads when the agent fixes a version', async () => {
+  let revision = 'unreadable';
+  const canvas = unreadableCanvas(() => Promise.resolve({ status: 200, text: () => Promise.resolve(revision) }));
+  await canvas.flush();
+  assert.equal(canvas.problem.textContent, 'A version cannot be read');
+  await canvas.round();
+  assert.equal(canvas.reloads(), 0);
+  revision = 'fixed';
+  await canvas.round();
+  assert.equal(canvas.reloads(), 1);
+});
+
+test('an unreadable design canvas stops recovery polling and ignores pending revisions after token refusal', async () => {
+  let revisions = 0, nextRevision;
+  const canvas = unreadableCanvas(() => ++revisions === 1 ? answer(200) : new Promise(resolve => { nextRevision = resolve; }));
+  await canvas.flush();
+  await canvas.round();
+  assert.equal(revisions, 2);
+  await assert.rejects(canvas.context.pageFetch('/data'), { stale: true });
+  const atRefusal = canvas.sent.slice();
+  nextRevision({ status: 200, text: () => Promise.resolve('agent fixed it') });
+  await canvas.flush();
+  await canvas.round();
+  assert.deepEqual(canvas.sent, atRefusal);
+  assert.equal(canvas.reloads(), 0);
+  assert.equal(canvas.strip.hidden, false);
+});
+
 test('a page that does not stream stays out of date once any request was refused, whatever /listening says later', async () => {
   const where = fragment('#t=old');
   const page = stripsOn({ stream: false }, url => url === '/listening' ? answerWith(true) : answer(401), {}, where.globals);
