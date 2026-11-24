@@ -29,6 +29,7 @@ from typing import Any
 import yaml
 from inspect_ai.dataset import Sample
 
+from skill_evals import planted_repo_files
 from skill_evals.grading.files import GRADERS
 
 EVALS = Path(__file__).resolve().parents[1]
@@ -155,13 +156,7 @@ def load_case(directory: Path) -> dict[str, Any]:
     case["source"] = [str(source) for source in case.get("source") or []]
     case["reads"] = case.get("reads") or []
     case["graders"] = _resolve(case["graders"], directory)
-    case["files"] = {}
-    for repo in (directory.parent / "_base", directory / "repo"):
-        case["files"].update(
-            (path.relative_to(repo).as_posix(), path)
-            for path in sorted(repo.rglob("*"))
-            if path.is_file() and "__pycache__" not in path.parts
-        )
+    case["files"] = planted_repo_files(directory)
     earlier, history = directory / "earlier", directory / "history"
     if earlier.is_dir() and history.is_dir():
         raise ValueError(f"{directory.name}: a case has earlier/ or history/, not both")
