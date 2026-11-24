@@ -336,7 +336,8 @@ def _rewritten(
 
     def write() -> None:
         records._still(unit, relative, stat)
-        paths.write_atomic(unit, relative, records._encode("\n".join(pieces)))
+        if not paths.replace_if_current(unit, relative, records._encode(text), records._encode("\n".join(pieces))):
+            raise cli.Busy(records.BUSY)
 
     return changed, write
 

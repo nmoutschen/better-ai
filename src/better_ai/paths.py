@@ -16,11 +16,16 @@ import errno
 import os
 import re
 import secrets
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Optional
 
 from .skill import OWNER_BY_HEAD, OWNER_BY_ROOT, Skill, UnitKind
+
+if os.name == "posix":
+    import fcntl
 
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 AGENT = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -265,7 +270,10 @@ def _open(unit: Unit, relative: str, flags: int, mode: int = 0o644) -> int:
 def _write_all(fd: int, data: bytes) -> None:
     view = memoryview(data)
     while view:
-        view = view[os.write(fd, view) :]
+        count = os.write(fd, view)
+        if count == 0:
+            raise OSError(errno.EIO, "zero-byte write")
+        view = view[count:]
 
 
 def read_bytes(unit: Unit, relative: str) -> bytes:
@@ -275,46 +283,103 @@ def read_bytes(unit: Unit, relative: str) -> bytes:
         return handle.read()
 
 
-def append_line(unit: Unit, relative: str, data: bytes) -> None:
-    """Append `data` (one line, ending in a newline) to a JSONL file of the unit in a single `write` on a file opened
-    with O_APPEND and O_NOFOLLOW, so concurrent appenders never interleave inside a line."""
-    if not data.endswith(b"\n"):
-        data += b"\n"
-    fd = _open(unit, relative, os.O_WRONLY | os.O_APPEND | os.O_CREAT)
+@contextlib.contextmanager
+def _unit_writer(unit: Unit):
+    """Coordinate writers on the existing directory, whose identity survives record replacement."""
+    if os.name != "posix":
+        yield
+        return
+    fd = os.open(unit.path, os.O_RDONLY | os.O_DIRECTORY | NOFOLLOW)
     try:
-        if os.write(fd, data) != len(data):
-            raise OSError(errno.EIO, "short write", relative)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
     finally:
         os.close(fd)
+
+
+@dataclass(frozen=True)
+class _RecordFile:
+    unit: Unit
+    relative: str
+
+    def read(self) -> bytes | None:
+        try:
+            return read_bytes(self.unit, self.relative)
+        except FileNotFoundError:
+            return None
+
+    def publish(self, replacement: bytes) -> None:
+        _write_atomic(self.unit, self.relative, replacement)
+
+    def matches(self, expected: bytes | None) -> bool:
+        return self.read() == expected
+
+
+def _commit_locked(record: _RecordFile, expected: Optional[bytes], replacement: bytes) -> bool:  # noqa: UP045
+    """Publish only when the file still matches the bytes used to prepare the update."""
+    # nagini: Requires(Acc(record.contents))
+    # nagini: Ensures(Acc(record.contents))
+    # nagini: Ensures(Result() == same_contents(Old(record.contents), expected))
+    # nagini: Ensures(not Result() or record.contents is replacement)
+    # nagini: Ensures(Result() or record.contents is Old(record.contents))
+    if not record.matches(expected):
+        return False
+    record.publish(replacement)
+    return True
+
+
+def replace_if_current(unit: Unit, relative: str, expected: bytes | None, replacement: bytes) -> bool:
+    with _unit_writer(unit):
+        return _commit_locked(_RecordFile(unit, relative), expected, replacement)
+
+
+def append_line(unit: Unit, relative: str, data: bytes) -> None:
+    """Append complete lines by staging and atomically publishing the updated log."""
+    if not data.endswith(b"\n"):
+        data += b"\n"
+    with _unit_writer(unit):
+        record = _RecordFile(unit, relative)
+        previous = record.read() or b""
+        separator = b"\n" if previous and not previous.endswith(b"\n") else b""
+        record.publish(previous + separator + data)
 
 
 def create_exclusive(unit: Unit, relative: str, data: bytes) -> None:
-    """Create a file that must not exist (a folder entry, `<id>.json`): O_CREAT|O_EXCL|O_NOFOLLOW. FileExistsError if
-    the name is taken, for the caller to retry on the next number."""
-    fd = _open(unit, relative, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
-    try:
-        _write_all(fd, data)
-    finally:
-        os.close(fd)
+    """Publish a complete new file, leaving an existing file at the target untouched."""
+    with _unit_writer(unit):
+        _write_atomic(unit, relative, data, exclusive=True)
 
 
 def write_atomic(unit: Unit, relative: str, data: bytes) -> None:
-    """Replace or create a file of the unit: write a temporary file with a random name in the same folder, created with
-    O_CREAT|O_EXCL|O_NOFOLLOW, then `os.replace` it over the target. The temporary file is removed if anything fails."""
+    with _unit_writer(unit):
+        _write_atomic(unit, relative, data)
+
+
+def _write_atomic(unit: Unit, relative: str, data: bytes, *, exclusive: bool = False) -> None:
+    """Stage a complete file in the target directory, then publish it in one operation."""
     path = unit.target(relative)
     temporary = f".{path.name}.{secrets.token_hex(8)}.tmp"
     relative_temporary = str(PurePosixPath(relative).with_name(temporary))
-    fd = _open(unit, relative_temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+    staged = path.with_name(temporary)
+    mode = None
+    if not exclusive:
+        with contextlib.suppress(FileNotFoundError):
+            mode = stat.S_IMODE(path.stat(follow_symlinks=False).st_mode)
+    fd = _open(unit, relative_temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644 if mode is None else mode)
     try:
         try:
             _write_all(fd, data)
+            if mode is not None and os.name == "posix":
+                os.fchmod(fd, mode)
         finally:
             os.close(fd)
-        os.replace(path.with_name(temporary), path)
-    except BaseException:
+        if exclusive:
+            os.link(staged, path)
+        else:
+            os.replace(staged, path)
+    finally:
         with contextlib.suppress(OSError):
-            os.unlink(path.with_name(temporary))
-        raise
+            os.unlink(staged)
 
 
 def write_state(unit: Unit, relative: str, data: bytes, mode: int | None = None) -> None:

@@ -699,7 +699,8 @@ def add(args: argparse.Namespace, run: Run) -> int:
         return _report(run, errors, new=True)
     _make_parent(unit, relative)
     _still(unit, relative, stat)
-    paths.append_line(unit, relative, _encode(("\n" if text and not text.endswith("\n") else "") + _json_line(record)))
+    if not paths.replace_if_current(unit, relative, None if text is None else _encode(text), _encode(new_text)):
+        raise Busy(BUSY)
     _warn(run, warnings)
     return _done(run, relative, ident)
 
@@ -929,7 +930,8 @@ def set_(args: argparse.Namespace, run: Run) -> int:
         run.out(args.ref)
         return cli.EXIT_DONE
     _still(unit, found.relative, found.stat)
-    paths.write_atomic(unit, found.relative, _encode(_new_text(found, record)))
+    if not paths.replace_if_current(unit, found.relative, _encode(found.text), _encode(_new_text(found, record))):
+        raise Busy(BUSY)
     _warn(run, warnings)
     run.out(args.ref)
     return cli.EXIT_DONE

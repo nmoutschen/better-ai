@@ -374,6 +374,82 @@ class Units(Repo):
         paths.make_folder(unit, "q/r")
         self.assertTrue((self.unit / "q" / "r").is_dir())
 
+    def test_a_failed_jsonl_append_leaves_the_original_log_intact(self):
+        unit = self.resolve(str(self.unit))
+        target = unit.path / "l.jsonl"
+        target.write_bytes(b'{"old": true}\n')
+        real_write = os.write
+
+        def fail_after_prefix(fd, data):
+            real_write(fd, data[:1])
+            raise OSError("injected write failure")
+
+        with mock.patch.object(paths.os, "write", fail_after_prefix):
+            with self.assertRaises(OSError):
+                paths.append_line(unit, "l.jsonl", b'{"new": true}\n')
+            with self.assertRaises(OSError):
+                paths.create_exclusive(unit, "new.json", b'{"new": true}\n')
+
+        self.assertEqual(target.read_bytes(), b'{"old": true}\n')
+        self.assertFalse((unit.path / "new.json").exists())
+        self.assertEqual(list(unit.path.glob("*.tmp")), [])
+
+    @unittest.skipUnless(os.name == "posix", "requires POSIX file permissions")
+    def test_a_private_log_is_never_staged_or_published_with_broader_permissions(self):
+        unit = self.resolve(str(self.unit))
+        target = unit.path / "private.jsonl"
+        target.write_bytes(b"{}\n")
+        target.chmod(0o600)
+        real_write = os.write
+
+        def check_stage(fd, data):
+            self.assertEqual(stat.S_IMODE(os.fstat(fd).st_mode), 0o600)
+            return real_write(fd, data)
+
+        with mock.patch.object(paths.os, "write", check_stage):
+            paths.append_line(unit, target.name, b"{}\n")
+
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
+        self.assertEqual(target.read_bytes(), b"{}\n{}\n")
+
+    @unittest.skipUnless(sys.platform in {"darwin", "linux"}, "requires a local macOS or Linux file lock")
+    def test_two_processes_can_commit_a_given_snapshot_only_once(self):
+        unit = self.resolve(str(self.unit))
+        target = unit.path / "l.jsonl"
+        target.write_bytes(b'{"old": true}\n')
+        command = """
+import sys
+sys.path.insert(0, sys.argv[1])
+from better_ai import code, paths
+
+unit = paths.resolve_unit(sys.argv[2], code.SKILL)
+replacement = sys.argv[3].encode() + b'\\n'
+print(paths.replace_if_current(unit, 'l.jsonl', b'{"old": true}\\n', replacement))
+"""
+        replacements = ['{"writer": 1}', '{"writer": 2}']
+        with contextlib.ExitStack() as stack:
+            writers = [
+                stack.enter_context(
+                    subprocess.Popen(
+                        [sys.executable, "-IB", "-c", command, str(SRC), str(unit.path), replacement],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                )
+                for replacement in replacements
+            ]
+            try:
+                results = [writer.communicate(timeout=15) for writer in writers]
+            finally:
+                for writer in writers:
+                    if writer.poll() is None:
+                        writer.kill()
+        self.assertEqual([writer.returncode for writer in writers], [0, 0], results)
+        self.assertCountEqual([out.strip() for out, _ in results], ["True", "False"])
+        winner = next(index for index, (out, _) in enumerate(results) if out.strip() == "True")
+        self.assertEqual(target.read_text(encoding="utf-8"), replacements[winner] + "\n")
+
     def test_s23_a_symlink_planted_at_a_state_file_or_a_temp_path_is_not_followed(self):
         unit = self.resolve(str(self.unit))
         victim = self.repo / "victim"

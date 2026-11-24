@@ -86,12 +86,7 @@ def review(args: argparse.Namespace, run: cli.Run) -> int:
     problems = schema.check_record(record, ["reviews.schema.json"])
     if problems:
         raise paths.refusal(unit.label, "the review is not valid: " + "; ".join(f"{f}: {m}" for f, m in problems))
-    try:
-        existing = paths.read_bytes(unit, "reviews.jsonl")
-    except FileNotFoundError:
-        existing = b""
-    separator = "\n" if existing and not existing.endswith(b"\n") else ""
-    paths.append_line(unit, "reviews.jsonl", (separator + json.dumps(record)).encode("ascii"))
+    paths.append_line(unit, "reviews.jsonl", json.dumps(record).encode("ascii"))
     run.out(f"Recorded the review of {', '.join(record['perspectives'])} in {unit.label}/reviews.jsonl.")
     return 0
 

@@ -379,7 +379,7 @@ class Conversation:
 
     def append(self, *events: dict) -> list:
         """Check events, then write them to the log as ASCII JSON, so a character such as U+2028 in a message cannot
-        split a line, in one `O_APPEND` write. None is written if one fails."""
+        split a line. Publish the batch as one complete update. None is written if validation fails."""
         records = [{"type": e.get("type"), "at": now(), **e} for e in events]
         with self.lock:
             for record in records:
