@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -18,8 +19,8 @@ import better  # noqa: E402
 import discover_populated as P  # noqa: E402
 import discover_records as R  # noqa: E402
 
-from better_ai import discover, page, paths, resources  # noqa: E402
-from better_ai.discover import pagespec, rules_moves  # noqa: E402
+from better_ai import discover, page, paths, resources, schema  # noqa: E402
+from better_ai.discover import pagespec, rules_moves, summary  # noqa: E402
 
 PAGE_EVENTS = ("choose", "add_evidence", "add_result", "remove", "edit", "redact")
 
@@ -143,6 +144,63 @@ class Loaded(unittest.TestCase):
         )
         self.assertNotEqual(stale.returncode, 0)
         self.assertIn("changed since", stale.stdout + stale.stderr)
+
+    def test_a_choice_uses_the_option_seen_before_a_concurrent_edit(self):
+        moves = self.folder / "moves.jsonl"
+        moves.write_text("")
+        option_file = self.folder / "options.jsonl"
+        option = json.loads(option_file.read_text())
+        edited = "A different option after an edit."
+        read_records = schema.read_records
+
+        def read_then_edit(unit, relative, *args, **kwargs):
+            found = read_records(unit, relative, *args, **kwargs)
+            if relative == "options.jsonl":
+                P.write_lines(option_file, [{**option, "text": edited}])
+            return found
+
+        with patch.object(schema, "read_records", side_effect=read_then_edit):
+            payload = pagespec.load(self.unit)
+        self.assertEqual(payload["options"][0]["text"], option["text"])
+        conv = page.Conversation(self.unit, pagespec.SPEC, page.load_docs(discover.SKILL))
+        conv.append(R.event("choose", id="c1", option="K1", revision=payload["revisions"]["K1"], confirmed=False))
+        move = R.without(R.MOVE, "type", "at", "by", "id")
+        move["answer"] = {"type": "page", "event": "c1"}
+        done = R.run(self.folder.parents[1], "add", ".discover/d", "move", "--by", R.COORD, stdin=json.dumps(move))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("changed since", done.stdout + done.stderr)
+        self.assertEqual(moves.read_text(), "")
+
+    def test_page_brief_and_copy_warning_use_the_latest_valid_evidence_event(self):
+        latest = "The revised evidence is three lost weeks."
+        invalid = "An incomplete event supplied different words."
+        events = self.folder / "conversation.jsonl"
+        with events.open("a", encoding="utf-8") as log:
+            log.write(json.dumps(R.event("add_evidence", id="a1", text=latest)) + "\n")
+            log.write(json.dumps(R.without(R.event("add_evidence", id="a1", text=invalid), "source")) + "\n")
+        data = pagespec.load(self.unit)
+        words = next(record["text"] for record in data["evidence"] if record["id"] == "E-coord-2")
+        done = R.run(self.folder.parents[1], "brief", ".discover/d", "v1")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        brief = (self.folder / "brief" / "v1.md").read_text()
+        items = self.folder / "items.jsonl"
+        problem, behaviour = (json.loads(line) for line in items.read_text().splitlines())
+        P.write_lines(items, [problem, {**behaviour, "text": latest}])
+        data = pagespec.load(self.unit)
+        discovery = summary.Discovery(
+            self.unit,
+            items=data["items"],
+            conversation=data["conversation"],
+            evidence=[json.loads((self.folder / "evidence" / "E-coord-2.json").read_text())],
+        )
+        with self.subTest(reader="page"):
+            self.assertEqual(words, latest)
+        with self.subTest(reader="brief"):
+            self.assertIn(latest, brief)
+            self.assertNotIn(P.EVENT_TEXT, brief)
+        with self.subTest(reader="copy warning"):
+            warnings = summary.warnings_of(discovery, datetime.now(timezone.utc))
+            self.assertIn(("evidence-text-copied", "E-coord-2"), [(w.code, w.about) for w in warnings])
 
     def test_the_words_of_evidence_given_on_the_page_come_from_its_event(self):
         data = pagespec.load(self.unit)
