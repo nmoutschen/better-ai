@@ -23,6 +23,7 @@ sys.path.insert(0, str(HERE.parent / "src"))
 import architect_records  # noqa: E402
 import better  # noqa: E402
 import code_records  # noqa: E402
+import pyz  # noqa: E402
 import research_records  # noqa: E402
 
 from better_ai import architect, code, design, page, research, show  # noqa: E402
@@ -167,6 +168,9 @@ def rpc(url: str, method: str, params: dict, token: str) -> dict:
 
 
 class PageContract(unittest.TestCase):
+    def test_every_shipped_skill_has_live_page_contract_samples(self):
+        self.assertEqual(set(PAGES), set(pyz.skill_names()))
+
     def test_every_page_saves_what_it_sends_as_the_users_and_refuses_a_by(self):
         self.assertEqual(set(page.PAGES), set(PAGES), "a page without a unit and samples, or samples without a page")
         for skill, spec in page.PAGES.items():

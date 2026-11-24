@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 
 import better  # noqa: E402
+import pyz  # noqa: E402
 
 sys.path.insert(0, str(HERE.parent / "tools"))
 import smoke  # noqa: E402
@@ -101,6 +102,9 @@ def served(skill, repo, unit):
 
 
 class OldFormatCountTest(unittest.TestCase):
+    def test_every_shipped_skill_has_an_old_format_count_case(self):
+        self.assertEqual(set(CASES), set(pyz.skill_names()))
+
     def test_every_page_carries_the_shared_count_and_serves_it_S35(self):
         for skill, (unit, setup, make_old, expected) in CASES.items():
             with self.subTest(skill), tempfile.TemporaryDirectory() as tmp:

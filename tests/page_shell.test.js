@@ -475,6 +475,28 @@ test('a read the server answers as out of date shows that on the page, and the s
   assert.equal(where.kept.pageToken, undefined);  // the token it saved is dropped
 });
 
+test('a stale page stops all polling and cannot reload for an in-flight server revision', async () => {
+  const where = fragment('#t=old'), sent = [];
+  let reloads = 0, revisions = 0, nextRevision;
+  where.globals.location.reload = () => { reloads++; };
+  const page = stripsOn({}, url => {
+    sent.push(url);
+    if (url === '/data') return answer(401);
+    if (url.startsWith('/events')) return new Promise(() => {});
+    if (url === '/rev' && ++revisions === 2) return new Promise(resolve => { nextRevision = resolve; });
+    return answer(200);
+  }, {}, where.globals);
+  await page.round();
+  assert.equal(revisions, 2);
+  await assert.rejects(page.context.pageFetch('/data'), { stale: true });
+  const atRefusal = sent.slice();
+  nextRevision({ status: 200, text: () => Promise.resolve('new revision') });
+  await page.round();
+  await page.round();
+  assert.deepEqual(sent, atRefusal);
+  assert.equal(reloads, 0);
+});
+
 test('the design canvas shows only the out of date message when its data is refused for the token', async () => {
   const where = fragment('#t=old'), problem = { textContent: '', hidden: true };
   const strip = { textContent: '', hidden: true };
