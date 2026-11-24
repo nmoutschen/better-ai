@@ -100,6 +100,8 @@ THEN SET the level from the answers:
 - `low`: any of these: retracted or withdrawn; it reports results without saying where they come from; it gives results with no method; or someone behind it gains from the results and the page gives no data that others could check.
 - `medium`: everything else, such as a study with a small sample, a survey of self-reports, a study funded by an interested party that discloses this, a secondary source that names its source and reports it faithfully, or a page that argues, advises or gives opinions without results of its own.
 
+A page about its publisher's own product, rules or decisions describes them only where it says what the product does or how it works, or what the rules or decisions say. Its claims about benefits, adoption, performance or customers' results are results from an interested party: APPLY checks 2 and 3 to them. A copy of rules or decisions published by anyone other than the body that issued them does not produce them: it is a secondary source (check 1).
+
 DO NOT raise or lower `trust` for the `category`, the venue's or author's prestige, citation counts, or how polished the page is. The same company's reference page and its post comparing its product with others are two sources and can get two levels.
 
 WRITE in `trust_reason` the answers that set the level, in one line, such as "own RCT; method shown; n=16, small; no stake" for a `medium`.
