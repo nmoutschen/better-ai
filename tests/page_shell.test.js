@@ -475,6 +475,28 @@ test('a read the server answers as out of date shows that on the page, and the s
   assert.equal(where.kept.pageToken, undefined);  // the token it saved is dropped
 });
 
+test('a stale page stops all polling and cannot reload for an in-flight server revision', async () => {
+  const where = fragment('#t=old'), sent = [];
+  let reloads = 0, revisions = 0, nextRevision;
+  where.globals.location.reload = () => { reloads++; };
+  const page = stripsOn({}, url => {
+    sent.push(url);
+    if (url === '/data') return answer(401);
+    if (url.startsWith('/events')) return new Promise(() => {});
+    if (url === '/rev' && ++revisions === 2) return new Promise(resolve => { nextRevision = resolve; });
+    return answer(200);
+  }, {}, where.globals);
+  await page.round();
+  assert.equal(revisions, 2);
+  await assert.rejects(page.context.pageFetch('/data'), { stale: true });
+  const atRefusal = sent.slice();
+  nextRevision({ status: 200, text: () => Promise.resolve('new revision') });
+  await page.round();
+  await page.round();
+  assert.deepEqual(sent, atRefusal);
+  assert.equal(reloads, 0);
+});
+
 test('the design canvas shows only the out of date message when its data is refused for the token', async () => {
   const where = fragment('#t=old'), problem = { textContent: '', hidden: true };
   const strip = { textContent: '', hidden: true };
@@ -486,6 +508,50 @@ test('the design canvas shows only the out of date message when its data is refu
   assert.equal(strip.textContent, 'page out of date: open the address the agent gave');
   assert.equal(problem.hidden, true);  // not also "could not load its versions"
   assert.equal(problem.textContent, '');
+});
+
+function unreadableCanvas(revision) {
+  const where = fragment('#t=old'), elements = { 'canvas-problem': { hidden: true }, status: {}, title: {} };
+  const strip = { hidden: true }, sent = [], timers = [];
+  let loads = 0, reloads = 0;
+  where.globals.location.reload = () => { reloads++; };
+  const document = { querySelector: s => s === '.offline' ? strip : null, getElementById: id => elements[id] || null };
+  const context = loadPage({ document, setTimeout: run => timers.push(run), fetch: url => {
+    sent.push(url);
+    return url === '/data' ? ++loads === 1 ? answerWith({ error: 'A version cannot be read' }) : answer(401) : revision();
+  }, ...where.globals });
+  require('node:vm').runInNewContext(read('design', 'canvas.js'), context);
+  const flush = () => new Promise(resolve => setImmediate(resolve));
+  return { context, sent, flush, strip, problem: elements['canvas-problem'], reloads: () => reloads,
+    round: async () => { timers.splice(0).forEach(run => run()); await flush(); } };
+}
+
+test('an unreadable design canvas reloads when the agent fixes a version', async () => {
+  let revision = 'unreadable';
+  const canvas = unreadableCanvas(() => Promise.resolve({ status: 200, text: () => Promise.resolve(revision) }));
+  await canvas.flush();
+  assert.equal(canvas.problem.textContent, 'A version cannot be read');
+  await canvas.round();
+  assert.equal(canvas.reloads(), 0);
+  revision = 'fixed';
+  await canvas.round();
+  assert.equal(canvas.reloads(), 1);
+});
+
+test('an unreadable design canvas stops recovery polling and ignores pending revisions after token refusal', async () => {
+  let revisions = 0, nextRevision;
+  const canvas = unreadableCanvas(() => ++revisions === 1 ? answer(200) : new Promise(resolve => { nextRevision = resolve; }));
+  await canvas.flush();
+  await canvas.round();
+  assert.equal(revisions, 2);
+  await assert.rejects(canvas.context.pageFetch('/data'), { stale: true });
+  const atRefusal = canvas.sent.slice();
+  nextRevision({ status: 200, text: () => Promise.resolve('agent fixed it') });
+  await canvas.flush();
+  await canvas.round();
+  assert.deepEqual(canvas.sent, atRefusal);
+  assert.equal(canvas.reloads(), 0);
+  assert.equal(canvas.strip.hidden, false);
 });
 
 test('a page that does not stream stays out of date once any request was refused, whatever /listening says later', async () => {

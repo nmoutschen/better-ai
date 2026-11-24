@@ -1134,7 +1134,7 @@ def strip_invalid(record: dict, errors: list[Error]) -> dict:
 MAX_DEPTH = 50  # no record of a unit's files nests deeper than a design.json step
 
 
-def _page_value(piece: str) -> Any:
+def page_value(piece: str) -> Any:
     """One JSON value as a page can show it: no NaN or Infinity (a browser cannot read them), and nothing nested so
     deep that Python gives up. ValueError says why not."""
 
@@ -1203,7 +1203,7 @@ def read_records(
     errors: list[dict] = []
     for number, piece in enumerate(_lines(text) if jsonl else [text], 1):
         try:
-            value = _page_value(piece)
+            value = page_value(piece)
         except ValueError as error:
             if number not in flagged:  # valid for the schema, but not for a page
                 errors.append({"file": relative, "line": number, "field": ROOT, "message": f"not valid JSON: {error}"})

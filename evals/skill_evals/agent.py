@@ -48,16 +48,17 @@ SKILL_TOOL = "Skill"
 # `claude -p` stays open while a shell it started in the background still runs, such as a skill's live page server,
 # even after it printed its final `result` event. End it once that event is out, so such a run ends when the agent's
 # turn ends, not at the timeout. The quotes inside a JSON string are escaped, so only the top-level event matches.
-# The run ends only while that event is still the last line `quiet` seconds later (10 in a real run): a background
+# The run ends only when the output has not grown `quiet` seconds after a result (10 in a real run): a background
 # task that finishes may start another turn, which prints more events and a new result. The output is checked every
 # `poll` seconds (2); the process gets `grace` seconds (5) after SIGTERM before SIGKILL, and the wait ends once it is gone.
 END_AFTER_RESULT = """{run} &
 pid=$!
 killer=
 while kill -0 $pid 2>/dev/null; do
+    size=$(wc -c 2>/dev/null < {out}) || size=
     if tail -n 1 {out} 2>/dev/null | grep -q '"type":"result"'; then
         sleep {quiet}
-        if tail -n 1 {out} | grep -q '"type":"result"'; then
+        if [ -n "$size" ] && [ "$(wc -c 2>/dev/null < {out})" = "$size" ]; then
             kill -TERM $pid 2>/dev/null || true
             (sleep {grace}; kill -KILL $pid) >/dev/null 2>&1 &
             killer=$!

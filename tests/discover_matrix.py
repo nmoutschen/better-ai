@@ -1,11 +1,11 @@
 """discover-better: the world and the harness of the cross-record matrix (T14), used by `test_discover_integration*`.
 
-`World` is a discovery that holds one valid, fully filled record of every type in every status. The matrix tries, on a
-copy of it, every way to change every field of every record: `add` of a filled record, and `set` with a new value, with
-null and with `--unset`, as the coordinator, an analyst, a verifier and with no `--by`. Three things are asserted for
-each attempt:
+The fixture is a discovery with fully filled records in representative states. The matrix tries, on a
+copy of it, ways to change its records: `add` of a filled record, and `set` with a new value, with null and with
+`--unset`, as the coordinator, an analyst, a verifier and with no `--by`. The default run samples the set combinations
+by record state, operation, writer, field and refusal rule. The full sweep tries all combinations. Every attempt checks:
 
-1. the stated rules (STATED below) hold: what they refuse is refused;
+1. allowed representative writes succeed, expected refusals are refused, and the CLI never reports an internal error;
 2. a refused write leaves every file of the unit byte for byte as it was;
 3. a write that is accepted leaves a unit that `check` accepts, and the record keeps its `type`, `at`, `by` and `id`.
 
@@ -17,6 +17,7 @@ import json
 import sys
 import tempfile
 import unittest
+from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -24,6 +25,9 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 import discover_populated as P  # noqa: E402
 import discover_records as R  # noqa: E402
+import sweep  # noqa: E402
+
+from better_ai.cli import EXIT_DONE, EXIT_REFUSED  # noqa: E402
 
 UNIT = ".discover/d"
 COORD, ANALYST, VERIFIER = R.COORD, "a1", "v1"
@@ -37,7 +41,7 @@ COORDINATOR_ONLY = ("item", "change", "option", "move", "brief", "decision", "te
 
 
 def build(root: Path) -> Path:
-    """A discovery with every record type, each in every status, and `check` accepts it."""
+    """A discovery with each record type and representative states that `check` accepts."""
     unit = R.made_unit(root)
     head = json.loads((unit / "discover.json").read_text())
     head["brought"] = "Some notes."
@@ -341,6 +345,49 @@ def cases(kind: str, record: dict):
         yield "patch", {field: {"id": "P9", "at": AT2}.get(field, "x") if field != "type" else "item"}, None
 
 
+# Representative writes that must succeed in both the sample and the full sweep.
+REQUIRED_WRITES = {
+    ("discover", "coordinator"): {"brought": "Some notes. more"},
+    ("B1", "coordinator"): {"text": "Shows the state of each item. more"},
+    ("K1", "coordinator"): {"note": "ruled out by your appetite"},
+    ("v2", "coordinator"): {"why": "Cheaper. more"},
+    ("D2", "coordinator"): {"default": "Another"},
+    ("X1", "coordinator"): {"what": "Ask five people to find a past check. more"},
+    ("S-a1-1", "analyst"): {"title": "A post about the problem more"},
+    ("E-a1-2", "analyst"): {"about": "elsewhere"},
+}
+
+
+@dataclass(frozen=True)
+class SetAttempt:
+    ref: str
+    record: dict
+    op: str
+    patch: dict
+    unset: str | None
+    writer: str
+    refused_by: str | None
+
+    @property
+    def field(self) -> str:
+        return self.unset or next(iter(self.patch))
+
+    @property
+    def required(self) -> bool:
+        return self.op == "patch" and self.patch == REQUIRED_WRITES.get((self.ref, self.writer))
+
+
+def set_attempts(unit, kinds):
+    for ref, record in records_of(unit):
+        kind = record["type"]
+        if kind not in kinds:
+            continue
+        for op, patch, unset in cases(kind, record):
+            for writer, who in WRITERS.items():
+                refused = must_be_refused(kind, record, op, patch, who, unset)
+                yield SetAttempt(ref, record, op, patch, unset, writer, refused)
+
+
 # ---------------------------------------------------------------- the harness
 
 
@@ -365,55 +412,60 @@ class MatrixCase(unittest.TestCase):
         full = [*args, *(["--by", who] if who else [])]
         return R.run(self.root, *full, stdin=stdin)
 
-    def judge(self, label, done, before, refused_by, keeps, found) -> None:
-        """The three assertions for one attempt; failures are collected in `found`."""
+    def judge(self, label, done, before, refused_by, keeps, found, *, required=False) -> None:
+        """Check the allowed outcome and resulting files, then restore the fixture for the next attempt."""
         after = files_of(self.unit)
-        if done.returncode != 0:
+        if done.returncode != EXIT_DONE:
+            detail = (done.stdout + done.stderr).strip()
+            if done.returncode != EXIT_REFUSED or not detail:
+                found.append(f"{label}: expected a write or diagnosed refusal, got {done.returncode}: {detail}")
+            if required:
+                found.append(f"{label}: a write that should succeed was refused: {detail}")
             if after != before:
                 found.append(f"{label}: refused but the files changed")
         else:
             if refused_by:
                 found.append(f"{label}: accepted, but {refused_by}")
-            if self.run_check() != 0:
+            if self.run_check() != EXIT_DONE:
                 found.append(f"{label}: accepted, and check no longer passes")
             if keeps is not None and not keeps(self.unit):
-                found.append(f"{label}: accepted, and the record's type, at, by or id changed")
+                found.append(f"{label}: accepted, but the target or its expected fields did not survive")
         if after != before:
             restore(self.unit, before)
 
-    def sets(self, kinds):
-        found = []
-        before = self.start
-        self.accepted = {}
-        for ref, record in records_of(self.unit):
-            kind = record["type"]
-            if kind not in kinds:
-                continue
-            for op, patch, unset in cases(kind, record):
-                for name, who in WRITERS.items():
-                    args = ["set", UNIT, ref]
-                    if unset:
-                        args += ["--unset", unset]
-                    label = f"set {kind} {ref} {record.get('status', '')} {op} {patch or unset} as {name}"
-                    done = self.attempt(args, json.dumps(patch), who)
-                    stamp = {f: record[f] for f in STAMPED if f in record}
-                    keeps = (
-                        None
-                        if kind == "discover" and ref == "discover"
-                        else (
-                            lambda unit, ref=ref, stamp=stamp: all(
-                                r.get(f) == v for i, r in records_of(unit) if i == ref for f, v in stamp.items()
-                            )
-                        )
-                    )
-                    if done.returncode == 0 and who == COORD and files_of(self.unit) != before:
-                        self.accepted[kind] = self.accepted.get(kind, 0) + 1
-                    self.judge(label, done, before, must_be_refused(kind, record, op, patch, who, unset), keeps, found)
-        return found
-
     def matrix(self, kinds, changing):
-        """The writes to the records of these kinds; the coordinator still makes some write of each kind that `changing`
-        names, so a rule that refuses everything does not pass."""
-        self.assertEqual(self.sets(kinds), [])
-        for kind in changing:
-            self.assertGreater(self.accepted.get(kind, 0), 0, f"the coordinator can change no {kind} at all")
+        attempts = list(set_attempts(self.unit, kinds))
+        required = [a for a in attempts if a.required]
+        self.assertEqual({a.record["type"] for a in required}, set(changing))
+        sampled = sweep.cases(
+            attempts,
+            key=[
+                lambda a: (a.record["type"], a.record.get("status"), a.op, a.writer),
+                lambda a: (a.record["type"], a.field),
+                lambda a: a.refused_by,
+            ],
+        )
+        found = []
+        for a in [*required, *(case for case in sampled if not case.required)]:
+            args = ["set", UNIT, a.ref]
+            if a.unset:
+                args += ["--unset", a.unset]
+            kind, status = a.record["type"], a.record.get("status", "")
+            label = f"set {kind} {a.ref} {status} {a.op} {a.patch or a.unset} as {a.writer}"
+            stamp = {key: a.record[key] for key in STAMPED if key in a.record}
+            expected = {**stamp, **(a.patch if a.required else {})}
+            done = self.attempt(args, json.dumps(a.patch), WRITERS[a.writer])
+            self.judge(
+                label,
+                done,
+                self.start,
+                a.refused_by,
+                lambda unit, expected=expected, target=a.ref: any(
+                    all(row.get(key) == value for key, value in expected.items())
+                    for ref, row in records_of(unit)
+                    if ref == target
+                ),
+                found,
+                required=a.required,
+            )
+        self.assertEqual(found, [])

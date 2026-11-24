@@ -26,6 +26,7 @@ from .. import schema
 UNVERIFIED = "unverified"
 RISK_ACCEPTED = "risk accepted"
 ACCEPTED = "accepted"
+WORDS_EVENTS = ("add_evidence", "add_result")  # the only page events that supply evidence text
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,23 @@ def derive(
             chosen = move["option"]
             by_option.setdefault(chosen, []).append(move.get("id"))
     return Derived(views, chosen, {k: tuple(v) for k, v in by_option.items()})
+
+
+def evidence_event_texts(events: Iterable[dict]) -> dict[str, str]:
+    """The latest valid evidence-bearing event text for each ID, in log order."""
+    return {
+        event["id"]: event["text"]
+        for event in events
+        if event.get("type") in WORDS_EVENTS
+        and not event.get("_errors")
+        and isinstance(event.get("id"), str)
+        and isinstance(event.get("text"), str)
+    }
+
+
+def evidence_event_text(events: Mapping[str, str], ident: Any) -> str | None:
+    """Look up words by event ID, including when a malformed record has no usable ID."""
+    return events.get(ident) if isinstance(ident, str) else None
 
 
 def read_lines(folder: Path, relative: str) -> list[dict]:

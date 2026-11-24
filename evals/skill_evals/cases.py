@@ -10,7 +10,8 @@ A skill's kind, `behavioural` or `procedural`, is `metadata.kind` in its SKILL.m
 also run `skill-installed` by default, because agents are meant to load them for the work without a command.
 
 A case folder `cases/<skill>/<case-id>/` holds `case.yaml` (id, rule, source, reads, situation, request, graders,
-optional validation), `repo/` with the planted files, `checks/` with hidden files that graders reference by path, and
+optional validation), `repo/` with case-specific planted files over an optional skill-wide `_base/`,
+`checks/` with hidden files that graders reference by path, and
 `replays/` with scripted runs for `tools/validate_cases.py` and the fake agent. A case about earlier work, such as
 work the user asks the agent to correct, also has `earlier/`: `before/` with the files as they were before that work,
 and `message.txt` with its commit message. The sandbox then starts with two commits, and the planted repository is
@@ -28,6 +29,7 @@ from typing import Any
 import yaml
 from inspect_ai.dataset import Sample
 
+from skill_evals import planted_repo_files
 from skill_evals.grading.files import GRADERS
 
 EVALS = Path(__file__).resolve().parents[1]
@@ -154,12 +156,7 @@ def load_case(directory: Path) -> dict[str, Any]:
     case["source"] = [str(source) for source in case.get("source") or []]
     case["reads"] = case.get("reads") or []
     case["graders"] = _resolve(case["graders"], directory)
-    repo = directory / "repo"
-    case["files"] = {
-        path.relative_to(repo).as_posix(): path
-        for path in sorted(repo.rglob("*"))
-        if path.is_file() and "__pycache__" not in path.parts
-    }
+    case["files"] = planted_repo_files(directory)
     earlier, history = directory / "earlier", directory / "history"
     if earlier.is_dir() and history.is_dir():
         raise ValueError(f"{directory.name}: a case has earlier/ or history/, not both")

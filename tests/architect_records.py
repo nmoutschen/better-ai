@@ -8,7 +8,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "evals"))
 import better  # noqa: E402
+from skill_evals import planted_repo_files  # noqa: E402
 
 from better_ai import paths, resources, schema  # noqa: E402
 from better_ai.architect import SKILL as ARCHITECT  # noqa: E402
@@ -179,7 +181,10 @@ def planted_cases():
 def planted_unit(root: Path, repo: Path, folder: Path) -> Path:
     """A case's repository, checked out as a repository of its own, with its change folder also at `.architect/<slug>`."""
     copy = root / "repo"
-    shutil.copytree(repo, copy)
+    for relative, source in planted_repo_files(repo.parent).items():
+        target = copy / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
     (copy / ".git").mkdir()
     unit = copy / ".architect" / folder.name
     shutil.copytree(copy / folder.relative_to(repo), unit)

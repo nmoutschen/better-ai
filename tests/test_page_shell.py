@@ -331,6 +331,20 @@ class ServerTest(Fixture):
         self.assertNotIn("Traceback", err.getvalue())
         self.assertNotIn("page server", err.getvalue())
 
+    def test_the_event_stream_keeps_invalid_positions_and_sends_the_valid_events_after_them(self):
+        _, host = self.serve()
+        self.seed({"type": "note", "by": "user", "id": "m1", "text": "before", "to": None})
+        with (self.unit_dir / "conversation.jsonl").open("a") as handle:
+            handle.write('{"type": "note", "text": NaN}\n{"type": "note", "text": 1e999}\nnot json\n')
+        self.seed({"type": "note", "by": "user", "id": "m2", "text": "after", "to": None})
+        status, body = self.get(host, "/events?after=1")
+        self.assertEqual(status, 200)
+        events = json.loads(body)
+        self.assertEqual(events["total"], 5)
+        self.assertEqual(events["events"][:3], [{}, {}, {}])
+        self.assertEqual(len(events["events"]), 4)
+        self.assertEqual(events["events"][-1]["id"], "m2")
+
     def test_a_log_that_is_a_folder_is_answered_as_the_file_error_in_every_reader(self):
         server, host = self.serve()
         (self.unit_dir / "conversation.jsonl").mkdir()

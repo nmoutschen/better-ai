@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 
 import better  # noqa: E402
+import pyz  # noqa: E402
 
 sys.path.insert(0, str(HERE.parent / "tools"))
 import smoke  # noqa: E402
@@ -85,6 +86,7 @@ CASES = {
     "design-better": (".design/demo", 1, old_design, 1),
     "show-better": (".show/demo", 1, old_show, 1),
     "architect-better": (".architect/demo", 1, None, 0),  # architect keeps no format from before this change
+    "discover-better": (".discover/demo", 1, None, 0),  # discover has always used the current format
 }
 
 
@@ -101,6 +103,9 @@ def served(skill, repo, unit):
 
 
 class OldFormatCountTest(unittest.TestCase):
+    def test_every_shipped_skill_has_an_old_format_count_case(self):
+        self.assertEqual(set(CASES), set(pyz.skill_names()))
+
     def test_every_page_carries_the_shared_count_and_serves_it_S35(self):
         for skill, (unit, setup, make_old, expected) in CASES.items():
             with self.subTest(skill), tempfile.TemporaryDirectory() as tmp:
@@ -112,11 +117,14 @@ class OldFormatCountTest(unittest.TestCase):
                 server = served(skill, repo, unit)
                 try:
                     address = folder / ".server"
+                    url = ""
                     for _ in range(100):
                         if address.exists():
-                            break
+                            url = address.read_text().strip()
+                            if url:
+                                break
                         time.sleep(0.1)
-                    url = address.read_text().strip()
+                    self.assertTrue(url, "serve did not publish its address")
                     with urllib.request.urlopen(url + "old", timeout=10) as response:  # noqa: S310
                         self.assertEqual(json.loads(response.read()), expected)
                     with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310

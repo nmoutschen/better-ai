@@ -38,7 +38,6 @@ BRIEF_FOLDER = "brief"
 STATE = ".redact"  # the state file of a redact that has not finished
 SERVER = ".server"  # where the page says it is served
 REMOVED = "[removed]"
-WORDS_EVENTS = ("add_evidence", "add_result")  # the page events whose text evidence words may name
 VERSION = re.compile(r"^v\d+$")
 EVIDENCE_ID = re.compile(r"^E-[\w.-]+-\d+$")
 POINTS = ("rendered", "linked", "recorded")  # where a `brief` run may stop; a test stops it at each
@@ -90,7 +89,7 @@ def _folder(unit: Unit, folder: str) -> dict[str, dict]:
     return found
 
 
-def _load(unit: Unit) -> Data:
+def _load(unit: Unit, *, conversation: list[dict] | None = None) -> Data:
     head = derive.read_object(unit.path, unit.kind.head)
     if head is None:
         raise refusal(unit.label, f"{unit.kind.head} does not parse", f"fix it, then run check {unit.label}")
@@ -103,7 +102,7 @@ def _load(unit: Unit) -> Data:
         tests=_lines(unit, "tests.jsonl"),
         briefs=_lines(unit, "briefs.jsonl"),
         decisions=_lines(unit, "decisions.jsonl"),
-        conversation=_lines(unit, "conversation.jsonl"),
+        conversation=_lines(unit, "conversation.jsonl") if conversation is None else conversation,
         evidence=_folder(unit, "evidence"),
         sources=_folder(unit, "sources"),
     )
@@ -150,13 +149,6 @@ def _sort_key(ident: str) -> tuple:
     return (found.group(1), int(found.group(2))) if found else (ident, 0)
 
 
-def _event_text(data: Data, ident: str) -> str:
-    for event in data.conversation:
-        if event.get("id") == ident and event.get("type") in WORDS_EVENTS and isinstance(event.get("text"), str):
-            return event["text"]
-    return "words not found"
-
-
 def _by_role(origin: dict, internal: bool) -> bool:
     """Whether the brief shows the evidence's summary by role in place of its words: the user's own words in an internal
     discovery, and anything from the user's files or tools in any discovery."""
@@ -177,7 +169,7 @@ def _results(data: Data, ident: str, internal: bool) -> list[str]:
     return lines
 
 
-def _evidence_block(ident: str, evidence: dict, data: Data, internal: bool) -> str:
+def _evidence_block(ident: str, evidence: dict, data: Data, internal: bool, events: dict[str, str]) -> str:
     source = data.sources.get(evidence.get("source"), {})
     origin = source.get("origin") or {}
     about = "about your users" if evidence.get("about") == "your users" else "from elsewhere"
@@ -191,7 +183,11 @@ def _evidence_block(ident: str, evidence: dict, data: Data, internal: bool) -> s
             line = f"From {inline(source.get('title') or 'your files')}: {summary} {facts}."
     else:
         words = evidence.get("words") or {}
-        text = _event_text(data, words.get("event")) if words.get("type") == "event" else words.get("text")
+        text = (
+            (derive.evidence_event_text(events, words.get("event")) or "words not found")
+            if words.get("type") == "event"
+            else words.get("text")
+        )
         line = f'"{inline(text)}" {facts}.'
         title = inline(source.get("title") or "no title")
         line += f" Source: {title}" + (f", {_url(origin['url'])}" if origin.get("type") == "web" else "") + "."
@@ -288,6 +284,7 @@ def render(unit: Unit, data: Data, version: str) -> str:
         for line in _item_lines(item, derived.items[item["id"]])
     ]
     blocks = []
+    events = derive.evidence_event_texts(data.conversation)
     corrected = {e.get("corrects") for e in data.evidence.values()}  # a reworded quote shows as its correction
     for ident in sorted(data.evidence, key=_sort_key):
         found = data.evidence[ident]
@@ -295,7 +292,7 @@ def render(unit: Unit, data: Data, version: str) -> str:
             continue
         if not EVIDENCE_ID.fullmatch(ident):
             raise refusal(unit.label, f"evidence {ident!r} has an id that is not valid", f"run check {unit.label}")
-        blocks.append(_evidence_block(ident, found, data, internal))
+        blocks.append(_evidence_block(ident, found, data, internal, events))
     tests = [line for test in data.tests for line in _test_lines(test, internal)]
     questions = [f"- {inline(q)}" for q in record.get("questions") or []]
     values = {
@@ -376,7 +373,10 @@ def brief(args: argparse.Namespace, run: cli.Run) -> int:
     version = args.version
     if not VERSION.fullmatch(version):
         raise refusal(unit.label, f"{version!r} is not a brief version", "name it v1, v2 and so on")
-    data = _load(unit)
+    conversation = schema.read_records(
+        unit, "conversation.jsonl", schema.docs_for(SKILL.package), {}, run.now(), run.info.cutoff
+    ).records
+    data = _load(unit, conversation=conversation)
     record = next((b for b in data.briefs if b.get("id") == version), None)
     if record is None:
         raise refusal(unit.label, f"no brief {version} in briefs.jsonl", f"add it first: add {unit.label} brief")
@@ -657,7 +657,7 @@ def _prepare(unit: Unit, data: Data, step: dict, request: str) -> tuple[list[str
     if kind == "event":
 
         def emptied(found: dict) -> dict | None:
-            if found.get("id") != ref or found.get("type") not in WORDS_EVENTS:
+            if found.get("id") != ref or found.get("type") not in derive.WORDS_EVENTS:
                 return None
             words = {"text": REMOVED, **({"source": REMOVED} if found["type"] == "add_evidence" else {})}
             return {**found, **words}

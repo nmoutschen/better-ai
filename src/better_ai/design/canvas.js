@@ -82,7 +82,8 @@
   if (data.error) {
     var problem = document.getElementById('canvas-problem'); problem.textContent = data.error; problem.hidden = false;
     document.getElementById('status').textContent = '';
-    watchForChange();
+    // A page whose unit cannot be read still reloads once the unit is fixed.
+    pageWatchRevision(function () { location.reload(); });
     return;
   }
   build(data, main, controls);
@@ -645,15 +646,6 @@
   }
   }
 
-  // A page whose unit cannot be read still reloads once the unit is fixed.
-  function watchForChange() {
-    var rev = null;
-    (function poll() {
-      fetch('/rev').then(function (r) { return r.text(); }).then(function (v) {
-        if (rev === null) rev = v; else if (v !== rev) location.reload();
-      }).catch(function () {}).then(function () { setTimeout(poll, 2000); });
-    })();
-  }
   var carried = document.getElementById('page-data');
   if (carried) boot(JSON.parse(carried.textContent));
   else pageFetch('/data').then(function (r) { return r.json(); }).then(boot).catch(function (e) {

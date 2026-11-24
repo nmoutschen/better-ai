@@ -3,8 +3,8 @@
 `load(unit)` is the page's data, served at `/data`: every record of the discovery, each read one by one (a record that
 fails its schema stays, without the fields that failed, and its errors are listed), with what the records derive for an
 item (`derive`), the words of each piece of evidence, the text of each final brief, and for each option the revision the
-page puts in a `choose` event (`rules_moves.revision_in`, so the page and the move rule cannot disagree about what the
-user saw). The page reads no other file: it draws the board and the shared conversation from this and from the log.
+page puts in a `choose` event, from the same records as the displayed option and items. The page draws the board and
+the shared conversation from this data and the log.
 """
 
 from __future__ import annotations
@@ -37,11 +37,11 @@ def _text(value: Any) -> str:
     return value if isinstance(value, str) else ""
 
 
-def _evidence_text(record: dict, events: dict[str, dict]) -> str:
+def _evidence_text(record: dict, events: dict[str, str]) -> str:
     """The words of a piece of evidence: the quote itself, or the text of the page event that holds them."""
     words = record.get("words") if isinstance(record.get("words"), dict) else {}
     if words.get("type") == "event":
-        return _text((events.get(words.get("event")) or {}).get("text"))
+        return derive.evidence_event_text(events, words.get("event")) or ""
     return _text(words.get("text"))
 
 
@@ -61,7 +61,7 @@ def load(unit: Unit) -> dict:
     found: dict[str, Any] = {attribute: read(name) for name, attribute in RECORD_FILES}
     sources = {s["id"]: s for name in _files(unit, "sources") for s in read(name) if isinstance(s.get("id"), str)}
     evidence = [r for name in _files(unit, "evidence") for r in read(name)]
-    events = {e["id"]: e for e in found["conversation"] if isinstance(e.get("id"), str)}  # the latest version wins
+    events = derive.evidence_event_texts(found["conversation"])
     view = derive.derive(found["items"], found["changes"], found["moves"])
 
     items = []
@@ -102,12 +102,12 @@ def load(unit: Unit) -> dict:
                 body = None
         briefs.append({**brief, "text": body})
 
-    revisions = {}
-    for option in found["options"]:
-        ident = option.get("id")
-        revision = rules_moves.revision_in(unit.path, ident) if isinstance(ident, str) else None
-        if revision:
-            revisions[ident] = revision
+    revision_items = rules_moves.revision_items(found["items"], view.items)
+    revisions = {
+        option["id"]: rules_moves.revision_of(option, revision_items)
+        for option in found["options"]
+        if isinstance(option.get("id"), str) and not option.get("_errors")
+    }
 
     # Each agent at work and its latest record, by summary's one rule (S56, L4): the page shows "No word from…" from it.
     known = summary.Discovery(
