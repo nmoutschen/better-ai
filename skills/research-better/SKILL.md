@@ -110,7 +110,7 @@ FOR a chain question, READ the reference list of the source (backward), and FIND
 After each search or page read, ADD to the board before the next step:
 
 - The query, as a `search` record in your log (`add <board> search --for <your agent name>`).
-- New sources, each a `source` record, with `author`, `date`, `title`, `publisher`, `url`, `category`, how you read it (`read`), and a trust assessment (`trust`, `trust_reason`). COPY the author, date, title, and publisher from the page itself, not from memory or the search result. LIST in `ids` the DOI, arXiv ID, PMID or ISBN the page gives. CHECK the board for the URL first. MARK a source that cites, copies, or summarizes another source as a repeat of it in `repeats`: the two are not independent.
+- New sources, each a `source` record, with `author`, `date`, `title`, `publisher`, `url`, `category`, how you read it (`read`), and `trust` with its `trust_reason`. SET `category` and `trust` by the rules in the board format, answering its trust checks one at a time. COPY the author, date, title, and publisher from the page itself, not from memory or the search result. LIST in `ids` the DOI, arXiv ID, PMID or ISBN the page gives. CHECK the board for the URL first. MARK a source that cites, copies, or summarizes another source as a repeat of it in `repeats`: the two are not independent.
 - New claims, each a `claim` record with its `source`, a verbatim `quote` and `status` `unchecked`. That a source does not report something is not a claim, because no quote can show it: GIVE it in the question's summary or add it as a `gap` record in your log. PREFER primary sources, such as the study, the dataset, or the official documentation, over pages that summarize them.
 - New terms, and new questions (step 5.3).
 

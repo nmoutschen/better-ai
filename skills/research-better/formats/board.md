@@ -69,6 +69,41 @@ A verifier, not the agent that added the claim, sets everything after `status` `
 
 `ids` lists the identifiers a retraction check can look the work up by, one object per identifier, with the identifier under the key named by its `type`; it is `[]` for a page with none.
 
+### category
+
+SET `category` from what the page shows about where the work appeared, not from how good it looks:
+
+- `peer-reviewed`: an article in a journal or conference proceedings that the page names.
+- `preprint`: a paper posted on a server such as arXiv, SSRN, bioRxiv or OSF. IT STAYS `preprint` unless the page names its published version, such as a journal reference or the DOI of the published article: THEN SET `peer-reviewed` and ADD that DOI to `ids`.
+- `working paper`: a paper in an institution's series, such as NBER, a central bank or a university department.
+- `documentation`: reference pages that describe how a product, API, standard or law works, by whoever maintains it.
+- `vendor`: a company's other material about its own products, such as marketing pages, case studies, white papers and posts that compare its products with others.
+- `government`: by a government body or an intergovernmental organization.
+- `news`: by a news organization.
+- `blog`: posts by a person or team, outside a news organization's editing, about things they do not sell.
+- `dataset`, `book`: as named. `other`: none of the above.
+
+### trust
+
+`trust` rates the work itself: how far its content can be believed, whichever claim the board takes from it. Whether a claim says more than the source shows is the verifier's check on the claim, not part of `trust`.
+
+ANSWER these four checks from the page, one at a time, BEFORE you set the level:
+
+1. **Origin**: does the source produce what the board takes from it, such as its own study, data, product, rules or decisions, or does it report what another source produced? IF it reports, SET `repeats` when that source is on the board, and LOOK for the original.
+2. **Method**: for results, such as a measurement, a rate, an effect or a comparison, does the page show how they were obtained: the design, the sample and its size, the data or code?
+3. **Interest**: do the author, the publisher or the funder gain if the results come out a certain way, such as a company evaluating its own product or a study funded by the maker of what it tests? Does the page say so?
+4. **Standing**: has the work been retracted, withdrawn or corrected, or does the page contradict its own data?
+
+THEN SET the level from the answers:
+
+- `high`: the source produces what it reports; IF it reports results, it shows how they were obtained, and they rest neither on a small sample, under about 50 people or cases, nor on self-reports alone; no one behind it gains from the results, or it describes its own product, rules or decisions without evaluating them; and nothing in check 4 applies.
+- `low`: any of these: retracted or withdrawn; it reports results without saying where they come from; it gives results with no method; or someone behind it gains from the results and the page gives no data that others could check.
+- `medium`: everything else, such as a study with a small sample, a survey of self-reports, a study funded by an interested party that discloses this, or a secondary source that names its source and reports it faithfully.
+
+DO NOT raise or lower `trust` for the `category`, the venue's or author's prestige, citation counts, or how polished the page is. The same company's reference page and its post comparing its product with others are two sources and can get two levels.
+
+WRITE in `trust_reason` the answers that set the level, in one line, such as "own RCT; method shown; n=16, small; no stake" for a `medium`.
+
 ## log lines
 
 ADD one record per event, with `--for` the log's agent name; only that agent adds its own. A record holds `type` and the fields of its kind.
