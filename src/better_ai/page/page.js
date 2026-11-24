@@ -33,6 +33,19 @@ function pageFetch(url, init) {
   });
 }
 
+function pagePollAgain(poll, delay) { if (!pageIsStale) setTimeout(poll, delay); }
+
+function pageWatchRevision(onChange) {
+  var rev = null;
+  (function poll() {
+    pageFetch('/rev').then(function (r) { return r.text(); }).then(function (t) {
+      if (pageIsStale) return;
+      if (rev === null) rev = t;
+      else if (t !== rev) onChange();
+    }).catch(function () {}).then(function () { pagePollAgain(poll, 2000); });
+  })();
+}
+
 // The element-comment layer. A page supplies its target metadata, pin coordinates and navigation;
 // this owns the editor, the numbered pins and their actions.
 function pageElementComments(o) {
@@ -437,11 +450,10 @@ function pageConversation(o) {
   function start() {
     renderThread();
     if (!o.served) return;
-    function again(poll, delay) { if (!pageIsStale) setTimeout(poll, delay); }
     (function count() {
       pageFetch('/old').then(function (r) { return r.json(); }).then(function (n) {
         if (!pageIsStale) oldNote(Number(n) || 0);
-      }).catch(function () {}).then(function () { again(count, 5000); });
+      }).catch(function () {}).then(function () { pagePollAgain(count, 5000); });
     })();
     // After two failed polls in a row, a strip under the bar says the agent's server stopped; it goes when it answers again.
     // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
@@ -456,21 +468,15 @@ function pageConversation(o) {
         if (after > 0) r.events.forEach(function (e) { if (e.type === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
         if (r.events.length) renderThread();
         stream(r.total);
-      }).catch(function (e) { if (e && e.stale) return; connected(false); again(function () { stream(after); }, 2000); });
+      }).catch(function (e) { if (e && e.stale) return; connected(false); pagePollAgain(function () { stream(after); }, 2000); });
     })(0);
     // A new render from the agent loads by itself, as soon as the user is not typing: a comment, a message or an answer
     // in progress would be lost. The page keeps its place through o.beforeReload.
-    var rev = null;
-    if (streaming) (function poll() {
-      pageFetch('/rev').then(function (r) { return r.text(); }).then(function (t) {
-        if (pageIsStale) return;
-        if (rev === null) rev = t;
-        else if (t !== rev && !busy()) {
-          try { if (o.beforeReload) o.beforeReload(); } catch (e) {}
-          location.reload();
-        }
-      }).catch(function () {}).then(function () { again(poll, 2000); });
-    })();
+    if (streaming) pageWatchRevision(function () {
+      if (busy()) return;
+      try { if (o.beforeReload) o.beforeReload(); } catch (e) {}
+      location.reload();
+    });
     // Once the agent has used `wait`, a note above the message box says when no `wait` is connected: what the user
     // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more. It goes
     // through pageFetch like every request: a page out of date shows only that strip, and asks nothing more.
@@ -480,7 +486,7 @@ function pageConversation(o) {
         unwatched.hidden = pageIsStale || on !== false;
         if (!streaming) connected(true);
       }).catch(function () { unwatched.hidden = true; if (!streaming) connected(false); })
-        .then(function () { again(watch, 2000); });
+        .then(function () { pagePollAgain(watch, 2000); });
     })();
   }
 
