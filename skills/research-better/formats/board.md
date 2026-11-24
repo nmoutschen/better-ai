@@ -58,7 +58,7 @@ A verifier, not the agent that added the claim, sets everything after `status` `
 {"type": "claim", "claim": "<...>", "question": "<Q-...>", "source": "<S-...>", "quote": "<...>", "status": "withdrawn", "replaced_by": "<C-... or null>"}
 ```
 
-`hard` and `blocked` are the JSON values `true` or `false`, not text. A `withdrawn` claim keeps only the fields shown: its checker, span and reason go, with `--unset`. A claim that stops being `verified` loses its `sha256`.
+`hard` and `blocked` are the JSON values `true` or `false`, not text. A `withdrawn` claim keeps only the fields shown: its checker, span and reason go, with `--unset`. A claim that stops being `verified` loses its `sha256`. Changing the `claim` or `question` of a `verified` claim is refused unless the same `set` takes it out of `verified`: the verdict was on the old wording. TO narrow it, SET it to `unchecked`, with `--unset` for its `checker`, `span`, `hard` and any `differs`.
 
 ## source
 

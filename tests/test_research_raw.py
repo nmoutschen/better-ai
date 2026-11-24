@@ -96,6 +96,44 @@ class ResearchRaw(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout)
         self.assertIn("--raw", done.stdout + done.stderr)
 
+    def test_a_verified_claim_whose_text_changes_is_refused(self):
+        self.assertEqual(self.verify().returncode, 0)
+        wider = json.dumps({"claim": "Steps before payment always change conversion."})
+        done = call(SKILL, "set", self.board, "C-w1-1", "--by", "coordinator", stdin=wider)
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertIn("unchecked", done.stderr)
+        self.assertEqual(self.claim()["claim"], "A step was added.")
+        self.assertEqual(self.claim()["status"], "verified")
+
+    def test_a_verified_claim_moved_to_another_question_is_refused(self):
+        self.assertEqual(self.verify().returncode, 0)
+        record = example("questions/<id>.json", "in progress")
+        fields = {k: v for k, v in record.items() if k not in ("type", "at", "by", "id", "raised_in", "lens")}
+        fields["kind"] = "seed"
+        self.assertEqual(
+            call(SKILL, "add", self.board, "question", "--by", "w1", stdin=json.dumps(fields)).returncode, 0
+        )
+        self.assertTrue((self.board / "questions" / "Q-w1-2.json").is_file())
+        done = call(SKILL, "set", self.board, "C-w1-1", "--by", "coordinator", stdin=json.dumps({"question": "Q-w1-2"}))
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.assertIn("unchecked", done.stderr)
+        self.assertEqual(self.claim()["question"], "Q-w1-1")
+
+    def test_a_verified_claim_reworded_back_to_unchecked_is_accepted(self):
+        self.assertEqual(self.verify().returncode, 0)
+        unset = [a for f in ("checker", "span", "hard") for a in ("--unset", f)]
+        narrower = json.dumps({"claim": "One address step was added before payment.", "status": "unchecked"})
+        done = call(SKILL, "set", self.board, "C-w1-1", "--by", "coordinator", *unset, stdin=narrower)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.claim()["status"], "unchecked")
+        self.assertNotIn("sha256", self.claim())
+
+    def test_setting_a_verified_claim_to_the_same_text_is_accepted(self):
+        self.assertEqual(self.verify().returncode, 0)
+        same = json.dumps({"claim": "A step was added."})
+        done = call(SKILL, "set", self.board, "C-w1-1", "--by", "coordinator", stdin=same)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_raw_on_a_verified_claim_is_checked_again(self):
         self.assertEqual(self.verify().returncode, 0)
         done = self.set({"differs": "date: the page says 2026-10-03"}, self.page)
