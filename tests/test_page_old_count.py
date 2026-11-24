@@ -86,6 +86,7 @@ CASES = {
     "design-better": (".design/demo", 1, old_design, 1),
     "show-better": (".show/demo", 1, old_show, 1),
     "architect-better": (".architect/demo", 1, None, 0),  # architect keeps no format from before this change
+    "discover-better": (".discover/demo", 1, None, 0),  # discover has always used the current format
 }
 
 

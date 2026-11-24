@@ -23,12 +23,12 @@ sys.path.insert(0, str(HERE.parent / "src"))
 import architect_records  # noqa: E402
 import better  # noqa: E402
 import code_records  # noqa: E402
+import discover_populated  # noqa: E402
+import discover_records  # noqa: E402
 import pyz  # noqa: E402
 import research_records  # noqa: E402
 
-from better_ai import architect, code, design, page, research, show  # noqa: E402
-
-REGISTERED = (architect, code, design, research, show)  # imported so each skill registers its page
+from better_ai import page, resources  # noqa: E402
 
 SHOW = {
     "type": "slides",
@@ -135,6 +135,14 @@ PAGES = {
             "comment": {"id": "c-x", "text": "why?", "on": {"kind": "question", "id": "Q-w2-4", "title": "t"}},
         },
     ),
+    "discover-better": (
+        discover_populated.populated,
+        {
+            "note": NOTE,
+            "answer": {"id": "a-x", "decision": "D1", "text": "Run the probe", "default": False},
+            **discover_records.EVENTS,
+        },
+    ),
 }
 
 
@@ -172,6 +180,8 @@ class PageContract(unittest.TestCase):
         self.assertEqual(set(PAGES), set(pyz.skill_names()))
 
     def test_every_page_saves_what_it_sends_as_the_users_and_refuses_a_by(self):
+        for skill in pyz.skill_names():
+            resources.skill_package(skill.removesuffix("-better"))
         self.assertEqual(set(page.PAGES), set(PAGES), "a page without a unit and samples, or samples without a page")
         for skill, spec in page.PAGES.items():
             make_unit, samples = PAGES[skill]

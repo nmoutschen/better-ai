@@ -357,8 +357,8 @@ class Conversation:
         events = []
         for line in self.lines():
             try:
-                event = json.loads(line)
-            except (ValueError, RecursionError):
+                event = schema.page_value(line)
+            except ValueError:
                 event = None
             events.append(
                 event if isinstance(event, dict) else {}
