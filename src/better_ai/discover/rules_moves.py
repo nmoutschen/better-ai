@@ -21,10 +21,12 @@ Every message names the existing record and the next action.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .. import paths, records, schema
+from .. import paths, records, resources, schema
 from ..schema import Context, hook
 from . import SKILL, derive
 
@@ -53,36 +55,47 @@ def _latest_event(context: Context, ident: str) -> dict | None:
 # ---------------------------------------------------------------- the revision of an option
 
 
-def revision_of(option: dict, items: list[dict], changes: list[dict]) -> str:
-    """The hash the page puts in a `choose` event: of the option as it is, and of every item as the page shows it (its
-    text and, for a behaviour, its testable form, with the state and importance derived from the changes). The page
-    and the move rule both call this, so they cannot disagree about what the user saw."""
-    view = derive.derive(items, changes).items
+def revision_items(items: list[dict], views: Mapping[str, derive.ItemView]) -> list[dict]:
+    """The item fields and derived state that contribute to every option's revision."""
     shown = []
     for item in items:
-        if not isinstance(item.get("id"), str):
+        ident = item.get("id")
+        if not isinstance(ident, str):
             continue
-        found = view.get(item["id"])
+        view = views.get(ident)
         shown.append(
             {
-                "id": item["id"],
+                "id": ident,
                 "kind": item.get("kind"),
                 "text": item.get("text"),
                 "testable": item.get("testable"),
-                "state": found.state if found else None,
-                "importance": found.importance if found else None,
+                "state": view.state if view else None,
+                "importance": view.importance if view else None,
             }
         )
+    return shown
+
+
+def revision_of(option: dict, shown: list[dict]) -> str:
+    """Hash the option and the state of the items that the page shows."""
     body = {"option": {k: v for k, v in option.items() if k not in ("at", "by")}, "items": shown}
     return schema.fingerprint(body)
 
 
 def revision_in(folder: Path, option: str) -> str | None:
-    """`revision_of` for an option of a discovery's folder; None if the option is not there."""
-    chosen = next((o for o in derive.read_lines(folder, "options.jsonl") if o.get("id") == option), None)
+    """The revision of the current valid option, using the same record reader as the page."""
+    unit = paths.resolve_unit(str(folder), SKILL)
+    docs, cache = schema.docs_for(SKILL.package), {}
+    now, cutoff = datetime.now(timezone.utc), resources.cutoff()
+
+    def read(relative: str) -> list[dict]:
+        return schema.read_records(unit, relative, docs, cache, now, cutoff, keep_invalid=True).records
+
+    chosen = next((o for o in read("options.jsonl") if o.get("id") == option and not o.get("_errors")), None)
     if chosen is None:
         return None
-    return revision_of(chosen, derive.read_lines(folder, "items.jsonl"), derive.read_lines(folder, "changes.jsonl"))
+    items, changes = read("items.jsonl"), read("changes.jsonl")
+    return revision_of(chosen, revision_items(items, derive.derive(items, changes).items))
 
 
 # ---------------------------------------------------------------- moves
@@ -181,7 +194,7 @@ def _the_choice_is_current(ctx: records.AddContext) -> None:
     if event is None or event.get("type") != "choose" or event.get("option") != ctx.record.get("option"):
         return  # the move rule says what is wrong
     now = revision_in(ctx.unit.path, ctx.record["option"])
-    if now is not None and event.get("revision") != now:
+    if now is None or event.get("revision") != now:
         raise paths.refusal(
             ctx.unit.label,
             f"{ctx.record['option']} or an item it rests on changed since the user chose it",

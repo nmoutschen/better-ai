@@ -171,15 +171,15 @@ def _silent(d: Discovery, agent: str, since: Any, fallback: dict, now: datetime)
     return int((now - last).total_seconds() // 60)
 
 
-def _evidence_texts(d: Discovery, evidence: dict) -> list[str]:
+def _evidence_texts(evidence: dict, events: dict[str, str]) -> list[str]:
     texts = []
     words = evidence.get("words") if isinstance(evidence.get("words"), dict) else {}
     if words.get("type") == "quote" and isinstance(words.get("text"), str):
         texts.append(words["text"])
     elif words.get("type") == "event":
-        event = next((e for e in d.conversation if e.get("id") == words.get("event")), None)
-        if event and isinstance(event.get("text"), str):
-            texts.append(event["text"])
+        text = derive.evidence_event_text(events, words.get("event"))
+        if text:
+            texts.append(text)
     if isinstance(evidence.get("summary"), str):
         texts.append(evidence["summary"])
     return [t for t in (_norm(t) for t in texts) if t and t != _norm(REMOVED)]  # a redact's mark is not a copy
@@ -364,8 +364,9 @@ def warnings_of(d: Discovery, now: datetime) -> list[Warning_]:
                         f"{brief.get('id')} still holds the block of removed {ident}: run redact again",
                     )
                 )
+    evidence_events = derive.evidence_event_texts(d.conversation)
     for e in d.evidence:
-        texts = _evidence_texts(d, e)
+        texts = _evidence_texts(e, evidence_events)
         for where, ident, record in _holders(d, e):
             if any(_occurs(t, s) for t in texts for s in _strings(record)):
                 found.append(
