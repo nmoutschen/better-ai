@@ -156,7 +156,7 @@ stops a run between models rather than in the middle of one.
 ```
 cases/<skill>/<case-id>/
   case.yaml   id, rule, source, reads, situation, request, graders, optional validation
-  repo/       the planted files, copied into the sandbox
+  repo/       the case-specific planted files, copied into the sandbox
   checks/     hidden files that graders reference by path
   replays/    good-*.yaml and bad-*.yaml runs for validate_cases.py and the fake agent
   earlier/    optional: the agent's earlier work, for skills that correct it, such as do-better
@@ -169,17 +169,22 @@ cases/<skill>/<case-id>/
       commit.env    optional: GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_AUTHOR_DATE
 ```
 
-With `earlier/`, the sandbox starts with two commits: `before/`, then `repo/`
+A skill can keep files common to all of its cases in `cases/<skill>/_base/`.
+Each case starts with those files and overlays its own `repo/` at the same
+relative paths. The base is part of the final planted tree. Files under
+`earlier/before/` or `history/<step>/files/` still define the earlier trees.
+
+With `earlier/`, the sandbox starts with two commits: `before/`, then the planted tree
 with `message.txt` as its message. The agent finds its earlier work as the last
 commit, and graders compare against that commit, so a case states the earlier
 work in the repository instead of in a conversation the harness would have to
 replay.
 
 With `history/`, the sandbox starts with one commit per step folder, each
-adding its `files/` to the tree of the step before. `repo/` then replaces the
+adding its `files/` to the tree of the step before. The planted tree then replaces the
 tree as a last commit, `Planted repository`, only when it differs from the
-last step, so a case can keep its last step identical to `repo/` and end on
-that step's message. A step cannot delete a file; leave it out of `repo/` to
+last step, so a case can keep its last step identical to the planted tree and end on
+that step's message. A step cannot delete a file. Leave it out of the planted tree to
 delete it in the last commit. Graders compare against the last commit.
 
 `rule` names the behaviour the case tests, such as `report-accurately` or
