@@ -96,9 +96,9 @@ ANSWER these four checks from the page, one at a time, BEFORE you set the level:
 
 THEN SET the level from the answers:
 
-- `high`: the source produces what it reports; IF it reports results, it shows how they were obtained, and they rest neither on a small sample, under about 50 people or cases, nor on self-reports alone; no one behind it gains from the results, or it describes its own product, rules or decisions without evaluating them; and nothing in check 4 applies.
+- `high`: the source produces what it reports, nothing in check 4 applies, and it is one of two kinds: it reports results, shows how they were obtained, rests neither on a small sample, under about 50 people or cases, nor on self-reports alone, and no one behind it gains from the results; OR it describes its own product, rules or decisions without evaluating them. A page that argues, advises or gives opinions without results of its own is neither kind, so it is `medium` at most.
 - `low`: any of these: retracted or withdrawn; it reports results without saying where they come from; it gives results with no method; or someone behind it gains from the results and the page gives no data that others could check.
-- `medium`: everything else, such as a study with a small sample, a survey of self-reports, a study funded by an interested party that discloses this, or a secondary source that names its source and reports it faithfully.
+- `medium`: everything else, such as a study with a small sample, a survey of self-reports, a study funded by an interested party that discloses this, a secondary source that names its source and reports it faithfully, or a page that argues, advises or gives opinions without results of its own.
 
 DO NOT raise or lower `trust` for the `category`, the venue's or author's prestige, citation counts, or how polished the page is. The same company's reference page and its post comparing its product with others are two sources and can get two levels.
 
