@@ -77,7 +77,7 @@ SET `category` from what the page shows about where the work appeared, not from 
 - `preprint`: a paper posted on a server such as arXiv, SSRN, bioRxiv or OSF. IT STAYS `preprint` unless the page names its published version, such as a journal reference or the DOI of the published article: THEN SET `peer-reviewed` and ADD that DOI to `ids`.
 - `working paper`: a paper in an institution's series, such as NBER, a central bank or a university department.
 - `documentation`: reference pages that describe how a product, API, standard or law works, by whoever maintains it.
-- `vendor`: a company's other material about its own products, such as marketing pages, case studies, white papers and its own benchmark posts.
+- `vendor`: a company's other material about its own products, such as marketing pages, case studies, white papers and posts that compare its products with others.
 - `government`: by a government body or an intergovernmental organization.
 - `news`: by a news organization.
 - `blog`: posts by a person or team, outside a news organization's editing, about things they do not sell.
@@ -100,7 +100,7 @@ THEN SET the level from the answers:
 - `low`: any of these: retracted or withdrawn; it reports results without saying where they come from; it gives results with no method; or someone behind it gains from the results and the page gives no data that others could check.
 - `medium`: everything else, such as a study with a small sample, a survey of self-reports, a study funded by an interested party that discloses this, or a secondary source that names its source and reports it faithfully.
 
-DO NOT raise or lower `trust` for the `category`, the venue's or author's prestige, citation counts, or how polished the page is. The same company's reference page and its benchmark post are two sources and can get two levels.
+DO NOT raise or lower `trust` for the `category`, the venue's or author's prestige, citation counts, or how polished the page is. The same company's reference page and its post comparing its product with others are two sources and can get two levels.
 
 WRITE in `trust_reason` the answers that set the level, in one line, such as "own RCT; method shown; n=16, small; no stake" for a `medium`.
 
