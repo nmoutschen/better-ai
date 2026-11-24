@@ -343,14 +343,7 @@ def test_a_repeated_result_restarts_the_quiet_interval(tmp_path: Path) -> None:
     fake = tmp_path / "fake-claude"
     result = '{"type":"result","stop_reason":"end_turn"}'
     last = '{"type":"result","stop_reason":"end_turn","turn":3}'
-    fake.write_text(
-        "#!/bin/sh\n"
-        f"echo '{result}'\n"
-        "sleep 0.5\n"
-        f"echo '{result}'\n"
-        "sleep 0.75\n"
-        f"echo '{last}'\n"
-    )
+    fake.write_text(f"#!/bin/sh\necho '{result}'\nsleep 0.5\necho '{result}'\nsleep 0.75\necho '{last}'\n")
     fake.chmod(0o755)
     out = tmp_path / "run.out"
     script = agent.end_after_result(f"{fake} > {out} < /dev/null", str(out), quiet=1, poll=0.05, grace=0.5)

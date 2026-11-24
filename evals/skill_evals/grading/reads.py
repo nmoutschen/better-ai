@@ -25,7 +25,7 @@ from inspect_ai.scorer import Score, Scorer, Target, mean, scorer
 from inspect_ai.solver import TaskState
 from inspect_ai.util import sandbox
 
-from skill_evals.agent import READ_TOOL, SKILLS_FOLDER
+from skill_evals.agent import AGENT_USER, READ_TOOL, SKILLS_FOLDER, home
 from skill_evals.cases import WITH_SKILL
 from skill_evals.grading.files import GradingError
 from skill_evals.grading.judge import NO_JUDGE, TRANSCRIPT_GUIDE, render_transcript, run_judge
@@ -36,9 +36,17 @@ SUB_AGENT = "sub-agent"
 JUDGE = "judge"
 
 
-def skill_path(skill: str) -> re.Pattern[str]:
-    """Match a file inside the installed skill folder and capture its path relative to that folder."""
-    return re.compile(rf"{re.escape(SKILLS_FOLDER)}/{re.escape(skill)}/([\w./-]+\.\w+)")
+def skill_path(file_path: object, skill: str) -> str | None:
+    """Return the exact relative path for a read inside the sandbox's installed skill."""
+    if not isinstance(file_path, str):
+        return None
+    for root in (home(AGENT_USER), "~", "$HOME", "${HOME}"):
+        prefix = f"{root}/{SKILLS_FOLDER}/{skill}/"
+        if file_path.startswith(prefix):
+            path = file_path.removeprefix(prefix)
+            if re.fullmatch(r"[\w.-]+(?:/[\w.-]+)*\.\w+", path) and not {".", ".."}.intersection(path.split("/")):
+                return path
+    return None
 
 
 def files_read(messages: list[ChatMessage], skill: str) -> dict[str, str]:
@@ -53,9 +61,9 @@ def files_read(messages: list[ChatMessage], skill: str) -> dict[str, str]:
             arguments = call.arguments or {}
             if call.function != READ_TOOL or call.id in failed:
                 continue
-            for path in skill_path(skill).findall(str(arguments.get("file_path", ""))):
-                if path != "SKILL.md":
-                    found.setdefault(path, reader)
+            path = skill_path(arguments.get("file_path"), skill)
+            if path and path != "SKILL.md":
+                found.setdefault(path, reader)
     return found
 
 

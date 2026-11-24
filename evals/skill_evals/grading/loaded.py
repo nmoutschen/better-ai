@@ -11,6 +11,8 @@ Which tool call loaded the skill is an exact fact, so a script decides it. The s
 folder come from the harness adapter (`agent.py`).
 """
 
+import re
+
 from inspect_ai.model import ChatMessage, ChatMessageAssistant, ChatMessageTool
 from inspect_ai.scorer import Score, Scorer, Target, mean, scorer
 from inspect_ai.solver import TaskState
@@ -22,15 +24,15 @@ from skill_evals.grading.reads import skill_path
 
 def names_skill(value: object, skill: str) -> bool:
     """Return whether a tool argument names the skill, alone or with a plugin prefix such as `plugin:skill`."""
-    return isinstance(value, str) and (value.strip().lstrip("/") == skill or value.endswith(f":{skill}"))
+    return isinstance(value, str) and bool(re.fullmatch(rf"/?(?:[\w.-]+:)*{re.escape(skill)}", value.strip()))
 
 
 def loads_skill(function: str, arguments: dict[str, object], skill: str) -> bool:
     """Return whether one tool call loads the skill: the skill tool with its name, or a read of its SKILL.md."""
     if function == SKILL_TOOL:
-        return any(names_skill(value, skill) for value in arguments.values())
+        return names_skill(arguments.get("skill", arguments.get("command")), skill)
     if function == READ_TOOL:
-        return skill_path(skill).findall(str(arguments.get("file_path", ""))) == ["SKILL.md"]
+        return skill_path(arguments.get("file_path"), skill) == "SKILL.md"
     return False
 
 
