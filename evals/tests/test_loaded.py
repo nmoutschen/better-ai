@@ -14,6 +14,10 @@ def test_skill_tool_with_the_name_loads_it() -> None:
     assert loaded.loaded([assistant(("Skill", {"command": "/write-better"}))], "write-better")
     assert loaded.loaded([assistant(("Skill", {"skill": "better-ai:write-better"}))], "write-better")
     assert not loaded.loaded([assistant(("Skill", {"skill": "do-better"}))], "write-better")
+    wrong_skill = assistant(("Skill", {"skill": "do-better", "args": "about:write-better"}))
+    assert not loaded.loaded([wrong_skill], "write-better")
+    wrong_plugin = assistant(("Skill", {"skill": "about this:write-better"}))
+    assert not loaded.loaded([wrong_plugin], "write-better")
 
 
 def test_reading_skill_md_loads_it() -> None:
@@ -24,3 +28,4 @@ def test_reading_skill_md_loads_it() -> None:
     assert not loaded.loaded([assistant(("Read", {"file_path": f"{SKILL_DIR}/SKILL.md"})), failed], "write-better")
     assert not loaded.loaded([assistant(("Read", {"file_path": f"{SKILL_DIR}/formats/x.md"}))], "write-better")
     assert not loaded.loaded([assistant(("Read", {"file_path": "/work/SKILL.md"}))], "write-better")
+    assert not loaded.loaded([assistant(("Read", {"file_path": f"{SKILL_DIR}/SKILL.md~"}))], "write-better")

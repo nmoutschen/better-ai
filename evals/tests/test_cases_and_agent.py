@@ -81,6 +81,20 @@ def test_case_yaml_keys_are_checked(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         cases.load_case(write_case(tmp_path / "5", VALID_CASE + "  - type: bogus\n"))
 
 
+def test_case_layers_its_repo_over_the_skill_base(tmp_path: Path) -> None:
+    """Common files are planted, a case can replace them, and earlier work uses its own tree."""
+    folder = write_case(tmp_path, VALID_CASE)
+    write_tree(tmp_path / "_base", {"README.md": "common\n", "main.py": "base\n"})
+    write_tree(folder / "earlier", {"before/main.py": "earlier\n", "message.txt": "Initial attempt\n"})
+    files = cases.load_case(folder)["files"]
+    assert {name: source.read_text() for name, source in files.items()} == {
+        "README.md": "common\n",
+        "main.py": "x = 1\n",
+        ".earlier/before/main.py": "earlier\n",
+        ".earlier/message.txt": "Initial attempt\n",
+    }
+
+
 def test_token_errors_never_show_the_token(monkeypatch: pytest.MonkeyPatch) -> None:
     """Either variable works; the error for a missing one names the variables only."""
     for name in agent.TOKEN_VARIABLES:
@@ -322,3 +336,23 @@ def test_run_continues_when_events_follow_a_result(tmp_path: Path) -> None:
     script = agent.end_after_result(f"{fake} > {out} < /dev/null", str(out), quiet=1.5, poll=0.2, grace=0.5)
     subprocess.run(["sh", "-c", script], check=False, timeout=30)
     assert out.read_text().splitlines()[-1] == '{"type":"result","stop_reason":"end_turn","turn":2}'
+
+
+def test_a_repeated_result_restarts_the_quiet_interval(tmp_path: Path) -> None:
+    """A second result begins a new quiet interval even when its JSON matches the first."""
+    fake = tmp_path / "fake-claude"
+    result = '{"type":"result","stop_reason":"end_turn"}'
+    last = '{"type":"result","stop_reason":"end_turn","turn":3}'
+    fake.write_text(
+        "#!/bin/sh\n"
+        f"echo '{result}'\n"
+        "sleep 0.5\n"
+        f"echo '{result}'\n"
+        "sleep 0.75\n"
+        f"echo '{last}'\n"
+    )
+    fake.chmod(0o755)
+    out = tmp_path / "run.out"
+    script = agent.end_after_result(f"{fake} > {out} < /dev/null", str(out), quiet=1, poll=0.05, grace=0.5)
+    subprocess.run(["sh", "-c", script], check=False, timeout=10)
+    assert out.read_text().splitlines() == [result, result, last]

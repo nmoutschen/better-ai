@@ -50,6 +50,17 @@ def test_track_accepts_any_alternative() -> None:
     assert tracked["missing"] == ["formats/next-steps.md"]
 
 
+def test_read_paths_are_exact_files_in_the_installed_skill() -> None:
+    """A backup or a different checkout does not satisfy the installed skill's required file."""
+    message = assistant(
+        ("Read", {"file_path": f"{SKILL_DIR}/modes/bug-fix.md~"}),
+        ("Read", {"file_path": f"/work{SKILL_DIR}/modes/tests.md"}),
+        ("Read", {"file_path": f"{SKILL_DIR}/../code-better/modes/refactor.md"}),
+        ("Read", {"file_path": "~/.claude/skills/code-better/modes/feature.md"}),
+    )
+    assert reads.files_read([message], "code-better") == {"modes/feature.md": reads.MAIN}
+
+
 READ_CALL = ("Read", {"file_path": f"{SKILL_DIR}/modes/bug-fix.md"})
 CAT_CALL = ("Bash", {"command": "cd ~/.claude/skills/code-better\ncat modes/bug-fix.md"})
 
