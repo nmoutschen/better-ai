@@ -86,6 +86,15 @@
    {"type": "note", "id": "m3", "to": "r1", "text": "t", "by": "user"}
   ],
   "work": [["m1", "replied"], ["m3", "new"]]},
+ {"name": "an answer to the agent's own message that the agent asks about waits for the user, and the message's next answer is an item",
+  "log": [
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "note", "id": "m1", "to": "r1", "text": "t", "by": "user"},
+   {"type": "reply", "id": "r2", "to": "m1", "text": "t", "by": "coordinator"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator"},
+   {"type": "note", "id": "m2", "to": "r1", "text": "t", "by": "user"}
+  ],
+  "work": [["m1", "asked"], ["m2", "new"]]},
  {"name": "an answer to what a worker closed is an item",
   "log": [
    {"type": "closed", "id": "x1", "by": "worker-2", "question": "Q4", "status": "answered"},

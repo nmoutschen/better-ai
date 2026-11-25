@@ -1282,15 +1282,22 @@ function pageThread(log, itemKinds, waiting, latestLast) {
     else if (e.type === 'accept' || e.type === 'accepted' || e.type === 'reopen' || e.type === 'status') return;
     else { var n = { kind: e.type, e: e, replies: [], last: i }; if (e.id) byKey[e.id] = n; entries.push(n); }
   });
+  // The user's items each entry holds, in ITEMS: the entry itself when it is one, and the answers under an entry that is
+  // not, such as the agent's own message. Open and a page's WAITING look at these, not only at the entry's own id.
+  entries.forEach(function (c) {
+    c.items = (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted ? [c.e.id] : []).concat(c.replies
+      .filter(function (r) { return r.type === 'note' && r.id && items[r.id]; }).map(function (r) { return r.id; }));
+  });
   // A message the agent sent on its own, a question, waits for the user until they answer it or the agent closes it with
   // a status: it counts as open and comes last, next to the message box.
   if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
   var waits = waiting ? function (c) { return waiting(c, state); }
     : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && state[c.e.id] !== 'done' && state[c.e.id] !== 'accepted' && !c.replies.some(function (r) { return r.type === 'note'; }); };
   entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
-  // Open: the user's items not yet accepted, with what was said under them, and the entries waiting for the user.
+  // Open: the entries that hold a user's item not yet accepted, with what was said under them, and the entries waiting
+  // for the user.
   var open = entries.filter(function (c) {
-    return (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted && state[c.e.id] !== 'accepted') || waits(c);
+    return c.items.some(function (id) { return state[id] !== 'accepted'; }) || waits(c);
   });
   return { state: state, entries: entries, open: open };
 }
