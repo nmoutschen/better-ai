@@ -225,3 +225,21 @@ test('the board has no list of its own: it feeds the shared one', () => {
   assert.match(between(boardJs, 'function drawAgents', '\nfunction setHTML'), /pageAgents\(/);
   assert.doesNotMatch(boardJs, /class="verifier"|class="dry"/);
 });
+
+// The issue's thread: the agent's own message, the user's answer the coordinator asked about, a later comment.
+const ASKED_ANSWER = [
+  { type: 'reply', id: 'r1', to: null, text: 'Three questions' },
+  { type: 'note', id: 'm1', to: 'r1', text: 'answers' },
+  { type: 'reply', id: 'r2', to: 'm1', text: 'which one?' },
+  { type: 'status', to: 'm1', status: 'asked' },
+  { type: 'note', id: 'm2', to: 'r1', text: 'more' },
+  { type: 'comment', id: 'c1', n: 1, text: 'later' },
+];
+
+test("the user's answer the coordinator asked about waits for the user: its thread comes last, under Open", () => {
+  let o;
+  loadBoard('0', { pageConversation: opts => { o = opts; return stand(); } });
+  const model = loadPage().pageThread(ASKED_ANSWER, o.itemKinds || ['comment', 'note'], o.waiting, o.latestLast);
+  assert.deepEqual(Array.from(model.entries, c => c.e.id), ['c1', 'r1']);
+  assert.ok(model.open.some(c => c.e.id === 'r1'));
+});

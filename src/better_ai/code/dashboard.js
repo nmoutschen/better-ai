@@ -322,7 +322,7 @@ const conv = pageConversation({
   accept: false, filter: false, latestLast: true,
   // A question waiting for the user, or a message of theirs the coordinator asked about, counts as open; it keeps its
   // place in time, so the newest message is always last.
-  waiting: (c, state) => c.kind === "decision" ? dec.waiting(c, state) : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
+  waiting: (c, state) => c.kind === "decision" ? dec.waiting(c, state) : (c.items || []).some(id => state[id] === "asked"),
   afterSend: () => tick(),
 });
 const dec = pageDecision({conversation: conv, now: () => D.now, md, esc, id: uid});

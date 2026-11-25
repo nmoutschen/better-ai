@@ -215,7 +215,7 @@ const conv = pageConversation({
   accept: false, filter: false,
   // A decision waiting for the user comes last, next to the message box, until they answer it; so does a message of
   // theirs that the coordinator asked about.
-  waiting: (c, state) => c.kind === "decision" ? decision.waiting(c, state) : ["comment", "note"].includes(c.kind) && state[c.e.id] === "asked",
+  waiting: (c, state) => c.kind === "decision" ? decision.waiting(c, state) : (c.items || []).some(id => state[id] === "asked"),
   afterSend: () => tick(),
 });
 const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
