@@ -5,7 +5,7 @@
 process.env.TZ = 'UTC';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { read, marked, between, loadPage } = require('./harness');
+const { read, stand, marked, between, loadPage, loadDashboard } = require('./harness');
 
 const html = read('code', 'dashboard.js');
 
@@ -442,4 +442,23 @@ test("a verify that passed never shows the findings of another verifier's failed
   const pop = TL.popupHTML(d.tasks[0], d);
   const passed = pop.split('Verify, round 1: passed')[1].split('</div>')[0];
   assert.doesNotMatch(passed, /Empty export/);
+});
+
+// The issue's thread: the agent's own message, the user's answer the coordinator asked about, a later comment.
+const ASKED_ANSWER = [
+  { type: 'reply', id: 'r1', to: null, text: 'Three questions' },
+  { type: 'note', id: 'm1', to: 'r1', text: 'answers' },
+  { type: 'reply', id: 'r2', to: 'm1', text: 'which one?' },
+  { type: 'status', to: 'm1', status: 'asked' },
+  { type: 'note', id: 'm2', to: 'r1', text: 'more' },
+  { type: 'comment', id: 'c1', n: 1, text: 'later' },
+];
+
+test("the user's answer the coordinator asked about waits for the user: its thread comes last, under Open", () => {
+  let o;
+  const page = loadPage();
+  loadDashboard('0', { ...page, document: stand(), pageConversation: opts => { o = opts; return stand(); } });
+  const model = loadPage().pageThread(ASKED_ANSWER, o.itemKinds || ['comment', 'note'], o.waiting, o.latestLast);
+  assert.deepEqual(Array.from(model.entries, c => c.e.id), ['c1', 'r1']);
+  assert.ok(model.open.some(c => c.e.id === 'r1'));
 });

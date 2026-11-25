@@ -208,7 +208,7 @@ function start(data) {
   const reviewIds = data.rerun;
   const reviewNames = reviewIds.map(id => nameOf(perspectives, id));
   const items = ['comment', 'note', 'approve', 'confirm'];
-  const waiting = (entry, states) => states[entry.e.id] === 'asked' ||
+  const waiting = (entry, states) => (entry.items || []).some(id => states[id] === 'asked') ||
     (entry.kind === 'reply' && !entry.e.to && entry.e.id && !entry.replies.some(reply => reply.type === 'note'));
   const revKey = 'architecture-page';
   const saved = JSON.parse(sessionStorage.getItem(revKey) || '{}');

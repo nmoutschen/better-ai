@@ -25,9 +25,13 @@ function work(log) {
     .map(id => [id, model.state[id] || 'new']);
 }
 
-test('the shared table of logs gives the open items and states that `pending` gives', () => {
+test('the shared table of logs gives the open items and states that `pending` gives, and Open shows each of them', () => {
   for (const { name, log, work: expected } of JSON.parse(fs.readFileSync(__dirname + '/fixtures/threads.json', 'utf8'))) {
     assert.deepEqual(work(log), expected, name);
+    const open = thread(log).open;
+    for (const [id] of expected) {
+      assert.ok(open.some(c => c.e.id === id || c.replies.some(r => r.id === id)), name + ': ' + id + ' is not under Open');
+    }
   }
 });
 
@@ -60,7 +64,8 @@ test("the agent's own message waits for the user until the user answers it or th
     assert.deepEqual(ids(closed.entries), ['r1', 'm1'], status);  // back in its place
   }
   const answered = thread(log.concat([{ type: 'note', id: 'm2', text: 'large', to: 'r1' }]));
-  assert.deepEqual(ids(answered.open), ['m1']);
+  // The user's answer is an item of its own: the message holding it stays under Open, back in its place in time.
+  assert.deepEqual(ids(answered.open), ['r1', 'm1']);
 });
 
 test('Open lists items not yet accepted, and not deleted comments', () => {
@@ -85,7 +90,9 @@ test("the agent's own question is open and last until the user answers it", () =
   assert.deepEqual(ids(t.entries), ['m1', 'r1']);
   assert.deepEqual(ids(t.open), ['m1', 'r1']);
   t = thread(log.concat([{ type: 'note', id: 'm2', to: 'r1', text: 'Large' }]));
-  assert.deepEqual(ids(t.open), ['m1']);
+  assert.deepEqual(ids(t.open), ['r1', 'm1']);  // it holds the user's answer, an item of its own
+  const accepted = log.concat([{ type: 'note', id: 'm2', to: 'r1', text: 'Large' }, { type: 'accept', to: 'm2' }]);
+  assert.deepEqual(ids(thread(accepted).open), ['m1']);  // until the answer is accepted
   assert.deepEqual(ids(t.entries), ['r1', 'm1']);  // answered, it goes back to its place in time
   assert.deepEqual(ids(thread([{ type: 'reply', to: null, text: 'FYI' }]).open), []);  // a reply without an id is not a question
 });
