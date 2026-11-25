@@ -52,7 +52,7 @@ A skill TELLS the agent to state where evidence is weak, where sources disagree,
 
 A skill NAMES capabilities, such as web search, page fetch, asking the user, sub-agents, or writing files. It MAY give a tool name as an example ("such as `AskUserQuestion`"), but DOES NOT depend on it. A skill also DOES NOT depend on a skill, plugin, or feature that exists in only one harness.
 
-FOR each capability a skill uses, SAY what to do when it is missing: ask in plain text, keep the board in working notes, run workers in batches. A skill DOES NOT tell the agent to block the user's harness or change its configuration without permission.
+FOR each capability a skill uses, SAY what to do when it is missing: ask in plain text, keep the board in working notes, run workers in batches. A fallback FAILS CLOSED: it DOES NOT quietly put something weaker in place of a step, such as putting the spec in replies when files cannot be written. IF a step cannot run without the capability, the skill SAYS which step, why it cannot run, such as a denied call or a harness without the feature, and what that leaves unchecked, and the agent STOPS there instead of handing back the work. A skill DOES NOT tell the agent to block the user's harness or change its configuration without permission.
 
 ### 5.2. Use the cheapest agent that can do the step
 
