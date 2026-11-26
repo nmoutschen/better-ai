@@ -498,6 +498,8 @@ class Driver:
                     "carry_ids": sorted(self._carry),
                     "recover_ids": sorted(self._recover),
                     "item_ids": sorted(items),
+                    "position": batch.position,
+                    "actions": actions,
                 }
             ),
         )

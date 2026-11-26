@@ -76,8 +76,9 @@ class DeliveryTest(shell.Fixture):
         self.assertEqual((code, out, err), (0, "0 not done.\n", ""))
 
     def test_driver_pending_keeps_exact_turn_after_late_user_input(self):
-        from better_ai.page.driver import Driver
         from test_page_driver import Peer
+
+        from better_ai.page.driver import Driver
 
         initial_action = {"type": "accept", "to": "earlier", "by": "user"}
         self.seed(*(note(f"m{n}") for n in range(21)), initial_action)
