@@ -59,9 +59,13 @@ from typing import Any
 from .. import cli, paths, resources, schema
 from ..paths import Refused, Unit
 from ..skill import Skill
+from . import delivery
+from .delivery import from_user as from_user
 
 COMMON = "conversation.schema.json"
 LOG, SEEN, ADDRESS, TOKEN = "conversation.jsonl", ".conversation-seen", ".server", ".server-token"
+WAIT_RECEIPT = ".page-wait"
+ACTIVE_DELIVERY = ".page-delivery"
 TOKEN_HEADER = "X-Page-Token"
 OUT_OF_DATE = "page out of date: open the address the agent gave"  # what a page without the token is told; page.js shows it and keeps the typing
 MAX_BODY = 200_000
@@ -261,11 +265,6 @@ def clean(value, depth=0):
     return None
 
 
-def from_user(event: dict) -> bool:
-    """An event the user made in the page, as opposed to the agent's replies, statuses and recorded acceptances."""
-    return bool(event) and event.get("by") == "user"
-
-
 def stop_like_ctrl_c() -> None:
     """Stop the server on SIGTERM or SIGHUP as on Ctrl+C, so `serve` still removes its address file when the harness
     ends the command or the terminal closes. A SIGKILL cannot be caught: `reply` checks the server instead."""
@@ -324,7 +323,7 @@ def old_count_of(unit: Unit) -> int:
 
 class Conversation:
     """One unit's log, `conversation.jsonl`, one ASCII JSON event per line, and the files that say where the unit is
-    served (`.server`) and how far the agent has read (`.conversation-seen`). Everything is read and written through
+    served (`.server`) and what fallback wait handed back (`.page-wait`). Everything is read and written through
     `paths`, so no file is opened with a symlink on the way."""
 
     def __init__(self, unit: Unit, spec: PageSpec, docs: dict[str, dict]):
@@ -441,15 +440,12 @@ class Conversation:
         except (OSError, ValueError, Refused):  # no server there, or an address file that holds no address
             return False
 
-    def seen(self) -> int:
-        try:
-            return int(paths.read_bytes(self.unit, SEEN).decode("utf-8").strip() or 0)
-        except FileNotFoundError:
-            return 0
-        except ValueError:
-            raise paths.refusal(
-                f"{self.unit.label}/{SEEN}", "does not hold a number", "delete it and run wait again"
-            ) from None
+    def delivery(
+        self, after: int = 0, *, carry_ids: frozenset[str] = frozenset(), recover_ids: frozenset[str] = frozenset()
+    ) -> delivery.Delivery:
+        events = self.events()
+        found = all_items(events, self.items, self.agent)
+        return delivery.select(events, found, self.items, after, carry_ids, recover_ids)
 
     def write(self, *events: dict) -> list:
         """Append the agent's own events; one that fails its schema is refused with the validator's message."""
@@ -508,50 +504,75 @@ def _wait_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--timeout", type=float, default=WAIT_DEFAULT, help=f"seconds to wait (default {WAIT_DEFAULT})")
 
 
+def _read_delivery_state(unit: Unit, name: str) -> dict:
+    try:
+        data = json.loads(paths.read_bytes(unit, name))
+    except (OSError, ValueError, Refused):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _delivery_position(data: dict, key: str) -> int:
+    position = data.get(key)
+    return position if type(position) is int and position >= 0 else 0
+
+
+def _delivery_ids(data: dict, key: str) -> frozenset[str]:
+    ids = data.get(key)
+    return frozenset(ids) if isinstance(ids, list) and all(isinstance(ident, str) for ident in ids) else frozenset()
+
+
+def _wait_total(address: str, after: int, seconds: float, headers: dict, unit: Unit) -> int:
+    request = urllib.request.Request(f"{address}wait?after={after}&seconds={max(1, int(seconds))}", headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return int(response.read())
+    except urllib.error.HTTPError as error:
+        if error.code == 401:
+            raise paths.refusal(
+                unit.label, "the page's server does not accept this token", f"run serve {unit.label} again"
+            ) from None
+    except (OSError, ValueError):
+        pass
+    raise paths.refusal(unit.label, "the page's server is not answering", f"run serve {unit.label} again")
+
+
 @cli.verb(
     "wait", help="wait for the user's next actions on the served page, print them and exit", arguments=_wait_arguments
 )
 def wait(args: argparse.Namespace, run: cli.Run) -> int:
-    """Print the user's events the agent has not seen yet, one JSON line each, waiting for the page to receive one.
-    Exit 3 when none came in time."""
+    """Print the actionable batch when the user acts. Exit 3 when none came in time."""
     unit = _unit(args, run)
     conv = _conversation(run, unit)
     address = conv.address()
     if address is None:
         raise paths.refusal(unit.label, "no page is served", f"run serve {unit.label} first")
-    seen = conv.seen()
+    receipt = _read_delivery_state(unit, WAIT_RECEIPT)
+    after = _delivery_position(receipt, "position")
+    if after > len(conv.lines()):
+        after = 0
+    carry_ids = _delivery_ids(receipt, "item_ids")
     headers = {}
     with contextlib.suppress(FileNotFoundError):  # a server from before the token has no file, and ignores the header
         headers[TOKEN_HEADER] = paths.read_bytes(unit, TOKEN).decode("ascii", errors="replace").strip()
-    deadline = time.time() + args.timeout
-    while time.time() < deadline:
-        request = urllib.request.Request(
-            f"{address}wait?after={seen}&seconds={max(1, int(deadline - time.time()))}", headers=headers
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                total = int(response.read())
-        except urllib.error.HTTPError as error:
-            if error.code == 401:
-                raise paths.refusal(
-                    unit.label, "the page's server does not accept this token", f"run serve {unit.label} again"
-                ) from None
-            raise paths.refusal(
-                unit.label, "the page's server is not answering", f"run serve {unit.label} again"
-            ) from None
-        except (OSError, ValueError):
-            raise paths.refusal(
-                unit.label, "the page's server is not answering", f"run serve {unit.label} again"
-            ) from None
-        if total <= seen:
+    deadline = time.monotonic() + args.timeout
+    scan = after
+    while (remaining := deadline - time.monotonic()) > 0:
+        total = _wait_total(address, scan, remaining, headers, unit)
+        if total <= scan:
             continue
-        lines = conv.lines()[seen:total]
-        new = [line for line, event in zip(lines, conv.events()[seen:total], strict=True) if from_user(event)]
-        paths.write_state(unit, SEEN, str(total).encode())
-        seen = total
-        if new:
-            run.out("\n".join(new))
-            return 0
+        events = conv.events()
+        if any(from_user(event) for event in events[scan:]):
+            found = delivery.select(
+                events, all_items(events, conv.items, conv.agent), conv.items, after, carry_ids, frozenset()
+            )
+            if found.items or found.events:
+                run.out("\n".join(terminal_json(event) for event in [*found.items, *found.events]))
+                # The listener has no turn-end signal. Keep its last batch visible to pending for an interrupted chat.
+                state = {"after": after, "position": found.position, "item_ids": [item["id"] for item in found.items]}
+                paths.write_atomic(unit, WAIT_RECEIPT, json.dumps(state).encode())
+                return 0
+        scan = len(events)
     raise cli.TimedOut("no new action before the timeout")
 
 
@@ -696,17 +717,27 @@ def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tup
     return found
 
 
-@cli.verb("pending", help="list the user's items that are not done or accepted", arguments=_unit_argument)
+@cli.verb("pending", help="list the user's actionable items and events", arguments=_unit_argument)
 def pending(args: argparse.Namespace, run: cli.Run) -> int:
-    """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so work can
-    resume after an interruption. Done waits for the user. An answer under an item that waited for the user (`asked`)
-    makes it `replied`; a follow-up from the user under a finished item makes it `followup`. `open_items` holds the
-    rules."""
-    conv = _conversation(run, _unit(args, run))
-    found = open_items(conv.events(), conv.items, conv.agent)
-    for e, state, extra in found:
-        run.out(terminal_json({**e, "status": state, **extra}))
-    run.out(f"{len(found)} not done.")
+    """Read current item states and the latest batch's non-item events, including after an interruption."""
+    unit = _unit(args, run)
+    conv = _conversation(run, unit)
+    session = os.environ.get("BETTER_PAGE_SESSION")
+    active = _read_delivery_state(unit, ACTIVE_DELIVERY) if session else {}
+    if session and active.get("session") == session:
+        # Items already sent in this turn stay available when the agent marks them seen or working.
+        sent = _delivery_ids(active, "item_ids")
+        found = conv.delivery(
+            _delivery_position(active, "after"),
+            carry_ids=_delivery_ids(active, "carry_ids"),
+            recover_ids=_delivery_ids(active, "recover_ids") | sent,
+        )
+    else:
+        receipt = _read_delivery_state(unit, WAIT_RECEIPT)
+        found = conv.delivery(_delivery_position(receipt, "after"), carry_ids=_delivery_ids(receipt, "item_ids"))
+    for event in [*found.items, *found.events]:
+        run.out(terminal_json(event))
+    run.out(f"{len(found.items)} not done.")
     return 0
 
 
