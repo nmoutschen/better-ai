@@ -45,7 +45,9 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(child_environment("codex", parent, SESSION), {**parent, "BETTER_PAGE_SESSION": SESSION})
         opencode = child_environment("opencode", parent, SESSION)
         self.assertEqual(opencode["OTHER"], "original")
-        self.assertEqual(json.loads(opencode["OPENCODE_CONFIG_CONTENT"]), {"permission": {"edit": "ask", "bash": "ask"}})
+        self.assertEqual(
+            json.loads(opencode["OPENCODE_CONFIG_CONTENT"]), {"permission": {"edit": "ask", "bash": "ask"}}
+        )
         self.assertEqual(parent, {"PATH": "/bin", "OTHER": "original"})
 
     def test_acp_version_session_turn_and_resume(self):
@@ -120,8 +122,10 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(sent[-1]["params"]["threadId"], SESSION)
         self.assertEqual(sent[-1]["params"]["approvalsReviewer"], "user")
         result = adapter.receive(
-            {"id": sent[-1]["id"], "result": {"thread": {"id": SESSION}, "approvalPolicy": "on-request",
-                                              "approvalsReviewer": "user"}}
+            {
+                "id": sent[-1]["id"],
+                "result": {"thread": {"id": SESSION}, "approvalPolicy": "on-request", "approvalsReviewer": "user"},
+            }
         )
         self.assertEqual(result[0].session_id, SESSION)
         adapter.prompt("Hello")
@@ -131,8 +135,7 @@ class AdapterTests(unittest.TestCase):
         adapter.cancel()
         self.assertEqual(sent[-1]["params"], {"threadId": SESSION, "turnId": "turn1"})
         event = adapter.receive(
-            {"method": "turn/completed",
-             "params": {"threadId": SESSION, "turn": {**turn, "status": "interrupted"}}}
+            {"method": "turn/completed", "params": {"threadId": SESSION, "turn": {**turn, "status": "interrupted"}}}
         )[0]
         self.assertEqual(event.outcome, "stopped")
 
@@ -144,8 +147,10 @@ class AdapterTests(unittest.TestCase):
                 adapter.open("/repo", None)
                 adapter.receive({"id": sent[-1]["id"], "result": {"userAgent": "codex_cli_rs/0.172.0"}})
                 event = adapter.receive(
-                    {"id": sent[-1]["id"], "result": {"thread": {"id": SESSION}, "approvalPolicy": policy,
-                                                      "approvalsReviewer": reviewer}}
+                    {
+                        "id": sent[-1]["id"],
+                        "result": {"thread": {"id": SESSION}, "approvalPolicy": policy, "approvalsReviewer": reviewer},
+                    }
                 )[0]
                 self.assertEqual((event.kind, event.outcome), ("failed", "unsafe-mode"))
 
@@ -158,12 +163,15 @@ class AdapterTests(unittest.TestCase):
         adapter.cancel()
         self.assertEqual([m["message"]["content"] for m in sent[:2]], ["First", "Second"])
         self.assertEqual(sent[2]["request"]["subtype"], "interrupt")
-        start = adapter.receive({"type": "system", "subtype": "init", "session_id": SESSION, "permissionMode": "default"})
+        start = adapter.receive(
+            {"type": "system", "subtype": "init", "session_id": SESSION, "permissionMode": "default"}
+        )
         self.assertEqual(start[0].session_id, SESSION)
         result = adapter.receive({"type": "result", "subtype": "success", "result": "Complete"})
         self.assertEqual((result[0].kind, result[0].outcome, result[0].text), ("turn_ended", "normal", "Complete"))
-        result = adapter.receive({"type": "system", "subtype": "init", "session_id": SESSION,
-                                  "permissionMode": "bypassPermissions"})
+        result = adapter.receive(
+            {"type": "system", "subtype": "init", "session_id": SESSION, "permissionMode": "bypassPermissions"}
+        )
         self.assertEqual(result[0].outcome, "unsafe-mode")
 
 
