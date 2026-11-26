@@ -49,6 +49,11 @@ class SkillDrivingTest(unittest.TestCase):
 
     def test_code_handbacks_are_stable_and_distinct(self):
         unit = self.unit(CODE)
+        self.write(
+            unit,
+            "logs/builder.card.json",
+            {"type": "card", "at": AT, "by": "coordinator", "role": "builder", "task": "T7", "branch": "example"},
+        )
         base = {"at": AT, "by": "builder", "text": "D12 handed_back"}
         step = {**base, "type": "step"}
         handback = {**base, "type": "handed_back", "result": "done"}
@@ -79,15 +84,16 @@ class SkillDrivingTest(unittest.TestCase):
         self.write(unit, "items.jsonl", discovery.ITEM)
         self.write(unit, "sources/S-a1-1.json", discovery.SOURCE)
         self.write(unit, "sources/S-coord-1.json", discovery.YOU_SOURCE)
-        self.write(unit, "evidence/E-a1-1.json", discovery.EVIDENCE)
+        evidence = {**discovery.EVIDENCE, "by": "a1"}
+        self.write(unit, "evidence/E-a1-1.json", evidence)
         self.write(
             unit,
             "evidence/E-coord-1.json",
             {**discovery.EVIDENCE, "by": discovery.COORD, "id": "E-coord-1", "source": "S-coord-1", "status": "counts"},
         )
-        self.write(unit, "evidence/E-a1-12.json", discovery.EVIDENCE)
+        self.write(unit, "evidence/E-a1-12.json", evidence)
         self.assertEqual(self.trigger_ids(unit), ["evidence:E-a1-1"])
-        self.write(unit, "evidence/E-a1-1.json", {**discovery.EVIDENCE, "verifier": "verifier"})
+        self.write(unit, "evidence/E-a1-1.json", {**evidence, "verifier": "verifier"})
         self.assertEqual(self.trigger_ids(unit), ["evidence:E-a1-1"])
 
     def test_only_waiting_decisions_wake_at_or_after_the_deadline(self):
