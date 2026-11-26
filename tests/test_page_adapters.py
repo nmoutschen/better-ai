@@ -31,7 +31,10 @@ class AdapterTests(unittest.TestCase):
         opencode = candidate("opencode", {}, lambda _: "/bin/opencode")
         self.assertEqual((opencode.approval, opencode.codec_factory), ("webauthn", OpenCodeAdapter))
         for name in ("cursor", "droid", "devin"):
-            self.assertEqual(candidate(name, {}, lambda _: "/bin/harness").kind, "no-approvals")
+            self.assertEqual(candidate(name, {}, lambda _: None).kind, "not-installed")
+            found = candidate(name, {}, lambda _: "/bin/harness")
+            self.assertIsNone(found.kind)
+            self.assertEqual(found.approval, "webauthn")
         for name in ("claude", "codex", "cursor", "opencode", "droid", "devin"):
             with self.subTest(name=name):
                 self.assertEqual(candidate(name, {}, lambda _: "/bin/harness").name, name)
@@ -425,6 +428,168 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual((event.kind, event.request_id, event.outcome), ("approval_closed", "ended", "expired"))
         self.assertFalse(adapter.answer("ended", "allow_once"))
         self.assertTrue(adapter.answer("running", "allow_once"))
+
+    def test_cursor_authenticates_and_requires_reported_approval_policy(self):
+        for mode, outcome in (("allowlist", None), ("unrestricted", "unsafe-mode"), (None, "no-approvals")):
+            with self.subTest(mode=mode):
+                sent = []
+                plan = candidate("cursor", {}, lambda _: "/bin/agent")
+                adapter = plan.codec(sent.append, SESSION, None)
+                adapter.open("/repo", None)
+                assert sent[-1]["method"] == "initialize"
+                self.assertEqual(sent[-1]["params"]["clientInfo"]["name"], "better-ai")
+                init = {
+                    "protocolVersion": 1,
+                    "authMethods": [
+                        {"id": "cursor_login", "name": "Cursor Login"},
+                    ],
+                }
+                adapter.receive({"id": sent[-1]["id"], "result": init})
+                self.assertEqual(sent[-1]["method"], "authenticate")
+                self.assertEqual(sent[-1]["params"], {"methodId": "cursor_login"})
+                adapter.receive({"id": sent[-1]["id"], "result": {}})
+                self.assertEqual(sent[-1]["method"], "session/new")
+                options = [{"id": "approvalMode", "currentValue": mode}] if mode else []
+                session = {"sessionId": "cursor_session", "configOptions": options}
+                event = adapter.receive({"id": sent[-1]["id"], "result": session})[0]
+                self.assertEqual(event.outcome, outcome)
+                self.assertEqual(event.kind, "failed" if outcome else "ready")
+
+    def test_devin_requires_normal_permissions_and_a_forwarded_startup_request(self):
+        for forwarded in (False, True):
+            with self.subTest(forwarded=forwarded):
+                sent = []
+                plan = candidate("devin", {}, lambda _: "/bin/devin")
+                adapter = plan.codec(sent.append, SESSION, None)
+                adapter.open("/repo", None)
+                adapter.receive({"id": sent[-1]["id"], "result": {"protocolVersion": 1}})
+                session_request = sent[-1]["id"]
+                if forwarded:
+                    request = {
+                        "sessionId": "devin_session",
+                        "toolCall": {"toolCallId": "call", "name": "Bash", "rawInput": {"command": "pwd"}},
+                        "options": [
+                            {"kind": "allow_once", "optionId": "once"},
+                            {"kind": "reject_once", "optionId": "no"},
+                        ],
+                    }
+                    self.assertEqual(
+                        adapter.receive(
+                            {
+                                "id": "perm",
+                                "method": "session/request_permission",
+                                "params": request,
+                            }
+                        ),
+                        (),
+                    )
+                    self.assertEqual(sent[-1]["result"]["outcome"]["optionId"], "no")
+                options = [{"id": "permission_mode", "currentValue": "normal"}]
+                event = adapter.receive(
+                    {
+                        "id": session_request,
+                        "result": {"sessionId": "devin_session", "configOptions": options},
+                    }
+                )[0]
+                self.assertEqual(event.kind, "ready" if forwarded else "failed")
+                self.assertEqual(event.outcome, None if forwarded else "no-approvals")
+
+    def test_droid_turn_interrupt_and_exact_permission_owner(self):
+        sent = []
+        plan = candidate("droid", {}, lambda _: "/bin/droid")
+        adapter = plan.codec(sent.append, SESSION, None)
+        adapter.open("/repo", None)
+        self.assertEqual(sent[-1]["method"], "droid.initialize_session")
+        self.assertEqual(sent[-1]["factoryApiVersion"], "1.0.0")
+        self.assertEqual(sent[-1]["factoryProtocolVersion"], "1.332.0")
+        self.assertEqual(
+            sent[-1]["params"],
+            {
+                "machineId": "default",
+                "cwd": "/repo",
+                "autonomyLevel": "off",
+                "interactionMode": "auto",
+            },
+        )
+        reply = {
+            "type": "response",
+            "id": sent[-1]["id"],
+            "factoryProtocolVersion": "1.332.0",
+            "result": {
+                "sessionId": SESSION,
+                "session": {"messages": []},
+                "settings": {"autonomyLevel": "off", "interactionMode": "auto"},
+            },
+        }
+        self.assertEqual(adapter.receive(reply)[0].kind, "ready")
+        adapter.prompt("Read a name")
+        self.assertEqual(sent[-1]["method"], "droid.add_user_message")
+        self.assertEqual(sent[-1]["params"], {"text": "Read a name", "queuePlacement": "end_of_turn"})
+        adapter.receive({"type": "response", "id": sent[-1]["id"], "result": {}})
+        for key, owner in (("own", None), ("other", "child-id")):
+            request = {
+                "toolUses": [
+                    {
+                        "toolUse": {"type": "tool_use", "id": "tool", "name": "Execute", "input": {"command": "pwd"}},
+                        "confirmationType": "exec",
+                        "details": {"type": "exec", "command": "pwd"},
+                    }
+                ],
+                "options": [{"value": "proceed_once"}, {"value": "cancel"}],
+            }
+            if owner:
+                request["workerSessionId"] = owner
+            event = adapter.receive(
+                {
+                    "id": key,
+                    "method": "droid.request_permission",
+                    "type": "request",
+                    "params": request,
+                }
+            )[0]
+            self.assertEqual((event.kind, event.requester), ("approval", owner))
+        adapter.cancel()
+        self.assertEqual(sent[-1]["method"], "droid.interrupt_session")
+        events = adapter.receive(
+            {
+                "method": "droid.session_notification",
+                "type": "notification",
+                "params": {
+                    "sessionId": SESSION,
+                    "notification": {"type": "agent_turn_completed", "reason": "cancelled"},
+                },
+            }
+        )
+        self.assertEqual(
+            [(e.kind, e.outcome) for e in events], [("approval_closed", "expired"), ("turn_ended", "stopped")]
+        )
+        self.assertFalse(adapter.answer("own", "allow_once"))
+        self.assertTrue(adapter.answer("other", "allow_once"))
+        self.assertEqual(sent[-1]["result"], {"selectedOption": "proceed_once"})
+        self.assertEqual(sent[-1]["type"], "response")
+
+    def test_droid_requires_current_protocol_and_off_autonomy(self):
+        for version, autonomy, failure in (
+            ("1.331.0", "off", "version"),
+            ("1.332.0", "high", "unsafe-mode"),
+        ):
+            with self.subTest(version=version, autonomy=autonomy):
+                sent = []
+                plan = candidate("droid", {}, lambda _: "/bin/droid")
+                adapter = plan.codec(sent.append, SESSION, None)
+                adapter.open("/repo", None)
+                event = adapter.receive(
+                    {
+                        "type": "response",
+                        "id": sent[-1]["id"],
+                        "factoryProtocolVersion": version,
+                        "result": {
+                            "sessionId": SESSION,
+                            "settings": {"autonomyLevel": autonomy, "interactionMode": "auto"},
+                        },
+                    }
+                )[0]
+                self.assertEqual((event.kind, event.outcome), ("failed", failure))
 
 
 if __name__ == "__main__":
