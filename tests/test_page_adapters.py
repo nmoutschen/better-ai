@@ -105,6 +105,7 @@ class AdapterTests(unittest.TestCase):
         request = {"id": "p", "method": "session/request_permission", "params": params}
         event = adapter.receive(request)[0]
         self.assertEqual((event.kind, event.tool, event.arguments), ("approval", "Run", {"command": "pwd"}))
+        self.assertIsNone(event.tool_id)
         self.assertEqual(event.options, ("allow_once", "deny"))
         self.assertTrue(adapter.answer("p", "allow_once"))
         self.assertEqual(sent[-1]["result"], {"outcome": {"outcome": "selected", "optionId": "once"}})
@@ -230,6 +231,7 @@ class AdapterTests(unittest.TestCase):
         }
         event = adapter.receive(request)[0]
         self.assertEqual((event.kind, event.arguments, event.requester), ("approval", raw, "worker"))
+        self.assertEqual(event.tool_id, "Bash")
         self.assertEqual(event.options, ("allow_once", "deny"))
         self.assertFalse(adapter.answer("different", "allow_once"))
         self.assertTrue(adapter.answer("p1", "allow_once"))
