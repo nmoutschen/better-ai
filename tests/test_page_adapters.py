@@ -312,6 +312,120 @@ class AdapterTests(unittest.TestCase):
         event = adapter.receive({"id": sent[-1]["id"], "result": old})[0]
         self.assertEqual((event.kind, event.outcome), ("failed", "version"))
 
+    def test_codex_expires_only_approvals_owned_by_the_completed_turn(self):
+        sent = []
+        adapter = CodexAdapter(sent.append)
+        adapter.open("/repo", None)
+        adapter.receive({"id": sent[-1]["id"], "result": {"userAgent": "codex_cli_rs/0.172.0"}})
+        adapter.receive({"id": sent[-1]["id"], "result": {"account": {"type": "chatgpt"}}})
+        adapter.receive(
+            {
+                "id": sent[-1]["id"],
+                "result": {
+                    "thread": {"id": SESSION},
+                    "approvalPolicy": "on-request",
+                    "approvalsReviewer": "user",
+                    "sandbox": {"type": "workspaceWrite", "networkAccess": False},
+                },
+            }
+        )
+        turn = {"id": "turn-main", "status": "inProgress"}
+        adapter.receive({"method": "turn/started", "params": {"threadId": SESSION, "turn": turn}})
+        for request_id, turn_id in (("main", "turn-main"), ("worker", "turn-other")):
+            event = adapter.receive(
+                {
+                    "id": request_id,
+                    "method": "item/commandExecution/requestApproval",
+                    "params": {"threadId": SESSION, "turnId": turn_id, "command": "pwd"},
+                }
+            )[0]
+            self.assertEqual(event.requester, turn_id)
+        events = adapter.receive(
+            {
+                "method": "turn/completed",
+                "params": {"threadId": SESSION, "turn": {**turn, "status": "completed"}},
+            }
+        )
+        self.assertEqual(
+            [(event.kind, event.request_id, event.outcome) for event in events],
+            [("approval_closed", "main", "expired"), ("turn_ended", None, "normal")],
+        )
+        self.assertFalse(adapter.answer("main", "allow_once"))
+        self.assertTrue(adapter.answer("worker", "allow_once"))
+
+    def test_acp_expires_an_exact_terminal_tool_call_only(self):
+        sent = []
+        adapter = ACPAdapter(sent.append)
+        adapter.open("/repo", None)
+        adapter.receive({"id": sent[-1]["id"], "result": {"protocolVersion": 1}})
+        adapter.receive({"id": sent[-1]["id"], "result": {"sessionId": "ses_one"}})
+        adapter.prompt("Work")
+        prompt_id = sent[-1]["id"]
+        for label in ("first", "worker"):
+            adapter.receive(
+                {
+                    "id": label,
+                    "method": "session/request_permission",
+                    "params": {
+                        "sessionId": "ses_one",
+                        "toolCall": {"toolCallId": label, "name": "Run", "rawInput": {"command": "pwd"}},
+                        "options": [{"optionId": "yes", "kind": "allow_once"}],
+                    },
+                }
+            )
+        self.assertEqual(
+            adapter.receive(
+                {
+                    "id": prompt_id,
+                    "result": {"stopReason": "end_turn"},
+                }
+            )[0].kind,
+            "turn_ended",
+        )
+        event = adapter.receive(
+            {
+                "method": "session/update",
+                "params": {
+                    "sessionId": "ses_one",
+                    "update": {"sessionUpdate": "tool_call_update", "toolCallId": "first", "status": "failed"},
+                },
+            }
+        )[0]
+        self.assertEqual((event.kind, event.request_id, event.outcome), ("approval_closed", "first", "expired"))
+        self.assertFalse(adapter.answer("first", "allow_once"))
+        self.assertTrue(adapter.answer("worker", "allow_once"))
+
+    def test_claude_expires_main_and_ended_workers_separately(self):
+        _, adapter, _, _ = self.open_claude()
+        for request_id, owner in (("main", None), ("ended", "worker-a"), ("running", "worker-b")):
+            adapter.receive(
+                {
+                    "type": "control_request",
+                    "request_id": request_id,
+                    "request": {
+                        "subtype": "can_use_tool",
+                        "tool_name": "Bash",
+                        "input": {"command": "pwd"},
+                        "agent_id": owner,
+                    },
+                }
+            )
+        events = adapter.receive({"type": "result", "subtype": "success"})
+        self.assertEqual([event.request_id for event in events if event.kind == "approval_closed"], ["main"])
+        self.assertFalse(adapter.answer("main", "allow_once"))
+        event = adapter.receive(
+            {
+                "type": "system",
+                "subtype": "task_updated",
+                "session_id": SESSION,
+                "task_id": "worker-a",
+                "patch": {"status": "killed"},
+            }
+        )[0]
+        self.assertEqual((event.kind, event.request_id, event.outcome), ("approval_closed", "ended", "expired"))
+        self.assertFalse(adapter.answer("ended", "allow_once"))
+        self.assertTrue(adapter.answer("running", "allow_once"))
+
 
 if __name__ == "__main__":
     unittest.main()
