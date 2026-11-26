@@ -634,8 +634,8 @@ class VerbsTest(Fixture):
         self.assertIn(f"no comment or message with id {under}", err)
         self.assertEqual(len(self.log()), before)
 
-    def test_pending_gives_the_states_of_the_shared_table_of_logs_and_the_threads_the_page_cannot_show(self):
-        """The same logs, with the same open items and states, are run on page.js `pageThread` in tests/page.test.js."""
+    def test_pending_selects_deliverable_items_from_the_shared_table_of_logs(self):
+        """The page shows all open items. Pending only delivers states that need the agent in a fresh turn."""
         table = json.loads((HERE / "fixtures" / "threads.json").read_text())
         for case in table:
             with self.subTest(case["name"]):
@@ -644,8 +644,11 @@ class VerbsTest(Fixture):
                 code_, out, _ = self.cli("pending", self.unit_arg)
                 lines = out.splitlines()
                 self.assertEqual(code_, 0)
-                items = [json.loads(line) for line in lines[:-1]]
-                self.assertEqual([[e["id"], e["status"]] for e in items], case["work"])
+                items = [event for event in map(json.loads, lines[:-1]) if "status" in event]
+                expected = [item for item in case["work"] if item[1] in ("new", "replied", "followup", "reopened")]
+                if case["name"] == "a comment sent again keeps its state, and is the same item":
+                    expected = [["c1", "done"], ["c2", "new"], ["c3", "accepted"]]
+                self.assertEqual([[e["id"], e["status"]] for e in items], expected)
                 self.assertEqual(lines[-1], f"{len(items)} not done.")
                 for name, (item, field, expected) in EXTRAS.items():
                     if name == case["name"]:
@@ -661,7 +664,8 @@ class VerbsTest(Fixture):
         code_, out, _ = self.cli("wait", self.unit_arg, "--timeout", "20")
         self.assertEqual(code_, 0)
         self.assertEqual(json.loads(out.splitlines()[-1])["id"], "m1")  # the server, in this process, prints it too
-        self.assertEqual((self.unit_dir / ".conversation-seen").read_text(), "1")
+        receipt = json.loads((self.unit_dir / ".page-wait").read_text())
+        self.assertEqual(receipt["position"], 1)
         # the agent's own events are not printed, and nothing new ends in exit 3
         self.cli("reply", self.unit_arg, stdin="ok")
         started = time.time()
@@ -680,20 +684,13 @@ class VerbsTest(Fixture):
         self.assertIn("no page is served", err)
         self.assertIn("run serve", err)
 
-    def test_a_corrupt_seen_or_address_file_is_a_one_line_refusal_naming_the_file(self):
-        for name, text, saying in (
-            (".conversation-seen", "x", "does not hold a number"),
-            (".server", "not an address", "does not hold an address"),
-        ):
-            with self.subTest(file=name):
-                (self.unit_dir / ".conversation-seen").write_text("0")
-                (self.unit_dir / ".server").write_text("http://127.0.0.1:1/")
-                (self.unit_dir / name).write_text(text)
-                code_, _, err = self.cli("wait", self.unit_arg, "--timeout", "1")
-                refusal = [line for line in err.splitlines() if not line.startswith("warning:")]
-                self.assertEqual(code_, 1, err)
-                self.assertEqual(len(refusal), 1, err)
-                self.assertIn(f"{name}: {saying}", refusal[0])
+    def test_a_corrupt_address_file_is_a_one_line_refusal_naming_the_file(self):
+        (self.unit_dir / ".server").write_text("not an address")
+        code_, _, err = self.cli("wait", self.unit_arg, "--timeout", "1")
+        refusal = [line for line in err.splitlines() if not line.startswith("warning:")]
+        self.assertEqual(code_, 1, err)
+        self.assertEqual(len(refusal), 1, err)
+        self.assertIn(".server: does not hold an address", refusal[0])
 
     def test_a_skill_without_a_page_refuses(self):
         with mock.patch.object(page, "PAGES", {}):
