@@ -42,6 +42,7 @@ START a separate reviewer for every audit, however small the scope: DO NOT revie
 5. Abstractions that fit their callers badly, such as a flag or branch per caller, and code written for needs that never came, such as unused parameters, modules or extension points. Speculative code has not been shown to cause defects: it costs only where the code changes.
 6. Code that breaks a rule the repository states.
 7. Small cleanups: unused imports or code, leftover debug output, unnamed constants, and names that break the codebase's conventions.
+8. The items of section 4 of the language file for each language in scope: READ `../languages/<language>.md`, where one exists, and GIVE them to the reviewer.
 
 FOR a scope too large for one reviewer to read, START one reviewer per area, each with the same list.
 

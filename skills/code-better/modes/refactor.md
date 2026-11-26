@@ -39,6 +39,7 @@ RUN, on the final code:
 2. FOR a data migration, the record counts, the same sample of records, and the records the old format allows and the new one does not.
 3. A smoke check that the program starts and its main path works.
 4. The static, type, lint and security checks the project uses.
+5. WHEN the paths the change touches give the same result for the same input, and the old version can still run: the old and the new code on the same inputs, including generated ones, comparing results, errors and the side effects the change could affect. CHECK a difference against the contract and the input before you call it a defect.
 
 COMPARE the checks with the copy of step 2. ASK the user about any difference.
 

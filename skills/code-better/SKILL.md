@@ -36,6 +36,15 @@ READ the repository's documentation: README.md, docs/, CONTRIBUTING.md, AGENTS.m
 
 IF the change adds an interface, or changes which screens exist, what they hold, their layout or their flow, and no design covers it, USE `/design-better` for the change instead, if available: it designs the change with the user, then has `/code-better` build its design.
 
+READ the language file for each language the change touches: it is MANDATORY. It names the checks to run while you build and before you hand back, what to review once they pass, and the checks to add for each kind of risk.
+
+| Language | File |
+|---|---|
+| Rust | [languages/rust.md](languages/rust.md) |
+| Python | [languages/python.md](languages/python.md) |
+| TypeScript | [languages/typescript.md](languages/typescript.md) |
+| Java | [languages/java.md](languages/java.md) |
+
 WHEN sources disagree, FOLLOW the user's instructions, THEN the repo's own files, THEN the existing code's patterns, THEN `.code/conventions.md`, THEN this skill.
 
 LIST what the result depends on that the request and these sources do not state. ASK the user about the gaps that need it, as the general rule [Ask the user](#ask-the-user) says, before you go on.
