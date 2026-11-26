@@ -755,6 +755,36 @@ def all_items(
     return found
 
 
+def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
+    sent = _delivery_ids(active, "item_ids")
+    position, actions = active.get("position"), active.get("actions")
+    if (
+        type(position) is int
+        and position >= 0
+        and isinstance(actions, list)
+        and all(isinstance(a, dict) for a in actions)
+    ):
+        events = conv.events()
+        snapshot = events[:position]
+        # Later user input belongs to a future turn. Only the agent's status
+        # changes affect the full copy of items that this turn actually received.
+        snapshot.extend(
+            event for event in events[position:] if event.get("type") in ("status", "accepted") and not from_user(event)
+        )
+        items = [
+            {**item, "status": state, **extra}
+            for item, state, extra in all_items(snapshot, conv.items, conv.agent)
+            if item["id"] in sent
+        ]
+        return delivery.Delivery(items, actions, position)
+    # Older drivers did not capture a turn boundary or its non-item actions.
+    return conv.delivery(
+        _delivery_position(active, "after"),
+        carry_ids=_delivery_ids(active, "carry_ids"),
+        recover_ids=_delivery_ids(active, "recover_ids") | sent,
+    )
+
+
 @cli.verb("pending", help="list the user's actionable items and events", arguments=_unit_argument)
 def pending(args: argparse.Namespace, run: cli.Run) -> int:
     """Read current item states and the latest batch's non-item events, including after an interruption."""
@@ -763,13 +793,7 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
     session = os.environ.get("BETTER_PAGE_SESSION")
     active = _read_delivery_state(unit, ACTIVE_DELIVERY) if session else {}
     if session and active.get("session") == session:
-        # Items already sent in this turn stay available when the agent marks them seen or working.
-        sent = _delivery_ids(active, "item_ids")
-        found = conv.delivery(
-            _delivery_position(active, "after"),
-            carry_ids=_delivery_ids(active, "carry_ids"),
-            recover_ids=_delivery_ids(active, "recover_ids") | sent,
-        )
+        found = _active_batch(conv, active)
     else:
         receipt = _read_delivery_state(unit, WAIT_RECEIPT)
         found = conv.delivery(_delivery_position(receipt, "after"), carry_ids=_delivery_ids(receipt, "item_ids"))
