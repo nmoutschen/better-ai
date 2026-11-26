@@ -152,6 +152,7 @@ class AdapterEvent:
     arguments: Any = None
     options: tuple[str, ...] = ()
     requester: str | None = None
+    tool_id: str | None = None
 
 
 Events = tuple[AdapterEvent, ...]
@@ -614,6 +615,7 @@ class ClaudeAdapter:
                 arguments=arguments,
                 options=("allow_once", "deny"),
                 requester=_text(request.get("agent_id")) or None,
+                tool_id=tool,
             ),
         )
 
