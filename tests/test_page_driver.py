@@ -335,6 +335,7 @@ class DriverTests(unittest.TestCase):
 
             def answer(self, request_id, choice, reason):
                 self.calls.append((request_id, choice, reason))
+                return True
 
         self.conv.item("one")
         driver = self.driver(launch=lambda _: Requests([approval("first")]))
@@ -344,6 +345,44 @@ class DriverTests(unittest.TestCase):
         eventually(lambda: driver.snapshot()["state"] == "stopped")
         records = [r for r in self.records() if r["type"] == "approval"]
         self.assertEqual([(r["request"], r["answer"]) for r in records], [("first", "deny"), ("last", "deny")])
+
+    def test_approval_future_confirms_only_its_own_wire_write(self):
+        class Responses(Peer):
+            def answer(self, request_id, choice, reason):
+                self.calls.append(("answer", request_id, choice))
+                if reason == "broken pipe":
+                    raise BrokenPipeError
+                return reason != "expired"
+
+        callbacks = []
+        gate = SimpleNamespace(
+            receive=lambda event, callback: callbacks.append(callback),
+            closed=lambda event: None,
+            close=lambda reason: None,
+        )
+        driver = self.driver(launch=lambda _: Responses(), approvals=gate)
+        driver.start()
+        peer = self.peers[0]
+
+        def request(count):
+            peer.events.put(SimpleNamespace(kind="approval", request_id=1, tool="Read", arguments={}))
+            eventually(lambda: len(callbacks) == count)
+            return callbacks[-1]
+
+        old = request(1)
+        peer.events.put(SimpleNamespace(kind="approval_closed", request_id=1, outcome="expired", text=""))
+        current = request(2)
+        self.assertFalse(old("allow_once", "").result(timeout=1))
+        self.assertTrue(current("allow_once", "").result(timeout=1))
+        self.assertEqual(peer.calls.count(("answer", 1, "allow_once")), 1)
+        self.assertFalse(request(3)("allow_once", "expired").result(timeout=1))
+        self.assertFalse(request(4)("allow_once", "broken pipe").result(timeout=1))
+        self.assertEqual(
+            [r["answer"] for r in self.records() if r["type"] == "approval"],
+            ["expired", "allow_once", "expired", "expired"],
+        )
+        driver.close()
+        self.assertFalse(current("allow_once", "").result(timeout=1))
 
     def test_failed_batch_uses_all_three_automatic_retries(self):
         self.conv.item("same")
