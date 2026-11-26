@@ -155,7 +155,7 @@ sys.exit(cli.main())
         self.assertEqual(self.request(main + "agent", token=conversation["secret"])[1]["state"], "idle")
         self.assertEqual(self.request(main + "agent", token=conversation["secret"], site="cross-site")[0], 401)
         self.assertEqual(self.request(main + "data", token=paired["secret"])[0], 401)
-        self.assertEqual(self.request(panel + "agent", token=conversation["secret"])[0], 401)
+        self.assertEqual(self.request(panel + "agent", token=conversation["secret"])[0], 403)
         self.assertEqual(self.request(panel + "data", token=paired["secret"])[0], 404)
         for verb, options in (
             ("wait", ()),
@@ -181,7 +181,7 @@ sys.exit(cli.main())
         new = better.run("show-better", "serve", str(self.folder), "--link", cwd=self.root)
         self.assertEqual(new.returncode, 0, new.stderr)
         self.assertEqual(self.request(main + "agent", token=conversation["secret"])[0], 401)
-        self.assertEqual(self.request(panel + "agent", token=paired["secret"])[0], 401)
+        self.assertEqual(self.request(panel + "agent", token=paired["secret"])[0], 403)
         self.pair(new.stdout.strip())
         process.terminate()
         stdout, _ = process.communicate(timeout=10)
@@ -207,3 +207,31 @@ sys.exit(cli.main())
         url, token = address.split("#t=")
         self.assertEqual(self.request(url + "agent", token=token)[0], 404)
         self.assertTrue((self.root / "harness-started").exists())
+
+    def test_orphan_cleanup_checks_the_exact_process_birth(self):
+
+        from better_ai.page.transport import process_birth
+
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"], start_new_session=True)
+        self.addCleanup(child.wait, timeout=3)
+        self.addCleanup(child.kill)
+        birth = process_birth(child.pid)
+        if not birth:
+            self.skipTest("Process birth is not available on this OS")
+        state_file = self.folder / ".driver"
+        state = {
+            "version": 1,
+            "harness": "opencode",
+            "session": "session-old",
+            "child_pid": child.pid,
+        }
+        for recorded in ("from-a-previous-boot", birth):
+            state_file.write_text(json.dumps({**state, "child_started": recorded}))
+            state_file.chmod(0o600)
+            server = self.serve()
+            server.terminate()
+            server.communicate(timeout=3)
+            if recorded != birth:
+                self.assertIsNone(child.poll())
+            else:
+                self.assertLess(child.wait(timeout=3), 0)
