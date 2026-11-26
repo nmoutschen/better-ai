@@ -256,7 +256,7 @@ class DriverTests(unittest.TestCase):
         driver.start()
         peer = self.peers[0]
         for attempt in range(1, 4):
-            eventually(lambda: len(peer.prompts) == attempt)
+            eventually(lambda attempt=attempt: len(peer.prompts) == attempt)
             peer.events.put(Event("turn_ended", outcome="completed", text="No further work"))
         eventually(lambda: driver.snapshot()["state"] == "failed")
         state = driver.snapshot()
@@ -294,7 +294,7 @@ class DriverTests(unittest.TestCase):
         self.conv.item("first")
         driver.start()
         for index in range(4):
-            eventually(lambda: len(self.peers) == index + 1 and self.peers[-1].prompts)
+            eventually(lambda index=index: len(self.peers) == index + 1 and self.peers[-1].prompts)
             self.peers[-1].events.put(Event("failed", outcome="crashed"))
             eventually(lambda: driver.snapshot()["state"] == "failed")
             self.assertEqual(len(self.peers), index + 1)
@@ -314,12 +314,12 @@ class DriverTests(unittest.TestCase):
                 peer = self.peers[-1]
                 self.assertTrue(peer.prompt_arrived.wait(2))
                 peer.events.put(Event("failed", outcome=kind))
-                eventually(lambda: driver.snapshot().get("kind") == kind)
+                eventually(lambda driver=driver, kind=kind: driver.snapshot().get("kind") == kind)
                 driver.enqueue(self.conv.item("after-" + kind))
                 time.sleep(0.1)
                 self.assertIs(peer, self.peers[-1])
                 driver.request_start()
-                eventually(lambda: self.peers[-1] is not peer and self.peers[-1].prompts)
+                eventually(lambda peer=peer: self.peers[-1] is not peer and self.peers[-1].prompts)
                 driver.close()
 
     def test_silence_stalls_without_cancelling(self):
@@ -389,9 +389,7 @@ class DriverTests(unittest.TestCase):
             "print(json.dumps(dict(child=child.pid)),flush=True);"
             "sys.stdin.read()"
         )
-        transport = self.driver_module.ProcessTransport(
-            [sys.executable, "-c", script], self.root, os.environ, Codec
-        )
+        transport = self.driver_module.ProcessTransport([sys.executable, "-c", script], self.root, os.environ, Codec)
         self.addCleanup(transport.close)
         event = transport.poll(2)
         self.assertEqual(event.kind, "child")
