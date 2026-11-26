@@ -15,7 +15,7 @@ test('each click opens a detached tab before obtaining a fresh conversation link
       return elements.get(id);
     },
   };
-  let count = 0;
+  let count = 0, failRemoval = false;
   const context = {
     document, location: { hash: '', pathname: '/approvals.html' }, history: { replaceState() {} },
     URLSearchParams, setTimeout() {},
@@ -27,10 +27,20 @@ test('each click opens a detached tab before obtaining a fresh conversation link
     window: {
       open() {
         trace.push('open');
+        const childStorage = new Map(storage);
         return {
+          sessionStorage: {
+            removeItem(key) {
+              assert.equal(key, 'approvalSecret');
+              assert.equal(childStorage.get(key), 'approved-tab');
+              if (failRemoval) throw new Error('Storage unavailable');
+              childStorage.delete(key);
+              trace.push('clear');
+            },
+          },
           set opener(value) { assert.equal(value, null); trace.push('detach'); },
-          location: { replace(url) { trace.push(url); } },
-          close() { assert.fail('The successful tab should stay open'); },
+          location: { replace(url) { assert.equal(childStorage.has('approvalSecret'), false); trace.push(url); } },
+          close() { trace.push('close'); },
         };
       },
     },
@@ -50,8 +60,13 @@ test('each click opens a detached tab before obtaining a fresh conversation link
   await link.click({ preventDefault() {} });
   await link.click({ preventDefault() {} });
   assert.deepEqual(trace, [
-    'open', 'detach', 'request', 'http://127.0.0.1:3000/#p=link1',
-    'open', 'detach', 'request', 'http://127.0.0.1:3000/#p=link2',
+    'open', 'detach', 'clear', 'request', 'http://127.0.0.1:3000/#p=link1',
+    'open', 'detach', 'clear', 'request', 'http://127.0.0.1:3000/#p=link2',
   ]);
+  failRemoval = true;
+  trace.length = 0;
+  await link.click({ preventDefault() {} });
+  assert.deepEqual(trace, ['open', 'detach', 'close']);
+  assert.match(document.getElementById('error').textContent, /could not open/i);
   assert.equal(storage.get('approvalSecret'), 'approved-tab');
 });
