@@ -2,6 +2,7 @@
 
 import json
 import os
+import select
 import subprocess
 import sys
 import urllib.error
@@ -53,7 +54,7 @@ class DrivenServeTest(Served):
         result = better.run("show-better", "serve", str(self.folder), "--drive", "unknown", cwd=self.root)
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
 
-    def launch_driven(self, *, enrolled=True, hanging=False):
+    def launch_driven(self, *, enrolled=True, hanging=False, once=False, delay=0, version="2.4.1"):
         bin_dir = self.root / "bin"
         bin_dir.mkdir()
         stub = bin_dir / "opencode"
@@ -63,7 +64,7 @@ class DrivenServeTest(Served):
 import json, pathlib, sys, time
 
 if sys.argv[1:] == ["--version"]:
-    print("opencode 2.4.1")
+    print("opencode " + CLI_VERSION)
     sys.exit()
 pathlib.Path("harness-started").touch()
 for line in sys.stdin:
@@ -77,7 +78,7 @@ for line in sys.stdin:
     }
     if msg["method"] in replies:
         print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": replies[msg["method"]]}), flush=True)
-""".replace("HANGING", repr(hanging))
+""".replace("HANGING", repr(hanging)).replace("CLI_VERSION", repr(version))
         )
         stub.chmod(0o700)
         bootstrap = """
@@ -87,8 +88,21 @@ sys.path.insert(0, sys.argv.pop(1))
 from better_ai.page import approvals
 from better_ai import cli, page
 approvals.credential_file = lambda: Path("test-credential")
-if sys.argv.pop(1) == "True":
+credential = sys.argv.pop(1)
+if credential == "True":
     approvals.load_credential = lambda path: {"id": "stub"}
+elif credential == "invalid":
+    path = Path("test-credential")
+    path.write_text("invalid")
+    path.chmod(0o600)
+delay = float(sys.argv.pop(1))
+if delay:
+    import time
+    original = page.schema.check_paths
+    def slow(*args, **kwargs):
+        time.sleep(delay)
+        return original(*args, **kwargs)
+    page.schema.check_paths = slow
 page.START_TIMEOUT = 1.2
 page.ENROLL_TIMEOUT = 1.4
 sys.exit(cli.main())
@@ -101,11 +115,13 @@ sys.exit(cli.main())
                 bootstrap,
                 str(better.SRC),
                 str(enrolled),
+                str(delay),
                 "serve",
                 str(self.folder),
                 "--drive",
                 "opencode",
                 "--no-browser",
+                *(["--once"] if once else []),
             ],
             cwd=self.root,
             env={"PATH": os.fspath(bin_dir), "BETTER_AI_SKILL": "show-better"},
@@ -247,3 +263,35 @@ sys.exit(cli.main())
                 self.assertIsNone(child.poll())
             else:
                 self.assertLess(child.wait(timeout=3), 0)
+
+    def test_invalid_enrollment_file_preserves_wait_fallback(self):
+        process = self.launch_driven(enrolled="invalid")
+        self.assertEqual(process.stdout.readline().strip(), "driver: off no-approvals")
+        self.assertIn("#t=", process.stdout.readline())
+        self.assertFalse((self.root / "harness-started").exists())
+
+    def test_validation_counts_toward_the_startup_deadline(self):
+        process = self.launch_driven(delay=3)
+        self.assertTrue(select.select([process.stdout], [], [], 2.5)[0])
+        self.assertEqual(process.stdout.readline().strip(), "driver: off crashed")
+        self.assertIn("#t=", process.stdout.readline())
+        self.assertFalse((self.root / "harness-started").exists())
+
+    def test_fallback_after_a_running_handshake_still_serves_once(self):
+        process = self.launch_driven(hanging=True, once=True)
+        self.assertEqual(process.stdout.readline().strip(), "driver: off crashed")
+        address = process.stdout.readline().split(" at ", 1)[1].strip()
+        with urllib.request.urlopen(address, timeout=3) as response:
+            self.assertEqual(response.status, 200)
+        self.assertEqual(process.wait(timeout=3), 0)
+
+    def test_unsupported_version_reports_detected_and_required_versions(self):
+        process = self.launch_driven(version="1.2.3", once=True)
+        self.assertEqual(process.stdout.readline().strip(), "driver: off version")
+        address = process.stdout.readline().split(" at ", 1)[1].strip()
+        with urllib.request.urlopen(address, timeout=3):
+            pass
+        _, diagnostics = process.communicate(timeout=3)
+        for detail in ("1.2.3", "2.4.1", "serve again"):
+            self.assertIn(detail, diagnostics)
+        self.assertNotIn("Start", diagnostics)
