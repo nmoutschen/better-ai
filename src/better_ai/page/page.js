@@ -54,7 +54,7 @@ function pageFetch(url, init) {
     init.headers = Object.assign({}, init.headers, { 'X-Page-Token': pageToken });
     return fetch(url, init);
   }).then(function (r) {
-    if (r.status !== 401) return r;
+    if (r.status !== (pageDriven ? 403 : 401)) return r;
     throw pageStale();
   });
 }

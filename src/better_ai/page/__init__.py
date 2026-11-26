@@ -101,6 +101,22 @@ CONTENT_TYPES = {
 }
 SHARED_ASSETS = {"/page.js": "page/page.js", "/page.css": "page/page.css"}
 
+# The driven shell and its srcdoc previews may run only bundled scripts.
+DRIVEN_SHELL_POLICY = "; ".join(
+    (
+        "default-src 'none'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline' data: http: https:",
+        "font-src 'self' data: http: https:",
+        "img-src 'self' data: http: https:",
+        "connect-src 'self'",
+        "frame-src 'self' http: https:",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+    )
+)
+
 
 class EventError(ValueError):
     """An event that fails its schema: the message is the validator's, `field: message` for each problem."""
@@ -952,11 +968,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send(unauthorized, b"Pairing link expired. Ask for a new link.", "text/plain")
         return self.send_json({"secret": secret, **({"page": new_page()} if new_page else {})})
 
-    def send(self, code: int, body: bytes, kind: str) -> None:
+    def send(self, code: int, body: bytes, kind: str, *, policy: str | None = None) -> None:
         self.send_response(code)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if policy:
+            self.send_header("Content-Security-Policy", policy)
         self.end_headers()
         self.wfile.write(body)
 
@@ -999,11 +1017,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if path == "/wait":
                 return self.send_error(403)
             if path in ("/data", "/events", "/old", "/rev", "/agent") and not self.driven_token(driven.main_pair):
-                return self.send(401, b"Opened elsewhere. Ask for a new link.", "text/plain")
+                return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
             if path == "/agent":
                 return self.send_json(driven.status())
         if path in ("/", "/index.html"):
-            return self.send(200, shell(self.spec, bool(driven and not driven.off)).encode(), CONTENT_TYPES[".html"])
+            paired = bool(driven and not driven.off)
+            return self.send(
+                200,
+                shell(self.spec, paired).encode(),
+                CONTENT_TYPES[".html"],
+                policy=DRIVEN_SHELL_POLICY if paired else None,
+            )
         if path in self.assets:
             kind = CONTENT_TYPES[os.path.splitext(path)[1]]
             return self.send(200, resources.read_bytes(self.assets[path]), kind)
@@ -1047,11 +1071,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not driven.main_host(self.headers.get("Host")) or not self.browser_origin():
                 return self.send_error(403)
             if self.path == "/pair":
-                return self.pair(driven.main_pair)
+                return self.pair(driven.main_pair, unauthorized=403)
             if self.path != "/rpc":
                 return self.send_error(404)
             if not self.driven_token(driven.main_pair):
-                return self.send(401, b"Opened elsewhere. Ask for a new link.", "text/plain")
+                return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
             if not driven.driver or not driven.session:
                 return self.send_error(503)
         elif self.path != "/rpc":
