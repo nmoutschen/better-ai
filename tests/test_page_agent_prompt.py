@@ -23,7 +23,15 @@ class PageAgentPromptTest(unittest.TestCase):
         self.assertTrue(inputs)
         inputs, separator, output = output.partition("## Output\n")
         self.assertTrue(separator)
-        for field in ("SKILL.md", "Unit", "Current step", "Hand-off note", "Verb command", "Working directory", "Items"):
+        for field in (
+            "SKILL.md",
+            "Unit",
+            "Current step",
+            "Hand-off note",
+            "Verb command",
+            "Working directory",
+            "Items",
+        ):
             with self.subTest(field=field):
                 self.assertIn(field, inputs)
         for rule in (
