@@ -174,6 +174,21 @@ class AdapterTests(unittest.TestCase):
         )
         self.assertEqual(result[0].outcome, "unsafe-mode")
 
+    def test_claude_spontaneous_turn_starts_on_main_assistant_output(self):
+        adapter = ClaudeAdapter(lambda _: None)
+        adapter.open("/repo", SESSION)
+        assistant = {
+            "type": "assistant",
+            "parent_tool_use_id": None,
+            "message": {"content": [{"type": "text", "text": "Main output"}]},
+        }
+        worker = {**assistant, "parent_tool_use_id": "tool123"}
+        self.assertNotIn("turn_started", [event.kind for event in adapter.receive(worker)])
+        self.assertEqual([event.kind for event in adapter.receive(assistant)], ["turn_started", "text"])
+        self.assertEqual([event.kind for event in adapter.receive(assistant)], ["text"])
+        adapter.receive({"type": "result", "subtype": "success", "result": "Complete"})
+        self.assertEqual([event.kind for event in adapter.receive(assistant)], ["turn_started", "text"])
+
 
 if __name__ == "__main__":
     unittest.main()

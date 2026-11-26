@@ -438,6 +438,7 @@ class ClaudeAdapter:
         self.send = send
         self.session_id: str | None = None
         self._ids = itertools.count(1)
+        self._running = False
 
     def open(self, cwd: str, resume: str | None) -> None:
         # Claude sends its authoritative session id with the stream's init event.
@@ -464,7 +465,9 @@ class ClaudeAdapter:
                 return _failure("crashed", "missing or invalid Claude session id")
             self.session_id = session_id
             return (AdapterEvent("ready", session_id=session_id),)
-        if kind == "assistant":
+        if kind == "assistant" and message.get("parent_tool_use_id") is None:
+            started = () if self._running else (AdapterEvent("turn_started"),)
+            self._running = True
             content = _object(message.get("message")).get("content")
             text = (
                 "".join(
@@ -475,8 +478,9 @@ class ClaudeAdapter:
                 if isinstance(content, list)
                 else ""
             )
-            return (AdapterEvent("text", text=text),)
+            return (*started, AdapterEvent("text", text=text))
         if kind == "result":
+            self._running = False
             error = _text(message.get("result"))
             if subtype == "success" and message.get("is_error") is not True:
                 outcome = "normal"
