@@ -50,14 +50,8 @@ def write_private(unit, name: str, data: bytes) -> None:
             Path(temporary).unlink()
 
 
-def read_driver_state(unit, harness=None, *, valid_session=None) -> dict:
+def read_driver_state(unit, harness=None, *, valid_session) -> dict:
     """A state file is useful only after we validate its mode, owner and adapter's session ID."""
-    if valid_session is None:
-        from .adapters import session_id_valid
-
-        def valid_session(key):
-            return session_id_valid(stored_harness, key)
-
     try:
         state = json.loads(private_bytes(unit, STATE))
     except (ValueError, UnicodeError):
@@ -67,7 +61,7 @@ def read_driver_state(unit, harness=None, *, valid_session=None) -> dict:
     stored_harness = state.get("harness")
     if not isinstance(stored_harness, str) or (harness is not None and harness != stored_harness):
         return {}
-    if not valid_session(state.get("session")):
+    if not valid_session(stored_harness, state.get("session")):
         return {}
     return state
 

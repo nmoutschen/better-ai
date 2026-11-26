@@ -3,18 +3,77 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes
 import json
 import os
 import queue
 import select
 import signal
 import subprocess
+import sys
 import threading
 import time
 from collections import deque
+from pathlib import Path
 from types import SimpleNamespace
 
 MAX_LINE = 4 * 1024 * 1024
+
+
+def _darwin_birth(pid: int) -> str | None:
+    # PROC_PIDTBSDINFO's public layout in XNU's bsd/sys/proc_info.h.
+    class BSDInfo(ctypes.Structure):
+        _fields_ = [
+            ("flags", ctypes.c_uint32),
+            ("status", ctypes.c_uint32),
+            ("xstatus", ctypes.c_uint32),
+            ("pid", ctypes.c_uint32),
+            ("before_names", ctypes.c_uint32 * 8),
+            ("comm", ctypes.c_char * 16),
+            ("name", ctypes.c_char * 32),
+            ("after_names", ctypes.c_uint32 * 6),
+            ("seconds", ctypes.c_uint64),
+            ("microseconds", ctypes.c_uint64),
+        ]
+
+    native = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+    native.proc_pidinfo.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
+    info = BSDInfo()
+    if native.proc_pidinfo(pid, 3, 0, ctypes.byref(info), ctypes.sizeof(info)) != ctypes.sizeof(info):
+        return None
+    if info.pid != pid or not info.seconds or not 0 <= info.microseconds < 1_000_000:
+        return None
+    native.sysctlbyname.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_size_t),
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+    ]
+    boot = ctypes.create_string_buffer(64)
+    size = ctypes.c_size_t(len(boot))
+    if native.sysctlbyname(b"kern.bootsessionuuid", boot, ctypes.byref(size), None, 0) or not boot.value:
+        return None
+    return f"{boot.value.decode('ascii')}:{info.seconds}:{info.microseconds}"
+
+
+def process_birth(pid: int | None) -> str | None:
+    """An OS birth marker for comparison before touching a recorded process."""
+    if type(pid) is not int or pid <= 0 or pid > 2**31 - 1:
+        return None
+    try:
+        if sys.platform == "darwin":
+            return _darwin_birth(pid)
+        if sys.platform == "linux":
+            boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+            # The command name in field 2 can contain spaces and parentheses. Fields start after its last ')'.
+            _, separator, fields = Path(f"/proc/{pid}/stat").read_text(errors="replace").rpartition(")")
+            started = fields.split()[19]  # field 22: start ticks since boot
+            if separator and boot and started.isascii() and started.isdigit():
+                return f"{boot}:{started}"
+    except (OSError, AttributeError, IndexError, UnicodeError):
+        return None
+    return None
 
 
 class ProcessTransport:
@@ -38,6 +97,7 @@ class ProcessTransport:
             pass_fds=pass_fds,
         )
         self.pid = self._proc.pid
+        self.started = process_birth(self.pid)
         os.set_blocking(self._proc.stdin.fileno(), False)
         self._readers = [
             threading.Thread(target=target, daemon=True) for target in (self._read_messages, self._read_stderr)

@@ -130,7 +130,7 @@ class DriverTests(unittest.TestCase):
         self.trigger_data = []
 
     def driver(self, launch=None, approvals=None):
-        def recording_launch(tag):
+        def recording_launch(tag, resume):
             peer = launch(tag) if launch else Peer()
             self.peers.append(peer)
             return peer
@@ -354,6 +354,8 @@ class DriverTests(unittest.TestCase):
         driver = self.driver(launch=lambda tag: Peer(missing=True))
         driver.start()
         peer = self.peers[-1]
+        self.assertTrue(self.peers[-2].closed)
+        self.assertIn(("open", str(self.root), "session-1"), self.peers[-2].calls)
         self.assertIn(("open", str(self.root), None), peer.calls)
         self.assertEqual(self.state()["session"], "session-1")
 
@@ -404,6 +406,12 @@ class DriverTests(unittest.TestCase):
         event = transport.poll(2)
         self.assertEqual(event.kind, "child")
         self.assertEqual(os.getpgid(transport.pid), transport.pid)
+        if sys.platform in ("darwin", "linux"):
+            from better_ai.page.transport import process_birth
+
+            self.assertTrue(transport.started)
+            self.assertEqual(process_birth(transport.pid), transport.started)
+            self.assertNotEqual(process_birth(os.getpid()), transport.started)
         self.assertEqual(os.getpgid(event.pid), transport.pid)
         started = time.monotonic()
         transport.close()

@@ -79,7 +79,7 @@ class Driver:
         triggers=lambda: (),
         approvals=None,
         clock=time.monotonic,
-        valid_session=None,
+        valid_session,
     ):
         self.conversation = conversation
         self.unit = conversation.unit
@@ -89,14 +89,8 @@ class Driver:
         self.step, self.handoff = step, handoff
         self.skill_path, self.command = str(skill_path), command
         self.triggers, self.approvals, self.clock = triggers, approvals, clock
-        if valid_session is None:
-            from .adapters import session_id_valid
-
-            def valid_session(key):
-                return session_id_valid(harness, key)
-
         self.valid_session = valid_session
-        saved = read_driver_state(self.unit, harness, valid_session=valid_session)
+        saved = read_driver_state(self.unit, harness, valid_session=lambda name, key: valid_session(key))
         self.session = saved.get("session")
         tag = saved.get("tag")
         try:
@@ -146,6 +140,7 @@ class Driver:
         self._details = {}
         self._last_output = self.clock()
         self._first_prompt = True
+        self._opened = 0.0
         self._approval_records = {}
 
     @staticmethod
@@ -220,7 +215,8 @@ class Driver:
                     "tag": self.tag,
                     "server_pid": os.getpid(),
                     "child_pid": self._peer.pid if self._peer else None,
-                    "opened": time.time(),
+                    "child_started": getattr(self._peer, "started", None),
+                    "opened": self._opened,
                     "delivered": self._delivered,
                     "fired": sorted(self._fired),
                 }
@@ -229,8 +225,7 @@ class Driver:
 
     def _open(self, deadline: float) -> None:
         resume = self.session
-        self._peer = self.launch(self.tag)
-        self._peer.open(self.cwd, resume)
+        self._launch(resume)
         while not self._closing.is_set() and time.monotonic() < deadline:
             event = self._peer.poll(POLL)
             if event is None:
@@ -248,12 +243,23 @@ class Driver:
             if event.kind == "failed":
                 if resume and event.outcome == "missing-session":
                     resume = None
-                    self._peer.open(self.cwd, None)
+                    self._close_peer("session missing")
+                    self._launch(None)
                     continue
                 raise StartError(event.outcome or "crashed", event.text)
             if event.kind == "approval":
                 self._peer.answer(event.request_id, "deny", "the page is starting")
         raise StartError("crashed", "harness startup timed out")
+
+    def _launch(self, resume: str | None) -> None:
+        try:
+            self._peer = self.launch(self.tag, resume)
+            self._opened = time.time()
+            self._peer.open(self.cwd, resume)
+        except FileNotFoundError as error:
+            raise StartError("not-installed", str(error)) from None
+        except OSError as error:
+            raise StartError("crashed", str(error)) from None
 
     def _run(self) -> None:
         try:
