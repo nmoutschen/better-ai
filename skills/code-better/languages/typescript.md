@@ -34,9 +34,11 @@ WHEN the change calls for one of these checks, USE its tool IF the project alrea
 
 | WHEN the change | Check | Bound it by |
 |---|---|---|
-| applies one rule to several distinct values | `test.each` or `it.each` with the cases that exercise new behaviour | |
+| applies one rule to several distinct values | `test.each` or `it.each` with the values that exercise new behaviour |  |
 | holds a rule over many inputs, such as a round trip or a result that stays the same when applied twice | a fast-check property test; KEEP a counterexample it finds as a regression test, with its seed and path | `numRuns` |
-| depends on the order of async operations | fast-check's scheduler | `numRuns` |
+| depends on a sequence of operations | fast-check `fc.commands` run with `fc.modelRun` against a simple model | `numRuns` and `maxCommands` |
+| shares state between threads, or depends on the order of async operations | fast-check's scheduler, for async operations | `numRuns` |
 | parses input from outside the program | a Jazzer.js fuzz target | its run count or time limit |
-| changes the public API of a published package | an API Extractor report compared with the last release, and the tests of the code that calls it | |
+| changes the public API of a published package | an API Extractor report compared with the last release, and the tests of the code that calls it |  |
 | needs evidence that the tests catch faults | StrykerJS on the changed files, in incremental mode | it is slow: run it on the changed files only |
+| holds a contract worth proving | no proof tool in common use: CHECK the contract with runtime assertions and a property test instead |  |

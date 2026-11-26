@@ -35,10 +35,11 @@ WHEN the change calls for one of these checks, USE its tool IF the project alrea
 
 | WHEN the change | Check | Bound it by |
 |---|---|---|
-| applies one rule to several distinct values | `pytest.mark.parametrize` with the cases that exercise new behaviour, not every combination | |
+| applies one rule to several distinct values | `pytest.mark.parametrize` with the values that exercise new behaviour, not every combination |  |
 | holds a rule over many inputs, such as a round trip or a result that stays the same when applied twice | a Hypothesis property test (`@given`) | `max_examples`, and a time limit on the test run, since replay and shrinking add calls |
 | depends on a sequence of operations | a Hypothesis `RuleBasedStateMachine` against a simple model | `stateful_step_count` |
+| shares state between threads, or depends on the order of async operations | no tool in common use controls the schedule: TEST each order you can name, forcing it with `threading.Barrier` or `asyncio.Event` |  |
 | parses input from outside the program | an Atheris fuzz target | libFuzzer's `-runs` or `-max_total_time` |
-| changes the public API of a published package | `griffe check` against the last release, and the tests of the code that calls it | |
+| changes the public API of a published package | `griffe check` against the last release, and the tests of the code that calls it |  |
 | needs evidence that the tests catch faults | mutmut or Cosmic Ray on the changed module | it is slow: run it on the changed module only |
-| holds a contract worth checking, in deterministic code | CrossHair on the contract, or Nagini; a clean CrossHair run is bounded evidence, not a proof | CrossHair's time limit |
+| holds a contract worth proving | CrossHair on the contract, in deterministic code, or Nagini; a clean CrossHair run is bounded evidence, not a proof | CrossHair's time limit |

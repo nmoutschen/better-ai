@@ -34,12 +34,13 @@ WHEN the change calls for one of these checks, USE its tool IF the project alrea
 
 | WHEN the change | Check | Bound it by |
 |---|---|---|
-| applies one rule to several distinct values | a JUnit `@ParameterizedTest` with the cases that exercise new behaviour | |
+| applies one rule to several distinct values | a JUnit `@ParameterizedTest` with the values that exercise new behaviour |  |
 | holds a rule over many inputs, such as a round trip or a result that stays the same when applied twice | a property test with the project's library, such as jqwik or QuickTheories | the number of tries |
+| depends on a sequence of operations | a jqwik action chain against a simple model | the chain's maximum length |
+| shares state between threads, or depends on the order of async operations | a jcstress test of the outcomes, for threads | its iteration settings |
 | parses input from outside the program | a Jazzer fuzz target | `-max_total_time` |
-| shares state between threads | a jcstress test of the outcomes | its iteration settings |
-| changes the public API of a published library | japicmp against the last release, and the tests of the code that calls it | |
+| changes the public API of a published package | japicmp against the last release, and the tests of the code that calls it |  |
 | needs evidence that the tests catch faults | PIT, with `targetClasses` set to the changed classes | it is slow: run it on the changed classes only |
-| holds a contract worth proving | JML checked by OpenJML, or KeY; CHECK the contract for behaviour it leaves out before you trust it | |
+| holds a contract worth proving | JML checked by OpenJML, or KeY; CHECK the contract for behaviour it leaves out before you trust it |  |
 
 jqwik's terms change from version 1.10. CHECK the installed jqwik version and its terms. IF they forbid use by an AI agent, USE another property-test library the project has, or LIST the check as a proposed next step.

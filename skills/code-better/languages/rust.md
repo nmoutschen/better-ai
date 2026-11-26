@@ -15,6 +15,7 @@ The repository's toolchain, features, lint settings, test runner and CI commands
 
 - RUN the project's format, Clippy, build and test commands as its CI runs them. IF the project uses nextest, ALSO RUN `cargo test --doc`: nextest does not run doctests.
 - WHEN the change adds or updates a dependency, RUN `cargo audit` or `cargo deny check`, whichever the project uses.
+- WHEN the change adds or changes `unsafe` code, RUN the tests that reach it under Miri, `cargo +nightly miri test`: it checks only the paths those tests run.
 
 ## 4. Review once the checks pass
 
@@ -32,10 +33,11 @@ WHEN the change calls for one of these checks, USE its tool IF the project alrea
 
 | WHEN the change | Check | Bound it by |
 |---|---|---|
+| applies one rule to several distinct values | one `rstest` test with a `#[case]` for each value, or one test that loops over a table of cases, with the values that exercise new behaviour |  |
 | holds a rule over many inputs, such as a round trip or a result that stays the same when applied twice | a property test with proptest or quickcheck | the number of cases and shrink iterations |
+| depends on a sequence of operations | a proptest-state-machine test against a simple model | the number of transitions |
+| shares state between threads, or depends on the order of async operations | a loom test of the invariant, for threads | its preemption bound |
 | parses input from outside the program | a cargo-fuzz target (needs a nightly toolchain), or bolero | `-runs` or `-max_total_time` |
-| shares state between threads | a loom test of the invariant | its preemption bound |
-| adds or changes `unsafe` code | a run of the tests under Miri, `cargo +nightly miri test`, which checks only the paths the tests run | |
-| changes the public API of a published crate | `cargo semver-checks` against the last release, and the tests of the crates that call it | |
+| changes the public API of a published package | `cargo semver-checks` against the last release, and the tests of the crates that call it |  |
 | needs evidence that the tests catch faults | `cargo mutants --in-diff <diff file>` on the changed code | it is slow: run it on the diff only |
-| holds a property worth proving | a Kani harness, or Verus, Prusti or Creusot; CHECK the specification against the request before you trust a proof | solver time |
+| holds a contract worth proving | a Kani harness, or Verus, Prusti or Creusot; CHECK the specification against the request before you trust a proof | solver time |
