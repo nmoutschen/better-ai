@@ -42,10 +42,14 @@ def select(
     after: int,
     carry_ids: frozenset[str],
     recover_ids: frozenset[str],
+    *,
+    admitted_edits: set[tuple[str, str]] | None = None,
 ) -> Delivery:
     if after > len(events):
         after = 0
     updated = _updated_items(events, item_types, after)
+    if admitted_edits is not None:
+        updated &= admitted_edits
     selected = [
         {**item, "status": state, **extra}
         for item, state, extra in items
