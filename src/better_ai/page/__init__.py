@@ -725,10 +725,12 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
     session = os.environ.get("BETTER_PAGE_SESSION")
     active = _read_delivery_state(unit, ACTIVE_DELIVERY) if session else {}
     if session and active.get("session") == session:
+        # Items already sent in this turn stay available when the agent marks them seen or working.
+        sent = _delivery_ids(active, "item_ids")
         found = conv.delivery(
             _delivery_position(active, "after"),
             carry_ids=_delivery_ids(active, "carry_ids"),
-            recover_ids=_delivery_ids(active, "recover_ids"),
+            recover_ids=_delivery_ids(active, "recover_ids") | sent,
         )
     else:
         receipt = _read_delivery_state(unit, WAIT_RECEIPT)

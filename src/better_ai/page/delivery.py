@@ -22,6 +22,19 @@ class Delivery:
         return [{"id": item["id"], "status": item["status"]} for item in self.items]
 
 
+def _updated_items(events: list[dict], item_types: tuple[str, ...], after: int) -> set[tuple[str, str]]:
+    """Find new versions of items, including updates to items that aren't otherwise ready."""
+    seen, updated = set(), set()
+    for index, event in enumerate(events):
+        kind, ident = event.get("type"), event.get("id")
+        if from_user(event) and kind in item_types and ident:
+            key = (kind, ident)
+            if index >= after and key in seen:
+                updated.add(key)
+            seen.add(key)
+    return updated
+
+
 def select(
     events: list[dict],
     items: list[tuple[dict, str, dict]],
@@ -30,17 +43,19 @@ def select(
     carry_ids: frozenset[str],
     recover_ids: frozenset[str],
 ) -> Delivery:
+    if after > len(events):
+        after = 0
+    updated = _updated_items(events, item_types, after)
     selected = [
         {**item, "status": state, **extra}
         for item, state, extra in items
         if state in READY
+        or (item["type"], item["id"]) in updated
         or (state == "seen" and item["id"] in carry_ids)
         or (state in ("seen", "working") and item["id"] in recover_ids)
     ]
     item_ids = {item["id"] for item, _, _ in items}
     # A note attached to another item is a user event, even when the parent is working and cannot be delivered.
-    if after > len(events):
-        after = 0
     other = [
         event
         for event in events[after:]
