@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .. import page, paths, resources, schema
+from ..page import triggers
 from ..paths import Unit
 from . import SKILL, derive, rules_moves, summary
 
@@ -140,6 +141,7 @@ def load(unit: Unit) -> dict:
 SPEC = page.register(
     SKILL,
     page.PageSpec(
+        triggers=triggers.discover,
         title="Discovery",
         agent="coordinator",
         main="discover/page.html",

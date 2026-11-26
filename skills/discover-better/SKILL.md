@@ -41,7 +41,7 @@ ASK, as the general rule [Ask the user](#ask-the-user) says, for what the reques
 
 MAKE the discovery with `python3 <skill dir>/scripts/better.pyz create .discover/<idea> --by <coordinator>`, with the head as JSON on stdin, as formats/records.md shows. MAKE the `<idea>` slug from general terms only, such as `flaky-test-owner`: no person's, customer's or internal project's name. CHOOSE your own name, such as `coordinator`, GIVE it as the head's `coordinator`, and USE it with `--by` from then on. TELL the user the folder's path once.
 
-IF the harness can run a command in the background and the user's browser can reach this machine, START the page with `python3 <skill dir>/scripts/better.pyz serve <unit> --open` and GIVE the user the address it prints, whole, with its `#t=` part. IF your harness tells you when a background command ends, ALSO RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` in the background, and START it again each time it ends, before you act on what it printed. The general rule [Work in the page](#work-in-the-page) applies from then on.
+FOLLOW the general rule [Work in the page](#work-in-the-page) to start the page.
 
 ### 2. Draft and challenge what the idea assumes
 
@@ -186,6 +186,8 @@ DO NOT change a test's rule, an item's text or a check so that the work passes, 
 DO NOT copy evidence text into another record, such as a change, a move, a question or a brief's decision. NAME the evidence by its id. A person's words are stored in one place only, so that they can be removed.
 
 ### Work in the page
+
+IF you are in a session opened by the page, DO NOT run `serve`. IF the page already has its own agent, ANSWER questions about it in the chat with "ask it in the page". IF you are in the chat, the page is not already served, your harness can run a background command, and the user's browser can reach this machine, RUN `python3 <skill dir>/scripts/better.pyz serve <unit> --drive auto --open` in the background with the hand-off note on stdin. INCLUDE the current step and what the page agent needs to continue. READ the startup output. IF serve prints a first-time enrollment address, GIVE it to the user immediately, ASK them to enroll there, and WAIT at most 120 seconds from startup for the driver result. OTHERWISE, LOOK for the driver line within 30 seconds from startup. IF no driver line arrives by the applicable deadline, TREAT it as `driver: off crashed`. IF serve prints `driver: on`, GIVE the full page address, including its `#t=` part, SAY the page has its own agent, and END the turn. IF serve prints `driver: off <kind>` or you reached the deadline without a driver line, TELL the user the kind and its action in one line. THEN, in the wait fallback, GIVE the fallback page address when serve prints it. IF you can stream output, STREAM the serve command's output and restart an expired stream. OTHERWISE, IF your harness can tell you when a background command ends, RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` in the background and START it again each time it ends before you act on its output. OTHERWISE, ASK the user to say "sent" in the chat and RUN `python3 <skill dir>/scripts/better.pyz pending <unit>` when they do.
 
 WHILE the page is served, PUT everything for the user in the page, and DO NOT repeat page events in the chat.
 

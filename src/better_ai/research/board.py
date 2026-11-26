@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .. import page, resources, schema
+from ..page import triggers
 from ..paths import Unit
 from . import SKILL, checks  # noqa: F401  (checks registers the hooks the schemas name)
 
@@ -204,6 +205,7 @@ def conversation(unit: Unit) -> page.Conversation:
 SPEC = page.register(
     SKILL,
     page.PageSpec(
+        triggers=triggers.research,
         title="Research board",
         agent="coordinator",
         main="research/board.html",
