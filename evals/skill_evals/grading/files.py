@@ -20,6 +20,8 @@ TEST_FILE = re.compile(r"(?:^|/)(?:test_|check_)[^/]*\.py$|_test\.py$")
 CACHE_FILE = re.compile(r"(?:^|/)__pycache__/|(?:^|/)\.pytest_cache/")
 # A note is Markdown, or one of the agent's own JSON working files under .code/, such as an audit's findings.jsonl.
 MARKDOWN_NOTE = re.compile(r"\.(?:md|markdown)$|(?:^|/)\.code/.*\.jsonl?$", re.IGNORECASE)
+# Every file in code-better's working folder is the agent's own record, not code or data: page state, check copies.
+WORKING_FILE = re.compile(r"(?:^|/)\.code/")
 SNAPSHOT_SCRIPT = (
     'mkdir -p "$1/repo" "$1/grade" && cp -a ./. "$1/repo/"'
     ' && find "$1/repo" -name __pycache__ -type d -prune -exec rm -rf {} +'
@@ -200,8 +202,8 @@ async def planted_unchanged(spec: dict[str, Any], repo: Checkout) -> bool:
 
 
 async def notes_only(spec: dict[str, Any], repo: Checkout) -> bool:
-    """Every changed or new file is a Markdown note: no code or data changed."""
-    return all(MARKDOWN_NOTE.search(path) for path in await repo.all_changed())
+    """Every changed or new file is a Markdown note or a file in code-better's working folder: no code or data changed."""
+    return all(MARKDOWN_NOTE.search(path) or WORKING_FILE.search(path) for path in await repo.all_changed())
 
 
 async def note_written(spec: dict[str, Any], repo: Checkout) -> bool:
