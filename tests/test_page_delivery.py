@@ -75,6 +75,41 @@ class DeliveryTest(shell.Fixture):
             code, out, err = self.cli("pending", self.unit_arg)
         self.assertEqual((code, out, err), (0, "0 not done.\n", ""))
 
+    def test_driver_pending_keeps_exact_turn_after_late_user_input(self):
+        from better_ai.page.driver import Driver
+        from test_page_driver import Peer
+
+        initial_action = {"type": "accept", "to": "earlier", "by": "user"}
+        self.seed(*(note(f"m{n}") for n in range(21)), initial_action)
+        sent = self.log()
+        peer = Peer()
+        driver = Driver(
+            shell.page.Conversation(self.unit(), self.spec, self.docs),
+            "stub",
+            lambda *_: peer,
+            skill_path="SKILL.md",
+            command="better.pyz",
+            cwd=self.unit_dir,
+            valid_session=lambda key: key == "session-1",
+        )
+        self.addCleanup(driver.close)
+        driver.start()
+        self.assertTrue(peer.prompt_arrived.wait(2))
+        self.seed(
+            note("m21"),
+            {**note("m0"), "text": "later edit"},
+            note("later-answer", to="m0"),
+            {"type": "reopen", "to": "earlier", "by": "user"},
+            status("m0", "working"),
+            status("m1", "seen"),
+        )
+        with mock.patch.dict(os.environ, {"BETTER_PAGE_SESSION": driver.tag}):
+            code, out, err = self.cli("pending", self.unit_arg)
+        self.assertEqual((code, err), (0, ""))
+        records = list(map(json.loads, out.splitlines()[:-1]))
+        expected = [{**item, "status": {0: "working", 1: "seen"}.get(n, "new")} for n, item in enumerate(sent[:-1])]
+        self.assertEqual(records, [*expected, sent[-1]])
+
     def test_wait_ignores_legacy_cursor_and_keeps_an_action_for_resume(self):
         self.serve()
         self.seed(note("m1"), status("m1", "done"), {"type": "reopen", "to": "m1", "by": "user", "text": "again"})
