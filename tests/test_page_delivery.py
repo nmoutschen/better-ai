@@ -94,3 +94,52 @@ class DeliveryTest(shell.Fixture):
         item, event = map(json.loads, out.splitlines()[:-1])
         self.assertEqual((item["id"], item["status"]), ("m1", "seen"))
         self.assertEqual((event["type"], event["to"]), ("reopen", "m1"))
+
+    def test_rpc_edits_to_excluded_states_reach_pending_and_wait_with_their_state(self):
+        _, host = self.serve()
+        states = ["working", "asked", "done", "accepted"]
+        for number, state in enumerate([*states, "stale"], 1):
+            self.assertEqual(
+                self.rpc(host, "comment", {"id": f"c{number}", "n": number, "on": {}, "text": state}).get("result"),
+                "saved",
+            )
+        self.assertEqual(self.cli("wait", self.unit_arg, "--timeout", "1")[0], 0)
+        for number, state in enumerate([*states, "working"], 1):
+            self.assertEqual(self.cli("status", self.unit_arg, state, f"c{number}", "--text", stdin="Agreed")[0], 0)
+        for number, state in enumerate(states, 1):
+            self.assertEqual(
+                self.rpc(host, "comment", {"id": f"c{number}", "n": number, "on": {}, "text": f"edited {state}"}).get(
+                    "result"
+                ),
+                "saved",
+            )
+        expected = [(f"c{number}", state, f"edited {state}") for number, state in enumerate(states, 1)]
+        for verb, args in (("pending", ()), ("wait", ("--timeout", "1"))):
+            with self.subTest(verb=verb):
+                code, out, err = self.cli(verb, self.unit_arg, *args)
+                self.assertEqual((code, err), (0, ""))
+                lines = out.splitlines()
+                if verb == "pending":
+                    lines = lines[:-1]
+                self.assertEqual(
+                    [(item["id"], item["status"], item["text"]) for item in map(json.loads, lines)], expected
+                )
+        self.assertEqual(self.cli("wait", self.unit_arg, "--timeout", "1")[0], 3)
+        self.assertEqual(self.conv.delivery(after=len(self.log())).items, [])
+
+    def test_pending_reads_all_sent_ids_once_active_prompt_items_are_seen(self):
+        self.conv = shell.page.Conversation(self.unit(), self.spec, self.docs)
+        self.seed(note("unrelated"), status("unrelated", "seen"), *(note(f"m{n}") for n in range(25)))
+        batch = self.conv.delivery()
+        (self.unit_dir / ".page-delivery").write_text(
+            json.dumps({"session": "live", "after": 0, "item_ids": [item["id"] for item in batch.prompt_items()]})
+        )
+        self.seed(*(status(f"m{n}", "seen") for n in range(25)))
+        with mock.patch.dict(os.environ, {"BETTER_PAGE_SESSION": "live"}):
+            code, out, err = self.cli("pending", self.unit_arg)
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(
+            [(item["id"], item["status"], item["text"]) for item in map(json.loads, out.splitlines()[:-1])],
+            [(f"m{n}", "seen", f"m{n}") for n in range(25)],
+        )
+        self.assertEqual(self.conv.delivery(after=batch.position).items, [])
