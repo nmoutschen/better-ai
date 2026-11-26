@@ -264,6 +264,55 @@ class DriverTests(unittest.TestCase):
         time.sleep(0.15)
         self.assertEqual(len(peer.prompts), 1)
 
+    def real_conversation(self, log):
+        from better_ai.page import Conversation
+
+        spec = SimpleNamespace(tracked=lambda: ("comment", "note"), agent="agent")
+        self.conv = Conversation(self.conv.unit, spec, {})
+        self.conv.events = lambda: list(log)
+
+    def test_rpc_note_under_agent_reply_delivers_its_asked_parent(self):
+        log = [
+            {"type": "comment", "by": "user", "id": "parent", "text": "Question"},
+            {"type": "reply", "by": "agent", "id": "reply", "to": "parent", "text": "Which format?"},
+            {"type": "status", "status": "asked", "to": "parent"},
+        ]
+        self.real_conversation(log)
+        driver = self.driver()
+        driver.start()
+        answer = {"type": "note", "by": "user", "id": "answer", "to": "reply", "text": "PDF"}
+        log.append(answer)
+        driver.enqueue(answer)
+        peer = self.peers[0]
+        self.assertTrue(peer.prompt_arrived.wait(2))
+        payload = json.loads(peer.prompts[0].split("\n\n")[-1])
+        self.assertEqual([item["id"] for item in payload["items"]], ["parent"])
+        self.assertEqual([message["text"] for message in payload["items"][0]["thread"]], ["Which format?", "PDF"])
+        self.assertEqual(payload["user_actions"], [answer])
+
+    def test_delivered_edit_does_not_admit_accepted_item_again(self):
+        item = {"type": "comment", "by": "user", "id": "pin", "text": "Original"}
+        log = [item, {"type": "status", "to": "pin", "status": "working"}]
+        self.real_conversation(log)
+        driver = self.driver()
+        driver.start()
+        edit = {**item, "text": "Edited"}
+        log.append(edit)
+        driver.enqueue(edit)
+        peer = self.peers[0]
+        self.assertTrue(peer.prompt_arrived.wait(2))
+        edited = json.loads(peer.prompts[0].split("\n\n")[-1])["items"]
+        self.assertEqual([(item["text"], item["status"]) for item in edited], [("Edited", "working")])
+        peer.events.put(Event("turn_ended", outcome="completed"))
+        eventually(lambda: self.state()["delivered"] == 3)
+        accept = {"type": "accept", "by": "user", "to": "pin"}
+        log.append(accept)
+        driver.enqueue(accept)
+        eventually(lambda: len(peer.prompts) == 2)
+        payload = json.loads(peer.prompts[1].split("\n\n")[-1])
+        self.assertEqual(payload["items"], [])
+        self.assertEqual(payload["user_actions"], [accept])
+
     def test_raw_appends_never_join_live_batches_or_become_their_own_retry(self):
         self.conv.item("historical")
         driver = self.driver()
