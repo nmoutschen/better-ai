@@ -251,6 +251,111 @@ class DriverTests(unittest.TestCase):
         self.assertIn('"id": "seen"', peer.prompts[1])
         self.assertNotIn('"id": "working"', peer.prompts[1])
 
+    def test_raw_append_during_completed_turn_does_not_wake(self):
+        self.conv.item("first")
+        driver = self.driver()
+        driver.start()
+        peer = self.peers[0]
+        self.assertTrue(peer.prompt_arrived.wait(2))
+        self.conv.items["first"] = "working"
+        self.conv.item("direct")
+        peer.events.put(Event("turn_ended", outcome="completed"))
+        eventually(lambda: self.state()["delivered"] >= 1)
+        time.sleep(0.15)
+        self.assertEqual(len(peer.prompts), 1)
+
+    def test_recovery_names_only_the_interrupted_batch(self):
+        self.conv.item("first")
+        driver = self.driver()
+        driver.start()
+        peer = self.peers[0]
+        self.assertTrue(peer.prompt_arrived.wait(2))
+        self.conv.items["first"] = "working"
+        driver.enqueue(self.conv.item("second"))
+        peer.events.put(Event("turn_ended", outcome="completed"))
+        eventually(lambda: len(peer.prompts) == 2)
+        self.conv.items["second"] = "working"
+        peer.events.put(Event("failed", outcome="crashed"))
+        eventually(lambda: driver.snapshot()["state"] == "failed")
+        driver.request_start()
+        eventually(lambda: self.peers[-1] is not peer and self.peers[-1].prompts)
+        prompt = self.peers[-1].prompts[0]
+        self.assertNotIn("first", prompt)
+        self.assertIn("second: sent before in turn 2, which ended: crashed", prompt)
+
+    def test_interrupted_turn_survives_rotated_history(self):
+        self.conv.item("open-item")
+        driver = self.driver()
+        driver.start()
+        self.assertTrue(self.peers[0].prompt_arrived.wait(2))
+        self.conv.items["open-item"] = "working"
+        # Restore the exact state a killed serve left before its graceful cleanup.
+        checkpoint = (self.root / ".driver").read_bytes()
+        driver.close()
+        (self.root / ".driver").write_bytes(checkpoint)
+        (self.root / ".driver.log").write_text("")
+        resumed = self.driver()
+        resumed.start()
+        self.assertTrue(self.peers[-1].prompt_arrived.wait(1))
+        self.assertIn("open-item: sent before in turn 1, which ended: crashed", self.peers[-1].prompts[0])
+
+    def test_stop_interrupts_restarting_peer(self):
+        class NoHandshake(Peer):
+            def open(self, cwd, resume):
+                self.calls.append(("open", cwd, resume))
+
+        driver = self.driver(launch=lambda tag: NoHandshake() if self.peers else Peer())
+        driver.start()
+        driver.request_stop()
+        eventually(lambda: driver.snapshot()["state"] == "stopped")
+        driver.request_start()
+        eventually(lambda: len(self.peers) == 2 and self.peers[-1].calls)
+        driver.request_stop()
+        eventually(lambda: self.peers[-1].closed)
+        self.assertEqual(driver.snapshot()["state"], "stopped")
+
+    def test_stderr_bytes_without_newline_are_output(self):
+        script = "import os,sys; os.write(2, b'progress'); sys.stdin.read()"
+        peer = self.driver_module.ProcessTransport([sys.executable, "-c", script], self.root, os.environ, lambda _: None)
+        self.addCleanup(peer.close)
+        event = peer.poll(1)
+        self.assertEqual(getattr(event, "kind", None), "output")
+        self.assertIn("progress", peer.stderr)
+
+    def test_handshake_and_stop_denials_are_audited(self):
+        def approval(key):
+            return SimpleNamespace(kind="approval", request_id=key, tool="Write", arguments={"path": "example"})
+
+        class Requests(Peer):
+            def cancel(self):
+                self.events.put(approval("last"))
+                super().cancel()
+
+            def answer(self, request_id, choice, reason):
+                self.calls.append((request_id, choice, reason))
+
+        self.conv.item("one")
+        driver = self.driver(launch=lambda _: Requests([approval("first")]))
+        driver.start()
+        self.assertTrue(self.peers[0].prompt_arrived.wait(2))
+        driver.request_stop()
+        eventually(lambda: driver.snapshot()["state"] == "stopped")
+        records = [r for r in self.records() if r["type"] == "approval"]
+        self.assertEqual([(r["request"], r["answer"]) for r in records], [("first", "deny"), ("last", "deny")])
+
+    def test_failed_batch_uses_all_three_automatic_retries(self):
+        self.conv.item("same")
+        driver = self.driver()
+        driver.start()
+        for attempt in range(4):
+            eventually(lambda: len(self.peers) == attempt + 1 and self.peers[-1].prompts)
+            self.peers[-1].events.put(Event("failed", outcome="crashed"))
+            eventually(lambda: driver.snapshot()["state"] == "failed")
+            self.assertEqual(driver.snapshot()["kind"], "crashed")
+            driver.enqueue({"type": "accept", "id": "elsewhere"})
+        time.sleep(0.15)
+        self.assertEqual(len(self.peers), 4)
+
     def test_ignored_items_fail_with_diagnostics(self):
         # S18 and S60.
         self.conv.item("ignored")
