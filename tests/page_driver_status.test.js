@@ -71,3 +71,29 @@ test('failed kinds render as text, with the details needed to recover', () => {
   }
   assert.match(pageDriverText({ state: 'failed', kind: 'driver' }), /driver stopped.*serve this page again/);
 });
+
+test('a 403 on a driven conversation page marks the tab as superseded', async () => {
+  const offline = { textContent: '', hidden: true };
+  const elements = {
+    'page-config': { textContent: '{"driven":true}' },
+    'agent-status': { textContent: '', hidden: true },
+    'agent-controls': { hidden: true },
+  };
+  const calls = [];
+  const context = loadPage({
+    document: { getElementById: id => elements[id], querySelector: () => offline },
+    location: { hash: '' }, sessionStorage: stand(), URLSearchParams, AbortController,
+    setTimeout: () => {},
+    fetch: path => {
+      calls.push(path);
+      return Promise.resolve({ status: 403 });
+    },
+  });
+  await assert.rejects(context.pageFetch('/data'), error => error.stale);
+  await settle();
+  const count = calls.length;
+  await assert.rejects(context.pageFetch('/events'), error => error.stale);
+  assert.equal(calls.length, count);
+  assert.equal(offline.hidden, false);
+  assert.match(offline.textContent, /Opened elsewhere/);
+});

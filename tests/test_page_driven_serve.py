@@ -153,10 +153,20 @@ sys.exit(cli.main())
         main, conversation = self.pair(paired["page"])
         self.assertFalse((self.folder / ".server-token").exists())
         self.assertEqual(self.request(main + "agent", token=conversation["secret"])[1]["state"], "idle")
-        self.assertEqual(self.request(main + "agent", token=conversation["secret"], site="cross-site")[0], 401)
-        self.assertEqual(self.request(main + "data", token=paired["secret"])[0], 401)
+        self.assertEqual(self.request(main + "agent", token=conversation["secret"], site="cross-site")[0], 403)
+        self.assertEqual(self.request(main + "data", token=paired["secret"])[0], 403)
         self.assertEqual(self.request(panel + "agent", token=conversation["secret"])[0], 403)
         self.assertEqual(self.request(panel + "data", token=paired["secret"])[0], 404)
+        with urllib.request.urlopen(main, timeout=3) as response:
+            policy = response.headers["Content-Security-Policy"]
+        for directive in (
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline' data: http: https:",
+            "frame-src 'self' http: https:",
+            "base-uri 'none'",
+            "form-action 'self'",
+        ):
+            self.assertIn(directive, policy.split("; "))
         for verb, options in (
             ("wait", ()),
             ("serve", ("--once",)),
@@ -180,7 +190,9 @@ sys.exit(cli.main())
         self.assertEqual(sent[1]["result"], "saved")
         new = better.run("show-better", "serve", str(self.folder), "--link", cwd=self.root)
         self.assertEqual(new.returncode, 0, new.stderr)
-        self.assertEqual(self.request(main + "agent", token=conversation["secret"])[0], 401)
+        for endpoint in ("agent", "data", "events?after=0"):
+            self.assertEqual(self.request(main + endpoint, token=conversation["secret"])[0], 403)
+        self.assertEqual(self.request(main + "rpc", token=conversation["secret"], body={"jsonrpc": "2.0"})[0], 403)
         self.assertEqual(self.request(panel + "agent", token=paired["secret"])[0], 403)
         self.pair(new.stdout.strip())
         process.terminate()
