@@ -120,7 +120,15 @@
       // Open during the click so popup blockers see the gesture, then detach before navigating.
       const tab = window.open('about:blank', '_blank');
       if (!tab) { el('error').textContent = 'Allow popups from this page to open the conversation.'; return; }
-      tab.opener = null;
+      try {
+        tab.opener = null;
+        // A new tab can inherit session storage before its opener is cleared.
+        tab.sessionStorage.removeItem('approvalSecret');
+      } catch {
+        tab.close();
+        el('error').textContent = 'Could not open the conversation in a separate tab.';
+        return;
+      }
       try {
         tab.location.replace(await rpc('open_conversation'));
       } catch (error) {
