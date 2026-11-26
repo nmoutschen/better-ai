@@ -1,6 +1,7 @@
-body { margin: 1rem; color: #202020; background: #fff; font: 1rem/1.5 system-ui, sans-serif; }
-main { max-width: 52rem; margin: 2rem auto; }
-section article { border-top: 1px solid #aaa; margin-top: 1rem; }
+body { margin: 0; overflow: auto; display: block; }
+main { max-width: 52rem; height: auto; margin: var(--space-group) auto; padding: 0 var(--space-section); }
+h1 { color: var(--heading); }
+section article { border-top: 1px solid var(--line); margin-top: var(--space-section); }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-button, a { padding: .45rem .7rem; margin-right: .4rem; font: inherit; }
-#error { color: #9c2121; }
+button, a { padding: var(--space-control) var(--space-item); margin-right: var(--space-tight); font:inherit; }
+#error { color: var(--error); }

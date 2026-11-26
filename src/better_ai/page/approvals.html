@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>Page agent approvals</title>
+  <link rel="stylesheet" href="/page.css">
   <link rel="stylesheet" href="/approvals.css">
   <script src="/approvals.js" defer></script>
 </head>
@@ -12,7 +13,7 @@
   <main>
     <h1>Page agent approvals</h1>
     <p id="status" role="status">Connecting…</p>
-    <a id="page" target="_blank" rel="noopener noreferrer" hidden>Open the page</a>
+    <a id="page" href="#page" target="_blank" rel="noopener noreferrer" hidden>Open the page</a>
     <button id="enroll" type="button" hidden>Set up approvals</button>
     <button id="stop" type="button" hidden>Stop agent</button>
     <button id="start" type="button" hidden>Start agent</button>

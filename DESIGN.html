@@ -748,13 +748,37 @@ var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied
 // keeps it for the tab, so a reload still has it, and takes it out of the address bar. Every request to /rpc, /data,
 // /events and /wait goes through pageFetch, which sends it; the server answers a page without it as out of date. The
 // page then drops the token it saved: a reload cannot fix it, only the address the agent gave.
-var PAGE_STALE = 'page out of date: open the address the agent gave', pageIsStale = false;
+var pageDriven = pageConfig().driven === true;
+var PAGE_STALE = pageDriven ? 'Opened elsewhere. Ask for a new link.' :
+  'page out of date: open the address the agent gave';
+var pageIsStale = false;
 var pageToken = (function () {
   var found = typeof location === 'undefined' ? null : /[#&]t=([\w-]+)/.exec(location.hash || '');
   try {
     if (found) { sessionStorage.setItem('pageToken', found[1]); history.replaceState(null, '', location.pathname + location.search); }
     return found ? found[1] : sessionStorage.getItem('pageToken') || '';
   } catch (e) { return found ? found[1] : ''; }
+})();
+var pagePairing = (function () {
+  if (!pageDriven) return Promise.resolve();
+  var fragment = new URLSearchParams(location.hash.slice(1));
+  var token = fragment.get('p');
+  if (!token) return Promise.resolve();
+  pageToken = '';
+  try {
+    sessionStorage.removeItem('pageToken');
+    history.replaceState(null, '', location.pathname + location.search);
+  } catch (error) {}
+  return fetch('/pair', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }),
+    mode: 'same-origin'
+  }).then(function (reply) {
+    if (!reply.ok) throw new Error(PAGE_STALE);
+    return reply.json();
+  }).then(function (reply) {
+    pageToken = reply.secret;
+    try { sessionStorage.setItem('pageToken', pageToken); } catch (error) {}
+  }).catch(function () { pageStale(); });
 })();
 function pageStale() {
   var strip = document.querySelector('.offline');
@@ -766,14 +790,71 @@ function pageStale() {
   return stale;
 }
 function pageFetch(url, init) {
-  if (pageIsStale) return Promise.reject(pageStale());  // the server refused this page's token: asking again cannot help
-  init = Object.assign({}, init);
-  init.headers = Object.assign({}, init.headers, { 'X-Page-Token': pageToken });
-  return fetch(url, init).then(function (r) {
-    if (r.status !== 401) return r;
+  return pagePairing.then(function () {
+    if (pageIsStale) throw pageStale();
+    init = Object.assign({ mode: 'same-origin' }, init);
+    init.headers = Object.assign({}, init.headers, { 'X-Page-Token': pageToken });
+    return fetch(url, init);
+  }).then(function (r) {
+    if (r.status !== (pageDriven ? 403 : 401)) return r;
     throw pageStale();
   });
 }
+
+function pageDriverText(agent) {
+  if (agent.age > 3 || agent.kind === 'driver') {
+    return "The page's agent driver stopped. Ask the agent in your chat to serve this page again.";
+  }
+  if (agent.state === 'failed') {
+    var kind = agent.kind, action = agent.action;
+    if (kind === 'login' && agent.harness) action = 'Log in to ' + agent.harness + ' in a terminal, then press Start.';
+    if (kind === 'not-installed' && agent.harness) action = agent.harness + ' CLI not found on PATH.';
+    var details = [];
+    if (kind === 'not-handling') {
+      if (agent.items && agent.items.length) details.push('Items: ' + agent.items.join(', '));
+      if (agent.final_message) details.push('Last reply: ' + agent.final_message);
+      if (agent.denied && agent.denied.length) {
+        details.push('Denied calls: ' + agent.denied.map(function (call) { return call.tool + ' (' + call.reason + ')'; }).join(', '));
+      }
+      if (agent.log) details.push('Log: ' + agent.log);
+      action = 'Start retries. You can also reword the comment.';
+    }
+    return [kind, agent.message].concat(details, action).filter(Boolean).join(' · ');
+  }
+  var states = {
+    starting: 'Starting', idle: 'Idle', working: 'Working', stopping: 'Stopping',
+    stopped: 'Stopped', stalled: 'Stalled. Use Stop in the approval tab if needed.'
+  };
+  return states[agent.state] || '';
+}
+
+function pageWatchDriver() {
+  var strip = document.getElementById('agent-status');
+  var controls = document.getElementById('agent-controls');
+  var stopped = pageDriverText({ kind: 'driver' });
+  var pending = null;
+  function show(text) {
+    strip.hidden = pageIsStale;
+    controls.hidden = pageIsStale || text === stopped;
+    if (strip.textContent !== text) strip.textContent = text;
+  }
+  function poll() {
+    if (pageIsStale) { strip.hidden = controls.hidden = true; return; }
+    if (pending) { pending.abort(); show(stopped); }
+    var request = pending = new AbortController();
+    pageFetch('/agent', { signal: request.signal }).then(function (reply) {
+      if (!reply.ok) throw new Error('Agent status unavailable');
+      return reply.json();
+    }).then(function (agent) {
+      if (pending === request) { pending = null; show(pageDriverText(agent)); }
+    }).catch(function () {
+      if (pending === request) { pending = null; show(stopped); }
+    });
+    pagePollAgain(poll, 2000);
+  }
+  pagePairing.then(poll);
+}
+if (pageDriven) pageWatchDriver();
 
 function pagePollAgain(poll, delay) { if (!pageIsStale) setTimeout(poll, delay); }
 
@@ -1201,7 +1282,10 @@ function pageConversation(o) {
     // A page that streams events counts the stream's polls; one that does not (stream: false) counts the /listening polls.
     var offline = document.querySelector('.offline'), misses = 0, streaming = o.stream !== false;
     // Once a request was refused as out of date the strip stays: no later poll or stream event clears it.
-    function connected(on) { misses = on ? 0 : misses + 1; offline.hidden = !pageIsStale && (on || misses < 2); }
+    function connected(on) {
+      if (pageDriven) return;  // the agent poll detects failure without waiting for a long conversation poll
+      misses = on ? 0 : misses + 1; offline.hidden = !pageIsStale && (on || misses < 2);
+    }
     if (streaming) (function stream(after) {
       pageFetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
@@ -1223,7 +1307,7 @@ function pageConversation(o) {
     // sends then reaches the agent only when it next looks. While the server is down, the offline strip says more. It goes
     // through pageFetch like every request: a page out of date shows only that strip, and asks nothing more.
     var unwatched = document.querySelector('.unwatched');
-    (function watch() {
+    if (!pageDriven) (function watch() {
       pageFetch('/listening').then(function (r) { return r.json(); }).then(function (on) {
         unwatched.hidden = pageIsStale || on !== false;
         if (!streaming) connected(true);

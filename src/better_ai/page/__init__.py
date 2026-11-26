@@ -1258,6 +1258,7 @@ def stop_orphan(unit: Unit) -> None:
 
 LINK_SOCKET = ".page-link"
 PANEL_ASSETS = {
+    "/page.css": "page/page.css",
     "/approvals.html": "page/approvals.html",
     "/approvals.js": "page/approvals.js",
     "/approvals.css": "page/approvals.css",
