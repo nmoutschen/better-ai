@@ -57,6 +57,8 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import Future
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1048,7 +1050,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             # Long poll for the page: every event after the first `after`, the agent's included.
             after = self.after(parts.query)
             total = c.wait_for_more(after, 20)
-            return self.send_json({"total": total, "events": c.events()[after:total]})
+            reply = {"total": total, "events": c.events()[after:total]}
+            if driven and not driven.off:
+                with driven.routing_lock:
+                    if not self.driven_token(driven.main_pair):
+                        return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+                    return self.send_json(reply)
+            return self.send_json(reply)
         if path == "/wait":
             seconds = urllib.parse.parse_qs(parts.query).get("seconds", ["25"])[0]
             seconds = int(seconds) if seconds.isdigit() and len(seconds) <= 4 else 25
@@ -1420,13 +1428,21 @@ class DrivenPage:
         from .driver import ACTIONS
 
         with self.routing_lock:
-            self.off = {"state": "failed", "kind": kind, "message": message, "action": ACTIONS.get(kind, "")}
+            self.off = {"state": "failed", "kind": kind, "message": message, "action": startup_action(kind, ACTIONS)}
 
     def close(self):
         if self.driver:
             self.driver.close()
         self.panel.shutdown()
         self.panel.server_close()
+
+
+def startup_action(kind, actions):
+    if kind == "login":
+        return "Log in to the harness in a terminal, then serve again."
+    if kind in ("crashed", "limit", "not-handling", "driver"):
+        return "Serve again."
+    return actions.get(kind, "")
 
 
 def link_existing(unit, conv):
@@ -1483,7 +1499,7 @@ def link_control(driven):
                     try:
                         with connection.makefile("rb") as stream:
                             identity = stream.read(64)
-                        if identity == driven.identity.encode() and driven.driver.snapshot()["age"] <= 3:
+                        if identity == driven.identity.encode():
                             connection.sendall(driven.panel_link().encode() + b"\n")
                     except OSError:
                         continue
@@ -1515,7 +1531,7 @@ def handoff_note(run: cli.Run):
 
 
 def start_driven(driven, candidate, conv, run, deadline, notes, archive, skill_path):
-    from .adapters import child_environment, session_id_valid, version_supported
+    from .adapters import _MIN_VERSION, child_environment, session_id_valid, version_supported
     from .driver import Driver, StartError
     from .transport import ProcessTransport
 
@@ -1536,8 +1552,11 @@ def start_driven(driven, candidate, conv, run, deadline, notes, archive, skill_p
         raise StartError("crashed", "harness startup timed out") from None
     except FileNotFoundError:
         raise StartError("not-installed") from None
+    detected = version.stdout.strip()[:500] or "unknown"
+    needed = ".".join(str(part) for part in _MIN_VERSION[candidate.name])
+    version_message = f"{candidate.name} reported {detected}. Version {needed} or later is required."
     if version.returncode or not version_supported(candidate.name, version.stdout):
-        raise StartError("version", version.stdout.strip()[:500] or "The CLI did not report a supported version")
+        raise StartError("version", version_message)
 
     def launch(tag, resume):
         return ProcessTransport(
@@ -1568,7 +1587,12 @@ def start_driven(driven, candidate, conv, run, deadline, notes, archive, skill_p
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         raise StartError("crashed", "harness startup timed out")
-    driven.driver.start(remaining)
+    try:
+        driven.driver.start(remaining)
+    except StartError as error:
+        if error.kind != "version":
+            raise
+        raise StartError("version", f"{version_message} The harness protocol reported: {error}.") from None
     driven.ready = True
 
 
@@ -1593,6 +1617,7 @@ def _serve_arguments(parser: argparse.ArgumentParser) -> None:
 def serve(args: argparse.Namespace, run: cli.Run) -> int:
     """Check every record, then serve the page until the unit stops (or Ctrl+C). A record that is not valid is a warning
     on stderr: the page still opens and shows it."""
+    deadline = time.monotonic() + START_TIMEOUT
     unit = _unit(args, run)
     if os.environ.get("BETTER_PAGE_SESSION"):
         raise Refused(f"{unit.label}: serve cannot run from a page agent session")
@@ -1603,10 +1628,10 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
         return 0
     with serve_lock(unit, conv):
         stop_orphan(unit)
-        return serve_page(args, run, unit, spec, conv)
+        return serve_page(args, run, unit, spec, conv, deadline)
 
 
-def serve_page(args, run, unit, spec, conv):
+def preflight(run, unit, conv):
     for guard in SERVE_GUARDS.get(run.skill.name, []):
         guard(unit)
     notices: list[schema.Error] = []
@@ -1617,7 +1642,37 @@ def serve_page(args, run, unit, spec, conv):
     for notice in notices:
         run.err(f"notice: {notice}")
     conv.lines()  # a log that cannot be read is refused here, not found by the first request
-    deadline = time.monotonic() + START_TIMEOUT
+
+
+def prepare_serve(args, run, unit, conv, deadline):
+    if not args.drive:
+        preflight(run, unit, conv)
+        return True
+    complete = Future()
+
+    def check():
+        try:
+            preflight(run, unit, conv)
+        except BaseException as error:
+            complete.set_exception(error)
+        else:
+            complete.set_result(None)
+
+    threading.Thread(target=check, daemon=True).start()
+    try:
+        complete.result(timeout=max(0, deadline - time.monotonic()))
+        return True
+    except FutureTimeout:
+        if complete.done():
+            complete.result()
+        run.out("driver: off crashed")
+        # The driver is abandoned at the deadline. The legacy page still needs all its usual checks.
+        complete.result()
+        return False
+
+
+def serve_page(args, run, unit, spec, conv, deadline):
+    can_drive = prepare_serve(args, run, unit, conv, deadline)
     try:
         server = make_server(unit, spec, conv, run.info, args.port)
     except OSError as error:
@@ -1630,9 +1685,9 @@ def serve_page(args, run, unit, spec, conv):
     driven, serving, token = None, None, None
     opened = False
     try:
-        if args.drive:
+        if args.drive and can_drive:
             from .adapters import candidate
-            from .driver import StartError
+            from .driver import ACTIONS, StartError
 
             wanted = candidate(args.drive, os.environ)
             kind = wanted.kind
@@ -1649,7 +1704,12 @@ def serve_page(args, run, unit, spec, conv):
                 # A previous server can leave a legacy token after SIGKILL. Never leave that file in driven mode.
                 with contextlib.suppress(FileNotFoundError):
                     unit.target(TOKEN).unlink()
-                driven = DrivenPage(server, unit, archive, ("add", "set"), wanted.approval == "webauthn")
+                try:
+                    driven = DrivenPage(server, unit, archive, ("add", "set"), wanted.approval == "webauthn")
+                except (OSError, ValueError):
+                    kind = "no-approvals"
+                    run.err("Could not load the approval credential or start the approval panel.")
+            if driven is not None:
                 notes = handoff_note(run)
                 serving = run_http(server)
                 url = driven.panel_link()
@@ -1671,6 +1731,8 @@ def serve_page(args, run, unit, spec, conv):
                     kind = error.kind if isinstance(error, StartError) else "crashed"
                     # Report the mode at the deadline even if cleaning up the harness takes a moment.
                     run.out(f"driver: off {kind}")
+                    action = startup_action(kind, ACTIONS)
+                    run.err(f"{str(error).rstrip('.')}. {action}")
                     driven.fail(kind, str(error))
                     url = page_url(server)
             if kind is None:
@@ -1678,6 +1740,9 @@ def serve_page(args, run, unit, spec, conv):
             elif driven is None:
                 run.out(f"driver: off {kind}")
 
+        if args.once and serving is not None and driven.off:
+            server.shutdown()
+            serving = None
         with link_control(driven):
             if driven and not driven.off:
                 run.out(f"Serving {unit.label} at {url}")
