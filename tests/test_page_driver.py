@@ -316,7 +316,9 @@ class DriverTests(unittest.TestCase):
 
     def test_stderr_bytes_without_newline_are_output(self):
         script = "import os,sys; os.write(2, b'progress'); sys.stdin.read()"
-        peer = self.driver_module.ProcessTransport([sys.executable, "-c", script], self.root, os.environ, lambda _: None)
+        peer = self.driver_module.ProcessTransport(
+            [sys.executable, "-c", script], self.root, os.environ, lambda _: None
+        )
         self.addCleanup(peer.close)
         event = peer.poll(1)
         self.assertEqual(getattr(event, "kind", None), "output")
@@ -348,7 +350,7 @@ class DriverTests(unittest.TestCase):
         driver = self.driver()
         driver.start()
         for attempt in range(4):
-            eventually(lambda: len(self.peers) == attempt + 1 and self.peers[-1].prompts)
+            eventually(lambda attempt=attempt: len(self.peers) == attempt + 1 and self.peers[-1].prompts)
             self.peers[-1].events.put(Event("failed", outcome="crashed"))
             eventually(lambda: driver.snapshot()["state"] == "failed")
             self.assertEqual(driver.snapshot()["kind"], "crashed")

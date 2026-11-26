@@ -54,6 +54,7 @@ class Turn:
     record: dict
     position: int | None = None
     triggers: tuple[str, ...] = ()
+    changed: bool = False
     final_message: str = ""
     denied: list[dict] = field(default_factory=list)
 
@@ -105,21 +106,27 @@ class Driver:
         for record in self._records:
             if record.get("type") == "approval" and "answer" not in record:
                 record.update(answer="expired", reason="driver restarted")
-        last = recent_turn(self._records, self.session)
-        self._number = last.get("number", 0) if type(last.get("number")) is int else 0
+        audit_turn = recent_turn(self._records, self.session)
+        # Older checkpoints stored turn membership only in the bounded audit history.
+        last = saved.get("last_turn", audit_turn)
+        self._last_turn = last if isinstance(last, dict) else {}
+        self._number = self._last_turn.get("number", 0)
+        if type(self._number) is not int:
+            self._number = 0
         self._carry = frozenset()
         self._recover = frozenset()
         self._recover_turn = 0
         self._recover_kind = ""
-        if last:
-            items = self._strings(last.get("items"))
-            if last.get("outcome") == "completed":
+        if self._last_turn:
+            items = self._strings(self._last_turn.get("items"))
+            outcome = self._last_turn.get("outcome") or "crashed"
+            if outcome == "completed":
                 self._carry = items
             else:
-                self._recover, self._recover_turn = items, self._number
-                self._recover_kind = last.get("outcome") or "crashed"
-                if "end" not in last:
-                    last.update(end=time.time(), outcome="crashed")
+                self._recover, self._recover_turn, self._recover_kind = items, self._number, outcome
+            if audit_turn.get("number") == self._number and "end" not in audit_turn:
+                audit_turn.update(end=time.time(), outcome=outcome)
+        self._retry = False
 
         # Startup replays persisted work. During a live session only /rpc can wake for user actions.
         self._wake = True
@@ -188,7 +195,7 @@ class Driver:
         }
 
     def _publish(self) -> None:
-        self._published = (self._state, self._since, self.clock(), self._wake, self._details)
+        self._published = (self._state, self._since, self.clock(), self._wake or self._retry, self._details)
 
     def _log(self, record_type: str, **fields) -> None:
         self._records.append({"type": record_type, "at": time.time(), "session": self.session, **fields})
@@ -217,6 +224,7 @@ class Driver:
                     "child_pid": self._peer.pid if self._peer else None,
                     "child_started": getattr(self._peer, "started", None),
                     "opened": self._opened,
+                    "last_turn": self._last_turn,
                     "delivered": self._delivered,
                     "fired": sorted(self._fired),
                 }
@@ -225,8 +233,19 @@ class Driver:
 
     def _open(self, deadline: float) -> None:
         resume = self.session
+        self._status("starting")
         self._launch(resume)
         while not self._closing.is_set() and time.monotonic() < deadline:
+            if self._started.is_set():
+                try:
+                    command = self._commands.get_nowait()
+                except queue.Empty:
+                    pass
+                else:
+                    self._command(*command)
+                    if self._state == "stopped":
+                        return
+                self._publish()
             event = self._peer.poll(POLL)
             if event is None:
                 continue
@@ -248,7 +267,7 @@ class Driver:
                     continue
                 raise StartError(event.outcome or "crashed", event.text)
             if event.kind == "approval":
-                self._peer.answer(event.request_id, "deny", "the page is starting")
+                self._request_approval(event, deny_reason="the page is starting")
         raise StartError("crashed", "harness startup timed out")
 
     def _launch(self, resume: str | None) -> None:
@@ -272,7 +291,7 @@ class Driver:
                     available = self._available_triggers()
                     if available:
                         self._wake = True
-                    if self._state == "idle" and self._wake and drained:
+                    if self._state == "idle" and (self._wake or self._retry) and drained:
                         self._deliver(available)
                 self._publish()
             self._stop("server stopped")
@@ -318,6 +337,8 @@ class Driver:
             self._wake = True
             if {value.get("id"), value.get("to")} & self._last_prompt_items:
                 self._repeats = 0
+                if self._turn:
+                    self._turn.changed = True
             if self._state == "failed" and self._details.get("kind") == "crashed" and self._crash_retries < 3:
                 self._crash_retries += 1
                 self._restart()
@@ -390,7 +411,12 @@ class Driver:
 
     def _deliver(self, available: tuple[dict, ...]) -> None:
         batch = self.conversation.delivery(self._delivered, carry_ids=self._carry, recover_ids=self._recover)
-        self._wake = False
+        retry_only = not self._wake
+        self._wake = self._retry = False
+        if retry_only and not any(
+            item["id"] in self._carry and item["status"] in ("new", "seen") for item in batch.items
+        ):
+            return
         if not (batch.items or batch.events or available):
             return
         items = frozenset(item["id"] for item in batch.items)
@@ -404,7 +430,8 @@ class Driver:
                 log=str(self.unit.target(LOG)),
             )
             return
-        self._repeats = self._repeats + 1 if items and items == self._last_prompt_items else 1
+        if items != self._last_prompt_items:
+            self._repeats = 0
         self._last_prompt_items = items
         paths.write_atomic(
             self.unit,
@@ -469,6 +496,8 @@ class Driver:
             "items": sorted(items),
         }
         self._turn = Turn(record, position, triggers)
+        self._last_turn = {"number": self._number, "items": sorted(items)}
+        self._checkpoint()
         self._records.append(record)
         self._flush_log()
         self._last_output = self.clock()
@@ -483,13 +512,15 @@ class Driver:
             self._fired |= frozenset(turn.triggers)
             self._carry = turn.items
             self._recover = frozenset()
-            self._wake = self._wake or bool(turn.items)
-            self._checkpoint()
+            self._retry = bool(turn.items)
+            if not turn.changed:
+                self._repeats += 1
         elif outcome != "completed":
-            self._recover |= turn.items | self._carry
+            self._recover = turn.items
             self._carry = frozenset()
             self._recover_turn, self._recover_kind = turn.record["number"], outcome
-            turn.record["items"] = sorted(self._recover)
+        self._last_turn["outcome"] = outcome
+        self._checkpoint()
         peer_stderr = self._peer.stderr if self._peer else ""
         turn.record.update(
             end=time.time(),
@@ -525,12 +556,12 @@ class Driver:
                     if event.kind in ("turn_ended", "failed"):
                         break
                     if event.kind == "approval":
-                        self._peer.answer(event.request_id, "deny", reason)
+                        self._request_approval(event, deny_reason=reason)
         self._end(reason)
         self._close_peer(reason)
         self._status("stopped")
 
-    def _request_approval(self, event) -> None:
+    def _request_approval(self, event, deny_reason=None) -> None:
         peer = self._peer
 
         def answer(choice: str, reason: str = "") -> None:
@@ -551,7 +582,9 @@ class Driver:
         self._approval_records[event.request_id] = record
         self._records.append(record)
         self._flush_log()
-        if self.approvals is None:
+        if deny_reason:
+            answer("deny", deny_reason)
+        elif self.approvals is None:
             answer("deny", "no page approval controller")
         else:
             self.approvals.receive(event, answer)

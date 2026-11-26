@@ -17,6 +17,7 @@ from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
 
+STDERR_OUTPUT = object()
 MAX_LINE = 4 * 1024 * 1024
 
 
@@ -108,7 +109,7 @@ class ProcessTransport:
     @property
     def stderr(self) -> str:
         with self._tail_lock:
-            return "\n".join(self._tail)
+            return "".join(self._tail)
 
     def _put(self, message) -> None:
         while not self._closed.is_set():
@@ -135,9 +136,10 @@ class ProcessTransport:
 
     def _read_stderr(self) -> None:
         try:
-            while line := self._proc.stderr.readline(4096):
+            while chunk := self._proc.stderr.read1(4096):
                 with self._tail_lock:
-                    self._tail.append(line.decode("utf-8", errors="replace").rstrip())
+                    self._tail.append(chunk.decode("utf-8", errors="replace"))
+                self._put(STDERR_OUTPUT)
         except OSError:
             pass
 
@@ -173,6 +175,8 @@ class ProcessTransport:
             message = self._messages.get(timeout=timeout)
         except queue.Empty:
             return None
+        if message is STDERR_OUTPUT:
+            return SimpleNamespace(kind="output")
         if message is None:
             return SimpleNamespace(kind="failed", outcome="crashed", text=self.stderr)
         self._events.extend(self.codec.receive(message))
