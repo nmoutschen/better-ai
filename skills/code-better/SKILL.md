@@ -119,6 +119,8 @@ IN a session the harness may compact, ADD each instruction the user gives on how
 
 KEEP `.code/conventions.md` as a short list of facts about the repo, each with its source.
 
+WHEN you commit, STAGE the files you changed by path, NEVER with `git add -A` or `git add .`, and NEVER stage `.code/`: the working records are not part of the change.
+
 ### Missing capabilities
 
 IF you cannot do a step, because a call was denied or the harness lacks a tool, MARK the change **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own.
