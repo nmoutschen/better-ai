@@ -8,7 +8,7 @@ import re
 import shutil
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 WireID = int | str
 Send = Callable[[dict], None]
@@ -156,6 +156,17 @@ class AdapterEvent:
 
 
 Events = tuple[AdapterEvent, ...]
+ApprovalBody = TypeVar("ApprovalBody")
+
+
+def _expire_owned(approvals: dict[WireID, tuple[str | None, ApprovalBody]], owner: str | None) -> Events:
+    expired = [request_id for request_id, (requester, _) in approvals.items() if requester == owner]
+    for request_id in expired:
+        del approvals[request_id]
+    return tuple(
+        AdapterEvent("approval_closed", request_id=request_id, outcome="expired", text="requester ended")
+        for request_id in expired
+    )
 
 
 def _object(data: Any) -> dict:
@@ -196,7 +207,7 @@ class _RPCAdapter:
         self.turn_id: str | None = None
         self._ids = itertools.count(1)
         self._calls: dict[WireID, tuple[str, Callable[[dict], Events]]] = {}
-        self._approvals: dict[WireID, Callable[[str, str], dict]] = {}
+        self._approvals: dict[WireID, tuple[str | None, Callable[[str, str], dict]]] = {}
 
     def _call(self, method: str, params: dict, done: Callable[[dict], Events]) -> int:
         request_id = next(self._ids)
@@ -214,9 +225,10 @@ class _RPCAdapter:
         self.send({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}})
 
     def answer(self, request_id: WireID, choice: str, reason: str = "") -> bool:
-        answer = self._approvals.pop(request_id, None)
-        if answer is None:
+        pending = self._approvals.pop(request_id, None)
+        if pending is None:
             return False
+        _, answer = pending
         self._result(request_id, answer(choice, reason))
         return True
 
@@ -354,10 +366,16 @@ class ACPAdapter(_RPCAdapter):
         ):
             self._result(request_id, respond("deny", ""))
             return ()
-        self._approvals[request_id] = respond
+        owner = _text(call.get("toolCallId")) or None
+        self._approvals[request_id] = (owner, respond)
         return (
             AdapterEvent(
-                "approval", request_id=request_id, tool=tool, arguments=arguments, options=("allow_once", "deny")
+                "approval",
+                request_id=request_id,
+                tool=tool,
+                arguments=arguments,
+                options=("allow_once", "deny"),
+                requester=owner,
             ),
         )
 
@@ -367,6 +385,10 @@ class ACPAdapter(_RPCAdapter):
         update = _object(params.get("update"))
         if update.get("sessionUpdate") == "agent_message_chunk":
             return (AdapterEvent("text", text=_text(_object(update.get("content")).get("text"))),)
+        if update.get("sessionUpdate") == "tool_call_update" and update.get("status") in ("completed", "failed"):
+            owner = _text(update.get("toolCallId"))
+            if owner:
+                return _expire_owned(self._approvals, owner)
         return ()
 
 
@@ -463,15 +485,21 @@ class CodexAdapter(_RPCAdapter):
         if method == "turn/completed":
             turn = _object(params.get("turn"))
             turn_id = _text(turn.get("id"))
-            if not turn_id or turn_id != self.turn_id:
+            if not turn_id:
                 return ()
+            closed = _expire_owned(self._approvals, turn_id)
+            self._changes = {key: changes for key, changes in self._changes.items() if key[0] != turn_id}
+            if turn_id != self.turn_id:
+                return closed
             self.turn_id = None
-            self._changes.clear()
             status, error = turn.get("status"), _object(turn.get("error"))
             outcome = {"completed": "normal", "interrupted": "stopped"}.get(
                 _text(status), _error_kind(error, "crashed")
             )
-            return (AdapterEvent("turn_ended", turn_id=turn_id, outcome=outcome, text=_text(error.get("message"))),)
+            return (
+                *closed,
+                AdapterEvent("turn_ended", turn_id=turn_id, outcome=outcome, text=_text(error.get("message"))),
+            )
         if method == "item/agentMessage/delta":
             return (AdapterEvent("text", text=_text(params.get("delta"))),)
         if method == "item/started":
@@ -507,7 +535,8 @@ class CodexAdapter(_RPCAdapter):
         if self.session_id is None or params.get("threadId") != self.session_id or not complete:
             self._result(request_id, respond("deny", ""))
             return ()
-        self._approvals[request_id] = respond
+        owner = _text(params.get("turnId")) or None
+        self._approvals[request_id] = (owner, respond)
         return (
             AdapterEvent(
                 "approval",
@@ -515,7 +544,7 @@ class CodexAdapter(_RPCAdapter):
                 tool=tool,
                 arguments=arguments,
                 options=("allow_once", "deny"),
-                requester=_text(params.get("turnId")) or None,
+                requester=owner,
             ),
         )
 
@@ -538,7 +567,7 @@ class ClaudeAdapter:
         self._ids = itertools.count(1)
         self._initialize_id: str | None = None
         self._running = False
-        self._approvals: dict[WireID, dict] = {}
+        self._approvals: dict[WireID, tuple[str | None, dict]] = {}
 
     def _control(self, subtype: str) -> str:
         request_id = f"page-{next(self._ids)}"
@@ -571,8 +600,9 @@ class ClaudeAdapter:
         pending = self._approvals.pop(request_id, None)
         if pending is None:
             return False
+        _, arguments = pending
         if choice == "allow_once":
-            result = {"behavior": "allow", "updatedInput": pending}
+            result = {"behavior": "allow", "updatedInput": arguments}
         else:
             result = {"behavior": "deny", "message": reason or "the page denied permission"}
         self._response(request_id, result=result)
@@ -607,7 +637,8 @@ class ClaudeAdapter:
         if self.session_id is None or not tool or not isinstance(arguments, dict):
             self._response(request_id, result={"behavior": "deny", "message": "permission request is incomplete"})
             return ()
-        self._approvals[request_id] = arguments
+        owner = _text(request.get("agent_id")) or None
+        self._approvals[request_id] = (owner, arguments)
         return (
             AdapterEvent(
                 "approval",
@@ -615,7 +646,7 @@ class ClaudeAdapter:
                 tool=tool,
                 arguments=arguments,
                 options=("allow_once", "deny"),
-                requester=_text(request.get("agent_id")) or None,
+                requester=owner,
                 tool_id=tool,
             ),
         )
@@ -633,6 +664,16 @@ class ClaudeAdapter:
             if message.get("session_id") != self.session_id:
                 self.session_id = None
                 return _failure("crashed", "Claude started a different session")
+        if kind == "system" and subtype in ("task_notification", "task_updated"):
+            session_id = message.get("session_id")
+            if session_id is not None and session_id != self.session_id:
+                return ()
+            status = (
+                message.get("status") if subtype == "task_notification" else _object(message.get("patch")).get("status")
+            )
+            owner = _text(message.get("task_id"))
+            if owner and status in ("completed", "failed", "stopped", "killed"):
+                return _expire_owned(self._approvals, owner)
         if kind == "assistant" and message.get("parent_tool_use_id") is None:
             started = () if self._running else (AdapterEvent("turn_started"),)
             self._running = True
@@ -663,7 +704,8 @@ class ClaudeAdapter:
                 outcome = "limit"
             else:
                 outcome = _error_kind({"message": text}, "crashed")
-            return (AdapterEvent("turn_ended", outcome=outcome, text=text),)
+            closed = _expire_owned(self._approvals, None)
+            return (*closed, AdapterEvent("turn_ended", outcome=outcome, text=text))
         request_id = message.get("request_id")
         if _wire_id(request_id):
             if kind == "control_request":
