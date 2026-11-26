@@ -58,7 +58,6 @@ class Package(unittest.TestCase):
         (kind,) = SKILL.kinds
         self.assertEqual((kind.folder, kind.head, kind.head_type), (".discover", "discover.json", "discover"))
         self.assertEqual(set(kind.folders), {"evidence", "sources"})
-        self.assertEqual(SKILL.exclude, ".discover/")
 
     def test_S96_skills_json_lists_discover_better_and_the_owner_maps_name_it(self):
         listed = json.loads(resources.read_text("skills.json"))["skills"]
@@ -138,19 +137,15 @@ class Package(unittest.TestCase):
 
 
 class Create(unittest.TestCase):
-    def test_S59_create_adds_the_folder_to_info_exclude_and_says_so(self):
+    def test_create_leaves_the_repositorys_git_exclusions_alone(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = R.make_repo(Path(tmp))
+            exclude = repo / ".git" / "info" / "exclude"
+            before = exclude.read_bytes() if exclude.exists() else None
             done = R.run(repo, "create", ".discover/d", "--by", R.COORD, stdin=R.head_fields())
             self.assertEqual(done.returncode, 0, done.stderr)
-            exclude = (repo / ".git" / "info" / "exclude").read_text().splitlines()
-            self.assertEqual(exclude.count(".discover/"), 1)
-            self.assertIn(".discover/", done.stdout)
-            self.assertIn("exclu", done.stdout)
-            again = R.run(repo, "create", ".discover/e", "--by", R.COORD, stdin=R.head_fields())
-            self.assertEqual(again.returncode, 0, again.stderr)
-            self.assertEqual((repo / ".git" / "info" / "exclude").read_text().splitlines().count(".discover/"), 1)
-            self.assertNotIn("exclu", again.stdout)
+            self.assertEqual(exclude.read_bytes() if exclude.exists() else None, before)
+            self.assertNotIn("exclu", done.stdout)
 
     def test_create_makes_the_head_and_the_two_folders_and_check_passes(self):
         with tempfile.TemporaryDirectory() as tmp:

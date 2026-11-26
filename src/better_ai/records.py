@@ -538,7 +538,7 @@ def _create_arguments(parser: argparse.ArgumentParser) -> None:
 
 @verb(
     "create",
-    help="make a unit: its head record (fields on stdin), its folders and the git exclusion",
+    help="make a unit: its head record (fields on stdin), and its folders",
     arguments=_create_arguments,
 )
 @_unit_named
@@ -578,10 +578,6 @@ def create(args: argparse.Namespace, run: Run) -> int:
         raise Busy(BUSY) from None
     for done in after:
         done()
-    if run.skill.exclude:
-        result = paths.add_exclude(unit, run.skill.exclude)
-        if result.startswith("skipped"):
-            run.out(f"git exclusion {result}")
     run.out(f"created {unit.label}")
     return cli.EXIT_DONE
 

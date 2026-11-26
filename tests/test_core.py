@@ -405,21 +405,6 @@ class Units(Repo):
         paths.write_state(unit, ".server", b"y")  # a file that was there keeps its mode
         self.assertEqual(stat.S_IMODE((self.unit / ".server").stat().st_mode), 0o640)
 
-    def test_the_exclude_line_is_added_once_and_never_rewritten(self):
-        unit = self.resolve(str(self.unit))
-        exclude = self.repo / ".git" / "info" / "exclude"
-        exclude.write_text("keep-me", encoding="utf-8")
-        self.assertEqual(paths.add_exclude(unit, ".code/"), "added")
-        self.assertEqual(paths.add_exclude(unit, ".code/"), "present")
-        self.assertEqual(exclude.read_text(encoding="utf-8"), "keep-me\n.code/\n")
-
-    def test_the_exclude_step_is_skipped_outside_a_repository(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            unit = paths.resolve_unit(os.path.join(os.path.realpath(tmp), ".code", "z"), code.SKILL, creating=True)
-            os.makedirs(unit.path)
-            self.assertTrue(paths.add_exclude(unit, ".code/").startswith("skipped"))
-            self.assertEqual(unit.root, Path(os.path.realpath(tmp)))
-
 
 class Check(Repo):
     def test_a_symlinked_record_file_is_an_error_in_check_as_add_refuses_it(self):

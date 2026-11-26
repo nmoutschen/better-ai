@@ -11,7 +11,6 @@ SKILL = Skill(
         UnitKind(kind="change", folder=".code", head="code.json", head_type="code", folders=("logs",)),
         UnitKind(kind="audit", folder=".code/audit", head="audit.json", head_type="audit"),
     ),
-    exclude=".code/",
 )
 
 from . import dashboard  # noqa: E402  (registers `render`)

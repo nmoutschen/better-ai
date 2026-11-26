@@ -20,13 +20,11 @@ SKILL = Skill(
             folders=("evidence", "sources"),
         ),
     ),
-    exclude=".discover/",
 )
 
 from . import (  # noqa: E402,F401  (each registers its rules, verbs or page when imported; they need SKILL above)
     brief,
     derive,
-    exclusion,
     pagespec,
     rules_changes,
     rules_evidence,

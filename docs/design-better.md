@@ -99,7 +99,7 @@ Without an argument, it audits the interface the conversation is building, then 
 <summary><b>What you get</b></summary>
 
 - A brief at `.design/<slug>/brief.md`, and in design mode a design at `.design/<slug>/design.md`.
-- A compare page at `.design/<slug>/index.html`, with your feedback appended to `conversation.jsonl` next to it. It is not committed unless you ask.
+- A compare page at `.design/<slug>/index.html`, with your feedback appended to `conversation.jsonl` next to it. Git sees it as untracked: commit it or ignore it as you choose.
 - In design mode, the interface built by `/code-better`. When a change alters how it looks, a page showing each changed screen before and after, and the same screenshots in the pull request when the change goes into one.
 - A short report:
   - which scenarios it walked and how, and which failed or could not be walked
