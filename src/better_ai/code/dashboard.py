@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timezone
 
 from .. import page, paths, records, resources, schema
+from ..page import triggers
 from ..paths import Unit
 from . import activity
 
@@ -154,6 +155,7 @@ def load(unit: Unit) -> dict:
 
 
 SPEC = page.PageSpec(
+    triggers=triggers.code,
     title="Change dashboard",
     agent="coordinator",
     main="code/dashboard.html",

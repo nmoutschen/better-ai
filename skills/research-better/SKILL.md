@@ -53,9 +53,7 @@ MAKE the board with `python3 <skill dir>/scripts/better.pyz create .research/<to
 
 TELL the user the board's path once.
 
-IF the harness can run a shell command in the background, and the user's browser can reach the machine where you run commands, START the live view: `python3 <skill dir>/scripts/better.pyz serve <board-path> --open`. GIVE the user the address it prints, whole, with its `#t=` part. IF the harness can only run commands in the foreground, DO NOT start it. TELL the user they can run it themselves instead.
-
-IF your harness tells you when a background command ends, ALSO RUN `python3 <skill dir>/scripts/better.pyz wait <board-path>` in the background while the live view runs: it ends with the user's new actions, so a message wakes you even when you are waiting for workers. START it again at once each time it ends, before you act on what it printed. WHILE no `wait` runs, the page tells the user that you are not watching.
+FOLLOW the general rule [Start the live view](#start-the-live-view). IF the harness can only run commands in the foreground, TELL the user they can start the live view themselves.
 
 The live view shows the board as a map of the questions, the agents at work, and the decisions waiting for the user or taken without them. The user asks about a question or an agent, messages you, and changes your decisions there.
 
@@ -211,6 +209,10 @@ START from the question summaries on the board. PRESENT the findings, with the c
 ## General rules
 
 FOLLOW these rules in every step.
+
+### Start the live view
+
+IF you are in a session opened by the page, DO NOT run `serve`. IF the page already has its own agent, ANSWER questions about it in the chat with "ask it in the page". IF you are in the chat, the page is not already served, your harness can run a background command, and the user's browser can reach this machine, RUN `python3 <skill dir>/scripts/better.pyz serve <unit> --drive auto --open` in the background with the hand-off note on stdin. INCLUDE the current step and what the page agent needs to continue. READ the startup output. IF serve prints a first-time enrollment address, GIVE it to the user immediately, ASK them to enroll there, and WAIT at most 120 seconds from startup for the driver result. OTHERWISE, LOOK for the driver line within 30 seconds from startup. IF no driver line arrives by the applicable deadline, TREAT it as `driver: off crashed`. IF serve prints `driver: on`, GIVE the full page address, including its `#t=` part, SAY the page has its own agent, and END the turn. IF serve prints `driver: off <kind>` or you reached the deadline without a driver line, TELL the user the kind and its action in one line. THEN, in the wait fallback, GIVE the fallback page address when serve prints it. IF you can stream output, STREAM the serve command's output and restart an expired stream. OTHERWISE, IF your harness can tell you when a background command ends, RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` in the background and START it again each time it ends before you act on its output. OTHERWISE, ASK the user to say "sent" in the chat and RUN `python3 <skill dir>/scripts/better.pyz pending <unit>` when they do.
 
 ### Tools and collections
 
