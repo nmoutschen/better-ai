@@ -221,6 +221,15 @@ class AdapterTests(unittest.TestCase):
                 self.assertEqual((event.kind, event.outcome), ("failed", expected))
                 self.assertEqual(len(sent), 1)
 
+    def test_claude_rechecks_permissions_at_the_first_turn(self):
+        _, adapter, _, ready = self.open_claude()
+        self.assertEqual(ready.kind, "ready")
+        event = adapter.receive(
+            {"type": "system", "subtype": "init", "session_id": SESSION, "permissionMode": "bypassPermissions"}
+        )[0]
+        self.assertEqual((event.kind, event.outcome), ("failed", "unsafe-mode"))
+        self.assertIsNone(adapter.session_id)
+
     def test_claude_replies_to_the_exact_permission_request(self):
         _, adapter, sent, _ = self.open_claude()
         raw = {"command": "pwd"}
@@ -266,6 +275,28 @@ class AdapterTests(unittest.TestCase):
         event = adapter.receive({"id": sent[-1]["id"], "result": {"account": None}})[0]
         self.assertEqual((event.kind, event.outcome), ("failed", "login"))
         self.assertFalse(any(message.get("method") == "thread/start" for message in sent))
+
+    def test_codex_opens_a_configured_provider_without_openai_auth(self):
+        sent = []
+        adapter = CodexAdapter(sent.append)
+        adapter.open("/repo", None)
+        adapter.receive({"id": sent[-1]["id"], "result": {"userAgent": "codex_cli_rs/0.172.0"}})
+        account = {"account": None, "requiresOpenaiAuth": False}
+        self.assertEqual(adapter.receive({"id": sent[-1]["id"], "result": account}), ())
+        self.assertEqual(sent[-1]["method"], "thread/start")
+
+    def test_opencode_replaces_a_missing_saved_session(self):
+        sent = []
+        adapter = OpenCodeAdapter(sent.append)
+        adapter.open("/repo", "ses_missing")
+        adapter.receive({"id": sent[-1]["id"], "result": {"protocolVersion": 1, "agentInfo": {"version": "2.4.1"}}})
+        self.assertEqual(sent[-1]["method"], "session/load")
+        missing = {"code": -32002, "message": "The selected session is gone"}
+        self.assertEqual(adapter.receive({"id": sent[-1]["id"], "error": missing}), ())
+        self.assertEqual(sent[-1]["method"], "session/new")
+        result = {"sessionId": "ses_new", "configOptions": [{"category": "mode", "currentValue": "build"}]}
+        event = adapter.receive({"id": sent[-1]["id"], "result": result})[0]
+        self.assertEqual((event.kind, event.session_id), ("ready", "ses_new"))
 
     def test_opencode_checks_its_reported_version_and_mode(self):
         sent = []
