@@ -1011,7 +1011,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         parts = urllib.parse.urlsplit(self.path)
         path, c = parts.path, self.conversation
         driven = self.driven
-        if driven and not driven.off:
+        paired = bool(driven and not driven.off)
+        if paired:
             if not driven.main_host(self.headers.get("Host")):
                 return self.send_error(403)
             if path == "/listening":
@@ -1023,7 +1024,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if path == "/agent":
                 return self.send_json(driven.status())
         if path in ("/", "/index.html"):
-            paired = bool(driven and not driven.off)
             return self.send(
                 200,
                 shell(self.spec, paired).encode(),
@@ -1033,7 +1033,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in self.assets:
             kind = CONTENT_TYPES[os.path.splitext(path)[1]]
             return self.send(200, resources.read_bytes(self.assets[path]), kind)
-        if (not driven or driven.off) and path in ("/data", "/events", "/wait") and not self.has_token():
+        if not paired and path in ("/data", "/events", "/wait") and not self.has_token():
             return self.send(401, f"{OUT_OF_DATE}\n".encode(), "text/plain; charset=utf-8")
         if path == "/data":
             return self.send_json(
@@ -1051,9 +1051,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             after = self.after(parts.query)
             total = c.wait_for_more(after, 20)
             reply = {"total": total, "events": c.events()[after:total]}
-            if driven and not driven.off:
+            if paired:
                 with driven.routing_lock:
-                    if not self.driven_token(driven.main_pair):
+                    if driven.off or not self.driven_token(driven.main_pair):
                         return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
                     return self.send_json(reply)
             return self.send_json(reply)
