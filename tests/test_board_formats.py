@@ -148,7 +148,9 @@ def serve_until_stopped(folder: Path, stderr: io.StringIO) -> threading.Thread:
     is stopped."""
     info = resources.BuildInfo(SKILL, "research", "source", resources.cutoff())
     run = cli.Run(research.SKILL, info, stdout=io.StringIO(), stderr=stderr)
-    args = mock.Mock(unit=str(folder), port=0, open=False, no_browser=True, linger=0.2, once=False)
+    args = mock.Mock(
+        unit=str(folder), port=0, open=False, no_browser=True, linger=0.2, once=False, link=False, drive=None
+    )
     runner = threading.Thread(target=page.serve, args=(args, run), daemon=True)
     runner.start()
     return runner

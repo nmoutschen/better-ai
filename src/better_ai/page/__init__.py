@@ -38,12 +38,17 @@ import functools
 import hashlib
 import hmac
 import html
+import http.client
 import http.server
 import json
 import os
 import secrets
+import shlex
 import signal
+import socket
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -52,8 +57,11 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import Future
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from .. import cli, paths, resources, schema
@@ -95,6 +103,22 @@ CONTENT_TYPES = {
 }
 SHARED_ASSETS = {"/page.js": "page/page.js", "/page.css": "page/page.css"}
 
+# The driven shell and its srcdoc previews may run only bundled scripts.
+DRIVEN_SHELL_POLICY = "; ".join(
+    (
+        "default-src 'none'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline' data: http: https:",
+        "font-src 'self' data: http: https:",
+        "img-src 'self' data: http: https:",
+        "connect-src 'self'",
+        "frame-src 'self' http: https:",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+    )
+)
+
 
 class EventError(ValueError):
     """An event that fails its schema: the message is the validator's, `field: message` for each problem."""
@@ -122,6 +146,7 @@ class PageSpec:
     revision: Callable[[Unit], str] | None = None
     stopped: Callable[[Unit], bool] | None = None
     tick: Callable[[Unit, Conversation], None] | None = None
+    triggers: Callable[[Unit], Iterable[dict]] | None = None
 
     def sendable(self) -> tuple[str, ...]:
         """The events the page may send: notes, and those of each capability and of `methods`."""
@@ -175,6 +200,8 @@ def register(skill: Skill, spec: PageSpec) -> PageSpec:
         raise ValueError(f"{skill.name}: the main section {spec.main!r} is not bundled")
     if spec.aside and not resources.exists(spec.aside):
         raise ValueError(f"{skill.name}: the side section {spec.aside!r} is not bundled")
+    if skill.name not in PAGES:
+        paths.unit_guard(skill.name)(driven_notice)
     PAGES[skill.name] = spec
     return spec
 
@@ -550,6 +577,8 @@ def wait(args: argparse.Namespace, run: cli.Run) -> int:
     """Print the actionable batch when the user acts. Exit 3 when none came in time."""
     unit = _unit(args, run)
     conv = _conversation(run, unit)
+    if os.environ.get("BETTER_PAGE_SESSION") or live_driver(unit, conv):
+        raise Refused(f"{unit.label}: wait cannot run on a driven page")
     address = conv.address()
     if address is None:
         raise paths.refusal(unit.label, "no page is served", f"run serve {unit.label} first")
@@ -758,11 +787,13 @@ def _json_for_html(value: Any) -> str:
     return json.dumps(value).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
-def shell(spec: PageSpec) -> str:
+def shell(spec: PageSpec, driven: bool = False) -> str:
     """The page: shell.html with the page's main section and bundled files, and constants escaped. Never record data."""
     title, agent = html.escape(spec.title), html.escape(spec.agent)
     empty = spec.empty or f"Nothing yet. Write to the {spec.agent} below."
     config = {"title": spec.title, "agent": spec.agent, "capabilities": list(spec.capabilities)}
+    if driven:
+        config["driven"] = True
     fills = {
         "%%TITLE%%": title,
         "%%AGENT%%": agent,
@@ -868,6 +899,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     token = ""
     answer_started = False
     old_cache: tuple[float, int] = (0.0, 0)
+    driven: DrivenPage | None = None
 
     def answer_failure(self, text: str, status: str) -> None:
         """Answer a failed request with one line, `text`: for a JSON-RPC request the error object -32603, else plain
@@ -902,6 +934,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 print(f"page server: {self.bug_prefix}: a request failed: {type(error).__name__}", file=sys.stderr)
 
     def setup(self) -> None:
+        if self.driven:
+            self.request.settimeout(2)
         self.guarded(super().setup)
 
     def handle(self) -> None:
@@ -914,11 +948,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # Only answer requests addressed to this machine, so a web page cannot reach it via DNS rebinding.
         return (self.headers.get("Host") or "").rsplit(":", 1)[0] in ("127.0.0.1", "localhost")
 
-    def send(self, code: int, body: bytes, kind: str) -> None:
+    def browser_origin(self) -> bool:
+        """Browsers omit Origin on same-origin GET. Fetch Metadata gives us the browser's origin check there."""
+        origin = self.headers.get("Origin")
+        expected = "http://" + (self.headers.get("Host") or "")
+        return (origin is None or origin == expected) and self.headers.get("Sec-Fetch-Site") == "same-origin"
+
+    def driven_token(self, pairing) -> bool:
+        origin = "http://" + (self.headers.get("Host") or "")
+        return self.browser_origin() and pairing.valid(self.headers.get(TOKEN_HEADER, ""), origin)
+
+    def read_json(self):
+        if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+            return self.send_error(415)
+        size = self.headers.get("Content-Length", "")
+        if not size.isascii() or not size.isdecimal() or len(size) > 6 or not 0 < int(size) <= MAX_BODY:
+            return self.send_error(413)
+        return json.loads(self.rfile.read(int(size)))
+
+    def pair(self, pairing, new_page=None, unauthorized=401):
+        try:
+            request = self.read_json()
+            if request is None:
+                return
+            origin = "http://" + self.headers["Host"]
+            secret = pairing.exchange(request.get("token", ""), origin) if isinstance(request, dict) else None
+        except ValueError:
+            secret = None
+        if not secret:
+            return self.send(unauthorized, b"Pairing link expired. Ask for a new link.", "text/plain")
+        return self.send_json({"secret": secret, **({"page": new_page()} if new_page else {})})
+
+    def send(self, code: int, body: bytes, kind: str, *, policy: str | None = None) -> None:
         self.send_response(code)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if policy:
+            self.send_header("Content-Security-Policy", policy)
         self.end_headers()
         self.wfile.write(body)
 
@@ -952,12 +1019,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send_error(403)
         parts = urllib.parse.urlsplit(self.path)
         path, c = parts.path, self.conversation
+        driven = self.driven
+        paired = bool(driven and not driven.off)
+        if paired:
+            if not driven.main_host(self.headers.get("Host")):
+                return self.send_error(403)
+            if path == "/listening":
+                return self.send_json({"unit": driven.identity, "session": driven.session})
+            if path == "/wait":
+                return self.send_error(403)
+            if path in ("/data", "/events", "/old", "/rev", "/agent") and not self.driven_token(driven.main_pair):
+                return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+            if path == "/agent":
+                return self.send_json(driven.status())
         if path in ("/", "/index.html"):
-            return self.send(200, shell(self.spec).encode(), CONTENT_TYPES[".html"])
+            return self.send(
+                200,
+                shell(self.spec, paired).encode(),
+                CONTENT_TYPES[".html"],
+                policy=DRIVEN_SHELL_POLICY if paired else None,
+            )
         if path in self.assets:
             kind = CONTENT_TYPES[os.path.splitext(path)[1]]
             return self.send(200, resources.read_bytes(self.assets[path]), kind)
-        if path in ("/data", "/events", "/wait") and not self.has_token():
+        if not paired and path in ("/data", "/events", "/wait") and not self.has_token():
             return self.send(401, f"{OUT_OF_DATE}\n".encode(), "text/plain; charset=utf-8")
         if path == "/data":
             return self.send_json(
@@ -974,7 +1059,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             # Long poll for the page: every event after the first `after`, the agent's included.
             after = self.after(parts.query)
             total = c.wait_for_more(after, 20)
-            return self.send_json({"total": total, "events": c.events()[after:total]})
+            reply = {"total": total, "events": c.events()[after:total]}
+            if paired:
+                with driven.routing_lock:
+                    if driven.off or not self.driven_token(driven.main_pair):
+                        return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+                    return self.send_json(reply)
+            return self.send_json(reply)
         if path == "/wait":
             seconds = urllib.parse.parse_qs(parts.query).get("seconds", ["25"])[0]
             seconds = int(seconds) if seconds.isdigit() and len(seconds) <= 4 else 25
@@ -983,21 +1074,37 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     @answers_any_failure
     def do_POST(self):
+        lock = self.driven.routing_lock if self.driven else contextlib.nullcontext()
+        with lock:
+            self.post()
+
+    def post(self):
         # Only this page may send: the same host and origin, and a JSON body that a cross-site form cannot send.
         origin = self.headers.get("Origin", "")
-        if not self.local() or self.path != "/rpc" or origin != "http://" + (self.headers.get("Host") or ""):
+        if not self.local() or origin != "http://" + (self.headers.get("Host") or ""):
             return self.send_error(403)
-        if not self.has_token():
+        driven = self.driven
+        if driven and not driven.off:
+            if not driven.main_host(self.headers.get("Host")) or not self.browser_origin():
+                return self.send_error(403)
+            if self.path == "/pair":
+                return self.pair(driven.main_pair, unauthorized=403)
+            if self.path != "/rpc":
+                return self.send_error(404)
+            if not self.driven_token(driven.main_pair):
+                return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+            if not driven.driver or not driven.session:
+                return self.send_error(503)
+        elif self.path != "/rpc":
+            return self.send_error(403)
+        elif not self.has_token():
             return self.send_json(rpc_error(None, -32001, OUT_OF_DATE))
-        if not (self.headers.get("Content-Type") or "").startswith("application/json"):
-            return self.send_error(415)
-        size = int(self.headers.get("Content-Length") or 0)
-        if not 0 < size <= MAX_BODY:
-            return self.send_error(413)
         try:
-            msg = json.loads(self.rfile.read(size))
+            msg = self.read_json()
         except ValueError:
             return self.send_json(rpc_error(None, -32700, "Parse error"))
+        if msg is None and self.answer_started:
+            return
         rid = msg.get("id") if isinstance(msg, dict) else None
         if (
             not isinstance(msg, dict)
@@ -1016,8 +1123,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             (line,) = self.conversation.append({"type": msg["method"], "by": "user", **params})
         except EventError as error:
             return self.send_json(rpc_error(rid, -32602, str(error)))
-        with contextlib.suppress(OSError):  # a closed stdout is not a failed save
-            print(line, flush=True)
+        if driven and not driven.off:
+            driven.driver.enqueue(json.loads(line))
+        else:
+            with contextlib.suppress(OSError):  # a closed stdout is not a failed save
+                print(line, flush=True)
         return self.send_json({"jsonrpc": "2.0", "id": rid, "result": "saved"})
 
     def log_message(self, *args):
@@ -1036,6 +1146,7 @@ def make_server(unit: Unit, spec: PageSpec, conv: Conversation, info: resources.
     PageHandler.cutoff = info.cutoff
     PageHandler.token = secrets.token_urlsafe(32)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), PageHandler)
+    server.handler = PageHandler
     server.token = PageHandler.token  # type: ignore[attr-defined]
     return server
 
@@ -1054,6 +1165,446 @@ def publish(unit: Unit, server: http.server.HTTPServer) -> str:
     return page_url(server)
 
 
+def unit_identity(unit: Unit) -> str:
+    return hashlib.sha256(os.fsencode(unit.path)).hexdigest()
+
+
+def live_driver(unit: Unit, conv: Conversation | None = None) -> dict:
+    if not unit.target(".driver").exists():
+        return {}
+    from .adapters import session_id_valid
+    from .driver_state import read_driver_state
+
+    state = read_driver_state(unit, valid_session=session_id_valid)
+    if not state:
+        return {}
+    try:
+        address = conv.address() if conv else paths.read_bytes(unit, ADDRESS).decode().strip()
+        parsed = urllib.parse.urlsplit(address or "")
+        if parsed.scheme != "http" or parsed.netloc != f"127.0.0.1:{parsed.port}" or parsed.path != "/":
+            return {}
+        with contextlib.closing(http.client.HTTPConnection("127.0.0.1", parsed.port, timeout=1)) as connection:
+            connection.request("GET", "/listening")
+            reply = connection.getresponse()
+            marker = json.loads(reply.read(4096)) if reply.status == 200 else {}
+    except (OSError, ValueError, Refused, http.client.HTTPException):
+        return {}
+    return state if marker == {"unit": unit_identity(unit), "session": state["session"]} else {}
+
+
+def driven_notice(unit: Unit) -> None:
+    state = live_driver(unit)
+    if state and os.environ.get("BETTER_PAGE_SESSION") not in (state["session"], state.get("tag", "")):
+        print(f"this unit's page is driven by session {state['session']}", file=sys.stderr)
+
+
+def remove_if_ours(unit: Unit, name: str, value: bytes) -> None:
+    with contextlib.suppress(OSError, Refused):
+        if paths.read_bytes(unit, name) == value:
+            unit.target(name).unlink()
+
+
+@contextlib.contextmanager
+def serve_lock(unit: Unit, conv: Conversation):
+    fd = os.open(unit.target(".page-serve-lock"), os.O_RDWR | os.O_CREAT | paths.NOFOLLOW, 0o600)
+    try:
+        try:
+            lock_unit(fd)
+        except OSError:
+            raise Refused(
+                f"{unit.label}: a page server is already serving at {conv.address() or 'a port opening now'}"
+            ) from None
+        if conv.answering():
+            raise Refused(f"{unit.label}: a page server is already serving at {conv.address()}")
+        yield
+    finally:
+        os.close(fd)
+
+
+def lock_unit(fd: int) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def stop_orphan(unit: Unit) -> None:
+    if not unit.target(".driver").exists():
+        return
+    from .adapters import session_id_valid
+    from .driver_state import read_driver_state
+    from .transport import process_birth
+
+    state = read_driver_state(unit, valid_session=session_id_valid)
+    pid, birth = state.get("child_pid"), state.get("child_started")
+    if type(pid) is not int or pid <= 1 or not birth:
+        return
+    for signum in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            if process_birth(pid) != birth or os.getpgid(pid) != pid:
+                return
+            os.killpg(pid, signum)
+        except ProcessLookupError:
+            return
+        except PermissionError:
+            raise Refused(f"{unit.label}: the previous page agent's process group could not be stopped") from None
+        if signum == signal.SIGTERM:
+            time.sleep(0.2)
+
+
+LINK_SOCKET = ".page-link"
+PANEL_ASSETS = {
+    "/approvals.html": "page/approvals.html",
+    "/approvals.js": "page/approvals.js",
+    "/approvals.css": "page/approvals.css",
+}
+START_TIMEOUT = 30
+ENROLL_TIMEOUT = 120
+
+
+class ApprovalHandler(Handler):
+    """Only bundled panel assets and session-specific control run on this origin."""
+
+    def end_headers(self):
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+        )
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        super().end_headers()
+
+    @answers_any_failure
+    def do_GET(self):
+        driven = self.driven
+        if self.headers.get("Host") != driven.panel_host:
+            return self.send_error(403)
+        if self.path in PANEL_ASSETS:
+            kind = CONTENT_TYPES[os.path.splitext(self.path)[1]]
+            return self.send(200, resources.read_bytes(PANEL_ASSETS[self.path]), kind)
+        if self.path != "/agent":
+            return self.send_error(404)
+        if not self.driven_token(driven.panel_pair):
+            return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+        return self.send_json(driven.panel_status())
+
+    @answers_any_failure
+    def do_POST(self):
+        with self.driven.routing_lock:
+            self.post()
+
+    def post(self):
+        driven = self.driven
+        if (
+            self.headers.get("Host") != driven.panel_host
+            or self.headers.get("Origin") != driven.panel_origin
+            or not self.browser_origin()
+        ):
+            return self.send_error(403)
+        if self.path == "/pair":
+            return self.pair(driven.panel_pair, driven.main_link, unauthorized=403)
+        if self.path != "/rpc":
+            return self.send_error(404)
+        if not self.driven_token(driven.panel_pair):
+            return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+        rid = None
+        try:
+            message = self.read_json()
+            if message is None and self.answer_started:
+                return
+            if not isinstance(message, dict):
+                raise ValueError("Invalid request")
+            rid, method, params = message.get("id"), message.get("method"), message.get("params")
+            if message.get("jsonrpc") != "2.0" or not isinstance(params, dict):
+                raise ValueError("Invalid request")
+            result = driven.control(method, params)
+        except (TypeError, ValueError) as error:
+            return self.send_json(rpc_error(rid, -32602, str(error)))
+        return self.send_json({"jsonrpc": "2.0", "id": rid, "result": result})
+
+
+def run_http(server):
+    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": POLL}, daemon=True)
+    thread.start()
+    return thread
+
+
+class DrivenPage:
+    def __init__(self, server, unit, archive, record_verbs, require_presence):
+        from .approvals import ApprovalGate, Pairing
+
+        self.server, self.unit = server, unit
+        self.identity = unit_identity(unit)
+        self.main_origin = f"http://127.0.0.1:{server.server_port}"
+        self.driver, self.off, self.ready = None, None, False
+        self.enrollment = threading.Event()
+        self.routing_lock = threading.RLock()
+
+        class PanelHandler(ApprovalHandler):
+            pass
+
+        PanelHandler.driven = self
+        self.panel = http.server.ThreadingHTTPServer(("127.0.0.1", 0), PanelHandler)
+        self.panel_host = f"localhost:{self.panel.server_port}"
+        self.panel_origin = "http://" + self.panel_host
+        try:
+            self.main_pair = Pairing(self.main_origin)
+            self.panel_pair = Pairing(self.panel_origin)
+            self.gate = ApprovalGate(
+                unit.path,
+                self.panel_origin,
+                require_presence=require_presence,
+                archive=archive,
+                record_verbs=record_verbs,
+            )
+            self.enrollment_needed = require_presence and not self.gate.enrolled()
+        except BaseException:
+            self.panel.server_close()
+            raise
+        server.handler.driven = self
+        run_http(self.panel)
+
+    @property
+    def session(self):
+        return self.driver.session if self.ready else None
+
+    def main_host(self, host):
+        return host == self.main_origin.removeprefix("http://")
+
+    def panel_link(self):
+        with self.routing_lock:
+            self.main_pair.issue()  # invalidate the previous conversation tab as soon as a new link is issued
+            return f"{self.panel_origin}/approvals.html#p={self.panel_pair.issue()}"
+
+    def main_link(self):
+        with self.routing_lock:
+            if self.off:
+                return page_url(self.server)
+            return f"{self.main_origin}/#p={self.main_pair.issue()}"
+
+    def status(self):
+        if self.off:
+            return self.off
+        if self.driver and self.session:
+            return {**self.driver.snapshot(), "harness": self.driver.harness}
+        return {"state": "starting", "age": 0}
+
+    def panel_status(self):
+        status = self.status()
+        return {
+            **status,
+            **self.available_controls(status),
+            **(self.gate.snapshot() if not self.off else {"approvals": [], "page": page_url(self.server)}),
+            "enrollment_needed": self.enrollment_needed and not self.off,
+        }
+
+    def available_controls(self, status):
+        live = self.ready and not self.off and status.get("age", 4) <= 3 and status.get("kind") != "driver"
+        return {
+            "can_start": bool(live and status["state"] in ("stopped", "failed")),
+            "can_stop": bool(live and status["state"] in ("idle", "working", "stalled")),
+        }
+
+    def control(self, method, params):
+        if self.off:
+            raise ValueError("This page has no driver")
+        if self.enrollment_needed and method == "enroll_begin":
+            return self.gate.begin_enrollment()
+        if self.enrollment_needed and method == "enroll_finish":
+            self.gate.finish_enrollment(params.get("proof"))
+            self.enrollment_needed = False
+            self.enrollment.set()
+            return True
+        if not self.driver or not self.session or self.driver.snapshot()["age"] > 3:
+            raise ValueError("The page's agent driver stopped. Serve the page again.")
+        if method == "permission_challenge":
+            return self.gate.challenge(params.get("id"), params.get("choice"))
+        if method == "permission_answer":
+            return self.gate.answer(params.get("id"), params.get("choice"), params.get("proof"))
+        if method == "agent_stop" and self.available_controls(self.status())["can_stop"]:
+            self.driver.request_stop()
+            return True
+        if method == "agent_start" and self.available_controls(self.status())["can_start"]:
+            self.driver.request_start()
+            return True
+        raise ValueError("Unknown method")
+
+    def fail(self, kind, message):
+        from .driver import ACTIONS
+
+        with self.routing_lock:
+            self.off = {"state": "failed", "kind": kind, "message": message, "action": startup_action(kind, ACTIONS)}
+
+    def close(self):
+        if self.driver:
+            self.driver.close()
+        self.panel.shutdown()
+        self.panel.server_close()
+
+
+def startup_action(kind, actions):
+    if kind == "login":
+        return "Log in to the harness in a terminal, then serve again."
+    if kind in ("crashed", "limit", "not-handling", "driver"):
+        return "Serve again."
+    return actions.get(kind, "")
+
+
+def link_existing(unit, conv):
+    """Ask the live server over its private local control socket. Its path is not a browser credential."""
+    from .driver_state import private_bytes
+
+    address = conv.address()
+    if not live_driver(unit, conv):
+        raise Refused(f"{unit.label}: no driven page is running at {address or 'this unit'}")
+    try:
+        path = Path(private_bytes(unit, LINK_SOCKET).decode())
+        if path.parent.parent != Path("/tmp") or not path.parent.name.startswith("better-page-") or path.name != "link":
+            raise ValueError()
+        with socket.socket(socket.AF_UNIX) as control:
+            control.settimeout(2)
+            control.connect(str(path))
+            control.sendall(unit_identity(unit).encode())
+            with control.makefile("rb") as stream:
+                url = stream.readline(512).decode().strip()
+            if not url.startswith("http://localhost:"):
+                raise ValueError()
+            return url
+    except (OSError, ValueError):
+        raise Refused(f"{unit.label}: could not pair a tab with the running server at {address}") from None
+
+
+@contextlib.contextmanager
+def link_control(driven):
+    if not driven or not driven.session:
+        yield
+        return
+    unit = driven.unit
+    with (
+        tempfile.TemporaryDirectory(prefix="better-page-", dir="/tmp") as folder,
+        socket.socket(socket.AF_UNIX) as control,
+    ):
+        path = os.path.join(folder, "link")
+        control.bind(path)
+        os.chmod(path, 0o600)
+        control.listen(4)
+        control.settimeout(0.2)
+        stopping = threading.Event()
+
+        def serve_links():
+            while not stopping.is_set():
+                try:
+                    connection, _ = control.accept()
+                except TimeoutError:
+                    continue
+                except OSError:
+                    return
+                with connection:
+                    connection.settimeout(0.2)
+                    try:
+                        with connection.makefile("rb") as stream:
+                            identity = stream.read(64)
+                        if identity == driven.identity.encode():
+                            connection.sendall(driven.panel_link().encode() + b"\n")
+                    except OSError:
+                        continue
+
+        paths.write_state(unit, LINK_SOCKET, os.fsencode(path), 0o600)
+        thread = threading.Thread(target=serve_links, daemon=True)
+        thread.start()
+        try:
+            yield
+        finally:
+            stopping.set()
+            thread.join(timeout=0.5)
+            remove_if_ours(unit, LINK_SOCKET, os.fsencode(path))
+
+
+def handoff_note(run: cli.Run):
+    """Read the hand-off without letting an open pipe hold startup past either deadline."""
+    notes = []
+    stream = run.stdin or sys.stdin
+    if stream.isatty():
+        return notes
+
+    def read():
+        with contextlib.suppress(OSError, ValueError):
+            notes.append(stream.read(64 * 1024))
+
+    threading.Thread(target=read, daemon=True).start()
+    return notes
+
+
+def start_driven(driven, candidate, conv, run, deadline, notes, archive, skill_path):
+    from .adapters import _MIN_VERSION, child_environment, session_id_valid, version_supported
+    from .driver import Driver, StartError
+    from .transport import ProcessTransport
+
+    env = os.environ.copy()
+    try:
+        remaining = max(0.0, deadline - time.monotonic())
+        version = subprocess.run(
+            [candidate.argv[0], "--version"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=remaining,
+            check=False,
+            cwd=conv.unit.root,
+            env=env,
+        )
+    except subprocess.TimeoutExpired:
+        raise StartError("crashed", "harness startup timed out") from None
+    except FileNotFoundError:
+        raise StartError("not-installed") from None
+    detected = version.stdout.strip()[:500] or "unknown"
+    needed = ".".join(str(part) for part in _MIN_VERSION[candidate.name])
+    version_message = f"{candidate.name} reported {detected}. Version {needed} or later is required."
+    if version.returncode or not version_supported(candidate.name, version.stdout):
+        raise StartError("version", version_message)
+
+    def launch(tag, resume):
+        return ProcessTransport(
+            candidate.command(tag, resume),
+            conv.unit.root,
+            child_environment(candidate.name, env, tag),
+            lambda send: candidate.codec(send, tag, resume),
+        )
+
+    try:
+        head = json.loads(paths.read_bytes(conv.unit, conv.unit.kind.head))
+        step = head.get("step", "") if isinstance(head, dict) else ""
+    except (OSError, ValueError, Refused):
+        step = ""
+    driven.driver = Driver(
+        conv,
+        candidate.name,
+        launch,
+        skill_path=skill_path,
+        command=shlex.join((os.path.abspath(sys.executable), str(archive or sys.argv[0]))),
+        cwd=conv.unit.root,
+        step=step if isinstance(step, str) else "",
+        handoff=notes[0] if notes else "",
+        triggers=lambda: conv.spec.triggers(conv.unit) if conv.spec.triggers else (),
+        approvals=driven.gate,
+        valid_session=lambda session: session_id_valid(candidate.name, session),
+    )
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise StartError("crashed", "harness startup timed out")
+    try:
+        driven.driver.start(remaining)
+    except StartError as error:
+        if error.kind != "version":
+            raise
+        raise StartError("version", f"{version_message} The harness protocol reported: {error}.") from None
+    driven.ready = True
+
+
 def _serve_arguments(parser: argparse.ArgumentParser) -> None:
     _unit_argument(parser)
     parser.add_argument("--port", type=int, default=0, help="port to serve on (default: any free port)")
@@ -1062,6 +1613,9 @@ def _serve_arguments(parser: argparse.ArgumentParser) -> None:
     opening.add_argument("--no-browser", action="store_true", help="do not open a browser (the default)")
     parser.add_argument("--linger", type=float, default=10, help="seconds to keep serving after the unit stops")
     parser.add_argument("--once", action="store_true", help="serve one request, then exit")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--drive", choices=("auto", "claude", "codex", "cursor", "opencode", "droid", "devin"))
+    mode.add_argument("--link", action="store_true", help="pair a new tab with an already driven page")
 
 
 @cli.verb(
@@ -1072,73 +1626,196 @@ def _serve_arguments(parser: argparse.ArgumentParser) -> None:
 def serve(args: argparse.Namespace, run: cli.Run) -> int:
     """Check every record, then serve the page until the unit stops (or Ctrl+C). A record that is not valid is a warning
     on stderr: the page still opens and shows it."""
+    deadline = time.monotonic() + START_TIMEOUT
     unit = _unit(args, run)
+    if os.environ.get("BETTER_PAGE_SESSION"):
+        raise Refused(f"{unit.label}: serve cannot run from a page agent session")
+    spec = spec_of(run.skill)
+    conv = Conversation(unit, spec, load_docs(run.skill))
+    if args.link:
+        run.out(link_existing(unit, conv))
+        return 0
+    with serve_lock(unit, conv):
+        stop_orphan(unit)
+        return serve_page(args, run, unit, spec, conv, deadline)
+
+
+def preflight(run, unit, conv):
     for guard in SERVE_GUARDS.get(run.skill.name, []):
         guard(unit)
-    spec = spec_of(run.skill)
-    docs = load_docs(run.skill)
     notices: list[schema.Error] = []
-    for error in schema.check_paths([unit.path], docs=docs, now=run.now(), cutoff=run.info.cutoff, notices=notices):
+    for error in schema.check_paths(
+        [unit.path], docs=conv.docs, now=run.now(), cutoff=run.info.cutoff, notices=notices
+    ):
         run.err(f"warning: {error}")
-    for notice in notices:  # a line in the format before this change is reported, not a warning of a bad record
+    for notice in notices:
         run.err(f"notice: {notice}")
-    conv = Conversation(unit, spec, docs)
     conv.lines()  # a log that cannot be read is refused here, not found by the first request
+
+
+def prepare_serve(args, run, unit, conv, deadline):
+    if not args.drive:
+        preflight(run, unit, conv)
+        return True
+    complete = Future()
+
+    def check():
+        try:
+            preflight(run, unit, conv)
+        except BaseException as error:
+            complete.set_exception(error)
+        else:
+            complete.set_result(None)
+
+    threading.Thread(target=check, daemon=True).start()
+    try:
+        complete.result(timeout=max(0, deadline - time.monotonic()))
+        return True
+    except FutureTimeout:
+        if complete.done():
+            complete.result()
+        run.out("driver: off crashed")
+        # The driver is abandoned at the deadline. The legacy page still needs all its usual checks.
+        complete.result()
+        return False
+
+
+def serve_page(args, run, unit, spec, conv, deadline):
+    can_drive = prepare_serve(args, run, unit, conv, deadline)
     try:
         server = make_server(unit, spec, conv, run.info, args.port)
-    except OSError as error:  # a port that is taken or not allowed is a refusal with a way out, not a bug
+    except OSError as error:
         reason = (error.strerror or type(error).__name__).lower()
         raise paths.refusal(
             unit.label, f"cannot be served on port {args.port} ({reason})", f"serve {unit.label} on a free port"
         ) from None
+    address = f"http://127.0.0.1:{server.server_port}/".encode()
     url = page_url(server)
-    # Printed before the address file is written: a reader that waits for the file and then stops the server has the
-    # address already, even if the stop comes before the signal handler below is set.
-    run.out(
-        f"Each action the user takes is printed here as one JSON line. Serving {unit.label} at {url}"
-    )  # the address last: no full stop after it
-    publish(unit, server)
-    if not unit.target(SEEN).exists():  # a resumed run keeps its place, so it still sees what came in while it was away
-        paths.write_state(unit, SEEN, b"0")
-    if args.open and not webbrowser.open(url):
+    driven, serving, token = None, None, None
+    opened = False
+    try:
+        if args.drive and can_drive:
+            from .adapters import candidate
+            from .driver import ACTIONS, StartError
+
+            wanted = candidate(args.drive, os.environ)
+            kind = wanted.kind
+            if kind is None and (os.name != "posix" or wanted.approval not in ("os", "webauthn")):
+                kind = "no-approvals"
+            if kind is None:
+                stop_like_ctrl_c()
+                archive = Path(sys.argv[0]).resolve() if run.info.hash != "source" else None
+                skill_path = (
+                    archive.parent.parent / "SKILL.md"
+                    if archive
+                    else (Path(__file__).resolve().parents[3] / "skills" / run.skill.name / "SKILL.md")
+                )
+                # A previous server can leave a legacy token after SIGKILL. Never leave that file in driven mode.
+                with contextlib.suppress(FileNotFoundError):
+                    unit.target(TOKEN).unlink()
+                try:
+                    driven = DrivenPage(server, unit, archive, ("add", "set"), wanted.approval == "webauthn")
+                except (OSError, ValueError):
+                    kind = "no-approvals"
+                    run.err("Could not load the approval credential or start the approval panel.")
+            if driven is not None:
+                notes = handoff_note(run)
+                serving = run_http(server)
+                url = driven.panel_link()
+                if driven.enrollment_needed:
+                    deadline += ENROLL_TIMEOUT - START_TIMEOUT
+                    run.out(f"Enrollment at {url}")
+                    if args.open:
+                        open_page(run, url)
+                        opened = True
+                try:
+                    if driven.enrollment_needed:
+                        # Leave the ordinary startup allowance after a touch when there is enough time.
+                        enrolled = driven.enrollment.wait(max(0, deadline - time.monotonic()))
+                        if not enrolled:
+                            raise StartError("no-approvals", "Approval enrollment timed out")
+                        deadline = min(deadline, time.monotonic() + START_TIMEOUT)
+                    start_driven(driven, wanted, conv, run, deadline, notes, archive, skill_path)
+                except (OSError, StartError) as error:
+                    kind = error.kind if isinstance(error, StartError) else "crashed"
+                    # Report the mode at the deadline even if cleaning up the harness takes a moment.
+                    run.out(f"driver: off {kind}")
+                    action = startup_action(kind, ACTIONS)
+                    run.err(f"{str(error).rstrip('.')}. {action}")
+                    driven.fail(kind, str(error))
+                    url = page_url(server)
+            if kind is None:
+                run.out(f"driver: on {wanted.name} {driven.session}")
+            elif driven is None:
+                run.out(f"driver: off {kind}")
+
+        if args.once and serving is not None and driven.off:
+            server.shutdown()
+            serving = None
+        with link_control(driven):
+            if driven and not driven.off:
+                run.out(f"Serving {unit.label} at {url}")
+                paths.write_state(unit, ADDRESS, address)
+            else:
+                run.out(f"Each action the user takes is printed here as one JSON line. Serving {unit.label} at {url}")
+                token = server.token.encode()
+                publish(unit, server)
+                if driven and driven.driver:
+                    driven.driver.close()
+            if not unit.target(SEEN).exists():
+                paths.write_state(unit, SEEN, b"0")
+            if args.open and (not opened or (driven and driven.off)):
+                open_page(run, url)
+            stop_like_ctrl_c()
+            if args.once and serving is None:
+                server.daemon_threads = False
+                server.handle_request()
+                return 0
+            if serving is None:
+                serving = run_http(server)
+            serve_until_stopped(args, run, unit, spec, conv, driven)
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        if serving is not None:
+            server.shutdown()
+        server.server_close()
+        if driven:
+            driven.close()
+        remove_if_ours(unit, ADDRESS, address)
+        if token:
+            remove_if_ours(unit, TOKEN, token)
+    return 0
+
+
+def open_page(run, url):
+    if not webbrowser.open(url):
         run.out(
             "Could not open a browser on this machine. If the user's browser runs on another machine, "
             "this address does not reach it."
         )
-    stop_like_ctrl_c()
-    serving = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": POLL}, daemon=True)
-    try:
-        if args.once:
-            server.daemon_threads = False  # server_close then waits for the thread that answers, so the answer is sent
-            server.handle_request()
-            return 0
-        serving.start()
-        stopped_at = None
-        while True:
-            time.sleep(TICK)
-            try:  # a tick that fails is reported and the next one tries again
-                if spec.tick:
-                    spec.tick(unit, conv)
-                stopped = bool(spec.stopped and spec.stopped(unit))
-            except Exception as error:
-                run.err(f"page server: tick failed: {type(error).__name__}: {error}")
-                continue
-            if stopped_at is None and stopped:
-                stopped_at = time.time()
-            if stopped_at is not None and not stopped:
-                stopped_at = None  # reopened
-            if stopped_at is not None and time.time() - stopped_at > args.linger:
-                run.out("The unit stopped; the page server is exiting. The open page keeps the last state.")
-                return 0
-    except KeyboardInterrupt:
-        return 0
-    finally:
-        if not args.once and serving.is_alive():
-            server.shutdown()
-        server.server_close()
-        for name in (ADDRESS, TOKEN):
-            with contextlib.suppress(OSError, Refused):
-                os.unlink(unit.target(name))
+
+
+def serve_until_stopped(args, run, unit, spec, conv, driven):
+    stopped_at = None
+    while True:
+        time.sleep(TICK)
+        try:
+            if spec.tick:
+                spec.tick(unit, conv)
+            stopped = bool(spec.stopped and spec.stopped(unit))
+            if stopped and driven and not driven.off:
+                stopped = driven.driver.can_linger()
+        except Exception as error:
+            run.err(f"page server: tick failed: {type(error).__name__}: {error}")
+            continue
+        if stopped_at is None and stopped:
+            stopped_at = time.monotonic()
+        if not stopped:
+            stopped_at = None
+        if stopped_at is not None and time.monotonic() - stopped_at > args.linger:
+            run.out("The unit stopped; the page server is exiting. The open page keeps the last state.")
+            return
 
 
 def revision_of(*parts: Any) -> str:
