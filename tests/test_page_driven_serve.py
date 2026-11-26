@@ -239,6 +239,13 @@ sys.exit(cli.main())
         agent = self.request(panel + "agent", token=paired["secret"])[1]
         self.assertFalse(agent["can_start"])
         self.assertEqual(agent["kind"], "no-approvals")
+        code, link = self.request(
+            panel + "rpc",
+            token=paired["secret"],
+            body={"jsonrpc": "2.0", "id": 1, "method": "open_conversation", "params": {}},
+        )
+        self.assertEqual(code, 200)
+        self.assertEqual(link["result"], agent["page"])
 
     def test_hanging_start_falls_back_without_start(self):
         process = self.launch_driven(hanging=True)
@@ -344,3 +351,21 @@ sys.exit(cli.main())
         agent = self.request(panel + "agent", token=paired["secret"])[1]
         self.assertGreater(agent["age"], 3)
         self.assertFalse(agent["can_start"])
+
+    def test_panel_reopens_the_conversation_without_repairing_itself(self):
+        process = self.launch_driven()
+        self.assertIn("driver: on", process.stdout.readline())
+        panel, paired = self.pair(process.stdout.readline().strip().split(" at ", 1)[1])
+        request = {"jsonrpc": "2.0", "id": 1, "method": "open_conversation", "params": {}}
+        code, first = self.request(panel + "rpc", token=paired["secret"], body=request)
+        self.assertEqual(code, 200)
+        main, conversation = self.pair(first["result"])
+        self.assertEqual(self.request(main + "agent", token=conversation["secret"])[0], 200)
+        self.assertEqual(self.request(panel + "rpc", body=request)[0], 403)
+        _, second = self.request(panel + "rpc", token=paired["secret"], body=request)
+        self.assertNotEqual(first["result"], second["result"])
+        new_main, new_conversation = self.pair(second["result"])
+        self.assertEqual(new_main, main)
+        self.assertEqual(self.request(main + "agent", token=conversation["secret"])[0], 403)
+        self.assertEqual(self.request(main + "agent", token=new_conversation["secret"])[0], 200)
+        self.assertEqual(self.request(panel + "agent", token=paired["secret"])[0], 200)

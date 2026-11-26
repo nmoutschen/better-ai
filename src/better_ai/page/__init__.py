@@ -1435,6 +1435,8 @@ class DrivenPage:
         }
 
     def control(self, method, params):
+        if method == "open_conversation" and not params and (self.ready or self.off):
+            return self.main_link()
         if self.off:
             raise ValueError("This page has no driver")
         if self.enrollment_needed and method == "enroll_begin":
