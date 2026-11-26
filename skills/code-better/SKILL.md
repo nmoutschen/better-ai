@@ -36,7 +36,7 @@ READ the repository's documentation: README.md, docs/, CONTRIBUTING.md, AGENTS.m
 
 IF the change adds an interface, or changes which screens exist, what they hold, their layout or their flow, and no design covers it, USE `/design-better` for the change instead, if available: it designs the change with the user, then has `/code-better` build its design.
 
-READ the language file for each language the change touches, IF the table has one: it is MANDATORY, and you FOLLOW it in step 3. It names the checks to run while you build and before you hand back, what to review once they pass, and the checks to add for each kind of risk.
+READ the language file of each language the change touches that the table below lists: it is MANDATORY. It names the checks to run while you build and before you hand back, what to review once they pass, and the checks to add for each kind of risk.
 
 | Language | File |
 |---|---|

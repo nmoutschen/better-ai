@@ -18,7 +18,7 @@ BUILD only your part, on your branch or worktree. COMMIT your checks before your
 
 RUN the checks in loops by speed, as `done_when` names them: WHILE you build, RUN only the tests your change affects; ONCE before you hand back, RUN the full suite, in parallel where the test runner allows, on every runtime version the project supports; and RUN the slow checks, such as fuzzing or a run on real data, once per round.
 
-FOLLOW steps 1 and 3 of SKILL.md and its general rules, in the mode named in your input. USE the spec and design in your input instead of writing your own. DO NOT start a verifier, and HAND back with your Output, not the report of step 5. The coordinator starts the verifier.
+FOLLOW steps 1 and 3 of SKILL.md and its general rules, in the mode named in your input. IF your input says to write checks without reading the code they check, READ only the spec, the design and the agreed interfaces in step 1, not that code. USE the spec and design in your input instead of writing your own. DO NOT start a verifier, and HAND back with your Output, not the report of step 5. The coordinator starts the verifier.
 
 ## Input
 

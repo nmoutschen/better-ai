@@ -14,7 +14,7 @@ The repository's JDK, build wrapper, static checks, test setup and CI commands c
 ## 3. Before you hand back
 
 - RUN the project's full check as its CI runs it, such as `./mvnw verify` or `./gradlew check`, with the static checks it configures, such as Error Prone, SpotBugs, PMD or NullAway.
-- READ the `javac` warnings on the changed code for raw types, unchecked operations, deprecation and removal. IF the build does not set `-Xlint:rawtypes,unchecked,deprecation,removal`, ADD it to your local compile: without it, `javac` prints only a summary.
+- READ the `javac` warnings on the changed code for raw types, unchecked operations, deprecation and removal. IF the build does not set `-Xlint:rawtypes,unchecked,deprecation,removal`, COMPILE once with it without committing the change: without it, `javac` reports unchecked and deprecated uses only as a summary note, and raw types not at all.
 - WHEN the change adds or updates a dependency, RUN the project's dependency scan, such as OWASP Dependency-Check.
 
 ## 4. Review once the checks pass
@@ -30,7 +30,7 @@ These pass the compiler and the static checks and can still be wrong. CHECK each
 
 ## 5. Checks to add when the change calls for them
 
-WHEN the change calls for one of these checks, USE its tool IF the project already uses it. OTHERWISE, LIST the check and its tool as a proposed next step: adding a test tool adds a dependency.
+WHEN the change calls for one of these checks, USE its tool IF the project already uses it. OTHERWISE, LIST the check and its tool as a proposed next step: a new test tool is a choice for the project.
 
 | WHEN the change | Check | Bound it by |
 |---|---|---|
@@ -42,4 +42,4 @@ WHEN the change calls for one of these checks, USE its tool IF the project alrea
 | needs evidence that the tests catch faults | PIT, with `targetClasses` set to the changed classes | it is slow: run it on the changed classes only |
 | holds a contract worth proving | JML checked by OpenJML, or KeY; CHECK the contract for behaviour it leaves out before you trust it | |
 
-jqwik's terms change from version 1.10. BEFORE you use jqwik, CHECK the installed version and its terms. IF they forbid use by an AI agent, USE another property-test library the project has, or LIST the check as a proposed next step.
+jqwik's terms change from version 1.10. CHECK the installed jqwik version and its terms. IF they forbid use by an AI agent, USE another property-test library the project has, or LIST the check as a proposed next step.

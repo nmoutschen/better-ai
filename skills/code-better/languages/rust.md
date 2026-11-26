@@ -28,7 +28,7 @@ These pass the compiler and Clippy and can still be wrong. CHECK each in the dif
 
 ## 5. Checks to add when the change calls for them
 
-WHEN the change calls for one of these checks, USE its tool IF the project already uses it. OTHERWISE, LIST the check and its tool as a proposed next step: adding a test tool adds a dependency.
+WHEN the change calls for one of these checks, USE its tool IF the project already uses it. OTHERWISE, LIST the check and its tool as a proposed next step: a new test tool is a choice for the project.
 
 | WHEN the change | Check | Bound it by |
 |---|---|---|

@@ -33,7 +33,7 @@ IF the repository has no history, or less than the period above, SAY so in the r
 
 ## 3. Run the review
 
-START a separate reviewer for every audit, however small the scope: DO NOT review the code yourself instead. USE `/review-better` to run the review, if available. The work is the code in scope. The GOAL of the review is that the user can choose what to improve next. The reviewer does not change the code, and reports every finding it confirms, however small, because the full list is for agents to work from: the report to the user stays short in step 6. READ `../languages/<language>.md` for each language in scope, where one exists. GIVE the reviewer the evidence records, section 4 of each of those files, and this list of what to look for:
+START a separate reviewer for every audit, however small the scope: DO NOT review the code yourself instead. USE `/review-better` to run the review, if available. The work is the code in scope. The GOAL of the review is that the user can choose what to improve next. The reviewer does not change the code, and reports every finding it confirms, however small, because the full list is for agents to work from: the report to the user stays short in step 6. READ the language file in `../languages/` for each language in scope, where one exists: `rust.md`, `python.md`, `typescript.md` or `java.md`. GIVE the reviewer the evidence records, section 4 of each of those files, and this list of what to look for:
 
 1. Code that gives wrong results now, or loses data, money or what users are told.
 2. Knowledge written in more than one place, such as a rate, a rule or a format, where the copies already differ, or where the history shows one copy changed without the other. Repeated lines alone are not a finding: duplicated code causes defects in some systems and not in others.
@@ -42,7 +42,6 @@ START a separate reviewer for every audit, however small the scope: DO NOT revie
 5. Abstractions that fit their callers badly, such as a flag or branch per caller, and code written for needs that never came, such as unused parameters, modules or extension points. Speculative code has not been shown to cause defects: it costs only where the code changes.
 6. Code that breaks a rule the repository states.
 7. Small cleanups: unused imports or code, leftover debug output, unnamed constants, and names that break the codebase's conventions.
-8. The items of section 4 of the language file for each language in scope.
 
 FOR a scope too large for one reviewer to read, START one reviewer per area, each with the same list.
 

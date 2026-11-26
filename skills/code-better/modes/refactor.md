@@ -45,6 +45,6 @@ COMPARE the checks with the copy of step 2. ASK the user about any difference.
 
 FIX each failure in the code, THEN RUN the checks again. STOP and REPORT what fails, what you tried and the cause you suspect WHEN the same check fails twice for the same reason, WHEN three rounds have not made all checks pass, or WHEN a fix breaks a check that passed before.
 
-DO NOT describe results you did not observe. Behaviour is kept only IF every check of step 2 gave its recorded result on the final code.
+DO NOT describe results you did not observe. Behaviour is kept only IF every check of step 2 gave its recorded result on the final code, and item 5 found no difference you could not explain by the contract.
 
 IF there is a task list, SET the `status` of each task whose check you saw pass to `done` with `python3 <skill dir>/scripts/better.pyz set .code/<change> <task id>`, in a command of its own.

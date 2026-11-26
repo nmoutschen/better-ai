@@ -17,8 +17,8 @@ The repository's Python version, environment, lint and type settings, test runne
 
 - RUN the project's full lint, type and test commands as its CI runs them, including the tests of the error paths the change touches.
 - RUN the changed entry point in an environment built only from the declared dependencies, such as a fresh virtual environment, `uv run --isolated` or CI: an import of an undeclared dependency passes where the package happens to be installed.
-- WHEN the change adds or updates a dependency, RUN `pip-audit`.
-- BEFORE you use `pytest -n` from pytest-xdist, TIME the run with and without it: each worker collects the tests and repeats session setup, so it can be slower.
+- WHEN the change adds or updates a dependency, RUN the project's dependency scan, such as `pip-audit`.
+- TIME the run with and without `pytest -n` from pytest-xdist, and USE it only IF it is faster: each worker collects the tests and repeats session setup.
 
 ## 4. Review once the checks pass
 
@@ -31,12 +31,12 @@ These pass the linter and the type checker and can still be wrong. CHECK each in
 
 ## 5. Checks to add when the change calls for them
 
-WHEN the change calls for one of these checks, USE its tool IF the project already uses it. OTHERWISE, LIST the check and its tool as a proposed next step: adding a test tool adds a dependency.
+WHEN the change calls for one of these checks, USE its tool IF the project already uses it. OTHERWISE, LIST the check and its tool as a proposed next step: a new test tool is a choice for the project.
 
 | WHEN the change | Check | Bound it by |
 |---|---|---|
 | applies one rule to several distinct values | `pytest.mark.parametrize` with the cases that exercise new behaviour, not every combination | |
-| holds a rule over many inputs, such as a round trip or a result that stays the same when applied twice | a Hypothesis property test (`@given`) | `max_examples`, and a time limit, since replay and shrinking add calls |
+| holds a rule over many inputs, such as a round trip or a result that stays the same when applied twice | a Hypothesis property test (`@given`) | `max_examples`, and a time limit on the test run, since replay and shrinking add calls |
 | depends on a sequence of operations | a Hypothesis `RuleBasedStateMachine` against a simple model | `stateful_step_count` |
 | parses input from outside the program | an Atheris fuzz target | libFuzzer's `-runs` or `-max_total_time` |
 | changes the public API of a published package | `griffe check` against the last release, and the tests of the code that calls it | |
