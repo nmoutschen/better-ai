@@ -1,0 +1,6 @@
+body { margin: 1rem; color: #202020; background: #fff; font: 1rem/1.5 system-ui, sans-serif; }
+main { max-width: 52rem; margin: 2rem auto; }
+section article { border-top: 1px solid #aaa; margin-top: 1rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+button, a { padding: .45rem .7rem; margin-right: .4rem; font: inherit; }
+#error { color: #9c2121; }
