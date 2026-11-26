@@ -11,7 +11,6 @@ SKILL = Skill(
     name="architect-better",
     package="architect",
     kinds=(UnitKind(kind="change", folder=".architect", head="architect.json", head_type="architect"),),
-    exclude=".architect/",
 )
 
 from . import checks, commands, pagespec  # noqa: E402,F401  (register the hooks, the verbs and the page)

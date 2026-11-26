@@ -301,6 +301,7 @@ CODE_TEXT_FILES = sorted(
     + list((CODE_BETTER / "modes").glob("*.md"))
     + list((CODE_BETTER / "agents").glob("*.md"))
     + list((CODE_BETTER / "formats").glob("*.md"))
+    + list((CODE_BETTER / "languages").glob("*.md"))
     + [ROOT / "docs" / "code-better.md"]
 )
 
@@ -700,7 +701,7 @@ class SkillTextCommands(unittest.TestCase):
 
     def files(self):
         for folder in self.FOLDERS:
-            for sub in ("", "modes", "agents", "formats"):
+            for sub in ("", "modes", "agents", "formats", "languages"):
                 yield from sorted((folder / sub).glob("*.md"))
 
     def test_no_file_names_an_old_script_or_the_schemas_folder(self):

@@ -43,7 +43,7 @@ If your project has its own colours and fonts, the slides and their drawings tak
 - **Export**, which downloads the slides alone as one presentation file: arrow keys, space or clicks to move, F for full screen.
 - **A copy to share.** Opened as a file or published as a link, the page shows the slides and their details without the conversation.
 - **Text instead**, for a terminal or chat: plain text, Markdown, ASCII only, or sentences and value lists for a screen reader.
-- The spec the slides were drawn from, `.show/<slug>/spec.json`, not committed unless you ask, and the document's answer stated in the chat.
+- The spec the slides were drawn from, `.show/<slug>/spec.json` (untracked in git until you commit or ignore it), and the document's answer stated in the chat.
 
 ## Works with
 

@@ -72,14 +72,15 @@ class Commands(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.cwd = repository(self.tmp.name)
 
-    def test_create_stamps_the_spec_and_keeps_the_unit_out_of_git(self):
+    def test_create_stamps_the_spec_and_leaves_git_exclusions_alone(self):
         done = process(self.cwd, "create", UNIT, "--by", "tester", stdin=json.dumps(FIELDS))
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         unit = Path(self.cwd, UNIT)
         head = json.loads((unit / "spec.json").read_text())
         self.assertEqual((head["type"], head["by"]), ("slides", "tester"))
         self.assertRegex(head["at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
-        self.assertIn(".show/", Path(self.cwd, ".git", "info", "exclude").read_text())
+        exclude = Path(self.cwd, ".git", "info", "exclude")
+        self.assertNotIn(".show/", exclude.read_text().splitlines() if exclude.exists() else [])
 
     def test_create_refuses_a_spec_that_holds_at_or_by(self):
         done = better(self.cwd, "create", UNIT, "--by", "tester", stdin=json.dumps(SPEC))

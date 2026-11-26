@@ -8,7 +8,6 @@ SKILL = Skill(
     name="show-better",
     package="show",
     kinds=(UnitKind(kind="slides", folder=".show", head="spec.json", head_type="slides"),),
-    exclude=".show/",
 )
 
 page.register(SKILL, commands.PAGE_SPEC)

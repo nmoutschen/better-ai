@@ -3,7 +3,7 @@
 A unit is a folder at `<root>/<skill folder>/<slug>`, where `<root>` is the top level of the repository that holds it.
 Every other module reaches a unit's files through `Unit.target` and the open and write helpers here, which refuse a path
 that leaves the unit or passes through a symlink, and open files with `O_NOFOLLOW`, so no verb repeats these checks.
-The only write outside a unit is `add_exclude`, one line in the repository's `info/exclude`.
+The command writes nothing outside a unit.
 
 Refusals are `Refused`, whose text is `<what>: <reason>. <next command>`; `cli` prints it after the skill name and
 exits 1.
@@ -343,41 +343,3 @@ def make_folder(unit: Unit, relative: str) -> None:
         path = unit.target(str(PurePosixPath(*pure.parts[:index])))
         if not path.is_dir():
             os.mkdir(path)
-
-
-def add_exclude(unit: Unit, line: str) -> str:
-    """Add `line` to the repository's `info/exclude` if it is not there yet, never rewriting the file: the one write
-    outside a unit. The file is where `git rev-parse --git-path info/exclude` says, so it works in a worktree too.
-    Returns "added", "present", or "skipped: <why>" (outside a git repository, or git cannot be run)."""
-    try:
-        done = subprocess.run(
-            ["git", "-C", str(unit.path), "rev-parse", "--git-path", "info/exclude"],
-            capture_output=True,
-            text=True,
-            timeout=20,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return "skipped: git cannot be run"
-    if done.returncode != 0 or not done.stdout.strip():
-        return "skipped: not a git repository"
-    exclude = Path(done.stdout.strip())
-    if not exclude.is_absolute():
-        exclude = unit.path / exclude
-    try:
-        fd = os.open(exclude, os.O_RDONLY | NOFOLLOW)
-    except FileNotFoundError:
-        existing = ""
-    else:
-        with os.fdopen(fd, "rb") as handle:
-            existing = handle.read().decode("utf-8", "replace")
-    if line in existing.splitlines():
-        return "present"
-    exclude.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(exclude, os.O_WRONLY | os.O_APPEND | os.O_CREAT | NOFOLLOW, 0o644)
-    try:
-        prefix = "" if not existing or existing.endswith("\n") else "\n"
-        os.write(fd, f"{prefix}{line}\n".encode())
-    finally:
-        os.close(fd)
-    return "added"

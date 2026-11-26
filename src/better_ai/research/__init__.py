@@ -15,7 +15,6 @@ SKILL = Skill(
             folders=("questions", "claims", "sources", "logs"),
         ),
     ),
-    exclude=".research/",
 )
 
 from . import board  # noqa: E402,F401  (registers the page and `render`; it needs SKILL above)
