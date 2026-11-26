@@ -35,7 +35,23 @@
     acts.append(node('button', 'vcomment', 'Comment on ' + v.label, { type: 'button', 'data-v': i }));
     if (full) acts.append(node('button', 'full', 'Full size', { type: 'button' }));
     var frame = node('iframe', null, null, { 'data-i': i, title: v.label + ', ' + size.w + ' × ' + size.h + ' px', width: size.w, height: size.h });
-    if (v.src) frame.setAttribute('src', v.src); else frame.srcdoc = v.srcdoc || '';
+    if (typeof pageDriven !== 'undefined' && pageDriven) {
+      frame.setAttribute('sandbox', v.src ? '' : 'allow-scripts');
+      frame.setAttribute('referrerpolicy', 'no-referrer');
+      if (!v.src) {
+        var asset = location.origin + '/mock-frame.js', key = crypto.randomUUID();
+        frame.setAttribute('data-bridge', key);
+        var policy = "default-src 'none'; script-src " + asset + "; style-src 'unsafe-inline' data: http: https:;" +
+          " img-src data: http: https:; font-src data: http: https:; base-uri 'none'; form-action 'none'";
+        frame.srcdoc = '<!doctype html><meta http-equiv="Content-Security-Policy" content="' + policy + '">' +
+          '<script src="' + asset + '" data-key="' + key + '"></scr' + 'ipt>' + (v.srcdoc || '');
+      } else {
+        try {
+          var url = new URL(v.src);
+          if (url.protocol === 'https:' || url.protocol === 'http:') frame.setAttribute('src', url.href);
+        } catch (e) {}
+      }
+    } else if (v.src) frame.setAttribute('src', v.src); else frame.srcdoc = v.srcdoc || '';
     var screen = node('div', 'screen'); screen.append(frame);
     var stage = node('div', 'stage'); stage.append(screen);
     fig.append(label, stage);
@@ -86,6 +102,7 @@
     pageWatchRevision(function () { location.reload(); });
     return;
   }
+  var ports = new WeakMap(), offsets = new WeakMap();
   build(data, main, controls);
   // The controls sit in the header, where the stats of the other pages are.
   var status = document.getElementById('status'); status.replaceChildren(controls); controls.hidden = false;
@@ -124,6 +141,7 @@
       box.style.width = Math.ceil(w * scale + 2) + 'px';
       box.style.height = sh + 'px';
       try { frame.contentDocument.documentElement.style.setProperty('--db-s', String(1 / scale)); } catch (e) {}
+      if (ports.has(frame)) sendView(frame);
       if (typeof movePins === 'function') movePins(frame);
     });
   }
@@ -181,6 +199,10 @@
       .filter(function (id) { return id && inA[id] === 1 && inB[id] === 1; });
   }
   function match(from, to) {
+    if (ports.has(to) && offsets.has(from)) {
+      ports.get(to).postMessage({kind: 'scroll', fraction: offsets.get(from)});
+      return;
+    }
     try {
       var src = from.contentWindow, dst = to.contentWindow, ids = sharedIds(src, dst);
       var a = tops(src, ids), b = tops(dst, ids), y = src.scrollY, k = 0;
@@ -199,6 +221,7 @@
   }
   var bound = new WeakSet();
   function bindOnce(frame) {
+    if (frame.hasAttribute('data-bridge')) return;
     var win; try { win = frame.contentWindow; } catch (e) { return; }
     if (!win || bound.has(win)) return;
     bound.add(win); bind(frame);
@@ -316,7 +339,7 @@
   });
   function setMode(on) {
     commenting = on; choose('data-mode', on ? 'comment' : 'use'); main.classList.toggle('commenting', on);
-    document.querySelectorAll('iframe').forEach(function (f) { try { f.contentDocument.documentElement.classList.toggle('db-commenting', on); } catch (e) {} });
+    document.querySelectorAll('iframe').forEach(function (f) { if (ports.has(f)) return sendView(f); try { f.contentDocument.documentElement.classList.toggle('db-commenting', on); } catch (e) {} });
   }
   main.classList.add('commenting');
   document.querySelectorAll('button[data-mode]').forEach(function (b) {
@@ -334,22 +357,6 @@
   document.addEventListener('keydown', shortcut);
   // What a click points at, in enough detail for the agent to find it without the user picking an exact element:
   // the element and its parents, the words under the pointer, an image's source, and where the click fell.
-  function elementText(x) {
-    return x.getAttribute('aria-label') || x.getAttribute('alt') || x.getAttribute('placeholder') || x.innerText || x.value || '';
-  }
-  function brief(x) {
-    return { tag: x.tagName.toLowerCase(), id: x.id || null, cls: (x.getAttribute('class') || '').trim() || null,
-             text: elementText(x).replace(/\s+/g, ' ').trim().slice(0, 120) };
-  }
-  function wordsAt(doc, x, y) {
-    var r = doc.caretRangeFromPoint ? doc.caretRangeFromPoint(x, y) : null;
-    if (!r && doc.caretPositionFromPoint) { var c = doc.caretPositionFromPoint(x, y); if (c) { r = doc.createRange(); r.setStart(c.offsetNode, c.offset); } }
-    if (!r || r.startContainer.nodeType !== 3) return null;
-    var text = r.startContainer.textContent, i = r.startOffset, a = i, b = i;
-    while (a > 0 && !/[.!?\n]/.test(text[a - 1])) a--;
-    while (b < text.length && !/[.!?\n]/.test(text[b])) b++;
-    return text.slice(a, b + 1).replace(/\s+/g, ' ').trim().slice(0, 200) || null;
-  }
   // Where the clicked element sits, in words: version › parents › the element and what it says.
   var ROLE = { h1: 'Heading', h2: 'Heading', h3: 'Heading', h4: 'Heading', h5: 'Heading', h6: 'Heading', p: 'Paragraph',
     img: 'Image', svg: 'Image', picture: 'Image', button: 'Button', a: 'Link', input: 'Field', textarea: 'Field', select: 'Menu',
@@ -370,40 +377,6 @@
     b.append(r, said ? ' “' + said.slice(0, 90) + (said.length > 90 ? '…' : '') + '”' : '');
     box.append(a, b);
     return box;
-  }
-  // Where an element sits among its peers, in the words a person would use: "Row 2, Status" in a table,
-  // "Item 3" in a list. Empty when position adds nothing.
-  function placeOf(el) {
-    var cell = el.closest('td, th');
-    if (cell) {
-      var row = cell.parentElement, table = cell.closest('table');
-      var body = Array.prototype.filter.call(table.rows, function (r) { return !r.closest('thead') && !r.querySelector('th:only-child, th:first-child:last-child'); });
-      var head = table.tHead ? table.tHead.rows[0] : table.rows[0].querySelector('th') ? table.rows[0] : null;
-      var name = head && head.cells[cell.cellIndex] ? head.cells[cell.cellIndex].innerText.trim() : '';
-      var n = body.indexOf(row) + 1;
-      if (row.closest('thead')) return 'Column ' + (name || cell.cellIndex + 1);
-      return 'Row ' + n + ', ' + (name || 'column ' + (cell.cellIndex + 1));
-    }
-    var li = el.closest('li');
-    if (li && li.parentElement) return 'Item ' + (Array.prototype.indexOf.call(li.parentElement.children, li) + 1);
-    return '';
-  }
-  function describe(el, cx, cy) {
-    var doc = el.ownerDocument, win = doc.defaultView, r = el.getBoundingClientRect(), d = pageElementDescription(el, null, elementText(el), 120);
-    // The nearest heading above the element in reading order, or the element itself if it is a heading.
-    var heading = null;
-    doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(function (x) {
-      if (x === el || x.contains(el) || (x.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) heading = x.innerText.trim();
-    });
-    var parents = [], up = el.parentElement;
-    while (up && up.tagName !== 'BODY' && parents.length < 4) { parents.push(brief(up)); up = up.parentElement; }
-    var img = el.tagName === 'IMG' ? el : null, image = null;
-    if (img) image = { src: (img.currentSrc || img.getAttribute('src') || '').slice(0, 300), alt: img.getAttribute('alt') };
-    else { var bg = win.getComputedStyle(el).backgroundImage; if (bg && bg !== 'none') image = { src: bg.slice(0, 300), alt: null }; }
-    return { selector: d.selector, tag: d.tag, text: d.text, heading: heading, words: wordsAt(doc, cx, cy), image: image,
-             place: placeOf(el),
-             parents: parents, point: { x: Math.round(cx + win.scrollX), y: Math.round(cy + win.scrollY) },
-             box: { x: Math.round(r.left + win.scrollX), y: Math.round(r.top + win.scrollY), w: Math.round(r.width), h: Math.round(r.height) } };
   }
   // The pin colours are the page's own table (pagePinCss, from page.css), with the page's colour variables filled in:
   // the version's document has none of them.
@@ -443,11 +416,72 @@
     frame.addEventListener('load', function () { instrument(frame); });
     try { if (frame.contentDocument.readyState === 'complete') instrument(frame); } catch (e) {}
   });
-  function openPop(frame, el, at, cx, cy, existing) {
+  function sendView(frame) {
+    var width = frame.getBoundingClientRect().width;
+    ports.get(frame).postMessage({
+      kind: 'view', commenting: commenting, css: pinCss(), inverseScale: width ? +frame.getAttribute('width') / width : 1,
+      pins: items.filter(function (it) { return it.version === labels[+frame.dataset.i]; }).map(function (it) {
+        return {id: it.id, n: it.n, selector: it.target.selector, spot: it.spot, state: comments.state()[it.id] || 'new'};
+      })
+    });
+  }
+  function fraction(n) { return Number.isFinite(n) && n >= 0 && n <= 1; }
+  function fromMock(frame, m) {
+    if (!m || typeof m !== 'object') return;
+    if (m.kind === 'scroll' && fraction(m.fraction)) {
+      offsets.set(frame, m.fraction);
+      follow(frame);
+    } else if (m.kind === 'key') {
+      if (m.key === 'escape' && !pop.hidden) comments.close();
+      if (m.key === 'c') setMode(!commenting);
+    } else if (m.kind === 'click' && Number.isFinite(m.x) && Number.isFinite(m.y) &&
+               m.x >= 0 && m.y >= 0 && m.x <= frame.clientWidth && m.y <= frame.clientHeight) {
+      if (!menu.hidden) openMenu(false);
+      if (!pop.hidden) return comments.close();
+      if (typeof m.id === 'string') {
+        var it = byId(m.id);
+        if (it && it.version === labels[+frame.dataset.i]) openPop(frame, null, null, m.x, m.y, it);
+      } else if (commenting && typeof m.selector === 'string' && m.selector.length > 0 && m.selector.length <= 4096 &&
+                 typeof m.tag === 'string' && m.tag.length <= 100 && typeof m.text === 'string' && m.text.length <= 120 &&
+                 fraction(m.fx) && fraction(m.fy)) {
+        var target = {selector: m.selector, tag: m.tag, text: m.text};
+        ['heading', 'words', 'place'].forEach(function (key) {
+          if (typeof m[key] === 'string') target[key] = m[key].slice(0, 300);
+        });
+        if (m.image && typeof m.image.src === 'string') target.image = {
+          src: m.image.src.slice(0, 300), alt: typeof m.image.alt === 'string' ? m.image.alt.slice(0, 300) : null
+        };
+        if (Array.isArray(m.parents)) target.parents = m.parents.slice(0, 4).filter(function (p) {
+          return p && typeof p.tag === 'string' && typeof p.text === 'string';
+        }).map(function (p) {
+          return {tag: p.tag.slice(0, 100), text: p.text.slice(0, 120),
+            id: typeof p.id === 'string' ? p.id.slice(0, 300) : null, cls: typeof p.cls === 'string' ? p.cls.slice(0, 300) : null};
+        });
+        if (m.point && Number.isFinite(m.point.x) && Number.isFinite(m.point.y)) target.point = {x: m.point.x, y: m.point.y};
+        if (m.box && [m.box.x, m.box.y, m.box.w, m.box.h].every(Number.isFinite)) {
+          target.box = {x: m.box.x, y: m.box.y, w: m.box.w, h: m.box.h};
+        }
+        openPop(frame, null, {fx: m.fx, fy: m.fy}, m.x, m.y, null, target);
+      }
+    }
+  }
+  if (typeof pageDriven !== 'undefined' && pageDriven) window.addEventListener('message', function (e) {
+    if (e.origin !== 'null' || !e.data || e.data.kind !== 'design-frame' || !e.ports || e.ports.length !== 1) return;
+    var frame = Array.from(main.querySelectorAll('iframe[data-bridge]')).find(function (f) {
+      return f.contentWindow === e.source && f.dataset.bridge === e.data.key;
+    });
+    if (!frame || ports.has(frame)) return;
+    var port = e.ports[0];
+    ports.set(frame, port);
+    port.onmessage = function (event) { fromMock(frame, event.data); };
+    offsets.set(frame, 0);
+    sendView(frame);
+  });
+  function openPop(frame, el, at, cx, cy, existing, target) {
     var box = frame.getBoundingClientRect(), scale = box.width / +frame.getAttribute('width');
     var data = existing ? { item: existing, version: existing.version, target: existing.target, verdict: existing.verdict }
       : { version: labels[+frame.dataset.i], screen: frame.getAttribute('width') + 'x' + frame.getAttribute('height'),
-          target: describe(el, cx, cy), spot: at, verdict: null };
+          target: target || canvasDescribe(el, cx, cy, pageElementDescription), spot: at, verdict: null };
     comments.open(data, existing, document.activeElement !== document.body ? document.activeElement : null, function () {
       return pageCommentPosition(box.left + cx * scale, box.top + cy * scale, pop);
     });
@@ -456,6 +490,7 @@
   document.querySelectorAll('.vcomment').forEach(function (b) {
     b.addEventListener('click', function () {
       var frame = document.querySelector('main > section:not([hidden]) iframe[data-i="' + b.dataset.v + '"]');
+      if (frame.hasAttribute('sandbox')) return openPop(frame, null, {fx: 0.5, fy: 0}, 24, 24, null, {selector: 'body', tag: 'body', text: ''});
       try { openPop(frame, frame.contentDocument.body, { fx: 0.5, fy: 0 }, 24, 24); } catch (e) {}
     });
   });
@@ -514,6 +549,7 @@
     var i = labels.indexOf(on.version); if (i < 0) return;
     if (main.classList.contains('switch')) show(i);
     var frame = (sec || main).querySelector('iframe[data-i="' + i + '"]'); if (!frame) return;
+    if (ports.has(frame)) return ports.get(frame).postMessage({kind: 'reveal', id: e.id});
     var doc; try { doc = frame.contentDocument; } catch (x) { return; }
     var pin = comments.findPin(doc && doc.body, e.id); if (!pin) return;
     comments.flashPin(pin, 'db-flash');
@@ -523,6 +559,7 @@
   var STATE_WORD = { asked: 'waiting for you', replied: 'answered, back with the agent', followup: 'you replied, back with the agent', seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
   function syncPins() {
     document.querySelectorAll('iframe').forEach(function (f) {
+      if (ports.has(f)) return sendView(f);
       try { f.contentDocument.querySelectorAll('.db-pin').forEach(function (pin) {
         var it = byId(pin.dataset.id); if (!it) return;
         comments.updatePin(pin, it);
