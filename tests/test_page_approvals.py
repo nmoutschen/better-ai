@@ -125,7 +125,7 @@ class GateTest(unittest.TestCase):
             with self.subTest(outcome=outcome):
                 self.gate = self.make_gate(False)
                 delivery = Future()
-                (item,) = self.request(callback=lambda *_: delivery)
+                (item,) = self.request(callback=lambda *_, result=delivery: result)
                 self.gate.answer(item["id"], "allow_session")
                 self.assertEqual(self.gate.snapshot()["last_outcome"], "")
                 with self.assertRaises(ValueError):

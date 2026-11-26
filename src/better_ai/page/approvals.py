@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
+from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -158,19 +159,39 @@ def repeatable_read(tool, args):
     name = args["file_path"]
     if not isinstance(name, str) or not Path(name).is_absolute():
         return False
-    path = Path(name).resolve()
+    paths = (Path(name), Path(name).resolve())
     protected = {
         "appdata",
         "application support",
         "claude",
         "codex",
         "opencode",
+        "opencode.json",
+        "opencode.jsonc",
+        "factory",
         "cursor",
         "droid",
         "devin",
         "better-ai",
     }
-    return not any(p.startswith(".") or p.casefold() in protected for p in Path(name).parts + path.parts)
+    if any(part.startswith(".") or part.casefold() in protected for path in paths for part in path.parts):
+        return False
+    for variable in (
+        "CLAUDE_CONFIG_DIR",
+        "CODEX_HOME",
+        "CURSOR_CONFIG_DIR",
+        "OPENCODE_CONFIG",
+        "OPENCODE_CONFIG_DIR",
+        "FACTORY_HOME",
+        "FACTORY_CONFIG_DIR",
+        "DEVIN_CONFIG_DIR",
+    ):
+        value = os.environ.get(variable)
+        if value:
+            config = Path(value).expanduser().absolute()
+            if any(path.is_relative_to(root) for path in paths for root in (config, config.resolve())):
+                return False
+    return True
 
 
 @dataclass
@@ -179,7 +200,8 @@ class Request:
     tool: str
     arguments: str
     options: tuple
-    callback: Callable
+    callback: Callable[[str, str], Future[bool]]
+    sending: bool = False
     challenge: str = ""
     choice: str = ""
 
@@ -260,29 +282,28 @@ class ApprovalGate:
                 args = display(event.arguments)
                 if not isinstance(event.tool, str) or not event.tool or len(tool) + len(args) > 131072:
                     raise ValueError
-                repeatable = repeatable_read(event.tool, event.arguments)
+                tool_id = getattr(event, "tool_id", None)
+                repeatable = repeatable_read(tool_id, event.arguments)
             except (ValueError, TypeError, RecursionError, OSError, RuntimeError):
                 callback("deny", "Cannot display the full tool request")
                 return
             if "allow_once" not in event.options:
                 callback("deny", "Request has no allow-once option")
                 return
+            options = ("allow_once", "allow_session", "deny") if repeatable else ("allow_once", "deny")
+            rid = secrets.token_urlsafe(24)
+            item = self.pending[rid] = Request(event.request_id, tool, args, options, callback)
             if repeatable and (tool, args) in self.grants:
-                callback("allow_once", "Allowed earlier for this session")
-                return
-            if (
-                event.tool == "Bash"
+                self._send(rid, item, "allow_once", "Allowed earlier for this session")
+            elif (
+                tool_id == "Bash"
                 and isinstance(event.arguments, dict)
                 and set(event.arguments) == {"command"}
                 and self.digest is not None
                 and verb_command(event.arguments["command"], self.unit, self.archive, self.record_verbs)
                 and self._hash() == self.digest
             ):
-                self.notice = "The page agent can run its page commands without asking."
-                callback("allow_once", "Approved page command")
-                return
-            options = ("allow_once", "allow_session", "deny") if repeatable else ("allow_once", "deny")
-            self.pending[secrets.token_urlsafe(24)] = Request(event.request_id, tool, args, options, callback)
+                self._send(rid, item, "allow_once", "Approved page command", page_command=True)
 
     def snapshot(self):
         with self.lock:
@@ -292,6 +313,7 @@ class ApprovalGate:
                 "approvals": [
                     {"id": rid, "tool": item.tool, "arguments": item.arguments, "options": list(item.options)}
                     for rid, item in self.pending.items()
+                    if not item.sending
                 ],
             }
 
@@ -302,6 +324,8 @@ class ApprovalGate:
     def _get(self, rid):
         if not isinstance(rid, str) or rid not in self.pending:
             raise ValueError(self.outcomes.get(rid, "Unknown approval") if isinstance(rid, str) else "Unknown approval")
+        if self.pending[rid].sending:
+            raise ValueError("Approval answer is being delivered")
         return self.pending[rid]
 
     def challenge(self, rid, choice):
@@ -325,6 +349,30 @@ class ApprovalGate:
         del self.pending[rid]
         self.last_outcome = self.outcomes[rid] = reason
 
+    def _send(self, rid, item, choice, reason, *, page_command=False):
+        item.sending = True
+
+        def settled(future):
+            try:
+                delivered = future.result() is True
+            except Exception:
+                delivered = False
+            with self.lock:
+                if rid not in self.pending:
+                    return
+                if delivered and choice == "allow_session":
+                    self.grants.add((item.tool, item.arguments))
+                if delivered and page_command:
+                    self.notice = "The page agent can run its page commands without asking."
+                self._finish(rid, reason if delivered else "expired")
+
+        try:
+            delivery = item.callback("deny" if choice == "deny" else "allow_once", reason)
+            delivery.add_done_callback(settled)
+        except Exception:
+            if rid in self.pending:
+                self._finish(rid, "expired")
+
     def answer(self, rid, choice, proof=None):
         with self.lock:
             item = self._get(rid)
@@ -335,16 +383,13 @@ class ApprovalGate:
                 if not self.credential or not challenge or item.choice != choice:
                     raise ValueError("Request needs a fresh WebAuthn assertion")
                 webauthn.verify(proof, challenge, self.origin, self.credential)
-            if choice == "allow_session":
-                self.grants.add((item.tool, item.arguments))
             allowed = choice != "deny"
             reason = (
                 "allowed for this session"
                 if choice == "allow_session"
                 else ("allowed once" if allowed else "denied by the user")
             )
-            self._finish(rid, reason)
-            item.callback("allow_once" if allowed else "deny", reason)
+            self._send(rid, item, choice, reason)
 
     def closed(self, event):
         with self.lock:
@@ -356,6 +401,12 @@ class ApprovalGate:
         with self.lock:
             self.grants.clear()
             self.notice = ""
-            for rid, item in list(self.pending.items()):
+            unanswered = [item for item in self.pending.values() if not item.sending]
+            for rid in list(self.pending):
                 self._finish(rid, reason)
+        for item in unanswered:
+            try:
                 item.callback("deny", reason)
+            except Exception:
+                # A disconnected recipient must not prevent the others from receiving their denial.
+                continue
