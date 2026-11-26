@@ -57,9 +57,10 @@ test('only a registered opaque local frame can bind its document port once', () 
 });
 
 test('only bounded local click details open a draft and parent supplies the version', () => {
-  const fn = new Function('openPop', 'byId', 'pop', 'menu', 'labels', 'commenting', between(read('design', 'canvas.js'), '  function fraction', '  if (typeof pageDriven') .replace(/^\(n\)/, 'function fraction(n)') + ';return fromMock');
+  const fn = new Function('openPop', 'byId', 'pop', 'menu', 'labels', 'commenting', 'comments', 'conv', between(read('design', 'canvas.js'), '  function fraction', '  if (typeof pageDriven') .replace(/^\(n\)/, 'function fraction(n)') + ';return fromMock');
   const calls = [], item = {id: 'x', version: 'A'}, frame = {dataset: {i: '0'}, clientWidth: 320, clientHeight: 800};
-  const handle = fn((...args) => calls.push(args), id => id === 'x' && item, {hidden: true}, {hidden: true}, ['A'], true);
+  const states = {}, reopened = [];
+  const handle = fn((...args) => calls.push(args), id => id === 'x' && item, {hidden: true}, {hidden: true}, ['A'], true, {state: () => states}, {reopen: id => reopened.push(id)});
   const click = {kind: 'click', x: 13, y: 17, selector: '#lead', text: 'Lead', tag: 'p', fx: 0, fy: 1};
   for (const changes of [{kind:'rpc'}, {kind:'approve'}, {x: Infinity}, {x: 321}, {fy: '1'}, {id: 'absent'}, {text: {}}]) handle(frame, {...click, ...changes});
   assert.equal(calls.length, 0);
@@ -67,6 +68,15 @@ test('only bounded local click details open a draft and parent supplies the vers
   assert.deepEqual(calls[0], [frame, null, {fx:0, fy:1}, 13, 17, null, {selector:'#lead', tag:'p', text:'Lead'}]);
   handle(frame, {...click, id:'x'});
   assert.equal(calls[1][5], item);
+  for (const state of ['done', 'accepted']) {
+    states.x = state;
+    item.version = 'B';
+    handle(frame, {...click, id:'x'});
+    item.version = 'A';
+    handle(frame, {...click, id:'x'});
+  }
+  assert.deepEqual(reopened, ['x', 'x']);
+  assert.equal(calls.length, 2);
 });
 
 test('the packaged bridge uses its port for clicks, pin editing, shortcuts and scroll', () => {
@@ -116,4 +126,28 @@ test('the packaged bridge uses its port for clicks, pin editing, shortcuts and s
   assert.equal(messages.at(-1).fraction, .5);
   channel.port1.onmessage({data:{kind:'scroll', fraction:.2}});
   assert.deepEqual(updates, [[0,100]]);
+});
+
+
+test('linked local frames align the same unique heading across different layouts', () => {
+  const source = read('design', 'canvas.js');
+  const from = {}, to = {}, offsets = new WeakMap(), ports = new WeakMap(), sent = [];
+  ports.set(to, {postMessage: event => sent.push(event)});
+  const scroll = between(source, '  var quietUntil', '  function follow');
+  const events = between(source, '  function fraction', "  if (typeof pageDriven").replace(/^\(n\)/, 'function fraction(n)');
+  const api = new Function('ports', 'offsets', 'follow', 'var quietUntil' + scroll + events + '; return {fromMock, match}')(
+    ports, offsets, () => {});
+  const report = (frame, kind, fraction, top) => api.fromMock(frame, {
+    kind, fraction, range: 1000, height: 1200, marks:[{id:'topic', top}]
+  });
+  report(to, 'layout', 0, 750);
+  report(from, 'scroll', .25, 250);
+  api.match(from, to);
+  assert.deepEqual(sent.pop(), {kind:'scroll', fraction:.75});
+  report(from, 'scroll', .125, 250);
+  api.match(from, to);
+  assert.deepEqual(sent.pop(), {kind:'scroll', fraction:.375});
+  report(from, 'scroll', .3, Infinity);
+  api.match(from, to);
+  assert.deepEqual(sent.pop(), {kind:'scroll', fraction:.375});
 });
