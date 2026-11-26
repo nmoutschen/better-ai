@@ -203,7 +203,9 @@ class DriverTests(unittest.TestCase):
             "## Output",
         ):
             self.assertIn(expected, prompt)
-        self.assertEqual(json.loads((self.root / ".page-delivery").read_text())["after"], 0)
+        metadata = json.loads((self.root / ".page-delivery").read_text())
+        self.assertEqual(metadata["after"], 0)
+        self.assertEqual(metadata["item_ids"], ["existing"])
 
     def test_end_checkpoints_and_restart_recovers_abnormal(self):
         # S16, S48, S54 and S72.
@@ -266,6 +268,14 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(state["denied"], [])
         self.assertEqual(state["log"], str(self.root / ".driver.log"))
         self.assertEqual((self.root / ".driver.log").stat().st_mode & 0o777, 0o600)
+
+    def test_log_discards_oldest_records_and_keeps_complete_lines(self):
+        from better_ai.page.driver_state import MAX_LOG, store_log
+
+        records = [{"number": index, "text": "x" * (MAX_LOG // 3)} for index in range(5)]
+        store_log(self.conv.unit, records)
+        self.assertLessEqual((self.root / ".driver.log").stat().st_size, MAX_LOG)
+        self.assertEqual(self.records(), records[-2:])
 
     def test_stop_waits_for_cancel_and_requires_start(self):
         # S19, S20, S32 and S54.
@@ -400,6 +410,9 @@ class DriverTests(unittest.TestCase):
         self.assertLess(time.monotonic() - started, 2)
         with self.assertRaises(ProcessLookupError):
             os.kill(transport.pid, 0)
+
+        # The sleeping worker inherits both pipes. Readers reach EOF only after it exits.
+        self.assertTrue(all(not reader.is_alive() for reader in transport._readers))
 
 
 if __name__ == "__main__":

@@ -108,6 +108,9 @@ class Driver:
         self._delivered = delivered if type(delivered) is int and delivered >= 0 else 0
         self._fired = self._strings(saved.get("fired"))
         self._records = log_records(self.unit)
+        for record in self._records:
+            if record.get("type") == "approval" and "answer" not in record:
+                record.update(answer="expired", reason="driver restarted")
         last = recent_turn(self._records, self.session)
         self._number = last.get("number", 0) if type(last.get("number")) is int else 0
         self._carry = frozenset()
@@ -406,6 +409,7 @@ class Driver:
                     "after": self._delivered,
                     "carry_ids": sorted(self._carry),
                     "recover_ids": sorted(self._recover),
+                    "item_ids": sorted(items),
                 }
             ),
         )
