@@ -1,24 +1,24 @@
 # Language: Python
 
-USE the repository's Python version, environment, lint and type settings, test runner and CI commands first: where they differ from this file, they win. TREAT this file as a guide, not a rule.
+The repository's Python version, environment, lint and type settings, test runner and CI commands come first: where they differ from this file, they win.
 
 ## 1. Before you edit
 
 - USE the project's interpreter and environment, such as its virtual environment, uv, Poetry or tox, for every command.
-- CHECK each import you add against the declared dependencies, and the distribution name against the import name. CHECK each library call you change against the installed version of that library.
+- CHECK the distribution name of each dependency you add against the name you import: they can differ.
 
 ## 2. While you build
 
 - RUN the configured linter and type checker on the changed files, such as `ruff check` and `mypy` or `pyright`.
-- RUN the focused test: `pytest <path>::<test> -x`, `pytest -k '<expression>'`, or `pytest --lf` to run the last failures again.
-- TEST with the real objects and value shapes the code receives WHERE the project's tests allow it, not stand-ins for them: most failures are a missing attribute or a wrong type at an interface.
+- RUN the focused test: `pytest <path>::<test> -x`, or `pytest -k '<expression>'`. `pytest --lf` runs the last failures again, and the whole suite when none are stored.
+- WHERE the project's tests allow it, TEST with the real objects and value shapes the code receives, not stand-ins for them: a missing attribute or a wrong type at an interface is a common failure that stand-ins hide.
 
 ## 3. Before you hand back
 
 - RUN the project's full lint, type and test commands as its CI runs them, including the tests of the error paths the change touches.
-- RUN the changed entry point in the project's environment: an import of an undeclared dependency fails there and not in your shell.
+- RUN the changed entry point in an environment built only from the declared dependencies, such as a fresh virtual environment, `uv run --isolated` or CI: an import of an undeclared dependency passes where the package happens to be installed.
 - WHEN the change adds or updates a dependency, RUN `pip-audit`.
-- USE `pytest -n` from pytest-xdist only WHEN a timed run shows it is faster: each worker collects the tests and repeats session setup.
+- BEFORE you use `pytest -n` from pytest-xdist, TIME the run with and without it: each worker collects the tests and repeats session setup, so it can be slower.
 
 ## 4. Review once the checks pass
 
@@ -31,12 +31,14 @@ These pass the linter and the type checker and can still be wrong. CHECK each in
 
 ## 5. Checks to add when the change calls for them
 
-| WHEN the change | ADD | Bound it by |
+WHEN the change calls for one of these checks, USE its tool IF the project already uses it. OTHERWISE, LIST the check and its tool as a proposed next step: adding a test tool adds a dependency.
+
+| WHEN the change | Check | Bound it by |
 |---|---|---|
 | applies one rule to several distinct values | `pytest.mark.parametrize` with the cases that exercise new behaviour, not every combination | |
 | holds a rule over many inputs, such as a round trip or a result that stays the same when applied twice | a Hypothesis property test (`@given`) | `max_examples`, and a time limit, since replay and shrinking add calls |
 | depends on a sequence of operations | a Hypothesis `RuleBasedStateMachine` against a simple model | `stateful_step_count` |
 | parses input from outside the program | an Atheris fuzz target | libFuzzer's `-runs` or `-max_total_time` |
-| changes the public API of a published package | `griffe check` against the last release | |
-| needs evidence that the tests catch faults | mutmut or Cosmic Ray on the changed module | it is slow: run it on the changed module only, once per task |
-| holds a contract worth checking, in deterministic code | CrossHair on the contract, or Nagini where the project uses it | CrossHair's time limit: a clean run is bounded evidence, not a proof |
+| changes the public API of a published package | `griffe check` against the last release, and the tests of the code that calls it | |
+| needs evidence that the tests catch faults | mutmut or Cosmic Ray on the changed module | it is slow: run it on the changed module only |
+| holds a contract worth checking, in deterministic code | CrossHair on the contract, or Nagini; a clean CrossHair run is bounded evidence, not a proof | CrossHair's time limit |

@@ -1,16 +1,15 @@
 # Language: Rust
 
-USE the repository's toolchain, features, lint settings, test runner and CI commands first: where they differ from this file, they win. TREAT this file as a guide, not a rule.
+The repository's toolchain, features, lint settings, test runner and CI commands come first: where they differ from this file, they win.
 
 ## 1. Before you edit
 
-- READ the imports, constructors, trait implementations and call sites around the code before you change a signature: most failed builds come from names, paths and methods a type does not have.
-- CHECK each crate you add, by name and version, against `Cargo.toml`, `Cargo.lock` and the crate's documentation for that version. CHECK that each method you call exists in the resolved version and behaves as you expect there.
+- READ the imports, constructors, trait implementations and call sites around the code before you change a signature: names, paths and methods a type does not have are a common cause of failed builds.
 
 ## 2. While you build
 
-- RUN `cargo check` on the affected crate, with the features and targets the project supports. RUN `cargo test --no-run` WHEN you need the test binary to build too.
-- RUN the focused test: `cargo test <name>`, or `cargo nextest run -E '<filterset>'` IF the project uses nextest.
+- RUN `cargo check` on the affected crate, with the features and targets the project supports. WHEN you need the test binary to build too, RUN `cargo test --no-run`.
+- RUN the focused test: `cargo test <name>`. IF the project uses nextest, RUN `cargo nextest run -E '<filterset>'` instead.
 
 ## 3. Before you hand back
 
@@ -29,12 +28,14 @@ These pass the compiler and Clippy and can still be wrong. CHECK each in the dif
 
 ## 5. Checks to add when the change calls for them
 
-| WHEN the change | ADD | Bound it by |
+WHEN the change calls for one of these checks, USE its tool IF the project already uses it. OTHERWISE, LIST the check and its tool as a proposed next step: adding a test tool adds a dependency.
+
+| WHEN the change | Check | Bound it by |
 |---|---|---|
 | holds a rule over many inputs, such as a round trip or a result that stays the same when applied twice | a property test with proptest or quickcheck | the number of cases and shrink iterations |
 | parses input from outside the program | a cargo-fuzz target (needs a nightly toolchain), or bolero | `-runs` or `-max_total_time` |
 | shares state between threads | a loom test of the invariant | its preemption bound |
-| adds or changes `unsafe` code | a run of the tests under Miri: `cargo +nightly miri test` | it checks only the paths the tests run |
-| changes the public API of a published crate | `cargo semver-checks` against the last release | |
-| needs evidence that the tests catch faults | `cargo mutants --in-diff <diff file>` on the changed code | it is slow: run it on the diff only, once per task |
-| holds a property worth proving, in a project with proof tooling | a Kani harness, or Verus, Prusti or Creusot where the project uses them | solver time; CHECK the specification against the request before you trust a proof |
+| adds or changes `unsafe` code | a run of the tests under Miri, `cargo +nightly miri test`, which checks only the paths the tests run | |
+| changes the public API of a published crate | `cargo semver-checks` against the last release, and the tests of the crates that call it | |
+| needs evidence that the tests catch faults | `cargo mutants --in-diff <diff file>` on the changed code | it is slow: run it on the diff only |
+| holds a property worth proving | a Kani harness, or Verus, Prusti or Creusot; CHECK the specification against the request before you trust a proof | solver time |

@@ -36,7 +36,7 @@ READ the repository's documentation: README.md, docs/, CONTRIBUTING.md, AGENTS.m
 
 IF the change adds an interface, or changes which screens exist, what they hold, their layout or their flow, and no design covers it, USE `/design-better` for the change instead, if available: it designs the change with the user, then has `/code-better` build its design.
 
-READ the language file for each language the change touches: it is MANDATORY. It names the checks to run while you build and before you hand back, what to review once they pass, and the checks to add for each kind of risk.
+READ the language file for each language the change touches, IF the table has one: it is MANDATORY, and you FOLLOW it in step 3. It names the checks to run while you build and before you hand back, what to review once they pass, and the checks to add for each kind of risk.
 
 | Language | File |
 |---|---|
@@ -65,7 +65,11 @@ PICK the one mode that fits the work. READ its file: it is MANDATORY, and the ne
 
 WHEN an existing spec covers the change, such as one from `/architect-better` or from earlier work on this change in `.code/<change>/`, USE it for the mode's requirements and UPDATE it in place where needed.
 
-FOLLOW every step of the mode's file, in order. The mode ends once its checks pass on the final code, or once you stop as its limits say.
+FOLLOW every step of the mode's file, in order, with the language file of each language the change touches. The mode ends once its checks pass on the final code, or once you stop as its limits say.
+
+CHECK each dependency you add, by its exact name and version, against the project's manifest and lock file and the registry it resolves from. CHECK each API you call against the documentation of the version the project installs.
+
+TREAT an updated snapshot or golden file as a changed check: the mode's rules on changing checks apply to it.
 
 ### 4. Verify with a verifier agent and fix
 
