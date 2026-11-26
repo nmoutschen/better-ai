@@ -17,6 +17,7 @@ from better_ai.page.adapters import (  # noqa: E402
 )
 
 SESSION = "018f237b-1234-7253-9111-0123456789ab"
+DROID_HEADER = {"jsonrpc": "2.0", "factoryApiVersion": "1.0.0", "factoryProtocolVersion": "1.332.0"}
 
 
 class AdapterTests(unittest.TestCase):
@@ -560,6 +561,7 @@ class AdapterTests(unittest.TestCase):
             },
         )
         reply = {
+            **DROID_HEADER,
             "type": "response",
             "id": sent[-1]["id"],
             "factoryProtocolVersion": "1.332.0",
@@ -578,9 +580,10 @@ class AdapterTests(unittest.TestCase):
         adapter.prompt("Read a name")
         self.assertEqual(sent[-1]["method"], "droid.add_user_message")
         self.assertEqual(sent[-1]["params"], {"text": "Read a name", "queuePlacement": "end_of_turn"})
-        adapter.receive({"type": "response", "id": sent[-1]["id"], "result": {}})
+        adapter.receive({**DROID_HEADER, "type": "response", "id": sent[-1]["id"], "result": {}})
         text = adapter.receive(
             {
+                **DROID_HEADER,
                 "method": "droid.session_notification",
                 "type": "notification",
                 "params": {
@@ -610,6 +613,7 @@ class AdapterTests(unittest.TestCase):
                 request["workerSessionId"] = owner
             event = adapter.receive(
                 {
+                    **DROID_HEADER,
                     "id": key,
                     "method": "droid.request_permission",
                     "type": "request",
@@ -617,15 +621,46 @@ class AdapterTests(unittest.TestCase):
                 }
             )[0]
             self.assertEqual((event.kind, event.requester), ("approval", owner))
+        for field, invalid in (
+            ("jsonrpc", "1.0"),
+            ("factoryApiVersion", "0.0.0"),
+            ("factoryProtocolVersion", "1.331.0"),
+            ("factoryProtocolVersion", None),
+            ("type", "notification"),
+        ):
+            with self.subTest(invalid_header=field, value=invalid):
+                message = {
+                    **DROID_HEADER,
+                    "type": "request",
+                    "id": "bad",
+                    "method": "droid.request_permission",
+                    "params": request,
+                    field: invalid,
+                }
+                self.assertFalse(adapter.receive(message))
+                self.assertFalse(adapter.answer("bad", "allow_once"))
+                self.assertEqual(sent[-1]["id"], "bad")
+                self.assertEqual(sent[-1]["result"]["selectedOption"], "cancel")
         adapter.cancel()
         self.assertEqual(sent[-1]["method"], "droid.interrupt_session")
         events = adapter.receive(
             {
+                **DROID_HEADER,
                 "method": "droid.session_notification",
                 "type": "notification",
                 "params": {
                     "sessionId": SESSION,
-                    "notification": {"type": "agent_turn_completed", "reason": "cancelled"},
+                    "notification": {
+                        "type": "agent_turn_completed",
+                        "reason": "cancelled",
+                        "tokenUsage": {
+                            "inputTokens": 1,
+                            "outputTokens": 1,
+                            "cacheCreationTokens": 0,
+                            "cacheReadTokens": 0,
+                            "thinkingTokens": 0,
+                        },
+                    },
                 },
             }
         )
@@ -649,6 +684,7 @@ class AdapterTests(unittest.TestCase):
                 adapter.open("/repo", None)
                 event = adapter.receive(
                     {
+                        **DROID_HEADER,
                         "type": "response",
                         "id": sent[-1]["id"],
                         "factoryProtocolVersion": version,
