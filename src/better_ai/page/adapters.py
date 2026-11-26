@@ -18,7 +18,28 @@ Send = Callable[[dict], None]
 class Candidate:
     name: str | None
     argv: tuple[str, ...]
-    kind: str
+    kind: str | None
+    approval: str | None = None
+    codec_factory: Callable[[Send], ACPAdapter | CodexAdapter | ClaudeAdapter] | None = None
+
+    def command(self, session_id: str, resume: str | None) -> tuple[str, ...]:
+        if self.kind is not None:
+            raise ValueError(f"harness is unavailable: {self.kind}")
+        if self.name != "claude":
+            return self.argv
+        if session_id_valid("claude", resume):
+            return (*self.argv, f"--resume={resume}")
+        if not session_id_valid("claude", session_id):
+            raise ValueError("a new Claude page session requires a UUID")
+        return (*self.argv, f"--session-id={session_id}")
+
+    def codec(self, send: Send, session_id: str, resume: str | None) -> ACPAdapter | CodexAdapter | ClaudeAdapter:
+        if self.codec_factory is None:
+            raise ValueError("no verified protocol for this harness")
+        if self.name == "claude":
+            expected = resume if session_id_valid("claude", resume) else session_id
+            return ClaudeAdapter(send, expected)
+        return self.codec_factory(send)
 
 
 # Prefer specific identifiers to generic markers if one harness is started from another.
@@ -32,7 +53,17 @@ _HARNESSES = {
     "opencode": (("opencode", "acp"), ("OPENCODE", "OPENCODE_SESSION_ID")),
     "codex": (("codex", "app-server"), ("CODEX_THREAD_ID",)),
     "claude": (
-        ("claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"),
+        (
+            "claude",
+            "-p",
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--permission-prompts",
+            "host",
+        ),
         ("CLAUDECODE",),
     ),
 }
@@ -56,8 +87,17 @@ def candidate(requested: str, env: Mapping[str, str], which: Callable[[str], str
     executable = which(command[0])
     if executable is None:
         return Candidate(name, (), "not-installed")
-    # A protocol endpoint alone does not establish isolation or trustworthy approval forwarding.
-    return Candidate(name, (executable, *command[1:]), "no-approvals")
+    argv = (executable, *command[1:])
+    factories = {"claude": ClaudeAdapter, "codex": CodexAdapter, "opencode": OpenCodeAdapter}
+    factory = factories.get(name)
+    if factory is None:
+        return Candidate(name, argv, "no-approvals")
+    if name == "opencode":
+        try:
+            _opencode_config(env)
+        except ValueError:
+            return Candidate(name, argv, "unsafe-mode")
+    return Candidate(name, argv, None, "webauthn", factory)
 
 
 def version_supported(name: str, version: str) -> bool:
@@ -73,10 +113,30 @@ def session_id_valid(name: str, session_id: Any) -> bool:
     return pattern.fullmatch(session_id) is not None
 
 
+def _opencode_config(env: Mapping[str, str]) -> str:
+    config = json.loads(env.get("OPENCODE_CONFIG_CONTENT") or "{}")
+    if not isinstance(config, dict):
+        raise ValueError("invalid OpenCode inline configuration")
+    legacy = config.get("permission", {})
+    if isinstance(legacy, str):
+        legacy = {"*": legacy}
+    current = config.get("permissions", [])
+    if not isinstance(legacy, dict) or not isinstance(current, list):
+        raise ValueError("invalid OpenCode inline permissions")
+    # Keep the user's other inline options. Modern OpenCode uses shell and ordered rules.
+    config["permission"] = {**legacy, "edit": "ask", "bash": "ask"}
+    config["permissions"] = [
+        *current,
+        {"action": "edit", "resource": "*", "effect": "ask"},
+        {"action": "shell", "resource": "*", "effect": "ask"},
+    ]
+    return json.dumps(config)
+
+
 def child_environment(name: str, env: Mapping[str, str], session_id: str) -> dict[str, str]:
     result = {**env, "BETTER_PAGE_SESSION": session_id}
     if name == "opencode":
-        result["OPENCODE_CONFIG_CONTENT"] = json.dumps({"permission": {"edit": "ask", "bash": "ask"}})
+        result["OPENCODE_CONFIG_CONTENT"] = _opencode_config(env)
     return result
 
 
@@ -308,6 +368,30 @@ class ACPAdapter(_RPCAdapter):
         return ()
 
 
+class OpenCodeAdapter(ACPAdapter):
+    def _initialized(self, data: dict) -> Events:
+        version = _text(_object(data.get("agentInfo")).get("version"))
+        if not version_supported("opencode", version):
+            return _failure("version")
+        return super()._initialized(data)
+
+    def _opened(self, data: dict) -> Events:
+        options = data.get("configOptions")
+        modes = (
+            [
+                option.get("currentValue")
+                for option in options
+                if isinstance(option, dict) and option.get("category") == "mode"
+            ]
+            if isinstance(options, list)
+            else []
+        )
+        old_mode = _object(data.get("modes")).get("currentModeId")
+        if (modes or [old_mode]) not in (["build"], ["plan"]):
+            return _failure("unsafe-mode")
+        return super()._opened(data)
+
+
 class CodexAdapter(_RPCAdapter):
     """Codex app-server stdio protocol version checked against the locally shipped schema."""
 
@@ -321,6 +405,12 @@ class CodexAdapter(_RPCAdapter):
         if not version_supported("codex", _text(data.get("userAgent"))):
             return _failure("version")
         self._notify("initialized", {})
+        self._call("account/read", {"refreshToken": False}, self._account)
+        return ()
+
+    def _account(self, data: dict) -> Events:
+        if not _object(data.get("account")).get("type"):
+            return _failure("login")
         self._open_thread()
         return ()
 
@@ -332,7 +422,12 @@ class CodexAdapter(_RPCAdapter):
             self._call("thread/start", params, self._opened)
 
     def _opened(self, data: dict) -> Events:
-        if data.get("approvalPolicy") not in ("untrusted", "on-request") or data.get("approvalsReviewer") != "user":
+        sandbox = _object(data.get("sandbox"))
+        if (
+            data.get("approvalPolicy") not in ("untrusted", "on-request")
+            or data.get("approvalsReviewer") != "user"
+            or sandbox.get("type") not in ("workspaceWrite", "readOnly")
+        ):
             return _failure("unsafe-mode")
         session_id = _object(data.get("thread")).get("id")
         if not session_id_valid("codex", session_id):
@@ -432,39 +527,109 @@ class CodexAdapter(_RPCAdapter):
 
 
 class ClaudeAdapter:
-    """Claude Code stream-json. The MCP approval wire is handled by the separate relay."""
+    """Claude Code stream-json, including the host approval channel."""
 
-    def __init__(self, send: Send):
+    def __init__(self, send: Send, expected_session: str | None = None):
         self.send = send
+        self.expected_session = expected_session
         self.session_id: str | None = None
         self._ids = itertools.count(1)
+        self._initialize_id: str | None = None
         self._running = False
+        self._approvals: dict[WireID, dict] = {}
+
+    def _control(self, subtype: str) -> str:
+        request_id = f"page-{next(self._ids)}"
+        self.send({"type": "control_request", "request_id": request_id, "request": {"subtype": subtype}})
+        return request_id
 
     def open(self, cwd: str, resume: str | None) -> None:
-        # Claude sends its authoritative session id with the stream's init event.
-        self.session_id = resume if session_id_valid("claude", resume) else None
+        self._initialize_id = self._control("initialize")
 
     def prompt(self, text: str) -> None:
-        self.send({"type": "user", "message": {"role": "user", "content": text}})
-
-    def cancel(self) -> None:
+        if self.session_id is None:
+            raise RuntimeError("Claude session is not open")
         self.send(
-            {"type": "control_request", "request_id": f"cancel-{next(self._ids)}", "request": {"subtype": "interrupt"}}
+            {
+                "type": "user",
+                "message": {"role": "user", "content": text},
+                "parent_tool_use_id": None,
+                "session_id": "default",
+            }
         )
 
+    def cancel(self) -> None:
+        self._control("interrupt")
+
+    def _response(self, request_id: WireID, *, result: dict | None = None, error: str = "") -> None:
+        payload = {"subtype": "error", "error": error} if error else {"subtype": "success", "response": result}
+        self.send({"type": "control_response", "response": {"request_id": request_id, **payload}})
+
     def answer(self, request_id: WireID, choice: str, reason: str = "") -> bool:
-        return False
+        pending = self._approvals.pop(request_id, None)
+        if pending is None:
+            return False
+        if choice == "allow_once":
+            result = {"behavior": "allow", "updatedInput": pending}
+        else:
+            result = {"behavior": "deny", "message": reason or "the page denied permission"}
+        self._response(request_id, result=result)
+        return True
+
+    def _initialized(self, response: dict) -> Events:
+        self._initialize_id = None
+        if response.get("subtype") != "success":
+            error = _text(response.get("error"))
+            return _failure(_error_kind({"message": error}, "crashed"), error)
+        data = _object(response.get("response"))
+        if not version_supported("claude", _text(data.get("claude_code_version"))):
+            return _failure("version")
+        if data.get("current_permission_mode") != "default":
+            return _failure("unsafe-mode")
+        account = _object(data.get("account"))
+        if not any(account.get(key) for key in ("subscriptionType", "apiKeySource", "tokenSource")):
+            return _failure("login")
+        if not session_id_valid("claude", self.expected_session):
+            return _failure("crashed", "missing or invalid Claude session id")
+        self.session_id = self.expected_session
+        return (AdapterEvent("ready", session_id=self.session_id),)
+
+    def _request(self, request_id: WireID, request: dict) -> Events:
+        if request_id in self._approvals:
+            self.answer(request_id, "deny", "duplicate request id")
+            return (AdapterEvent("approval_closed", request_id=request_id, outcome="denied"),)
+        if request.get("subtype") != "can_use_tool":
+            self._response(request_id, error="permission denied")
+            return ()
+        tool, arguments = _text(request.get("tool_name")), request.get("input")
+        if self.session_id is None or not tool or not isinstance(arguments, dict):
+            self._response(request_id, result={"behavior": "deny", "message": "permission request is incomplete"})
+            return ()
+        self._approvals[request_id] = arguments
+        return (
+            AdapterEvent(
+                "approval",
+                request_id=request_id,
+                tool=tool,
+                arguments=arguments,
+                options=("allow_once", "deny"),
+                requester=_text(request.get("agent_id")) or None,
+            ),
+        )
 
     def receive(self, message: dict) -> Events:
         kind, subtype = message.get("type"), message.get("subtype")
+        if kind == "control_response":
+            response = _object(message.get("response"))
+            if self._initialize_id is not None and response.get("request_id") == self._initialize_id:
+                return self._initialized(response)
         if kind == "system" and subtype == "init":
             if message.get("permissionMode") != "default":
+                self.session_id = None
                 return _failure("unsafe-mode")
-            session_id = message.get("session_id")
-            if not session_id_valid("claude", session_id):
-                return _failure("crashed", "missing or invalid Claude session id")
-            self.session_id = session_id
-            return (AdapterEvent("ready", session_id=session_id),)
+            if message.get("session_id") != self.session_id:
+                self.session_id = None
+                return _failure("crashed", "Claude started a different session")
         if kind == "assistant" and message.get("parent_tool_use_id") is None:
             started = () if self._running else (AdapterEvent("turn_started"),)
             self._running = True
@@ -481,7 +646,12 @@ class ClaudeAdapter:
             return (*started, AdapterEvent("text", text=text))
         if kind == "result":
             self._running = False
-            error = _text(message.get("result"))
+            text = _text(message.get("result"))
+            errors = message.get("errors")
+            if not text and isinstance(errors, list):
+                text = " ".join(error for error in errors if isinstance(error, str))
+            if self.session_id is None and "no conversation found" in text.casefold():
+                return _failure("missing-session")
             if subtype == "success" and message.get("is_error") is not True:
                 outcome = "normal"
             elif subtype in ("interrupted", "error_interrupted"):
@@ -489,13 +659,12 @@ class ClaudeAdapter:
             elif subtype in ("error_max_turns", "error_max_budget_usd"):
                 outcome = "limit"
             else:
-                outcome = _error_kind({"message": error}, "crashed")
-            return (AdapterEvent("turn_ended", outcome=outcome, text=error),)
-        if kind == "control_request" and _wire_id(message.get("request_id")):
-            self.send(
-                {
-                    "type": "control_response",
-                    "response": {"subtype": "error", "request_id": message["request_id"], "error": "permission denied"},
-                }
-            )
+                outcome = _error_kind({"message": text}, "crashed")
+            return (AdapterEvent("turn_ended", outcome=outcome, text=text),)
+        request_id = message.get("request_id")
+        if _wire_id(request_id):
+            if kind == "control_request":
+                return self._request(request_id, _object(message.get("request")))
+            if kind == "control_cancel_request" and self._approvals.pop(request_id, None) is not None:
+                return (AdapterEvent("approval_closed", request_id=request_id, outcome="expired"),)
         return ()

@@ -9,8 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from better_ai.page.adapters import (  # noqa: E402
     ACPAdapter,
-    ClaudeAdapter,
     CodexAdapter,
+    OpenCodeAdapter,
     candidate,
     child_environment,
     version_supported,
@@ -26,7 +26,12 @@ class AdapterTests(unittest.TestCase):
         found = candidate("auto", {"CODEX_THREAD_ID": SESSION}, lambda name: f"/bin/{name}")
         self.assertEqual(found.name, "codex")
         self.assertEqual(found.argv, ("/bin/codex", "app-server"))
-        self.assertEqual(found.kind, "no-approvals")
+        self.assertIsNone(found.kind)
+        self.assertEqual((found.approval, found.codec_factory), ("webauthn", CodexAdapter))
+        opencode = candidate("opencode", {}, lambda _: "/bin/opencode")
+        self.assertEqual((opencode.approval, opencode.codec_factory), ("webauthn", OpenCodeAdapter))
+        for name in ("cursor", "droid", "devin"):
+            self.assertEqual(candidate(name, {}, lambda _: "/bin/harness").kind, "no-approvals")
         for name in ("claude", "codex", "cursor", "opencode", "droid", "devin"):
             with self.subTest(name=name):
                 self.assertEqual(candidate(name, {}, lambda _: "/bin/harness").name, name)
@@ -45,8 +50,14 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(child_environment("codex", parent, SESSION), {**parent, "BETTER_PAGE_SESSION": SESSION})
         opencode = child_environment("opencode", parent, SESSION)
         self.assertEqual(opencode["OTHER"], "original")
+        config = json.loads(opencode["OPENCODE_CONFIG_CONTENT"])
+        self.assertEqual(config["permission"], {"edit": "ask", "bash": "ask"})
         self.assertEqual(
-            json.loads(opencode["OPENCODE_CONFIG_CONTENT"]), {"permission": {"edit": "ask", "bash": "ask"}}
+            config["permissions"],
+            [
+                {"action": "edit", "resource": "*", "effect": "ask"},
+                {"action": "shell", "resource": "*", "effect": "ask"},
+            ],
         )
         self.assertEqual(parent, {"PATH": "/bin", "OTHER": "original"})
 
@@ -118,13 +129,21 @@ class AdapterTests(unittest.TestCase):
         adapter = CodexAdapter(sent.append)
         adapter.open("/repo", SESSION)
         adapter.receive({"id": sent[-1]["id"], "result": {"userAgent": "codex_cli_rs/0.172.0"}})
+        self.assertEqual(sent[-1]["method"], "account/read")
+        self.assertEqual(sent[-1]["params"], {"refreshToken": False})
+        adapter.receive({"id": sent[-1]["id"], "result": {"account": {"type": "chatgpt"}}})
         self.assertEqual(sent[-1]["method"], "thread/resume")
         self.assertEqual(sent[-1]["params"]["threadId"], SESSION)
         self.assertEqual(sent[-1]["params"]["approvalsReviewer"], "user")
         result = adapter.receive(
             {
                 "id": sent[-1]["id"],
-                "result": {"thread": {"id": SESSION}, "approvalPolicy": "on-request", "approvalsReviewer": "user"},
+                "result": {
+                    "thread": {"id": SESSION},
+                    "approvalPolicy": "on-request",
+                    "approvalsReviewer": "user",
+                    "sandbox": {"type": "workspaceWrite", "networkAccess": False},
+                },
             }
         )
         self.assertEqual(result[0].session_id, SESSION)
@@ -146,37 +165,85 @@ class AdapterTests(unittest.TestCase):
                 adapter = CodexAdapter(sent.append)
                 adapter.open("/repo", None)
                 adapter.receive({"id": sent[-1]["id"], "result": {"userAgent": "codex_cli_rs/0.172.0"}})
+                adapter.receive({"id": sent[-1]["id"], "result": {"account": {"type": "chatgpt"}}})
                 event = adapter.receive(
                     {
                         "id": sent[-1]["id"],
-                        "result": {"thread": {"id": SESSION}, "approvalPolicy": policy, "approvalsReviewer": reviewer},
+                        "result": {
+                            "thread": {"id": SESSION},
+                            "approvalPolicy": policy,
+                            "approvalsReviewer": reviewer,
+                            "sandbox": {"type": "workspaceWrite", "networkAccess": False},
+                        },
                     }
                 )[0]
                 self.assertEqual((event.kind, event.outcome), ("failed", "unsafe-mode"))
 
-    def test_claude_reuses_one_stream_for_multiple_prompts(self):
+    def open_claude(self, permission_mode="default", account=None):
         sent = []
-        adapter = ClaudeAdapter(sent.append)
-        adapter.open("/repo", SESSION)
+        plan = candidate("claude", {}, lambda _: "/bin/claude")
+        adapter = plan.codec(sent.append, SESSION, None)
+        adapter.open("/repo", None)
+        self.assertEqual(sent[-1]["request"]["subtype"], "initialize")
+        data = {
+            "claude_code_version": "2.1.332",
+            "current_permission_mode": permission_mode,
+            "account": {"subscriptionType": "pro"} if account is None else account,
+        }
+        event = adapter.receive(
+            {
+                "type": "control_response",
+                "response": {"subtype": "success", "request_id": sent[-1]["request_id"], "response": data},
+            }
+        )[0]
+        return plan, adapter, sent, event
+
+    def test_claude_reuses_one_stream_for_multiple_prompts(self):
+        plan, adapter, sent, ready = self.open_claude()
+        self.assertEqual((plan.approval, ready.kind, ready.session_id), ("webauthn", "ready", SESSION))
+        self.assertEqual(plan.command(SESSION, None)[-1], f"--session-id={SESSION}")
+        self.assertEqual(plan.command(SESSION, SESSION)[-1], f"--resume={SESSION}")
+        self.assertEqual(plan.command(SESSION, "--dangerously-skip-permissions")[-1], f"--session-id={SESSION}")
+        self.assertIn("--permission-prompts", plan.command(SESSION, None))
         adapter.prompt("First")
         adapter.prompt("Second")
         adapter.cancel()
-        self.assertEqual([m["message"]["content"] for m in sent[:2]], ["First", "Second"])
-        self.assertEqual(sent[2]["request"]["subtype"], "interrupt")
-        start = adapter.receive(
-            {"type": "system", "subtype": "init", "session_id": SESSION, "permissionMode": "default"}
-        )
-        self.assertEqual(start[0].session_id, SESSION)
+        self.assertEqual([m["message"]["content"] for m in sent[1:3]], ["First", "Second"])
+        self.assertEqual(sent[-1]["request"]["subtype"], "interrupt")
         result = adapter.receive({"type": "result", "subtype": "success", "result": "Complete"})
         self.assertEqual((result[0].kind, result[0].outcome, result[0].text), ("turn_ended", "normal", "Complete"))
-        result = adapter.receive(
-            {"type": "system", "subtype": "init", "session_id": SESSION, "permissionMode": "bypassPermissions"}
-        )
-        self.assertEqual(result[0].outcome, "unsafe-mode")
+
+    def test_claude_checks_login_and_effective_mode_before_a_turn(self):
+        for mode, account, expected in (("bypassPermissions", None, "unsafe-mode"), ("default", {}, "login")):
+            with self.subTest(mode=mode, account=account):
+                _, _, sent, event = self.open_claude(mode, account)
+                self.assertEqual((event.kind, event.outcome), ("failed", expected))
+                self.assertEqual(len(sent), 1)
+
+    def test_claude_replies_to_the_exact_permission_request(self):
+        _, adapter, sent, _ = self.open_claude()
+        raw = {"command": "pwd"}
+        request = {
+            "type": "control_request",
+            "request_id": "p1",
+            "request": {"subtype": "can_use_tool", "tool_name": "Bash", "input": raw, "agent_id": "worker"},
+        }
+        event = adapter.receive(request)[0]
+        self.assertEqual((event.kind, event.arguments, event.requester), ("approval", raw, "worker"))
+        self.assertEqual(event.options, ("allow_once", "deny"))
+        self.assertFalse(adapter.answer("different", "allow_once"))
+        self.assertTrue(adapter.answer("p1", "allow_once"))
+        self.assertEqual(sent[-1]["response"]["response"], {"behavior": "allow", "updatedInput": raw})
+        self.assertFalse(adapter.answer("p1", "allow_once"))
+        adapter.receive({**request, "request_id": "p2"})
+        closed = adapter.receive({"type": "control_cancel_request", "request_id": "p2"})[0]
+        self.assertEqual((closed.kind, closed.request_id, closed.outcome), ("approval_closed", "p2", "expired"))
+        self.assertFalse(adapter.answer("p2", "allow_once"))
+        adapter.receive({**request, "request_id": "p3", "request": {"subtype": "can_use_tool"}})
+        self.assertEqual(sent[-1]["response"]["response"]["behavior"], "deny")
 
     def test_claude_spontaneous_turn_starts_on_main_assistant_output(self):
-        adapter = ClaudeAdapter(lambda _: None)
-        adapter.open("/repo", SESSION)
+        _, adapter, _, _ = self.open_claude()
         assistant = {
             "type": "assistant",
             "parent_tool_use_id": None,
@@ -188,6 +255,29 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual([event.kind for event in adapter.receive(assistant)], ["text"])
         adapter.receive({"type": "result", "subtype": "success", "result": "Complete"})
         self.assertEqual([event.kind for event in adapter.receive(assistant)], ["turn_started", "text"])
+
+    def test_codex_reports_logged_out_without_starting_a_thread(self):
+        sent = []
+        adapter = CodexAdapter(sent.append)
+        adapter.open("/repo", None)
+        adapter.receive({"id": sent[-1]["id"], "result": {"userAgent": "codex_cli_rs/0.172.0"}})
+        event = adapter.receive({"id": sent[-1]["id"], "result": {"account": None}})[0]
+        self.assertEqual((event.kind, event.outcome), ("failed", "login"))
+        self.assertFalse(any(message.get("method") == "thread/start" for message in sent))
+
+    def test_opencode_checks_its_reported_version_and_mode(self):
+        sent = []
+        adapter = OpenCodeAdapter(sent.append)
+        adapter.open("/repo", None)
+        adapter.receive({"id": sent[-1]["id"], "result": {"protocolVersion": 1, "agentInfo": {"version": "2.4.1"}}})
+        result = {"sessionId": "ses_new", "configOptions": [{"category": "mode", "currentValue": "build"}]}
+        event = adapter.receive({"id": sent[-1]["id"], "result": result})[0]
+        self.assertEqual((event.kind, event.session_id), ("ready", "ses_new"))
+        adapter = OpenCodeAdapter(sent.append)
+        adapter.open("/repo", None)
+        old = {"protocolVersion": 1, "agentInfo": {"version": "2.3.9"}}
+        event = adapter.receive({"id": sent[-1]["id"], "result": old})[0]
+        self.assertEqual((event.kind, event.outcome), ("failed", "version"))
 
 
 if __name__ == "__main__":
