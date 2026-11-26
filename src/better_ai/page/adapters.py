@@ -8,6 +8,7 @@ import re
 import shutil
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, TypeVar
 
 WireID = int | str
@@ -46,7 +47,7 @@ class Candidate:
 
 # Prefer specific identifiers to generic markers if one harness is started from another.
 _HARNESSES = {
-    "devin": (("devin", "acp"), ("DEVIN_CLI", "DEVIN_SESSION_ID")),
+    "devin": (("devin", "--process-model", "in-process", "acp"), ("DEVIN_CLI", "DEVIN_SESSION_ID")),
     "droid": (
         ("droid", "exec", "--input-format", "stream-jsonrpc", "--output-format", "stream-jsonrpc"),
         ("FACTORY_DROID", "DROID_SESSION_ID"),
@@ -70,8 +71,19 @@ _HARNESSES = {
     ),
 }
 
-_MIN_VERSION = {"claude": (2, 1, 332), "codex": (0, 172, 0), "opencode": (2, 4, 1)}
+_MIN_VERSION = {
+    "claude": (2, 1, 332),
+    "codex": (0, 172, 0),
+    "opencode": (2, 4, 1),
+    "cursor": (2026, 11, 17),  # Cursor's November 17 CLI release documents ACP fixes.
+    "droid": (1, 21, 0),  # CLI tested in Factory's SDK 0.11.0 example.
+    "devin": (3000, 13, 4),  # First release with --process-model in-process.
+}
 _VERSION = re.compile(r"(?<![\d.])(\d{1,5})\.(\d{1,5})\.(\d{1,5})(?![\d.])")
+_CURSOR_VERSION = re.compile(
+    r"(?:(?:cursor-agent|cursor|agent)\s+)?v?([0-9]{4})\.([0-9]{2})\.([0-9]{2})(?:-[0-9a-f]{7,40})?",
+    re.IGNORECASE,
+)
 _UUID = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 _ACP_SESSION = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}")
 
@@ -108,8 +120,16 @@ def candidate(requested: str, env: Mapping[str, str], which: Callable[[str], str
 
 def version_supported(name: str, version: str) -> bool:
     minimum = _MIN_VERSION.get(name)
-    match = _VERSION.search(version)
-    return minimum is not None and match is not None and tuple(map(int, match.groups())) >= minimum
+    match = _CURSOR_VERSION.fullmatch(version.strip()) if name == "cursor" else _VERSION.search(version)
+    if minimum is None or match is None:
+        return False
+    release = tuple(map(int, match.groups()))
+    if name == "cursor":
+        try:
+            date(*release)
+        except ValueError:
+            return False
+    return release >= minimum
 
 
 def session_id_valid(name: str, session_id: Any) -> bool:
@@ -868,18 +888,35 @@ class DroidAdapter(_RPCAdapter):
         )
 
     def receive(self, message: dict) -> Events:
-        request_id = message.get("id")
+        request_id, method, kind = message.get("id"), message.get("method"), message.get("type")
+        has_id = isinstance(request_id, str) and bool(request_id)
+        frame = (
+            (kind == "request" and has_id and isinstance(method, str))
+            or (kind == "response" and has_id and method is None and ("result" in message) != ("error" in message))
+            or (kind == "notification" and "id" not in message and isinstance(method, str))
+        )
+        version = _VERSION.fullmatch(_text(message.get("factoryProtocolVersion")))
+        supported = version is not None and version[1] == "1" and tuple(map(int, version.groups())) >= (1, 332, 0)
         if (
-            _wire_id(request_id)
-            and self._calls.get(request_id, ("", None))[0] in self._start_methods
-            and "result" in message
+            frame
+            and supported
+            and message.get("jsonrpc") == "2.0"
+            and message.get("factoryApiVersion") == self._factory_api_version
         ):
-            version = _text(message.get("factoryProtocolVersion"))
-            match = _VERSION.fullmatch(version)
-            if match is None or int(match[1]) != 1 or tuple(map(int, match.groups())) < (1, 332, 0):
-                self._calls.pop(request_id)
-                return _failure("version")
-        return super().receive(message)
+            return super().receive(message)
+        if has_id and method == "droid.request_permission":
+            pending = self._approvals.pop(request_id, None)
+            self._result(request_id, {"selectedOption": "cancel"})
+            if pending is not None:
+                return (AdapterEvent("approval_closed", request_id=request_id, outcome="denied"),)
+        elif has_id and not isinstance(method, str) and request_id in self._calls:
+            called, _ = self._calls.pop(request_id)
+            if called in self._start_methods:
+                return _failure("version", "unsupported Droid protocol envelope")
+            return _failure("crashed", "invalid Droid response")
+        elif has_id and isinstance(method, str):
+            self._error(request_id, -32600, "invalid Droid request")
+        return ()
 
     def open(self, cwd: str, resume: str | None) -> None:
         self._cwd = cwd

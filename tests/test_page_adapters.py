@@ -60,7 +60,7 @@ class AdapterTests(unittest.TestCase):
         }
         for name, (supported, previous) in cases.items():
             with self.subTest(name=name):
-                plan = candidate(name, {}, lambda _: f"/bin/{name}")
+                plan = candidate(name, {}, lambda binary: f"/bin/{binary}")
                 self.assertIsNone(plan.kind)
                 self.assertTrue(version_supported(plan.name, supported))
                 self.assertFalse(version_supported(plan.name, previous))
