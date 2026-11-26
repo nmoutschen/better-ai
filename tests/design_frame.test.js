@@ -122,8 +122,12 @@ test('the packaged bridge uses its port for clicks, pin editing, shortcuts and s
   assert.equal(messages.at(-1).id, 'c1');
   handlers.keydown({...event, isTrusted:true, key:'c'});
   assert.equal(messages.at(-1).key, 'c');
+  doc.querySelectorAll = selector => selector === '[id]' ? [
+    {id:'repeat'}, {id:'topic', getBoundingClientRect: () => ({top:0})}, {id:'repeat'}
+  ] : [];
   handlers.scroll();
   assert.equal(messages.at(-1).fraction, .5);
+  assert.equal(JSON.stringify(messages.at(-1).marks), JSON.stringify([{id:'topic', top:250}]));
   channel.port1.onmessage({data:{kind:'scroll', fraction:.2}});
   assert.deepEqual(updates, [[0,100]]);
 });

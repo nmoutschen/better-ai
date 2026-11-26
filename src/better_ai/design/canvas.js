@@ -198,18 +198,29 @@
     return Array.prototype.map.call(a.document.querySelectorAll('[id]'), function (el) { return el.id; })
       .filter(function (id) { return id && inA[id] === 1 && inB[id] === 1; });
   }
+  function matchedTop(a, b, y) {
+    var k = 0;
+    while (k < a.length - 2 && a[k + 1].top <= y) k++;
+    var p = (y - a[k].top) / Math.max(1, a[k + 1].top - a[k].top);
+    return b[k].top + p * (b[k + 1].top - b[k].top);
+  }
   function match(from, to) {
-    if (ports.has(to) && offsets.has(from)) {
-      ports.get(to).postMessage({kind: 'scroll', fraction: offsets.get(from)});
+    if (ports.has(to)) {
+      var srcLayout = offsets.get(from), dstLayout = offsets.get(to);
+      if (!srcLayout || !dstLayout) return;
+      var a = [{top: 0}], b = [{top: 0}];
+      srcLayout.marks.forEach(function (top, id) {
+        if (dstLayout.marks.has(id)) { a.push({top: top}); b.push({top: dstLayout.marks.get(id)}); }
+      });
+      a.push({top: srcLayout.height}); b.push({top: dstLayout.height});
+      var top = matchedTop(a, b, srcLayout.fraction * srcLayout.range);
+      ports.get(to).postMessage({kind: 'scroll', fraction: Math.max(0, Math.min(1, top / Math.max(1, dstLayout.range)))});
       return;
     }
     try {
       var src = from.contentWindow, dst = to.contentWindow, ids = sharedIds(src, dst);
-      var a = tops(src, ids), b = tops(dst, ids), y = src.scrollY, k = 0;
-      while (k < a.length - 2 && a[k + 1].top <= y) k++;
-      var p = (y - a[k].top) / Math.max(1, a[k + 1].top - a[k].top);
       quietUntil.set(to, Date.now() + 150);
-      dst.scrollTo(0, b[k].top + p * (b[k + 1].top - b[k].top));
+      dst.scrollTo(0, matchedTop(tops(src, ids), tops(dst, ids), src.scrollY));
     } catch (e) {}
   }
   function follow(frame) {
@@ -428,9 +439,17 @@
   function fraction(n) { return Number.isFinite(n) && n >= 0 && n <= 1; }
   function fromMock(frame, m) {
     if (!m || typeof m !== 'object') return;
-    if (m.kind === 'scroll' && fraction(m.fraction)) {
-      offsets.set(frame, m.fraction);
-      follow(frame);
+    if (m.kind === 'scroll' || m.kind === 'layout') {
+      if (!fraction(m.fraction) || !Number.isFinite(m.height) || m.height < 0 || m.height > 1e8 ||
+          !Number.isFinite(m.range) || m.range < 0 || m.range > m.height || !Array.isArray(m.marks) || m.marks.length > 512) return;
+      var marks = new Map();
+      for (var mark of m.marks) {
+        if (!mark || typeof mark.id !== 'string' || !mark.id || mark.id.length > 256 || marks.has(mark.id) ||
+            !Number.isFinite(mark.top) || mark.top < 0 || mark.top > m.height) return;
+        marks.set(mark.id, mark.top);
+      }
+      offsets.set(frame, {fraction: m.fraction, range: m.range, height: m.height, marks: marks});
+      if (m.kind === 'scroll') follow(frame);
     } else if (m.kind === 'key') {
       if (m.key === 'escape' && !pop.hidden) comments.close();
       if (m.key === 'c') setMode(!commenting);
@@ -440,7 +459,10 @@
       if (!pop.hidden) return comments.close();
       if (typeof m.id === 'string') {
         var it = byId(m.id);
-        if (it && it.version === labels[+frame.dataset.i]) openPop(frame, null, null, m.x, m.y, it);
+        if (!it || it.version !== labels[+frame.dataset.i]) return;
+        var state = comments.state()[it.id];
+        if (state === 'done' || state === 'accepted') conv.reopen(it.id);
+        else openPop(frame, null, null, m.x, m.y, it);
       } else if (commenting && typeof m.selector === 'string' && m.selector.length > 0 && m.selector.length <= 4096 &&
                  typeof m.tag === 'string' && m.tag.length <= 100 && typeof m.text === 'string' && m.text.length <= 120 &&
                  fraction(m.fx) && fraction(m.fy)) {
@@ -474,7 +496,6 @@
     var port = e.ports[0];
     ports.set(frame, port);
     port.onmessage = function (event) { fromMock(frame, event.data); };
-    offsets.set(frame, 0);
     sendView(frame);
   });
   function openPop(frame, el, at, cx, cy, existing, target) {

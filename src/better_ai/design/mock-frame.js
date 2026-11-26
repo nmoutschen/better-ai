@@ -85,6 +85,18 @@ var canvasDescribe = (function () {
     pin.style.top = (r.top + window.scrollY + spot.fy * r.height) + 'px';
   }
   function scrollRange() { return Math.max(0, document.documentElement.scrollHeight - window.innerHeight); }
+  function reportLayout(kind) {
+    const height = document.documentElement.scrollHeight, range = scrollRange();
+    const elements = document.querySelectorAll('[id]'), counts = new Map(), marks = [];
+    for (const el of elements) counts.set(el.id, (counts.get(el.id) || 0) + 1);
+    for (const el of elements) {
+      if (!el.id || el.id.length > 256 || counts.get(el.id) !== 1) continue;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      if (top >= 0 && top <= height) marks.push({id: el.id, top});
+      if (marks.length === 512) break;
+    }
+    port.postMessage({kind, height, range, marks, fraction: Math.max(0, Math.min(1, window.scrollY / Math.max(1, range)))});
+  }
   function render(list) {
     const kept = new Set();
     for (const item of list) {
@@ -116,6 +128,7 @@ var canvasDescribe = (function () {
         style.textContent = m.css;
         document.documentElement.style.setProperty('--db-s', String(m.inverseScale));
         render(m.pins);
+        reportLayout('layout');
       } else if (m.kind === 'scroll') {
         quietUntil = Date.now() + 150;
         window.scrollTo(0, m.fraction * scrollRange());
@@ -153,7 +166,7 @@ var canvasDescribe = (function () {
         port.postMessage({kind: 'key', key: e.key.toLowerCase()});
     });
     window.addEventListener('scroll', () => {
-      if (Date.now() >= quietUntil) port.postMessage({kind: 'scroll', fraction: window.scrollY / Math.max(1, scrollRange())});
+      reportLayout(Date.now() >= quietUntil ? 'scroll' : 'layout');
     }, {passive: true});
     window.parent.postMessage({kind: 'design-frame', key}, origin, [channel.port2]);
   });
