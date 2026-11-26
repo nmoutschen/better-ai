@@ -6,7 +6,7 @@
   const token = fragment.get('p');
   history.replaceState(null, '', location.pathname);
   let secret = sessionStorage.getItem('approvalSecret') || '';
-  let page = sessionStorage.getItem('approvalPage') || '';
+  sessionStorage.removeItem('approvalPage');
   let active = true, serial = 0, rendered = '';
   const labels = { allow_once: 'Allow once', allow_session: 'Allow for this session', deny: 'Deny' };
   function fail(message) {
@@ -19,7 +19,6 @@
     const response = await fetch(path, Object.assign({ cache: 'no-store', credentials: 'omit' }, init));
     if (response.status === 403) {
       sessionStorage.removeItem('approvalSecret');
-      sessionStorage.removeItem('approvalPage');
       fail('Opened elsewhere. Open the latest address the agent gave you.');
     }
     if (!response.ok) throw new Error('The page server refused this request.');
@@ -97,9 +96,7 @@
     el('stop').hidden = !data.can_stop;
     el('notice').textContent = data.notice || '';
     el('outcome').textContent = data.last_outcome || data.action || '';
-    if (data.page) { page = data.page; sessionStorage.setItem('approvalPage', page); }
-    el('page').hidden = !page || data.state === 'starting';
-    if (page) el('page').href = page;
+    el('page').hidden = data.state === 'starting';
     requests(data.approvals || []);
   }
   async function poll() {
@@ -111,11 +108,34 @@
     if (token) {
       const pair = await post('/pair', { token });
       secret = pair.secret;
-      page = pair.page;
       sessionStorage.setItem('approvalSecret', secret);
-      sessionStorage.setItem('approvalPage', page);
     }
     if (!secret) { fail('Open the latest address the agent gave you.'); return; }
+    const pageLink = el('page');
+    pageLink.href = '#page';
+    pageLink.addEventListener('click', async event => {
+      event.preventDefault();
+      if (!active || pageLink.hidden) return;
+      el('error').textContent = '';
+      // Open during the click so popup blockers see the gesture, then detach before navigating.
+      const tab = window.open('about:blank', '_blank');
+      if (!tab) { el('error').textContent = 'Allow popups from this page to open the conversation.'; return; }
+      try {
+        tab.opener = null;
+        // A new tab can inherit session storage before its opener is cleared.
+        tab.sessionStorage.removeItem('approvalSecret');
+      } catch {
+        tab.close();
+        el('error').textContent = 'Could not open the conversation in a separate tab.';
+        return;
+      }
+      try {
+        tab.location.replace(await rpc('open_conversation'));
+      } catch (error) {
+        tab.close();
+        if (active) el('error').textContent = error.message;
+      }
+    });
     action(el('enroll'), async () => {
       const opts = await rpc('enroll_begin');
       await rpc('enroll_finish', { proof: await credential(opts, true) });
