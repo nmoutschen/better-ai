@@ -441,11 +441,17 @@ class Conversation:
             return False
 
     def delivery(
-        self, after: int = 0, *, carry_ids: frozenset[str] = frozenset(), recover_ids: frozenset[str] = frozenset()
+        self,
+        after: int = 0,
+        *,
+        carry_ids: frozenset[str] = frozenset(),
+        recover_ids: frozenset[str] = frozenset(),
+        admitted_edits: set[tuple[str, str]] | None = None,
+        thread_parents: dict[str, str] | None = None,
     ) -> delivery.Delivery:
         events = self.events()
-        found = all_items(events, self.items, self.agent)
-        return delivery.select(events, found, self.items, after, carry_ids, recover_ids)
+        found = all_items(events, self.items, self.agent, thread_parents=thread_parents)
+        return delivery.select(events, found, self.items, after, carry_ids, recover_ids, admitted_edits=admitted_edits)
 
     def write(self, *events: dict) -> list:
         """Append the agent's own events; one that fails its schema is refused with the validator's message."""
@@ -665,12 +671,15 @@ def open_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tu
     return [found for found in all_items(events, item_types, agent) if found[1] not in FINISHED]
 
 
-def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
+def all_items(
+    events: list, item_types: tuple[str, ...], agent: str, *, thread_parents: dict[str, str] | None = None
+) -> list[tuple[dict, str, dict]]:
     """Every item of the user's, in its latest form, as (event, state, extra); `deleted` ones are left out. The state is
     `new`, `asked`, `working`, `replied`, `followup` or `reopened`; `extra` holds `reopened_because` and the `thread` of
     answers and replies under the item. These are the page's rules: page.js `pageThread` gives the same states, and
     tests/fixtures/threads.json holds the logs both are run on. `pending` and a skill's own summary both call these."""
-    items, order, state, reasons, thread, closes, home = {}, [], {}, {}, {}, {}, {}
+    items, order, state, reasons, thread, closes = {}, [], {}, {}, {}, {}
+    home = thread_parents if thread_parents is not None else {}
     for e in events:
         a, i = e.get("type"), e.get("id")
         to = home.get(e.get("to"), e.get("to"))  # a message under a reply belongs to the item that reply is under

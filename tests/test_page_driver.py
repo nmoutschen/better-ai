@@ -96,7 +96,9 @@ class Conversation:
         self.events.append(event)
         return event
 
-    def delivery(self, after=0, *, carry_ids=frozenset(), recover_ids=frozenset()):
+    def delivery(
+        self, after=0, *, carry_ids=frozenset(), recover_ids=frozenset(), admitted_edits=None, thread_parents=None
+    ):
         items = [
             {"id": key, "status": status}
             for key, status in self.items.items()

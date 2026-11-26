@@ -131,6 +131,7 @@ class Driver:
                 audit_turn.update(end=time.time(), outcome=outcome)
         self._retry = False
         self._admitted_items = set()
+        self._admitted_edits = set()
         self._admitted_events = []
         self._scan_after = self._delivered
 
@@ -294,6 +295,7 @@ class Driver:
             # new work must enter through enqueue, including while a turn is busy or failed.
             historical = self.conversation.delivery(self._delivered, carry_ids=self._carry, recover_ids=self._recover)
             self._admitted_items.update(item["id"] for item in historical.items)
+            self._admitted_edits.update((item.get("type"), item["id"]) for item in historical.items)
             self._admitted_events.extend(historical.events)
             self._started.set()
             while not self._closing.is_set():
@@ -361,6 +363,7 @@ class Driver:
             self._wake = True
             targets = {value.get("id"), value.get("to")}
             self._admitted_items.update(targets)
+            self._admitted_edits.add((value.get("type"), value.get("id")))
             self._admitted_events.append(value)
             if targets & self._last_prompt_items:
                 self._repeats = 0
@@ -440,8 +443,18 @@ class Driver:
         # An RPC append can be visible to a previous turn before its enqueue reaches
         # this thread. Select from the session's original cursor, then admit exact
         # events and item IDs so an intervening completion cannot skip that RPC.
-        batch = self.conversation.delivery(self._scan_after, carry_ids=self._carry, recover_ids=self._recover)
-        admitted = self._admitted_items | self._recover
+        parents = {}
+        batch = self.conversation.delivery(
+            self._scan_after,
+            carry_ids=self._carry,
+            recover_ids=self._recover,
+            admitted_edits=self._admitted_edits,
+            thread_parents=parents,
+        )
+        parent_ids = {parents[target] for target in self._admitted_items if target in parents}
+        if parent_ids & self._last_prompt_items:
+            self._repeats = 0
+        admitted = self._admitted_items | self._recover | parent_ids
         batch.items[:] = [
             item
             for item in batch.items
@@ -468,6 +481,7 @@ class Driver:
             )
             return
         self._admitted_items.clear()
+        self._admitted_edits.clear()
         self._admitted_events.clear()
         if not (items or actions or available):
             return
