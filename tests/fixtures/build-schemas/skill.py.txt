@@ -25,9 +25,6 @@ class Skill:
     name: str  # "code-better"
     package: str  # "code": the folder in src/better_ai/
     kinds: tuple[UnitKind, ...]
-    exclude: str | None = (
-        None  # the line `create` adds to the repository's info/exclude, such as ".code/"; None adds none
-    )
 
     @property
     def root(self) -> str:

@@ -157,15 +157,13 @@ def snapshot(folder):
 
 
 class Create(Repo):
-    def test_s13_create_writes_a_stamped_head_the_folders_and_the_exclude_line_once(self):
+    def test_s13_create_writes_a_stamped_head_and_the_folders_and_no_exclude_line(self):
         unit = self.code_change()
         head = json.loads((unit / "code.json").read_text())
         self.assertEqual((head["type"], head["by"]), ("code", "coordinator"))
         self.assertRegex(head["at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
         self.assertTrue((unit / "logs").is_dir())
-        self.assertEqual(self.exclude().splitlines().count(".code/"), 1)
-        self.code_change("y")
-        self.assertEqual(self.exclude().splitlines().count(".code/"), 1)
+        self.assertNotIn(".code/", self.exclude().splitlines())
         self.assertEqual(call("code-better", "check", unit)[0], 0)
 
     def test_s13_every_skills_unit_can_be_created_with_its_folders(self):
@@ -185,10 +183,10 @@ class Create(Repo):
             self.assertEqual(done[0], 0, (name, done))
             for sub in folders:
                 self.assertTrue((unit / sub).is_dir(), (name, sub))
-        self.assertIn(".research/", self.exclude())
-        self.assertIn(".code/", self.exclude())
+        self.assertNotIn(".research/", self.exclude().splitlines())
+        self.assertNotIn(".code/", self.exclude().splitlines())
 
-    def test_s13_create_in_a_linked_worktree_writes_the_one_exclude_file_of_the_repository(self):
+    def test_s13_create_in_a_linked_worktree_writes_no_exclude_line(self):
         subprocess.run(
             [
                 "git",
@@ -210,14 +208,14 @@ class Create(Repo):
         subprocess.run(["git", "-C", self.repo, "worktree", "add", "-q", str(linked)], check=True)
         done = call("code-better", "create", linked / ".code" / "w", "--by", "coordinator", stdin=CODE_HEAD)
         self.assertEqual(done[0], 0, done)
-        self.assertIn(".code/", self.exclude().splitlines())
+        self.assertNotIn(".code/", self.exclude().splitlines())
 
-    def test_s14_outside_a_repository_the_exclusion_is_skipped_and_said_so(self):
+    def test_s14_outside_a_repository_create_works_and_says_nothing_about_git(self):
         with tempfile.TemporaryDirectory() as tmp:
             unit = Path(os.path.realpath(tmp)) / ".code" / "x"
             done = call("code-better", "create", unit, "--by", "coordinator", stdin=CODE_HEAD)
         self.assertEqual(done[0], 0, done)
-        self.assertIn("git exclusion skipped: not a git repository", done[1])
+        self.assertNotIn("git", done[1])
 
     def test_s2_an_invalid_head_leaves_no_folder_head_or_exclude_line(self):
         unit = self.unit(".code/bad")
@@ -1000,7 +998,7 @@ def docs_types(docs):
 
 
 class Safety(Repo):
-    def test_s25_no_verb_writes_outside_the_unit_except_the_one_exclude_line_at_create(self):
+    def test_s25_no_verb_writes_outside_the_unit(self):
         outside = self.repo / "other"
         outside.mkdir()
         (outside / "keep.txt").write_text("keep")
@@ -1011,8 +1009,7 @@ class Safety(Repo):
         after_create = snapshot(self.repo)
         inside = {k for k in after_create if k.startswith(".code/x/")}
         self.assertEqual({k: v for k, v in after_create.items() if k not in inside}, before)
-        self.assertNotEqual(self.exclude(), exclude_before)
-        exclude_after_create = self.exclude()
+        self.assertEqual(self.exclude(), exclude_before)
         steps = [
             ("add", unit, "decision", "--by", "c"),
             ("add", unit, "progress", "--by", "c"),
@@ -1038,7 +1035,7 @@ class Safety(Repo):
             self.assertEqual(done[0], 0, (step, done))
         now = snapshot(self.repo)
         self.assertEqual({k: v for k, v in now.items() if not k.startswith(".code/x/")}, before)
-        self.assertEqual(self.exclude(), exclude_after_create)
+        self.assertEqual(self.exclude(), exclude_before)
         # a refused add changes nothing, inside or out
         frozen = snapshot(self.repo)
         call("code-better", "add", unit, "decision", "--by", "c", stdin={})

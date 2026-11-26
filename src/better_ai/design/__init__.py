@@ -7,7 +7,6 @@ SKILL = Skill(
     name="design-better",
     package="design",
     kinds=(UnitKind(kind="canvas", folder=".design", head="canvas.json", head_type="canvas"),),
-    exclude=".design/",
 )
 
 from . import canvas  # noqa: E402  (registers `render` and the page; needs SKILL above)

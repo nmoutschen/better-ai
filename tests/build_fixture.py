@@ -53,7 +53,6 @@ SKILL = Skill(
         UnitKind(kind="change", folder=".alpha", head="code.json", head_type="code", folders=("logs",)),
         UnitKind(kind="audit", folder=".alpha/audit", head="audit.json", head_type="audit"),
     ),
-    exclude=".alpha/",
 )
 '''
 
@@ -65,7 +64,6 @@ SKILL = Skill(
     name="beta-better",
     package="beta",
     kinds=(UnitKind(kind="board", folder=".beta", head="brief.json", head_type="brief"),),
-    exclude=".beta/",
 )
 '''
 

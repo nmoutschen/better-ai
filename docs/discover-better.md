@@ -45,7 +45,7 @@ With an idea it has already started, it resumes that discovery. Without an argum
 9. **The hand-on** of the brief to design, for Expand or Shrink.
 10. **What real use shows**, in a later session, comes back as evidence for the next move.
 
-The discovery lives in `.discover/<idea>/`, and the brief versions in its `brief/` folder. It is not committed unless you ask.
+The discovery lives in `.discover/<idea>/`, and the brief versions in its `brief/` folder. Git sees it as untracked: commit it or ignore it as you choose.
 
 ## The live page
 
