@@ -48,6 +48,31 @@ class AdapterTests(unittest.TestCase):
         self.assertFalse(version_supported("codex", "codex-cli 0.171.0"))
         self.assertFalse(version_supported("opencode", "version unknown"))
 
+    def test_startup_cli_version_gate_covers_every_candidate(self):
+        cases = {
+            "claude": ("2.1.332 (Claude Code)", "2.1.331 (Claude Code)"),
+            "codex": ("codex-cli 0.172.0", "codex-cli 0.171.999"),
+            "opencode": ("2.4.1", "2.4.0"),
+            "cursor": ("2026.11.17-6dfa30c", "2026.11.16-6dfa30c"),
+            "droid": ("droid 1.21.0", "droid 1.20.999"),
+            "devin": ("devin v3000.13.4", "devin v3000.13.3"),
+        }
+        for name, (supported, previous) in cases.items():
+            with self.subTest(name=name):
+                plan = candidate(name, {}, lambda _: f"/bin/{name}")
+                self.assertIsNone(plan.kind)
+                self.assertTrue(version_supported(plan.name, supported))
+                self.assertFalse(version_supported(plan.name, previous))
+                self.assertFalse(version_supported(plan.name, "version unknown"))
+        self.assertTrue(version_supported("cursor", "v2026.11.17"))
+        self.assertTrue(version_supported("cursor", "cursor-agent 2027.01.05-abcdef0"))
+        self.assertFalse(version_supported("cursor", "2026.12.32-abcdef0"))
+        self.assertFalse(version_supported("cursor", "2026.11.17-not-a-release"))
+
+    def test_devin_launch_selects_the_owned_process(self):
+        plan = candidate("devin", {}, lambda _: "/bin/devin")
+        self.assertEqual(plan.command(SESSION, None), ("/bin/devin", "--process-model", "in-process", "acp"))
+
     def test_environments(self):
         parent = {"PATH": "/bin", "OTHER": "original"}
         self.assertEqual(child_environment("codex", parent, SESSION), {**parent, "BETTER_PAGE_SESSION": SESSION})
