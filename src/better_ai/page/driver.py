@@ -9,6 +9,7 @@ import queue
 import threading
 import time
 import uuid
+from collections import Counter
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 
@@ -55,6 +56,7 @@ class Turn:
     record: dict
     position: int | None = None
     triggers: tuple[str, ...] = ()
+    actions: list[dict] = field(default_factory=list)
     changed: bool = False
     final_message: str = ""
     denied: list[dict] = field(default_factory=list)
@@ -128,6 +130,9 @@ class Driver:
             if audit_turn.get("number") == self._number and "end" not in audit_turn:
                 audit_turn.update(end=time.time(), outcome=outcome)
         self._retry = False
+        self._admitted_items = set()
+        self._admitted_events = []
+        self._scan_after = self._delivered
 
         # Startup replays persisted work. During a live session only /rpc can wake for user actions.
         self._wake = True
@@ -285,6 +290,11 @@ class Driver:
     def _run(self) -> None:
         try:
             self._open(self._deadline)
+            # On serve startup the existing log is the recovery source. Once start returns,
+            # new work must enter through enqueue, including while a turn is busy or failed.
+            historical = self.conversation.delivery(self._delivered, carry_ids=self._carry, recover_ids=self._recover)
+            self._admitted_items.update(item["id"] for item in historical.items)
+            self._admitted_events.extend(historical.events)
             self._started.set()
             while not self._closing.is_set():
                 self._commands_once()
@@ -349,7 +359,10 @@ class Driver:
     def _command(self, kind, value) -> None:
         if kind == "event":
             self._wake = True
-            if {value.get("id"), value.get("to")} & self._last_prompt_items:
+            targets = {value.get("id"), value.get("to")}
+            self._admitted_items.update(targets)
+            self._admitted_events.append(value)
+            if targets & self._last_prompt_items:
                 self._repeats = 0
                 if self._turn:
                     self._turn.changed = True
@@ -424,15 +437,25 @@ class Driver:
             self._record_approval_end(event, event.outcome or "expired", event.text)
 
     def _deliver(self, available: tuple[dict, ...]) -> None:
-        batch = self.conversation.delivery(self._delivered, carry_ids=self._carry, recover_ids=self._recover)
-        retry_only = not self._wake
+        # An RPC append can be visible to a previous turn before its enqueue reaches
+        # this thread. Select from the session's original cursor, then admit exact
+        # events and item IDs so an intervening completion cannot skip that RPC.
+        batch = self.conversation.delivery(self._scan_after, carry_ids=self._carry, recover_ids=self._recover)
+        admitted = self._admitted_items | self._recover
+        batch.items[:] = [
+            item
+            for item in batch.items
+            if item["id"] in admitted or (item["id"] in self._carry and item["status"] in ("new", "seen"))
+        ]
+        events = Counter(encode(event) for event in self._admitted_events)
+        actions = []
+        for event in batch.events:
+            key = encode(event)
+            if events[key]:
+                actions.append(event)
+                events[key] -= 1
+        batch.events[:] = actions
         self._wake = self._retry = False
-        if retry_only and not any(
-            item["id"] in self._carry and item["status"] in ("new", "seen") for item in batch.items
-        ):
-            return
-        if not (batch.items or batch.events or available):
-            return
         items = frozenset(item["id"] for item in batch.items)
         if items and items == self._last_prompt_items and self._repeats >= 3:
             last = recent_turn(self._records, self.session)
@@ -443,6 +466,10 @@ class Driver:
                 denied=last.get("denied", []),
                 log=str(self.unit.target(LOG)),
             )
+            return
+        self._admitted_items.clear()
+        self._admitted_events.clear()
+        if not (items or actions or available):
             return
         if items != self._last_prompt_items:
             self._repeats = 0
@@ -461,6 +488,7 @@ class Driver:
             ),
         )
         self._begin(batch.position, items, tuple(r["id"] for r in available))
+        self._turn.actions = actions
         prompt = self._prompt(batch, available)
         try:
             self._peer.prompt(prompt)
@@ -530,6 +558,7 @@ class Driver:
             if not turn.changed:
                 self._repeats += 1
         elif outcome != "completed":
+            self._admitted_events.extend(turn.actions)
             self._recover = turn.items
             self._carry = frozenset()
             self._recover_turn, self._recover_kind = turn.record["number"], outcome
