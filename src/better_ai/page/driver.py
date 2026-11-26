@@ -9,6 +9,7 @@ import queue
 import threading
 import time
 import uuid
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 
 from .. import paths, resources
@@ -140,6 +141,7 @@ class Driver:
         self._start_error = None
         self._deadline = 0.0
         self._commands = queue.Queue()
+        self._answer_lock = threading.Lock()
         self._published = ("starting", time.time(), clock(), False, {})
         self._thread = threading.Thread(target=self._run, name="page-agent", daemon=True)
         self._state = "starting"
@@ -311,6 +313,18 @@ class Driver:
             try:
                 self._close_peer("driver closed")
             finally:
+                # Synchronize the final drain with handlers enqueueing answers off-thread.
+                with self._answer_lock:
+                    self._closing.set()
+                while True:
+                    try:
+                        kind, value = self._commands.get_nowait()
+                    except queue.Empty:
+                        break
+                    if kind == "answer":
+                        receipt = value[-1]
+                        if receipt.set_running_or_notify_cancel():
+                            receipt.set_result(False)
                 self._started.set()
 
     def _available_triggers(self) -> tuple[dict, ...]:
@@ -564,12 +578,18 @@ class Driver:
     def _request_approval(self, event, deny_reason=None) -> None:
         peer = self._peer
 
-        def answer(choice: str, reason: str = "") -> None:
-            values = (peer, event, choice, reason)
+        def answer(choice: str, reason: str = "") -> Future[bool]:
+            receipt = Future()
+            values = (peer, event, record, choice, reason, receipt)
             if threading.current_thread() is self._thread:
                 self._answer(*values)
             else:
-                self._commands.put(("answer", values))
+                with self._answer_lock:
+                    if self._closing.is_set():
+                        receipt.set_result(False)
+                    else:
+                        self._commands.put(("answer", values))
+            return receipt
 
         record = {
             "type": "approval",
@@ -589,14 +609,28 @@ class Driver:
         else:
             self.approvals.receive(event, answer)
 
-    def _answer(self, peer, event, choice: str, reason: str) -> None:
-        if self._peer is not peer:
+    def _answer(self, peer, event, record, choice: str, reason: str, receipt: Future[bool]) -> None:
+        if not receipt.set_running_or_notify_cancel():
             return
-        self._peer.answer(event.request_id, choice, reason)
-        self._last_output = self.clock()
-        self._record_approval_end(event, choice, reason)
-        if self._turn and choice == "deny":
-            self._turn.denied.append({"tool": event.tool, "reason": reason})
+        delivered = False
+        try:
+            if self._peer is not peer or self._approval_records.get(event.request_id) is not record:
+                return
+            if self._closing.is_set() and choice != "deny":
+                return
+            try:
+                delivered = peer.answer(event.request_id, choice, reason) is True
+            except OSError:
+                delivered = False
+            if not delivered:
+                self._record_approval_end(event, "expired", "approval response was not delivered")
+                return
+            self._last_output = self.clock()
+            self._record_approval_end(event, choice, reason)
+            if self._turn and choice == "deny":
+                self._turn.denied.append({"tool": event.tool, "reason": reason})
+        finally:
+            receipt.set_result(delivered)
 
     def _record_approval_end(self, event, choice: str, reason: str) -> None:
         record = self._approval_records.pop(event.request_id, None)
