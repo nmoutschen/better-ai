@@ -184,16 +184,25 @@ class ProcessTransport:
             return
         self._closed.set()
         self._proc.stdin.close()
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(self.pid, signal.SIGTERM)
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            self._proc.wait(timeout=0.2)
-        # The session leader can exit as soon as it receives cancel, leaving its workers.
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(self.pid, signal.SIGKILL)
+        signal_error = None
+        for signum in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(self.pid, signum)
+            except ProcessLookupError:
+                break
+            except PermissionError as error:
+                signal_error = error
+            if signum == signal.SIGTERM:
+                # Reap the leader after the final signal so the group ID cannot be reused.
+                time.sleep(0.2)
         with contextlib.suppress(subprocess.TimeoutExpired):
             self._proc.wait(timeout=0.5)
         for reader, stream in zip(self._readers, (self._proc.stdout, self._proc.stderr), strict=True):
             reader.join(timeout=0.2)
             if not reader.is_alive():
                 stream.close()
+        # On macOS a group that contains only unreaped processes can refuse a signal.
+        if signal_error is not None and (
+            self._proc.returncode is None or any(reader.is_alive() for reader in self._readers)
+        ):
+            raise signal_error

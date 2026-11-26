@@ -420,8 +420,13 @@ class Driver:
             ),
         )
         self._begin(batch.position, items, tuple(r["id"] for r in available))
-        self._peer.prompt(self._prompt(batch, available))
-        self._first_prompt = False
+        prompt = self._prompt(batch, available)
+        try:
+            self._peer.prompt(prompt)
+        except OSError as error:
+            self._failed("crashed", str(error))
+        else:
+            self._first_prompt = False
 
     def _prompt(self, batch, available: tuple[dict, ...]) -> str:
         parts = []
@@ -500,6 +505,7 @@ class Driver:
             self.unit.target(ACTIVE_DELIVERY).unlink()
 
     def _failed(self, kind: str, message: str = "", **details) -> None:
+        kind = kind if kind in ACTIONS else "crashed"
         self._end(kind)
         self._close_peer(kind)
         self._log("error", kind=kind, message=message)
