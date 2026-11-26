@@ -264,6 +264,51 @@ class DriverTests(unittest.TestCase):
         time.sleep(0.15)
         self.assertEqual(len(peer.prompts), 1)
 
+    def test_raw_appends_never_join_live_batches_or_become_their_own_retry(self):
+        self.conv.item("historical")
+        driver = self.driver()
+        driver.start()
+        peer = self.peers[0]
+
+        def batch(peer, number, *expected):
+            eventually(lambda: len(peer.prompts) >= number)
+            data = json.loads(peer.prompts[number - 1].split("\n\n")[-1])
+            self.assertCountEqual([item["id"] for item in data["items"]], expected)
+            self.assertEqual(data["user_actions"], [])
+
+        batch(peer, 1, "historical")
+        self.conv.item("raw-before-rpc")
+        driver.enqueue(self.conv.item("rpc"))
+        self.conv.item("raw-after-rpc")
+        self.conv.events.append({"type": "accept", "id": "raw-action"})
+        self.conv.items["historical"] = "done"
+        peer.events.put(Event("turn_ended", outcome="completed"))
+        batch(peer, 2, "rpc")
+        self.conv.item("raw-during-retry")
+        peer.events.put(Event("turn_ended", outcome="completed"))
+        batch(peer, 3, "rpc")
+        peer.events.put(Event("turn_ended", outcome="completed"))
+        batch(peer, 4, "rpc")
+        self.conv.items["rpc"] = "working"
+        peer.events.put(Event("failed", outcome="crashed"))
+        eventually(lambda: driver.snapshot()["state"] == "failed")
+        self.conv.item("raw-while-failed")
+        driver.enqueue(self.conv.item("next-rpc"))
+        eventually(lambda: len(self.peers) == 2)
+        peer = self.peers[1]
+        batch(peer, 1, "rpc", "next-rpc")
+        self.conv.items.update({"rpc": "done", "next-rpc": "done"})
+        peer.events.put(Event("turn_ended", outcome="completed"))
+        eventually(lambda: driver.snapshot()["state"] == "idle")
+        self.conv.item("raw-while-idle")
+        time.sleep(0.2)
+        self.assertEqual(len(peer.prompts), 1)
+        driver.close()
+        resumed = self.driver()
+        resumed.start()
+        batch_items = [key for key in self.conv.items if key.startswith("raw-")]
+        batch(self.peers[-1], 1, *batch_items)
+
     def test_recovery_names_only_the_interrupted_batch(self):
         self.conv.item("first")
         driver = self.driver()
