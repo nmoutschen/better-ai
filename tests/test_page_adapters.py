@@ -449,7 +449,22 @@ class AdapterTests(unittest.TestCase):
                 self.assertEqual(sent[-1]["params"], {"methodId": "cursor_login"})
                 adapter.receive({"id": sent[-1]["id"], "result": {}})
                 self.assertEqual(sent[-1]["method"], "session/new")
-                options = [{"id": "approvalMode", "currentValue": mode}] if mode else []
+                options = (
+                    [
+                        {
+                            "id": "approvalMode",
+                            "name": "Approval mode",
+                            "type": "select",
+                            "currentValue": mode,
+                            "options": [
+                                {"value": "allowlist", "name": "Allowlist"},
+                                {"value": "unrestricted", "name": "Unrestricted"},
+                            ],
+                        }
+                    ]
+                    if mode
+                    else []
+                )
                 session = {"sessionId": "cursor_session", "configOptions": options}
                 event = adapter.receive({"id": sent[-1]["id"], "result": session})[0]
                 self.assertEqual(event.outcome, outcome)
@@ -469,8 +484,8 @@ class AdapterTests(unittest.TestCase):
                         "sessionId": "devin_session",
                         "toolCall": {"toolCallId": "call", "name": "Bash", "rawInput": {"command": "pwd"}},
                         "options": [
-                            {"kind": "allow_once", "optionId": "once"},
-                            {"kind": "reject_once", "optionId": "no"},
+                            {"kind": "allow_once", "optionId": "once", "name": "Allow once"},
+                            {"kind": "reject_once", "optionId": "no", "name": "Deny"},
                         ],
                     }
                     self.assertEqual(
@@ -484,7 +499,15 @@ class AdapterTests(unittest.TestCase):
                         (),
                     )
                     self.assertEqual(sent[-1]["result"]["outcome"]["optionId"], "no")
-                options = [{"id": "permission_mode", "currentValue": "normal"}]
+                options = [
+                    {
+                        "id": "permission_mode",
+                        "name": "Permission mode",
+                        "type": "select",
+                        "currentValue": "normal",
+                        "options": [{"value": "normal", "name": "Normal"}, {"value": "dangerous", "name": "Bypass"}],
+                    }
+                ]
                 event = adapter.receive(
                     {
                         "id": session_request,
@@ -518,7 +541,12 @@ class AdapterTests(unittest.TestCase):
             "result": {
                 "sessionId": SESSION,
                 "session": {"messages": []},
-                "settings": {"autonomyLevel": "off", "interactionMode": "auto"},
+                "settings": {
+                    "autonomyLevel": "off",
+                    "interactionMode": "auto",
+                    "modelId": "model",
+                    "reasoningEffort": "off",
+                },
             },
         }
         self.assertEqual(adapter.receive(reply)[0].kind, "ready")
@@ -526,16 +554,32 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(sent[-1]["method"], "droid.add_user_message")
         self.assertEqual(sent[-1]["params"], {"text": "Read a name", "queuePlacement": "end_of_turn"})
         adapter.receive({"type": "response", "id": sent[-1]["id"], "result": {}})
+        text = adapter.receive(
+            {
+                "method": "droid.session_notification",
+                "type": "notification",
+                "params": {
+                    "sessionId": SESSION,
+                    "notification": {
+                        "type": "assistant_text_delta",
+                        "messageId": "msg",
+                        "blockIndex": 0,
+                        "textDelta": "Read",
+                    },
+                },
+            }
+        )[0]
+        self.assertEqual((text.kind, text.text), ("text", "Read"))
         for key, owner in (("own", None), ("other", "child-id")):
             request = {
                 "toolUses": [
                     {
                         "toolUse": {"type": "tool_use", "id": "tool", "name": "Execute", "input": {"command": "pwd"}},
                         "confirmationType": "exec",
-                        "details": {"type": "exec", "command": "pwd"},
+                        "details": {"type": "exec", "command": "pwd", "fullCommand": "pwd"},
                     }
                 ],
-                "options": [{"value": "proceed_once"}, {"value": "cancel"}],
+                "options": [{"value": "proceed_once", "label": "Allow once"}, {"value": "cancel", "label": "Deny"}],
             }
             if owner:
                 request["workerSessionId"] = owner

@@ -20,7 +20,7 @@ class Candidate:
     argv: tuple[str, ...]
     kind: str | None
     approval: str | None = None
-    codec_factory: Callable[[Send], ACPAdapter | CodexAdapter | ClaudeAdapter] | None = None
+    codec_factory: Callable[[Send], ACPAdapter | CodexAdapter | ClaudeAdapter | DroidAdapter] | None = None
 
     def command(self, session_id: str, resume: str | None) -> tuple[str, ...]:
         if self.kind is not None:
@@ -33,7 +33,9 @@ class Candidate:
             raise ValueError("a new Claude page session requires a UUID")
         return (*self.argv, f"--session-id={session_id}")
 
-    def codec(self, send: Send, session_id: str, resume: str | None) -> ACPAdapter | CodexAdapter | ClaudeAdapter:
+    def codec(
+        self, send: Send, session_id: str, resume: str | None
+    ) -> ACPAdapter | CodexAdapter | ClaudeAdapter | DroidAdapter:
         if self.codec_factory is None:
             raise ValueError("no verified protocol for this harness")
         if self.name == "claude":
@@ -88,16 +90,20 @@ def candidate(requested: str, env: Mapping[str, str], which: Callable[[str], str
     if executable is None:
         return Candidate(name, (), "not-installed")
     argv = (executable, *command[1:])
-    factories = {"claude": ClaudeAdapter, "codex": CodexAdapter, "opencode": OpenCodeAdapter}
-    factory = factories.get(name)
-    if factory is None:
-        return Candidate(name, argv, "no-approvals")
+    factories = {
+        "claude": ClaudeAdapter,
+        "codex": CodexAdapter,
+        "opencode": OpenCodeAdapter,
+        "cursor": CursorAdapter,
+        "droid": DroidAdapter,
+        "devin": DevinAdapter,
+    }
     if name == "opencode":
         try:
             _opencode_config(env)
         except ValueError:
             return Candidate(name, argv, "unsafe-mode")
-    return Candidate(name, argv, None, "webauthn", factory)
+    return Candidate(name, argv, None, "webauthn", factories[name])
 
 
 def version_supported(name: str, version: str) -> bool:
@@ -109,7 +115,7 @@ def version_supported(name: str, version: str) -> bool:
 def session_id_valid(name: str, session_id: Any) -> bool:
     if name not in _HARNESSES or not isinstance(session_id, str):
         return False
-    pattern = _UUID if name in {"claude", "codex", "droid"} else _ACP_SESSION
+    pattern = _UUID if name in {"claude", "codex"} else _ACP_SESSION
     return pattern.fullmatch(session_id) is not None
 
 
@@ -209,20 +215,26 @@ class _RPCAdapter:
         self._calls: dict[WireID, tuple[str, Callable[[dict], Events]]] = {}
         self._approvals: dict[WireID, tuple[str | None, Callable[[str, str], dict]]] = {}
 
-    def _call(self, method: str, params: dict, done: Callable[[dict], Events]) -> int:
-        request_id = next(self._ids)
+    def _request_id(self) -> WireID:
+        return next(self._ids)
+
+    def _send_frame(self, _kind: str, **fields) -> None:
+        self.send({"jsonrpc": "2.0", **fields})
+
+    def _call(self, method: str, params: dict, done: Callable[[dict], Events]) -> WireID:
+        request_id = self._request_id()
         self._calls[request_id] = (method, done)
-        self.send({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
+        self._send_frame("request", id=request_id, method=method, params=params)
         return request_id
 
     def _notify(self, method: str, params: dict) -> None:
-        self.send({"jsonrpc": "2.0", "method": method, "params": params})
+        self._send_frame("notification", method=method, params=params)
 
     def _result(self, request_id: WireID, payload: dict) -> None:
-        self.send({"jsonrpc": "2.0", "id": request_id, "result": payload})
+        self._send_frame("response", id=request_id, result=payload)
 
     def _error(self, request_id: WireID, code: int, message: str) -> None:
-        self.send({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}})
+        self._send_frame("response", id=request_id, error={"code": code, "message": message})
 
     def answer(self, request_id: WireID, choice: str, reason: str = "") -> bool:
         pending = self._approvals.pop(request_id, None)
@@ -268,6 +280,8 @@ class _RPCAdapter:
 class ACPAdapter(_RPCAdapter):
     """ACP v1 documents transport and request shapes, but leaves approval enforcement to the agent."""
 
+    _client_info: dict = {}
+
     def open(self, cwd: str, resume: str | None) -> None:
         self._cwd = cwd
         self._resume = resume if session_id_valid("opencode", resume) else None
@@ -276,6 +290,7 @@ class ACPAdapter(_RPCAdapter):
             {
                 "protocolVersion": 1,
                 "clientCapabilities": {"fs": {"readTextFile": False, "writeTextFile": False}, "terminal": False},
+                **self._client_info,
             },
             self._initialized,
         )
@@ -283,6 +298,9 @@ class ACPAdapter(_RPCAdapter):
     def _initialized(self, data: dict) -> Events:
         if type(data.get("protocolVersion")) is not int or data["protocolVersion"] != 1:
             return _failure("version")
+        return self._open_session(data)
+
+    def _open_session(self, _data: dict) -> Events:
         params: dict = {"cwd": self._cwd, "mcpServers": []}
         if self._resume:
             self._call("session/load", {**params, "sessionId": self._resume}, self._opened)
@@ -414,6 +432,115 @@ class OpenCodeAdapter(ACPAdapter):
         if (modes or [old_mode]) not in (["build"], ["plan"]):
             return _failure("unsafe-mode")
         return super()._opened(data)
+
+
+class _ConfiguredACPAdapter(ACPAdapter):
+    """Require the peer's effective approval choice, distinct from its coding profile."""
+
+    _permission_option: str
+    _safe_mode: str
+
+    def _permission_check(self, data: dict) -> str | None:
+        options = data.get("configOptions")
+        values = (
+            [
+                option.get("currentValue")
+                for option in options
+                if isinstance(option, dict) and option.get("id") == self._permission_option
+            ]
+            if isinstance(options, list)
+            else []
+        )
+        if len(values) != 1:
+            return "no-approvals"
+        if values[0] != self._safe_mode:
+            return "unsafe-mode"
+        return None
+
+    def _opened(self, data: dict) -> Events:
+        failure = self._permission_check(data)
+        if failure:
+            return _failure(failure)
+        return super()._opened(data)
+
+    def _notification(self, method: str, params: dict) -> Events:
+        if method == "session/update" and self.session_id is not None and params.get("sessionId") == self.session_id:
+            update = _object(params.get("update"))
+            if update.get("sessionUpdate") == "config_option_update":
+                failure = self._permission_check(update)
+                if failure:
+                    self.session_id = None
+                    return _failure(failure)
+        return super()._notification(method, params)
+
+
+class CursorAdapter(_ConfiguredACPAdapter):
+    # The CLI documents allowlist, auto-review and unrestricted independently
+    # of the agent/plan/ask profile. ACP does not require it to expose this choice.
+    _permission_option = "approvalMode"
+    _safe_mode = "allowlist"
+    _client_info = {"clientInfo": {"name": "better-ai", "version": "0.1.0"}}
+
+    def _initialized(self, data: dict) -> Events:
+        if type(data.get("protocolVersion")) is not int or data["protocolVersion"] != 1:
+            return _failure("version")
+        methods = data.get("authMethods")
+        if not isinstance(methods, list) or not any(_object(method).get("id") == "cursor_login" for method in methods):
+            return _failure("login")
+        self._call("authenticate", {"methodId": "cursor_login"}, self._open_session)
+        return ()
+
+
+class DevinAdapter(_ConfiguredACPAdapter):
+    # Devin documents normal mode, but does not promise that its ACP server
+    # forwards tool prompts. Require an actual startup request for this session.
+    _permission_option = "permission_mode"
+    _safe_mode = "normal"
+
+    def __init__(self, send: Send):
+        super().__init__(send)
+        self._forwarded_sessions: set[str] = set()
+
+    def _opened(self, data: dict) -> Events:
+        failure = self._permission_check(data)
+        if failure:
+            return _failure(failure)
+        session_id = data.get("sessionId", self._resume)
+        if not isinstance(session_id, str) or session_id not in self._forwarded_sessions:
+            return _failure("no-approvals")
+        return super()._opened(data)
+
+    def _request(self, request_id: WireID, method: str, params: dict) -> Events:
+        loading = any(called in ("session/load", "session/new") for called, _ in self._calls.values())
+        if self.session_id is not None or not loading or method != "session/request_permission":
+            return super()._request(request_id, method, params)
+        session_id = params.get("sessionId")
+        tool = _object(params.get("toolCall"))
+        options = params.get("options")
+        deny = (
+            next(
+                (
+                    _text(_object(option).get("optionId"))
+                    for option in options
+                    if _object(option).get("kind") == "reject_once"
+                ),
+                "",
+            )
+            if isinstance(options, list)
+            else ""
+        )
+        if (
+            session_id_valid("devin", session_id)
+            and _text(tool.get("toolCallId"))
+            and tool.get("rawInput") is not None
+            and deny
+        ):
+            self._forwarded_sessions.add(session_id)
+            outcome = {"outcome": "selected", "optionId": deny}
+        else:
+            outcome = {"outcome": "cancelled"}
+        self._result(request_id, {"outcome": outcome})
+        return ()
 
 
 class CodexAdapter(_RPCAdapter):
@@ -712,4 +839,188 @@ class ClaudeAdapter:
                 return self._request(request_id, _object(message.get("request")))
             if kind == "control_cancel_request" and self._approvals.pop(request_id, None) is not None:
                 return (AdapterEvent("approval_closed", request_id=request_id, outcome="expired"),)
+        return ()
+
+
+class DroidAdapter(_RPCAdapter):
+    """Factory stream-jsonrpc as published in @factory/droid-sdk 0.11.0."""
+
+    _factory_api_version = "1.0.0"
+    _factory_protocol_version = "1.332.0"
+    _start_methods = ("droid.initialize_session", "droid.load_session")
+
+    def __init__(self, send: Send):
+        super().__init__(send)
+        self._running = False
+
+    def _request_id(self) -> str:
+        return str(next(self._ids))
+
+    def _send_frame(self, kind: str, **fields) -> None:
+        self.send(
+            {
+                "jsonrpc": "2.0",
+                "type": kind,
+                "factoryApiVersion": self._factory_api_version,
+                "factoryProtocolVersion": self._factory_protocol_version,
+                **fields,
+            }
+        )
+
+    def receive(self, message: dict) -> Events:
+        request_id = message.get("id")
+        if (
+            _wire_id(request_id)
+            and self._calls.get(request_id, ("", None))[0] in self._start_methods
+            and "result" in message
+        ):
+            version = _text(message.get("factoryProtocolVersion"))
+            match = _VERSION.fullmatch(version)
+            if match is None or int(match[1]) != 1 or tuple(map(int, match.groups())) < (1, 332, 0):
+                self._calls.pop(request_id)
+                return _failure("version")
+        return super().receive(message)
+
+    def open(self, cwd: str, resume: str | None) -> None:
+        self._cwd = cwd
+        self._resume = resume if session_id_valid("droid", resume) else None
+        if self._resume:
+            self._call("droid.load_session", {"sessionId": self._resume}, self._opened)
+        else:
+            self._new_session()
+
+    def _new_session(self) -> None:
+        self._call(
+            "droid.initialize_session",
+            {
+                "machineId": "default",
+                "cwd": self._cwd,
+                "autonomyLevel": "off",
+                "interactionMode": "auto",
+            },
+            self._opened,
+        )
+
+    def _opened(self, data: dict) -> Events:
+        settings = _object(data.get("settings"))
+        if settings.get("autonomyLevel") != "off" or settings.get("interactionMode") != "auto":
+            return _failure("unsafe-mode")
+        session_id = data.get("sessionId", self._resume)
+        if not session_id_valid("droid", session_id):
+            return _failure("crashed", "missing or invalid Droid session id")
+        self.session_id = session_id
+        pending = data.get("pendingPermissions")
+        for request in pending if isinstance(pending, list) else ():
+            request_id = _object(request).get("requestId")
+            if isinstance(request_id, str) and request_id:
+                self._result(request_id, {"selectedOption": "cancel", "comment": "previous page session ended"})
+        return (AdapterEvent("ready", session_id=session_id),)
+
+    def prompt(self, text: str) -> None:
+        if self.session_id is None:
+            raise RuntimeError("Droid session is not open")
+        self._call("droid.add_user_message", {"text": text, "queuePlacement": "end_of_turn"}, lambda _: ())
+
+    def cancel(self) -> None:
+        if self.session_id is not None:
+            self._call("droid.interrupt_session", {}, lambda _: ())
+
+    def _call_failed(self, method: str, error: dict) -> Events:
+        if method == "droid.load_session" and error.get("code") == -32004:
+            self._resume = None
+            self._new_session()
+            return ()
+        if error.get("code") == -32001:
+            return _failure("login", _text(error.get("message")))
+        return super()._call_failed(method, error)
+
+    def _request(self, request_id: WireID, method: str, params: dict) -> Events:
+        if method != "droid.request_permission":
+            return super()._request(request_id, method, params)
+        uses, options = params.get("toolUses"), params.get("options")
+        if not isinstance(uses, list) or not isinstance(options, list):
+            self._result(request_id, {"selectedOption": "cancel"})
+            return ()
+        calls = [_object(_object(use).get("toolUse")) for use in uses]
+        names = [_text(call.get("name")) for call in calls]
+        can_approve = (
+            self.session_id is not None
+            and names
+            and all(names)
+            and all(isinstance(call.get("input"), dict) for call in calls)
+            and any(_object(option).get("value") == "proceed_once" for option in options)
+            and all(_object(use).get("confirmationType") != "exit_spec_mode" for use in uses)
+        )
+        if not can_approve:
+            self._result(request_id, {"selectedOption": "cancel"})
+            return ()
+
+        def respond(choice: str, reason: str) -> dict:
+            if choice == "allow_once":
+                return {"selectedOption": "proceed_once"}
+            result = {"selectedOption": "cancel"}
+            if reason:
+                result["comment"] = reason
+            return result
+
+        owner = _text(params.get("workerSessionId")) or None
+        self._approvals[request_id] = (owner, respond)
+        return (
+            AdapterEvent(
+                "approval",
+                request_id=request_id,
+                tool=", ".join(names),
+                arguments=uses,
+                options=("allow_once", "deny"),
+                requester=owner,
+            ),
+        )
+
+    def _notification(self, method: str, params: dict) -> Events:
+        if method != "droid.session_notification":
+            return ()
+        session_id = params.get("sessionId")
+        if session_id is not None and session_id != self.session_id:
+            return ()
+        data = _object(params.get("notification"))
+        kind = data.get("type")
+        if kind == "permission_resolved" and _wire_id(data.get("requestId")):
+            request_id = data["requestId"]
+            if self._approvals.pop(request_id, None) is not None:
+                return (AdapterEvent("approval_closed", request_id=request_id, outcome="expired"),)
+        if kind == "child_session_settled" and (owner := _text(data.get("childSessionId"))):
+            return _expire_owned(self._approvals, owner)
+        if kind == "settings_updated":
+            settings = _object(data.get("settings"))
+            if settings.get("autonomyLevel", "off") != "off" or settings.get("interactionMode", "auto") != "auto":
+                self.session_id = None
+                return _failure("unsafe-mode")
+        if kind == "assistant_text_delta":
+            return (AdapterEvent("text", text=_text(data.get("textDelta"))),)
+        if (
+            kind == "droid_working_state_changed"
+            and data.get("newState")
+            in (
+                "thinking",
+                "streaming_assistant_message",
+                "executing_tool",
+                "waiting_for_tool_confirmation",
+            )
+            and not self._running
+        ):
+            self._running = True
+            return (AdapterEvent("turn_started"),)
+        if kind == "agent_turn_completed":
+            self._running = False
+            outcomes = {
+                "completed": "normal",
+                "permission_rejected": "normal",
+                "cancelled": "stopped",
+                "model_usage_exhausted": "limit",
+                "model_rate_limited": "limit",
+                "model_authentication_failed": "login",
+                "no_approver_available": "no-approvals",
+            }
+            closed = _expire_owned(self._approvals, None)
+            return (*closed, AdapterEvent("turn_ended", outcome=outcomes.get(_text(data.get("reason")), "crashed")))
         return ()
