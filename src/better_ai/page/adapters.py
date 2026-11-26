@@ -315,9 +315,10 @@ class ACPAdapter(_RPCAdapter):
 
     def _call_failed(self, method: str, error: dict) -> Events:
         message = _text(error.get("message"))
-        if error.get("code") == -32000 or error.get("code") == -32002:
-            return _failure("login", message) if error.get("code") == -32000 else super()._call_failed(method, error)
-        if method == "session/load" and (error.get("code") == -32602 or "not found" in message.casefold()):
+        code = error.get("code")
+        if code == -32000:
+            return _failure("login", message)
+        if method == "session/load" and (code in (-32002, -32602) or "not found" in message.casefold()):
             self._resume = None
             self._call("session/new", {"cwd": self._cwd, "mcpServers": []}, self._opened)
             return ()
@@ -410,7 +411,7 @@ class CodexAdapter(_RPCAdapter):
         return ()
 
     def _account(self, data: dict) -> Events:
-        if not _object(data.get("account")).get("type"):
+        if data.get("requiresOpenaiAuth") is not False and not _object(data.get("account")).get("type"):
             return _failure("login")
         self._open_thread()
         return ()
