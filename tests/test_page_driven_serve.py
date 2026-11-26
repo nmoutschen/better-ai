@@ -8,6 +8,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 import better
 from test_page_token import NOTE, Served, rpc
@@ -54,7 +55,7 @@ class DrivenServeTest(Served):
         result = better.run("show-better", "serve", str(self.folder), "--drive", "unknown", cwd=self.root)
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
 
-    def launch_driven(self, *, enrolled=True, hanging=False, once=False, delay=0, version="2.4.1"):
+    def launch_driven(self, *, enrolled=True, hanging=False, once=False, delay=0, version="2.4.1", stale=False):
         bin_dir = self.root / "bin"
         bin_dir.mkdir()
         stub = bin_dir / "opencode"
@@ -95,6 +96,16 @@ elif credential == "invalid":
     path = Path("test-credential")
     path.write_text("invalid")
     path.chmod(0o600)
+stale = sys.argv.pop(1) == "True"
+if stale:
+    from better_ai.page.driver import Driver
+    snapshot = Driver.snapshot
+    Driver.snapshot = lambda self: {**snapshot(self), "age": 4}
+wait_for_more = page.Conversation.wait_for_more
+def marked_wait(self, after, seconds):
+    Path("poll-started").touch()
+    return wait_for_more(self, after, seconds)
+page.Conversation.wait_for_more = marked_wait
 delay = float(sys.argv.pop(1))
 if delay:
     import time
@@ -115,6 +126,7 @@ sys.exit(cli.main())
                 bootstrap,
                 str(better.SRC),
                 str(enrolled),
+                str(stale),
                 str(delay),
                 "serve",
                 str(self.folder),
@@ -295,3 +307,40 @@ sys.exit(cli.main())
         for detail in ("1.2.3", "2.4.1", "serve again"):
             self.assertIn(detail, diagnostics)
         self.assertNotIn("Start", diagnostics)
+
+    def test_link_rotation_denies_events_already_waiting(self):
+        import time
+
+        process = self.launch_driven()
+        self.assertIn("driver: on", process.stdout.readline())
+        _, paired = self.pair(process.stdout.readline().strip().split(" at ", 1)[1])
+        main, conversation = self.pair(paired["page"])
+        with ThreadPoolExecutor() as pool:
+            poll = pool.submit(self.request, main + "events?after=0", token=conversation["secret"])
+            deadline = time.monotonic() + 2
+            while not (self.root / "poll-started").exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue((self.root / "poll-started").exists())
+            rotated = better.run("show-better", "serve", str(self.folder), "--link", cwd=self.root)
+            self.assertEqual(rotated.returncode, 0, rotated.stderr)
+            _, paired = self.pair(rotated.stdout.strip())
+            main, new = self.pair(paired["page"])
+            code, reply = self.request(
+                main + "rpc",
+                token=new["secret"],
+                body={"jsonrpc": "2.0", "id": 1, "method": "note", "params": NOTE},
+            )
+            self.assertEqual(code, 200)
+            self.assertEqual(reply["result"], "saved")
+            self.assertEqual(poll.result(timeout=3)[0], 403)
+
+    def test_a_live_server_can_pair_when_its_driver_is_stale(self):
+        process = self.launch_driven(stale=True)
+        self.assertIn("driver: on", process.stdout.readline())
+        self.assertIn("Serving", process.stdout.readline())
+        linked = better.run("show-better", "serve", str(self.folder), "--link", cwd=self.root)
+        self.assertEqual(linked.returncode, 0, linked.stderr)
+        panel, paired = self.pair(linked.stdout.strip())
+        agent = self.request(panel + "agent", token=paired["secret"])[1]
+        self.assertGreater(agent["age"], 3)
+        self.assertFalse(agent["can_start"])
