@@ -39,7 +39,7 @@ Diagrams: <link to design JSON>
   - Drivers: <requirement IDs>
   - Rejected: <alternative>: <reason>
   - Drawback: <main cost, risk or maintenance burden of the chosen option>
-  - Assumes: <what must stay true for this choice to hold>
+  - Assumes: <what must stay true for this choice to hold>, <confirmed by a proof of concept, with what was observed; contradicted, with what was observed; or untested>
 
 ## Departures from existing patterns
 

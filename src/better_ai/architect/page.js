@@ -203,6 +203,15 @@ function changeList(since, labels, removed = []) {
   return '<details class="rej"><summary>All ' + since.length + ' changes</summary><ul>' + items.join('') + '</ul></details>';
 }
 
+// The agents at work in the side column, by the list every page shares, aged from when each started; a copy written by
+// `render` has no clock to age them by (NOW is null).
+const AGENT_STATES = {'review': 'Reviewing', 'proof of concept': 'Testing', 'spec check': 'Checking'};
+function agentList(agents, now) {
+  const rows = agents.map(a => ({who: a.name, what: a.what, since: now === null ? null : a.at, state: AGENT_STATES[a.task],
+    kind: a.task === 'proof of concept' ? '' : 'verifier'}));  // reviewers and the spec checker check what others wrote
+  return pageAgents(rows, {now, quietAfter: 0, empty: 'No agent is working right now.'});
+}
+
 function threadComment(log, id) {
   const event = log.findLast(event => (event.type === 'comment' && event.id === id) || (event.type === 'delete' && event.to === id));
   return event?.type === 'comment' && byId(event.on?.id) ? event : undefined;
@@ -267,6 +276,9 @@ function start(data) {
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
   section('decisions', 'Decision records', decisionRecords(data.decisions));
   section('spec', 'Spec', specTables(data.spec));
+  const drawAgents = () => { byId('agents').innerHTML = agentList(data.agents || [], readOnly ? null : Date.now() / 1000); };
+  drawAgents();
+  if (!readOnly) setInterval(drawAgents, 30000);
 
   for (const [key, part] of Object.entries(data.parts)) {
     if (key !== part.key) continue;

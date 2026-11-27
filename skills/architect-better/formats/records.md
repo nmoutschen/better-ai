@@ -1,6 +1,6 @@
 # Architect records
 
-ADD each with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, its fields as JSON on stdin, where `<unit>` is the change folder `.architect/<change>` and `<type>` is `design`, `requirement`, `perspective`, `finding` or `decision`. The head record is the one you gave `create`. CHANGE a record with `python3 <skill dir>/scripts/better.pyz set <unit> <id>`, or `set <unit> design` for the design. Leave out `at`, `by` and `id`: the command adds them. IF the command refuses a record, FIX the record and RUN it again.
+ADD each with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your name>`, its fields as JSON on stdin, where `<unit>` is the change folder `.architect/<change>` and `<type>` is `design`, `requirement`, `perspective`, `finding`, `decision` or `agent`. The head record is the one you gave `create`. CHANGE a record with `python3 <skill dir>/scripts/better.pyz set <unit> <id>`, or `set <unit> design` for the design. Leave out `at`, `by` and `id`: the command adds them. IF the command refuses a record, FIX the record and RUN it again.
 
 - GIVE a missing value as `null`, a list as a JSON array, and a value that has a fixed set as one of its exact lowercase words. A field the record does not name is an error. ADD the record a pointer names before the pointer: a perspective before its findings, a requirement before the decision it drives. An optional field may be `null`, which means it is absent; a field a status drives, such as `handled_by`, exists only in that status.
 - `kind` of a requirement is `functional`, `quality` or `constraint`. ADD one record per requirement, with the source it comes from.
@@ -43,6 +43,12 @@ The findings, type `finding`: one per finding, open or handled.
 The decisions, type `decision`: one per decision.
 
 {"type": "decision", "title": "<title>", "drivers": ["<requirement id>"], "chosen": "<what was chosen>", "rejected": [{"option": "<option>", "why": "<why not>"}], "drawback": "<main drawback of the chosen option>"}
+
+The agents you start, type `agent`: one per agent, added `running` when it starts; its `at` is when it started. `task` is `review`, `proof of concept` or `spec check`, and `what` says in a few words what it works on, such as the perspective's name or the question a proof of concept answers. SET `status` to `done` when it hands back, or `stopped` when it ends without a hand-back.
+
+{"type": "agent", "name": "<the agent's name>", "task": "review", "what": "<perspective name>", "status": "running"}
+{"type": "agent", "name": "<the agent's name>", "task": "proof of concept", "what": "<the question it answers, in a few words>", "status": "done"}
+{"type": "agent", "name": "<the agent's name>", "task": "spec check", "what": "<what it checks>", "status": "stopped"}
 
 The reviews, type `review`: the `review` command adds them, never `add`:
 

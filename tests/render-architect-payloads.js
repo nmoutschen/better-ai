@@ -28,6 +28,7 @@ for (const {label, data} of payloads) {
     draw('data.flows.map(flow => flowMarks(flow.status) + figures(flow.versions, data.versions)).join("")');
     draw('reviewSummary(data.since, data.change_labels, data.rerun.map(id => nameOf(data.perspectives, id)))');
     draw('changeList(data.since, data.change_labels, data.removed)');
+    draw('agentList(data.agents, Date.now() / 1000) + agentList(data.agents, null)');
   } catch (error) {
     failed.push(`${label}: ${error.stack.split('\n').slice(0, 2).join(' ')}`);
   }

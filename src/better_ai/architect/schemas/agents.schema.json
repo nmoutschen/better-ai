@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agents.schema.json",
+  "title": "one line of agents.jsonl: an agent the architect started, such as a reviewer, a proof of concept or the spec checker; `at` is when it started",
+  "x-files": [
+    "agents.jsonl"
+  ],
+  "x-required-files": [
+    "architect.json"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "at",
+    "by",
+    "id",
+    "name",
+    "task",
+    "what",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "agent"
+    },
+    "at": {
+      "$ref": "base.schema.json#/$defs/at"
+    },
+    "by": {
+      "$ref": "base.schema.json#/$defs/by"
+    },
+    "id": {
+      "$ref": "base.schema.json#/$defs/id",
+      "pattern": "^A\\d+$",
+      "x-id": {
+        "prefix": "A"
+      }
+    },
+    "name": {
+      "description": "the agent's own name, as the architect calls it",
+      "type": "string",
+      "minLength": 1
+    },
+    "task": {
+      "enum": [
+        "review",
+        "proof of concept",
+        "spec check"
+      ]
+    },
+    "what": {
+      "description": "what it works on, in a few words: the perspective, or the question the proof of concept answers",
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "description": "running while it works; done once it handed back; stopped when it ended without a hand-back",
+      "enum": [
+        "running",
+        "done",
+        "stopped"
+      ]
+    }
+  }
+}
