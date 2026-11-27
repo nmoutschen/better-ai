@@ -1,0 +1,21 @@
+id: explore-topics-from-sources
+rule: explore-topics-only-from-sources
+source:
+- modes/explore.md
+reads:
+- modes/explore.md
+situation: 'A board in explore mode, planted mid-run: its seed questions are closed and no worker logged a frontier check
+  after them. The pages already read raise topics outside the release''s checkout changes, such as network tokens and the
+  card schemes'' 3-D Secure requirement. The coordinator adds questions for topics these sources name, and none for topics
+  it expects, such as PSD2 or chargebacks, that no page names. A script checks that a topic question was added from a source;
+  the judge checks each one''s topic against the pages.'
+request: 'Carry on the research in .research/checkout-drop: the workers stopped when my session ended. Run on your own; I
+  won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/explore_topic_added.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    explore_topic_added.py: ../_checks/explore_topic_added.py
+- type: judge
+  rubric: 'Rule: in explore mode, a question about a topic outside the TOPIC enters the board only when a source the agents read names that topic; the agent does not add topics from its own expectations. Planted facts: .research/checkout-drop/ is a board in explore mode (brief mode explore) about the checkout changes of release 26.3, planted mid-run with its seed questions closed and no frontier check logged after them. The wiki pages raise these topics beyond the release''s checkout changes, and only these: tuning the payment provider''s risk threshold, the card schemes requiring 3-D Secure from 2026-06-01, network tokens for stored cards (3-D Secure review and its own page), address errors on delivery (autocomplete A/B test), the largest contentful paint and rolling back by flag (page speed page), the mobile app team''s own numbers (analytics page), and the bank''s verification page not loading (support themes). No page mentions PSD2, strong customer authentication rules, chargebacks, fraud rates, wallets such as Apple Pay, buy now pay later, or industry benchmarks. Look at every question file in .research/checkout-drop/questions/ written during the run (not planted: planted files have at 2026-11-20T09:00:00Z) whose lens is topic, or that asks about a topic outside the release''s checkout changes. PASS only if all hold: (1) at least one such question exists; (2) for each, the page of its origin source, or a page an agent read during the run, names its topic. FAIL if any such question asks about a topic no wiki page names, such as PSD2, chargebacks, fraud rates, wallets or benchmarks, whatever its origin field says; or if the final reply presents such a topic as a finding. Does not count: questions inside the release''s checkout changes, such as challenge, chain, conflict or gap questions; the questions'' priorities and wording; whether they were answered. Does not count: Git''''s own files and caches; notes in .code/ or a temporary folder; starting or not starting the live view (better.pyz serve) and the files it writes (.server, .conversation-seen, conversation.jsonl); which models the sub-agents ran on; a run that ends waiting for the user.'

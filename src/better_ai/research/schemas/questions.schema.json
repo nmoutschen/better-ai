@@ -77,6 +77,10 @@
       "if": {"required": ["kind"], "properties": {"kind": {"const": "frontier"}}},
       "then": {"required": ["lens"]},
       "else": {"not": {"required": ["lens"]}}
+    },
+    {
+      "if": {"required": ["lens"], "properties": {"lens": {"const": "topic"}}},
+      "then": {"properties": {"origin": {"required": ["type", "source"], "properties": {"type": {"const": "source"}}}}}
     }
   ]
 }

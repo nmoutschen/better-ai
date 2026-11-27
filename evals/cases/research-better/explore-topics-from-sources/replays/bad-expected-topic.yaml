@@ -1,0 +1,5 @@
+reply: Added a question on PSD2 rules.
+actions:
+- write: .research/checkout-drop/questions/Q-coordinator-5.json
+  content: '{"type": "question", "at": "2026-11-21T10:00:00Z", "by": "coordinator", "id": "Q-coordinator-5", "question": "How do PSD2 strong customer authentication rules shape 3-D Secure challenges?", "title": "PSD2 rules and challenges", "priority": "medium", "status": "open", "origin": {"type": "goal"}, "kind": "gap", "raised_in": "Q-coordinator-3", "stakes": "what regulation adds to the picture", "done_when": "a page describes the rules", "note": null}
+'

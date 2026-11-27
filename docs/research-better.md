@@ -8,6 +8,7 @@ Researches a topic from sources instead of the model's training data, and writes
 ## When to use it
 
 - To answer a question from sources: a topic to understand, a choice to make, a review of what is known.
+- To learn a field and see where the reading leads, in explore mode: it follows the topics the sources raise beyond your first question.
 - To answer a simple factual question, such as a date or a current value. It stops after one or two searches and answers in one or two sentences, naming the source.
 - To research your organisation's own systems or decisions, from the internal tools your agent can reach, such as a wiki or ticket tracker.
 
@@ -39,6 +40,18 @@ Without an argument, it resumes from an existing research board, or restarts the
 7. **It stops** when no question at the stop level is still open, or when results stop adding anything new after one change of strategy. It does not stop because it found the answer it expected.
 8. **It presents the findings** with APA citations, a reference list built only from the board, what each challenge question found, and the questions that remain open.
 
+## Explore mode
+
+When you ask to explore or learn a field rather than answer a question, it runs in explore mode and says so. The evidence rules stay the same; what changes:
+
+- **Scope:** a topic a source raises outside your first question becomes a new question, not out of scope. Each records the source that raised it and the question it came from, so the board shows the path from your topic to each new one.
+- **Priority:** a topic ranks higher the more independent sources raise it, or the more central it is to the source that does.
+- **Depth:** it follows topics up to three steps from the first questions, unless you set another limit. Deeper topics are listed as leads.
+- **Stopping:** it stops when no question at the stop level is left within that depth, or when reading stops adding new sources, terms or topics.
+- **Report:** a map of the branches, with the path to each topic, the source that raised it and what the branch found.
+
+It adds a topic only when a source it read names it, never because it expects the topic to matter. From the live board, ask it to drop a branch, keep a topic, or end the run.
+
 If a source it needs is unreachable (a missing tool, a login, an error), it does not fill the gap from other sources or from memory. Before the research runs, it tells you and asks whether to wait, continue without it, or read sources you give it. Once it runs, it does not stop to wait for you: it records a decision with a safe default and a deadline (see below) and keeps working. It never puts internal names or text in a web search.
 
 Without a live view, it posts one line in the chat each time a question closes.
@@ -58,7 +71,7 @@ When the board's server stops, a strip says the board is closed; ask the agent t
 
 ## What you get
 
-- A research board in `.research/<topic-slug>/`, as JSON files: `brief.json` (the topic, its meaning, your goal and the state of the run), `questions/`, `claims/` (each with its verbatim quote and the verifier's verdict and copied passage) and `sources/`, one file each, `logs/` (each agent's searches), `decisions.jsonl` (the decisions taken during the run), and your conversation with the coordinator (`conversation.jsonl`). Git sees it as untracked, so commit it or ignore it as you choose. A later session can resume from it.
+- A research board in `.research/<topic-slug>/`, as JSON files: `brief.json` (the topic, its meaning, your goal, the mode and the state of the run), `questions/`, `claims/` (each with its verbatim quote and the verifier's verdict and copied passage) and `sources/`, one file each, `logs/` (each agent's searches), `decisions.jsonl` (the decisions taken during the run), and your conversation with the coordinator (`conversation.jsonl`). Git sees it as untracked, so commit it or ignore it as you choose. A later session can resume from it.
 - Records that fit their schema. Each record is stamped and checked against its schema when it is written, with `better.pyz add`, `set` and `check`, and the live board lists any record that does not fit, with its file, line and field, instead of hiding it. Nothing others point to is deleted: a wrong claim is marked withdrawn, a source that copies another is marked a duplicate, and a duplicate question is merged into the one that covers it.
 - A live board while the research runs, or progress lines in the chat.
 - A report: the answer first, where sources disagree or evidence is weak, citations in APA style (7th edition), a reference list, and open questions or blocked sources that could change the answer.
