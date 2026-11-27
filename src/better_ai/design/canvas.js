@@ -537,27 +537,20 @@
     if (e.text) body.append(e.text);
     return body;
   }
-  function approvalItem(c) {
-    var e = c.e, li = el('li', 'msg me decision'), head = el('div', 'head');
-    head.append(el('span', 'who', 'You approved'), el('span', 'when', time(e.at)));
-    var d = el('p', 'body'); d.append(el('strong', '', e.label || e.option));
-    if (e.carries && e.carries.length) d.append(el('span', 'with', ' with comments ' + e.carries.map(function (id) { var x = conv.log().filter(function (y) { return y.id === id; })[0]; return x && x.n ? x.n : '?'; }).join(', ')));
-    li.append(head, d); if (e.text) li.append(el('p', 'body', e.text));
-    return li;
-  }
+  function approvalItem(c) { return pageApprovalItem(c, conv.log()); }
   function verdictItem(c) {
     var e = c.e, t = (e.verdict ? (e.verdict === 'up' ? 'Thumbs up for ' : 'Thumbs down for ') + e.version : 'You withdrew your verdict on ' + e.version);
     return el('li', 'sys', t + ', ' + time(e.at));
   }
   // New versions from the agent load on the same view and version; the screen size is kept by SIZE_KEY above.
-  var KEY = 'canvas-view:' + location.pathname, deciding = false;
+  var KEY = 'canvas-view:' + location.pathname, approval = null;
   var conv = pageConversation({
     served: served, agent: 'Agent', unsent: 'Use Copy all to paste it in the chat.', apply: apply, reset: reset, byId: byId,
     reveal: reveal, edit: openEdit, remove: comments.remove,
     showLabel: function (n) { return 'Show where comment ' + n + ' is'; },
     crumb: function (e) { var on = e.on || e; return crumb(on.version, on.target || {}); }, commentBody: commentBody,
     kinds: { approve: approvalItem, verdict: verdictItem }, itemKinds: ['comment', 'note', 'approve'],
-    sendMode: function () { return deciding ? sendApproval : null; },
+    sendMode: function () { return approval ? approval.sendMode() : null; },
     busy: function () { return !pop.hidden; },
     beforeReload: function () {
       sessionStorage.setItem(KEY, JSON.stringify({ view: main.classList.contains('switch') ? 'switch' : 'side', current: current }));
@@ -589,50 +582,20 @@
         function () { say('Could not copy. Select the conversation and copy it by hand.', true); });
     });
   }
-  // Approve: one confirmed approval, sent with the open comments that come with it and the message as its note. The
-  // Send button becomes Confirm while the panel is open, so the same place sends both. page.js opens and closes the panel.
-  var panel = el('div', 'approval'), approveBtn = el('button', 'btn btn--quiet', 'Approve…');
-  approveBtn.type = 'button'; approveBtn.setAttribute('aria-expanded', 'false'); panel.hidden = true;
-  panel.append(el('p', 'menu-h', 'Your approval'), el('div', 'dopts'), el('div', 'carry'));
-  panel.querySelector('.dopts').setAttribute('role', 'radiogroup'); panel.querySelector('.dopts').setAttribute('aria-label', 'Approval');
-  document.querySelector('.notes .composer').insertBefore(panel, document.querySelector('.notes .composer label'));
-  noteBtn.parentElement.insertBefore(approveBtn, noteBtn.nextSibling);
+  // Approve: page.js's panel, with one option per version, or Ship After and Keep Before.
   var beforeAfter = labels.length === 2 && labels[0].toLowerCase() === 'before' && labels[1].toLowerCase() === 'after';
-  var OPTIONS = beforeAfter ? [['Ship After', 'After'], ['Keep Before', 'Before']]
-    : labels.map(function (l) { return ['Build ' + l, l]; }).concat([['Combine versions (say how below)', 'combine']]);
-  OPTIONS.push(['None of these (say why below)', 'none']);
+  function approvalOptions() {
+    var options = beforeAfter ? [{ label: 'Ship After', value: 'After' }, { label: 'Keep Before', value: 'Before' }]
+      : labels.map(function (l) { return { label: 'Build ' + l, value: l }; }).concat([{ label: 'Combine versions (say how below)', value: 'combine', note: true }]);
+    return options.concat([{ label: 'None of these (say why below)', value: 'none', note: true }]);
+  }
   function openItems() {
     var pinState = comments.state();
-    return items.filter(function (it) { return pinState[it.id] !== 'accepted' && pinState[it.id] !== 'done'; });
+    return items.filter(function (it) { return pinState[it.id] !== 'accepted' && pinState[it.id] !== 'done'; })
+      .map(function (it) { return { id: it.id, n: it.n, text: it.text || (it.verdict === 'up' ? 'Good' : 'Not good') }; });
   }
-  function approval() {
-    var pick = panel.querySelector('input[name="approval"]:checked'), note = noteBox.value.trim();
-    return { option: pick.value, label: pick.parentElement.textContent.trim(),
-             carries: openItems().map(function (it) { return it.id; }), text: note || null };
-  }
-  function fillPanel(on) {
-    deciding = on;
-    approveBtn.textContent = on ? 'Cancel' : 'Approve…';
-    noteBtn.textContent = on ? 'Confirm approval' : 'Send';
-    if (!on) return;
-    var box = panel.querySelector('.dopts'); box.replaceChildren();
-    OPTIONS.forEach(function (o, k) {
-      var lab = el('label', 'dopt'), r = el('input'); r.type = 'radio'; r.name = 'approval'; r.value = o[1]; if (!k) r.checked = true;
-      lab.append(r, ' ' + o[0]); box.append(lab);
-    });
-    var open = openItems(), carry = panel.querySelector('.carry'); carry.replaceChildren();
-    if (open.length) {
-      carry.append(el('p', 'menu-h', 'Comes with your open comments'));
-      open.forEach(function (it) { carry.append(el('p', 'carried', it.n + '. ' + (it.text || (it.verdict === 'up' ? 'Good' : 'Not good')))); });
-    }
-    noteBox.focus();
-  }
-  var approve = pageApprove({ button: approveBtn, panel: panel, label: 'Approval', params: approval, onToggle: fillPanel });
-  function sendApproval() {
-    var pick = approval();
-    if ((pick.option === 'combine' || pick.option === 'none') && !pick.text) { say('Say how to combine them, or why none fits, in the message.', true); return noteBox.focus(); }
-    approve.send(conv, function () { noteBox.value = ''; });
-  }
+  approval = pageApprovalPanel({ conversation: conv, options: approvalOptions, openItems: openItems,
+    needs: 'Say how to combine them, or why none fits, in the message.' });
   conv.start();
   if (served) {
     try {

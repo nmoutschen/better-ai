@@ -463,7 +463,7 @@ class Architect(unittest.TestCase):
         html = self.render_javascript(view, "controls(data.perspectives, data.reviews.at(-1), data.versions)")
         self.assertNotIn('aria-label="Version"', html)
         page_script = (PACKAGE / "page.js").read_text()
-        self.assertIn("} else if (!before) {", page_script)  # no Approve… while only Before is drawn
+        self.assertIn("if (!readOnly && !before &&", page_script)  # no Approve… while only Before is drawn
 
     def test_alternatives_each_draw_their_own_version_after_the_shared_before(self):
         self.write_design(self.ALTERNATIVES)
@@ -651,7 +651,7 @@ class Architect(unittest.TestCase):
 
     def test_the_page_uses_the_shared_approve_and_not_its_own_copy(self):
         script = (PACKAGE / "page.js").read_text()
-        self.assertIn("pageApprove(", script)
+        self.assertIn("pageApprovalPanel(", script)
         self.assertNotIn("conversation.send('approve'", script)
         self.assertNotIn("Could not load the design", (PACKAGE / "page.html").read_text())  # the strips are shared
         for strip in ('class="offline"', 'class="unwatched"'):
@@ -812,9 +812,9 @@ class Architect(unittest.TestCase):
         bad = self.post(url, "approve", {"id": "a9", "perspectives": ["security"], "changes": [], "text": "t"})
         self.assertIn("error", bad)
         self.assertEqual((self.folder / "conversation.jsonl").read_text(), before)
-        chosen = self.post(url, "approve", {**self.SENT["approve"], "id": "approval-y", "alternative": "queue"})
-        self.assertNotIn("error", chosen)
-        bad = self.post(url, "approve", {**self.SENT["approve"], "id": "approval-z", "alternative": "Not an id"})
+        chosen = {"option": "queue", "label": "Build Order queue", "carries": ["c1-x"], "text": None}
+        self.assertNotIn("error", self.post(url, "approve", {**self.SENT["approve"], "id": "approval-y", **chosen}))
+        bad = self.post(url, "approve", {**self.SENT["approve"], "id": "approval-z", **chosen, "carries": "c1-x"})
         self.assertIn("error", bad)
 
     # What the page sends, by method, as page.js sends it (the server adds type, by and at).

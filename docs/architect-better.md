@@ -25,7 +25,7 @@ Use it to design a feature or a structural change, such as adding a module, chan
 
 Switch between Before and After in Containers and Flows, or between Before and each alternative design, with its strengths and drawbacks above the diagram. Overview lists the alternatives side by side. Click a box, arrow or step to comment. Confirm a guessed requirement or choose Change to correct a row. The agent replies under your message.
 
-Choose **Approve…** to start perspective reviews. When the design has alternatives, choose the one you approve there; the others are recorded as rejected alternatives. When a finding appears, select its linked part to see where it applies. After a revision, **Review again…** shows what changed in the diagrams, the requirements or `design.md`, and reruns the perspectives those changes affect.
+Choose **Approve…** to approve the design, with your open comments, and start perspective reviews. When the design has alternatives, choose which one to build, or ask for a combination or for none of them; the alternatives you did not choose are recorded as rejected. When a finding appears, select its linked part to see where it applies. After a revision, **Review again…** shows what changed in the diagrams, the requirements or `design.md`, and reruns the perspectives those changes affect.
 
 ## What you get
 

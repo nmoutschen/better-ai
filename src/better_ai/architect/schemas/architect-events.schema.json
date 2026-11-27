@@ -48,7 +48,7 @@
       }
     },
     "approve": {
-      "description": "the user asked for the design to be approved, with the alternative they chose when it has alternatives, or reviewed again",
+      "description": "the user approved an option of the design, as on design-better's canvas, with the comments that come with it, or asked for a review again",
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "at", "by", "id", "again", "perspectives", "changes", "text"],
@@ -60,8 +60,10 @@
         "again": {"type": "boolean"},
         "perspectives": {"type": "array", "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "perspectives.jsonl", "type": "perspective"}}},
         "changes": {"type": "array", "items": {"type": "string", "minLength": 1}},
-        "alternative": {"description": "the alternative of design.json the user chose and approved", "type": "string", "pattern": "^[a-z0-9]+$"},
-        "text": {"type": "string", "minLength": 1}
+        "option": {"description": "what the user approved: an alternative's id, after, before (keep the system as it is), combine, none, or again (review again)", "type": "string", "minLength": 1},
+        "label": {"description": "the option in the words the page showed", "type": "string", "minLength": 1},
+        "carries": {"description": "the open comments that come with the approval", "type": "array", "items": {"type": "string", "minLength": 1}},
+        "text": {"description": "the user's note; in events from before the approval panel, the page's summary", "type": ["string", "null"]}
       }
     },
     "confirm": {

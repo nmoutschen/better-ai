@@ -87,11 +87,16 @@ KEEP the page served. INVITE comments on boxes, arrows and flow steps. GIVE the 
 
 UPDATE the files and rendered views as the user corrects the design. WHEN the user accepts a section in words or in the page, ADD its key to `accepted` in the `architect` record, with `set`. WHEN the design is ready for review, ASK the user to choose Approve….
 
-WHEN the design has alternatives, Approve… names the one the user chose as `alternative`. THEN SET the `design` record to it alone before step 6: in each `in`, REPLACE its `id` with `after` and DROP the ids of the other alternatives; DROP each part whose `in` is left empty, and DROP `alternatives`. RECORD the decision in `design.md` with the chosen alternative and each other alternative as rejected, with why the user did not choose it.
+WHEN the user chooses Approve…, READ its `option`, and APPLY the open comments its `carries` names as part of it:
+
+- An alternative's `id`: SET the `design` record to that alternative alone before step 6: in each `in`, REPLACE its `id` with `after` and DROP the ids of the other alternatives; DROP each part whose `in` is left empty, and DROP `alternatives`. RECORD the decision in `design.md` with the chosen alternative and each other alternative as rejected, with why the user did not choose it. THEN GO to step 6.
+- `after`: GO to step 6.
+- `before`: the user keeps the system as it is. DO NOT review; HAND BACK with the design as drawn and the user's note as the reason.
+- `combine` or `none`: DO NOT review. CHANGE the design as the user's note says, as a new alternative when they combine, and ASK again in the page.
 
 ## 6. Review the approved design
 
-WHEN the user chooses Approve…, START one fresh reviewer per applicable perspective on the approved design: READ and FOLLOW the perspective's reviewer from the table in step 4, and FILL IN its inputs. GIVE its `scenarios` from the scenarios of the `requirement` records that reach what the perspective covers, up to five, the most harmful first. WHEN fewer than three do, GIVE scenarios up to three and MARK each "(added)". GIVE a reviewer in `standards` only the standards that have no reviewer of their own. GIVE its `context` with the facts the review needs that the design does not show, such as where the system runs or which data is personal, not your verdict on the design or the problems you expect. GIVE its `decided` from the constraints and preferences the user stated, such as the `requirement` records with source `user`, not from the design's own decisions.
+WHEN the user approves an alternative or `after`, START one fresh reviewer per applicable perspective on the approved design: READ and FOLLOW the perspective's reviewer from the table in step 4, and FILL IN its inputs. GIVE its `scenarios` from the scenarios of the `requirement` records that reach what the perspective covers, up to five, the most harmful first. WHEN fewer than three do, GIVE scenarios up to three and MARK each "(added)". GIVE a reviewer in `standards` only the standards that have no reviewer of their own. GIVE its `context` with the facts the review needs that the design does not show, such as where the system runs or which data is personal, not your verdict on the design or the problems you expect. GIVE its `decided` from the constraints and preferences the user stated, such as the `requirement` records with source `user`, not from the design's own decisions.
 
 WAIT for every report. HOLD changes and user replies about the reviewed design while the reviewers run. THEN RUN `python3 <skill dir>/scripts/better.pyz review <unit> --perspectives <id>...` with the ids of the perspectives run.
 

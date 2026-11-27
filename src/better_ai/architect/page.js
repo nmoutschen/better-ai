@@ -216,30 +216,12 @@ function start(data) {
     '<button type="button" class="stat" id="questions"><b id="question-count">0</b>open questions</button>';
   const versions = data.versions || [];
   const alternatives = data.alternatives || [];
-  // While the design draws only the system as it is, the sections of a change show only once they hold something.
-  const before = versions.length < 2;
-  const empty = {requirements: data.requirements, perspectives: data.perspectives, decisions: data.decisions, spec: data.spec};
-  for (const [key, records] of Object.entries(empty)) byId('tab-' + key).hidden = before && !records.length;
-  const tabs = all('.tabs [role="tab"]').filter(button => !button.hidden);
+  const before = versions.length < 2;  // the design draws only the system as it is: nothing to approve yet
+  const tabs = all('.tabs [role="tab"]');
   const panel = key => byId('panel-' + key);
   const pop = $('.pop');
-  const reviewMenu = document.createElement('div');
-  reviewMenu.className = 'decide';
-  reviewMenu.id = 'review-menu';
-  reviewMenu.hidden = true;
-  reviewMenu.innerHTML = '<p class="menu-h"></p><p class="review-summary"></p><div class="review-changes"></div><button type="button" class="btn" id="run-review"></button>';
-  const reviewToggle = document.createElement('button');
-  reviewToggle.type = 'button';
-  reviewToggle.className = 'btn btn--quiet';
-  reviewToggle.id = 'review-toggle';
-  reviewToggle.setAttribute('aria-controls', 'review-menu');
-  const runReview = $('#run-review', reviewMenu);
-  if (readOnly) {
-    $('.composer').hidden = true;
-  } else if (!before) {  // nothing to approve while only Before is drawn
-    $('#noteform').prepend(reviewMenu);
-    $('.notes .send .btn').after(reviewToggle);
-  }
+  if (readOnly) $('.composer').hidden = true;
+  let approval = null;
   const {perspectives} = data;
   const review = data.reviews.at(-1);
   const applicable = perspectives.filter(p => p.applies);
@@ -265,9 +247,7 @@ function start(data) {
   pageShowErrors(byId('errors'), data.errors);
   document.title = 'Design: ' + data.title;
   byId('title').textContent = document.title;
-  const shownKeys = tabs.slice(1).map(button => button.id.slice(4));
-  byId('accepted-count').innerHTML = new Set(data.accepted.filter(key => shownKeys.includes(key))).size +
-    '<span class="of"> / ' + shownKeys.length + '</span>';
+  byId('accepted-count').innerHTML = new Set(data.accepted).size + '<span class="of"> / ' + (tabs.length - 1) + '</span>';
   const sections = tabs.slice(1).map(button => {
     const key = button.id.slice(4);
     const accepted = data.accepted.includes(key);
@@ -431,10 +411,11 @@ function start(data) {
 
   const conversation = pageConversation({
     served: !readOnly, readOnly, itemKinds: items, latestLast: true, waiting,
-    kinds: {approve: logItem, confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.text),
+    kinds: {approve: entry => pageApprovalItem(entry, conversation.log()), confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.text),
     byId: id => threadComment(conversation.log(), id),
     reveal, edit: editComment, remove: event => commentLayer.remove(event), showLabel: n => 'Show comment ' + n,
-    busy: () => !pop.hidden || !reviewMenu.hidden || !!$('.edit:not([hidden])'),
+    busy: () => !pop.hidden || !!approval?.open() || !!$('.edit:not([hidden])'),
+    sendMode: () => approval?.sendMode() || null,
     beforeReload: () => sessionStorage.setItem(revKey, JSON.stringify({tab, version, findings, scroll: view.scrollTop})),
     rendered: states => {
       const log = conversation.log();
@@ -581,41 +562,33 @@ function start(data) {
     if (entry) showConversation(entry.e.id);
   });
 
-  reviewToggle.textContent = review ? 'Review again…' : 'Approve…';
-  $('.menu-h', reviewMenu).textContent = review ? 'Review the changes' : 'Approve the design';
-  runReview.textContent = review ? 'Run the review again' : 'Approve and run the review';
-  runReview.disabled = !!review && !reviewNames.length;
-  // With alternatives, approving means choosing one of them: the run waits for the user's choice, never preset.
-  if (alternatives.length) {
-    const choice = document.createElement('fieldset');
-    choice.className = 'choose';
-    choice.innerHTML = '<legend>Alternative to approve</legend>' + alternatives.map(alt =>
-      '<label><input type="radio" name="alternative" value="' + text(alt.id) + '"> ' + text(alt.name) + '</label>').join('');
-    runReview.before(choice);
-    choice.addEventListener('change', () => { runReview.disabled = !!review && !reviewNames.length; });
+  // Approve…: page.js's panel, as on design-better's canvas. Before a review: one option per alternative, or Ship After
+  // and Keep Before; after one, Review again… while a perspective has changes to review.
+  function approvalOptions() {
+    if (review) return [{label: 'Review the changes again', value: 'again'}];
+    const options = alternatives.length ?
+      [...alternatives.map(alt => ({label: 'Build ' + alt.name, value: alt.id})),
+        {label: 'Combine alternatives (say how below)', value: 'combine', note: true}] :
+      [{label: 'Ship After', value: 'after'}, {label: 'Keep Before', value: 'before'}];
+    return [...options, {label: 'None of these (say why below)', value: 'none', note: true}];
   }
-  const chosen = () => $('input[name="alternative"]:checked', reviewMenu)?.value;
-  const chosenName = () => (alternatives.find(alt => alt.id === chosen()) || {}).name;
-  const approval = readOnly || before ? null : pageApprove({
-    button: reviewToggle, panel: reviewMenu, label: 'Review request',
-    params: () => ({again: !!review, perspectives: reviewIds, changes: data.since, ...(chosen() ? {alternative: chosen()} : {}),
-      text: (review ? 'Review requested again' : 'Design approved') + (chosen() ? ' · ' + chosenName() : '') +
-        (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')}),
-    onToggle: open => {
-      if (!open) return;
-      if (alternatives.length) runReview.disabled = !chosen() || (!!review && !reviewNames.length);
-      const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
-      const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
-      const removed = data.removed || [];
-      $('.review-summary', reviewMenu).textContent = review ? reviewSummary(data.since, data.change_labels, reviewNames, removed) : stats + scope;
-      $('.review-changes', reviewMenu).innerHTML = review ? changeList(data.since, data.change_labels, removed) : '';
-    }
-  });
-  if (approval) {
-    runReview.addEventListener('click', () => {
-      runReview.disabled = true;
-      approval.send(conversation, () => { runReview.disabled = false; }, () => { runReview.disabled = false; });
-    });
+  function approvalIntro(box) {
+    const removed = data.removed || [];
+    const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
+    const summary = document.createElement('p');
+    summary.className = 'review-summary';
+    summary.textContent = review ? reviewSummary(data.since, data.change_labels, reviewNames, removed) : scope;
+    const changes = document.createElement('div');
+    changes.className = 'review-changes';
+    changes.innerHTML = review ? changeList(data.since, data.change_labels, removed) : '';
+    box.append(summary, changes);
+  }
+  const openItems = () => pageThread(conversation.log(), items, waiting, true).open
+    .filter(entry => entry.kind === 'comment' && !entry.deleted).map(entry => ({id: entry.e.id, n: entry.e.n, text: entry.e.text}));
+  if (!readOnly && !before && !(review && !reviewNames.length)) {
+    approval = pageApprovalPanel({conversation, options: approvalOptions, openItems, intro: approvalIntro,
+      button: review ? 'Review again…' : 'Approve…', params: () => ({again: !!review, perspectives: reviewIds, changes: data.since}),
+      needs: 'Say how to combine them, or why none fits, in the message.'});
   }
 
   showTab(saved.tab || 'overview');
