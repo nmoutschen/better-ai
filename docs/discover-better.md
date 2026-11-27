@@ -2,6 +2,9 @@
 
 Takes your product idea to a brief for design, in versions. It drafts what the idea assumes, checks it against evidence, asks you only what you can decide, and has you choose each move, from testing first to dropping the idea.
 
+![The discovery page on its Moves tab: the idea, a question waiting for you with its suggested default and a ✓ to accept it, the decision log with a Test first move, an analyst at work, and a conversation with the coordinator on the right](img/discover-better-page.png)
+*You answer what only you can decide, take a suggested default with one click, and choose each move. Analysts check evidence in the meantime.*
+
 ## When to use it
 
 - You have an idea for a product or a feature and want to know whether to build it, test it first, change it or drop it, before any design.
