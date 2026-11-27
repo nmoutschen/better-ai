@@ -2,8 +2,8 @@
 
 Designs a feature or a change to a software system. You check how the system works today, agree what the change needs to do, and discuss the design on a live page.
 
-![The live design page: tabs for Overview, Requirements, Containers, Flows, Perspectives, Decision records and Spec; the container diagram after the change, with new parts in terracotta, a removed part dashed, and security findings marked on the parts they concern; and a conversation with the architect on the right](img/architect-better-design.png)
-*You check the diagrams before and after the change, see review findings on the parts they concern, and click any box, arrow or step to comment on it.*
+![The live design page: tabs for Overview, Requirements, Containers, Flows, Perspectives, Decision records and Spec; the container diagram after the change, with new parts in terracotta, a removed part dashed, and security findings marked on the parts they concern; and on the right the agents at work, two perspective reviewers and a proof of concept, above a conversation with the architect](img/architect-better-design.png)
+*You check the diagrams before and after the change, see review findings on the parts they concern, see which agents are at work, and click any box, arrow or step to comment on it.*
 
 ## When to use it
 
