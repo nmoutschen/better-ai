@@ -2,14 +2,8 @@
 
 Interviews you about how you read, how you review work, and how you want agents to work for you, then writes personal guides agents follow.
 
-```markdown
-### 3. Put the question for the reader first
-
-- Applies: any reply that needs a decision
-- Does not apply: none found
-- Evidence: chose — picked the version that opened with the question in 3 of 3 comparisons
-```
-*An example rule in the `write-for-<name>` guide it writes. Each rule records whether you chose it, showed it or only said it.*
+![A chat: the user runs interview-me write; the agent shows two versions of a status message that differ only in where the question sits, and asks which the user would rather get and why](img/interview-me-chat.png)
+*It shows two versions that differ in one thing, and asks which you would rather get and why.*
 
 ## When to use it
 
@@ -38,6 +32,9 @@ In every interview, it:
 - **Shows you each guide before saving it**, so you can correct or delete rules.
 
 ## Your workflow
+
+![The interview-me workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/interview-me-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
 
 1. **Gather material** before you start: a document you found easy and one you found hard, a review you wrote, two or three times you corrected an agent.
 2. **Run it** and share the material in one message.

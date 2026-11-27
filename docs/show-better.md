@@ -32,6 +32,9 @@ In every introduction, it:
 
 ## Your workflow
 
+![The show-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/show-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
 1. **Start it** on the document.
 2. **Go through the slides** on the live page, with the buttons, the strip or the arrow keys. Click a mark for its detail and source.
 3. **Comment** on any part of a slide, or ask a question. The agent replies under your message and changes the slides in place.

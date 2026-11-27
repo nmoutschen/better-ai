@@ -2,15 +2,8 @@
 
 Improves what your agent carries from one session to the next: memory, instructions files, skills and workflows.
 
-```diff
- 3. LOOK at the rendered page before you show it, and FIX each version that does not load, overlaps or is cut off.
-+   FOR new directions, ALSO REVIEW them with modes/review.md before you show them, and FIX or DROP what the review confirms.
-```
-- **Evidence:** in one session the user asked by hand to review directions before seeing them.
-- **Test:** checked against recorded sessions; in another session it would have added a review round.
-- **Undo:** delete the added line.
-
-*A proposal from the run that led to these docs: the change, its evidence, its test result and how to undo it.*
+![A chat: the user runs improve-better; the agent reports it read 23 sessions and shows one proposal as a two-line diff to a skill, with its evidence, test result and undo step, then asks to approve, reject or change it](img/improve-better-chat.png)
+*Each proposal shows the exact change, the evidence it came from, its test result and how to undo it. Nothing changes until you approve.*
 
 ## When to use it
 
@@ -38,6 +31,9 @@ In every run, it:
 - **Applies only what you approve**, and keeps a record so later runs can undo or retire a change.
 
 ## Your workflow
+
+![The improve-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/improve-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
 
 1. **Run it** now and then, or on one area that keeps going wrong.
 2. **Settle any conflicts** between rules it raises first.

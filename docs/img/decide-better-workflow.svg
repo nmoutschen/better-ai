@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" width="960" height="240" font-family="'Space Grotesk', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="decide-better workflow">
+<rect width="960" height="240" fill="#FFFCF7"/>
+<defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#78736B"/></marker></defs>
+<line x1="0" y1="44" x2="960" y2="44" stroke="#C4B69C" stroke-width="1"/>
+<text x="14" y="95.0" font-size="15" font-weight="700" fill="#33302B">You</text>
+<line x1="0" y1="136" x2="960" y2="136" stroke="#C4B69C" stroke-width="1"/>
+<text x="14" y="187.0" font-size="15" font-weight="700" fill="#33302B">Agent</text>
+<line x1="0" y1="228" x2="960" y2="228" stroke="#C4B69C" stroke-width="1"/>
+<rect x="99.0" y="59.0" width="117.3" height="62" fill="#F2EDE5" stroke="#33302B" stroke-width="1.5"/>
+<text x="157.7" y="86.0" font-size="15" text-anchor="middle" fill="#33302B">Bring a</text>
+<text x="157.7" y="104.0" font-size="15" text-anchor="middle" fill="#33302B">decision</text>
+<rect x="242.3" y="151.0" width="117.3" height="62" fill="#FFFCF7" stroke="#33302B" stroke-width="1.5"/>
+<text x="301.0" y="178.0" font-size="15" text-anchor="middle" fill="#33302B">Lay out</text>
+<text x="301.0" y="196.0" font-size="15" text-anchor="middle" fill="#33302B">the options</text>
+<rect x="385.7" y="59.0" width="117.3" height="62" fill="#F2EDE5" stroke="#E8725C" stroke-width="2.5"/>
+<text x="444.3" y="86.0" font-size="15" text-anchor="middle" fill="#33302B">Say which way</text>
+<text x="444.3" y="104.0" font-size="15" text-anchor="middle" fill="#33302B">you lean</text>
+<rect x="529.0" y="151.0" width="117.3" height="62" fill="#FFFCF7" stroke="#33302B" stroke-width="1.5"/>
+<text x="587.7" y="178.0" font-size="15" text-anchor="middle" fill="#33302B">Compare with</text>
+<text x="587.7" y="196.0" font-size="15" text-anchor="middle" fill="#33302B">what matters</text>
+<rect x="672.3" y="151.0" width="117.3" height="62" fill="#FFFCF7" stroke="#33302B" stroke-width="1.5"/>
+<text x="731.0" y="178.0" font-size="15" text-anchor="middle" fill="#33302B">Recommend,</text>
+<text x="731.0" y="196.0" font-size="15" text-anchor="middle" fill="#33302B">name drawback</text>
+<rect x="815.7" y="59.0" width="117.3" height="62" fill="#F2EDE5" stroke="#33302B" stroke-width="1.5"/>
+<text x="874.3" y="95.0" font-size="15" text-anchor="middle" fill="#33302B">Decide</text>
+<path d="M216.3,90.0 L229.3,90.0 L229.3,182.0 L241.3,182.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M359.7,182.0 L372.7,182.0 L372.7,90.0 L384.7,90.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M503.0,90.0 L516.0,90.0 L516.0,182.0 L528.0,182.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M646.3,182.0 L671.3,182.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M789.7,182.0 L802.7,182.0 L802.7,90.0 L814.7,90.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+</svg>

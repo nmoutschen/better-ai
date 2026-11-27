@@ -35,6 +35,9 @@ In every research, it:
 
 ## Your workflow
 
+![The research-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/research-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
 1. **Start it** with your question. Answer which meaning you meant if it asks.
 2. **Check the depth it chose** (quick, standard or exhaustive) and correct it if needed.
 3. **Follow the live board** if you want: ask about a question, change the scope, or drop a branch. You don't have to: it does not wait for you.

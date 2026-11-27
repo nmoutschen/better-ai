@@ -32,20 +32,24 @@ In every design, it:
 - **Draws the current system.** It checks the affected containers and flows against the code and asks you to correct the drawing.
 - **Agrees requirements with you.** It drafts observable scenarios for quality attributes, marks its guesses and shows where each requirement came from.
 - **Shows options and trade-offs.** It recommends a design, explains why it rejected alternatives and records the main drawback of each choice.
+- **Tests what documentation cannot settle.** When a choice rests on how a tool or library behaves, it proposes a throwaway proof of concept with the questions it must answer, runs it once you agree, and writes what it observed into the design. A result that contradicts a choice comes back to you.
 - **Reviews the design after you approve it**, with a separate review for each perspective that applies, such as security, failure handling, agent experience or API standards.
 
 ## Your workflow
 
+![The architect-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/architect-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
 1. **Start it** with the change. It opens a live page.
 2. **Check the current system** on the Before diagrams, and correct what is wrong.
 3. **Agree the requirements**: confirm each guessed requirement, or choose Change to correct it.
-4. **Discuss the design** on the page: click a box, arrow or step to comment, and the agent replies under your message.
+4. **Discuss the design** on the page: click a box, arrow or step to comment, and the agent replies under your message. When a choice rests on how a tool behaves, agree to the proof of concept it proposes; the results come back into the design.
 5. **Approve it.** The perspective reviews run on their own and attach findings to the parts they concern. Revise, then choose **Review again…**.
 6. **Hand the spec to [`/code-better`](code-better.md)** to build it.
 
 ## How long it takes
 
-**How you work with it:** a live design session. You are on the page for most of it: checking diagrams, agreeing requirements and commenting on the design. Only the perspective reviews and the audit run without you.
+**How you work with it:** a live design session. You are on the page for most of it: checking diagrams, agreeing requirements and commenting on the design. Only proofs of concept, the perspective reviews and the audit run without you.
 
 | Work | Rough time |
 |---|---|
@@ -54,7 +58,7 @@ In every design, it:
 | Design of a feature or structural change | 30–60 min |
 | Audit | 15–45 min |
 
-It takes longer when the current system has no diagrams yet, when you ask for alternatives, and when a review leads to a revision.
+It takes longer when the current system has no diagrams yet, when you ask for alternatives, when a choice needs a proof of concept, and when a review leads to a revision.
 
 ## Reference
 
@@ -62,6 +66,8 @@ It takes longer when the current system has no diagrams yet, when you ask for al
 <summary><b>The live page</b></summary>
 
 Switch between Before and After in Containers and Flows, or between Before and each alternative design, with its strengths and drawbacks above the diagram. Overview lists the alternatives side by side. Click a box, arrow or step to comment. Confirm a guessed requirement or choose Change to correct a row. The agent replies under your message.
+
+The Agents list at the top of the conversation shows each reviewer, proof of concept or spec check at work.
 
 Choose **Approve…** to approve the design, with your open comments, and start perspective reviews. When the design has alternatives, choose which one to build, or ask for a combination or for none of them; the alternatives you did not choose are recorded as rejected. When a finding appears, select its linked part to see where it applies. After a revision, **Review again…** shows what changed in the diagrams, the requirements or `design.md`, and reruns the perspectives those changes affect.
 

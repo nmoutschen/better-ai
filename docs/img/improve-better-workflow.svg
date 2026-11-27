@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" width="960" height="240" font-family="'Space Grotesk', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="improve-better workflow">
+<rect width="960" height="240" fill="#FFFCF7"/>
+<defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#78736B"/></marker></defs>
+<line x1="0" y1="44" x2="960" y2="44" stroke="#C4B69C" stroke-width="1"/>
+<text x="14" y="95.0" font-size="15" font-weight="700" fill="#33302B">You</text>
+<line x1="0" y1="136" x2="960" y2="136" stroke="#C4B69C" stroke-width="1"/>
+<text x="14" y="187.0" font-size="15" font-weight="700" fill="#33302B">Agent</text>
+<line x1="0" y1="228" x2="960" y2="228" stroke="#C4B69C" stroke-width="1"/>
+<rect x="262.0" y="14" width="336.0" height="218" fill="none" stroke="#C4B69C" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="270.0" y="32" font-size="13" fill="#78736B">on its own</text>
+<rect x="99.0" y="59.0" width="146.0" height="62" fill="#F2EDE5" stroke="#33302B" stroke-width="1.5"/>
+<text x="172.0" y="95.0" font-size="15" text-anchor="middle" fill="#33302B">Run it</text>
+<rect x="271.0" y="151.0" width="146.0" height="62" fill="#FFFCF7" stroke="#33302B" stroke-width="1.5"/>
+<text x="344.0" y="178.0" font-size="15" text-anchor="middle" fill="#33302B">Read past</text>
+<text x="344.0" y="196.0" font-size="15" text-anchor="middle" fill="#33302B">sessions</text>
+<rect x="443.0" y="151.0" width="146.0" height="62" fill="#FFFCF7" stroke="#33302B" stroke-width="1.5"/>
+<text x="516.0" y="178.0" font-size="15" text-anchor="middle" fill="#33302B">Test each</text>
+<text x="516.0" y="196.0" font-size="15" text-anchor="middle" fill="#33302B">candidate</text>
+<rect x="615.0" y="59.0" width="146.0" height="62" fill="#F2EDE5" stroke="#E8725C" stroke-width="2.5"/>
+<text x="688.0" y="86.0" font-size="15" text-anchor="middle" fill="#33302B">Approve or reject</text>
+<text x="688.0" y="104.0" font-size="15" text-anchor="middle" fill="#33302B">each proposal</text>
+<rect x="787.0" y="151.0" width="146.0" height="62" fill="#FFFCF7" stroke="#33302B" stroke-width="1.5"/>
+<text x="860.0" y="178.0" font-size="15" text-anchor="middle" fill="#33302B">Apply and</text>
+<text x="860.0" y="196.0" font-size="15" text-anchor="middle" fill="#33302B">record</text>
+<path d="M245.0,90.0 L258.0,90.0 L258.0,182.0 L270.0,182.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M417.0,182.0 L442.0,182.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M589.0,182.0 L602.0,182.0 L602.0,90.0 L614.0,90.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M761.0,90.0 L774.0,90.0 L774.0,182.0 L786.0,182.0" fill="none" stroke="#78736B" stroke-width="1.5" marker-end="url(#a)"/>
+</svg>

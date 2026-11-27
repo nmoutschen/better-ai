@@ -38,6 +38,9 @@ In every design, it:
 
 ## Your workflow
 
+![The design-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/design-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
 1. **Start it** with the interface or the task people do in it.
 2. **Check the brief**: the audience, their scenarios, and which pages stay, merge or go. Answer its few questions.
 3. **Compare directions** on the live page: comment on any part, and choose one version, a combination or none with Decide.

@@ -47,6 +47,9 @@ In every change, it:
 
 ## Your workflow
 
+![The code-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/code-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
 1. **Start it** with the task, or with a ticket or design to build from.
 2. **Check the scenarios.** For anything beyond a small fix, it shows the requirements as Given/When/Then scenarios with real data, with its questions next to the scenarios they affect. Correct or confirm them: this is where your time matters most.
 3. **Let it build.** It writes the code, runs the checks and gets a separate review without you. For a large change, follow it on the dashboard and answer its questions there or in the chat.

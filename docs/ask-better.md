@@ -2,13 +2,8 @@
 
 Decides whether the agent should ask you a question before working, and how to ask it.
 
-> **Who should the docs serve first?**
->
-> 1. **Deciding to install**: someone sizing up the plugin: what each skill does and why it is different.
-> 2. **Already installed**: someone using a skill: how to run it, what happens, what they get.
-> 3. **Both equally**: pages serve both readers.
-
-*A question from planning these docs, in the form this skill asks for: one decision only the user could make, with what each option means.*
+![A chat: the user asks to clean up old branches; the agent reports what it checked, says it will delete the merged ones, and asks one question about three unmerged branches, with three options and its recommendation first](img/ask-better-chat.png)
+*You give a request. It looks up what it can, does the safe part, and asks only what you alone know, with options and its recommendation first.*
 
 ## When to use it
 
@@ -34,6 +29,9 @@ In every task, it:
 - **Raises conflicting instructions** to you instead of picking one.
 
 ## Your workflow
+
+![The ask-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/ask-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
 
 1. Run it with your request, or on the task in progress.
 2. Answer its questions, usually three or fewer, each with options and its recommendation first. Or read the assumptions it states next to the result.

@@ -2,13 +2,8 @@
 
 Writes or rewrites text so you understand it and can act on it: an answer, a report, a message or a document.
 
-**Before**
-> Following a review of the various handoff points between the skills, it appears there may be a few gaps that could be worth considering at some point.
-
-**After**
-> Two skills skip a handoff: design-better shows directions before reviewing them, and do-better drops the checks of the skill that made the work.
-
-*An example rewrite: the main point first, in specific words.*
+![A chat: a vague agent answer about gaps between skills, the user runs write-better, and the agent rewrites it to name the two skills that skip a handoff, stating the goal it assumed](img/write-better-chat.png)
+*It rewrites the agent's last answer with the main point first, and states the goal it assumed.*
 
 ## When to use it
 
@@ -38,6 +33,9 @@ In every text, it:
 - **Uses plain, specific words**, one term per idea, and adds a table or diagram when the text describes how things relate.
 
 ## Your workflow
+
+![The write-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/write-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
 
 1. Run it after an answer you find hard to read, or on a document.
 2. Read the opening: it gives you the result in one or two sentences.

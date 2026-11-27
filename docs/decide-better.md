@@ -2,14 +2,8 @@
 
 Helps you make a decision yourself, so the choice fits what matters to you and rests on your own judgement.
 
-> **Should the decision method be a skill of its own?**
->
-> 1. **Rules only**: add "name the main drawback" to the skills that recommend.
-> 2. **A core skill**: one skill holds the method, and the others use it when you must choose.
->
-> Which way do you lean, and why? Or skip this and see my recommendation.
-
-*The decision that created this skill, in the form it asks: the options first, then your leaning before its view.*
+![A chat: the user asks whether to move a blog to a static site; the agent lists three options with costs and one unknown, then asks which way the user leans before giving its view](img/decide-better-chat.png)
+*It lays out the options and what is unknown, then asks which way you lean before it gives its view.*
 
 ## When to use it
 
@@ -38,6 +32,9 @@ In every decision, it:
 - **Asks instead of judging** when the options differ mainly in which of your values wins.
 
 ## Your workflow
+
+![The decide-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/decide-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
 
 1. Run it with the decision, or when another skill brings you a choice.
 2. Say which way you lean and why, and the two or three things that matter most. Or skip.

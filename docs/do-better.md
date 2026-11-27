@@ -2,9 +2,8 @@
 
 Corrects work the agent gave you that misses what you wanted, and hands back the corrected work.
 
-> I stopped the page too early, sorry. Both items were accepted and I took that to mean you were done. Restarting it now with the built page so you can send your feedback again.
-
-*A correction from building these docs, in the form this skill asks for: own the error in plain words, say what changes, and fix it.*
+![A chat: the user says the summary buries the decision; the agent owns the misreading, gives a revised summary that opens with the decision and its cost, and says what changed](img/do-better-chat.png)
+*It owns the error in plain words, hands back the corrected work, and says in one sentence what changed.*
 
 ## When to use it
 
@@ -32,6 +31,9 @@ In every correction, it:
 - **Asks only when a decision blocks the fix**, with a few concrete choices.
 
 ## Your workflow
+
+![The do-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/do-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
 
 1. Run it when a result misses, with or without a description of what is wrong.
 2. Answer its question if two readings of your request lead to different fixes.

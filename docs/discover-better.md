@@ -37,6 +37,9 @@ In every discovery, it:
 
 ## Your workflow
 
+![The discover-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/discover-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
 1. **Start it** with your idea and any notes. Say your appetite and what you would waste if the idea is wrong.
 2. **Shape the draft** by answering its questions about who faces the problem and what they do today.
 3. **Read the reality check** while analysts gather evidence, and add evidence about your own users: your data, your notes, people you can ask.

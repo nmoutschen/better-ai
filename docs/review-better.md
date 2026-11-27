@@ -2,15 +2,8 @@
 
 Reviews work, such as text, code, an interface, a plan or a research report, so that each finding leads to a fix, an answer or a decision.
 
-```markdown
-- Scenario and step: See it, the caption under the screenshot
-- What I did: compared the caption with the image and with SKILL.md 1.5
-- What happened: the caption names thumbs up or down; the image shows two
-  versions and no thumbs controls (they appear with three or more)
-- Why it slows the person: the caption names a control they cannot find
-- Proposed fix: drop the thumbs from the caption
-```
-*A finding from the review of these docs. Each finding names the check behind it and an action.*
+![A chat: the user reviews a docs page; the agent says one blocking finding stops the page reaching its goal, lists the finding with what it checked, what happened, why it slows the reader and a proposed fix, and says what it did not check](img/review-better-chat.png)
+*The report opens with whether the work reaches its goal. Each finding names the check behind it and an action.*
 
 ## When to use it
 
@@ -48,6 +41,9 @@ In every review, it:
 - **Fixes what is simple, asks what only the author knows**, and lays out the options when there are several.
 
 ## Your workflow
+
+![The review-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/review-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
 
 1. **Start it** on the work. Answer its one question if the work's goal is unclear.
 2. **Let it review.** A separate reviewer reads the work, and it confirms each finding with a check.
