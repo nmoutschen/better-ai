@@ -28,11 +28,10 @@ for (const {label, data} of payloads) {
     draw('data.flows.map(flow => flowMarks(flow.status) + figures(flow.versions, data.versions)).join("")');
     draw('reviewSummary(data.since, data.change_labels, data.rerun.map(id => nameOf(data.perspectives, id)))');
     draw('changeList(data.since, data.change_labels, data.removed)');
-    const live = draw('agentList(data.agents, Date.now() / 1000)'), copy = draw('agentList(data.agents, null)');
-    const running = (data.agents || []).length;
-    if (running && !/(Reviewing|Testing|Checking|Working), \d+ min/.test(live)) throw new Error('the agents list shows no age: ' + live);
-    if (/ min</.test(copy)) throw new Error('a rendered copy ages its agents: ' + copy);
-    if (!running && !/No agent is working/.test(live)) throw new Error('no agent, but the list says otherwise: ' + live);
+    const list = draw('agentList(data.agents)'), running = (data.agents || []).length;
+    if (/chip|min</.test(list)) throw new Error('the agents list shows a state or an age: ' + list);
+    if (running && (list.match(/<li>/g) || []).length !== running) throw new Error('one row per running agent: ' + list);
+    if (!running && !/No agent is working/.test(list)) throw new Error('no agent, but the list says otherwise: ' + list);
   } catch (error) {
     failed.push(`${label}: ${error.stack.split('\n').slice(0, 2).join(' ')}`);
   }

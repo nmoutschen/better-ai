@@ -425,7 +425,7 @@ def model(data):
         "reviews": reviews,
         "decisions": [shown(d, title="", drivers=[], chosen="", rejected=[], drawback="") for d in data["decisions"]],
         "spec": [shown(r, statement="", source=None, checked_by="") for r in data["spec"]],
-        # The agents at work: the side column lists them, aged from when each started (`at`).
+        # The agents at work: the side column lists them.
         "agents": [
             shown(a, name="", what="", task="")
             for a in data["agents"]
