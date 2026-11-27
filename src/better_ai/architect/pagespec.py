@@ -33,6 +33,7 @@ SPEC = page.register(
         title="Architecture design",
         agent="architect",
         main="architect/page.html",
+        aside="page/agents.html",
         load=load,
         events="architect-events.schema.json",
         assets={"/architect.css": "architect/page.css", "/architect.js": "architect/page.js"},

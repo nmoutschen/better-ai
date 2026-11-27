@@ -203,6 +203,13 @@ function changeList(since, labels, removed = []) {
   return '<details class="rej"><summary>All ' + since.length + ' changes</summary><ul>' + items.join('') + '</ul></details>';
 }
 
+// The agents at work in the side column, by the list every page shares: who, and what on. Reviewers and the spec checker
+// check what others wrote.
+function agentList(agents) {
+  const rows = agents.map(a => ({who: a.name, what: a.what, kind: a.task === 'proof of concept' ? '' : 'verifier'}));
+  return pageAgents(rows, {now: 0, quietAfter: 0, empty: 'No agent is working right now.'});
+}
+
 function threadComment(log, id) {
   const event = log.findLast(event => (event.type === 'comment' && event.id === id) || (event.type === 'delete' && event.to === id));
   return event?.type === 'comment' && byId(event.on?.id) ? event : undefined;
@@ -267,6 +274,7 @@ function start(data) {
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
   section('decisions', 'Decision records', decisionRecords(data.decisions));
   section('spec', 'Spec', specTables(data.spec));
+  byId('agents').innerHTML = agentList(data.agents || []);
 
   for (const [key, part] of Object.entries(data.parts)) {
     if (key !== part.key) continue;

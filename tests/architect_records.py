@@ -65,6 +65,7 @@ KINDS = {
     "decisions.jsonl": "decisions.schema.json",
     "reviews.jsonl": "reviews.schema.json",
     "spec.jsonl": "spec.schema.json",
+    "agents.jsonl": "agents.schema.json",
 }
 JSON_FILES = ("architect.json", "design.json")
 
@@ -145,6 +146,7 @@ def folder_records():
         "decisions.jsonl": [r for _, r in examples("decisions.jsonl")],
         "reviews.jsonl": [review],
         "spec.jsonl": [r for _, r in examples("spec.jsonl")],
+        "agents.jsonl": [r for _, r in examples("agents.jsonl")],
     }
 
 
