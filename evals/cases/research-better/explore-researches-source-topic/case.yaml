@@ -1,0 +1,18 @@
+id: explore-researches-source-topic
+rule: explore-follows-source-topics
+source:
+- modes/explore.md
+reads:
+- modes/explore.md
+situation: 'A board in explore mode, planted mid-run, with a question a worker proposed: Q-w2-6 asks what network tokens are,
+  a topic the 3-D Secure review raises in passing and that lies outside the release''s checkout changes. A wiki page on network
+  tokens exists. In explore mode the coordinator opens the question instead of setting it out of scope, and a worker researches
+  it from that page. A script checks that Q-w2-6 is answered or contested, with a claim from the network tokens page.'
+request: 'Carry on the research in .research/checkout-drop: the workers stopped when my session ended. Run on your own; I
+  won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/explore_topic_researched.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    explore_topic_researched.py: ../_checks/explore_topic_researched.py

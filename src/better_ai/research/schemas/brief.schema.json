@@ -16,6 +16,7 @@
     "short": {"description": "the topic in two or three words, for the centre of the map", "type": "string", "minLength": 1},
     "meaning": {"type": "string", "minLength": 1},
     "goal": {"type": "string", "minLength": 1},
+    "mode": {"description": "answer: the default mode, which answers the user's question; explore: follows the topics the sources raise. A brief without it is in the default mode", "enum": ["answer", "explore"]},
     "limit": {"type": ["string", "null"]},
     "stop_at": {"enum": ["high", "medium", "low"]},
     "collections": {"type": "array", "items": {"type": "string", "minLength": 1}},

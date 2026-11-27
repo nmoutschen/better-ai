@@ -1,0 +1,5 @@
+reply: Network tokens are outside the release's checkout changes, so I set the question out of scope.
+actions:
+- write: .research/checkout-drop/questions/Q-w2-6.json
+  content: '{"type": "question", "at": "2026-11-20T09:00:00Z", "by": "w2", "id": "Q-w2-6", "question": "What are network tokens, and what would they change for the cards customers store with us?", "title": "Network tokens for stored cards", "priority": "medium", "status": "out of scope", "origin": {"type": "source", "source": "S-w2-1"}, "kind": "frontier", "raised_in": "Q-coordinator-3", "lens": "topic", "stakes": "what network tokens add to how card payments work at the shop", "done_when": "a page describes network tokens and what they change for stored cards", "note": "outside the topic"}
+'

@@ -41,15 +41,19 @@ IF the topic is a simple factual question, such as a date, a definition or a cur
 
 FOR every topic that is not a simple factual question, FOLLOW every remaining step, however few sources the COLLECTIONs hold. A COLLECTION you could read in a few minutes is not a reason to skip the board, its live view, the workers, the verifiers or the check for a missing COLLECTION.
 
+CHOOSE the mode. The default mode answers the user's question. IF the user wants to learn a field and see where the reading leads, rather than answer a question or make a decision, USE explore mode: READ and FOLLOW [modes/explore.md](modes/explore.md), which is mandatory in that mode and replaces the rules it names. IF the user asks a question or names a decision, USE the default mode, even when the topic is broad.
+
 IDENTIFY the user's GOAL: what they must understand, learn, decide, or do with the findings. CHOOSE the stop level from the GOAL: `high` for a quick decision, `medium` by default, `low` for an exhaustive review. The stop level and the stop rules (step 5.5) decide how much research to do. DO NOT ask the user for a budget, a number of searches, or a research size. USE a limit only when the user states one.
 
-IF you chose the MEANING, the GOAL or the stop level without the user stating it, STATE your choice in one sentence when you tell the user the board's path, so they can correct it.
+IF you chose the mode, the MEANING, the GOAL or the stop level without the user stating it, STATE your choice in one sentence when you tell the user the board's path, so they can correct it.
 
 ### 2. Keep a research board
 
 The board is the shared record of the research. Every agent reads it and adds records to it as it works.
 
 MAKE the board with `python3 <skill dir>/scripts/better.pyz create .research/<topic-slug> --by coordinator`, at the repository's top level, with the brief as JSON on stdin, so it survives the session and the research can resume. DO NOT use a temporary or session scratch directory. DO NOT commit the board unless the user asks. FOLLOW the record formats in [formats/board.md](formats/board.md): its records are the board.
+
+WHEN you resume a board whose brief has `mode` `explore`, READ and FOLLOW [modes/explore.md](modes/explore.md).
 
 TELL the user the board's path once.
 
