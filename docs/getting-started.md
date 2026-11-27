@@ -20,16 +20,17 @@ See [`/interview-me`](interview-me.md).
 
 ## 2. Work as usual, and name a skill when the task matches
 
-| You want to | Use |
-|---|---|
-| Shape a product idea into a brief for design | [`/discover-better`](discover-better.md) |
-| Build or change code | [`/code-better`](code-better.md) |
-| Design or build a page or screen | [`/design-better`](design-better.md) |
-| Research a topic from sources | [`/research-better`](research-better.md) |
-| Get a dense document introduced with visual panels | [`/show-better`](show-better.md) |
-| Make a decision you will live with | [`/decide-better`](decide-better.md) |
-| Review text, code, an interface or a plan | [`/review-better`](review-better.md) |
-| Get text you can understand and act on | [`/write-better`](write-better.md) |
+| You want to | Use | How it runs | Rough time |
+|---|---|---|---|
+| Shape a product idea into a brief for design | [`/discover-better`](discover-better.md) | Guided sessions: you choose each move | 1–2 h per move, days to weeks with tests |
+| Design a feature or a structural change | [`/architect-better`](architect-better.md) | Live design session on a page | 30–60 min for a feature |
+| Build or change code | [`/code-better`](code-better.md) | You agree scenarios, then it builds on its own | 10 min for a fix, 1–8 h for a project |
+| Design or build a page or screen | [`/design-better`](design-better.md) | Live design session, then it builds on its own | 30–60 min for a new page |
+| Research a topic from sources | [`/research-better`](research-better.md) | On its own, with a live board you can steer from | 20–60 min, up to 3 h |
+| Get a dense document introduced with visual panels | [`/show-better`](show-better.md) | Built on its own, then a live session you lead | 20–50 min |
+| Review text, code, an interface or a plan | [`/review-better`](review-better.md) | On its own, then your choices | 5–60 min |
+| Make a decision you will live with | [`/decide-better`](decide-better.md) | Changes how the agent answers | Part of the reply |
+| Get text you can understand and act on | [`/write-better`](write-better.md) | Changes how the agent answers | Part of the reply |
 
 You rarely need to call these yourself:
 
