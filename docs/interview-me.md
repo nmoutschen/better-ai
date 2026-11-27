@@ -11,24 +11,9 @@ Interviews you about how you read, how you review work, and how you want agents 
 ```
 *An example rule in the `write-for-<name>` guide it writes. Each rule records whether you chose it, showed it or only said it.*
 
-## What it does
+## When to use it
 
-- **Works from your real material**: documents you liked, reviews you wrote, corrections you made.
-- **Asks you to compare concrete samples** instead of asking general questions about your preferences.
-- **Writes `write-for-<name>` and `review-for-<name>`**, which `/write-better` and `/review-better` follow, and a short profile you can paste into any AI tool.
-- **Shows you each guide before saving it**, so you can correct or delete rules.
-
-For example, to run only the reading interview:
-
-```
-/interview-me write
-```
-
-## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
-
+- Once, when you start with these skills: [`/write-better`](write-better.md) and [`/review-better`](review-better.md) follow the guides it writes.
 - Agents' text often needs rewriting before you can act on it.
 - Agents check work differently from how you would.
 - Agents ask, cite, guess or agree in ways you keep correcting.
@@ -36,24 +21,43 @@ For example, to run only the reading interview:
 
 Use [`/improve-better`](improve-better.md) instead to improve memory, instructions or skills from evidence in past sessions, without an interview.
 
-</details>
+## What you can do with it
 
-<details>
-<summary><b>How to run it</b></summary>
+| You want to | Run | You get |
+|---|---|---|
+| Run all three interviews | `/interview-me` | All three outputs below; you can stop after any interview |
+| Teach agents how you read | `/interview-me write` | A `write-for-<name>` skill |
+| Teach agents how you review | `/interview-me review` | A `review-for-<name>` skill |
+| Tell any AI tool how to work for you | `/interview-me profile` | Short instructions to paste into its always-on settings |
+| Change an existing guide | `/interview-me <path to the guide>` | The guide updated |
 
-```
-/interview-me [write | review | profile | path to an existing guide]
-```
+In every interview, it:
 
-- No argument: runs all three interviews in order (`write`, `review`, `profile`). It offers to stop after each one.
-- `write`: how you read. Writes the `write-for-<name>` skill.
-- `review`: how you review work. Writes the `review-for-<name>` skill.
-- `profile`: how you want agents to work. Writes profile instructions you paste into any AI tool. It runs last because it points to the two skills.
-- A path to an existing guide or profile record: updates it.
+- **Works from your real material.** Documents you liked, reviews you wrote, corrections you made.
+- **Asks you to compare concrete samples** instead of asking general questions about your preferences.
+- **Shows you each guide before saving it**, so you can correct or delete rules.
 
-Example: `/interview-me write`
+## Your workflow
 
-</details>
+1. **Gather material** before you start: a document you found easy and one you found hard, a review you wrote, two or three times you corrected an agent.
+2. **Run it** and share the material in one message.
+3. **Answer its questions** about what you did with each piece.
+4. **Pick between samples**: two short versions that differ in one thing. Say why.
+5. **Check each guide** before it is saved: correct or delete rules, and choose where it goes.
+
+## How long it takes
+
+**How you work with it:** an interview. You are in the conversation the whole time, answering and choosing.
+
+| Work | Rough time |
+|---|---|
+| One interview | 15–30 min |
+| All three | 45–90 min |
+| Update to one guide | 5–15 min |
+
+It goes faster when you bring real material, and the guides rest on more evidence.
+
+## Reference
 
 <details>
 <summary><b>What happens</b></summary>

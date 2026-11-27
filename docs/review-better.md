@@ -12,23 +12,7 @@ Reviews work, such as text, code, an interface, a plan or a research report, so 
 ```
 *A finding from the review of these docs. Each finding names the check behind it and an action.*
 
-## What it does
-
-- **Agrees what the review is for**, and looks for the few problems that would stop the work reaching its goal.
-- **Uses a separate reviewer**, from a different model when it can, and backs each finding with a check it ran.
-- **Fixes what is simple, asks what only the author knows**, and lays out the options when there are several.
-- **Adds your `review-for-<name>` criteria** when you have them.
-
-For example:
-
-```
-/review-better docs/design-better.md
-```
-
-## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
+## When to use it
 
 - You want a review of a file, a diff, a pull request, a link or work in the conversation.
 - You want findings you can act on, not a long list of remarks.
@@ -44,21 +28,45 @@ The method is the same for all work. The skill for the kind of work adds what to
 
 For a plan, a specification or a research report, it writes three to six kinds of problem from the work's goal and requirements.
 
-If you rejected a review and want it corrected, use [`/do-better`](do-better.md).
-
-</details>
-
-<details>
-<summary><b>How to run it</b></summary>
-
-- `/review-better <work>` reviews that work. The work can be a file, a diff, a pull request or a link.
-- `/review-better` with no argument reviews the work in the current conversation. If there is none, it asks you what to review.
-
-Example: `/review-better https://github.com/acme/app/pull/42`
-
 A review can end with no findings. It then says so in one sentence, with what it checked and how.
 
-</details>
+If you rejected a review and want it corrected, use [`/do-better`](do-better.md).
+
+## What you can do with it
+
+| You want to | Run | You get |
+|---|---|---|
+| Review a file, a pull request or a link | `/review-better https://github.com/acme/app/pull/42` | A report with the fixes it made, findings with actions, and questions for the author |
+| Review the work in this conversation | `/review-better` | The same, for that work |
+| Review against your own criteria | Run [`/interview-me`](interview-me.md) `review` once | Your blocking criteria count as blocking findings in every review |
+| Get a thorough review | Ask for a thorough review | A second independent reviewer |
+
+In every review, it:
+
+- **Agrees what the review is for**, and looks for the few problems that would stop the work reaching its goal.
+- **Uses a separate reviewer**, from a different model when it can, and backs each finding with a check it ran.
+- **Fixes what is simple, asks what only the author knows**, and lays out the options when there are several.
+
+## Your workflow
+
+1. **Start it** on the work. Answer its one question if the work's goal is unclear.
+2. **Let it review.** A separate reviewer reads the work, and it confirms each finding with a check.
+3. **Read the report**: whether the work reaches its goal, the fixes it made, and the findings marked blocking or suggestion.
+4. **Answer its questions and choose between fixes** where there are several.
+
+## How long it takes
+
+**How you work with it:** it reviews on its own, then brings you the questions and choices only you or the author can settle.
+
+| Work | Rough time |
+|---|---|
+| Short text or small diff | 5–10 min |
+| Document or pull request | 15–30 min |
+| Thorough review with a second reviewer | 30–60 min |
+
+It takes longer when confirming findings means running code or opening many sources.
+
+## Reference
 
 <details>
 <summary><b>What happens</b></summary>

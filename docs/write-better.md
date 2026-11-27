@@ -10,46 +10,41 @@ Writes or rewrites text so you understand it and can act on it: an answer, a rep
 
 *An example rewrite: the main point first, in specific words.*
 
-## What it does
+## When to use it
+
+- An agent's answer or report is hard to read or act on.
+- You have a document you want rewritten for its readers.
+- You want a text reviewed without changes.
+
+You often get it without naming it: it loads by itself when an agent writes text you will read, and the other skills use it for their reports.
+
+Running it does not mean the text needs large changes. A text that already meets its rules keeps its length and structure.
+
+Use [`/show-better`](show-better.md) instead when a long, dense document needs visual panels before it.
+
+## What you can do with it
+
+| You want to | Run | You get |
+|---|---|---|
+| Fix the agent's last answer | `/write-better` | The answer rewritten |
+| Rewrite a document | `/write-better docs/onboarding.md` | The file rewritten |
+| Find what makes a text hard to read | `/write-better review docs/onboarding.md` | Each problem with its passage and a proposed rewrite; the text unchanged |
+| Have every text written for you | Run [`/interview-me`](interview-me.md) once | Rewrites that follow your `write-for-<name>` guide |
+
+In every text, it:
 
 - **Names your goal** for the text: understand, decide, do or learn.
 - **Puts the main point first** and cuts what you don't need.
 - **Uses plain, specific words**, one term per idea, and adds a table or diagram when the text describes how things relate.
-- **Follows your `write-for-<name>` guide** when you have one.
 
-For example:
+## Your workflow
 
-```
-/write-better the summary above
-```
+1. Run it after an answer you find hard to read, or on a document.
+2. Read the opening: it gives you the result in one or two sentences.
+3. Check the goal it assumed, stated next to the result when it had to guess one.
+4. If the text still misses, say what is wrong, or run [`/do-better`](do-better.md).
 
 ## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
-
-- An agent's answer or report is hard to read or act on.
-- You have a document you want rewritten for its readers.
-- You want a text reviewed without changes: it then follows [`/review-better`](review-better.md), with its own rules as what to look for.
-
-Use a neighbouring skill instead when:
-
-- A long, dense document needs visual panels before it: use [`/show-better`](show-better.md).
-
-</details>
-
-<details>
-<summary><b>How to run it</b></summary>
-
-- `/write-better` with no argument rewrites the agent's previous output.
-- `/write-better <document>` rewrites that document.
-- To review without rewriting, ask for a review of the text.
-
-Example: `/write-better docs/onboarding.md`
-
-Running it does not mean the text needs large changes. A text that already meets the rules keeps its length and structure.
-
-</details>
 
 <details>
 <summary><b>What happens</b></summary>

@@ -5,38 +5,13 @@ Designs and audits an interface so the people who use it can do what they came f
 ![The compare page: two versions of an orders list side by side, "A, one list" and "B, late orders first", with a conversation panel on the right](img/design-better-compare.png)
 *You compare versions on one page, and click any part of a version to comment on it or Decide.*
 
-## What it does
-
-- **Shows you versions to choose from.** For a new page or a layout change, it puts two or three rough directions side by side on one page before anything is built.
-- **Agrees the tasks first.** A short brief: who uses the page and what they come to do, as scenarios with real data.
-- **Hands the build to `/code-better`.** It writes a design with one requirement per scenario, and `/code-better` builds and checks the code.
-- **Accepts the result by using it.** A separate reviewer walks every scenario in the built interface, by pointer, by keyboard and on a small screen, and what fails goes back to `/code-better`.
-- **Keeps your design language.** When a rule, such as text contrast, clashes with it, it tells you and follows your decision.
-
-For example, to get late orders found first:
-
-```
-/design-better the orders page
-```
-
-## How it is tested
-
-Tested on 18 situations with Sonnet 5.5 (2026-11-21).
-
-| What it does | Passed |
-| --- | ---: |
-| Checks the interface the way its users meet it: does their tasks in it, reads what its labels and pages say, and reports what stops them. Claims only what it checked, and suggests a test with real people for the rest | 72% |
-| Puts the user's direction, design language and decisions first, and asks few questions, each costly to get wrong | 89% |
-| Follows the skill's design rules in the design, the directions and the build | 89% |
-
-## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
+## When to use it
 
 - To design a new interface or change one: its screens, what they hold, their layout or their flow. A web page, an app screen, a rendered report.
 - To audit an interface or a design language, yours or someone else's.
 - To create, extend or change a design language: the named colours, type, spacing and components that give a set of interfaces one look.
+
+Running it does not mean a redesign. A run can end with a brief and a few questions for you, or with a report that the interface already works for its audience.
 
 Use something else nearby:
 
@@ -44,30 +19,46 @@ Use something else nearby:
 - To introduce a dense document with visual panels, use [`/show-better`](show-better.md).
 - For the words in the interface, such as labels, button text and messages, `/design-better` calls [`/write-better`](write-better.md) itself.
 
-Being invoked does not mean a redesign. A run can end with a brief and a few questions for you, or with a report that the interface already works for its audience.
+## What you can do with it
 
-</details>
+| You want to | Run | You get |
+|---|---|---|
+| Design or change an interface | `/design-better the orders page` | Versions to compare, a design, the built interface, and a report of each scenario walked |
+| Audit an interface or a design language | `/design-better audit the settings page` | Findings in order, each with a proposed fix; nothing changed |
+| Create or change a design language | `/design-better a design language for our admin tools` | A design language document, with values shared by the document and the code |
+| Check the interface work in this conversation | `/design-better` | The work audited, then continued or corrected |
 
-<details>
-<summary><b>How to run it</b></summary>
+In every design, it:
 
-```
-/design-better <interface or task>
-```
+- **Agrees the tasks first.** A short brief of who uses the page and what they come to do, as scenarios with real data.
+- **Shows you versions to choose from.** For a new page or a layout change, two or three rough directions side by side on one page before anything is built.
+- **Hands the build to `/code-better`**, with one requirement per scenario.
+- **Accepts the result by using it.** A separate reviewer walks every scenario in the built interface, by pointer, by keyboard and on a small screen, and what fails goes back to `/code-better`.
+- **Keeps your design language.** When a rule, such as text contrast, clashes with it, it tells you and follows your decision.
 
-Example: `/design-better the settings page, so people can find and change their email`.
+## Your workflow
 
-It picks one of three modes from the task:
+1. **Start it** with the interface or the task people do in it.
+2. **Check the brief**: the audience, their scenarios, and which pages stay, merge or go. Answer its few questions.
+3. **Compare directions** on the live page: comment on any part, and choose one version, a combination or none with Decide.
+4. **Decide the review findings** on the chosen direction, and the empty, loading and error states.
+5. **Let it build.** `/code-better` builds the design without you, and a reviewer walks every scenario in the result.
+6. **Read the report**, and run the short test with three to five people it offers for a new interface.
 
-| Task | Mode |
+## How long it takes
+
+**How you work with it:** a live design session. You compare versions and comment on a page while the agent revises them. Once you choose, the build and its review run without you.
+
+| Work | Rough time |
 |---|---|
-| A new interface, or a change to its screens, layout or flow | design |
-| A review of an interface or a design language, or what to improve | audit |
-| Create, extend or change a design language | language |
+| Small change with a design rule applied | 10–20 min |
+| New page or changed flow, from brief to built | 30–60 min |
+| Design language | 30–60 min, mostly with you |
+| Audit | 15–45 min, without you |
 
-Without an argument, it audits the interface the conversation is building, then continues or corrects the work. If there is none, it asks which interface or design language to work on, and whether to design, audit or change it.
+It takes longer with each round of directions, and when the walk of the built interface sends problems back to `/code-better`, for at most three rounds.
 
-</details>
+## Reference
 
 <details>
 <summary><b>What happens</b></summary>
@@ -138,5 +129,18 @@ The report keeps three claims apart: the scenarios can be completed, the checks 
 | An accessibility checker | It says none ran, and relies on the walks and reading the markup. |
 | Sub-agents | It stops and marks the work not finished: the review needs a reviewer that did not design the interface. |
 | Writing files | It stops and marks the work not finished. |
+
+</details>
+
+<details>
+<summary><b>How it is tested</b></summary>
+
+Tested on 18 situations with Sonnet 5.5 (2026-11-21).
+
+| What it does | Passed |
+| --- | ---: |
+| Checks the interface the way its users meet it: does their tasks in it, reads what its labels and pages say, and reports what stops them. Claims only what it checked, and suggests a test with real people for the rest | 72% |
+| Puts the user's direction, design language and decisions first, and asks few questions, each costly to get wrong | 89% |
+| Follows the skill's design rules in the design, the directions and the build | 89% |
 
 </details>

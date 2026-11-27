@@ -8,29 +8,60 @@ Researches a topic from sources instead of the model's training data, and writes
 ## When to use it
 
 - To answer a question from sources: a topic to understand, a choice to make, a review of what is known.
-- To learn a field and see where the reading leads, in explore mode: it follows the topics the sources raise beyond your first question.
-- To answer a simple factual question, such as a date or a current value. It stops after one or two searches and answers in one or two sentences, naming the source.
+- To learn a field and see where the reading leads, in explore mode.
+- To answer a simple factual question, such as a date or a current value.
 - To research your organisation's own systems or decisions, from the internal tools your agent can reach, such as a wiki or ticket tracker.
 
 Use something else nearby:
 
+- To shape a product idea into a brief, use [`/discover-better`](discover-better.md).
 - To introduce the finished report with visual panels, use [`/show-better`](show-better.md).
 
-## How to run it
+## What you can do with it
 
-```
-/research-better <topic>
-```
+| You want to | Run | You get |
+|---|---|---|
+| Answer a question | `/research-better do code review checklists reduce defects?` | A report with APA citations, where sources disagree, and open questions |
+| Learn a field | `/research-better explore incident review practices` | A map of the branches the sources led to, with what each found |
+| Check a fact | `/research-better when did Python 2 reach end of life?` | One or two sentences, with the source |
+| Resume earlier research | `/research-better` | The research continued from its board |
 
-Example: `/research-better do code review checklists reduce defects?`.
+In every research, it:
 
-Without an argument, it resumes from an existing research board, or restarts the previous research.
+- **Searches before asking**, to see which meanings sources give your topic, and asks only if several remain.
+- **Has cheaper worker agents research questions in parallel**, each recording every query, source and claim with a verbatim quote.
+- **Has separate agents check each claim** against the source page.
+- **Looks for contradicting evidence** for each key answer, and stops when results stop adding anything new, not when it finds the answer it expected.
 
-## What happens
+## Your workflow
+
+1. **Start it** with your question. Answer which meaning you meant if it asks.
+2. **Check the depth it chose** (quick, standard or exhaustive) and correct it if needed.
+3. **Follow the live board** if you want: ask about a question, change the scope, or drop a branch. You don't have to: it does not wait for you.
+4. **Answer decisions** it posts mid-run, or let the safe default apply at the deadline.
+5. **Read the report**: the answer first, then where evidence is weak, and the open questions.
+
+## How long it takes
+
+**How you work with it:** it researches on its own. A live board shows the work, and you can steer from it, but the research does not wait for you.
+
+| Work | Rough time |
+|---|---|
+| Factual question | 1–2 min |
+| Question for a quick decision | 10–20 min |
+| Standard research | 20–60 min |
+| Exhaustive review, or explore mode | 1–3 h |
+
+It takes longer for a broad topic, for sources in several languages, and for deeper exploration.
+
+## Reference
+
+<details>
+<summary><b>What happens</b></summary>
 
 1. **It searches before asking.** It runs a search or two with the topic's own words to see which meanings sources use. If the topic still has several meanings, it explains each and asks which one you meant.
 2. **It picks the depth.** It chooses a goal and a stop level: `high` for a quick decision, `medium` by default, or `low` for an exhaustive review from what you need. It does not ask you for a budget, and says what it chose so you can correct it.
-3. **It opens a board** in `.research/<topic-slug>/` and tells you the path. If it can, it opens the live board in your browser (see [The live board](#the-live-board)).
+3. **It opens a board** in `.research/<topic-slug>/` and tells you the path. If it can, it opens the live board in your browser (see The live board below).
 4. **It seeds questions** from your question and from broad searches, including searches in other languages when the topic has sources there. Each question says what evidence would answer it.
 5. **Workers research the questions.** Each records every query, source and claim on the board as it goes, with a verbatim quote for each claim. As they read, they add questions:
    - newer work, origins, other fields, other regions and critics
@@ -40,7 +71,10 @@ Without an argument, it resumes from an existing research board, or restarts the
 7. **It stops** when no question at the stop level is still open, or when results stop adding anything new after one change of strategy. It does not stop because it found the answer it expected.
 8. **It presents the findings** with APA citations, a reference list built only from the board, what each challenge question found, and the questions that remain open.
 
-## Explore mode
+</details>
+
+<details>
+<summary><b>Explore mode</b></summary>
 
 When you ask to explore or learn a field rather than answer a question, it runs in explore mode and says so. The evidence rules stay the same; what changes:
 
@@ -56,7 +90,10 @@ If a source it needs is unreachable (a missing tool, a login, an error), it does
 
 Without a live view, it posts one line in the chat each time a question closes.
 
-## The live board
+</details>
+
+<details>
+<summary><b>The live board</b></summary>
 
 The board fills one window and updates as the agents write:
 
@@ -69,18 +106,27 @@ The board fills one window and updates as the agents write:
 
 When the board's server stops, a strip says the board is closed; ask the agent to restart it. The coordinator reads what you wrote while it was away when it resumes the board.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - A research board in `.research/<topic-slug>/`, as JSON files: `brief.json` (the topic, its meaning, your goal, the mode and the state of the run), `questions/`, `claims/` (each with its verbatim quote and the verifier's verdict and copied passage) and `sources/`, one file each, `logs/` (each agent's searches), `decisions.jsonl` (the decisions taken during the run), and your conversation with the coordinator (`conversation.jsonl`). Git sees it as untracked, so commit it or ignore it as you choose. A later session can resume from it.
 - Records that fit their schema. Each record is stamped and checked against its schema when it is written, with `better.pyz add`, `set` and `check`, and the live board lists any record that does not fit, with its file, line and field, instead of hiding it. Nothing others point to is deleted: a wrong claim is marked withdrawn, a source that copies another is marked a duplicate, and a duplicate question is merged into the one that covers it.
 - A live board while the research runs, or progress lines in the chat.
 - A report: the answer first, where sources disagree or evidence is weak, citations in APA style (7th edition), a reference list, and open questions or blocked sources that could change the answer.
 
-## Works with
+</details>
+
+<details>
+<summary><b>Works with</b></summary>
 
 - [`/write-better`](write-better.md) writes the final report.
 
-## What it needs
+</details>
+
+<details>
+<summary><b>What it needs</b></summary>
 
 | Capability | Without it |
 |---|---|
@@ -92,7 +138,10 @@ When the board's server stops, a strip says the board is closed; ask the agent t
 | Writing files | It keeps the board in its working notes and restates it every few results. |
 | Asking through a tool | It asks in plain text and waits for your answer. |
 
-## How it is tested
+</details>
+
+<details>
+<summary><b>How it is tested</b></summary>
 
 Tested on 18 situations with Sonnet 5.5 (2026-11-21), each searching a planted wiki with no web access.
 
@@ -101,3 +150,5 @@ Tested on 18 situations with Sonnet 5.5 (2026-11-21), each searching a planted w
 | Keeps the board on disk in its format, copies quotes and source details from the page, and marks repeats and blocked sources | 61% |
 | Asks before the research runs when a collection is missing, records a decision instead of waiting once it runs, and reports only what the board holds | 72% |
 | Leaves the research to workers, has claims checked by verifiers that did not record them, and keeps the board's questions in order | 89% |
+
+</details>

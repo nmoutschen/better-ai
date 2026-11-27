@@ -2,7 +2,29 @@
 
 Takes your product idea to a brief for design, in versions. It drafts what the idea assumes, checks it against evidence, asks you only what you can decide, and has you choose each move, from testing first to dropping the idea.
 
-## What it does
+## When to use it
+
+- You have an idea for a product or a feature and want to know whether to build it, test it first, change it or drop it, before any design.
+- The idea serves your own organisation, such as a tool for your team, or customers.
+- You have evidence from a test or from real use and want to choose the next move.
+
+Running it does not mean running every step. A discovery can end early with Stop, Switch or Adopt.
+
+Use something else nearby:
+
+- To research a topic rather than shape an idea, use [`/research-better`](research-better.md) instead.
+- To design an interface or a system you have already decided to build, use [`/design-better`](design-better.md) or [`/architect-better`](architect-better.md).
+
+## What you can do with it
+
+| You want to | Run | You get |
+|---|---|---|
+| Shape and check a new idea | `/discover-better make flaky tests someone's job` | The idea's problems, opportunities and behaviours, checked against evidence |
+| Test the idea cheaply first | Choose Test first | The cheapest test, with what would stop or change the idea written before it runs |
+| Commit to a version | Choose Expand, Shrink, Adopt or Stop | A brief version with the decision and its evidence, handed to design for Expand or Shrink |
+| Resume a discovery | `/discover-better`, or the same idea again | The discovery where you left it, with new evidence added |
+
+In every discovery, it:
 
 - **Breaks your idea into what it rests on.** Problems, opportunities and behaviours, each with its risks: would people want it, could they use it, can it be built, can it be sustained. Each behaviour is written as "When [situation], [who] can [observable result]", with a testable form, and checked for wording two readers would read differently.
 - **Shapes the idea with you before checking it.** It asks who faces the problem and what they last did about it, turns your statements into questions, and proposes an alternative idea only once yours is on record.
@@ -13,26 +35,32 @@ Takes your product idea to a brief for design, in versions. It drafts what the i
 - **Has you choose each move.** Test first, Expand, Shrink, Switch, Adopt, Pause or Stop, each option with its cost, speed, upkeep and how hard it is to undo. Expand, Adopt and Stop ask you to confirm.
 - **Writes a brief for each move that commits.** Each version is kept and names the move that wrote it. Expand and Shrink briefs are handed to [`/design-better`](design-better.md) and [`/architect-better`](architect-better.md).
 
-## When to use it
+## Your workflow
 
-Use it when you have an idea for a product or a feature and want to know whether to build it, test it first, change it or drop it, before any design. It works for an idea inside your organisation, such as a tool for your team, and for one aimed at customers.
+1. **Start it** with your idea and any notes. Say your appetite and what you would waste if the idea is wrong.
+2. **Shape the draft** by answering its questions about who faces the problem and what they do today.
+3. **Read the reality check** while analysts gather evidence, and add evidence about your own users: your data, your notes, people you can ask.
+4. **Make your calls** on the live page: answer the open questions, accept or refuse risks, and choose a move.
+5. **Run the test** if you chose Test first, by yourself, with an analyst, or with `/code-better` for code. Bring the result back to choose the next move.
+6. **Hand the brief on** to design when you choose Expand or Shrink.
 
-Use something else nearby:
+## How long it takes
 
-- To research a topic rather than shape an idea, use [`/research-better`](research-better.md) instead.
-- To design an interface or a system you have already decided to build, use [`/design-better`](design-better.md) or [`/architect-better`](architect-better.md).
+**How you work with it:** a guided session over several sittings. You answer questions and choose each move on a live page; analysts and verifiers check evidence without you in between.
 
-## How to run it
+| Work | Rough time |
+|---|---|
+| Draft and shape the idea | 20–40 min, with you |
+| Reality check | 20–60 min, without you |
+| One pass to a move | 1–2 h |
+| Whole discovery with tests | Days to weeks, set by how long your tests take |
 
-```
-/discover-better <idea>
-```
+It takes longer when you test before committing, and shorter when the idea stops or switches early.
 
-Example: `/discover-better make flaky tests someone's job`.
+## Reference
 
-With an idea it has already started, it resumes that discovery. Without an argument, it resumes your one open discovery, or asks which one.
-
-## What happens
+<details>
+<summary><b>What happens</b></summary>
 
 1. **Your idea and appetite.** You bring the idea and any notes. It asks for your appetite, what you would waste if the idea is wrong, and whether the idea serves your own organisation or customers.
 2. **The draft, shaped with you.** It drafts the problems, opportunities and behaviours, then asks questions to shape and challenge them. The idea can already stop or switch here.
@@ -47,16 +75,24 @@ With an idea it has already started, it resumes that discovery. Without an argum
 
 The discovery lives in `.discover/<idea>/`, and the brief versions in its `brief/` folder. Git sees it as untracked: commit it or ignore it as you choose.
 
-## The live page
+</details>
+
+<details>
+<summary><b>The live page</b></summary>
 
 The page opens on **Moves**: your idea, what waits for you, the moves made so far with the brief each one wrote, and your setting, which you can change. Tabs for **Problems**, **Opportunities** and **Behaviours** show each item with its state and evidence. **Evidence** splits what is about your users from what comes from elsewhere, and lets you add evidence of your own. **Options** compares the options of each move. **Tests** lists the tests and lets you add a result. **Brief** shows the current version and the earlier ones.
 
 Answer a question with ✓ to take its default, or with Answer. Choose a move with **Choose a move…** next to Send. The analysts at work are listed above the conversation.
 
-## What you get
+</details>
+
+<details>
+<summary><b>What you get</b></summary>
 
 - A brief for each move that commits, kept as versions, ready for design.
 - The items, evidence, tests, options and moves as records in the discovery's folder, so the work can resume in a later session.
+
+</details>
 
 <details>
 <summary><b>Works with</b></summary>

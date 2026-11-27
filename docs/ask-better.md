@@ -10,42 +10,36 @@ Decides whether the agent should ask you a question before working, and how to a
 
 *A question from planning these docs, in the form this skill asks for: one decision only the user could make, with what each option means.*
 
-## What it does
-
-- **Looks things up first.** It reads the code, documents, earlier conversation and memory, and asks you nothing these answer.
-- **Asks only what only you know**, when the answer changes the result and a wrong guess would be costly. Otherwise it goes ahead and states its assumption.
-- **Asks early and all at once**, with each question answerable in a few words or by choosing.
-- **Raises conflicting instructions** to you instead of picking one.
-
-For example, before a task with an unclear target:
-
-```
-/ask-better clean up the old branches
-```
-
-## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
+## When to use it
 
 - Before the agent starts a task that may be unclear.
 - When an agent guessed wrong on an earlier task, or asked you things it could have looked up.
 
+You rarely need to name it: other skills use it at the point where they ask you something (see Works with below).
+
 Running it does not mean a question is needed. It often ends with the agent going ahead and stating its assumptions.
 
-Other skills use it at the point where they ask you something, so you rarely need to call it yourself (see Works with below).
+## What you can do with it
 
-</details>
+| You want to | Run | You get |
+|---|---|---|
+| Check a request before work starts | `/ask-better clean up the old branches` | A few questions with options, or the work with its assumptions stated |
+| Check the current task before more work is done | `/ask-better` | The same, for the task in the conversation |
 
-<details>
-<summary><b>How to run it</b></summary>
+In every task, it:
 
-- `/ask-better <request>` checks that request before starting it.
-- `/ask-better` with no argument checks the current task before more work is done on it.
+- **Looks things up first.** It reads the code, documents, earlier conversation and memory, and asks you nothing these answer.
+- **Asks only what only you know**, when the answer changes the result and a wrong guess would be costly; otherwise it goes ahead and states its assumption.
+- **Asks early and all at once**, with each question answerable in a few words or by choosing.
+- **Raises conflicting instructions** to you instead of picking one.
 
-Example: `/ask-better clean up the old branches`
+## Your workflow
 
-</details>
+1. Run it with your request, or on the task in progress.
+2. Answer its questions, usually three or fewer, each with options and its recommendation first. Or read the assumptions it states next to the result.
+3. If an assumption is wrong, say so: it keeps your answers as requirements for the rest of the task.
+
+## Reference
 
 <details>
 <summary><b>What happens</b></summary>
