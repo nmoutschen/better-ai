@@ -2,6 +2,9 @@
 
 Introduces a dense document, such as a research paper, a strategy or a design doc, with a short story of visual slides you go through before you read it. Each slide shows one relation you would otherwise work out from the prose, every value is checked against the document, and you can ask about or correct any slide in the same page.
 
+![The live slides page: a strip of story parts from The question to Decision asked, slide 2 of 7 with a slope chart showing that workspaces of 26+ seats bring 18% of revenue but 52% of usage, and a conversation on the right where the reader asked about one label and the agent replied and marked it done](img/show-better-page.png)
+*You go through the story one slide at a time, click any label to comment, and the agent answers and changes the slide in place.*
+
 ## When to use it
 
 - Before reading a long, dense document, to see the question it answers, its answer and how its main ideas relate.
