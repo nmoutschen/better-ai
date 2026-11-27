@@ -5,6 +5,7 @@ import json
 import sys
 import unittest
 import xml.etree.ElementTree as ET
+from itertools import pairwise
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -18,6 +19,31 @@ NS = {"svg": "http://www.w3.org/2000/svg"}
 def content(svg, element_id):
     group = ET.fromstring(svg).find(f".//*[@id='{element_id}']")
     return [] if group is None else [text.text for text in group.findall("svg:text", NS)]
+
+
+def shared_lanes(layout):
+    """Pairs of different edges whose vertical segments overlap on one x."""
+    segments = [
+        (ident, x1, min(y1, y2), max(y1, y2))
+        for ident, points in layout["routes"].items()
+        for (x1, y1), (x2, y2) in pairwise(points)
+        if abs(x1 - x2) < 0.5 and abs(y1 - y2) > 0.5
+    ]
+    return [
+        (a[0], b[0])
+        for i, a in enumerate(segments)
+        for b in segments[i + 1 :]
+        if a[0] != b[0] and abs(a[1] - b[1]) < 4 and a[2] < b[3] and b[2] < a[3]
+    ]
+
+
+def services(names, edges):
+    return {
+        "containers": {
+            "nodes": [{"id": name, "kind": "service", "label": name} for name in names],
+            "edges": [{"id": f"{a}-{b}", "from": a, "to": b} for a, b in edges],
+        }
+    }
 
 
 class DiagramTests(unittest.TestCase):
@@ -121,6 +147,21 @@ class DiagramTests(unittest.TestCase):
         self.assertEqual([label.text for label in labels], ["Returns the result", "REMOVED"])
         for label in labels:
             self.assertGreater(float(label.get("x")) - left, diagram.width(label.text, diagram.LABEL))
+
+    def test_edges_going_up_and_down_through_one_gap_take_separate_lanes(self):
+        design = services(["a", "b", "c", "d", "e"], [("e", "c"), ("d", "b"), ("d", "a"), ("a", "c")])
+        self.assertEqual(shared_lanes(diagram.layout(design)), [])
+
+    def test_return_edges_from_one_box_take_separate_lanes_inside_the_viewbox(self):
+        design = services(["a", "b", "c"], [("a", "b"), ("b", "c"), ("c", "a"), ("c", "b")])
+        layout = diagram.layout(design)
+        self.assertEqual(shared_lanes(layout), [])
+        xs = [x for points in layout["routes"].values() for x, _ in points]
+        self.assertGreaterEqual(min(xs), layout["left"])
+        self.assertLessEqual(max(xs), layout["left"] + layout["width"])
+
+    def test_example_design_has_no_shared_lanes(self):
+        self.assertEqual(shared_lanes(diagram.layout(self.design)), [])
 
     def test_participant_uses_the_containers_box_style(self):
         flow = self.design["flows"][0]
