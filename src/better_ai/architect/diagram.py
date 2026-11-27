@@ -243,6 +243,10 @@ def layout(design: dict) -> dict:
     x = {item: column * (COLW + GAP) for column, slot in enumerate(slots) for item in slot}
     y, bands, total = place_bands(slots, heights, groups, chains, x)
     routes, extra = route_edges(edges, chains, incoming, outgoing, labels, x, y, heights, total)
+    width = len(slots) * (COLW + GAP) - GAP
+    # Return lanes may sit outside the outer columns; the drawing spans them all.
+    xs = [point[0] for points in routes.values() for point in points]
+    left, right = min([0, *xs]), max([width, *xs])
     return {
         "nodes": nodes,
         "edges": edges,
@@ -253,7 +257,8 @@ def layout(design: dict) -> dict:
         "box_heights": box_heights,
         "labels": labels,
         "routes": routes,
-        "width": len(slots) * (COLW + GAP) - GAP,
+        "left": left,
+        "width": right - left,
         "height": total + extra,
         "findings": design.get("findings", {}),
         "step_counts": Counter(step["id"] for flow in design.get("flows", []) for step in flow["steps"]),
@@ -316,7 +321,7 @@ def route_edges(edges, chains, incoming, outgoing, labels, x, y, heights, total)
         for i, edge in enumerate(edges_out, 1):
             ports_out[edge["id"]] = y[node] + heights[node] * i / (len(edges_out) + 1)
 
-    routes, gaps, return_space = {}, {}, 0
+    routes, gaps, returns, return_space = {}, {}, [], 0
     for edge in edges:
         ident = edge["id"]
         chain = chains[ident]
@@ -324,16 +329,7 @@ def route_edges(edges, chains, incoming, outgoing, labels, x, y, heights, total)
         start, end = ports_out[ident], ports_in[ident]
         if x[source] >= x[target]:
             return_space += 15 * len(labels[ident]) + 14
-            lower = total + return_space
-            right, left = x[source] + COLW + 18, x[target] - 18
-            routes[ident] = [
-                (right - 18, start),
-                (right, start),
-                (right, lower),
-                (left, lower),
-                (left, end),
-                (x[target], end),
-            ]
+            returns.append((ident, source, target, start, end, total + return_space))
             continue
         if len(chain) == 2 and abs(end - start) < 16 and y[source] + 10 <= end <= y[source] + heights[source] - 10:
             start = end
@@ -343,14 +339,42 @@ def route_edges(edges, chains, incoming, outgoing, labels, x, y, heights, total)
             gaps.setdefault(x[a] + COLW, []).append((ident, start, finish, x[b], i == len(chain) - 2))
             start = finish
 
-    for gap, runs in sorted(gaps.items()):
+    # Every vertical segment in a gap is a lane: (key, top, bottom, side). Forward runs and the lane a return edge
+    # leaves its source by take tracks from the gap's left side; the lane a return edge enters its target by takes
+    # them from the right side. Two lanes share a track only when their spans keep apart, so no two edges read as one.
+    lanes = {}
+    for gap, runs in gaps.items():
         up = sorted((run for run in runs if run[2] < run[1]), key=lambda run: run[2])
         down = sorted((run for run in runs if run[2] > run[1]), key=lambda run: -run[2])
-        tracks = {
-            run: gap + 18 + min(14, (GAP - 44) / max(1, len(direction))) * i
-            for direction in (up, down)
-            for i, run in enumerate(direction)
-        }
+        for run in up + down:
+            lanes.setdefault(gap, []).append((run, min(run[1], run[2]), max(run[1], run[2]), 1))
+    for ident, source, target, start, end, lower in returns:
+        lanes.setdefault(x[source] + COLW, []).append(((ident, "out"), start, lower, 1))
+        lanes.setdefault(x[target] - GAP, []).append(((ident, "in"), end, lower, -1))
+    tracks = {}
+    for gap, entries in lanes.items():
+        taken, chosen = {}, {}
+        for key, top, bottom, side in entries:
+            index = 0
+            while any(top < b + 8 and t < bottom + 8 for t, b in taken.get((side, index), [])):
+                index += 1
+            taken.setdefault((side, index), []).append((top, bottom))
+            chosen[key] = side, index
+        step = min(14, (GAP - 44) / len(taken))
+        for key, (side, index) in chosen.items():
+            tracks[key] = gap + 18 + step * index if side == 1 else gap + GAP - 18 - step * index
+
+    for ident, source, target, start, end, lower in returns:
+        right, left = tracks[(ident, "out")], tracks[(ident, "in")]
+        routes[ident] = [
+            (x[source] + COLW, start),
+            (right, start),
+            (right, lower),
+            (left, lower),
+            (left, end),
+            (x[target], end),
+        ]
+    for _gap, runs in sorted(gaps.items()):
         for run in runs:
             ident, start, end, destination, last = run
             if run in tracks:
@@ -489,8 +513,9 @@ def svg_containers(layout: dict, state: str) -> str:
     """Render one state from the shared layout. IDs start with c-<state>-."""
     prefix = f"c-{state}"
     pad = 24
+    left = layout["left"] - pad
     w, h = layout["width"] + 2 * pad, layout["height"] + 2 * pad
-    out = start_svg(f"{-pad} {-pad} {w} {h}", "Containers", w, h, -pad, -pad)
+    out = start_svg(f"{left} {-pad} {w} {h}", "Containers", w, h, left, -pad)
     out.extend(markers(prefix, ("response",)))
     box_marks, edge_marks = [], []
     for group, x, y, gw, gh in layout["groups"]:
