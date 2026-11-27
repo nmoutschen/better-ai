@@ -129,7 +129,8 @@ def _box_kinds() -> set[str] | None:
 
 def design_problems(design: dict) -> list[tuple[str, str]]:
     """What is wrong with the references inside a design that has the right shape: an id used twice, a box kind that is
-    not in the register, an edge, a group, a participant or a step that names what does not exist, a box in two groups.
+    not in the register, an edge, a group, a participant or a step that names what does not exist, a box in two groups,
+    a version in `in` that is not `before`, `after` or an alternative.
     The messages are the ones the diagram has always given."""
     problems: list[tuple[str, str]] = []
 
@@ -173,6 +174,26 @@ def design_problems(design: dict) -> list[tuple[str, str]]:
                     )
                 )
             members.add(member)
+    alternatives = design.get("alternatives") or []
+    versions = {"before", "after"} | set(index(alternatives, "Alternatives", "alternatives"))
+    for number, alternative in enumerate(alternatives):
+        if alternative["id"] in ("before", "after"):
+            problems.append((f"alternatives[{number}].id", f"Alternative id {alternative['id']!r} names a version"))
+
+    def versions_of(item, field):
+        for value in item.get("in") or []:
+            if value not in versions:
+                problems.append((f"{field}.in", f"{field}: in names {value!r}, not before, after or an alternative"))
+
+    for kind in ("nodes", "edges", "groups"):
+        for number, item in enumerate(containers.get(kind) or []):
+            versions_of(item, f"containers.{kind}[{number}]")
+    for number, flow in enumerate(design.get("flows", [])):
+        versions_of(flow, f"flows[{number}]")
+        for key in ("participants", "steps"):
+            for at, item in enumerate(flow[key]):
+                if isinstance(item, dict):
+                    versions_of(item, f"flows[{number}].{key}[{at}]")
     for number, flow in enumerate(design.get("flows", [])):
         where = f"Flow {number + 1}"
         participants = []
@@ -204,7 +225,9 @@ def _design_renders(record: dict, context: Context) -> list[tuple[str, str]]:
     an error of design.json, so `check` says it as the page would."""
     from . import diagram  # not at the top: the diagram imports this module for design_problems
 
-    candidate = diagram.without_nulls({key: value for key, value in record.items() if key in ("containers", "flows")})
+    candidate = diagram.without_nulls(
+        {key: value for key, value in record.items() if key in ("containers", "flows", "alternatives")}
+    )
     try:
         if diagram.shape_problems(candidate) or design_problems(candidate):
             return []  # reported by the schema and design-references

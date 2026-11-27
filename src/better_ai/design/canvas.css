@@ -1,4 +1,4 @@
-/* What only the canvas shows: the versions, their controls, the comment box and the approval panel. The shared look
+/* What only the canvas shows: the versions, their controls, the comment box. The shared look, the Approve… panel included,
    is in page.css, loaded first. */
 .seg button.ico { display:inline-flex; align-items:center; gap:var(--space-control); padding:var(--space-control) var(--space-item); opacity:.8;
   font:var(--font-label); letter-spacing:.06em; text-transform:uppercase; }
@@ -60,17 +60,10 @@ main.on-dark .pick button[aria-pressed="true"] { background:var(--cream); color:
 .msg.deleted { opacity:.55; }
 .msg .n { display:inline-flex; width:24px; height:24px; border-radius:50%; background:var(--terracotta); color:var(--heading);
   font:var(--font-small-strong); align-items:center; justify-content:center; }
-.msg .with { color:var(--muted); }
 .verdict { display:inline-block; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; padding:1px var(--space-control);
   margin-right:var(--space-control); vertical-align:1px; }
 .verdict.up { background:var(--moss-dark); color:var(--cream); }
 .verdict.down { background:var(--terracotta); color:var(--heading); }
-.approval { border:1px solid var(--sand); background:var(--white); padding:var(--space-control) var(--space-item); margin-bottom:var(--space-item); }
-.approval .menu-h { color:var(--muted); margin:0 0 var(--space-control); }
-.dopt { display:flex; align-items:center; gap:var(--space-control); font-size:var(--text-message); margin:var(--space-tight) 0; cursor:pointer; }
-.dopt input { accent-color:var(--umber); }
-.carry .menu-h { margin-top:var(--space-control); }
-.carried { margin:var(--space-tight) 0; font-size:var(--text-message); color:var(--ink); }
 .status { margin:0; font-size:var(--text-message); }
 .status.error { color:var(--error); font-weight:700; }
 .copy[hidden] { display:none; }

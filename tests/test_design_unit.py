@@ -231,7 +231,7 @@ class Script(unittest.TestCase):
         self.assertEqual(subprocess.run(["node", "--check", str(path)], capture_output=True).returncode, 0)
         text = path.read_text()
         self.assertNotIn("'decide'", text)
-        self.assertIn("pageApprove", text)
+        self.assertIn("pageApprovalPanel", text)  # the Approve… panel is page.js's, shared with architect-better
         self.assertIn("pagePinCss", text)  # the frame's pin colours are page.css's table
 
 
@@ -306,7 +306,8 @@ class Served(unittest.TestCase):
         self.assertEqual(data["title"], "Pay screen")
         self.assertEqual(data["versions"][0]["label"], "A")
         self.assertIn("function boot", self.get("canvas.js"))
-        self.assertIn(".approval", self.get("canvas.css"))
+        self.assertIn(".seg button.ico", self.get("canvas.css"))
+        self.assertIn(".approval", self.get("page.css"))  # the Approve… panel is shared
         with self.assertRaises(urllib.error.HTTPError) as refused:
             self.get("a.html")  # a version's file is not served: only the fixed table is
         refused.exception.close()

@@ -86,7 +86,10 @@ def read_design(reader: Reader):
     design = records[0] if records else None
     if design is None:
         return None, {}, ({}, {})
-    usable = diagram.without_nulls({"containers": design.get("containers"), "flows": design.get("flows") or []})
+    drawn = {"containers": design.get("containers"), "flows": design.get("flows") or []}
+    if design.get("alternatives"):
+        drawn["alternatives"] = design["alternatives"]
+    usable = diagram.without_nulls(drawn)
     if not isinstance(usable.get("containers"), dict):
         return None, {}, ({}, {})
     try:
@@ -193,10 +196,18 @@ def text_hashes(
     )
 
 
+def step_label_numbers(flow, states):
+    """The number of each step for its label: the one of the first version after the change that draws it, else the one
+    Before gives it."""
+    numbers = [diagram.step_numbers(flow, state) for state in (*states[1:], states[0])]
+    return [next((n for n in column if n), "") for column in zip(*numbers, strict=True)]
+
+
 def diagram_parts(design):
-    """Index the same boxes, arrows and steps across both versions for links and comments, with each part's
+    """Index the same boxes, arrows and steps across all versions for links and comments, with each part's
     fingerprint, and the same in the form reviews stored before the shared fingerprint."""
     parts, hashes, before = {}, {}, {}
+    states = [state for state, _ in diagram.versions(design)]
 
     def add(key, item, part):
         require(key not in parts, f"duplicate diagram part {key!r}")
@@ -205,7 +216,7 @@ def diagram_parts(design):
         before[key] = stored_fingerprint(item)
 
     def ids(view, kind, ident):
-        return [diagram.part_id(f"{view}-{state}", kind, ident) for state in diagram.STATES]
+        return [diagram.part_id(f"{view}-{state}", kind, ident) for state in states]
 
     nodes = {node["id"]: node for node in design["containers"]["nodes"]}
     for ident, node in nodes.items():
@@ -239,7 +250,7 @@ def diagram_parts(design):
         participants = {p["id"]: nodes[p["box"]]["label"] for p in flow["participants"]}
         for participant in flow["participants"]:
             parts[f"box:{participant['box']}"]["ids"].extend(ids(view, "box", participant["id"]))
-        for step, number in zip(flow["steps"], diagram.step_numbers(flow), strict=True):
+        for step, number in zip(flow["steps"], step_label_numbers(flow, states), strict=True):
             ident = step["id"]
             route = f"{participants[step['from']]} to {participants[step['to']]}"
             description = f"{step.get('label', '')} (Flows, step {number})"
@@ -282,17 +293,18 @@ def changed_texts(texts, review, before=None):
 
 
 def render_diagrams(design, marks):
+    """The drawings of each version: the containers, and each flow with how each version shows it (`current`, `new` or
+    `removed`), and an empty drawing in a version that does not draw it."""
     try:
         layout = diagram.layout({**design, "findings": marks})
-        containers = {s: diagram.svg_containers(layout, s) for s in diagram.STATES}
+        states = [state for state, _ in diagram.versions(design)]
+        containers = {s: diagram.svg_containers(layout, s) for s in states}
         flows = [
             {
                 "name": flow["name"],
-                "new": flow.get("in") == ["after"],
-                "removed": flow.get("in") == ["before"],
+                "status": {s: diagram.appearance(flow, s) for s in states if diagram.visible(flow, s)},
                 "versions": {
-                    s: diagram.svg_flow(flow, s, layout, f"flow{i}") if diagram.visible(flow, s) else ""
-                    for s in diagram.STATES
+                    s: diagram.svg_flow(flow, s, layout, f"flow{i}") if diagram.visible(flow, s) else "" for s in states
                 },
             }
             for i, flow in enumerate(design["flows"], 1)
@@ -388,7 +400,9 @@ def model(data):
         if last is None or affected or rewritten:
             rerun.append(ident)
             changes.update(dict.fromkeys(affected + rewritten))
-    containers, flows = {state: "" for state in diagram.STATES}, []
+    states = diagram.versions(design) if design else [("before", "Before")]
+    versions = [{"id": state, "name": name} for state, name in states]
+    containers, flows = {version["id"]: "" for version in versions}, []
     if design:
         try:
             containers, flows = render_diagrams(design, marks)
@@ -415,6 +429,8 @@ def model(data):
         "change_labels": {key: labels.get(key) or text_label(key) for key in changes},
         "removed_labels": {key: labels.get(key, key) for key in known if key not in parts},
         "rerun": rerun,
+        "versions": versions,
+        "alternatives": design.get("alternatives", []) if design else [],
         "containers": containers,
         "flows": flows,
     }

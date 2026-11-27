@@ -563,7 +563,7 @@ class EveryAcceptedExampleRenders(unittest.TestCase):
             self.assertEqual([str(e) for e in check(folder)], [])
             data = load(folder)
             self.assertEqual(data["errors"], [])
-            self.assertIn("&lt;b&gt;", data["containers"]["after"])
+            self.assertIn("&lt;b&gt;", data["containers"]["before"])
             payloads.append({"label": "odd ids", "data": data})
         wrong_types.render("render-architect-payloads.js", payloads, self)
 
@@ -1244,7 +1244,7 @@ class Serving(unittest.TestCase):
             data = load(folder)
             self.assertEqual([e["file"] for e in data["errors"]], ["decisions.jsonl"])
             self.assertEqual(data["title"], read(folder, "architect.json")["title"])
-            self.assertTrue(data["containers"]["after"])
+            self.assertTrue(data["containers"]["before"])
 
     def test_the_page_script_shows_an_errors_band_and_reads_the_new_fields(self):
         page = (PACKAGE / "page.html").read_text() + (PACKAGE / "page.js").read_text()
