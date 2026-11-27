@@ -32,6 +32,7 @@
     },
     "id": {
       "$ref": "base.schema.json#/$defs/id",
+      "description": "nothing points to an agent; the id lets `set` change its status",
       "pattern": "^A\\d+$",
       "x-id": {
         "prefix": "A"
