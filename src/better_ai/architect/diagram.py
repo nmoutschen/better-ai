@@ -23,7 +23,6 @@ from .checks import design_problems
 KINDS = {kind["name"]: kind for kind in json.loads(resources.read_text("architect/kinds.json"))}
 ICONS = json.loads(resources.read_text("architect/icons.json"))
 
-STATES = ("before", "after")
 INK, HEAD, SEC = "#33302B", "#1C1A17", "#78736B"
 LINEN, CREAM, SAND = "#F2EDE5", "#FFFCF7", "#C4B69C"
 TERRA, STRIP = "#AA5141", "#E8725C"
@@ -90,17 +89,52 @@ def validate(design: dict) -> list[str]:
     return errors
 
 
+def versions(design: dict) -> list[tuple[str, str]]:
+    """The versions a design draws, as (id, name): Before; then each alternative, or one After; or Before alone while
+    no part differs between Before and After, as when the design maps the system as it is."""
+    design = without_nulls(design)
+    alternatives = design.get("alternatives") or []
+    if alternatives:
+        return [("before", "Before"), *((alt["id"], alt["name"]) for alt in alternatives)]
+    containers = design.get("containers") or {}
+    items = [item for key in ("nodes", "edges", "groups") for item in containers.get(key) or []]
+    for flow in design.get("flows") or []:
+        items += [flow, *flow.get("participants", []), *flow.get("steps", [])]
+    if any(exists(item, "before") != exists(item, "after") for item in items):
+        return [("before", "Before"), ("after", "After")]
+    return [("before", "Before")]
+
+
+def exists(item, state):
+    """Whether a part exists in a version: `in` lists them, `after` standing for every version after the change; a
+    part without `in` exists in all."""
+    where = item.get("in")
+    if where is None:
+        return True
+    return state in where or (state != "before" and "after" in where)
+
+
 def visible(item, state):
-    """Before draws what exists before the change; After draws everything, a removed part as removed."""
-    return state == "after" or state in item.get("in", STATES)
+    """Before draws what exists before the change; a version after it draws what exists in it, and what it removed as
+    removed."""
+    return exists(item, state) or (state != "before" and exists(item, "before"))
 
 
 def appearance(item, state):
-    if state == "after" and item.get("in") == ["before"]:
+    if state == "before":
+        return "current"
+    old, new = exists(item, "before"), exists(item, state)
+    if old and not new:
         return "removed"
-    if state == "after" and item.get("in") == ["after"]:
+    if new and not old:
         return "new"
     return "current"
+
+
+def removable(item):
+    """Whether some version after the change removes the part, so its drawing keeps room for the removal tag."""
+    where = item.get("in")
+    return where is not None and "before" in where and "after" not in where
 
 
 def width(text, size, bold=False):
@@ -185,7 +219,7 @@ def layout(design: dict) -> dict:
         outgoing[source].append(edge)
         raw = edge.get("label", "")
         # Reserve the same label space in both views, including the removal tag.
-        labels[ident] = wrap(raw, LABEL, GAP - 70) + (["REMOVED"] if edge.get("in") == ["before"] else [])
+        labels[ident] = wrap(raw, LABEL, GAP - 70) + (["REMOVED"] if removable(edge) else [])
 
     for sweep in range(8):
         forward = sweep % 2 == 0
@@ -481,7 +515,7 @@ def svg_containers(layout: dict, state: str) -> str:
         # horizontal leg so it remains inside the view even in column zero.
         x, y = points[2] if layout["x"][edge["from"]] >= layout["x"][edge["to"]] else points[-1]
         lines = layout["labels"][ident]
-        if edge.get("in") == ["before"] and status != "removed":
+        if removable(edge) and status != "removed":
             lines = lines[:-1]  # the removal tag the layout reserved room for
         for i, line in enumerate(lines):
             yy = y - 6 - 15 * (len(lines) - 1 - i)
@@ -508,14 +542,21 @@ def svg_containers(layout: dict, state: str) -> str:
     return finish_svg(out, box_marks + edge_marks)
 
 
-def step_numbers(flow):
+def step_numbers(flow, state="after"):
+    """The number of each step in one version: steps the change adds take a letter after the step before them, and a
+    step the version does not draw has none ("")."""
     steps = flow["steps"]
-    if flow.get("in") == ["after"] or all(step.get("in") == ["after"] for step in steps):
-        return [str(i) for i in range(1, len(steps) + 1)]
+    drawn = [visible(step, state) for step in steps]
+    new = [appearance(step, state) == "new" for step in steps]
+    if appearance(flow, state) == "new" or all(n for n, d in zip(new, drawn, strict=True) if d):
+        count = iter(range(1, len(steps) + 1))
+        return [str(next(count)) if d else "" for d in drawn]
     base, suffix = 0, 0
     numbers = []
-    for step in steps:
-        if step.get("in") == ["after"]:
+    for is_drawn, is_new in zip(drawn, new, strict=True):
+        if not is_drawn:
+            numbers.append("")
+        elif is_new:
             suffix += 1
             index, letters = suffix, ""
             while index:
@@ -528,8 +569,8 @@ def step_numbers(flow):
     return numbers
 
 
-def flow_status(item, related):
-    states = [appearance(part, "after") for part in (item, related)]
+def flow_status(item, related, state):
+    states = [appearance(part, state) for part in (item, related)]
     return next((status for status in ("removed", "new") if status in states), "current")
 
 
@@ -604,11 +645,11 @@ def svg_flow(flow: dict, state: str, layout: dict, view: str) -> str:
             )
         if state == "after":
             marks.extend(badges(layout["findings"], box, center + COLW / 2 - 6, top - hbox - 9))
-    for i, (step, number) in enumerate(zip(steps, step_numbers(flow), strict=True)):
+    for i, (step, number) in enumerate(zip(steps, step_numbers(flow, state), strict=True)):
         source, target = step["from"], step["to"]
         if not visible(step, state) or source not in shown or target not in shown:
             continue
-        status = flow_status(step, flow) if state == "after" else "current"
+        status = flow_status(step, flow, state)
         y = top + 44 + 50 * i
         out.extend(draw_step(step, y, centers[source], centers[target], number, prefix, status))
         if state == "after":
@@ -644,11 +685,12 @@ def register() -> str:
 
 
 def drawings(design: dict) -> dict[str, str]:
-    """The Before and After SVGs of a design: `containers-<state>.svg`, and `flow<N>-<state>.svg` for each flow."""
+    """The SVGs of each version of a design (see `versions`): `containers-<version>.svg`, and `flow<N>-<version>.svg`
+    for each flow."""
     design = without_nulls(design)
     positions = layout(design)
     files = {}
-    for state in STATES:
+    for state, _ in versions(design):
         files[f"containers-{state}.svg"] = svg_containers(positions, state)
         for i, flow in enumerate(design.get("flows", []), 1):
             view = f"flow{i}"

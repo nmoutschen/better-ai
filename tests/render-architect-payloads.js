@@ -20,11 +20,12 @@ for (const {label, data} of payloads) {
     draw('decisionRecords(data.decisions)');
     draw('perspectiveTables(data.perspectives, data.findings, data.parts, true, data.removed_labels)');
     draw('perspectiveTables(data.perspectives, data.findings, data.parts, false, data.removed_labels)');
-    draw('controls(data.perspectives, data.reviews.at(-1))');
+    draw('controls(data.perspectives, data.reviews.at(-1), data.versions)');
+    draw('alternativeTable(data.alternatives) + alternativeCards(data.alternatives)');
     draw('specTables(data.spec)');
     draw('pageErrors(data.errors)');
-    draw('figures(data.containers)');
-    draw('data.flows.map(flow => figures(flow.versions)).join("")');
+    draw('figures(data.containers, data.versions)');
+    draw('data.flows.map(flow => flowMarks(flow.status) + figures(flow.versions, data.versions)).join("")');
     draw('reviewSummary(data.since, data.change_labels, data.rerun.map(id => nameOf(data.perspectives, id)))');
     draw('changeList(data.since, data.change_labels, data.removed)');
   } catch (error) {

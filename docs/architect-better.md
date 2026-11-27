@@ -7,9 +7,9 @@ Designs a feature or a change to a software system. You check how the system wor
 
 ## What it does
 
-- **Draws the current system.** It checks the affected containers and flows against the code and asks you to correct the drawing.
+- **Draws the current system.** It checks the affected containers and flows against the code and asks you to correct the drawing. If all you need is a map of the system as it is, the work can stop there.
 - **Agrees requirements with you.** It drafts observable scenarios for quality attributes, marks its guesses and shows where each requirement came from.
-- **Shows options and trade-offs.** It recommends a design, explains why it rejected alternatives and records the main drawback of each recorded choice.
+- **Shows options and trade-offs.** It recommends a design, explains why it rejected alternatives and records the main drawback of each recorded choice. When two designs are both worth weighing, it draws each one so you can switch between them and choose.
 - **Reviews the design after you approve it.** It runs a separate review for each applicable perspective, such as security, failure handling, agent experience or API standards, and attaches findings to the affected parts.
 
 ## When to use it
@@ -23,9 +23,9 @@ Use it to design a feature or a structural change, such as adding a module, chan
 
 ## The live page
 
-Switch between Before and After in Containers and Flows. Click a box, arrow or step to comment. Confirm a guessed requirement or choose Change to correct a row. The agent replies under your message.
+Switch between Before and After in Containers and Flows, or between Before and each alternative design, with its strengths and drawbacks above the diagram. Overview lists the alternatives side by side. Click a box, arrow or step to comment. Confirm a guessed requirement or choose Change to correct a row. The agent replies under your message.
 
-Choose **Approve…** to start perspective reviews. When a finding appears, select its linked part to see where it applies. After a revision, **Review again…** shows what changed in the diagrams, the requirements or `design.md`, and reruns the perspectives those changes affect.
+Choose **Approve…** to start perspective reviews. When the design has alternatives, choose the one you approve there; the others are recorded as rejected alternatives. When a finding appears, select its linked part to see where it applies. After a revision, **Review again…** shows what changed in the diagrams, the requirements or `design.md`, and reruns the perspectives those changes affect.
 
 ## What you get
 

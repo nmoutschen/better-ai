@@ -65,17 +65,49 @@ function decisionRecords(decisions) {
   }).join('');
 }
 
-function controls(perspectives, review) {
+// The versions to switch between, Before and each version after the change, shown only when there is more than one.
+function controls(perspectives, review, versions = []) {
   const segment = (label, attr, options) => '<div class="seg seg--light" role="group" aria-label="' + label + '">' +
     options.map(([key, name]) => '<button type="button" data-' + attr + '="' + text(key) +
       '" aria-pressed="false">' + text(name) + '</button>').join('') + '</div>';
-  return '<div class="controls">' + segment('State', 'version', [['before', 'Before'], ['after', 'After']]) +
+  return '<div class="controls">' +
+    (versions.length > 1 ? segment('Version', 'version', versions.map(v => [v.id, v.name])) : '') +
     (review ? segment('Findings', 'findings', [['', 'No findings'], ...perspectives.map(p => [p.id, p.name])]) : '') + '</div>';
 }
 
-function figures(versions, empty = 'This flow does not exist before the change.') {
-  return Object.entries(versions).map(([state, svg]) => '<div class="fig" data-state="' + state + '" hidden>' +
-    (svg || '<p class="muted">' + text(empty) + '</p>') + '</div>').join('');
+// One drawing per version; a version that does not draw a flow says so, by the version's name.
+function figures(drawings, versions = [], empty) {
+  const nameOf = state => (versions.find(v => v.id === state) || {}).name || state;
+  const missing = state => empty || (state === 'before' ? 'This flow does not exist before the change.' :
+    state === 'after' ? 'This flow does not exist after the change.' : 'This flow is not part of ' + nameOf(state) + '.');
+  return Object.entries(drawings).map(([state, svg]) => '<div class="fig" data-state="' + text(state) + '" hidden>' +
+    (svg || '<p class="muted">' + text(missing(state)) + '</p>') + '</div>').join('');
+}
+
+// A flow's New or Removed mark, one per version that shows it so.
+function flowMarks(status = {}) {
+  return Object.entries(status).filter(([, how]) => how !== 'current').map(([state, how]) =>
+    '<span class="chip by-version" data-state="' + text(state) + '" hidden>' + (how === 'new' ? 'New' : 'Removed') + '</span>').join('');
+}
+
+function bullets(items) {
+  return items.length ? '<ul class="bullets">' + items.map(item => '<li>' + inlineCode(item) + '</li>').join('') + '</ul>' : '<p class="muted">None given.</p>';
+}
+
+// The alternatives side by side, each with its trade-offs; each row takes a change request.
+function alternativeTable(alternatives) {
+  if (!alternatives.length) return '';
+  return '<h3>Alternatives</h3>' + table(['Alternative', 'Summary', 'Strengths', 'Drawbacks', 'Actions'], alternatives.map(alt => row([
+    '<strong>' + text(alt.name) + '</strong>', inlineCode(alt.summary) + editor('What should change in ' + alt.name),
+    bullets(alt.strengths), bullets(alt.drawbacks), '<div class="row-actions">' + changeButton + '</div>'
+  ], 'id="alt-' + text(alt.id) + '" data-record="' + text(alt.id) + '" data-name="' + text(alt.name) + '"')));
+}
+
+// The trade-offs of the alternative a diagram shows, above the diagram, shown with its version.
+function alternativeCards(alternatives) {
+  return alternatives.map(alt => '<article class="dec by-version" data-state="' + text(alt.id) + '" hidden><div class="dh"><h3>' +
+    text(alt.name) + '</h3></div><p>' + inlineCode(alt.summary) + '</p><span class="lbl">Strengths</span>' + bullets(alt.strengths) +
+    '<span class="lbl">Drawbacks</span>' + bullets(alt.drawbacks) + '</article>').join('');
 }
 
 function specSource(source) {
@@ -182,7 +214,13 @@ function start(data) {
   byId('status').innerHTML = '<span class="stat"><b id="accepted-count"></b>sections accepted</span>' +
     '<span class="stat"><b id="comment-count">0</b>open comments</span>' +
     '<button type="button" class="stat" id="questions"><b id="question-count">0</b>open questions</button>';
-  const tabs = all('.tabs [role="tab"]');
+  const versions = data.versions || [];
+  const alternatives = data.alternatives || [];
+  // While the design draws only the system as it is, the sections of a change show only once they hold something.
+  const before = versions.length < 2;
+  const empty = {requirements: data.requirements, perspectives: data.perspectives, decisions: data.decisions, spec: data.spec};
+  for (const [key, records] of Object.entries(empty)) byId('tab-' + key).hidden = before && !records.length;
+  const tabs = all('.tabs [role="tab"]').filter(button => !button.hidden);
   const panel = key => byId('panel-' + key);
   const pop = $('.pop');
   const reviewMenu = document.createElement('div');
@@ -196,11 +234,11 @@ function start(data) {
   reviewToggle.id = 'review-toggle';
   reviewToggle.setAttribute('aria-controls', 'review-menu');
   const runReview = $('#run-review', reviewMenu);
-  if (!readOnly) {
+  if (readOnly) {
+    $('.composer').hidden = true;
+  } else if (!before) {  // nothing to approve while only Before is drawn
     $('#noteform').prepend(reviewMenu);
     $('.notes .send .btn').after(reviewToggle);
-  } else {
-    $('.composer').hidden = true;
   }
   const {perspectives} = data;
   const review = data.reviews.at(-1);
@@ -227,7 +265,9 @@ function start(data) {
   pageShowErrors(byId('errors'), data.errors);
   document.title = 'Design: ' + data.title;
   byId('title').textContent = document.title;
-  byId('accepted-count').innerHTML = new Set(data.accepted).size + '<span class="of"> / ' + (tabs.length - 1) + '</span>';
+  const shownKeys = tabs.slice(1).map(button => button.id.slice(4));
+  byId('accepted-count').innerHTML = new Set(data.accepted.filter(key => shownKeys.includes(key))).size +
+    '<span class="of"> / ' + shownKeys.length + '</span>';
   const sections = tabs.slice(1).map(button => {
     const key = button.id.slice(4);
     const accepted = data.accepted.includes(key);
@@ -237,14 +277,13 @@ function start(data) {
       '<span data-section-status="' + key + '">' + (accepted ? chip('Accepted', 'ok') : chip('Draft')) + '</span>']);
   });
   section('overview', data.title, '<p class="lead">' + text(data.summary) + '</p><h3>Scope</h3><p>' +
-    text(data.scope) + '</p><h3>Sections</h3>' + table(['Section', 'Status'], sections));
+    text(data.scope) + '</p>' + alternativeTable(alternatives) + '<h3>Sections</h3>' + table(['Section', 'Status'], sections));
   section('requirements', 'Requirements', table(['ID', 'Kind', 'Requirement', 'Source', 'Actions'], requirementRows(data.requirements)));
-  const diagramControls = controls(applicable, review);
-  section('containers', 'Containers', diagramControls + figures(data.containers, 'The containers are not drawn: see the errors above.'));
+  const diagramControls = controls(applicable, review, versions) + alternativeCards(alternatives);
+  section('containers', 'Containers', diagramControls + figures(data.containers, versions, 'The containers are not drawn: see the errors above.'));
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
-    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New') : '') +
-    (flow.removed ? ' ' + chip('Removed') : '') + '</h3>' +
-    figures(flow.versions)).join(''));
+    '<h3 class="figtitle">' + text(flow.name) + ' ' + flowMarks(flow.status) + '</h3>' +
+    figures(flow.versions, versions)).join(''));
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
   section('decisions', 'Decision records', decisionRecords(data.decisions));
   section('spec', 'Spec', specTables(data.spec));
@@ -280,10 +319,12 @@ function start(data) {
     placePins();
   }
 
+  // Shows one version; by default the first after the change, or Before when there is none.
   function setVersion(state) {
-    version = state === 'before' ? 'before' : 'after';
+    const known = versions.map(v => v.id);
+    version = known.includes(state) ? state : known[1] || 'before';
     all('[data-version]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.version === version)));
-    all('.fig').forEach(fig => { fig.hidden = fig.dataset.state !== version; });
+    all('.fig, .by-version').forEach(node => { node.hidden = node.dataset.state !== version; });
     placePins();
   }
 
@@ -506,7 +547,7 @@ function start(data) {
     const button = $('button', form);
     button.disabled = true;
     conversation.send('comment', {id: 'change-' + Date.now().toString(36), text: message,
-      on: {id: record.id, title: 'Change ' + record.dataset.record}}, 'Change request', () => {
+      on: {id: record.id, title: 'Change ' + (record.dataset.name || record.dataset.record)}}, 'Change request', () => {
       form.hidden = true;
       button.disabled = false;
       input.value = input.defaultValue;
@@ -544,12 +585,25 @@ function start(data) {
   $('.menu-h', reviewMenu).textContent = review ? 'Review the changes' : 'Approve the design';
   runReview.textContent = review ? 'Run the review again' : 'Approve and run the review';
   runReview.disabled = !!review && !reviewNames.length;
-  const approval = readOnly ? null : pageApprove({
+  // With alternatives, approving means choosing one of them: the run waits for the user's choice, never preset.
+  if (alternatives.length) {
+    const choice = document.createElement('fieldset');
+    choice.className = 'choose';
+    choice.innerHTML = '<legend>Alternative to approve</legend>' + alternatives.map(alt =>
+      '<label><input type="radio" name="alternative" value="' + text(alt.id) + '"> ' + text(alt.name) + '</label>').join('');
+    runReview.before(choice);
+    choice.addEventListener('change', () => { runReview.disabled = !!review && !reviewNames.length; });
+  }
+  const chosen = () => $('input[name="alternative"]:checked', reviewMenu)?.value;
+  const chosenName = () => (alternatives.find(alt => alt.id === chosen()) || {}).name;
+  const approval = readOnly || before ? null : pageApprove({
     button: reviewToggle, panel: reviewMenu, label: 'Review request',
-    params: () => ({again: !!review, perspectives: reviewIds, changes: data.since,
-      text: (review ? 'Review requested again' : 'Design approved') + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')}),
+    params: () => ({again: !!review, perspectives: reviewIds, changes: data.since, ...(chosen() ? {alternative: chosen()} : {}),
+      text: (review ? 'Review requested again' : 'Design approved') + (chosen() ? ' · ' + chosenName() : '') +
+        (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')}),
     onToggle: open => {
       if (!open) return;
+      if (alternatives.length) runReview.disabled = !chosen() || (!!review && !reviewNames.length);
       const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
       const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
       const removed = data.removed || [];

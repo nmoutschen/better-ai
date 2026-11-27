@@ -48,7 +48,7 @@
       }
     },
     "approve": {
-      "description": "the user asked for the design to be approved, or reviewed again",
+      "description": "the user asked for the design to be approved, with the alternative they chose when it has alternatives, or reviewed again",
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "at", "by", "id", "again", "perspectives", "changes", "text"],
@@ -60,6 +60,7 @@
         "again": {"type": "boolean"},
         "perspectives": {"type": "array", "items": {"type": "string", "minLength": 1, "x-points-to": {"file": "perspectives.jsonl", "type": "perspective"}}},
         "changes": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "alternative": {"description": "the alternative of design.json the user chose and approved", "type": "string", "pattern": "^[a-z0-9]+$"},
         "text": {"type": "string", "minLength": 1}
       }
     },

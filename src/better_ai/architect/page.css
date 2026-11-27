@@ -50,6 +50,11 @@ code { font:var(--font-code); background:var(--linen); padding:1px var(--space-t
 .boxref svg { flex:none; }
 
 .menu-h { font-weight:700; }
+.choose { border:1px solid var(--sand); margin:0 0 var(--space-item); padding:var(--space-control) var(--space-item); display:grid; gap:var(--space-tight); }
+.choose input { accent-color:var(--ink); }
+.choose legend { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.bullets { margin:0; padding-left:1.2em; }
+.dec.by-version .bullets { margin:var(--space-tight) 0 var(--space-item); }
 .pop textarea { display:block; min-height:5em; margin:var(--space-control) 0; }
 .comment-actions { display:flex; gap:var(--space-control); }
 /* Where a comment pin sits; its look and its state colours are page.css's. */

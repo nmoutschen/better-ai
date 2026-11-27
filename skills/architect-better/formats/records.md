@@ -19,6 +19,10 @@ The design, type `design`, one record: the containers and the flows, each flow w
 
 Leave `in` out for a part in both versions; use `["before"]` for a part the change removes and `["after"]` for a part it adds, and leave `kind` of a step out for `request`. A part key, used in `parts` of a finding and in `changed` of a review, is `box:<box id>`, `edge:<edge id>` or `step:<flow id>/<step id>`; join the two views of one exchange with `+`, such as `edge:<edge id>+step:<flow id>/<step id>`.
 
+A design with alternatives, still to choose from: `in` names an alternative by its `id`, one word of lowercase letters and digits, and `after` stands for every alternative.
+
+{"type": "design", "alternatives": [{"id": "<alternative id>", "name": "<name>", "summary": "<what it does differently>", "strengths": ["<strength>"], "drawbacks": ["<drawback>"]}, {"id": "<other alternative id>", "name": "<name>", "summary": "<summary>", "strengths": [], "drawbacks": ["<drawback>"]}], "containers": {"nodes": [{"id": "<box id>", "label": "<label>", "kind": "<kind>", "in": ["<alternative id>"]}, {"id": "<box id>", "label": "<label>", "kind": "<kind>", "in": ["before", "<other alternative id>"]}]}, "flows": []}
+
 The requirements, type `requirement`: one record per source.
 
 {"type": "requirement", "kind": "functional", "text": "<requirement>", "source": {"type": "request", "sentence": "<a sentence of the request, word for word>"}}
