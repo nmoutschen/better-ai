@@ -95,6 +95,7 @@ class OneBadRecordPerKind(unittest.TestCase):
         "decisions.jsonl": (lambda r: {**r, "drivers": ["Z9"]}, "drivers"),
         "reviews.jsonl": (lambda r: {**r, "at": "2026-11-20T19:42:54"}, "at"),
         "spec.jsonl": (lambda r: {k: v for k, v in r.items() if k != "statement"}, "statement"),
+        "agents.jsonl": (lambda r: {**r, "status": "waiting"}, "status"),
     }
     SHOWN = {
         "requirements.jsonl": "requirements",
@@ -712,6 +713,7 @@ class Templates(unittest.TestCase):
         "spec": "spec.schema.json",
         "gap": "spec.schema.json",
         "unlinked": "spec.schema.json",
+        "agent": "agents.schema.json",
     }
 
     def lines(self):
@@ -729,7 +731,15 @@ class Templates(unittest.TestCase):
         line = re.sub(r"<SHA-256[^>]*>", DIGEST, line)
         return re.sub(r"<[^<>\"]+>", "text", line)
 
-    IDS = {"requirement": None, "finding": "V1", "decision": "D1", "spec": "S1", "gap": "G1", "perspective": "security"}
+    IDS = {
+        "requirement": None,
+        "finding": "V1",
+        "decision": "D1",
+        "spec": "S1",
+        "gap": "G1",
+        "perspective": "security",
+        "agent": "A1",
+    }
     PREFIX = {"functional": "F1", "quality": "Q1", "constraint": "C1"}
 
     def stamp(self, record):
@@ -756,6 +766,7 @@ class Templates(unittest.TestCase):
             ("gap", "answered"),
             ("finding", "open"),
             ("finding", "handled"),
+            *(("agent", s) for s in ("running", "done", "stopped")),
             *(("requirement", t) for t in ("request", "file", "user", "guessed")),
             *(("spec", t) for t in ("design", "request", "decision", "requirement")),
             *(("perspective", t) for t in ("built_in", "standard")),
@@ -768,7 +779,7 @@ class Templates(unittest.TestCase):
         seen = set()
         for r in records:
             kind = r["type"]
-            if kind in ("gap", "finding"):
+            if kind in ("gap", "finding", "agent"):
                 seen.add((kind, r["status"]))
             elif kind in ("requirement", "spec"):
                 seen.add((kind, r["source"]["type"]))
@@ -808,6 +819,7 @@ KINDWORDS = {
     "design", "request", "decision", "requirement", "file", "user", "guessed", "issue", "built_in", "standard",
     "functional", "quality", "constraint", "spec", "gap", "unlinked", "perspective", "finding", "review", "architect",
     "service", "person", "box", "step", "async", "response", "dashboard", "after", "before",
+    "agent", "proof of concept", "spec check", "running", "done", "stopped",
 }  # fmt: skip
 
 

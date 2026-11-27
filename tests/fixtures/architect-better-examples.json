@@ -54,5 +54,15 @@
    "title": "spec (shared format, see code-better spec.jsonl)",
    "line": "{\"type\": \"spec\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"architect\", \"id\": \"S1\", \"statement\": \"WHEN a builder writes a question, the page SHALL show it within 2 seconds.\", \"source\": {\"type\": \"requirement\", \"requirement\": \"Q1\"}, \"checked_by\": \"Time a builder question from write to display.\"}"
   }
+ ],
+ "agents.jsonl": [
+  {
+   "title": "agent, running",
+   "line": "{\"type\": \"agent\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"architect\", \"id\": \"A1\", \"name\": \"security-reviewer\", \"task\": \"review\", \"what\": \"Security\", \"status\": \"running\"}"
+  },
+  {
+   "title": "agent, done",
+   "line": "{\"type\": \"agent\", \"at\": \"2026-11-21T10:00:00Z\", \"by\": \"architect\", \"id\": \"A2\", \"name\": \"poc-resume\", \"task\": \"proof of concept\", \"what\": \"Can a session be resumed?\", \"status\": \"done\"}"
+  }
  ]
 }

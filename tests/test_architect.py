@@ -288,6 +288,13 @@ class Architect(unittest.TestCase):
         ):
             self.assertIn(error, out)
 
+    def test_the_page_lists_only_the_running_agents_with_when_each_started(self):
+        view = model.model(self.read())
+        self.assertEqual(
+            [(a["id"], a["name"], a["task"], a["at"]) for a in view["agents"]],
+            [("A2", "poc-resume", "proof of concept", "2026-11-20T10:05:00Z")],
+        )
+
     def test_reader_loads_every_contract_file(self):
         data = self.read()
         for name in model.FILES:
