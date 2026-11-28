@@ -13,7 +13,7 @@ const ago = minutes => new Date((NOW - minutes * 60) * 1000).toISOString().slice
 function pure(returns, over = {}) {
   const env = Object.assign({
     document: stand(), pageEscape: shared.pageEscape, pageThread: shared.pageThread, pageDecisionEvents: shared.pageDecisionEvents, pageOpenDecisions: shared.pageOpenDecisions,
-    pageDecision: shared.pageDecision, pageAgents: shared.pageAgents, pageTime: shared.pageTime,
+    pageDecision: shared.pageDecision, pageAgents: shared.pageAgents, pageApprovals: shared.pageApprovals, pageOpenApproval: shared.pageOpenApproval, pageTime: shared.pageTime,
     pageMarkdown: t => ({ outerHTML: '<p>' + shared.pageEscape(t) + '</p>' }), pageMarkdownText: String,
   }, over);
   return new Function(...Object.keys(env), `${between(source, '', '// ---------- Start ----------')}; return ${returns};`)(...Object.values(env));

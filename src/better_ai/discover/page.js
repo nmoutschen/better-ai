@@ -216,8 +216,9 @@ function headerHTML(data, open) {
   const head = data.head || {}, briefs = data.briefs || [];
   const stat = (big, label) => '<span class="stat"><b>' + big + '</b>' + esc(label) + '</span>';
   const version = briefs.length ? 'v' + Math.max(...briefs.map(b => briefNumber(b.id))) : '–';
+  const waiting = open.length + pageApprovals().length;
   return stat(esc(s(head.step) || '–') + '<span class="of"> / 10</span>', 'step') + stat(esc(version), 'brief') +
-    (open.length ? '<button type="button" class="stat" id="questions"><b>' + open.length + '</b>' + (open.length === 1 ? 'open question' : 'open questions') + '</button>'
+    (waiting ? '<button type="button" class="stat" id="questions"><b>' + waiting + '</b>' + (waiting === 1 ? 'open question' : 'open questions') + '</button>'
       : '<span class="stat"><b>0</b>open questions</span>');
 }
 
@@ -890,6 +891,7 @@ byId('agents').addEventListener('click', event => {
 });
 byId('status').addEventListener('click', event => {
   if (!event.target.closest('#questions')) return;
+  if (pageOpenApproval()) return;
   const first = $('li.open-q', byId('thread'));
   const target = first && ($('.use', first) || $('.answer', first));
   if (target) { first.scrollIntoView({ block: 'nearest' }); target.focus(); }

@@ -66,6 +66,7 @@ function pageFetch(url, init) {
 // reason }). The page shows what it says and adds nothing: the notice and Stop or Start in the Agents section, a waiting
 // worker's row, the tab title, and each request in one pop-up.
 var PAGE_DRIVER_DOWN = "The page's agent driver stopped. Ask the agent in your chat to serve this page again.";
+var PAGE_OWN_WAITING = "The page's agent is waiting for you to allow a tool call. Open the request to answer it.";
 var PAGE_UNSENT = 'May not have been sent; check after the page reopens.';
 var PAGE_WAITING = 'Waiting for you: ';
 var PAGE_CHOICES = { allow_once: 'Allow once', allow_session: 'Allow for this session', deny: 'Deny' };
@@ -148,7 +149,8 @@ function pageDialog(o) {
     else if (!e.shiftKey && at === last) { e.preventDefault(); buttons[0].focus(); }
   });
   document.body.append(pop);
-  pageDialogOpen = { pop: pop, opener: o.opener, approval: o.approval };
+  pageDialogOpen = { pop: pop, opener: o.opener, approval: o.approval,
+    row: o.opener && o.opener.getAttribute ? o.opener.getAttribute('data-approval-for') : null };
   buttons[o.focus].focus();
 }
 function pageDialogClose() {
@@ -156,7 +158,9 @@ function pageDialogClose() {
   if (!open) return;
   pageDialogOpen = null;
   open.pop.remove();
-  if (open.opener && document.contains(open.opener)) open.opener.focus();
+  // A redraw replaces the row the pop-up opened from: its new copy takes the focus.
+  var back = open.opener && document.contains(open.opener) ? open.opener : open.row ? document.querySelector('[data-approval-for="' + open.row + '"]') : null;
+  if (back) back.focus();
 }
 
 // The confirm before Stop. Only "Stop all agents" sends it.
@@ -176,7 +180,12 @@ function pageApprovalAsk(a, opener) {
     buttons: a.options.map(function (choice, i) {
       return { text: PAGE_CHOICES[choice], quiet: i > 0, label: PAGE_CHOICES[choice] + ': ' + a.who + ', ' + a.tool + ' ' + a.arguments,
         click: function () {
-          pageControl('permission_answer', { id: a.id, choice: choice }).then(pageDialogClose, pageControlFailed);
+          var all = pageDialogOpen.pop.querySelectorAll('button');
+          all.forEach(function (b) { b.disabled = true; });
+          pageControl('permission_answer', { id: a.id, choice: choice }).then(pageDialogClose, function (error) {
+            all.forEach(function (b) { b.disabled = false; });
+            pageControlFailed(error);
+          });
         } };
     }) });
 }
@@ -263,7 +272,7 @@ function pageWatchDriver() {
     }).then(function (agent) {
       if (pending !== request) return;
       pending = null;
-      var changed = JSON.stringify(agent.blocked) !== JSON.stringify(pageAgentState && pageAgentState.blocked);
+      var changed = JSON.stringify([agent.blocked, agent.approvals]) !== JSON.stringify(pageAgentState && [pageAgentState.blocked, pageAgentState.approvals]);
       pageAgentState = agent; pageDriverDown = agent.mark_age > 3; pageAgentDraw(chrome);
       if (changed && pageThreadDraw) pageThreadDraw();
     }).catch(function (error) {
@@ -280,6 +289,9 @@ function pageWatchDriver() {
     e.stopPropagation(); e.preventDefault();
     pageOpenApproval(row.getAttribute('data-approval-for'), row);
   }, true);
+  // Pages write their own title when they redraw: the prefix is put back whenever the title changes.
+  var title = document.querySelector('title');
+  if (title && typeof MutationObserver !== 'undefined') new MutationObserver(pageSetTitle).observe(title, { childList: true, characterData: true, subtree: true });
   pagePairing.then(poll);
 }
 if (pageDriven) pageWatchDriver();
@@ -1293,7 +1305,11 @@ function pageAgents(rows, o) {
   rows = rows.filter(function (r) { return waiting.indexOf(r.who) >= 0; }).concat(rows.filter(function (r) { return waiting.indexOf(r.who) < 0; }));
   var notice = pageAgentNotice();
   pageAgentRows = { rows: given, o: o };
-  var list = (notice ? '<li class="notice"><div>' + pageEscape(notice) + '</div></li>' : '') + rows.map(function (r) {
+  // A request from an agent that has no row here, the page's own, has no row to press: a notice with a button instead.
+  var own = pageApprovals().filter(function (a) { return !pageAgentState.workers.some(function (w) { return w.name === a.who; }); })[0];
+  var list = (notice ? '<li class="notice" role="status"><div>' + pageEscape(notice) + '</div></li>' : '') +
+    (own ? '<li class="notice"><div>' + pageEscape(PAGE_OWN_WAITING) + '<button type="button" class="btn btn--sm" data-approval-for="' + pageEscape(own.who) + '">Open the request</button></div></li>' : '') +
+    rows.map(function (r) {
     var waits = waiting.indexOf(r.who) >= 0;
     var attrs = Object.keys(r.data || {}).map(function (k) { return ' data-' + pageEscape(k) + '="' + pageEscape(r.data[k]) + '"'; }).join('');
     var tag = (r.data || waits ? 'button type="button"' : 'div') + (r.kind ? ' class="' + pageEscape(r.kind) + '"' : '') + attrs +
