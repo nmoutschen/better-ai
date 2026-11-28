@@ -8,6 +8,7 @@ import re
 import shlex
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -30,6 +31,16 @@ from better_ai.research import SKILL as RESEARCH  # noqa: E402
 ARCHIVE = "/plugins/code/better.pyz"
 COMMAND = f"{sys.executable} {ARCHIVE}"
 AT = "2026-06-01T12:00:00Z"
+SKILLS = Path(__file__).resolve().parent.parent / "skills"
+PAGE_AGENT = Path(__file__).resolve().parent.parent / "src" / "better_ai" / "page" / "page-agent.md"
+# The worker briefs a page agent may start, with the field that carries the header's form.
+WORKER_BRIEFS = (
+    ("code-better/agents/builder.md", "`page_form`"),
+    ("code-better/agents/verifier.md", "`page_form`"),
+    ("discover-better/agents/analyst.md", "PAGE FORM"),
+    ("research-better/agents/worker.md", "PAGE FORM"),
+    ("research-better/agents/verifier.md", "PAGE FORM"),
+)
 
 
 def note(item, *, to=None, by="user"):
@@ -82,6 +93,33 @@ class Straying(Answering):
         self.events.put(Event("turn_ended", outcome="completed"))
 
 
+class Queued(Answering):
+    """Runs a turn of its own while the first prompt waits, then takes up each waiting prompt in order a moment later:
+    its echo, then its turn (verifier-t3d's probe of S97 and S49)."""
+
+    def __init__(self):
+        super().__init__()
+        self.queue, self.first = [], True
+
+    def prompt(self, text, uuid=None):
+        super().prompt(text, uuid)
+        self.queue.append(uuid)
+        if self.first:
+            self.first = False
+            self.events.put(Event("turn_started"))
+            self.events.put(Event("turn_ended", outcome="completed"))
+        timer = threading.Timer(0.3, self.take)
+        timer.daemon = True
+        timer.start()
+
+    def take(self):
+        if self.queue:
+            uuid = self.queue.pop(0)
+            self.events.put(SimpleNamespace(kind="prompt_echoed", uuid=uuid))
+            self.events.put(Event("turn_started"))
+            self.events.put(Event("turn_ended", outcome="completed"))
+
+
 class Turns(shell.Fixture):
     """A driver on a real conversation of the fixture page, and a peer to play the harness."""
 
@@ -91,13 +129,22 @@ class Turns(shell.Fixture):
         self.clock = time.monotonic
         self.scanned = []
         self.workers = []
-        for name, value in (("TRIGGER_INTERVAL", 0.05), ("TRIGGER_BUDGET", 5.0)):
-            patch = mock.patch.object(driver_module, name, value)
+        for name, value in (("TRIGGER_INTERVAL", 0.05), ("TRIGGER_BUDGET", 5.0), ("ECHO_TIMEOUT", 0.2)):
+            patch = mock.patch.object(driver_module, name, value, create=True)
             patch.start()
             self.addCleanup(patch.stop)
 
     def make(
-        self, peer=Answering, *, handoff="", harness="stub", resume=True, paired=True, verbs=("add", "set"), **more
+        self,
+        peer=Answering,
+        *,
+        handoff="",
+        harness="stub",
+        resume=True,
+        paired=True,
+        verbs=("add", "set"),
+        command=COMMAND,
+        **more,
     ):
         if resume:
             # A session opened earlier is resumed; a new one starts with a turn of its own (S93).
@@ -114,7 +161,7 @@ class Turns(shell.Fixture):
             harness,
             launch,
             skill_path="/plugins/code/SKILL.md",
-            command=COMMAND,
+            command=command,
             cwd=self.unit_dir,
             step="review",
             handoff=handoff,
@@ -708,6 +755,24 @@ class WhichTurnsCount(Turns):
         eventually(lambda: self.state()["delivered"]["position"] == 1)
         self.assertEqual(self.state()["fired"], ["t1"])
 
+    def test_a_prompt_echoed_after_a_turn_of_the_harness_own_is_delivered_once_S97_S49(self):
+        # The harness runs a turn of its own while the prompt waits, then echoes the prompt and takes it up: the
+        # prompt stays outstanding until its echo, is never sent again meanwhile, and its turn advances.
+        patch = mock.patch.object(driver_module, "ECHO_TIMEOUT", 2.0, create=True)
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.scanned = [{"id": "t1", "type": "handed_back"}]
+        self.seed(note("m0"))
+        driver = self.make(Queued, harness="claude")
+        self.assertEqual([item["id"] for item in sent(self.prompts()[0])["items"]], ["m0"])
+        self.seed(status("m0", "done"))
+        eventually(lambda: self.state()["delivered"]["position"] == 1)
+        self.assertEqual(self.state()["fired"], ["t1"])
+        time.sleep(0.5)
+        self.assertEqual(len(self.peers[0].prompts), 1)
+        self.assertEqual(driver.agent()["state"], "idle")
+        self.assertEqual([r for r in self.records("error") if r.get("kind") in ("unechoed", "protocol")], [])
+
     def test_the_echo_of_another_uuid_is_not_this_prompts_S97(self):
         class Wrong(Answering):
             def prompt(self, text, uuid=None):
@@ -874,6 +939,112 @@ class TheApprovedForm(Turns):
                 number += 1
                 event = self.codex_request(adapter, f"{COMMAND} pending {self.unit_dir}", number, kind="writeStdin")
                 self.assertIsNone(self.answered(driver, event, number))
+
+    def move_unit(self, folder):
+        """Put this test's unit under `folder`, a name that needs shell quoting."""
+        self.unit_dir = self.root / folder / ".code" / "fix"
+        self.unit_dir.mkdir(parents=True)
+        (self.unit_dir / "code.json").write_text("{}\n")
+        self.unit_arg = str(self.unit_dir)
+
+    def quoting_cases(self, command, archive):
+        """(call, approved) for one unit and archive: the call as the header prints them is approved; the same call in
+        any other quoting is not."""
+        q, python, unit = shlex.quote, sys.executable, str(self.unit_dir)
+        tail = " --to m1 --state done --by b <<'EOF'\nIt's done\nEOF"
+        head = f"{q(python)} {q(archive)} reply"
+        others = [
+            f"{python} {archive} reply {unit}{tail}",  # as the path is, unquoted
+            f'{head} "{unit}"{tail}',  # double quotes
+            f"{head} {unit.replace(' ', chr(92) + ' ').replace(chr(39), chr(92) + chr(39))}{tail}",  # backslashes
+            f"{head} {q(unit)}/{tail}",
+        ]
+        if "'" in unit:
+            others.append(f"{head} '{unit.replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'{tail}")
+        if q(archive) != archive:
+            others += [f'{q(python)} "{archive}" reply {q(unit)}{tail}', f"{q(python)} {archive} reply {q(unit)}{tail}"]
+        else:
+            others.append(f"{q(python)} '{archive}' reply {q(unit)}{tail}")  # quoted where shlex.quote leaves it bare
+        exact = f"{command} reply {q(unit)}{tail}"
+        return [(exact, True), *((other, False) for other in others if other != exact)]
+
+    def test_paths_that_need_quoting_are_approved_only_as_the_header_quotes_them_in_claude_code_S9_S78_S95(self):
+        # A unit with a space, a ~ or an apostrophe, and an archive with a space: the header prints each as
+        # shlex.quote writes it, and that call is approved; any other quoting is denied with the form.
+        _, adapter, _, _ = open_claude()
+        number = 0
+        for folder, archive in (
+            ("my work", ARCHIVE),
+            ("~", ARCHIVE),
+            ("it's", ARCHIVE),
+            ("plain", "/plugins/my code/better.pyz"),
+        ):
+            self.move_unit(folder)
+            command = shlex.join((sys.executable, archive))
+            driver = self.make(Echoing, harness="claude", command=command)
+            form = approvals.approved_form(command, self.unit_dir, ("add", "set"))
+            self.assertIn(f"{command} <verb> {shlex.quote(str(self.unit_dir))} <arguments>", form)
+            self.assertEqual(self.prompts()[0].splitlines()[1], f"Approved without asking: {form}")
+            for call, approved in self.quoting_cases(command, archive):
+                number += 1
+                request = frame("bash_prefix_request", request_id=f"q{number}")
+                request["request"]["input"].update({"command": call})
+                (event,) = adapter.receive(request)
+                expected = (
+                    ("allow_once", "Approved page command") if approved else ("deny", f"not-the-approved-form: {form}")
+                )
+                with self.subTest(folder=folder, archive=archive, call=call):
+                    self.assertEqual(self.answered(driver, event, f"q{number}"), expected)
+            driver.close()
+            self.peers.clear()
+
+    def test_paths_that_need_quoting_are_approved_only_as_the_header_quotes_them_in_codex_S9_S78(self):
+        number = 500
+        for folder, archive in (
+            ("my work", ARCHIVE),
+            ("~", ARCHIVE),
+            ("it's", ARCHIVE),
+            ("plain", "/plugins/my code/better.pyz"),
+        ):
+            self.move_unit(folder)
+            command = shlex.join((sys.executable, archive))
+            driver = self.make(harness="codex", command=command)
+            form = approvals.approved_form(command, self.unit_dir, ("add", "set"))
+            adapter = self.codex("on-request", "workspaceWrite")
+            for call, approved in self.quoting_cases(command, archive):
+                number += 1
+                event = self.codex_request(adapter, f"/bin/zsh -lc {shlex.quote(call)}", number)
+                expected = (
+                    ("allow_once", "Approved page command") if approved else ("deny", f"not-the-approved-form: {form}")
+                )
+                with self.subTest(folder=folder, archive=archive, call=call):
+                    self.assertEqual(self.answered(driver, event, number), expected)
+            driver.close()
+            self.peers.clear()
+
+    def test_a_worker_logs_in_the_form_its_brief_gives_from_the_header_and_is_approved_S9_N2(self):
+        # The page agent fills each worker brief's page form with the header's form, word for word; the worker fills
+        # in <verb> and <arguments> and gives the JSON as a quoted heredoc. Its call is approved like the agent's own.
+        for brief, field in WORKER_BRIEFS:
+            with self.subTest(brief=brief):
+                text = (SKILLS / brief).read_text()
+                self.assertIn(field, text)
+                self.assertIn(f"IF {field} is not", text)
+                self.assertIn("RUN each `better.pyz` call in that form instead", text)
+        self.assertIn("FILL it with the form after `Approved without asking:`", PAGE_AGENT.read_text())
+        self.move_unit("my work")
+        command = shlex.join((sys.executable, "/plugins/my code/better.pyz"))
+        driver = self.make(Echoing, harness="claude", command=command)
+        header = self.prompts()[0].splitlines()[1]
+        form = header.removeprefix("Approved without asking: ").split(", where ")[0]
+        call = form.replace("<verb>", "add").replace("<arguments>", "log --for builder-t3e")
+        call += ' <<\'EOF\'\n{"text": "It\'s started"}\nEOF'
+        self.assertTrue(approvals.verb_command(call, self.unit_dir, "/plugins/my code/better.pyz", ("add", "set")))
+        event = approval(key="w1", arguments={"command": call, "description": "Log a step"}, requester="builder-t3e")
+        self.assertEqual(self.answered(driver, event, "w1"), ("allow_once", "Approved page command"))
+
+    def test_the_page_agent_reads_ids_only_past_the_most_items_a_prompt_holds_N3(self):
+        self.assertIn("IF only item IDs are supplied, RUN `pending` for the full copy.", PAGE_AGENT.read_text())
 
     def test_a_harness_with_no_recorded_shell_request_shape_is_asked_S9(self):
         # No recorded request or schema gives the shape of an ACP or Droid shell call, so none is approved or denied.
