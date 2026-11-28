@@ -59,7 +59,7 @@ test('D14: a decision you answered is closed; one the agent decided or that defa
   const decisions = [
     { id: 'W', at: at(0), asked: 'Which?', status: 'waiting' },
     { id: 'A', at: at(1), asked: 'Which?', status: 'answered', answer: { type: 'chat', text: 'B' } },
-    { id: 'AE', at: at(2), asked: 'Which?', status: 'answered' },
+    { id: 'AE', at: at(2), asked: 'Which?', status: 'answered', default: null, deadline: null, answer: { type: 'page', event: 'a1' } },
     { id: 'P', at: at(3), asked: 'Which?', status: 'decided', decision: 'C' },
     { id: 'F', at: at(4), asked: 'Which?', status: 'defaulted', default: 'D' },
     { id: 'AW', at: at(5), asked: 'Which?', status: 'waiting' },
@@ -78,6 +78,13 @@ test('D14: a decision you answered is closed; one the agent decided or that defa
     { type: 'note', id: 'n1', to: 'a1', text: 'And also this.', by: 'user', at: at(13) }]);
   const after = states(more);
   assert.deepEqual([after.P, after.AE], [['done', true], ['agent', false]]);
+  // A later answer of yours, to change your mind or to answer the agent's ask-back, is the agent's to apply.
+  const later = log.concat([{ type: 'answer', id: 'a3', decision: 'AE', text: 'B after all', default: false, by: 'user', at: at(14) }]);
+  assert.deepEqual(states(later).AE, ['agent', false]);
+  const askback = log.concat([{ type: 'reply', id: 'r9', to: 'a1', text: 'A for both?', by: 'coordinator', at: at(15) },
+    { type: 'status', to: 'a1', status: 'asked', by: 'coordinator', at: at(15) },
+    { type: 'answer', id: 'a4', decision: 'AE', text: 'Yes', default: false, by: 'user', at: at(16) }]);
+  assert.deepEqual(states(askback).AE, ['agent', false]);
 });
 
 test('every state the page gives a pin has a colour in page.css, and words for its title', () => {

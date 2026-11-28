@@ -759,8 +759,9 @@ function pageThreads(log, itemKinds) {
     if (e.type !== 'decision' || e.x == null) n++;
     if (!e.type) return;  // a line the log could not read keeps its place, and is no event
     var user = e.by === 'user', item = user && itemKinds.indexOf(e.type) >= 0;
-    if (!user && typeof e.read === 'number') agentRead = Math.max(agentRead, e.read);
     var target = e.type === 'answer' ? e.decision : e.to, t = target != null ? threadOf(target) : null;
+    // A status on a thread that holds nothing of the user's, such as the agent's own report, is no sign of reading.
+    if (!user && typeof e.read === 'number' && !(e.type === 'status' && t && t.userAt < 0)) agentRead = Math.max(agentRead, e.read);
     if (!t && item && e.id != null && byId[e.id] && byId[e.id].root.type === e.type) {
       // The user's item sent again, such as an edited or restored comment: the same thread, in its state.
       t = byId[e.id];
@@ -815,8 +816,9 @@ function pageThreads(log, itemKinds) {
     // A report the agent posted before reports carried their own done status (an old log), with no status and no
     // message from you: closed by you, in All and not in Open (D13).
     if (r.type === 'reply' && r.by !== 'user' && t.userAt < 0 && marked.indexOf(t) < 0) t.closedByUser = true;
-    // A decision the record says you answered, whose latest word from you is that answer: closed (D14).
-    if (r.type === 'decision' && pageDecisionStatus(r.x || {}) === 'answered' && t.state !== 'you' && (!last || last.type === 'answer')) {
+    // A decision the record says you answered, whose latest word from you is the answer the record took: closed (D14).
+    // A later answer, to change your mind or to answer the agent's ask-back, is the agent's to apply (D15).
+    if (r.type === 'decision' && pageDecisionStatus(r.x || {}) === 'answered' && t.state !== 'you' && (!last || (((r.x || {}).answer || {}).event === last.id))) {
       t.state = 'done'; t.closedByUser = true;
     }
   });

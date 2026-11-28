@@ -756,10 +756,11 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
         item = user and kind in item_types
         number = e.get("read")
         number = number if isinstance(number, int) and not isinstance(number, bool) else None
-        if not user and number is not None:
-            agent_read = max(agent_read, number)
         target = e.get("decision") if kind == "answer" else e.get("to")
         t = thread_of(target)
+        # A status on a thread that holds nothing of the user's, such as the agent's own report, is no sign of reading.
+        if not user and number is not None and not (kind == "status" and t is not None and t["user_at"] < 0):
+            agent_read = max(agent_read, number)
         if t is None and item and ident in by_id and by_id[ident]["root"].get("type") == kind:
             t = by_id[ident]  # the user's item sent again, such as an edited comment: the same thread, in its state
             if kind == "comment":
