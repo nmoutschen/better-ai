@@ -49,7 +49,7 @@ class PageThreadRule(unittest.TestCase):
         for name in SKILL_FILES:
             for line in (ROOT / name).read_text().splitlines():
                 if "ASK in one sentence" in line:
-                    self.assertIn("--to <id> --state asked", normal(line), name)
+                    self.assertIn("--to <id> --read <n> --state asked", normal(line), name)
 
     def test_acceptance_in_words_gives_the_command(self):
         for name in SKILL_FILES:

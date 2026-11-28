@@ -14,7 +14,8 @@
 (* user's latest event in the thread when it decided (`read`).             *)
 (*                                                                         *)
 (* Assumptions: A1 appends are whole and ordered (model `talk`). A2 the    *)
-(* agent's read sees the whole log at that moment. A3 the page shows the   *)
+(* agent reads what it was shown before it acts, and its `read` is the     *)
+(* last line it was shown (it passes it as --read). A3 the page shows the  *)
 (* user the log as it is when they act.                                    *)
 (***************************************************************************)
 EXTENDS Naturals, Sequences, TLC

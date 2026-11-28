@@ -13,9 +13,30 @@ same time. TLC checks each model against the invariants named in its config.
 - `thread.tla`: the designed thread machine, one state per thread (Your turn, Agent's turn, Done), read from the log
   by one fold. `Root` is `user`, `question` or `report`.
 
-Assumptions (also at the top of each `.tla`): A1 appends are whole and ordered; A2 the agent's read sees the whole
-log at that moment; A3 the page shows the user the log as it is when they act. A user acting on an older drawing is
-not modelled. The runs are bounded by `MaxLog` (and `MaxItems`), so a pass means no violation within that bound.
+Assumptions (also at the top of each `.tla`): A1 appends are whole and ordered; A2 the agent reads what it was shown
+before it acts, and the `read` of its status is the last line it was shown, which `--read` now makes explicit: the
+agent passes it (the `_i` of the last line `wait` or `serve` printed, or the number on `pending`'s last line), and the
+CLI refuses the status when the user wrote in the thread after that line; A3 the page shows the user the log as it is
+when they act. A user acting on an older drawing is not modelled. The runs are bounded by `MaxLog` (and `MaxItems`),
+so a pass means no violation within that bound.
+
+## Where the code differs from `thread.tla`
+
+The model is one thread with the events above. The fold in the code (`threads` in `src/better_ai/page/__init__.py`,
+`pageThreads` in `page.js`) also handles, outside the model:
+
+- A status with no `read`, from a log written before `read`: it counts as fresh, and a `done` one closes the thread as
+  the user's ✓ does (D13). In the model every status has a `read`.
+- Reopen: the model offers it only on a done thread; the code takes it in any state, and it acts as a note from the
+  user (the thread is the agent's turn, not seen).
+- Edits and deletes: a comment sent again with its id replaces the thread's first message, and a delete hides the
+  thread. Neither is modelled.
+- Threads that start closed by the user: an action of the user that is no message to the agent, such as a verdict or a
+  confirmation (D8), a worker's report that it closed a question (D10), and a thread an old log marked done (D13). The
+  model's roots all start open.
+- Order: on the pages with decisions (the research board, the discover page, the code dashboard), `page.js` folds the
+  events in time order, as `pageDecisionEvents` merges the decisions into the log by time, while Python folds them in
+  log order. Both index an event by its line in the log, so `read` means the same in both.
 
 Invariants: `NoLostWrite` (a user event the agent has not read puts the thread in the agent's turn), `CloseSticks`
 (in `conversation.tla`, a close the agent has not read stays closed; in `thread.tla`, a thread the user closed stays

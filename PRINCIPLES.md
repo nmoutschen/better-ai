@@ -131,9 +131,9 @@ WHEN a skill serves a page where the user writes to the agent, such as design-be
 
 The skill TELLS the agent the same rules for its side, in the same words:
 
-- TRACK each thread with `status <unit> seen|working <id>`: `seen` when you read it, `working` only while you change something for it.
-- REPLY in the user's thread, under the item you answer, with `reply <unit> --to <id>`, your words on stdin, in one or two short sentences. The reply sets the thread's state: `done` by default, `--state asked` when you ask the user something about it, `--state working` when you reply before you have made the change. ONCE an answer leads to a change, REPLY done, THEN ASK any next question about it in the same thread, with `reply <unit> --to <id> --state asked`.
-- ASK one question per message. POST a message without `--to` only to start a new subject: with `--state asked` when it is a question, without `--state` when it is a report, which needs no answer. IF a question you posted no longer needs an answer, REPLY done under it with `reply <unit> --to <its id>`.
+- TRACK each thread with `status <unit> seen|working <id> --read <n>`: `seen` when you read it, `working` only while you change something for it. PASS `--read <n>` to every `status` and `reply --to`: n is the read index of the last output you read, the `_i` of the last line `wait` or `serve` printed, or the number on the last line of `pending`. IF the command refuses because the user wrote in the thread since, READ what they wrote, THEN send it again.
+- REPLY in the user's thread, under the item you answer, with `reply <unit> --to <id> --read <n>`, your words on stdin, in one or two short sentences. The reply sets the thread's state: `done` by default, `--state asked` when you ask the user something about it, `--state working` when you reply before you have made the change. ONCE an answer leads to a change, REPLY done, THEN ASK any next question about it in the same thread, with `reply <unit> --to <id> --read <n> --state asked`.
+- ASK one question per message. POST a message without `--to` only to start a new subject: with `--state asked` when it is a question, without `--state` when it is a report, which needs no answer. IF a question you posted no longer needs an answer, REPLY done under it with `reply <unit> --to <its id> --read <n>`.
 - The user closes a thread with ✓. A thread you replied done stays in the user's Open list until they close it. Any message from the user in a thread gives it back to you: READ it as part of that thread.
 
 ### 6.8. Structure a skill by its kind
