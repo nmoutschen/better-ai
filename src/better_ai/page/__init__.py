@@ -62,6 +62,9 @@ from ..skill import Skill
 
 COMMON = "conversation.schema.json"
 LOG, SEEN, ADDRESS, TOKEN = "conversation.jsonl", ".conversation-seen", ".server", ".server-token"
+# The log index of the last event `pending` or `wait` showed the agent, which its statuses carry as `read`.
+READ = ".conversation-read"
+LINE = "_i"  # the line position (from 0) of an event that a page's data reads from the log, which `read` counts in
 TOKEN_HEADER = "X-Page-Token"
 OUT_OF_DATE = "page out of date: open the address the agent gave"  # what a page without the token is told; page.js shows it and keeps the typing
 MAX_BODY = 200_000
@@ -71,7 +74,7 @@ TICK = 1  # seconds between the ticks of a served page; tests set it shorter
 POLL = 0.05  # seconds serve_forever waits for a request before it looks whether it was told to stop
 STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is written as its own event, `accepted`
 REPLY_STATES = ("done", "asked", "working")
-FINISHED = ("done", "accepted")  # the states of an item that needs no more work, until a follow-up reopens it
+FINISHED = ("done",)  # the state of a thread that needs no more work, until the user writes in it or reopens it
 BUG_TEXT = "The page hit a bug: ask the agent to restart it and report it"
 QUIET_AFTER = timedelta(minutes=30)  # how long an agent at work may go without a record before its page says so
 # What each shared capability lets the page send, and which of those events the agent tracks with a status.
@@ -324,7 +327,8 @@ def old_count_of(unit: Unit) -> int:
 
 class Conversation:
     """One unit's log, `conversation.jsonl`, one ASCII JSON event per line, and the files that say where the unit is
-    served (`.server`) and how far the agent has read (`.conversation-seen`). Everything is read and written through
+    served (`.server`), how far `wait` has read (`.conversation-seen`) and the last event the agent was shown
+    (`.conversation-read`). Everything is read and written through
     `paths`, so no file is opened with a symlink on the way."""
 
     def __init__(self, unit: Unit, spec: PageSpec, docs: dict[str, dict]):
@@ -364,6 +368,11 @@ class Conversation:
                 event if isinstance(event, dict) else {}
             )  # keep the position, so indexes into the log stay right
         return events
+
+    def logged(self) -> list[dict]:
+        """The events that could be read, each with its line position in LINE, for data a page reads threads from
+        (see `log_records`)."""
+        return [{**e, LINE: n} for n, e in enumerate(self.events()) if e]
 
     def check(self, event: dict) -> None:
         """Raise EventError, with the validator's message, unless the event meets the shared conversation schema and
@@ -451,6 +460,29 @@ class Conversation:
                 f"{self.unit.label}/{SEEN}", "does not hold a number", "delete it and run wait again"
             ) from None
 
+    def read_marker(self) -> int | None:
+        """The log index of the last event `pending` or `wait` showed the agent, or None when neither has run."""
+        try:
+            return int(paths.read_bytes(self.unit, READ).decode("utf-8").strip())
+        except FileNotFoundError:
+            return None
+        except ValueError:
+            raise paths.refusal(
+                f"{self.unit.label}/{READ}", "does not hold a number", "delete it and run pending again"
+            ) from None
+
+    def mark_read(self, index: int) -> None:
+        """Record that the agent was shown the log up to INDEX; the marker never goes back."""
+        before = self.read_marker()
+        if index >= 0 and (before is None or index > before):
+            paths.write_state(self.unit, READ, str(index).encode())
+
+    def status_event(self, by: str, to: str, state: str) -> dict:
+        """The agent's status on a thread, with `read`, so a status decided before the user's latest event changes
+        nothing."""
+        read = self.read_marker()
+        return {"type": "status", "by": by, "to": to, "status": state, **({"read": read} if read is not None else {})}
+
     def write(self, *events: dict) -> list:
         """Append the agent's own events; one that fails its schema is refused with the validator's message."""
         try:
@@ -459,11 +491,13 @@ class Conversation:
             raise Refused(f"{self.unit.label}: the event is not valid: {error}") from None
 
     def known(self, ids: list, what: str = "no comment or message with id", started: bool = False) -> None:
-        """Refuse ids that name no item of the user's; with `started`, a message the agent sent on its own is known too."""
+        """Refuse ids that name no item of the user's; with `started`, a message the agent or a worker sent on its own
+        is known too."""
         have = {
             e.get("id")
             for e in self.events()
-            if e.get("type") in self.items or (started and e.get("type") == "reply" and not e.get("to"))
+            if e.get("type") in self.items
+            or (started and e.get("type") in ("reply", "closed") and e.get("by") != "user" and not e.get("to"))
         }
         unknown = [i for i in ids if i not in have]
         if unknown:
@@ -548,6 +582,7 @@ def wait(args: argparse.Namespace, run: cli.Run) -> int:
         lines = conv.lines()[seen:total]
         new = [line for line, event in zip(lines, conv.events()[seen:total], strict=True) if from_user(event)]
         paths.write_state(unit, SEEN, str(total).encode())
+        conv.mark_read(total - 1)
         seen = total
         if new:
             run.out("\n".join(new))
@@ -562,7 +597,8 @@ def _reply_arguments(parser: argparse.ArgumentParser) -> None:
         "--state",
         choices=REPLY_STATES,
         default="done",
-        help="the status of the item it answers: done (default), asked when the reply asks the user back, or working",
+        help="the status of the thread it answers: done (default), asked when the reply asks the user back, or working;"
+        " without --to, asked posts it as a question and the rest as a report",
     )
     parser.add_argument("--by", help="the agent's name, if not the page's role name")
 
@@ -573,17 +609,21 @@ def _reply_arguments(parser: argparse.ArgumentParser) -> None:
     arguments=_reply_arguments,
 )
 def reply(args: argparse.Namespace, run: cli.Run) -> int:
-    """Show the agent's reply in the page's conversation, under the item it answers. It works without a server, so a
-    resumed run can answer what the user wrote while no agent was running."""
+    """Show the agent's reply in the page's conversation, in the thread it answers, with the thread's status. Without
+    `--to` it starts a thread: a question with `--state asked` (the user's turn), else a report (done). It works without
+    a server, so a resumed run can answer what the user wrote while no agent was running."""
     unit = _unit(args, run)
     conv = _conversation(run, unit)
     by = paths.check_by(args.by) if args.by else conv.agent
     text = _text(run, f"{unit.label}: reply")[:5000]
-    events = [{"type": "reply", "by": by, "id": "r-" + str(time.time_ns()), "text": text, "to": args.to}]
+    ident = "r-" + str(time.time_ns())
+    events = [{"type": "reply", "by": by, "id": ident, "text": text, "to": args.to}]
     if args.to is not None:
         target = conv.target_of(args.to)
-        conv.known([target])
-        events.append({"type": "status", "by": by, "to": target, "status": args.state})
+        conv.known([target], started=True)
+        events.append(conv.status_event(by, target, args.state))
+    elif args.state == "asked":  # a question of its own: the user's turn; any other message of its own is a report
+        events.append(conv.status_event(by, ident, "asked"))
     conv.write(*events)
     run.out("Reply shown in the page." if conv.answering() else "Reply saved; the page shows it when served.")
     return 0
@@ -599,8 +639,9 @@ def _status_arguments(parser: argparse.ArgumentParser) -> None:
 
 @cli.verb("status", help="mark the user's items seen, asked, working, done or accepted", arguments=_status_arguments)
 def status(args: argparse.Namespace, run: cli.Run) -> int:
-    """Mark the user's items as seen, asked, working or done. A message the agent sent on its own (`reply` without
-    `--to`) waits for the user on the page until they answer it, or until it is marked done or accepted. Accepted
+    """Mark threads as seen, asked, working or done, by the id of the user's item or of a message the agent sent on its
+    own (`reply` without `--to`). Each status carries `read`, the last event `pending` or `wait` showed the agent, so
+    one decided before the user's latest event in the thread changes nothing. Accepted
     records an acceptance the user gave in words, the same as the page's Accept button, as an `accepted` event with
     those words (on stdin, with `--text`)."""
     unit = _unit(args, run)
@@ -631,7 +672,7 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
         *(
             {"type": "accepted", "by": by, "to": i, "text": words}
             if args.state == "accepted"
-            else {"type": "status", "by": by, "to": i, "status": args.state}
+            else conv.status_event(by, i, args.state)
             for i in args.ids
         ),
     )
@@ -639,73 +680,152 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
     return 0
 
 
-def open_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
-    """The user's items that are neither done nor accepted: `all_items` without the finished ones."""
-    return [found for found in all_items(events, item_types, agent) if found[1] not in FINISHED]
+CONTROL = ("status", "accept", "accepted", "reopen", "delete")  # events that change a thread and start none
 
 
-def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
-    """Every item of the user's, in its latest form, as (event, state, extra); `deleted` ones are left out. The state is
-    `new`, `asked`, `working`, `replied`, `followup` or `reopened`; `extra` holds `reopened_because` and the `thread` of
-    answers and replies under the item. These are the page's rules: page.js `pageThread` gives the same states, and
-    tests/fixtures/threads.json holds the logs both are run on. `pending` and a skill's own summary both call these."""
-    items, order, state, reasons, thread, closes, home = {}, [], {}, {}, {}, {}, {}
-    for e in events:
-        a, i = e.get("type"), e.get("id")
-        to = home.get(e.get("to"), e.get("to"))  # a message under a reply belongs to the item that reply is under
-        if a == "closed":  # a worker's message: the user can reply to it, and the reply goes to the agent
-            closes[i] = e
-        elif a == "note" and to and to not in items:  # an answer to the agent's own message is a new item
-            order.append(i)
-            items[i] = e
-            if to in closes:  # the worker cannot read the page: say which question the user replied about
-                c = closes[to]
-                items[i] = {**e, "about": f"{c.get('by')} closed {c.get('question')} as {c.get('status')}"}
-        elif a == "note" and to:  # the user's answer belongs to the item it answers
-            thread.setdefault(to, []).append({"from": "user", "at": e.get("at"), "text": e.get("text")})
-            if state.get(to) == "asked":  # the answer ends the wait: the item is the agent's again
-                state[to] = "replied"
-            elif state.get(to) in FINISHED:  # a follow-up under a finished item is work again
-                state[to] = "followup"
-            if i:
-                home[i] = to
-        elif a == "reply" and to:
-            thread.setdefault(to, []).append({"from": agent, "at": e.get("at"), "text": e.get("text")})
-            if i:
-                home[i] = to
-        elif a in item_types and i:  # an item sent again, such as an edited comment, keeps its state
-            if i not in items:
-                order.append(i)
-            items[i] = e
-        elif a == "delete" and to in items:
-            items[to] = None
-        elif a == "status":
-            state[to] = e.get("status")
-        elif a in ("accept", "accepted"):
-            state[to] = "accepted"
-        elif a == "reopen":
-            state[to], reasons[to] = "reopened", e.get("text")
-    found = []
-    for e in (items[i] for i in order if items.get(i)):
-        extra = {}
-        if state.get(e["id"]) == "reopened" and reasons.get(e["id"]):
-            extra["reopened_because"] = reasons[e["id"]]
-        if thread.get(e["id"]):
-            extra["thread"] = thread[e["id"]]
-        found.append((e, state.get(e["id"], "new"), extra))
+def log_records(read: schema.Read) -> list[dict]:
+    """The records `schema.read_records` read from a conversation.jsonl, each with its line position in LINE. A status's
+    `read` is a line index, and the reader leaves out lines it cannot read: every reader whose records `threads` or
+    page.js `pageThreads` turn into threads goes through this, so a left-out line shifts no index."""
+    return [{**record, LINE: line - 1} for record, line in zip(read.records, read.lines, strict=True)]
+
+
+def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
+    """The threads of a log, each in one state of the one machine every thread follows
+    (.design/conversation-panel/states.md): page.js `pageThreads` gives the same threads for the same log, and
+    tests/fixtures/threads.json holds the logs both are run on. Each thread, in the order it started, holds `id`, `root`
+    (the latest form of the event that started it), `messages`, `state` (`you`, `agent` or `done`), `step` (`new`,
+    `seen` or `working`), `closed_by_user`, `deleted`, `since` (when the state or step was set), `user_at` (the log
+    index of the user's latest event) and `last` (the time of its last message). An agent status counts only if its
+    `read` covers the user's latest event in the thread; one without `read` counts (logs before `read`). An event's
+    index is its place in EVENTS, or its LINE when it has one (`log_records`)."""
+    found: list[dict] = []
+    by_id: dict[str, dict] = {}
+    home: dict[str, str] = {}
+    agent_read = -1
+
+    def thread_of(ident: Any) -> dict | None:
+        return by_id.get(home.get(ident, ident)) if isinstance(ident, str) else None
+
+    for index, e in enumerate(events):
+        if not isinstance(e, dict) or not e.get("type"):
+            continue  # a line the log could not read keeps its place, and is no event
+        line = e.get(LINE)
+        i = line if isinstance(line, int) and not isinstance(line, bool) else index  # see log_records
+        kind, ident, at, read = e.get("type"), e.get("id"), e.get("at"), agent_read
+        user = e.get("by") == "user"
+        item = user and kind in item_types
+        number = e.get("read")
+        number = number if isinstance(number, int) and not isinstance(number, bool) else None
+        if not user and number is not None:
+            agent_read = max(agent_read, number)
+        target = e.get("decision") if kind == "answer" else e.get("to")
+        t = thread_of(target)
+        if t is None and item and ident in by_id and by_id[ident]["root"].get("type") == kind:
+            t = by_id[ident]  # the user's item sent again, such as an edited comment: the same thread, in its state
+            if kind == "comment":
+                t["root"], t["messages"][0], t["deleted"] = e, e, False
+        elif t is None:
+            if kind not in CONTROL:
+                t = {
+                    "id": ident,
+                    "root": e,
+                    "messages": [e],
+                    "state": "agent" if item else "done",
+                    "step": "new",
+                    "closed_by_user": False,
+                    "deleted": False,
+                    "since": at,
+                    "user_at": i if user else -1,
+                    "last": at,
+                }
+                if isinstance(ident, str):
+                    by_id[ident] = t
+                found.append(t)
+                if kind == "answer" and isinstance(target, str) and target not in by_id:
+                    home[target] = ident  # later answers to the same decision join this thread
+        else:
+            if isinstance(ident, str):
+                home[ident] = t["id"]
+            fresh = number is None or number >= t["user_at"]
+            if user and (item or kind in ("note", "answer", "reopen")):
+                t["messages"].append(e)
+                t.update(last=at, user_at=i, state="agent", step="new", closed_by_user=False, since=at)
+            elif kind == "reply":
+                t["messages"].append(e)  # the CLI writes the reply's status with it (done by default)
+                t["last"] = at
+            elif kind == "delete" and user:
+                t["deleted"] = True
+            elif (kind == "accept" and user) or kind == "accepted":
+                # ✓, or the user's words that accept it: closes an open thread, or confirms one the agent finished.
+                if t["state"] != "done":
+                    t["since"] = at
+                t.update(state="done", closed_by_user=True, user_at=i)
+            elif kind == "status" and fresh and not t["closed_by_user"]:
+                was = (t["state"], t["step"])  # a thread you closed changes only when you act on it again
+                if e.get("status") == "asked":
+                    t["state"] = "you"
+                elif e.get("status") == "done":
+                    t["state"] = "done"
+                elif t["state"] == "agent" and e.get("status") in ("seen", "working"):
+                    t["step"] = e.get("status")
+                if (t["state"], t["step"]) != was:
+                    t["since"] = at
+        if agent_read > read:  # seen follows the agent's reading, in every thread its read now covers
+            for x in found:
+                if x["state"] == "agent" and x["step"] == "new" and agent_read >= x["user_at"]:
+                    x["step"], x["since"] = "seen", at
     return found
 
 
-@cli.verb("pending", help="list the user's items that are not done or accepted", arguments=_unit_argument)
+def open_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
+    """The threads that are the agent's turn, as `all_items` gives them: what `pending` lists."""
+    return [found for found in all_items(events, item_types, agent) if found[1] == "agent"]
+
+
+def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tuple[dict, str, dict]]:
+    """Every thread that holds an item of the user's, as (event, state, extra), without the deleted ones: the event
+    that started it in its latest form, its state (`you`, `agent` or `done`, from `threads`), and in `extra` its
+    `step`, `since`, `closed_by_user`, the `thread` of messages after the first, `reopened_because` (the user's last
+    reopen) and, under a worker's `closed`, what the worker closed (`about`). `pending` and a skill's own summary both
+    call these."""
+    found = []
+    for t in threads(events, item_types):
+        held = [m for m in t["messages"] if m.get("by") == "user" and m.get("type") in (*item_types, "reopen")]
+        if t["deleted"] or not held:
+            continue
+        root = {k: v for k, v in t["root"].items() if k != LINE}
+        extra: dict[str, Any] = {"step": t["step"], "since": t["since"], "closed_by_user": t["closed_by_user"]}
+        if root.get("type") == "closed":  # the worker cannot read the page: say which question the user replied about
+            extra["about"] = f"{root.get('by')} closed {root.get('question')} as {root.get('status')}"
+        reasons = [m.get("text") for m in t["messages"] if m.get("type") == "reopen" and m.get("text")]
+        if reasons:
+            extra["reopened_because"] = reasons[-1]
+        thread = [
+            {"from": "user" if m.get("by") == "user" else agent, "at": m.get("at"), "text": m.get("text")}
+            | ({"id": m["id"]} if m.get("id") else {})
+            for m in t["messages"][1:]
+            if m.get("type") != "reopen"
+        ]
+        if thread:
+            extra["thread"] = thread
+        found.append((root, t["state"], extra))
+    return found
+
+
+@cli.verb("pending", help="list the threads that are the agent's turn", arguments=_unit_argument)
 def pending(args: argparse.Namespace, run: cli.Run) -> int:
-    """Print each item neither done nor accepted, in its latest form, with the answers and replies under it, so work can
-    resume after an interruption. Done waits for the user. An answer under an item that waited for the user (`asked`)
-    makes it `replied`; a follow-up from the user under a finished item makes it `followup`. `open_items` holds the
-    rules."""
+    """Print each thread that is the agent's turn, the event that started it in its latest form, with its step as
+    `status` (`new`, `seen` or `working`) and the messages under it, so work can resume after an interruption. A thread
+    waiting on the user (`asked`) or done is not listed. `open_items` holds the rules. Records the index of the last
+    event it read, which `status` and `reply` write as `read`."""
     conv = _conversation(run, _unit(args, run))
-    found = open_items(conv.events(), conv.items, conv.agent)
-    for e, state, extra in found:
-        run.out(terminal_json({**e, "status": state, **extra}))
+    events = conv.events()
+    found = open_items(events, conv.items, conv.agent)
+    for e, _, extra in found:
+        rest = {k: v for k, v in extra.items() if k not in ("step", "closed_by_user")}
+        run.out(terminal_json({**e, "status": extra["step"], **rest}))
+    conv.mark_read(len(events) - 1)
     run.out(f"{len(found)} not done.")
     return 0
 

@@ -25,14 +25,61 @@ function work(log) {
     .map(id => [id, model.state[id] || 'new']);
 }
 
+const TABLE = JSON.parse(fs.readFileSync(__dirname + '/fixtures/threads.json', 'utf8'));
+
 test('the shared table of logs gives the open items and states that `pending` gives, and Open shows each of them', () => {
-  for (const { name, log, work: expected } of JSON.parse(fs.readFileSync(__dirname + '/fixtures/threads.json', 'utf8'))) {
+  // pageThread's per-item states, until the drawing moves to pageThreads: only the cases written for them.
+  for (const { name, log, work: expected } of TABLE.filter(c => c.work)) {
     assert.deepEqual(work(log), expected, name);
     const open = thread(log).open;
     for (const [id] of expected) {
       assert.ok(open.some(c => c.e.id === id || c.replies.some(r => r.id === id)), name + ': ' + id + ' is not under Open');
     }
   }
+});
+
+// The one state machine of every thread (.design/conversation-panel/states.md). `all_items` and `pending` in
+// src/better_ai/page/__init__.py give the same threads, with the same states, for every log in the table.
+const shape = t => ({ id: t.id, state: t.state, step: t.step, closedByUser: t.closedByUser });
+test('the shared table of logs gives each thread the state `pending` gives it', () => {
+  for (const { name, log, threads: expected, items } of TABLE) {
+    const got = Array.from(context.pageThreads(log, items || ITEMS)).filter(t => !t.deleted);
+    assert.deepEqual(got.map(shape), expected.map(shape), name);
+    expected.forEach((t, k) => { if (t.since) assert.equal(got[k].since, t.since, name + ': since of ' + t.id); });
+  }
+});
+
+test('a thread holds its messages, the latest form of its first one, and the index of your latest event', () => {
+  const log = [
+    { type: 'comment', id: 'c1', n: 1, text: 'first', by: 'user' },
+    { type: 'reply', id: 'r1', to: 'c1', text: 'ok', by: 'coordinator' },
+    { type: 'note', id: 'm1', to: 'r1', text: 'more', by: 'user' },
+    { type: 'comment', id: 'c1', n: 1, text: 'edited', by: 'user' },
+    { type: 'comment', id: 'c2', n: 2, text: 'gone', by: 'user' },
+    { type: 'delete', to: 'c2', by: 'user' },
+  ];
+  const [c1, c2] = Array.from(context.pageThreads(log, ITEMS));
+  assert.equal(c1.root.text, 'edited');
+  assert.deepEqual(Array.from(c1.messages, m => m.id), ['c1', 'r1', 'm1']);
+  assert.equal(c1.userAt, 2);
+  assert.equal(c2.deleted, true);
+});
+
+test("a decision from the records is a thread: waiting is your turn, your answer is the agent's, and read counts in the log's own order", () => {
+  const decisions = [{ id: 'D-1', at: '2026-11-28T10:00:00Z', asked: 'Which?', status: 'waiting' },
+    { id: 'D-2', at: '2026-11-28T09:00:00Z', asked: 'Old', status: 'decided' }];
+  const log = [
+    { type: 'note', id: 'm1', to: null, text: 'hi', by: 'user', at: '2026-11-28T11:00:00Z' },
+    { type: 'answer', id: 'a1', decision: 'D-1', text: 'A', default: false, by: 'user', at: '2026-11-28T11:05:00Z' },
+  ];
+  const states = l => Array.from(context.pageThreads(context.pageDecisionEvents(decisions, l), ITEMS), t => [t.id, t.state, t.step]);
+  assert.deepEqual(states([]), [['D-2', 'done', 'new'], ['D-1', 'you', 'new']]);
+  assert.deepEqual(states(log), [['D-2', 'done', 'new'], ['D-1', 'agent', 'new'], ['m1', 'agent', 'new']]);
+  // read 0 is the note, the first line of the log: it does not cover the answer, the second.
+  const stale = log.concat([{ type: 'status', to: 'a1', status: 'done', read: 0, by: 'coordinator', at: '2026-11-28T11:06:00Z' }]);
+  assert.deepEqual(states(stale), [['D-2', 'done', 'new'], ['D-1', 'agent', 'new'], ['m1', 'agent', 'seen']]);
+  const fresh = log.concat([{ type: 'status', to: 'a1', status: 'done', read: 1, by: 'coordinator', at: '2026-11-28T11:06:00Z' }]);
+  assert.deepEqual(states(fresh), [['D-2', 'done', 'new'], ['D-1', 'done', 'new'], ['m1', 'agent', 'seen']]);
 });
 
 test('every state the page gives an item has a pin colour in page.css', () => {

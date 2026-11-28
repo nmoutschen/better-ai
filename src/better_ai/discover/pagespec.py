@@ -55,7 +55,7 @@ def load(unit: Unit) -> dict:
     def read(relative: str) -> list[dict]:
         done = schema.read_records(unit, relative, docs, cache, now, cutoff, keep_invalid=True)
         errors.extend(done.errors)
-        return done.records
+        return page.log_records(done) if relative == page.LOG else done.records  # the log keeps its lines
 
     head = read(unit.kind.head)
     found: dict[str, Any] = {attribute: read(name) for name, attribute in RECORD_FILES}

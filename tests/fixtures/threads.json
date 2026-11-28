@@ -15,7 +15,16 @@
    {"type": "note", "id": "m7", "to": null, "text": "t", "by": "user"},
    {"type": "accepted", "to": "m7", "by": "coordinator", "text": "yes"}
   ],
-  "work": [["m1", "new"], ["m2", "seen"], ["m3", "working"], ["m4", "asked"]]},
+  "work": [["m1", "new"], ["m2", "seen"], ["m3", "working"], ["m4", "asked"]],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false},
+   {"id": "m2", "state": "agent", "step": "seen", "closedByUser": false},
+   {"id": "m3", "state": "agent", "step": "working", "closedByUser": false},
+   {"id": "m4", "state": "you", "step": "new", "closedByUser": false},
+   {"id": "m5", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "m6", "state": "done", "step": "new", "closedByUser": true},
+   {"id": "m7", "state": "done", "step": "new", "closedByUser": true}
+  ]},
  {"name": "an answer to a question the agent asked ends the wait",
   "log": [
    {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
@@ -23,7 +32,10 @@
    {"type": "reply", "id": "r1", "to": "m1", "text": "t", "by": "coordinator"},
    {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "replied"]]},
+  "work": [["m1", "replied"]],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "a reply under a done or an accepted item is a follow-up",
   "log": [
    {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
@@ -33,14 +45,21 @@
    {"type": "accept", "to": "m3", "by": "user"},
    {"type": "note", "id": "m4", "to": "m3", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "followup"], ["m3", "followup"]]},
+  "work": [["m1", "followup"], ["m3", "followup"]],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false},
+   {"id": "m3", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "a reply under a working item changes nothing",
   "log": [
    {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
    {"type": "status", "to": "m1", "status": "working", "by": "coordinator"},
    {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "working"]]},
+  "work": [["m1", "working"]],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "a comment sent again keeps its state, and is the same item",
   "log": [
    {"type": "comment", "id": "c1", "n": 1, "text": "t", "by": "user"},
@@ -52,7 +71,12 @@
    {"type": "accept", "to": "c3", "by": "user"},
    {"type": "comment", "id": "c3", "n": 3, "text": "edited", "by": "user"}
   ],
-  "work": [["c2", "new"]]},
+  "work": [["c2", "new"]],
+  "threads": [
+   {"id": "c1", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "c2", "state": "agent", "step": "new", "closedByUser": false},
+   {"id": "c3", "state": "done", "step": "new", "closedByUser": true}
+  ]},
  {"name": "a deleted comment is not work, until it is sent again",
   "log": [
    {"type": "comment", "id": "c1", "n": 1, "text": "t", "by": "user"},
@@ -61,14 +85,20 @@
    {"type": "delete", "to": "c2", "by": "user"},
    {"type": "comment", "id": "c2", "n": 2, "text": "t", "by": "user"}
   ],
-  "work": [["c2", "new"]]},
+  "work": [["c2", "new"]],
+  "threads": [
+   {"id": "c2", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "a reopened item is work again",
   "log": [
    {"type": "comment", "id": "c1", "n": 1, "text": "t", "by": "user"},
    {"type": "status", "to": "c1", "status": "done", "by": "coordinator"},
    {"type": "reopen", "to": "c1", "text": "still wrong", "by": "user"}
   ],
-  "work": [["c1", "reopened"]]},
+  "work": [["c1", "reopened"]],
+  "threads": [
+   {"id": "c1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "a message under the agent's reply is part of the item the reply is under",
   "log": [
    {"type": "comment", "id": "c1", "n": 1, "text": "t", "by": "user"},
@@ -76,7 +106,10 @@
    {"type": "reply", "id": "r1", "to": "c1", "text": "t", "by": "coordinator"},
    {"type": "note", "id": "m1", "to": "r1", "text": "t", "by": "user"}
   ],
-  "work": [["c1", "followup"]]},
+  "work": [["c1", "followup"]],
+  "threads": [
+   {"id": "c1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "an answer to the agent's own message is an item, and an answer under it belongs to it",
   "log": [
    {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
@@ -85,7 +118,10 @@
    {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"},
    {"type": "note", "id": "m3", "to": "r1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "replied"], ["m3", "new"]]},
+  "work": [["m1", "replied"], ["m3", "new"]],
+  "threads": [
+   {"id": "r1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "an answer to the agent's own message that the agent asks about waits for the user, and the message's next answer is an item",
   "log": [
    {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
@@ -94,11 +130,370 @@
    {"type": "status", "to": "m1", "status": "asked", "by": "coordinator"},
    {"type": "note", "id": "m2", "to": "r1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "asked"], ["m2", "new"]]},
+  "work": [["m1", "asked"], ["m2", "new"]],
+  "threads": [
+   {"id": "r1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "an answer to what a worker closed is an item",
   "log": [
    {"type": "closed", "id": "x1", "by": "worker-2", "question": "Q4", "status": "answered"},
    {"type": "note", "id": "m1", "to": "x1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "new"]]}
+  "work": [["m1", "new"]],
+  "threads": [
+   {"id": "x1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "state: your turn, the agent asked after reading your message",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "you", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "state: agent's turn, not seen",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "state: agent's turn, seen",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "seen", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "seen", "closedByUser": false}
+  ]},
+ {"name": "state: agent's turn, working",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "working", "closedByUser": false}
+  ]},
+ {"name": "state: done by the agent",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "state: done, closed by you",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "accept", "to": "m1", "by": "user"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "new", "closedByUser": true}
+  ]},
+ {"name": "transition: you write in a thread in any state, and it is the agent's turn, not seen",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "note", "id": "m3", "to": null, "text": "t", "by": "user"},
+   {"type": "note", "id": "m5", "to": null, "text": "t", "by": "user"},
+   {"type": "note", "id": "m7", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 3},
+   {"type": "status", "to": "m3", "status": "done", "by": "coordinator", "read": 3},
+   {"type": "accept", "to": "m5", "by": "user"},
+   {"type": "status", "to": "m7", "status": "working", "by": "coordinator", "read": 3},
+   {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"},
+   {"type": "note", "id": "m4", "to": "m3", "text": "t", "by": "user"},
+   {"type": "note", "id": "m6", "to": "m5", "text": "t", "by": "user"},
+   {"type": "note", "id": "m8", "to": "m7", "text": "t", "by": "user"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false},
+   {"id": "m3", "state": "agent", "step": "new", "closedByUser": false},
+   {"id": "m5", "state": "agent", "step": "new", "closedByUser": false},
+   {"id": "m7", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "transition: the agent says done on a your-turn thread",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 0},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "transition: you close an agent's-turn and a your-turn thread",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 0},
+   {"type": "accept", "to": "m1", "by": "user"},
+   {"type": "note", "id": "m2", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m2", "status": "asked", "by": "coordinator", "read": 3},
+   {"type": "accept", "to": "m2", "by": "user"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "working", "closedByUser": true},
+   {"id": "m2", "state": "done", "step": "new", "closedByUser": true}
+  ]},
+ {"name": "transition: the agent asks in a thread it finished",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 0},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "you", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "transition: no agent event changes a thread you closed, fresh or not",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "accept", "to": "m1", "by": "user"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 1},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 1},
+   {"type": "status", "to": "m1", "status": "seen", "by": "coordinator", "read": 1},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 1},
+   {"type": "reply", "id": "r1", "to": "m1", "text": "t", "by": "coordinator"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 4}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "new", "closedByUser": true}
+  ]},
+ {"name": "transition: seen after working: the agent stopped working on it",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 0},
+   {"type": "status", "to": "m1", "status": "seen", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "seen", "closedByUser": false}
+  ]},
+ {"name": "transition: seen or working on a your-turn thread changes nothing",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 0},
+   {"type": "status", "to": "m1", "status": "seen", "by": "coordinator", "read": 0},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "you", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "transition: you reopen a thread the agent finished, and one you closed",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 0},
+   {"type": "reopen", "to": "m1", "text": "why", "by": "user"},
+   {"type": "note", "id": "m2", "to": null, "text": "t", "by": "user"},
+   {"type": "accept", "to": "m2", "by": "user"},
+   {"type": "reopen", "to": "m2", "text": "why", "by": "user"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false},
+   {"id": "m2", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "transition: you reopen a report the agent posted on its own",
+  "log": [
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "reopen", "to": "r1", "text": "why", "by": "user"}
+  ],
+  "threads": [
+   {"id": "r1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "transition: you confirm a thread the agent finished",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 0},
+   {"type": "accept", "to": "m1", "by": "user"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "new", "closedByUser": true}
+  ]},
+ {"name": "transition: the agent posts a question on its own",
+  "log": [
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "status", "to": "r1", "status": "asked", "by": "coordinator"}
+  ],
+  "threads": [
+   {"id": "r1", "state": "you", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "transition: the agent posts a report on its own",
+  "log": [
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"}
+  ],
+  "threads": [
+   {"id": "r1", "state": "done", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "transition: a reply alone changes nothing",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "reply", "id": "r1", "to": "m1", "text": "t", "by": "coordinator"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "seen: the agent's latest read covers your latest message in another thread",
+  "log": [
+   {"type": "note", "id": "m0", "to": null, "text": "t", "by": "user"},
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m0", "status": "done", "by": "coordinator", "read": 1},
+   {"type": "note", "id": "m2", "to": null, "text": "t", "by": "user"}
+  ],
+  "threads": [
+   {"id": "m0", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "m1", "state": "agent", "step": "seen", "closedByUser": false},
+   {"id": "m2", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "seen: each state shows when it started, and a status that changes nothing keeps it",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user", "at": "2026-11-28T10:00:00Z"},
+   {"type": "status", "to": "m1", "status": "seen", "by": "coordinator", "at": "2026-11-28T10:05:00Z", "read": 0},
+   {"type": "status", "to": "m1", "status": "seen", "by": "coordinator", "at": "2026-11-28T10:09:00Z", "read": 0},
+   {"type": "note", "id": "m2", "to": null, "text": "t", "by": "user", "at": "2026-11-28T11:00:00Z"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "at": "2026-11-28T11:30:00Z", "read": 3}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "seen", "closedByUser": false, "since": "2026-11-28T11:30:00Z"},
+   {"id": "m2", "state": "agent", "step": "seen", "closedByUser": false, "since": "2026-11-28T11:30:00Z"}
+  ]},
+ {"name": "stale: a question the agent decided before your message does not hide it",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "stale: a done the agent decided before your message does not hide it",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 0},
+   {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 1}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "stale: a status the agent decided before you reopened changes nothing",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 0},
+   {"type": "reopen", "to": "m1", "text": "why", "by": "user"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 1}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "stale: a status decided before you closed does not reopen it",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "accept", "to": "m1", "by": "user"},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "new", "closedByUser": true}
+  ]},
+ {"name": "stale: a stale status still counts as reading what came before",
+  "log": [
+   {"type": "note", "id": "m0", "to": null, "text": "t", "by": "user"},
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "asked", "by": "coordinator", "read": 1}
+  ],
+  "threads": [
+   {"id": "m0", "state": "agent", "step": "seen", "closedByUser": false},
+   {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "#172: the agent's message, your answer under it, done by the agent, then closed by you",
+  "log": [
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "note", "id": "m1", "to": "r1", "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator", "read": 1},
+   {"type": "note", "id": "m2", "to": "r1", "text": "t", "by": "user"},
+   {"type": "status", "to": "r1", "status": "done", "by": "coordinator", "read": 3},
+   {"type": "accept", "to": "r1", "by": "user"}
+  ],
+  "threads": [
+   {"id": "r1", "state": "done", "step": "new", "closedByUser": true}
+  ]},
+ {"name": "#172: the agent's message you answered is done once the agent marks it, without accepting each note",
+  "log": [
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "note", "id": "m1", "to": "r1", "text": "t", "by": "user"},
+   {"type": "note", "id": "m2", "to": "r1", "text": "t", "by": "user"},
+   {"type": "status", "to": "r1", "status": "done", "by": "coordinator", "read": 2}
+  ],
+  "threads": [
+   {"id": "r1", "state": "done", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "an old log without read: every status counts",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "seen", "by": "coordinator"},
+   {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator"},
+   {"type": "note", "id": "m3", "to": null, "text": "t", "by": "user"},
+   {"type": "reply", "id": "r1", "to": "m3", "text": "t", "by": "coordinator"},
+   {"type": "status", "to": "m3", "status": "done", "by": "coordinator"},
+   {"type": "reply", "id": "r2", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "note", "id": "m4", "to": "r2", "text": "t", "by": "user"},
+   {"type": "status", "to": "m4", "status": "asked", "by": "coordinator"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "agent", "step": "working", "closedByUser": false},
+   {"id": "m3", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "r2", "state": "you", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "kind: an approval is a thread of yours",
+  "items": ["comment", "note", "approve"],
+  "log": [
+   {"type": "approve", "id": "a1", "text": "B", "by": "user"},
+   {"type": "status", "to": "a1", "status": "done", "by": "coordinator", "read": 0},
+   {"type": "approve", "id": "a2", "text": "C", "by": "user"}
+  ],
+  "threads": [
+   {"id": "a1", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "a2", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "kind: a confirmation is a thread of yours",
+  "items": ["comment", "note", "confirm"],
+  "log": [
+   {"type": "confirm", "id": "k1", "requirement": "R1", "wording": "w", "text": "ok", "by": "user"},
+   {"type": "status", "to": "k1", "status": "seen", "by": "coordinator", "read": 0}
+  ],
+  "threads": [
+   {"id": "k1", "state": "agent", "step": "seen", "closedByUser": false}
+  ]},
+ {"name": "kind: a verdict is shown, and nobody's turn",
+  "items": ["comment", "note", "approve"],
+  "log": [
+   {"type": "verdict", "version": "v1", "verdict": "up", "by": "user"},
+   {"type": "comment", "id": "c1", "n": 1, "text": "t", "verdict": "down", "on": {}, "by": "user"}
+  ],
+  "threads": [
+   {"id": null, "state": "done", "step": "new", "closedByUser": false},
+   {"id": "c1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "kind: answers to one decision are one thread, named by the decision",
+  "items": ["comment", "note", "answer"],
+  "log": [
+   {"type": "answer", "id": "a1", "decision": "D1", "text": "A", "default": false, "by": "user"},
+   {"type": "status", "to": "a1", "status": "asked", "by": "coordinator", "read": 0},
+   {"type": "answer", "id": "a2", "decision": "D1", "text": "B", "default": false, "by": "user"},
+   {"type": "answer", "id": "a3", "decision": "D2", "text": "C", "default": true, "by": "user"},
+   {"type": "status", "to": "a3", "status": "done", "by": "coordinator", "read": 3}
+  ],
+  "threads": [
+   {"id": "a1", "state": "agent", "step": "seen", "closedByUser": false},
+   {"id": "a3", "state": "done", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "kind: a worker's closed question is a report, and your note under it is the agent's turn",
+  "items": ["comment", "note", "answer"],
+  "log": [
+   {"type": "closed", "id": "x1", "by": "worker-2", "question": "Q4", "status": "answered"},
+   {"type": "closed", "id": "x2", "by": "worker-3", "question": "Q5", "status": "answered"},
+   {"type": "note", "id": "m1", "to": "x1", "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 2}
+  ],
+  "threads": [
+   {"id": "x1", "state": "agent", "step": "working", "closedByUser": false},
+   {"id": "x2", "state": "done", "step": "new", "closedByUser": false}
+  ]}
 ]

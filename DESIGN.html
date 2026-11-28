@@ -1311,6 +1311,81 @@ function pageThread(log, itemKinds, waiting, latestLast) {
   return { state: state, entries: entries, open: open };
 }
 
+// The threads of a LOG, each in one state of the one machine every thread follows (.design/conversation-panel/states.md).
+// Kept apart from the drawing so it can be tested without a browser; `threads` in src/better_ai/page/__init__.py gives
+// the same threads for the same log, and tests/fixtures/threads.json holds the logs both are run on.
+// ITEMKINDS: the user's kinds the agent tracks (comment, note, ...). Each thread, in the order it started:
+//   { id, root, messages, state: 'you' | 'agent' | 'done', step: 'new' | 'seen' | 'working', closedByUser, deleted,
+//     since (when the state or step was set), userAt (log index of the user's latest event), last (time of the last
+//     message) }
+// A thread starts with an event that names no thread: the user's item, the agent's message on its own (a report, done),
+// a worker's `closed`, a decision from pageDecisionEvents (your turn while it waits), or anything else the page shows
+// (such as a verdict: nobody's turn). An answer names its decision; the rest name the thread, or a message in it, in `to`.
+// An agent status counts only if its `read` (the log index of the last event the agent was shown) covers the user's
+// latest event in the thread; a status without `read` counts (logs before `read`). Indexes are the conversation log's
+// own: pageDecisionEvents keeps each event's in `_i`.
+var PAGE_CONTROL = ['status', 'accept', 'accepted', 'reopen', 'delete'];
+function pageThreads(log, itemKinds) {
+  var threads = [], byId = {}, home = {}, agentRead = -1;
+  function threadOf(id) { return byId[home[id] || id]; }
+  function start(e, i, state) {
+    var t = { id: e.id == null ? null : e.id, root: e, messages: [e], state: state, step: 'new', closedByUser: false,
+      deleted: false, since: e.at, userAt: e.by === 'user' ? i : -1, last: e.at };
+    if (e.id != null) byId[e.id] = t;
+    threads.push(t);
+    return t;
+  }
+  function seenStep(t, at) {
+    if (t.state === 'agent' && t.step === 'new' && agentRead >= t.userAt) { t.step = 'seen'; t.since = at; }
+  }
+  var n = 0;
+  log.forEach(function (e) {
+    var i = e._i != null ? e._i : n, read = agentRead;
+    if (e.type !== 'decision' || e.x == null) n++;
+    if (!e.type) return;  // a line the log could not read keeps its place, and is no event
+    var user = e.by === 'user', item = user && itemKinds.indexOf(e.type) >= 0;
+    if (!user && typeof e.read === 'number') agentRead = Math.max(agentRead, e.read);
+    var target = e.type === 'answer' ? e.decision : e.to, t = target != null ? threadOf(target) : null;
+    if (!t && item && e.id != null && byId[e.id] && byId[e.id].root.type === e.type) {
+      // The user's item sent again, such as an edited or restored comment: the same thread, in its state.
+      t = byId[e.id];
+      if (e.type === 'comment') { t.root = e; t.messages[0] = e; t.deleted = false; }
+    } else if (!t) {
+      if (PAGE_CONTROL.indexOf(e.type) < 0) {
+        var state = item ? 'agent' : e.type === 'decision' && pageDecisionStatus(e.x || {}) === 'waiting' ? 'you' : 'done';
+        t = start(e, i, state);
+        // Later answers to the same decision join this thread, when the decision is not in the log.
+        if (e.type === 'answer' && target != null && !byId[target]) home[target] = t.id;
+      }
+    } else {
+      if (e.id != null) home[e.id] = t.id;
+      var fresh = typeof e.read !== 'number' || e.read >= t.userAt;
+      if (user && (item || e.type === 'note' || e.type === 'answer' || e.type === 'reopen')) {
+        t.messages.push(e); t.last = e.at; t.userAt = i;
+        t.state = 'agent'; t.step = 'new'; t.closedByUser = false; t.since = e.at;
+      } else if (e.type === 'reply') {
+        t.messages.push(e); t.last = e.at;  // the CLI writes the reply's status with it (done by default)
+      } else if (e.type === 'delete' && user) {
+        t.deleted = true;
+      } else if (e.type === 'accept' && user || e.type === 'accepted') {
+        // ✓, or the user's words that accept it: closes an open thread, or confirms one the agent finished.
+        if (t.state !== 'done') t.since = e.at;
+        t.state = 'done'; t.closedByUser = true; t.userAt = i;
+      } else if (e.type === 'status' && fresh && !t.closedByUser) {
+        // A thread you closed changes only when you act on it again.
+        var was = t.state + t.step;
+        if (e.status === 'asked') t.state = 'you';
+        else if (e.status === 'done') t.state = 'done';
+        else if (t.state === 'agent' && (e.status === 'seen' || e.status === 'working')) t.step = e.status;
+        if (t.state + t.step !== was) t.since = e.at;
+      }
+    }
+    // Seen follows the agent's reading: a further read can cover the user's latest event of any thread.
+    if (agentRead > read) threads.forEach(function (x) { seenStep(x, e.at); });
+  });
+  return threads;
+}
+
 // ---------- Markdown in messages ----------
 // What the user and the agent write in the conversation is Markdown: paragraphs (a single line break stays a line
 // break, as in a chat), headings, lists (nested by indenting), quotes, code spans and blocks, tables, rules, bold,
@@ -1620,10 +1695,11 @@ function pageDecisionEvents(decisions, conversation) {
   var entries = (decisions || []).map(function (x) { return { type: 'decision', id: x.id, x: x, at: x.at, _t: Date.parse(x.at) / 1000 || 0 }; });
   var when = {};
   entries.forEach(function (e) { when[e.id] = e._t; });
-  var events = (conversation || []).map(function (e) {
+  var events = (conversation || []).map(function (e, k) {
     var t = Math.max(Date.parse(e.at) / 1000 || 0, when[e.type === 'answer' ? e.decision : e.to] || 0);
     if (e.id) when[e.id] = t;
-    return Object.assign({}, e, { _t: t });
+    // _i: its line in the log, which `read` counts in: the one the page's data gave it (page.log_records), else its place.
+    return Object.assign({}, e, { _t: t, _i: e._i != null ? e._i : k });
   });
   return events.concat(entries).sort(function (a, z) { return a._t - z._t || (z.type === 'decision') - (a.type === 'decision'); });
 }

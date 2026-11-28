@@ -75,7 +75,7 @@
       }
     },
     "status": {
-      "description": "where the agent is with one of the user's items",
+      "description": "where the agent is with one of the threads",
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "at", "by", "to", "status"],
@@ -84,7 +84,8 @@
         "at": {"$ref": "base.schema.json#/$defs/at"},
         "by": {"$ref": "#/$defs/agent"},
         "to": {"$ref": "#/$defs/to"},
-        "status": {"enum": ["seen", "asked", "working", "done"]}
+        "status": {"enum": ["seen", "asked", "working", "done"]},
+        "read": {"description": "the log index (from 0) of the last event `pending` or `wait` showed the agent before it wrote this status; a status whose read is before the user's latest event in the thread changes nothing, and one without read (logs before it) counts", "type": "integer", "minimum": 0}
       }
     },
     "accept": {
