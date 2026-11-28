@@ -688,6 +688,91 @@ class SpellingsTest(Unit):
                 (self.folder / ".server").unlink(missing_ok=True)
 
 
+class SpacedPathTest(Unit):
+    """A unit whose path holds a space is the same unit to the old-server check (round 2 F2)."""
+
+    def test_a_serve_whose_unit_path_has_spaces_is_recognised(self):  # S108
+        from types import SimpleNamespace
+        from unittest import mock
+
+        from better_ai import page
+
+        unit = SimpleNamespace(path=Path("/tmp/my  decks/a b/.show/deck"))
+        commands = {
+            "python3 /x y/better.pyz serve /tmp/my  decks/a b/.show/deck --no-browser": True,
+            "python3 /x y/better.pyz serve --linger 0.2 /tmp/my  decks/a b/.show/deck/": True,
+            "python3 better.pyz serve a b/.show/deck": True,  # relative, from /tmp/my  decks
+            "python3 better.pyz serve /tmp/my  decks/a b/.show/deck2": False,
+            "python3 better.pyz serve /tmp/my  decks/a b/.show": False,
+            "python3 better.pyz reply /tmp/my  decks/a b/.show/deck": False,
+        }
+        for line, expected in commands.items():
+            with (
+                self.subTest(line),
+                mock.patch.object(page, "command_of", return_value=line),
+                mock.patch.object(page, "cwd_of", return_value="/tmp/my  decks"),
+            ):
+                self.assertIs(page.is_serve_of(4242, unit), expected)
+
+    def test_a_stopped_server_of_a_unit_with_a_space_is_ended(self):  # S108, round 2 F2
+        spaced = self.root / "my decks"
+        spaced.mkdir()
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
+        subprocess.run([*git, "init", "-q", "-b", "main"], cwd=spaced, check=True)
+        subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "x"], cwd=spaced, check=True)
+        done = better.call("show-better", "create", ".show/deck", "--by", "t", stdin=json.dumps(SHOW), cwd=spaced)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.folder = spaced / ".show" / "deck"
+        for spelling, cwd in ((str(self.folder), self.root), ("my decks/.show/deck/", self.root)):
+            with self.subTest(spelling):
+                self.served()
+                old = self.state()["server_pid"]
+                os.kill(old, signal.SIGSTOP)
+                done = subprocess.run(
+                    better.command("serve", spelling, "--no-browser"),
+                    cwd=cwd,
+                    env=stub_env(),
+                    input="",
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertTrue(wait_for(lambda pid=old: not alive(pid)))
+                self.end_everything()
+                (self.folder / ".server").unlink(missing_ok=True)
+
+
+class TestServersEndTest(unittest.TestCase):
+    """A server a test serves is ended by `stop_page` even after its folder is gone, and one left running is found
+    (round 2 F1, lesson L6)."""
+
+    def serve_in_temp_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(os.path.realpath(tmp))
+            done = better.call("show-better", "create", ".show/deck", "--by", "t", stdin=json.dumps(SHOW), cwd=root)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            folder = root / ".show" / "deck"
+            better.serve_page("show-better", folder, cwd=root)
+            state = json.loads((folder / ".driver").read_text())
+        return folder, state
+
+    def test_stop_page_ends_the_server_after_its_folder_is_removed(self):
+        folder, state = self.serve_in_temp_folder()
+        self.assertFalse(folder.exists())
+        better.stop_page(folder)
+        self.assertTrue(wait_for(lambda: not alive(state["server_pid"])))
+        self.assertTrue(wait_for(lambda: not alive(state["child_pid"])))
+        self.assertEqual(better.leftover_servers(), [])
+
+    def test_a_server_left_running_is_reported_and_ended(self):
+        folder, state = self.serve_in_temp_folder()
+        left = better.leftover_servers()
+        self.assertEqual(left, [os.path.realpath(folder)])
+        self.assertTrue(wait_for(lambda: not alive(state["server_pid"])))
+        self.assertTrue(wait_for(lambda: not alive(state["child_pid"])))
+
+
 class MachineOutputTest(Unit):
     def test_no_machine_read_verb_gets_the_notice_on_stdout(self):  # S37, round 1 B4
         from unittest import mock
