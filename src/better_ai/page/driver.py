@@ -13,7 +13,6 @@ import uuid
 from collections import Counter, deque
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 
 from .. import paths, resources
 from .driver_state import (
@@ -22,6 +21,7 @@ from .driver_state import (
     delivered_field,
     delivered_position,
     encode,
+    iso,
     load_state,
     log_records,
     recent_turn,
@@ -67,6 +67,8 @@ NOTICES = {
     "driver": "The page's agents stopped because of an error: {}. Ask the agent in your chat to serve this page again. Log: {}.",
     "protocol": "All agents are stopped because the harness protocol is unknown: {}. Update better-ai, or use a version it was tested with.",
     "stopped": "All agents are stopped. Press Start to have them read your messages.",
+    "stopping": "The agents are stopping.",
+    "stalled": "The agents have shown no output for 10 minutes. Press Stop to end them, or keep waiting.",
     "idle": "This page is closed after 30 minutes with no activity. Ask the agent in your chat to reopen it.",
     "closed": "This page has closed: {}.",
 }
@@ -117,10 +119,7 @@ class Approval:
     key: tuple
     requester: str | None
     summary: str
-
-
-def iso(moment: float) -> str:
-    return datetime.fromtimestamp(moment, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    options: list
 
 
 def display(value) -> str:
@@ -146,6 +145,7 @@ class Driver:
         auto_approve=None,
         version: str = "",
         tested: str = "",
+        build: str = "",
         clock=time.monotonic,
         valid_session,
     ):
@@ -157,7 +157,7 @@ class Driver:
         self.step = step
         self.skill_path, self.command = str(skill_path), command
         self.triggers, self.workers, self.auto_approve, self.clock = triggers, workers, auto_approve, clock
-        self.version, self.tested = version, tested
+        self.version, self.tested, self.build = version, tested, build
         self.valid_session = valid_session
         saved = load_state(self.unit) or with_defaults({})
         self._saved = saved
@@ -182,6 +182,9 @@ class Driver:
         self._note = handoff or saved["note"] or ""
         self._handoff_delivered = False if handoff else bool(saved["handoff_delivered"])
         self._ended = dict(saved["ended"])
+        if self._ended.get("build") != build:
+            # A changed better.pyz is a new chance: the count of repeated driver errors starts again.
+            self._ended["repeats"] = 0
         self._turn_state = None
         self._records = log_records(self.unit)
         for record in self._records:
@@ -195,18 +198,25 @@ class Driver:
         # A turn still set in .driver ended without the driver seeing it: it crashed (S72).
         crashed = saved["turn"] if isinstance(saved["turn"], dict) else None
         turns = [record for record in self._records if record.get("type") == "turn"]
-        last = turns[-1] if turns else {}
         if crashed:
-            last = next((r for r in reversed(turns) if r.get("number") == crashed.get("number")), last)
-        number = (crashed or last).get("number", 0)
-        self._number = number if type(number) is int else 0
-        if last:
+            number = crashed.get("number")
+            self._number = number if type(number) is int else 0
+            record = next((r for r in reversed(turns) if r.get("number") == self._number), None)
+            # With no record of that turn, the delivery file names what it carried; no other turn's record will do.
+            items = self._strings(record.get("items")) if record else self._delivery_items()
+            self._recover, self._recover_turn, self._recover_kind = items, self._number, "crashed"
+            if record is not None and "end" not in record:
+                record.update(end=time.time(), outcome="crashed")
+        elif turns:
+            last = turns[-1]
+            number = last.get("number", 0)
+            self._number = number if type(number) is int else 0
             items = self._strings(last.get("items"))
-            outcome = "crashed" if crashed else (last.get("outcome") or "crashed")
+            outcome = last.get("outcome") or "crashed"
             if outcome == "completed":
                 self._carry = items
             else:
-                self._recover, self._recover_turn, self._recover_kind = items, last.get("number", 0), outcome
+                self._recover, self._recover_turn, self._recover_kind = items, self._number, outcome
             if "end" not in last:
                 last.update(end=time.time(), outcome=outcome)
         self._retry = False
@@ -246,9 +256,20 @@ class Driver:
         self._close_reason = "server stopped"
         self._driver_failed = False
         self._failed_error = None
+        self._workers_broken = False
+        self._same_end = False
+        # Open until this serve reaches driver: on; a driver error after that starts a new count (D11).
+        self._streak_open = True
         self._last_stderr = ""
         self._published = {}
         self._publish()
+
+    def _delivery_items(self) -> frozenset[str]:
+        try:
+            record = json.loads(paths.read_bytes(self.unit, ACTIVE_DELIVERY))
+        except (OSError, ValueError, paths.Refused):
+            return frozenset()
+        return self._strings(record.get("item_ids")) if isinstance(record, dict) else frozenset()
 
     @staticmethod
     def _strings(values) -> frozenset[str]:
@@ -259,7 +280,7 @@ class Driver:
     def start(self, timeout=START_TIMEOUT) -> str:
         self._deadline = time.monotonic() + timeout
         if end_orphan(self._saved["child_pid"], self._saved["child_argv"]):
-            self._record_end("orphan ended at start")
+            self._record_end("orphan ended at start", "orphan")
         self._thread.start()
         if not self._started.wait(timeout):
             self._closing.set()
@@ -294,6 +315,7 @@ class Driver:
             or published["approvals"]
             or published["waiting"]
             or self._worker_list()
+            or self._workers_broken
             or not self._commands.empty()
         )
 
@@ -322,10 +344,12 @@ class Driver:
         self._driver_failed = True
         self._failed_error = error
         self._force("failed", {"kind": "driver", "message": error, "log": str(self.unit.target(LOG))})
-        self._record_end(error)
+        self._record_end(error, "driver")
         self._closing.set()
-        with contextlib.suppress(Exception):
+        try:
             self._close_peer(error)
+        except Exception as problem:
+            self.log("error", kind="driver", message=f"the harness's process group did not end: {problem}")
 
     @property
     def error(self) -> str | None:
@@ -361,7 +385,11 @@ class Driver:
     def _worker_list(self) -> list:
         try:
             return [dict(worker) for worker in self.workers()]
-        except Exception:
+        except Exception as error:
+            # A callback that fails must not look like no workers: the page stays up, and the failure is logged once.
+            if not self._workers_broken:
+                self._workers_broken = True
+                self.log("error", kind="workers", message=f"the workers callback failed: {error}")
             return []
 
     def _text(self, state: str, details: dict) -> str | None:
@@ -369,12 +397,12 @@ class Driver:
         message = str(details.get("message", ""))[:500]
         if state == "closed":
             return NOTICES["idle"] if details.get("kind") == "idle" else NOTICES["closed"].format(message)
-        if state == "stopped":
-            return NOTICES["stopped"]
+        if state in ("stopped", "stopping", "stalled"):
+            return NOTICES[state]
         if state != "failed":
             return None
         kind = details.get("kind", "crashed")
-        if kind == "crashed" and details.get("repeats", 0) >= 1:
+        if kind == "crashed" and details.get("again"):
             kind = "crashed-again"
         if kind == "login":
             return NOTICES[kind].format(self.harness)
@@ -409,7 +437,7 @@ class Driver:
                 "arguments": a.arguments,
                 "summary": a.summary,
                 "since": iso(a.since),
-                "options": list(OPTIONS),
+                "options": list(a.options),
             }
             for a in self._open_approvals.values()
         ]
@@ -436,7 +464,17 @@ class Driver:
 
     def _flush_log(self) -> None:
         with self._log_lock:
+            self._attach_verbs()
             self._records = store_log(self.unit, self._records)
+
+    def _attach_verbs(self) -> None:
+        """Move verb lines the verbs appended to the log onto the records of their turns (D11)."""
+        turns = {r.get("number"): r for r in self._records if r.get("type") == "turn"}
+        for line in log_records(self.unit):
+            if line.get("type") != "verb" or not turns:
+                continue
+            turn = turns.get(line.get("turn")) or turns[max(n for n in turns if type(n) is int)]
+            turn.setdefault("verbs", []).append({k: line.get(k) for k in ("verb", "exit", "at")})
 
     def _status(self, state: str, **details) -> None:
         if self._state != state or self._details != details:
@@ -465,11 +503,14 @@ class Driver:
             },
         )
 
-    def _record_end(self, reason: str) -> None:
-        """Note when the harness process ended and why; repeats counts the same reason in a row (S98, S121)."""
+    def _record_end(self, reason: str, kind: str = "stopped") -> None:
+        """Note when the harness process ended and why (S98). repeats counts the same error of kind driver in a row."""
         reason = reason[:2000]
-        repeats = self._ended.get("repeats", 0) + 1 if self._ended.get("reason") == reason else 0
-        self._ended = {"at": iso(time.time()), "reason": reason, "repeats": repeats}
+        previous = self._ended
+        same = previous.get("reason") == reason and previous.get("kind") == kind
+        repeats = previous.get("repeats", 0) + 1 if kind == "driver" and same and self._streak_open else 0
+        self._ended = {"at": iso(time.time()), "reason": reason, "kind": kind, "build": self.build, "repeats": repeats}
+        self._same_end = same
         # The record stays in memory when the write fails.
         with contextlib.suppress(OSError, ValueError, paths.Refused):
             self._checkpoint()
@@ -546,6 +587,7 @@ class Driver:
             self._admitted_events.extend(historical.events)
             self._last_poll = self.clock()
             self._ended["repeats"] = 0
+            self._streak_open = False
             self._started.set()
             while not self._closing.is_set():
                 self._check_unit()
@@ -572,7 +614,7 @@ class Driver:
             except Exception:
                 self._state, self._since = "failed", time.time()
                 self._details = {"kind": "driver", "message": str(error), "log": str(self.unit.target(LOG))}
-                self._record_end(str(error))
+                self._record_end(str(error), "driver")
                 self._publish()
         finally:
             try:
@@ -882,12 +924,12 @@ class Driver:
     def _failed(self, kind: str, message: str = "", **details) -> None:
         kind = kind if kind in ACTIONS else "crashed"
         self._end(kind)
-        self._record_end(message or kind)
+        self._record_end(message or kind, kind)
         self._close_peer(message or kind)
         self._log("error", kind=kind, message=message, stderr=self._last_stderr[-2000:])
         if kind == "driver":
             details.setdefault("log", str(self.unit.target(LOG)))
-        self._status("failed", kind=kind, message=message, repeats=self._ended["repeats"], **details)
+        self._status("failed", kind=kind, message=message, again=self._same_end, **details)
 
     def _stop(self, reason: str) -> None:
         """Show stopping, cancel, wait up to 3 s for the turn to end, then end the process group in every case."""
@@ -908,7 +950,7 @@ class Driver:
                         self._request_approval(event, deny_reason=reason)
         self._end(reason)
         if self._peer is not None:
-            self._record_end(reason)
+            self._record_end(reason, "stopped" if reason == "stopped by the user" else "server")
         self._close_peer(reason)
         self._status("stopped")
 
@@ -946,22 +988,25 @@ class Driver:
             key=(tool, arguments),
             requester=event.requester,
             summary=WANTS.get(tool, f"to use {tool}"),
+            # The page offers what the harness offers, so the harness applies its own scope to the answer (D5, D8).
+            options=[option for option in OPTIONS if option in event.options],
         )
         self._open_approvals[approval.id] = approval
         self._records.append(record)
         self._flush_log()
+        if approval.key in self._grants:
+            # The harness asks again for a call the user allowed for the session: record it, and ask as usual.
+            self._log("allowed", tool=tool, arguments_sha256=record["arguments_sha256"])
         if deny_reason:
             self._answer_open(approval, "deny", deny_reason)
-        elif approval.key in self._grants:
-            self._log("allowed", tool=tool, arguments_sha256=record["arguments_sha256"])
-            self._answer_open(approval, "allow_once", "Allowed earlier for this session")
         elif self.auto_approve is not None and self.auto_approve(event):
             self._auto_used = True
             self._answer_open(approval, "allow_once", "Approved page command")
 
     def answer_approval(self, approval_id: str, choice: str, reason: str = "") -> Future[bool]:
         """The user's answer to an open approval. The result is True once the harness was told."""
-        if choice not in OPTIONS:
+        approval = self._open_approvals.get(approval_id)
+        if choice not in OPTIONS or (approval is not None and choice not in approval.options):
             raise ValueError("Invalid approval choice")
         receipt = Future()
         values = (approval_id, choice, reason, receipt)
@@ -982,7 +1027,7 @@ class Driver:
         try:
             approval = self._open_approvals.get(approval_id)
             # An approval is relayed only while it is still waiting; otherwise it already expired.
-            if approval is None or (self._closing.is_set() and choice != "deny"):
+            if approval is None or choice not in approval.options or (self._closing.is_set() and choice != "deny"):
                 return
             delivered = self._answer_open(approval, choice, reason)
         finally:
@@ -1001,9 +1046,7 @@ class Driver:
             }[choice]
         )
         try:
-            delivered = approval.peer.answer(
-                approval.event.request_id, "deny" if choice == "deny" else "allow_once", text
-            )
+            delivered = approval.peer.answer(approval.event.request_id, choice, text)
         except OSError:
             delivered = False
         if delivered is not True:

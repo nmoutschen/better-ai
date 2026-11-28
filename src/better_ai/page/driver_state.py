@@ -8,6 +8,8 @@ import json
 import os
 import stat
 import tempfile
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..paths import NOFOLLOW, Refused
@@ -33,8 +35,12 @@ DEFAULTS = {
     "fired": [],
     "handoff_delivered": False,
     "turn": None,
-    "ended": {"at": None, "reason": None, "repeats": 0},
+    "ended": {"at": None, "reason": None, "kind": None, "build": None, "repeats": 0},
 }
+
+
+def iso(moment: float) -> str:
+    return datetime.fromtimestamp(moment, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def private_bytes(unit, name: str) -> bytes:
@@ -136,7 +142,24 @@ def delivered_position(delivered, events: list[dict]) -> int:
     for index, event in enumerate(events):
         if event.get("id") == ident:
             return index + 1
-    return 0
+    # The id is gone (the log was rewritten): keep what the position says, within the log.
+    return min(position, len(events))
+
+
+def last_ended(unit) -> dict:
+    """How the last harness process ended: {at, reason, kind, build, repeats}. Only the driver writes it (D11)."""
+    state = load_state(unit)
+    return state["ended"] if state else with_defaults({})["ended"]
+
+
+def log_verb(unit, verb: str, exit_code: int) -> None:
+    """Add one verb call to .driver.log, with the number of the turn now running. The driver attaches it to that turn."""
+    state = load_state(unit)
+    turn = state["turn"] if state and isinstance(state["turn"], dict) else {}
+    line = encode({"type": "verb", "at": time.time(), "verb": verb, "exit": exit_code, "turn": turn.get("number")})
+    fd = os.open(unit.target(LOG), os.O_WRONLY | os.O_APPEND | os.O_CREAT | NOFOLLOW, 0o600)
+    with os.fdopen(fd, "ab") as stream:
+        stream.write(line)
 
 
 def log_records(unit) -> list[dict]:

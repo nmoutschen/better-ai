@@ -119,7 +119,7 @@ class StateTests(Case):
         state = self.state()
         self.assertEqual(set(state), FIELDS)
         self.assertEqual(state["version"], 1)
-        self.assertEqual(set(state["ended"]), {"at", "reason", "repeats"})
+        self.assertEqual(set(state["ended"]), {"at", "reason", "kind", "build", "repeats"})
         self.assertEqual(state["server_pid"], os.getpid())
         self.assertEqual((self.root / ".driver").stat().st_mode & 0o777, 0o600)
 
@@ -174,7 +174,7 @@ class StateTests(Case):
         self.assertEqual(field, {"id": "e2", "position": 3})
         self.assertEqual(delivered_position(field, events), 3)
         self.assertEqual(delivered_position(field, [{"id": "x"}, {"id": "e2"}]), 2)
-        self.assertEqual(delivered_position(field, [{"id": "x"}]), 0)
+        self.assertEqual(delivered_position(field, [{"id": "x"}]), 1)
         self.assertEqual(delivered_position({"id": None, "position": 4}, events), 4)
 
     def test_log_reset_under_a_live_state_recomputes_the_position(self):
@@ -596,6 +596,7 @@ class ApprovalTests(Case):
         driver.answer_approval(driver.agent()["approvals"][0]["id"], "allow_session").result(timeout=2)
         again = approval(key=2)
         again.options = wide.options
+        eventually(lambda: not driver.agent()["approvals"])
         self.peers[0].events.put(again)
         eventually(lambda: driver.agent()["approvals"])
         self.assertTrue(self.records("allowed"))
@@ -854,6 +855,7 @@ class RoundTwoTests(Case):
             eventually(lambda: driver.snapshot()["state"] == "failed")
             driver.close()
             self.conv.__dict__.pop("delivery")
+            self.conv.items.clear()
 
         fail("b1")
         ended = last_ended(self.conv.unit)
@@ -862,6 +864,19 @@ class RoundTwoTests(Case):
         # Reaching driver: on resets the count, so a second serve that fails the same way is the first again.
         fail("b1")
         self.assertEqual(last_ended(self.conv.unit)["repeats"], 0)
+
+    def test_the_same_driver_error_before_driver_on_counts_as_repeated(self):
+        # D11: two serves in a row that end with the same driver error
+        from better_ai.page.driver_state import last_ended
+
+        def broken(tag):
+            raise ValueError("boom")
+
+        for expected in (0, 1, 2):
+            driver = self.driver(launch=broken, build="b1")
+            with self.assertRaises(self.module.StartError):
+                driver.start()
+            self.assertEqual(last_ended(self.conv.unit)["repeats"], expected)
 
     def test_repeats_count_within_one_serve_and_a_new_build_resets_them(self):
         # D11

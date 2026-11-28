@@ -26,7 +26,7 @@ def _ps(field: str, pid: int) -> str | None:
         return None
     try:
         done = subprocess.run(
-            ["ps", "-o", f"{field}=", "-p", str(pid)],
+            ["ps", "-ww", "-o", f"{field}=", "-p", str(pid)],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -151,11 +151,13 @@ class ProcessTransport:
         self._outbox.put((json.dumps(message, ensure_ascii=True) + "\n").encode("ascii"))
 
     def _write_messages(self) -> None:
-        fd = self._proc.stdin.fileno()
-        while (data := self._outbox.get()) is not None:
-            data = memoryview(data)
-            deadline = time.monotonic() + WRITE_TIMEOUT
-            try:
+        """The only thread that touches stdin: it writes, and it closes the pipe when it is told to stop or fails."""
+        stdin = self._proc.stdin
+        fd = stdin.fileno()
+        try:
+            while (data := self._outbox.get()) is not None:
+                data = memoryview(data)
+                deadline = time.monotonic() + WRITE_TIMEOUT
                 while data:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0 or not select.select([], [fd], [], remaining)[1]:
@@ -164,10 +166,12 @@ class ProcessTransport:
                         data = data[os.write(fd, data) :]
                     except BlockingIOError:
                         continue
-            except (OSError, ValueError):
-                # A write that is late or partial leaves the harness in an unknown state: the driver ends it.
-                self._put(WRITE_FAILED)
-                return
+        except (OSError, ValueError):
+            # A write that is late or partial leaves the harness in an unknown state: the driver ends it.
+            self._put(WRITE_FAILED)
+        finally:
+            with contextlib.suppress(OSError, ValueError):
+                stdin.close()
 
     def open(self, cwd: str, resume: str | None) -> None:
         self.codec.open(cwd, resume)
@@ -204,8 +208,6 @@ class ProcessTransport:
             return
         self._closed.set()
         self._outbox.put(None)
-        with contextlib.suppress(OSError, ValueError):
-            self._proc.stdin.close()
         signal_error = None
         for signum in (signal.SIGTERM, signal.SIGKILL):
             try:
@@ -228,6 +230,7 @@ class ProcessTransport:
             self._proc.returncode is None or any(reader.is_alive() for reader in self._readers)
         ):
             raise signal_error
+        self._writer.join(timeout=0.5)
         deadline = time.monotonic() + 2
         while self._group_alive() and time.monotonic() < deadline:
             time.sleep(0.05)
