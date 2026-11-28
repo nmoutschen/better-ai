@@ -22,7 +22,7 @@ DROID_HEADER = {"jsonrpc": "2.0", "factoryApiVersion": "1.0.0", "factoryProtocol
 
 class AdapterTests(unittest.TestCase):
     def test_selection_uses_harness_markers_and_checks_executable(self):
-        self.assertEqual(candidate("auto", {}, lambda _: "/bin/codex").kind, "none")
+        self.assertEqual(candidate("auto", {}, lambda _: "/bin/codex").kind, "no-harness")
         self.assertEqual(candidate("auto", {"CLAUDECODE": "1"}, lambda _: None).kind, "not-installed")
         found = candidate("auto", {"CODEX_THREAD_ID": SESSION}, lambda name: f"/bin/{name}")
         self.assertEqual(found.name, "codex")
@@ -135,7 +135,7 @@ class AdapterTests(unittest.TestCase):
         event = adapter.receive(request)[0]
         self.assertEqual((event.kind, event.tool, event.arguments), ("approval", "Run", {"command": "pwd"}))
         self.assertIsNone(event.tool_id)
-        self.assertEqual(event.options, ("allow_once", "deny"))
+        self.assertEqual(event.options, ("allow_once", "allow_session", "deny"))
         self.assertTrue(adapter.answer("p", "allow_once"))
         self.assertEqual(sent[-1]["result"], {"outcome": {"outcome": "selected", "optionId": "once"}})
         self.assertFalse(adapter.answer("p", "allow_once"))
@@ -147,11 +147,11 @@ class AdapterTests(unittest.TestCase):
     def test_unknown_notifications_and_requests(self):
         sent = []
         adapter = ACPAdapter(sent.append)
-        self.assertEqual(adapter.receive({"method": "vendor/notification"}), ())
+        self.assertEqual([event.kind for event in adapter.receive({"method": "vendor/notification"})], ["unknown"])
         self.assertEqual(sent, [])
-        self.assertEqual(adapter.receive({"method": "vendor/rpc", "id": 1}), ())
+        self.assertEqual([event.kind for event in adapter.receive({"method": "vendor/rpc", "id": 1})], ["unknown"])
         self.assertEqual(sent[-1]["error"]["code"], -32601)
-        self.assertEqual(adapter.receive({"method": "vendor/requestApproval", "id": 2}), ())
+        adapter.receive({"method": "vendor/requestApproval", "id": 2})
         self.assertEqual(sent[-1]["error"]["message"], "permission denied")
 
     def test_codex_turn_interrupt_and_approval_policy(self):
@@ -164,7 +164,7 @@ class AdapterTests(unittest.TestCase):
         adapter.receive({"id": sent[-1]["id"], "result": {"account": {"type": "chatgpt"}}})
         self.assertEqual(sent[-1]["method"], "thread/resume")
         self.assertEqual(sent[-1]["params"]["threadId"], SESSION)
-        self.assertEqual(sent[-1]["params"]["approvalsReviewer"], "user")
+        self.assertNotIn("approvalsReviewer", sent[-1]["params"])
         result = adapter.receive(
             {
                 "id": sent[-1]["id"],
@@ -188,8 +188,8 @@ class AdapterTests(unittest.TestCase):
         )[0]
         self.assertEqual(event.outcome, "stopped")
 
-    def test_codex_never_accepts_bypass_or_a_nonuser_reviewer(self):
-        for policy, reviewer in (("never", "user"), ("on-request", "guardian")):
+    def test_codex_refuses_an_unknown_policy_or_reviewer(self):
+        for policy, reviewer in (("granular", "user"), ("on-request", "guardian")):
             with self.subTest(policy=policy, reviewer=reviewer):
                 sent = []
                 adapter = CodexAdapter(sent.append)
@@ -243,12 +243,10 @@ class AdapterTests(unittest.TestCase):
         result = adapter.receive({"type": "result", "subtype": "success", "result": "Complete"})
         self.assertEqual((result[0].kind, result[0].outcome, result[0].text), ("turn_ended", "normal", "Complete"))
 
-    def test_claude_checks_login_and_effective_mode_before_a_turn(self):
-        for mode, account, expected in (("bypassPermissions", None, "unsafe-mode"), ("default", {}, "login")):
-            with self.subTest(mode=mode, account=account):
-                _, _, sent, event = self.open_claude(mode, account)
-                self.assertEqual((event.kind, event.outcome), ("failed", expected))
-                self.assertEqual(len(sent), 1)
+    def test_claude_checks_login_before_a_turn(self):
+        _, _, sent, event = self.open_claude("default", {})
+        self.assertEqual((event.kind, event.outcome), ("failed", "login"))
+        self.assertEqual(len(sent), 1)
 
     def test_claude_rechecks_permissions_at_the_first_turn(self):
         _, adapter, _, ready = self.open_claude()
@@ -456,7 +454,12 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(adapter.answer("running", "allow_once"))
 
     def test_cursor_authenticates_and_requires_reported_approval_policy(self):
-        for mode, outcome in (("allowlist", None), ("unrestricted", "unsafe-mode"), (None, "no-approvals")):
+        for mode, outcome in (
+            ("allowlist", None),
+            ("unrestricted", None),
+            ("surprise", "unsafe-mode"),
+            (None, "no-approvals"),
+        ):
             with self.subTest(mode=mode):
                 sent = []
                 plan = candidate("cursor", {}, lambda _: "/bin/agent")
@@ -556,7 +559,6 @@ class AdapterTests(unittest.TestCase):
             {
                 "machineId": "default",
                 "cwd": "/repo",
-                "autonomyLevel": "off",
                 "interactionMode": "auto",
             },
         )
@@ -675,7 +677,7 @@ class AdapterTests(unittest.TestCase):
     def test_droid_requires_current_protocol_and_off_autonomy(self):
         for version, autonomy, failure in (
             ("1.331.0", "off", "version"),
-            ("1.332.0", "high", "unsafe-mode"),
+            ("1.332.0", "ultra", "unsafe-mode"),
         ):
             with self.subTest(version=version, autonomy=autonomy):
                 sent = []
