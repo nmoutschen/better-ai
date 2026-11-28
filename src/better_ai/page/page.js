@@ -1137,7 +1137,8 @@ function pageDecisionEvents(decisions, conversation) {
   var events = (conversation || []).map(function (e, k) {
     var t = Math.max(Date.parse(e.at) / 1000 || 0, when[e.type === 'answer' ? e.decision : e.to] || 0);
     if (e.id) when[e.id] = t;
-    return Object.assign({}, e, { _t: t, _i: k });  // _i: its index in the log, which `read` counts in
+    // _i: its line in the log, which `read` counts in: the one the page's data gave it (page.log_records), else its place.
+    return Object.assign({}, e, { _t: t, _i: e._i != null ? e._i : k });
   });
   return events.concat(entries).sort(function (a, z) { return a._t - z._t || (z.type === 'decision') - (a.type === 'decision'); });
 }

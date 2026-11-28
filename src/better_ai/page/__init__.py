@@ -64,6 +64,7 @@ COMMON = "conversation.schema.json"
 LOG, SEEN, ADDRESS, TOKEN = "conversation.jsonl", ".conversation-seen", ".server", ".server-token"
 # The log index of the last event `pending` or `wait` showed the agent, which its statuses carry as `read`.
 READ = ".conversation-read"
+LINE = "_i"  # the line position (from 0) of an event that a page's data reads from the log, which `read` counts in
 TOKEN_HEADER = "X-Page-Token"
 OUT_OF_DATE = "page out of date: open the address the agent gave"  # what a page without the token is told; page.js shows it and keeps the typing
 MAX_BODY = 200_000
@@ -367,6 +368,11 @@ class Conversation:
                 event if isinstance(event, dict) else {}
             )  # keep the position, so indexes into the log stay right
         return events
+
+    def logged(self) -> list[dict]:
+        """The events that could be read, each with its line position in LINE, for data a page reads threads from
+        (see `log_records`)."""
+        return [{**e, LINE: n} for n, e in enumerate(self.events()) if e]
 
     def check(self, event: dict) -> None:
         """Raise EventError, with the validator's message, unless the event meets the shared conversation schema and
@@ -677,6 +683,13 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
 CONTROL = ("status", "accept", "accepted", "reopen", "delete")  # events that change a thread and start none
 
 
+def log_records(read: schema.Read) -> list[dict]:
+    """The records `schema.read_records` read from a conversation.jsonl, each with its line position in LINE. A status's
+    `read` is a line index, and the reader leaves out lines it cannot read: every reader whose records `threads` or
+    page.js `pageThreads` turn into threads goes through this, so a left-out line shifts no index."""
+    return [{**record, LINE: line - 1} for record, line in zip(read.records, read.lines, strict=True)]
+
+
 def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
     """The threads of a log, each in one state of the one machine every thread follows
     (.design/conversation-panel/states.md): page.js `pageThreads` gives the same threads for the same log, and
@@ -684,7 +697,8 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
     (the latest form of the event that started it), `messages`, `state` (`you`, `agent` or `done`), `step` (`new`,
     `seen` or `working`), `closed_by_user`, `deleted`, `since` (when the state or step was set), `user_at` (the log
     index of the user's latest event) and `last` (the time of its last message). An agent status counts only if its
-    `read` covers the user's latest event in the thread; one without `read` counts (logs before `read`)."""
+    `read` covers the user's latest event in the thread; one without `read` counts (logs before `read`). An event's
+    index is its place in EVENTS, or its LINE when it has one (`log_records`)."""
     found: list[dict] = []
     by_id: dict[str, dict] = {}
     home: dict[str, str] = {}
@@ -693,9 +707,11 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
     def thread_of(ident: Any) -> dict | None:
         return by_id.get(home.get(ident, ident)) if isinstance(ident, str) else None
 
-    for i, e in enumerate(events):
+    for index, e in enumerate(events):
         if not isinstance(e, dict) or not e.get("type"):
             continue  # a line the log could not read keeps its place, and is no event
+        line = e.get(LINE)
+        i = line if isinstance(line, int) and not isinstance(line, bool) else index  # see log_records
         kind, ident, at, read = e.get("type"), e.get("id"), e.get("at"), agent_read
         user = e.get("by") == "user"
         item = user and kind in item_types
@@ -775,10 +791,10 @@ def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tup
     call these."""
     found = []
     for t in threads(events, item_types):
-        held = [m for m in t["messages"] if m.get("by") == "user" and m.get("type") in item_types]
+        held = [m for m in t["messages"] if m.get("by") == "user" and m.get("type") in (*item_types, "reopen")]
         if t["deleted"] or not held:
             continue
-        root = t["root"]
+        root = {k: v for k, v in t["root"].items() if k != LINE}
         extra: dict[str, Any] = {"step": t["step"], "since": t["since"], "closed_by_user": t["closed_by_user"]}
         if root.get("type") == "closed":  # the worker cannot read the page: say which question the user replied about
             extra["about"] = f"{root.get('by')} closed {root.get('question')} as {root.get('status')}"

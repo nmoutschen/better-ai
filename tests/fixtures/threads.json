@@ -288,6 +288,14 @@
    {"id": "m1", "state": "agent", "step": "new", "closedByUser": false},
    {"id": "m2", "state": "agent", "step": "new", "closedByUser": false}
   ]},
+ {"name": "transition: you reopen a report the agent posted on its own",
+  "log": [
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "reopen", "to": "r1", "text": "why", "by": "user"}
+  ],
+  "threads": [
+   {"id": "r1", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "transition: you confirm a thread the agent finished",
   "log": [
    {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
