@@ -4,6 +4,7 @@ description: Takes questions from a shared research board, researches them in th
 capabilities: [search and read the board's collections, read files, run commands]
 edits: true
 model: cheaper
+model_reason: A design choice to save cost; verifiers check each claim it records against its source.
 ---
 
 # Agent: worker

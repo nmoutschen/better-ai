@@ -4,6 +4,7 @@ description: Checks that a quote an analyst added as evidence occurs in the raw 
 capabilities: [use web tools, run commands, read files, write files, use the connectors the sources name]
 edits: true
 model: cheaper
+model_reason: A design choice to save cost; it checks that a quote occurs in its source, which needs no judgement.
 ---
 
 # Agent: quote-verifier

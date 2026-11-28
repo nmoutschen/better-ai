@@ -62,7 +62,7 @@ KEEP the list short and focused. DO NOT replace it with a long generic checklist
 
 ### 2.1. Use a separate reviewer
 
-IF you can start a sub-agent, GIVE a reviewer the work, the GOALS, what the work answers to, the decisions already made and the list from section 1.3, with [templates/review-brief.md](templates/review-brief.md). DO NOT give it your reasoning, your conversation with the user, or your verdict, such as a note that the work is done or correct: what the author says about the work pulls a reviewer toward accepting it. DO NOT give it an earlier reviewer's findings, scores or verdict either: they pull its judgement toward theirs, even when it is told to ignore them. IF you can choose its model, CHOOSE the most capable model available, and a different model from the one that made the work when one is as capable: a model misses errors in its own output that it catches in someone else's. The reviewer reports findings and does not change the work. CONFIRM its findings by section 3 and APPLY section 4 yourself: in a controlled test, about two in three findings from a fresh-context reviewer were false.
+IF you can start a sub-agent, GIVE a reviewer the work, the GOALS, what the work answers to, the decisions already made and the list from section 1.3, with [templates/review-brief.md](templates/review-brief.md). DO NOT give it your reasoning, your conversation with the user, or your verdict, such as a note that the work is done or correct: what the author says about the work pulls a reviewer toward accepting it. DO NOT give it an earlier reviewer's findings, scores or verdict either: they pull its judgement toward theirs, even when it is told to ignore them. IF you can choose its model, CHOOSE the one the reviewer's agent file names in its `model` field, OTHERWISE the most capable model available. AMONG models as capable as that one, CHOOSE one other than the model that made the work: a different model finds partly different errors, though none is shown to review better than a more capable model. IF the user names a model for a review, for this run or for the skill, USE it instead. The reviewer reports findings and does not change the work. CONFIRM its findings by section 3 and APPLY section 4 yourself: in a controlled test, about two in three findings from a fresh-context reviewer were false.
 
 OTHERWISE, REVIEW in a separate pass after the work is done: RE-READ the GOAL and the list first, THEN read the work as if someone else made it. DO NOT review the same work a second time in the same conversation: a second review there does clearly worse than a review from a fresh context.
 
@@ -124,7 +124,7 @@ ORDER findings by their effect on the GOAL of the work. LABEL each one **blockin
 
 ### 4.4. Report
 
-USE `/write-better` if available, OTHERWISE plain words. LEAD with whether the work reaches its GOAL, and what blocks it if not. THEN LIST the fixes you made, the findings, the questions and choices for the author, and the unconfirmed findings. END with what you did not read, run or check.
+USE `/write-better` if available, OTHERWISE plain words. LEAD with whether the work reaches its GOAL, and what blocks it if not. THEN LIST the fixes you made, the findings, the questions and choices for the author, and the unconfirmed findings. END with which model ran each review, or that you could not choose it, and what you did not read, run or check.
 
 DISTINGUISH three things, and DO NOT claim one from another: the work meets its requirements, the checks you ran pass, and the author accepts the work.
 

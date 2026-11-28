@@ -4,6 +4,7 @@ description: Runs a throwaway proof of concept that answers questions a design r
 capabilities: [read files, run commands, write files]
 edits: false
 model: same
+model_reason: It reports what code did when run, not a judgement of the design, and no eval compares models on it.
 ---
 
 # Agent: proof-of-concept

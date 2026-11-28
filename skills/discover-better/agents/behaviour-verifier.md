@@ -4,6 +4,7 @@ description: Reads the behaviours of a discovery and their testable forms, and h
 capabilities: [read files]
 edits: false
 model: cheaper
+model_reason: A design choice to save cost; it reports ambiguity, and the coordinator words each finding itself.
 ---
 
 # Agent: behaviour-verifier

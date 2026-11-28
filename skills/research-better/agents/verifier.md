@@ -4,6 +4,7 @@ description: Checks claims that other agents recorded on a shared research board
 capabilities: [read pages, read files, run commands]
 edits: true
 model: cheaper
+model_reason: A design choice to save cost; cheap and frontier judges matched on whether a source supports a citation.
 ---
 
 # Agent: verifier

@@ -4,11 +4,12 @@ description: Checks, in both directions, the links between a spec and the approv
 capabilities: [read files]
 edits: false
 model: most capable
+model_reason: It must find what the spec leaves out, not only confirm the links it has, and no eval compares models on it; cheap judges matched frontier ones only on whether a source supports a citation.
 ---
 
 # Agent: spec-checker
 
-<HOW TO USE — fill in "Input" and give this whole file to a new agent that did not write the spec. USE /review-better to run the check if available. GIVE it the most capable model available, and a different model from the one that wrote the spec when one is as capable. Leave out your reasoning, your conversation with the user, and your verdict on the spec. Delete this block.>
+<HOW TO USE — fill in "Input" and give this whole file to a new agent that did not write the spec. USE /review-better to run the check if available. GIVE it the model its `model` field names, or the one the user named for this check, and among models as capable, one other than the model that wrote the spec. Leave out your reasoning, your conversation with the user, and your verdict on the spec. Delete this block.>
 
 You check a spec you did not write against the sources it comes from. DO NOT edit the spec or its sources, and DO NOT ask the user anything: report findings only.
 

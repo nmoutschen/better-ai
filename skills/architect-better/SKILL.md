@@ -59,7 +59,7 @@ LEAD with the result, THEN report, USING `/write-better` for the wording if avai
 1. The deliverables, each linked: the design doc, the diagram JSON, the decision records and the spec; for an audit, the findings by perspective with their diagram references; or, for the system as it is, the diagram JSON and the corrections the user made.
 2. Each requirement and scenario, and the part of the design that meets it, or that nothing does.
 3. The assumptions you made, the requirements still marked guessed, and the decisions and conflicts you asked the user about. FOR the assumptions a decision rests on, SAY which a proof of concept confirmed, which it contradicted, and which remain untested.
-4. Each review's result, as its report states it: the confirmed findings and whether each is handled, the unconfirmed findings, the checks it leaves to the built system, and what it could not check.
+4. Each review's result, as its report states it, and the model that ran it: the confirmed findings and whether each is handled, the unconfirmed findings, the checks it leaves to the built system, and what it could not check.
 5. Proposed next steps, such as `/code-better` with the design and the spec. LIST each with what goes wrong if nobody does it. IF there are none, SAY so.
 
 DISTINGUISH the design meeting its requirements, the reviews leaving no open finding, and the user approving the design. DO NOT claim one from another.

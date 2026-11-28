@@ -4,6 +4,7 @@ description: Looks for evidence for and against the items of a discovery, or run
 capabilities: [search the web, read pages, read files, use the connectors named, run commands]
 edits: true
 model: cheaper
+model_reason: A design choice to save cost; the coordinator checks each quote it adds with a quote verifier.
 ---
 
 # Agent: analyst
