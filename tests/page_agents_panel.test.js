@@ -24,7 +24,7 @@ const TEXT = {
   stopped: 'All agents are stopped. Press Start to have them read your messages.',
   login: "All agents are stopped because Claude Code isn't logged in. Log in from a terminal, then press Start.",
   closed: 'This page is closed after 30 minutes with no activity. Ask the agent in your chat to reopen it.',
-  driver: "The page's agents stopped because of an error: boom. Ask the agent in your chat to serve this page again. Log: /tmp/u/.driver.log.",
+  driver: "The page's agents stopped because of an error: boom. Ask the agent in your chat to serve this page again.\nLog: /tmp/u/.driver.log.",
   down: "The page's agent driver stopped. Ask the agent in your chat to serve this page again.",
   tab: 'This tab is no longer connected. Use the newer tab, or ask the agent in your chat to reopen the page.',
   blocked: 'Auto mode blocked Bash rm -rf build (the command deletes files). Run it yourself, or tell the agent how to go on.',
@@ -690,6 +690,17 @@ test('N3: after a redraw the focus goes back to the new copy of the row the pop-
   page.doc.body.append(fresh);
   fire(page.doc, page.dialog().querySelectorAll('button')[1], 'keydown', { key: 'Escape' });
   assert.equal(page.doc.activeElement, fresh);
+});
+
+test('S166: the driver error\'s log path is on a line of its own, in the Agents section and in the pinned bar', async () => {
+  const page = boot({ width: 800 });
+  await page.show(body({ state: 'failed', kind: 'driver', text: TEXT.driver }));
+  assert.ok(page.agentsHtml().includes(page.escaped(TEXT.driver)));
+  assert.equal(page.pinbar().querySelector('.pinbar-text').textContent, TEXT.driver);
+  // The line break in the text is kept where the notice is drawn.
+  const css = read('page', 'page.css');
+  assert.match(css, /\.agents \.notice div \{[^}]*white-space:pre-line/);
+  assert.match(css, /\.pinbar-text \{[^}]*white-space:pre-line/);
 });
 
 test('N4: the notice is one status region at every width', async () => {

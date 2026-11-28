@@ -1001,6 +1001,73 @@ class RoundTwoTests(Case):
             "Ask the agent in your chat to serve this page from another harness.",
         )
 
+    def test_each_runtime_failure_gives_the_state_then_the_action_with_one_value_at_most_S166(self):
+        # T9's open notices: version, unsafe-mode, not-installed, no-harness and protocol said only the action.
+        driver = self.driver(harness="claude")
+        for kind, message, expected in (
+            (
+                "version",
+                "Claude Code 2.0.1 is older than 2.1.0",
+                "All agents are stopped because the harness version is not supported: Claude Code 2.0.1 is older than "
+                "2.1.0. Update the harness, then serve again.",
+            ),
+            (
+                "version",
+                "",
+                "All agents are stopped because the harness version is not supported. Update the harness, then serve "
+                "again.",
+            ),
+            (
+                "unsafe-mode",
+                "bypassPermissions",
+                "All agents are stopped because the harness runs in an approval mode the page cannot use: "
+                "bypassPermissions. Change the harness's approval mode, then serve again.",
+            ),
+            (
+                "not-installed",
+                "[Errno 2] No such file or directory: 'claude'",
+                "All agents are stopped because Claude Code is not installed. Install it, then serve again.",
+            ),
+            (
+                "no-harness",
+                "",
+                "All agents are stopped because no supported harness was found. Start a harness this machine can "
+                "drive, then serve again.",
+            ),
+            (
+                "protocol",
+                "",
+                "All agents are stopped because the harness protocol is unknown. Update better-ai, or use a version it "
+                "was tested with.",
+            ),
+        ):
+            with self.subTest(kind=kind, message=message):
+                self.assertEqual(driver._text("failed", {"kind": kind, "message": message}), expected)
+
+    def test_an_empty_message_leaves_no_empty_value_in_a_notice_S166(self):
+        driver = self.driver()
+        for kind in ("crashed", "limit", "protocol", "version", "unsafe-mode"):
+            with self.subTest(kind=kind):
+                text = driver._text("failed", {"kind": kind, "message": ""})
+                self.assertNotIn(": .", text)
+                self.assertNotIn(":  ", text)
+                self.assertTrue(text.startswith("All agents are stopped because"), text)
+        self.assertEqual(
+            driver._text("failed", {"kind": "crashed", "message": "", "again": True}),
+            "The same error came back. Fix it in a terminal, then press Start.",
+        )
+        self.assertEqual(driver._text("closed", {"message": ""}), "This page has closed.")
+
+    def test_the_driver_error_gives_the_log_on_a_line_of_its_own_S166(self):
+        # One value per sentence: the error in the notice, the log path on its own line.
+        driver = self.driver()
+        text = driver._text("failed", {"kind": "driver", "message": "boom", "log": "/tmp/u/.driver.log"})
+        self.assertEqual(
+            text,
+            "The page's agents stopped because of an error: boom. Ask the agent in your chat to serve this page again."
+            "\nLog: /tmp/u/.driver.log.",
+        )
+
     def test_stopping_and_stalled_have_their_fixed_text(self):
         # D10
         driver = self.driver()
