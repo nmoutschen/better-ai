@@ -27,6 +27,8 @@ import better  # noqa: E402
 from test_page_cli_v2 import NOTE, SHOW, UUID, Unit, alive, stub_env, wait_for  # noqa: E402
 from test_page_pairing_v2 import Browser, rpc  # noqa: E402
 
+from better_ai.page import threads  # noqa: E402
+
 CLOCK_BOOT = """
 import os, pathlib, time
 from better_ai.page import driver
@@ -533,6 +535,36 @@ class ReadInASessionTest(Unit):
         body = self.agent()
         self.assertNotEqual(body["state"], "failed", body)
         self.assertEqual((body["approvals"], body["blocked"], body.get("problems", [])), ([], [], []))
+
+    def prompts(self):
+        found = []
+        for line in self.dump.read_text().splitlines() if self.dump.exists() else []:
+            if line.startswith("{"):
+                message = json.loads(line)
+                if message.get("type") == "user":
+                    content = message["message"]["content"]
+                    found.append(content if isinstance(content, str) else "".join(p.get("text", "") for p in content))
+        return found
+
+    def test_a_thread_the_turn_did_not_carry_stays_not_seen_and_comes_next(self):  # thread.tla A2, NoLostWrite
+        """The user starts a thread the turn does not carry, then writes in the turn's own one: pending in the session
+        gives a --read that stops before the new thread, which stays Not seen yet and comes in the next turn."""
+        self.assertTrue(wait_for(lambda: self.agent()["approvals"], 30))
+        (asked,) = self.agent()["approvals"]
+        status, text = self.request("POST", "/rpc", rpc("note", note("m2", "a new point")), self.secret)
+        self.assertEqual(json.loads(text).get("result"), "saved", text)
+        more = {**note("m1-more", "and make it blue"), "to": "m1"}
+        status, text = self.request("POST", "/rpc", rpc("note", more), self.secret)
+        self.assertEqual(json.loads(text).get("result"), "saved", text)
+        self.request("POST", "/rpc", rpc("permission_answer", {"id": asked["id"], "choice": "allow_once"}), self.secret)
+        self.assertTrue(wait_for(lambda: len(self.answers()) == len(self.commands), 30), self.answers())
+        # m2 came before m1-more: a --read that covered m1-more would cover m2 too, so both replies are refused.
+        self.assertEqual([a["exit"] for a in self.answers()], [0, 1, 0, 1])
+        log = [json.loads(line) for line in (self.folder / "conversation.jsonl").read_text().splitlines()]
+        found = {t["id"]: (t["state"], t["step"]) for t in threads(log, ("note",))}
+        self.assertEqual(found["m2"], ("agent", "new"), "m2 was never shown to the agent")
+        self.assertTrue(wait_for(lambda: len(self.prompts()) >= 2, 20), self.prompts())
+        self.assertIn('"id": "m2"', self.prompts()[1])
 
 
 class LinkTest(Browser):

@@ -85,7 +85,13 @@ class DeliveryTest(shell.Fixture):
         )
         with mock.patch.dict(os.environ, {"BETTER_PAGE_SESSION": "unrelated"}):
             code, out, err = self.cli("pending", self.unit_arg)
-        self.assertEqual((code, out, err), (0, "0 not done. Pass --read 3 to status and reply.\n", ""))
+        # Outside the turn's session, pending lists every thread that is the agent's turn (D31).
+        self.assertEqual((code, err), (0, ""))
+        lines = out.splitlines()
+        self.assertEqual(
+            [(i["id"], i["status"]) for i in map(json.loads, lines[:-1])], [("m1", "working"), ("m2", "seen")]
+        )
+        self.assertEqual(lines[-1], "2 not done. Pass --read 3 to status and reply.")
 
     def test_driver_pending_keeps_exact_turn_after_late_user_input(self):
         from test_page_driver import Peer
@@ -123,14 +129,14 @@ class DeliveryTest(shell.Fixture):
         records = [{k: v for k, v in r.items() if k != "since"} for r in map(json.loads, out.splitlines()[:-1])]
         expected = [{**item, "status": {0: "working", 1: "seen"}.get(n, "new")} for n, item in enumerate(sent[:-1])]
         # The turn keeps its items, and m21, sent since, stays for a later turn. The user's writes since in the turn's
-        # own threads are shown, with a --read that covers them, as a --read before them is refused (D12): the agent
-        # sent here by that refusal reads them, then sends again. A note sent again keeps its first text (page
-        # `threads`: only a comment is edited).
+        # own threads are shown, as a --read before them is refused (D12): the agent sent here by that refusal reads
+        # them, then sends again. Its --read stops before m21, which it is not shown (thread.tla A2). A note sent again
+        # keeps its first text (page `threads`: only a comment is edited).
         answer = self.log()[len(sent) + 2]
         thread = [{"from": "user", "at": answer["at"], "text": "later-answer", "id": "later-answer"}]
         expected[0] = {**expected[0], "thread": thread}
         self.assertEqual(records, [*expected, sent[-1]])
-        self.assertEqual(out.splitlines()[-1], f"21 not done. Pass --read {len(sent) + 2} to status and reply.")
+        self.assertEqual(out.splitlines()[-1], f"21 not done. Pass --read {len(sent) - 1} to status and reply.")
 
     def test_an_rpc_edit_reaches_pending_only_while_the_item_is_not_settled(self):
         _, host = self.serve()
@@ -152,13 +158,14 @@ class DeliveryTest(shell.Fixture):
                 ),
                 "saved",
             )
-        # An edit of a working item is delivered; one of an asked, done or accepted item is not (S15, S58).
+        # pending lists every thread that is the agent's turn (D31): the edit of a working item in its latest form; an
+        # asked, done or accepted item, edited or not, is not listed.
         code, out, err = self.cli("pending", self.unit_arg)
         self.assertEqual((code, err), (0, ""))
         lines = out.splitlines()[:-1]
         self.assertEqual(
             [(item["id"], item["status"], item["text"]) for item in map(json.loads, lines)],
-            [("c1", "working", "edited working")],
+            [("c1", "working", "edited working"), ("c5", "working", "stale")],
         )
         self.assertEqual(self.conv.delivery(after=len(self.log())).items, [])
 
@@ -292,6 +299,7 @@ class ReadTest(shell.Fixture):
         later = note("m1")
         self.seed(later)
         driver.enqueue(later)
+        eventually(lambda: "m1" in driver._admitted_items)  # the page's own write is admitted before the turn ends
         peer.events.put(Event("turn_ended", outcome="completed"))
         eventually(lambda: len(peer.prompts) == 2)
         line = next(n for n, e in enumerate(self.log()) if e["id"] == "unadmitted")
