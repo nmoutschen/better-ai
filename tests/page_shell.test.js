@@ -214,7 +214,7 @@ function stripsOn(extra, fetchAnswer, ids = {}, more = {}) {
     classList: { toggle() {}, add() {}, remove() {} }, addEventListener() {}, querySelector() { return el(); },
     querySelectorAll() { return []; }, replaceChildren() {}, append() {}, appendChild() {}, focus() {}, setAttribute() {},
   }, more);
-  const els = { '.offline': el({ hidden: true }), '.unwatched': el({ hidden: true }), '#note': el(), '.thread': el(), '.notes .empty': el(),
+  const els = { '.offline': el({ hidden: true }), '#note': el(), '.thread': el(), '.notes .empty': el(),
     '.toast': el({ hidden: true }), '.notes .status': el() };
   const timers = [];
   const globals = {
@@ -229,32 +229,6 @@ function stripsOn(extra, fetchAnswer, ids = {}, more = {}) {
   const round = async () => { await flush(); await flush(); const due = timers.splice(0); due.forEach(f => f()); await flush(); await flush(); };
   return { els, round, conversation, context, flush: async () => { await flush(); await flush(); await flush(); } };
 }
-
-test('a page that does not stream shows the not-watching strip when /listening says false', async () => {
-  const page = stripsOn({ stream: false }, url => url === '/listening' ? Promise.resolve({ json: () => Promise.resolve(false) }) : Promise.reject(new Error('unexpected ' + url)));
-  await page.round();
-  assert.equal(page.els['.unwatched'].hidden, false);
-  assert.equal(page.els['.offline'].hidden, true);
-});
-
-test('a page that does not stream shows the closed strip after two failed fetches, not one', async () => {
-  const page = stripsOn({ stream: false }, () => Promise.reject(new Error('down')));
-  await page.flush();
-  assert.equal(page.els['.offline'].hidden, true);  // once is a blip
-  await page.round();
-  assert.equal(page.els['.offline'].hidden, false);
-});
-
-test('a page that does not stream hides the closed strip again once the server answers', async () => {
-  let up = false;
-  const page = stripsOn({ stream: false }, () => up ? Promise.resolve({ json: () => Promise.resolve(true) }) : Promise.reject(new Error('down')));
-  await page.round(); await page.round();
-  assert.equal(page.els['.offline'].hidden, false);
-  up = true;
-  await page.round();
-  assert.equal(page.els['.offline'].hidden, true);
-  assert.equal(page.els['.unwatched'].hidden, true);
-});
 
 test('an answered decision the agent applied says answered by you and hides the default line', () => {
   const t = decision(load({ agent: 'coordinator', capabilities: ['decisions'] }));
@@ -562,24 +536,11 @@ test('an unreadable design canvas stops recovery polling and ignores pending rev
   assert.equal(canvas.strip.hidden, false);
 });
 
-test('a page that does not stream stays out of date once any request was refused, whatever /listening says later', async () => {
+test('a page that does not stream stays out of date once any request was refused', async () => {
   const where = fragment('#t=old');
-  const page = stripsOn({ stream: false }, url => url === '/listening' ? answerWith(true) : answer(401), {}, where.globals);
+  const page = stripsOn({ stream: false }, () => answer(401), {}, where.globals);
   await page.context.pageFetch('/data').catch(() => {});
   await page.round(); await page.round();
-  assert.equal(page.els['.offline'].hidden, false);
-  assert.equal(page.els['.offline'].textContent, 'page out of date: open the address the agent gave');
-});
-
-test('a page out of date shows only the out of date strip: /listening goes through pageFetch, and the not-watching note stays hidden', async () => {
-  const where = fragment('#t=old'), sent = [];
-  const page = stripsOn({ stream: false }, (url, init) => { sent.push([url, ((init || {}).headers || {})['X-Page-Token']]);
-    return url === '/listening' ? answerWith(false) : answer(401); }, {}, where.globals);
-  await page.round();
-  assert.deepEqual(sent.find(x => x[0] === '/listening'), ['/listening', 'old']);  // with the token, as every request of the page
-  await page.context.pageFetch('/data').catch(() => {});
-  await page.round(); await page.round();
-  assert.equal(page.els['.unwatched'].hidden, true);
   assert.equal(page.els['.offline'].hidden, false);
   assert.equal(page.els['.offline'].textContent, 'page out of date: open the address the agent gave');
 });

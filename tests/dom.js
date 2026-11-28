@@ -167,7 +167,6 @@ function shellDocument() {
       make('p', { class: 'empty', id: 'empty', text: 'Nothing yet.' }),
       make('ol', { class: 'thread', id: 'thread' }),
       make('form', { class: 'composer', id: 'noteform' }, [
-        make('p', { class: 'unwatched', id: 'unwatched' }),
         make('textarea', { id: 'note' }),
         make('div', { class: 'send' }, [make('button', { type: 'submit', class: 'btn', text: 'Send' }), make('p', { class: 'status' })])])]),
     make('div', { class: 'toast', id: 'toast' }));

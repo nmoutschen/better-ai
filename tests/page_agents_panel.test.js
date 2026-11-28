@@ -49,7 +49,7 @@ function build(doc, o) {
         x('div.notes-top', {}, x('h2#notes-h', {}, 'Conversation'),
           x('div.seg', {}, x('button', { 'data-filter': 'all', 'aria-pressed': 'false' }, 'All'), x('button', { 'data-filter': 'open', 'aria-pressed': 'true' }, 'Open'))),
         x('p.empty#empty'), x('ol.thread#thread'),
-        x('form.composer#noteform', {}, x('p.unwatched#unwatched', { hidden: true }), x('label', {}, 'Message'), x('textarea#note'),
+        x('form.composer#noteform', {}, x('label', {}, 'Message'), x('textarea#note'),
           x('div.send', {}, x('button.btn', { type: 'submit' }, 'Send'), x('p.status'))))),
     x('div.pop', { role: 'dialog', 'aria-label': 'Comment', hidden: true }, x('p.target'), x('textarea'), x('div.row2', {}, x('button.btn.ok', {}, 'Send'), x('button.btn.btn--quiet.cancel', {}, 'Cancel'), x('button.btn.btn--quiet.remove', {}, 'Delete'))),
     x('div.toast#toast', { hidden: true }), config, title);
@@ -253,10 +253,9 @@ test('S163: the agents state replaces the empty text in the Agents section, and 
   // Nothing about the agents under the Conversation heading: no state line, no strip of the old design.
   const conversation = page.doc.querySelector('.notes > .notes-top');
   assert.equal(conversation.textContent, 'ConversationAllOpen');
-  assert.ok(page.doc.querySelector('.unwatched').hidden);
   assert.equal(page.doc.getElementById('thread').textContent, '');
   const shell = read('page', 'shell.html');
-  assert.doesNotMatch(shell, /agent-status|agent-controls|approval tab/);
+  assert.doesNotMatch(shell, /agent-status|agent-controls|approval tab|unwatched/);
 });
 
 test('S163: a page without an Agents section gets the same one, with the same notice', async () => {

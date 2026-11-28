@@ -216,7 +216,7 @@ class ShellTest(Fixture):
     def strips(self, agent):
         text = page.shell(fixture_spec(agent))
         found = {}
-        for name in ("offline", "unwatched"):
+        for name in ("offline",):
             start = text.index(f'id="{name}"')
             start = text.index(">", start) + 1
             found[name] = text[start : text.index("</p>", start)]
@@ -225,11 +225,8 @@ class ShellTest(Fixture):
     def test_the_strips_are_the_same_text_for_every_page_except_the_role_S45(self):
         # No agent is listening: the strips are hidden but their text is what the page shows when it needs them.
         a, b = self.strips("coordinator"), self.strips("architect")
-        self.assertEqual(a["unwatched"].replace("coordinator", "ROLE"), b["unwatched"].replace("architect", "ROLE"))
         self.assertEqual(a["offline"].replace("coordinator", "ROLE"), b["offline"].replace("architect", "ROLE"))
-        self.assertIn("is not watching this page", a["unwatched"])
         self.assertIn("is closed", a["offline"])
-        self.assertNotEqual(a["unwatched"], b["unwatched"])
 
     def test_shell_holds_head_header_conversation_and_both_strips(self):
         text = page.shell(self.spec)
@@ -239,9 +236,9 @@ class ShellTest(Fixture):
             "<header",
             'class="notes"',
             'class="offline"',
-            'class="unwatched"',
         ):
             self.assertIn(part, text)
+        self.assertNotIn("unwatched", text)  # no not-watching notice: every served page has its own agent
         self.assertIn(FIXTURE_MAIN, text)
         self.assertIn('<script src="/fixture.js">', text)
         self.assertNotIn("%%", text)

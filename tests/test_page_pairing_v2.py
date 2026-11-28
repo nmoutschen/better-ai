@@ -525,10 +525,13 @@ class StaticTest(unittest.TestCase):
         for name in ("ApprovalGate", "Request"):
             self.assertFalse(hasattr(approvals, name), name)
 
-    def test_the_page_never_asks_listening_in_a_driven_session(self):  # S152
+    def test_the_page_never_asks_listening_and_has_no_not_watching_notice(self):  # S152
         source = (ROOT / "src" / "better_ai" / "page" / "page.js").read_text()
-        self.assertIn("if (!pageDriven) (function watch() {\n      pageFetch('/listening')", source)
+        self.assertNotIn("/listening", source)  # every served page has its own agent: none is undriven
+        self.assertNotIn("unwatched", source)
         self.assertIn("pageFetch('/agent'", source)
+        for name in ("shell.html", "page.css"):
+            self.assertNotIn("unwatched", (ROOT / "src" / "better_ai" / "page" / name).read_text(), name)
 
 
 class ServedTest(Browser):

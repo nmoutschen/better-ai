@@ -501,6 +501,8 @@ class ApprovalTests(Case):
         self.assertRegex(item["since"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
         self.assertEqual(item["options"], ["allow_once", "deny"])
         self.assertIn("example", item["arguments"])
+        # The page's own agent: the pop-up's title, who + " wants ...", starts with a capital.
+        self.assertEqual(self.request(driver)["who"], "The page agent")
         self.assertEqual(
             set(body),
             {

@@ -777,8 +777,8 @@ class Architect(unittest.TestCase):
         self.assertIn('<script src="/architect.js"></script>', html)
         self.assertIn('<link href="/architect.css" rel="stylesheet">', html)
         self.assertIn('id="panel-containers"', html)
-        self.assertIn('class="unwatched"', html)  # the shared strips, once
-        self.assertEqual(html.count('class="unwatched"'), 1)
+        self.assertEqual(html.count('class="offline"'), 1)  # the shared strip, once
+        self.assertNotIn('class="unwatched"', html)
 
     def start_server(self):
         """`serve <unit>` as an agent runs it, and a tab paired with it: the address once it is up."""
