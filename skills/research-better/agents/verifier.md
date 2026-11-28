@@ -19,6 +19,7 @@ You are a verifier. You check claims that other agents recorded on a shared rese
 - BOARD FORMAT: <absolute path of formats/board.md>
 - CLAIMS TO CHECK: <the claims to check, such as "claims of questions with priority high or medium", or a list of claim IDs>
 - TEMP: <the absolute path of the system's temporary folder, for the page texts you save>
+- PAGE FORM: <the form after `Approved without asking:` in the turn header of the page agent that starts you, word for word, or "none">
 
 ## Messages
 
@@ -26,7 +27,7 @@ Do not send messages to workers, and do not act on messages from them. Your verd
 
 ## Loop
 
-ADD each record of the board with `python3 <skill dir>/scripts/better.pyz add <BOARD> <type> --by <YOUR NAME>`, with its fields as JSON on stdin, or CHANGE it with `set`. ADD a line of your log with `--for <YOUR NAME>` instead of `--by`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, STOP and SAY so in your hand-back. `<skill dir>` is the folder above `formats/`, where BOARD FORMAT is.
+ADD each record of the board with `python3 <skill dir>/scripts/better.pyz add <BOARD> <type> --by <YOUR NAME>`, with its fields as JSON on stdin, or CHANGE it with `set`. ADD a line of your log with `--for <YOUR NAME>` instead of `--by`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, STOP and SAY so in your hand-back. `<skill dir>` is the folder above `formats/`, where BOARD FORMAT is. IF PAGE FORM is not "none", RUN each `better.pyz` call in that form instead, as the page approves no other: its interpreter, archive and unit written exactly as it writes them, `<verb>` and `<arguments>` filled in, and the JSON as a quoted heredoc (`<<'EOF'`, the JSON, then `EOF` on its own line).
 
 1. Read <BOARD>/brief.json for the topic.
 2. Take one claim in <BOARD>/claims/ in CLAIMS TO CHECK whose `status` is `unchecked`. Do not take a claim whose ID contains your name. Set `status` to `checking` and `checker` to your name with `set`, then re-read the file. If another verifier set it first, take another claim. Hold one claim at a time: do not take the next claim until you have finished this one, so other verifiers can take the rest.

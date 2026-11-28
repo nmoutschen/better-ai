@@ -57,9 +57,11 @@ class Pairing:
             return origin == self.origin and self.matches(secret, self.secret)
 
 
-# Only these literal shell words are accepted outside the quoted heredoc.
-# They are the characters shlex.quote leaves bare, so a path that needs no quoting is a word; one that does is never approved.
-WORD = re.compile(r"[A-Za-z0-9_@%+=:,./-]+")
+# Only these shell words are accepted outside the quoted heredoc: a bare word of the characters shlex.quote leaves
+# bare, or a word as shlex.quote writes one it quotes ('...', with each ' written as '"'"'). The interpreter, archive and
+# unit must be exactly shlex.quote of their paths; every other word must be bare.
+WORD = re.compile(r"[A-Za-z0-9_@%+=:,./-]+|'[^']*'(?:\"'\"'[^']*')*")
+BARE = re.compile(r"[A-Za-z0-9_@%+=:,./-]+")
 IDENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
 TAG = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,31}")
 FLAGS = {
@@ -86,7 +88,7 @@ def verbs_of(skill_verbs):
 def approved_form(command, unit, verbs):
     """The one sentence that says which command is approved without asking: the turn's header and the denial hold it."""
     return (
-        f"{command} <verb> {unit} <arguments>, where <verb> is one of {', '.join(verbs_of(verbs))}, "
+        f"{command} <verb> {shlex.quote(str(unit))} <arguments>, where <verb> is one of {', '.join(verbs_of(verbs))}, "
         "text only as a quoted heredoc (<<'EOF', the text, then EOF on its own line), "
         "and --by or --for naming an agent other than user"
     )
@@ -134,8 +136,8 @@ def shell_request(harness, tool, arguments):
 
 
 def own_call(command, archive):
-    """Whether a shell command names the driver's own better.pyz by its absolute path."""
-    return isinstance(command, str) and str(archive) in command
+    """Whether a shell command names the driver's own better.pyz by its absolute path, as it is or quoted."""
+    return isinstance(command, str) and (str(archive) in command or shlex.quote(str(archive)) in command)
 
 
 def verb_command(command, unit, archive, verbs, interpreter=None):
@@ -164,10 +166,11 @@ def verb_command(command, unit, archive, verbs, interpreter=None):
         return False
     first, script, verb, target, *args = words
     if (
-        first != (interpreter or sys.executable)
-        or script != str(archive)
-        or target != str(unit)
+        first != shlex.quote(interpreter or sys.executable)
+        or script != shlex.quote(str(archive))
+        or target != shlex.quote(str(unit))
         or verb not in verbs_of(verbs)
+        or not all(BARE.fullmatch(arg) for arg in args)
     ):
         return False
     positional = []

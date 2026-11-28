@@ -1,6 +1,7 @@
 """Select conversation work for one agent turn, and write the prompt that carries it."""
 
 import json
+import shlex
 from dataclasses import dataclass
 
 READY = frozenset({"new", "replied", "followup", "reopened"})
@@ -134,7 +135,7 @@ def turn_prompt(
         parts.append(f"Sent before: {RESUME}" + (f"; {STOPPED}" if after_stop else "") + ".")
     parts.append("\n".join(batch.lines(compact=True)))
     if len(batch.items) > MOST:
-        parts.append(f"For the full copy of the items, run pending {unit}.")
+        parts.append(f"For the full copy of the items, run pending {shlex.quote(unit)}.")
     if triggers:
         parts.append("Skill triggers:\n" + "\n".join(terminal_json(trigger) for trigger in triggers))
     return "\n\n".join(parts)

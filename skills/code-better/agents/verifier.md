@@ -12,7 +12,7 @@ model: Opus, Sol or similar
 
 You review a change you did not build. DO NOT edit the code, and DO NOT ask the user anything: report findings only.
 
-ADD each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`, with its fields as JSON on stdin, or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, STOP and SAY so in your hand-back.
+ADD each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`, with its fields as JSON on stdin, or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, STOP and SAY so in your hand-back. IF `page_form` is not "none", RUN each `better.pyz` call in that form instead, as the page approves no other: its interpreter, archive and unit written exactly as it writes them, `<verb>` and `<arguments>` filled in, and the JSON as a quoted heredoc (`<<'EOF'`, the JSON, then `EOF` on its own line).
 
 ## Input
 
@@ -28,6 +28,7 @@ IF a field is missing, SAY so in the output and review what you have.
 - `decisions`: <paths of the recorded decisions>
 - `lessons`: <path of `.code/<change>/lessons.jsonl`, or "none">
 - `log`: <path of your log, `.code/<change>/logs/<agent name>.jsonl`, or none>
+- `page_form`: <the form after `Approved without asking:` in the turn header of the page agent that starts you, word for word, or "none">
 
 ## Log
 

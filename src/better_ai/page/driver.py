@@ -49,6 +49,10 @@ TRIGGER_INTERVAL = 1.0  # the least time between two scans of the skill's trigge
 TRIGGER_BUDGET = 2.0  # a scan that takes longer is logged and its result skipped
 ECHOING = frozenset({"claude"})  # the harnesses that echo each prompt's uuid back (decision D5)
 MAX_UNECHOED = 3
+# How long a prompt sent to an echoing harness stays outstanding with no turn running and no echo of its uuid. Claude
+# Code queues a prompt sent during a turn of its own and echoes it when it takes it up, after that turn
+# (verifier-t3d's probe of S97): the wait starts again at each turn's end. The length is a judgement, not on record.
+ECHO_TIMEOUT = 30
 ALIVE_LIMIT = 10
 MAX_APPROVAL_TEXT = 131072
 OPTIONS = ["allow_once", "allow_session", "deny"]
@@ -250,6 +254,8 @@ class Driver:
         self._paired = threading.Event()
         self._new_session = False
         self._unechoed = 0
+        # The prompt sent and not yet echoed: its uuid, the turn that carried it, and when the wait for its echo began.
+        self._outstanding = None
         self._scanned = ()
         self._scan_error = None
         self._scan_slow = None
@@ -494,7 +500,7 @@ class Driver:
             "state": state,
             "since": since,
             "at": self.clock(),
-            "waiting": self._wake or self._retry,
+            "waiting": self._wake or self._retry or self._outstanding is not None,
             "details": self._details,
             "approvals": approvals,
             "blocked": list(self._blocked),
@@ -655,7 +661,14 @@ class Driver:
                     available = self._available_triggers()
                     if available:
                         self._wake = True
-                    if self._state == "idle" and (self._wake or self._retry) and drained and self._paired.is_set():
+                    self._expire_outstanding()
+                    if (
+                        self._state == "idle"
+                        and (self._wake or self._retry)
+                        and self._outstanding is None
+                        and drained
+                        and self._paired.is_set()
+                    ):
                         self._deliver(available)
                 self._publish()
             if not self._driver_failed:
@@ -823,8 +836,11 @@ class Driver:
             self._turn.record["turn_id"] = event.turn_id
             self._flush_log()
         elif event.kind == "prompt_echoed":
-            if self._turn is not None and getattr(event, "uuid", None) == self._turn_state["prompt_uuid"]:
+            echoed = getattr(event, "uuid", None)
+            if self._turn is not None and echoed == self._turn_state["prompt_uuid"]:
                 self._turn.echoed = True
+            elif self._outstanding is not None and echoed == self._outstanding["uuid"]:
+                self._take_up()
         elif event.kind == "text" and self._turn:
             self._turn.final_message = (self._turn.final_message + event.text)[-500:]
         elif event.kind == "turn_ended" and self._turn:
@@ -835,10 +851,7 @@ class Driver:
                 self._close_approvals("the turn ended", "expired", only=lambda a: a.requester is None)
                 self._end("completed")
                 self._crash_retries = 0
-                if self._unechoed >= MAX_UNECHOED:
-                    self._failed("protocol", f"{self.harness} did not echo {MAX_UNECHOED} prompts in a row")
-                else:
-                    self._status("idle")
+                self._status("idle")
             else:
                 self._failed(event.outcome or "crashed", event.text)
         elif event.kind == "approval":
@@ -991,15 +1004,47 @@ class Driver:
         self._unknown_since = None
         self._status("working")
 
+    def _take_up(self) -> None:
+        """The outstanding prompt was echoed: the turn now running, or the one about to start, carries its work."""
+        outstanding, self._outstanding = self._outstanding, None
+        sent = outstanding["turn"]
+        if self._turn is None:
+            self._begin(sent.position, sent.items, sent.triggers)
+        else:
+            self._turn.position, self._turn.triggers = sent.position, sent.triggers
+            self._turn.record["items"] = sorted(sent.items)
+        self._turn.actions, self._turn.note, self._turn.echoed = sent.actions, sent.note, True
+        self._turn_state["prompt_uuid"] = outstanding["uuid"]
+        self._checkpoint()
+
+    def _expire_outstanding(self) -> None:
+        """A prompt with no echo by ECHO_TIMEOUT, while no turn runs, counts as unechoed and is sent again (S97)."""
+        outstanding = self._outstanding
+        if outstanding is None or self._turn is not None or self.clock() - outstanding["since"] < ECHO_TIMEOUT:
+            return
+        self._outstanding = None
+        self._unechoed += 1
+        self._retry = True
+        number = outstanding["turn"].record["number"]
+        self._log("error", kind="unechoed", message=f"turn {number} ended without echoing its prompt")
+        if self._unechoed >= MAX_UNECHOED:
+            self._failed("protocol", f"{self.harness} did not echo {MAX_UNECHOED} prompts in a row")
+
     def _end(self, outcome: str, by_user: bool = False) -> None:
         turn, self._turn = self._turn, None
         if turn is None:
             return
+        if self._outstanding is not None:
+            # The harness takes up a waiting prompt after its own turn: the wait for the echo starts again.
+            self._outstanding["since"] = self.clock()
         if outcome == "completed" and turn.position is not None:
-            # A turn that never echoed the prompt's uuid is another turn: it advances nothing (S97).
+            # A turn that never echoed the prompt's uuid is another turn: it advances nothing (S97). Its prompt stays
+            # outstanding until its echo, or until ECHO_TIMEOUT passes with no turn running; it is not sent again before.
             advanced = turn.echoed or not self._echoes()
             self._carry = turn.items
-            self._retry = bool(turn.items) or not advanced
+            self._retry = bool(turn.items) and advanced
+            if not advanced:
+                self._outstanding = {"uuid": self._turn_state["prompt_uuid"], "turn": turn, "since": self.clock()}
             if advanced:
                 self._unechoed = 0
                 self._delivered = turn.position
@@ -1010,11 +1055,6 @@ class Driver:
                 if turn.note:
                     # The note stays in .driver until a turn that carried it ends normally (S148).
                     self._handoff_delivered = True
-            else:
-                self._unechoed += 1
-                self._log(
-                    "error", kind="unechoed", message=f"turn {turn.record['number']} ended without echoing its prompt"
-                )
             if not turn.changed:
                 self._repeats += 1
         elif outcome != "completed":
@@ -1220,6 +1260,8 @@ class Driver:
             self._close_approvals(reason)
             self._grants.clear()
         finally:
+            # A new harness process never echoes the old one's prompt.
+            self._outstanding = None
             if self._peer is not None:
                 peer, self._peer = self._peer, None
                 self._last_stderr = getattr(peer, "stderr", "")

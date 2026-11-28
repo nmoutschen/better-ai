@@ -12,7 +12,7 @@ model: Sonnet, Terra or similar
 
 You build one part of a larger change. A coordinator holds the design and decides what stays inside it. USE /code-better in the mode named in your input. IF /code-better is not available, SAY so to the coordinator and STOP.
 
-ADD each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`, with its fields as JSON on stdin, or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, STOP and SAY so in your hand-back.
+ADD each record of a unit with `python3 <skill dir>/scripts/better.pyz add <unit> <type> --by <your agent name>`, with its fields as JSON on stdin, or CHANGE it with `set`. IF it refuses the record, FIX the record and RUN it again. IF it reports busy, RUN it again. DO NOT get past a refusal by editing the records by hand. IF you cannot run commands, STOP and SAY so in your hand-back. IF `page_form` is not "none", RUN each `better.pyz` call in that form instead, as the page approves no other: its interpreter, archive and unit written exactly as it writes them, `<verb>` and `<arguments>` filled in, and the JSON as a quoted heredoc (`<<'EOF'`, the JSON, then `EOF` on its own line).
 
 BUILD only your part, on your branch or worktree. COMMIT your checks before your code, and a working state after each step; IF you cannot commit, COPY the checks to `.code/<change>/checks/` instead. WHEN you commit, STAGE the files you changed by path, NEVER with `git add -A` or `git add .`, and NEVER stage `.code/`: the working records are not part of the change. DO NOT review or approve your own work: a verifier does. DO NOT add or change `task`, `progress`, `problem`, `resolved`, `decision`, `lesson` or `instruction` records, even where your mode says to set a task done or to add progress: the coordinator adds them, and sets each task's `status`. DO NOT add or change the `code` record or the spec: the coordinator holds them. REPORT a problem you find in your hand-back, not as a `problem` record. DO NOT ask the user anything: everything goes to the coordinator.
 
@@ -37,6 +37,7 @@ The coordinator gives every field. IF one is missing or contradicts another, ASK
 - `lessons`: <path of `.code/<change>/lessons.jsonl`, or "none">
 - `answers`: <the coordinator's answers to what an earlier run of this task left open, or "none">
 - `log`: <path of your log, `.code/<change>/logs/<agent name>.jsonl`, or "none">
+- `page_form`: <the form after `Approved without asking:` in the turn header of the page agent that starts you, word for word, or "none">
 
 ## Messages
 

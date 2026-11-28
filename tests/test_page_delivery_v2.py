@@ -130,7 +130,7 @@ class Turns(shell.Fixture):
         self.scanned = []
         self.workers = []
         for name, value in (("TRIGGER_INTERVAL", 0.05), ("TRIGGER_BUDGET", 5.0), ("ECHO_TIMEOUT", 0.2)):
-            patch = mock.patch.object(driver_module, name, value, create=True)
+            patch = mock.patch.object(driver_module, name, value)
             patch.start()
             self.addCleanup(patch.stop)
 
@@ -758,7 +758,7 @@ class WhichTurnsCount(Turns):
     def test_a_prompt_echoed_after_a_turn_of_the_harness_own_is_delivered_once_S97_S49(self):
         # The harness runs a turn of its own while the prompt waits, then echoes the prompt and takes it up: the
         # prompt stays outstanding until its echo, is never sent again meanwhile, and its turn advances.
-        patch = mock.patch.object(driver_module, "ECHO_TIMEOUT", 2.0, create=True)
+        patch = mock.patch.object(driver_module, "ECHO_TIMEOUT", 2.0)
         patch.start()
         self.addCleanup(patch.stop)
         self.scanned = [{"id": "t1", "type": "handed_back"}]
@@ -980,6 +980,7 @@ class TheApprovedForm(Turns):
             ("plain", "/plugins/my code/better.pyz"),
         ):
             self.move_unit(folder)
+            self.seed(note("m1"))
             command = shlex.join((sys.executable, archive))
             driver = self.make(Echoing, harness="claude", command=command)
             form = approvals.approved_form(command, self.unit_dir, ("add", "set"))
@@ -1033,6 +1034,7 @@ class TheApprovedForm(Turns):
                 self.assertIn("RUN each `better.pyz` call in that form instead", text)
         self.assertIn("FILL it with the form after `Approved without asking:`", PAGE_AGENT.read_text())
         self.move_unit("my work")
+        self.seed(note("m1"))
         command = shlex.join((sys.executable, "/plugins/my code/better.pyz"))
         driver = self.make(Echoing, harness="claude", command=command)
         header = self.prompts()[0].splitlines()[1]
