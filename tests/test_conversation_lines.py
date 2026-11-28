@@ -9,6 +9,7 @@ data.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -22,12 +23,13 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 
+import architect_records as rec  # noqa: E402
 import better  # noqa: E402
 import code_records  # noqa: E402
 import discover_populated  # noqa: E402
 import research_records  # noqa: E402
 
-from better_ai import code, discover, page, paths, research, resources  # noqa: E402
+from better_ai import architect, code, discover, page, paths, research, resources  # noqa: E402
 from better_ai.code import dashboard  # noqa: E402
 from better_ai.discover import pagespec  # noqa: E402
 from better_ai.research import board  # noqa: E402
@@ -55,6 +57,17 @@ class ConversationLines(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(os.path.realpath(tmp.name))
         self.payloads = []
+
+    def test_the_architect_render_keeps_line_positions(self):
+        """The events `render` embeds, which architect/page.js reads, give the positional thread states."""
+        folder = rec.example_folder(self.root / "architect")
+        write_log(folder)
+        code_, _, err = rec.run_cli("render", str(folder))
+        self.assertEqual(code_, 0, err)
+        text = (folder / "render" / "index.html").read_text()
+        data = json.loads(re.search(r'id="page-data">(.*?)</script>', text, re.S).group(1))
+        spec = page.spec_of(architect.SKILL)
+        self.assertIn(["m1", "agent", "new"], states(page.threads(data["events"], (*spec.tracked(), "note"))))
 
     def test_the_static_architect_page_gets_the_events_with_their_lines(self):
         """architect-better's `render` embeds `Conversation.logged()`: the readable events, each with its line."""
