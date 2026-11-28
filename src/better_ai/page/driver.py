@@ -21,16 +21,19 @@ from .driver_state import (
     delivered_field,
     delivered_position,
     encode,
+    end_orphan_child,
     iso,
     load_state,
+    locked_log,
     log_records,
+    new_verb,
     recent_turn,
     save_state,
     store_log,
     with_defaults,
 )
 from .transport import ProcessTransport as ProcessTransport
-from .transport import end_orphan, process_started
+from .transport import process_started
 
 POLL = 0.05
 START_TIMEOUT = 30
@@ -186,7 +189,8 @@ class Driver:
             # A changed better.pyz is a new chance: the count of repeated driver errors starts again.
             self._ended["repeats"] = 0
         self._turn_state = None
-        self._records = log_records(self.unit)
+        # Verb lines not yet attached stay in the file only: the first write of the log attaches them once.
+        self._records = [record for record in log_records(self.unit) if not new_verb(record)]
         for record in self._records:
             if record.get("type") == "approval" and "answer" not in record:
                 record.update(answer="expired", reason="driver restarted")
@@ -279,8 +283,8 @@ class Driver:
 
     def start(self, timeout=START_TIMEOUT) -> str:
         self._deadline = time.monotonic() + timeout
-        if end_orphan(self._saved["child_pid"], self._saved["child_argv"]):
-            self._record_end("orphan ended at start", "orphan")
+        if end_orphan_child(self.unit):
+            self._ended = dict(load_state(self.unit)["ended"])
         self._thread.start()
         if not self._started.wait(timeout):
             self._closing.set()
@@ -463,18 +467,23 @@ class Driver:
     _log = log
 
     def _flush_log(self) -> None:
-        with self._log_lock:
+        with self._log_lock, locked_log(self.unit):
             self._attach_verbs()
             self._records = store_log(self.unit, self._records)
 
     def _attach_verbs(self) -> None:
-        """Move verb lines the verbs appended to the log onto the records of their turns (D11)."""
-        turns = {r.get("number"): r for r in self._records if r.get("type") == "turn"}
+        """Move the verb lines appended since the last write onto the records of their turns (D11). A verb that ran
+        outside a known turn keeps a line of its own, marked so that no later write takes it again."""
+        turns = {r.get("number"): r for r in self._records if r.get("type") == "turn" and type(r.get("number")) is int}
         for line in log_records(self.unit):
-            if line.get("type") != "verb" or not turns:
+            if not new_verb(line):
                 continue
-            turn = turns.get(line.get("turn")) or turns[max(n for n in turns if type(n) is int)]
-            turn.setdefault("verbs", []).append({k: line.get(k) for k in ("verb", "exit", "at")})
+            call = {key: line.get(key) for key in ("verb", "exit", "at")}
+            turn = turns.get(line.get("turn")) if type(line.get("turn")) is int else None
+            if turn is not None:
+                turn.setdefault("verbs", []).append(call)
+            else:
+                self._records.append({"type": "verb", **call, "turn": line.get("turn"), "attached": False})
 
     def _status(self, state: str, **details) -> None:
         if self._state != state or self._details != details:

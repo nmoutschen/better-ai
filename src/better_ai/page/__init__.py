@@ -1256,12 +1256,9 @@ def lock_unit(fd: int) -> None:
 
 
 def stop_orphan(unit: Unit) -> None:
-    from .driver_state import load_state
-    from .transport import end_orphan
+    from .driver_state import end_orphan_child
 
-    state = load_state(unit)
-    if state:
-        end_orphan(state["child_pid"], state["child_argv"])
+    end_orphan_child(unit)
 
 
 LINK_SOCKET = ".page-link"

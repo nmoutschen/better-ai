@@ -152,14 +152,59 @@ def last_ended(unit) -> dict:
     return state["ended"] if state else with_defaults({})["ended"]
 
 
+def end_orphan_child(unit) -> bool:
+    """End the harness child an earlier server left running, only if its command line is the recorded one, and
+    record that end in ended (S98). Serve and the driver both end orphans through this one function."""
+    from .transport import end_orphan
+
+    state = load_state(unit)
+    if not state or not end_orphan(state["child_pid"], state["child_argv"]):
+        return False
+    ended = {
+        **state["ended"],
+        "at": iso(time.time()),
+        "reason": "orphan ended at start",
+        "kind": "orphan",
+        "repeats": 0,
+    }
+    save_state(unit, {"child_pid": None, "child_argv": [], "ended": ended})
+    return True
+
+
+@contextlib.contextmanager
+def locked_log(unit):
+    """Hold an exclusive lock on the current .driver.log, so a verb's append never falls between the driver's read
+    and its replace. A file replaced while waiting is opened again: the lock must be on the file at the path."""
+    import fcntl
+
+    path = unit.target(LOG)
+    while True:
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | NOFOLLOW, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            try:
+                current = os.stat(path, follow_symlinks=False).st_ino
+            except FileNotFoundError:
+                current = None
+            if current == os.fstat(fd).st_ino:
+                yield fd
+                return
+        finally:
+            os.close(fd)
+
+
 def log_verb(unit, verb: str, exit_code: int) -> None:
     """Add one verb call to .driver.log, with the number of the turn now running. The driver attaches it to that turn."""
     state = load_state(unit)
     turn = state["turn"] if state and isinstance(state["turn"], dict) else {}
     line = encode({"type": "verb", "at": time.time(), "verb": verb, "exit": exit_code, "turn": turn.get("number")})
-    fd = os.open(unit.target(LOG), os.O_WRONLY | os.O_APPEND | os.O_CREAT | NOFOLLOW, 0o600)
-    with os.fdopen(fd, "ab") as stream:
-        stream.write(line)
+    with locked_log(unit) as fd:
+        os.write(fd, line)
+
+
+def new_verb(record: dict) -> bool:
+    """A verb line as log_verb wrote it, that the driver has not yet moved onto a turn or kept as its own line."""
+    return record.get("type") == "verb" and "attached" not in record
 
 
 def log_records(unit) -> list[dict]:

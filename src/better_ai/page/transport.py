@@ -199,8 +199,8 @@ class ProcessTransport:
         if message is None:
             return SimpleNamespace(kind="failed", outcome="crashed", text=self.stderr)
         self._events.extend(self.codec.receive(message))
-        # Even a frame with no state change is harness activity for the stall timer.
-        return self._events.popleft() if self._events else SimpleNamespace(kind="output")
+        # A frame the codec knows but maps to no event is still harness activity, and a known message (S112).
+        return self._events.popleft() if self._events else SimpleNamespace(kind="frame")
 
     def close(self) -> None:
         """End the harness's process group and return only once it is gone."""
