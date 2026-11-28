@@ -340,7 +340,8 @@ class Driver:
         """A planned end: publish closed with the reason at once, cancel as Stop does, and end the process group."""
         self._closed = (kind, reason, time.time())
         self._close_reason = reason
-        self._force("closed", {"kind": kind, "message": reason}, self._closed[2])
+        if self._failed_error is None:  # the driver's own error stays the page's notice, with its reason
+            self._force("closed", {"kind": kind, "message": reason}, self._closed[2])
         self._closing.set()
         if self._thread.ident is not None:
             self._thread.join(timeout=4.75)

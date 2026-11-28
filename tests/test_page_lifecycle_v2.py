@@ -329,6 +329,25 @@ class DriverErrorTest(Flow):
         self.assertEqual(self.launches(), [], "no harness ran")
 
 
+    def test_a_driver_error_while_served_keeps_its_reason_in_ended_and_on_the_page(self):  # S62, B2
+        flag = self.root / "boom.flag"
+        boot = (
+            "import os\nfrom better_ai.page import driver\n\n_check = driver.Driver._check_unit\n\n"
+            "def check(self):\n    if os.path.exists(%r):\n        raise RuntimeError('boom')\n    _check(self)\n\n"
+            "driver.Driver._check_unit = check\n" % str(flag)
+        )
+        done = self.served(env=self.env(), boot=boot)
+        self.secret = self.pair(done)
+        server = self.state()["server_pid"]
+        flag.write_text("")
+        self.assertTrue(wait_for(lambda: self.agent()["state"] == "failed", 20))
+        body = self.agent()
+        self.assertEqual(body["kind"], "driver")
+        self.assertIn("boom", body["text"])
+        self.assertTrue(wait_for(lambda: not alive(server), 20), "the server ends after a driver error")
+        self.assertEqual((self.state()["ended"]["kind"], self.state()["ended"]["reason"]), ("driver", "boom"))
+
+
 class VerbFormTest(Unit):
     """The page agent's own calls, as the header's form approves them, in a unit whose path holds a space."""
 

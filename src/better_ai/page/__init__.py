@@ -1288,6 +1288,7 @@ class DrivenPage:
         self.answered: dict[str, tuple[str, Future]] = {}  # each approval's first answer, for a send that came twice
         self.answer_lock = threading.Lock()  # held to look up and record an answer, never while one is awaited
         self.link_lock = threading.Lock()  # one new tab at a time
+        self.closed_served = threading.Event()  # a tab has been answered closed (S105)
         server.handler.driven = self
 
     @property
@@ -1310,7 +1311,10 @@ class DrivenPage:
     def status(self):
         """The body of /agent, as the driver builds it."""
         if self.driver:
-            return self.driver.agent()
+            body = self.driver.agent()
+            if body.get("state") == "closed":
+                self.closed_served.set()
+            return body
         return {
             "state": "starting",
             "since": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -1516,6 +1520,7 @@ CALLER_WAIT = 15  # seconds the calling process waits past START_TIMEOUT before 
 NOTE_WAIT = 2  # seconds `serve` reads the hand-off note from stdin
 STALE_WAIT = 10  # seconds a server with a late liveness mark is given to exit
 DRIVER_GRACE = 5  # seconds a dead driver's last answer stays up for the page
+CLOSED_GRACE = 5  # seconds the server still answers closed after a planned exit: longer than the page's 2 s poll
 ERROR_WINDOW = 60  # seconds between two server_error lines in .driver.log
 OFF_KINDS = (
     "no-harness",
@@ -1921,6 +1926,10 @@ def stop_serving(server, serving, driven, unit: Unit, address, ending=("stopped"
     is the kind and reason the page shows as `closed`."""
     if driven:
         driven.close(*ending)
+        # A paired tab gets one more poll answered, so it shows the closed notice of S105 rather than taking the server's
+        # end for an error. A driver error has had its own grace (DRIVER_GRACE).
+        if serving is not None and ending[0] != "driver" and driven.paired.is_set():
+            driven.closed_served.wait(CLOSED_GRACE)
     if server is not None:
         if serving is not None:
             server.shutdown()
@@ -2034,7 +2043,7 @@ def wait_until_done(args, run, unit, conv, driven) -> tuple[str, str]:
             continue
         if not driven.driver.check_alive():
             time.sleep(DRIVER_GRACE)  # the page keeps getting its answer for a moment: the driver stopped
-            return "driver", driven.driver.error() or "the driver stopped"
+            return "driver", driven.driver.error or "the driver stopped"
         if driven.driver.idle_expired():
             return "idle", "no page was open for 30 minutes"
         try:

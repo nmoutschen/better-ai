@@ -99,9 +99,12 @@ function pageApprovals() {
 function pageWaitingWorkers() {
   return pageAgentState && !pageDriverDown ? (pageAgentState.workers || []).filter(function (w) { return w.waiting; }) : [];
 }
-// The words under the Agents heading: what the driver says of the agents' state, or that the driver is gone.
+// The words under the Agents heading: what the driver says of the agents' state, or that the driver is gone. A page that
+// showed closed, or the driver's own error, keeps it: the server then stops answering, which says nothing more (S105).
 var PAGE_REQUEST_WAITS = 'A request waits for you.';
 function pageAgentNotice() {
+  var a = pageAgentState;
+  if (a && (a.state === 'closed' || (a.state === 'failed' && a.kind === 'driver'))) return a.text || '';
   if (pageDriverDown) return PAGE_DRIVER_DOWN;
   return (pageAgentState && pageAgentState.text) || '';
 }
