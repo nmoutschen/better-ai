@@ -179,24 +179,24 @@ class Summary(Discovery):
         _, out = self.summary()
         return [x for x in out if x["type"] == "event"]
 
-    def test_S54_a_done_event_the_user_reopened_is_listed_as_reopened_with_the_reason(self):
+    def test_S54_a_done_event_the_user_reopened_is_listed_as_the_agents_turn_with_the_reason(self):
         self.assertEqual(self.events(), [])
         reopen = {"type": "reopen", "at": R.AT, "by": "user", "to": "a1", "text": "You did not add it."}
         (found,) = self.events(reopen)
         self.assertEqual(
-            (found["id"], found["state"], found["reopened_because"]), ("a1", "reopened", "You did not add it.")
+            (found["id"], found["state"], found["reopened_because"]), ("a1", "agent", "You did not add it.")
         )
 
-    def test_S54_a_follow_up_note_under_a_done_event_makes_it_open_as_followup(self):
+    def test_S54_a_follow_up_note_under_a_done_event_makes_it_the_agents_turn_again(self):
         note = {"type": "note", "at": R.AT, "by": "user", "id": "n9", "to": "a1", "text": "Also this."}
         (found,) = self.events(note)
-        self.assertEqual((found["id"], found["state"]), ("a1", "followup"))
+        self.assertEqual((found["id"], found["state"]), ("a1", "agent"))
         self.assertEqual(found["thread"][0]["text"], "Also this.")
 
-    def test_S54_a_new_event_has_the_state_new(self):
+    def test_S54_a_new_event_is_the_agents_turn_not_seen(self):
         put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1")])
         _, out = self.summary()
-        self.assertEqual([x["state"] for x in out if x["type"] == "event"], ["new"])
+        self.assertEqual([(x["state"], x["step"]) for x in out if x["type"] == "event"], [("agent", "new")])
 
     def test_S54_the_moves_name_their_move_and_the_briefs_their_move(self):
         self.compacted()

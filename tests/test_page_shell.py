@@ -528,17 +528,51 @@ class ConversationTest(Fixture):
         self.assertEqual(target.read_text(), "")
 
 
-# What `pending` shows for an item beyond its state, by the name of the case in the table, as (item, field, value).
+# What `pending` shows for a thread beyond its state, by the name of the case in the table, as (thread, field, value).
 EXTRAS = {
     "an answer to a question the agent asked ends the wait": (
         "m1",
         "thread",
-        [{"from": "coordinator", "text": "t"}, {"from": "user", "text": "t"}],
+        [{"from": "coordinator", "id": "r1", "text": "t"}, {"from": "user", "id": "m2", "text": "t"}],
     ),
     "a comment sent again keeps its state, and is the same item": ("c2", "text", "edited"),
     "a reopened item is work again": ("c1", "reopened_because", "still wrong"),
-    "an answer to what a worker closed is an item": ("m1", "about", "worker-2 closed Q4 as answered"),
+    "an answer to what a worker closed is an item": ("x1", "about", "worker-2 closed Q4 as answered"),
 }
+TABLE = json.loads((HERE / "fixtures" / "threads.json").read_text())
+DEFAULT_KINDS = ("comment", "note")
+
+
+def shape(thread: dict) -> list:
+    return [thread["id"], thread["state"], thread["step"], thread.get("closed_by_user", thread.get("closedByUser"))]
+
+
+class ThreadsTest(unittest.TestCase):
+    def test_the_shared_table_of_logs_gives_each_thread_the_state_page_js_gives_it(self):
+        """The same logs are run on page.js `pageThreads` in tests/page.test.js: both give the same threads."""
+        for case in TABLE:
+            with self.subTest(case["name"]):
+                got = [t for t in page.threads(case["log"], tuple(case.get("items", DEFAULT_KINDS))) if not t["deleted"]]
+                self.assertEqual([shape(t) for t in got], [shape(t) for t in case["threads"]])
+                for thread, expected in zip(got, case["threads"], strict=True):
+                    if "since" in expected:
+                        self.assertEqual(thread["since"], expected["since"], thread["id"])
+
+    def test_a_thread_holds_its_messages_the_latest_form_of_its_first_one_and_your_latest_event(self):
+        log = [
+            {"type": "comment", "id": "c1", "n": 1, "text": "first", "by": "user"},
+            {"type": "reply", "id": "r1", "to": "c1", "text": "ok", "by": "coordinator"},
+            {"type": "note", "id": "m1", "to": "r1", "text": "more", "by": "user"},
+            {"type": "comment", "id": "c1", "n": 1, "text": "edited", "by": "user"},
+            {"type": "comment", "id": "c2", "n": 2, "text": "gone", "by": "user"},
+            {"type": "delete", "to": "c2", "by": "user"},
+        ]
+        c1, c2 = page.threads(log, DEFAULT_KINDS)
+        self.assertEqual(c1["root"]["text"], "edited")
+        self.assertEqual([m["id"] for m in c1["messages"]], ["c1", "r1", "m1"])
+        self.assertEqual(c1["user_at"], 2)
+        self.assertTrue(c2["deleted"])
+        self.assertEqual([e["id"] for e, _, _ in page.all_items(log, DEFAULT_KINDS, "coordinator")], ["c1"])
 
 
 class VerbsTest(Fixture):
@@ -634,10 +668,11 @@ class VerbsTest(Fixture):
         self.assertIn(f"no comment or message with id {under}", err)
         self.assertEqual(len(self.log()), before)
 
-    def test_pending_gives_the_states_of_the_shared_table_of_logs_and_the_threads_the_page_cannot_show(self):
-        """The same logs, with the same open items and states, are run on page.js `pageThread` in tests/page.test.js."""
-        table = json.loads((HERE / "fixtures" / "threads.json").read_text())
-        for case in table:
+    def test_pending_lists_the_threads_of_the_shared_table_that_are_the_agents_turn(self):
+        """`pending` prints each thread that is the agent's turn, with its step as `status`, and the thread under it."""
+        for case in TABLE:
+            if "items" in case:
+                continue  # the fixture page tracks comments and notes, and approvals
             with self.subTest(case["name"]):
                 (self.unit_dir / "conversation.jsonl").unlink(missing_ok=True)
                 self.seed(*case["log"])
@@ -645,14 +680,67 @@ class VerbsTest(Fixture):
                 lines = out.splitlines()
                 self.assertEqual(code_, 0)
                 items = [json.loads(line) for line in lines[:-1]]
-                self.assertEqual([[e["id"], e["status"]] for e in items], case["work"])
-                self.assertEqual(lines[-1], f"{len(items)} not done.")
-                for name, (item, field, expected) in EXTRAS.items():
+                expected = [[t["id"], t["step"]] for t in case["threads"] if t["state"] == "agent"]
+                self.assertEqual([[e["id"], e["status"]] for e in items], expected)
+                self.assertEqual(lines[-1], f"{len(items)} to act on.")
+                for name, (item, field, value) in EXTRAS.items():
                     if name == case["name"]:
                         got = next(e[field] for e in items if e["id"] == item)
                         if field == "thread":
                             got = [{k: v for k, v in t.items() if k != "at"} for t in got]
-                        self.assertEqual(got, expected)
+                        self.assertEqual(got, value)
+
+    def test_status_and_reply_write_as_read_the_last_event_pending_showed_S2(self):
+        self.seed(
+            {"type": "note", "by": "user", "id": "m1", "text": "a", "to": None},
+            {"type": "note", "by": "user", "id": "m2", "text": "b", "to": None},
+        )
+        self.assertEqual(self.cli("status", self.unit_arg, "seen", "m1")[0], 0)
+        self.assertNotIn("read", self.log()[-1])  # nothing shown yet: the status counts, as in a log from before
+        self.assertEqual(self.cli("pending", self.unit_arg)[0], 0)
+        self.assertEqual((self.unit_dir / ".conversation-read").read_text(), "2")
+        self.assertEqual(self.cli("status", self.unit_arg, "working", "m1", "m2")[0], 0)
+        self.assertEqual([e.get("read") for e in self.log()[-2:]], [2, 2])
+        self.seed({"type": "note", "by": "user", "id": "m3", "text": "c", "to": "m1"})
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--state", "asked", stdin="Which?")[0], 0)
+        last = self.log()[-1]
+        self.assertEqual((last["type"], last["status"], last["read"]), ("status", "asked", 2))
+        # Decided before the agent read m3: m1 stays the agent's turn, not seen.
+        m1 = next(t for t in page.threads(self.log(), DEFAULT_KINDS) if t["id"] == "m1")
+        self.assertEqual((m1["state"], m1["step"]), ("agent", "new"))
+        self.cli("pending", self.unit_arg)
+        self.assertEqual((self.unit_dir / ".conversation-read").read_text(), str(len(self.log()) - 1))
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--state", "working", stdin="On it.")[0], 0)
+        self.assertEqual((self.log()[-1]["status"], self.log()[-1]["read"]), ("working", len(self.log()) - 3))
+        m1 = next(t for t in page.threads(self.log(), DEFAULT_KINDS) if t["id"] == "m1")
+        self.assertEqual((m1["state"], m1["step"]), ("agent", "working"))
+
+    def test_a_status_read_is_a_whole_number_in_the_schema(self):
+        conv = page.Conversation(self.unit(), self.spec, self.docs)
+        base = {"type": "status", "at": "2026-11-28T10:00:00Z", "by": "coordinator", "to": "m1", "status": "seen"}
+        conv.check({**base, "read": 3})
+        for bad in ("3", -1, 1.5):
+            with self.subTest(read=bad), self.assertRaises(page.EventError):
+                conv.check({**base, "read": bad})
+
+    def test_reply_without_to_is_a_report_unless_asked_which_sets_asked_on_its_own_id_S6(self):
+        self.assertEqual(self.cli("reply", self.unit_arg, stdin="Built it.")[0], 0)
+        self.assertEqual([e["type"] for e in self.log()], ["reply"])
+        self.assertEqual(self.cli("reply", self.unit_arg, "--state", "asked", stdin="Which size?")[0], 0)
+        question, status = self.log()[1:]
+        self.assertEqual((status["type"], status["to"], status["status"]), ("status", question["id"], "asked"))
+        states = [(t["state"], t["step"]) for t in page.threads(self.log(), DEFAULT_KINDS)]
+        self.assertEqual(states, [("done", "new"), ("you", "new")])
+
+    def test_the_agent_can_reply_to_and_mark_a_thread_it_started(self):
+        self.seed(
+            {"type": "reply", "by": "coordinator", "id": "r1", "text": "Which?", "to": None},
+            {"type": "closed", "by": "worker-2", "id": "x1", "question": "Q4", "status": "answered"},
+            {"type": "note", "by": "user", "id": "m1", "text": "this", "to": "r1"},
+        )
+        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "r1", stdin="Done.")[0], 0)
+        self.assertEqual((self.log()[-1]["to"], self.log()[-1]["status"]), ("r1", "done"))
+        self.assertEqual(self.cli("status", self.unit_arg, "done", "x1")[0], 0)
 
     def test_wait_prints_the_users_events_saves_its_place_and_times_out_with_exit_3(self):
         _, host = self.serve()
@@ -669,6 +757,20 @@ class VerbsTest(Fixture):
         self.assertEqual(code_, 3)
         self.assertIn("no new action before the timeout", err)
         self.assertLess(time.time() - started, 60)
+
+    def test_wait_records_what_it_showed_as_what_the_agent_read(self):
+        """What `wait` printed the agent has read too: the status it writes next counts (D2, with `pending`)."""
+        _, host = self.serve()
+        self.seed({"type": "note", "by": "user", "id": "m0", "text": "old", "to": None})
+        self.cli("pending", self.unit_arg)
+        sender = threading.Timer(0.5, lambda: self.rpc(host, "note", {"id": "m1", "text": "hi", "to": "m0"}))
+        sender.start()
+        self.assertEqual(self.cli("wait", self.unit_arg, "--timeout", "20")[0], 0)
+        self.assertEqual((self.unit_dir / ".conversation-read").read_text(), "1")
+        self.assertEqual(self.cli("status", self.unit_arg, "asked", "m0")[0], 0)
+        self.assertEqual(self.log()[-1]["read"], 1)
+        (m0,) = page.threads(self.log(), DEFAULT_KINDS)
+        self.assertEqual(m0["state"], "you")
 
     def test_wait_defaults_to_600_seconds_in_every_skill_S34(self):
         parser = cli._parser(cli.load(resources.build_info()), resources.build_info())
