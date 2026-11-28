@@ -172,7 +172,7 @@ On the served page, the user reads the slides, switches to Comment and clicks an
 
 ## 7. Hand it over
 
-GIVE the user the published link or the path once, or the text output. FOR a served page, GIVE no address: the page opened in the browser, and `python3 <skill dir>/scripts/better.pyz link <unit>` opens it again. STATE the document's answer in one or two sentences in the chat, so a reader who does not open the page still has it. STATE any assumption you made about the GOAL or the reader, and any gap in the vocabulary (section 3.1, rule 4), next to the result it affects. DO NOT repeat the slides in the chat.
+GIVE the user the published link or the path once, or the text output. FOR a served page, GIVE no address: the page opened in the browser, and a new tab comes from `link` as section 6 says. STATE the document's answer in one or two sentences in the chat, so a reader who does not open the page still has it. STATE any assumption you made about the GOAL or the reader, and any gap in the vocabulary (section 3.1, rule 4), next to the result it affects. DO NOT repeat the slides in the chat.
 
 ## 8. Missing capabilities
 
