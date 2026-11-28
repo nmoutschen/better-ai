@@ -6,7 +6,6 @@ import itertools
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 from collections.abc import Callable, Mapping
@@ -24,7 +23,7 @@ class Candidate:
     argv: tuple[str, ...]
     kind: str | None
     approval: str | None = None
-    codec_factory: Callable[[Send], ACPAdapter | CodexAdapter | ClaudeAdapter | DroidAdapter] | None = None
+    codec_factory: Callable[..., ACPAdapter | CodexAdapter | ClaudeAdapter | DroidAdapter] | None = None
     text: str = ""
     mode: str | None = None
 
@@ -47,9 +46,7 @@ class Candidate:
         if self.name == "claude":
             expected = resume if session_id_valid("claude", resume) else session_id
             return ClaudeAdapter(send, expected, self.mode)
-        if self.name == "codex":
-            return CodexAdapter(send, self.mode)
-        return self.codec_factory(send)
+        return self.codec_factory(send, self.mode)
 
 
 _REAL_BROWSER_TOOLS = (
@@ -73,6 +70,13 @@ _CLAUDE_FLAGS = {
     "auto": ("--permission-mode", "auto"),
     "skip approvals": ("--dangerously-skip-permissions",),
 }
+# Cursor's approvalMode: cursor.com/docs/cli/reference/configuration. Devin's permission modes:
+# docs.devin.ai/cli/reference/permissions. Droid's autonomy levels: docs.factory.com/cli/user-guides/auto-run.
+# Only the values those pages describe are mapped; any other value fails closed as unsafe-mode.
+_CURSOR_MODES = {"allowlist": "manual", "auto-review": "auto", "unrestricted": "skip approvals"}
+_DEVIN_MODES = {"normal": "manual", "accept-edits": "accept edits", "smart": "auto", "dangerous": "skip approvals"}
+_DEVIN_CHAT = {**_DEVIN_MODES, "auto": "manual", "yolo": "skip approvals", "bypass": "skip approvals"}
+_DROID_MODES = {"off": "manual", "low": "accept edits"}
 _CLAUDE_REPORTED = {**_CLAUDE_CHAT, "plan": "plan", "dontAsk": "don't ask"}
 
 # Prefer specific identifiers to generic markers if one harness is started from another.
@@ -144,6 +148,11 @@ def chat_mode(name: str, argv: tuple[str, ...] | list[str]) -> str | None:
             return "skip approvals"
         values = _flag_values(argv, "--permission-mode")
         return _CLAUDE_CHAT.get(values[-1]) if values else None
+    if name == "devin":
+        values = _flag_values(argv, "--permission-mode")
+        return _DEVIN_CHAT.get(values[-1]) if values else None
+    if name == "cursor":
+        return "auto" if "--auto-review" in argv else None
     if name == "codex":
         if "--dangerously-bypass-approvals-and-sandbox" in argv:
             return "skip approvals"
@@ -161,15 +170,16 @@ def chat_argv(name: str, pid: int | None = None, run: Callable = subprocess.run)
     pid = os.getppid() if pid is None else pid
     binary = _HARNESSES[name][0][0]
     for _ in range(12):
-        shown = run(["ps", "-o", "ppid=,command=", "-p", str(pid)], capture_output=True, text=True)
+        try:
+            shown = run(["ps", "-ww", "-o", "ppid=,command=", "-p", str(pid)], capture_output=True, text=True)
+        except OSError:
+            return ()
         fields = shown.stdout.strip().split(None, 1)
         if shown.returncode or len(fields) != 2 or not fields[0].isdigit():
             return ()
-        try:
-            argv = tuple(shlex.split(fields[1]))
-        except ValueError:
-            argv = ()
-        if argv and os.path.basename(argv[0]) == binary:
+        argv = tuple(fields[1].split())
+        # A harness run by node shows the script as the second word.
+        if any(os.path.basename(word) == binary for word in argv[:2]):
             return argv
         pid = int(fields[0])
         if pid <= 1:
@@ -323,7 +333,13 @@ def _wire_id(data: Any) -> bool:
     return type(data) in (int, str)
 
 
-_CONFIG_PATH = re.compile(r"(?:^|[\s/\\='\"])\.(?:claude|codex|cursor|factory|devin|opencode)(?:[\s/\\'\"]|$)")
+# A harness's own configuration: its dot folder or dot file (.claude/, .claude.json, .mcp.json), however the
+# path is written (absolute, ~/, after a redirection such as ">"), and OpenCode's ~/.config/opencode.
+_CONFIG_PATH = re.compile(
+    r"(?<![\w.-])\.(?:claude|codex|cursor|factory|devin|opencode)(?![\w-])"
+    r"|(?<![\w.-])\.mcp\.json"
+    r"|(?<![\w-])\.config[/\\]opencode(?![\w-])"
+)
 
 
 def _touches_config(data: Any) -> bool:
@@ -366,8 +382,9 @@ def _error_kind(error: dict, default: str) -> str:
 class _RPCAdapter:
     _name = "the harness"
 
-    def __init__(self, send: Send):
+    def __init__(self, send: Send, chat_mode: str | None = None):
         self.send = send
+        self.chat_mode = chat_mode
         self.session_id: str | None = None
         self.turn_id: str | None = None
         self._ids = itertools.count(1)
@@ -440,6 +457,7 @@ class ACPAdapter(_RPCAdapter):
     """ACP v1 documents transport and request shapes, but leaves approval enforcement to the agent."""
 
     _name = "the agent"
+    _mode = "manual"
     _client_info: dict = {}
 
     def open(self, cwd: str, resume: str | None) -> None:
@@ -476,7 +494,7 @@ class ACPAdapter(_RPCAdapter):
         if not session_id_valid("opencode", session_id):
             return _failure("crashed", "missing or invalid ACP session id")
         self.session_id = session_id
-        return (AdapterEvent("ready", session_id=session_id, mode="manual"),)
+        return (AdapterEvent("ready", session_id=session_id, mode=self._mode),)
 
     def prompt(self, text: str, uuid: str | None = None) -> None:
         if self.session_id is None:
@@ -596,12 +614,13 @@ class OpenCodeAdapter(ACPAdapter):
 
 
 class _ConfiguredACPAdapter(ACPAdapter):
-    """Require the peer's effective approval choice, distinct from its coding profile."""
+    """Read the peer's effective approval mode from its config option, and set it to the chat's mode."""
 
     _permission_option: str
-    _safe_mode: str
+    _modes: dict[str, str]
 
-    def _permission_check(self, data: dict) -> str | None:
+    def _reported(self, data: dict) -> tuple[str | None, str | None]:
+        """The reported value and the failure kind, if any."""
         options = data.get("configOptions")
         values = (
             [
@@ -613,25 +632,48 @@ class _ConfiguredACPAdapter(ACPAdapter):
             else []
         )
         if len(values) != 1:
-            return "no-approvals"
-        if values[0] != self._safe_mode:
-            return "unsafe-mode"
-        return None
+            return None, "no-approvals"
+        if values[0] not in self._modes:
+            return None, "unsafe-mode"
+        return values[0], None
 
     def _opened(self, data: dict) -> Events:
-        failure = self._permission_check(data)
+        value, failure = self._reported(data)
         if failure:
             return _failure(failure)
+        self._mode = self._modes[value]
+        session_id = data.get("sessionId", self._resume)
+        if self.chat_mode and self._mode != self.chat_mode:
+            wanted = next((value for value, label in self._modes.items() if label == self.chat_mode), None)
+            if wanted is None or not session_id_valid("opencode", session_id):
+                return _failure("unsafe-mode")
+            self._opening = {**data, "sessionId": session_id}
+            self._call(
+                "session/set_config_option",
+                {"sessionId": session_id, "configId": self._permission_option, "value": wanted},
+                self._configured,
+            )
+            return ()
+        return self._finish(data)
+
+    def _configured(self, result: dict) -> Events:
+        value, failure = self._reported(result)
+        if failure or self._modes[value] != self.chat_mode:
+            return _failure(failure or "unsafe-mode")
+        self._mode = self._modes[value]
+        return self._finish({**self._opening, **result})
+
+    def _finish(self, data: dict) -> Events:
         return super()._opened(data)
 
     def _notification(self, method: str, params: dict) -> Events:
         if method == "session/update" and self.session_id is not None and params.get("sessionId") == self.session_id:
             update = _object(params.get("update"))
             if update.get("sessionUpdate") == "config_option_update":
-                failure = self._permission_check(update)
-                if failure:
+                value, failure = self._reported(update)
+                if failure or self._modes[value] != self._mode:
                     self.session_id = None
-                    return _failure(failure)
+                    return _failure(failure or "unsafe-mode")
         return super()._notification(method, params)
 
 
@@ -639,7 +681,7 @@ class CursorAdapter(_ConfiguredACPAdapter):
     # The CLI documents allowlist, auto-review and unrestricted independently
     # of the agent/plan/ask profile. ACP does not require it to expose this choice.
     _permission_option = "approvalMode"
-    _safe_mode = "allowlist"
+    _modes = _CURSOR_MODES
     _client_info = {"clientInfo": {"name": "better-ai", "version": "0.1.0"}}
 
     def _initialized(self, data: dict) -> Events:
@@ -656,20 +698,17 @@ class DevinAdapter(_ConfiguredACPAdapter):
     # Devin documents normal mode, but does not promise that its ACP server
     # forwards tool prompts. Require an actual startup request for this session.
     _permission_option = "permission_mode"
-    _safe_mode = "normal"
+    _modes = _DEVIN_MODES
 
-    def __init__(self, send: Send):
-        super().__init__(send)
+    def __init__(self, send: Send, chat_mode: str | None = None):
+        super().__init__(send, chat_mode)
         self._forwarded_sessions: set[str] = set()
 
-    def _opened(self, data: dict) -> Events:
-        failure = self._permission_check(data)
-        if failure:
-            return _failure(failure)
+    def _finish(self, data: dict) -> Events:
         session_id = data.get("sessionId", self._resume)
         if not isinstance(session_id, str) or session_id not in self._forwarded_sessions:
             return _failure("no-approvals")
-        return super()._opened(data)
+        return super()._finish(data)
 
     def _request(self, request_id: WireID, method: str, params: dict) -> Events:
         loading = any(called in ("session/load", "session/new") for called, _ in self._calls.values())
@@ -709,10 +748,6 @@ class CodexAdapter(_RPCAdapter):
 
     _name = "codex"
 
-    def __init__(self, send: Send, chat_mode: str | None = None):
-        super().__init__(send)
-        self.chat_mode = chat_mode
-
     def open(self, cwd: str, resume: str | None) -> None:
         self._cwd = cwd
         self._resume = resume if session_id_valid("codex", resume) else None
@@ -735,7 +770,9 @@ class CodexAdapter(_RPCAdapter):
 
     def _open_thread(self) -> None:
         # No sandbox or network setting: the page session runs under the user's own Codex configuration.
-        params = {"cwd": self._cwd, "approvalsReviewer": "auto_review" if self.chat_mode == "auto" else "user"}
+        params = {"cwd": self._cwd}
+        if reviewer := {"auto": "auto_review", "manual": "user"}.get(self.chat_mode):
+            params["approvalsReviewer"] = reviewer
         if self.chat_mode == "skip approvals":
             params["approvalPolicy"] = "never"
         if self._resume:
@@ -745,7 +782,7 @@ class CodexAdapter(_RPCAdapter):
 
     def _opened(self, data: dict) -> Events:
         reviewer, policy = data.get("approvalsReviewer"), data.get("approvalPolicy")
-        if reviewer != ("auto_review" if self.chat_mode == "auto" else "user"):
+        if reviewer not in ("user", "auto_review"):
             return _failure("unsafe-mode")
         if policy == "never":
             mode = "skip approvals"
@@ -932,6 +969,10 @@ class ClaudeAdapter:
             result = {"behavior": "allow", "updatedInput": arguments}
             if choice == "allow_session" and scope:
                 result["updatedPermissions"] = scope
+                # A granted setMode changes the mode the session reports from now on.
+                for item in scope:
+                    if item.get("type") == "setMode" and item.get("mode") in _CLAUDE_REPORTED:
+                        self.mode = _CLAUDE_REPORTED[item["mode"]]
         else:
             result = {"behavior": "deny", "message": reason or "the page denied permission"}
         self._response(request_id, result=result)
@@ -1095,8 +1136,9 @@ class DroidAdapter(_RPCAdapter):
     _factory_protocol_version = "1.332.0"
     _start_methods = ("droid.initialize_session", "droid.load_session")
 
-    def __init__(self, send: Send):
-        super().__init__(send)
+    def __init__(self, send: Send, chat_mode: str | None = None):
+        super().__init__(send, chat_mode)
+        self._mode = "manual"
         self._running = False
 
     def _request_id(self) -> str:
@@ -1153,21 +1195,18 @@ class DroidAdapter(_RPCAdapter):
             self._new_session()
 
     def _new_session(self) -> None:
-        self._call(
-            "droid.initialize_session",
-            {
-                "machineId": "default",
-                "cwd": self._cwd,
-                "autonomyLevel": "off",
-                "interactionMode": "auto",
-            },
-            self._opened,
-        )
+        params = {"machineId": "default", "cwd": self._cwd, "interactionMode": "auto"}
+        level = next((level for level, label in _DROID_MODES.items() if label == self.chat_mode), None)
+        if level:
+            params["autonomyLevel"] = level
+        self._call("droid.initialize_session", params, self._opened)
 
     def _opened(self, data: dict) -> Events:
         settings = _object(data.get("settings"))
-        if settings.get("autonomyLevel") != "off" or settings.get("interactionMode") != "auto":
+        mode = _DROID_MODES.get(settings.get("autonomyLevel"))
+        if mode is None or settings.get("interactionMode") != "auto" or (self.chat_mode and mode != self.chat_mode):
             return _failure("unsafe-mode")
+        self._mode = mode
         session_id = data.get("sessionId", self._resume)
         if not session_id_valid("droid", session_id):
             return _failure("crashed", "missing or invalid Droid session id")
@@ -1177,7 +1216,7 @@ class DroidAdapter(_RPCAdapter):
             request_id = _object(request).get("requestId")
             if isinstance(request_id, str) and request_id:
                 self._result(request_id, {"selectedOption": "cancel", "comment": "previous page session ended"})
-        return (AdapterEvent("ready", session_id=session_id, mode="manual"),)
+        return (AdapterEvent("ready", session_id=session_id, mode=self._mode),)
 
     def prompt(self, text: str, uuid: str | None = None) -> None:
         if self.session_id is None:
@@ -1263,7 +1302,10 @@ class DroidAdapter(_RPCAdapter):
             return _expire_owned(self._approvals, owner)
         if kind == "settings_updated":
             settings = _object(data.get("settings"))
-            if settings.get("autonomyLevel", "off") != "off" or settings.get("interactionMode", "auto") != "auto":
+            if (
+                _DROID_MODES.get(settings.get("autonomyLevel"), self._mode) != self._mode
+                or settings.get("interactionMode", "auto") != "auto"
+            ):
                 self.session_id = None
                 return _failure("unsafe-mode")
         if kind == "assistant_text_delta":

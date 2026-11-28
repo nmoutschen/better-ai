@@ -550,7 +550,10 @@ def open_cursor(reported, *chat):
     adapter.receive({"id": sent[-1]["id"], "result": {"protocolVersion": 1, "authMethods": [{"id": "cursor_login"}]}})
     adapter.receive({"id": sent[-1]["id"], "result": {}})
     events = adapter.receive(
-        {"id": sent[-1]["id"], "result": {"sessionId": "cs1", "configOptions": acp_option("approvalMode", reported)}}
+        {
+            "id": sent[-1]["id"],
+            "result": {"sessionId": "cs1", "configOptions": acp_option("approvalMode", reported) if reported else []},
+        }
     )
     return adapter, sent, events
 
