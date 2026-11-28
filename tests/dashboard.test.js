@@ -469,6 +469,8 @@ const DASH_LOG = {
 
 test('the dashboard draws a decision inside its row as your turn, with where it is from and its controls; a comment keeps its crumb', () => {
   const b = liveDashboard(DASH_LOG);
+  // The dashboard feeds the panel before it writes its header: the figure is in its slot all the same.
+  assert.equal(text(b.$('#status #yourturn')), '1 your turn');
   const d1 = b.rowOf('D1'), c1 = b.rowOf('c1');
   assert.equal(text(d1.querySelector('.chip')), 'Your turn');
   assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Answer']);

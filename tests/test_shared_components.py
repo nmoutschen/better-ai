@@ -151,8 +151,8 @@ class SharedComponents(unittest.TestCase):
         for kind, expected in (("ok", done), ("working", working), ("wait", wait), ("error", blocked)):
             border = re.search(r"border-color:var\((--[a-z-]+)\)", rule(PAGE_CSS, f".chip.{kind}")).group(1)
             self.assertEqual(table[border], expected, f".chip.{kind}")
-        # the progress word on a pin: asked umber, working terracotta-dark, done moss-dark
-        for kind, expected in (("asked", wait), ("working", table["--terracotta-dark"]), ("done", done)):
+        # the agent's progress word on a row: working terracotta-dark, done moss-dark (your turn is the umber .chip.wait)
+        for kind, expected in (("working", table["--terracotta-dark"]), ("done", done)):
             colour = re.search(r"(?<![-\w])color:var\((--[a-z-]+)\)", rule(PAGE_CSS, f".progress.{kind}")).group(1)
             self.assertEqual(table[colour], expected, f".progress.{kind} word")
         # the research board's dots, rings and legend
