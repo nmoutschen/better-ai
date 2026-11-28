@@ -50,13 +50,13 @@ def process_started(pid: int | None) -> str | None:
 
 
 def same_command(command: str | None, argv) -> bool:
-    """Whether a `ps` command line is the recorded argv. `ps` shows the resolved path of argv[0], so only its name counts."""
+    """Whether a `ps` command line is the recorded argv. `ps` shows the resolved path of argv[0], which can have another name, so the arguments decide."""
     if not command or not isinstance(argv, list) or not argv:
         return False
     rest = " ".join(str(part) for part in argv[1:])
     name = os.path.basename(str(argv[0]))
     if rest:
-        return command.endswith(" " + rest) and os.path.basename(command[: -len(rest) - 1]).startswith(name[:15])
+        return command.endswith(" " + rest)
     return os.path.basename(command) == name
 
 
