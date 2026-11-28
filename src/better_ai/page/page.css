@@ -278,6 +278,57 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .why { margin-top:var(--space-item); }
 .thread .reply + .why { margin-top:var(--space-edge); }
 
+/* One row per thread (pageConversation): the head, which opens and folds the thread, then its messages when open, then
+   how many messages and the buttons of its state. The left edge carries the state: umber your turn, terracotta working,
+   moss-dark done, sand otherwise. */
+.notes-top .seg button { white-space:nowrap; }
+.thread > li.trow { padding:var(--space-item); background:var(--white); border:1px solid var(--line); border-left:4px solid var(--sand); }
+.thread > li.trow[data-state="asked"] { border-left-color:var(--umber); }
+.thread > li.trow[data-state="working"] { border-left-color:var(--terracotta); }
+.thread > li.trow[data-state="done"] { border-left-color:var(--moss-dark); }
+.thead { display:block; width:100%; margin:0; padding:0; border:0; background:none; text-align:left; cursor:pointer; font:inherit; color:inherit; }
+.thead:hover .tgist { text-decoration:underline; }
+.ttop { display:flex; align-items:flex-start; gap:var(--space-control); }
+.tchips { flex:1; display:flex; flex-wrap:nowrap; align-items:center; gap:var(--space-tight) var(--space-control); min-height:28px; }
+.tchips .progress { white-space:nowrap; }
+/* The fold control is a drawn equilateral triangle, with no outline: ▼ to open, ▲ to fold. */
+.tfold { flex:none; margin-left:auto; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; color:var(--ink); }
+.thead:hover .tfold { color:var(--umber); }
+.tage { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--umber); }
+.tgist { display:block; margin:var(--space-tight) 0 0; font-size:var(--text-message); line-height:1.45; color:var(--heading); }
+.twho { font-weight:700; }
+.tfoot { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-tight) var(--space-control); margin-top:var(--space-control); }
+.tleft { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:baseline; font-size:var(--text-small); color:var(--muted); }
+.tleft .link { border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
+.tacts { display:flex; gap:var(--space-control); margin-left:auto; }
+.tacts .close { min-width:2.25rem; }
+/* Answer is the one filled button on a row, in the colour of what waits for you; the others are outlined. */
+.tacts .primary { padding-left:var(--space-section); padding-right:var(--space-section); }
+/* An open thread: its messages run flat across the row, no box inside the box; yours on white, the agent's on linen. */
+.tbody { margin:var(--space-control) calc(-1 * var(--space-item)) 0; border-top:1px solid var(--line); }
+.tmsg { padding:var(--space-control) var(--space-item); border-bottom:1px solid var(--line); }
+.tmsg.agent { background:var(--linen); --muted:var(--ink); }
+.tmsg .head { display:flex; flex-wrap:wrap; gap:var(--space-control); font-size:var(--text-small); color:var(--muted); }
+.tmsg .who { font-weight:700; color:var(--umber); }
+.tmsg.mine .who { color:var(--heading); }
+.tmsg .tag { font-weight:700; color:var(--error); }
+.tmsg .md, .tmsg > :not(.head) { font-size:var(--text-message); line-height:1.45; }
+.tmsg.agent code { background:var(--cream); }
+.tmsg code { padding:0 .2em; }
+li.trow .why { margin-top:var(--space-control); display:grid; gap:var(--space-tight); }
+li.trow .why label { margin:0; font-size:var(--text-small); font-weight:700; }
+li.trow .why textarea { border-color:var(--ink); }
+li.trow .why .row2 { display:flex; gap:var(--space-control); }
+li.trow .why .err { margin:0; font-size:var(--text-small); color:var(--error); font-weight:700; }
+/* A close in its undo window: the row stays in place as Closed, with its own Undo. */
+li.trow.closing { display:flex; justify-content:space-between; align-items:center; gap:var(--space-control); }
+.tclosed { flex:1; display:grid; gap:var(--space-tight); justify-items:start; }
+.tclosed .tgist { margin:0; color:var(--muted); }
+/* Rows out of view above: how many, and a way there. */
+.tabove { display:block; width:calc(100% - 2 * var(--space-edge)); margin:0 var(--space-edge) var(--space-tight); padding:var(--space-tight); border:1px solid var(--line);
+  background:var(--white); cursor:pointer; font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
+.tabove[hidden] { display:none; }
+
 /* The Approve… panel (pageApprovalPanel), above the message box. */
 .approval { border:1px solid var(--sand); background:var(--white); padding:var(--space-control) var(--space-item); margin-bottom:var(--space-item); }
 .approval .menu-h { color:var(--muted); margin:0 0 var(--space-control); }

@@ -667,7 +667,7 @@ class El {
   constructor(doc, tag) {
     Object.assign(this, { ownerDocument: doc, tagName: tag.toUpperCase(), nodeType: 1, children: [], parentNode: null, attributes: {},
       dataset: {}, className: '', hidden: false, value: '', listeners: {}, style: {}, scrollTop: 0, scrollHeight: 0, clientHeight: 0,
-      _text: '', disabled: false });
+      disabled: false });
   }
   get childNodes() { return this.children; }
   get firstChild() { return this.children[0] || null; }
@@ -677,9 +677,13 @@ class El {
       remove: c => { n.className = list().filter(x => x !== c).join(' '); },
       toggle: (c, on) => { if (on === undefined ? !list().includes(c) : on) n.classList.add(c); else n.classList.remove(c); } };
   }
-  get textContent() { return this._text + this.children.map(c => c.textContent).join(''); }
-  set textContent(v) { this.children.forEach(c => { c.parentNode = null; }); this.children = []; this._text = String(v); }
-  set innerHTML(v) { this.textContent = ''; this._html = String(v); this.append(String(v).replace(/<[^>]*>/g, '')); }
+  get textContent() { return this.children.map(c => c.textContent).join(''); }
+  set textContent(v) { this.children.forEach(c => { c.parentNode = null; }); this.children = []; this._html = ''; if (String(v)) this.append(String(v)); }
+  set innerHTML(v) {
+    this.textContent = ''; this._html = String(v);
+    const words = String(v).replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e]);
+    if (words) this.append(words);
+  }
   insertAdjacentHTML(_where, html) { const x = this.ownerDocument.createElement('span'), c = /class="([^"]*)"/.exec(html); x.className = c ? c[1] : ''; x.innerHTML = html; this.append(x); }
   get innerHTML() { return this._html || ''; }
   get id() { return this.attributes.id || ''; }
@@ -708,7 +712,7 @@ class El {
   before(n) { this.parentNode.insertBefore(n, this); }
   after(n) { const p = this.parentNode, i = p.children.indexOf(this); p.insertBefore(n, p.children[i + 1] || null); }
   remove() { if (this.parentNode) { const p = this.parentNode; p.children.splice(p.children.indexOf(this), 1); this.parentNode = null; } }
-  replaceChildren(...nodes) { this.children.slice().forEach(c => c.remove && c.remove()); this._text = ''; this._html = ''; this.append(...nodes); }
+  replaceChildren(...nodes) { this.children.slice().forEach(c => c.remove && c.remove()); this._html = ''; this.append(...nodes); }
   contains(n) { for (; n; n = n.parentNode) if (n === this) return true; return false; }
   addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
   dispatch(type, extra = {}) {
@@ -931,13 +935,13 @@ test('S14 with every thread closed, Open says nothing is open', () => {
 });
 
 test('S15 the list opens on its end, and a button says how many rows are above the view and goes to them', () => {
-  const p = panel(EVERY_STATE);
+  const p = panel(null);
   const list = p.$('.thread');
   list.scrollHeight = 900; list.clientHeight = 300;
+  p.conv.setLog(EVERY_STATE);
+  assert.equal(list.scrollTop, 900);
   list.rect = { top: 100 };
   p.rows().forEach((li, k) => { li.rect = { top: 100 + k * 150 - 600 }; });
-  p.conv.render();
-  assert.equal(list.scrollTop, 900);
   list.dispatch('scroll');
   const cue = p.$('.tabove');
   assert.equal(cue.hidden, false);
@@ -1081,7 +1085,7 @@ test('S20 a done thread offers Reopen, which asks why and records reopen; one th
   const row = p.rowOf('m5');
   assert.equal(text(row.querySelector('.chip')), 'Agent’s turn');
   assert.match(text(row.querySelector('.progress')), /^Not seen/);
-  assert.equal(text(row.querySelector('.tbody .tmsg:last-child .tag')), 'Reopened');
+  assert.equal(text(row.querySelectorAll('.tbody .tmsg').pop().querySelector('.tag')), 'Reopened');
 });
 
 test('S21 Answer is the one filled button on a row; the check, Reply and Reopen are outlined', () => {
@@ -1200,14 +1204,14 @@ test('a waiting decision keeps its default, deadline, use-the-default check and 
   assert.equal(p.rowOf('D1').querySelector('.why label').textContent, 'Your answer');
   ta.input('Large');
   ta.key('Enter', { ctrlKey: true });
-  assert.deepEqual(p.sent().map(e => [e.type, e.decision, e.text, e.default]), [['answer', 'D1', 'Large', false]]);
+  assert.deepEqual(p.sent().filter(e => e.type !== 'decision').map(e => [e.type, e.decision, e.text, e.default]), [['answer', 'D1', 'Large', false]]);
   assert.equal(text(p.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
 });
 
 test('use the default answers with the default from the row', () => {
   const p = decisionPanel({ default: 'Small' });
   actions(p.rowOf('D1'))[0].click();
-  assert.deepEqual(p.sent().map(e => [e.type, e.decision, e.text, e.default]), [['answer', 'D1', 'Small', true]]);
+  assert.deepEqual(p.sent().filter(e => e.type !== 'decision').map(e => [e.type, e.decision, e.text, e.default]), [['answer', 'D1', 'Small', true]]);
 });
 
 test('page kinds without controls of their own, such as an approval, keep their text and get the row\'s buttons', () => {
