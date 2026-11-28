@@ -702,16 +702,8 @@ class VerbsTest(Fixture):
         self.assertIn(f"no comment or message with id {under}", err)
         self.assertEqual(len(self.log()), before)
 
-    def test_pending_selects_deliverable_items_from_the_shared_table_of_logs(self):
-        """The page shows every thread. Outside a page session, pending delivers the threads that are the agent's turn
-        and new, or seen only because the agent's --read covered them (no status of its own names them since: they may
-        never have been delivered), with the line to pass as --read. One the agent marked seen or working comes again
-        only in the turn after its own, or after a crash (S15)."""
-        seen_by_read = {
-            "seen: the agent's latest read covers your latest message in another thread",
-            "seen: each state shows when it started, and a status that changes nothing keeps it",
-            "stale: a stale status still counts as reading what came before",
-        }
+    def test_pending_lists_the_threads_of_the_shared_table_that_are_the_agents_turn(self):
+        """`pending` prints each thread that is the agent's turn, with its step as `status`, and the thread under it."""
         for case in TABLE:
             if "items" in case:
                 continue  # the fixture page tracks comments and notes, and approvals
@@ -721,13 +713,8 @@ class VerbsTest(Fixture):
                 code_, out, _ = self.cli("pending", self.unit_arg)
                 lines = out.splitlines()
                 self.assertEqual(code_, 0)
-                items = [event for event in map(json.loads, lines[:-1]) if "status" in event]
-                expected = [
-                    [t["id"], t["step"]]
-                    for t in case["threads"]
-                    if t["state"] == "agent"
-                    and (t["step"] == "new" or (t["step"] == "seen" and case["name"] in seen_by_read))
-                ]
+                items = [json.loads(line) for line in lines[:-1]]
+                expected = [[t["id"], t["step"]] for t in case["threads"] if t["state"] == "agent"]
                 self.assertEqual([[e["id"], e["status"]] for e in items], expected)
                 read = len(case["log"]) - 1
                 self.assertEqual(lines[-1], f"{len(items)} not done. Pass --read {read} to status and reply.")
