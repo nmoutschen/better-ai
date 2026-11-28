@@ -112,7 +112,7 @@ class LogicFlowChecks(unittest.TestCase):
     def test_decision_needs_two_labelled_outcomes(self):
         design = example()
         flow = logic(design)
-        flow["edges"] = [e for e in flow["edges"] if e["id"] != "e-reject"]
+        flow["edges"] = [e for e in flow["edges"] if e["id"] not in ("e-reject", "e-again")]  # leaves one outcome
         found = errors(design)
         self.assertIn("'ok'", found)
         self.assertIn("two", found)
@@ -142,7 +142,9 @@ class LogicFlowChecks(unittest.TestCase):
         self.assertIn("reach", found)
         design = example()
         logic(design)["nodes"].append({"id": "stuck", "type": "step", "label": "Stuck", "in": ["after"]})
-        logic(design)["edges"].append({"id": "e-stuck", "from": "draft", "to": "stuck", "label": "try", "in": ["after"]})
+        logic(design)["edges"].append(
+            {"id": "e-stuck", "from": "draft", "to": "stuck", "label": "try", "in": ["after"]}
+        )
         found = errors(design)
         self.assertIn("'stuck'", found)
         self.assertIn("after", found)
@@ -245,6 +247,18 @@ class LogicFlowDrawing(unittest.TestCase):
         for i, (a, r) in enumerate(labels):
             for b, s in labels[i + 1 :]:
                 self.assertFalse(overlap(r, s), (a, b))
+        # A connector's circle and an edge's label are in the way of every other edge too.
+        circles = {
+            ident: (cx - 9, cy - 9, 18, 18)
+            for ident, loop in shape["loops"].items()
+            for cx, cy in loop.get("circles", [])
+        }
+        for ident, parts in lines.items():
+            for other, rect in [*circles.items(), *labels]:
+                if other == ident:
+                    continue
+                for s in parts:
+                    self.assertFalse(through(s, rect), (ident, other, s))
 
     def test_logic_before_after(self):
         before, after = self.svg("before"), self.svg("after")
@@ -316,6 +330,20 @@ class Groupings(unittest.TestCase):
         ix, iy, iw, ih = rect_of(root, "cruns-after-group-tab")
         self.assertTrue(ox < ix and oy < iy and ix + iw < ox + ow and iy + ih < oy + oh)
 
+    def test_outlines_inside_the_drawing(self):
+        for name, svg in diagram.drawings(example()).items():
+            if not name.startswith("containers"):
+                continue
+            root = ET.fromstring(svg)
+            vx, vy, vw, vh = (float(v) for v in root.get("viewBox").split())
+            for group in root.iterfind(".//*[@id]", NS):
+                if "-group-" not in group.get("id"):
+                    continue
+                gx, gy, gw, gh = rect_of(root, group.get("id"))
+                self.assertTrue(
+                    vx <= gx and gx + gw <= vx + vw and vy <= gy and gy + gh <= vy + vh, (name, group.get("id"))
+                )
+
     def test_trust_crossing_marks(self):
         design = example()
         root = ET.fromstring(diagram.drawings(design)["containers-trust-after.svg"])
@@ -334,9 +362,7 @@ class Groupings(unittest.TestCase):
     def test_overlay_switch(self):
         overlays = [{"id": "trust", "name": "Trust"}, {"id": "runs", "name": "Where it runs"}]
         html = run_page_js("controls([], false, [], data)", overlays)
-        self.assertEqual(
-            [b.split('"')[0] for b in html.split('data-overlay="')[1:]], ["systems", "trust", "runs"]
-        )
+        self.assertEqual([b.split('"')[0] for b in html.split('data-overlay="')[1:]], ["systems", "trust", "runs"])
         for word in ("Systems", "Trust", "Where it runs"):
             self.assertIn(">" + word + "<", html)
         self.assertNotIn("data-overlay", run_page_js("controls([], false, [], data)", []))
@@ -344,7 +370,9 @@ class Groupings(unittest.TestCase):
         self.assertEqual([o["id"] for o in data[2]], ["trust", "runs"])
         self.assertEqual([o["name"] for o in data[2]], ["Trust", "Where it runs"])
         plain = example()
-        plain["containers"]["groups"] = [g for g in plain["containers"]["groups"] if g.get("kind", "boundary") == "boundary"]
+        plain["containers"]["groups"] = [
+            g for g in plain["containers"]["groups"] if g.get("kind", "boundary") == "boundary"
+        ]
         self.assertEqual(model.render_diagrams(plain, {})[2], [])
 
 

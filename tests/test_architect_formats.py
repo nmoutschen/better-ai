@@ -728,6 +728,7 @@ class Templates(unittest.TestCase):
     def fill(line):
         line = line.replace("<UTC time>", AT).replace("<agent>", "architect").replace("<n>", "1")
         line = line.replace("<before | after>", "before").replace("<request | response | async>", "request")
+        line = line.replace("<positive | negative>", "positive")
         line = re.sub(r"<SHA-256[^>]*>", DIGEST, line)
         return re.sub(r"<[^<>\"]+>", "text", line)
 
@@ -820,6 +821,7 @@ KINDWORDS = {
     "functional", "quality", "constraint", "spec", "gap", "unlinked", "perspective", "finding", "review", "architect",
     "service", "person", "box", "step", "async", "response", "dashboard", "after", "before",
     "agent", "proof of concept", "spec check", "running", "done", "stopped",
+    "trust", "runs", "logic", "start", "exit",
 }  # fmt: skip
 
 

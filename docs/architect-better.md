@@ -29,7 +29,7 @@ Use something else nearby:
 
 In every design, it:
 
-- **Draws the current system.** It checks the affected containers and flows against the code and asks you to correct the drawing.
+- **Draws the current system.** It checks the affected containers and flows against the code and asks you to correct the drawing. Where the change has a process with decisions, loops back and exits, or a lifecycle, it draws a logic flow; where trust or hosting matters, it groups the boxes by trust zone or by where they run. It draws only the views the change touches.
 - **Agrees requirements with you.** It drafts observable scenarios for quality attributes, marks its guesses and shows where each requirement came from.
 - **Shows options and trade-offs.** It recommends a design, explains why it rejected alternatives and records the main drawback of each choice.
 - **Tests what documentation cannot settle.** When a choice rests on how a tool or library behaves, it proposes a throwaway proof of concept with the questions it must answer, runs it once you agree, and writes what it observed into the design. A result that contradicts a choice comes back to you.
@@ -65,7 +65,7 @@ It takes longer when the current system has no diagrams yet, when you ask for al
 <details>
 <summary><b>The live page</b></summary>
 
-Switch between Before and After in Containers and Flows, or between Before and each alternative design, with its strengths and drawbacks above the diagram. Overview lists the alternatives side by side. Click a box, arrow or step to comment. Confirm a guessed requirement or choose Change to correct a row. The agent replies under your message.
+Switch between Before and After in Containers and Flows, or between Before and each alternative design, with its strengths and drawbacks above the diagram. When the design groups its boxes by trust or by where they run, switch Containers between Systems, Trust and Where it runs; arrows that cross a trust boundary carry a mark. Overview lists the alternatives side by side. Click a box, arrow or step to comment. Confirm a guessed requirement or choose Change to correct a row. The agent replies under your message.
 
 The Agents list at the top of the conversation shows each reviewer, proof of concept or spec check at work.
 

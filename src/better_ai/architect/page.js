@@ -65,22 +65,26 @@ function decisionRecords(decisions) {
   }).join('');
 }
 
-// The versions to switch between, Before and each version after the change, shown only when there is more than one.
-function controls(perspectives, review, versions = []) {
+// The versions to switch between, Before and each version after the change, shown only when there is more than one;
+// on Containers, the groupings to switch between, Systems and each other one the design uses.
+function controls(perspectives, review, versions = [], overlays = []) {
   const segment = (label, attr, options) => '<div class="seg seg--light" role="group" aria-label="' + label + '">' +
     options.map(([key, name]) => '<button type="button" data-' + attr + '="' + text(key) +
       '" aria-pressed="false">' + text(name) + '</button>').join('') + '</div>';
   return '<div class="controls">' +
     (versions.length > 1 ? segment('Version', 'version', versions.map(v => [v.id, v.name])) : '') +
+    (overlays.length ? segment('Grouping', 'overlay', [['systems', 'Systems'], ...overlays.map(o => [o.id, o.name])]) : '') +
     (review ? segment('Findings', 'findings', [['', 'No findings'], ...perspectives.map(p => [p.id, p.name])]) : '') + '</div>';
 }
 
-// One drawing per version; a version that does not draw a flow says so, by the version's name.
-function figures(drawings, versions = [], empty) {
+// One drawing per version; a version that does not draw a flow says so, by the version's name. A Containers drawing
+// also names its grouping.
+function figures(drawings, versions = [], empty, overlay) {
   const nameOf = state => (versions.find(v => v.id === state) || {}).name || state;
   const missing = state => empty || (state === 'before' ? 'This flow does not exist before the change.' :
     state === 'after' ? 'This flow does not exist after the change.' : 'This flow is not part of ' + nameOf(state) + '.');
-  return Object.entries(drawings).map(([state, svg]) => '<div class="fig" data-state="' + text(state) + '" hidden>' +
+  const grouping = overlay ? ' data-overlay="' + text(overlay) + '"' : '';
+  return Object.entries(drawings).map(([state, svg]) => '<div class="fig" data-state="' + text(state) + '"' + grouping + ' hidden>' +
     (svg || '<p class="muted">' + text(missing(state)) + '</p>') + '</div>').join('');
 }
 
@@ -240,7 +244,8 @@ function start(data) {
   const revKey = 'architecture-page';
   const saved = JSON.parse(sessionStorage.getItem(revKey) || '{}');
   sessionStorage.removeItem(revKey);
-  let tab, version, findings;
+  let tab, version, findings, overlay;
+  const overlays = data.overlays || [];
   const requirementWording = new Map(data.requirements.map(req => [req.id, req.wording]));
   let commentsById = new Map();
   const partByElement = new Map();
@@ -267,7 +272,10 @@ function start(data) {
     text(data.scope) + '</p>' + alternativeTable(alternatives) + '<h3>Sections</h3>' + table(['Section', 'Status'], sections));
   section('requirements', 'Requirements', table(['ID', 'Kind', 'Requirement', 'Source', 'Actions'], requirementRows(data.requirements)));
   const diagramControls = controls(applicable, review, versions) + alternativeCards(alternatives);
-  section('containers', 'Containers', diagramControls + figures(data.containers, versions, 'The containers are not drawn: see the errors above.'));
+  const notDrawn = 'The containers are not drawn: see the errors above.';
+  section('containers', 'Containers', controls(applicable, review, versions, overlays) + alternativeCards(alternatives) +
+    figures(data.containers, versions, notDrawn, overlays.length ? 'systems' : undefined) +
+    overlays.map(o => figures(o.drawings, versions, notDrawn, o.id)).join(''));
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
     '<h3 class="figtitle">' + text(flow.name) + ' ' + flowMarks(flow.status) + '</h3>' +
     figures(flow.versions, versions)).join(''));
@@ -312,7 +320,20 @@ function start(data) {
     const known = versions.map(v => v.id);
     version = known.includes(state) ? state : known[1] || 'before';
     all('[data-version]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.version === version)));
-    all('.fig, .by-version').forEach(node => { node.hidden = node.dataset.state !== version; });
+    showFigures();
+  }
+
+  // Shows the Containers drawing of one grouping; Systems by default.
+  function setOverlay(key) {
+    overlay = overlays.some(o => o.id === key) ? key : 'systems';
+    all('[data-overlay]').forEach(b => { if (b.matches('button')) b.setAttribute('aria-pressed', String(b.dataset.overlay === overlay)); });
+    showFigures();
+  }
+
+  function showFigures() {
+    all('.fig, .by-version').forEach(node => {
+      node.hidden = node.dataset.state !== version || (node.dataset.overlay !== undefined && node.dataset.overlay !== overlay);
+    });
     placePins();
   }
 
@@ -376,7 +397,9 @@ function start(data) {
     const element = locate(event);
     if (!element) return;
     showTab(element.closest('[role="tabpanel"]').id.slice(6));
-    if (element.closest('.fig')) setVersion(element.closest('.fig').dataset.state);
+    const fig = element.closest('.fig');
+    if (fig?.dataset.overlay) setOverlay(fig.dataset.overlay);
+    if (fig) setVersion(fig.dataset.state);
     element.scrollIntoView({block: 'center'});
   }
 
@@ -424,7 +447,7 @@ function start(data) {
     reveal, edit: editComment, remove: event => commentLayer.remove(event), showLabel: n => 'Show comment ' + n,
     busy: () => !pop.hidden || !!approval?.open() || !!$('.edit:not([hidden])'),
     sendMode: () => approval?.sendMode() || null,
-    beforeReload: () => sessionStorage.setItem(revKey, JSON.stringify({tab, version, findings, scroll: view.scrollTop})),
+    beforeReload: () => sessionStorage.setItem(revKey, JSON.stringify({tab, version, findings, overlay, scroll: view.scrollTop})),
     rendered: states => {
       const log = conversation.log();
       const model = pageThread(log, items, waiting, true);
@@ -490,6 +513,7 @@ function start(data) {
     const link = event.target.closest('a');
     if (button?.matches('[role="tab"]')) showTab(button.id.slice(4));
     if (button?.matches('[data-version]')) setVersion(button.dataset.version);
+    if (button?.matches('[data-overlay]')) setOverlay(button.dataset.overlay);
     if (button?.matches('[data-findings]')) { clearHighlight(); setFindings(button.dataset.findings); }
     if (link?.matches('[data-parts]')) { event.preventDefault(); revealFinding(link); }
     if (link?.matches('[data-section]')) { event.preventDefault(); showTab(link.dataset.section); }
@@ -600,6 +624,7 @@ function start(data) {
   }
 
   showTab(saved.tab || 'overview');
+  setOverlay(saved.overlay);
   setVersion(saved.version);
   setFindings(saved.findings);
   view.scrollTop = saved.scroll || 0;

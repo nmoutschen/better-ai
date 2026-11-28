@@ -36,6 +36,10 @@ TO RUN it, READ and FOLLOW [../agents/proof-of-concept.md](../agents/proof-of-co
 
 WHEN it hands back, PUT its results in `design.md` as evidence: in each decision's "Assumes", WRITE what was observed and whether it confirms the assumption, and UPDATE the unresolved questions. WHEN a result contradicts a decision or the design, ASK the user about the decision again, with what was observed, before you go on. POST the results in the page in one or two sentences.
 
+### Views
+
+DRAW the containers and the sequence flows the change touches. DRAW a logic flow only WHEN the change has a process with decisions, loops back or exits, or something with a lifecycle of states. GROUP the boxes by trust WHEN the security or the data and privacy perspective applies, and by where they run WHEN the change touches hosts, networks or regions. DO NOT draw a view of what the change does not touch. CHECK each loop back, exit, timeout and trust crossing against the code or the request.
+
 ### Box kinds
 
 RUN `python3 <skill dir>/scripts/better.pyz register <unit>`, then READ `register.html` in the unit for the available box kinds. USE only kinds from that register.
