@@ -9,8 +9,7 @@ python3 <skill dir>/scripts/better.pyz check .show/SLUG
 python3 <skill dir>/scripts/better.pyz render .show/SLUG
 python3 <skill dir>/scripts/better.pyz render .show/SLUG --format text
 python3 <skill dir>/scripts/better.pyz render .show/SLUG --format md
-python3 <skill dir>/scripts/better.pyz serve .show/SLUG --open
-python3 <skill dir>/scripts/better.pyz wait .show/SLUG --timeout S
+python3 <skill dir>/scripts/better.pyz serve .show/SLUG
 python3 <skill dir>/scripts/better.pyz reply .show/SLUG --to ID
 python3 <skill dir>/scripts/better.pyz status .show/SLUG seen|asked|working|done ID...
 python3 <skill dir>/scripts/better.pyz status .show/SLUG accepted ID... --text

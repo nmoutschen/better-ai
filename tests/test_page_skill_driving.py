@@ -19,14 +19,6 @@ from better_ai.paths import Unit  # noqa: E402
 from better_ai.research import SKILL as RESEARCH  # noqa: E402
 
 AT = "2026-06-01T12:00:00Z"
-WORDING = {
-    "architect-better/modes/design.md": "## 2.",
-    "code-better/modes/coordinate.md": "## 2. Start the builders",
-    "design-better/SKILL.md": "### Show versions on one page",
-    "discover-better/SKILL.md": "## General rules",
-    "research-better/SKILL.md": "## General rules",
-    "show-better/SKILL.md": "## 6. Work with the user in the page",
-}
 
 
 class SkillDrivingTest(unittest.TestCase):
@@ -122,50 +114,3 @@ class SkillDrivingTest(unittest.TestCase):
                 with patch("better_ai.page.triggers.datetime", wraps=datetime) as clock:
                     clock.now.return_value = clock.fromisoformat(AT.replace("Z", "+00:00"))
                     self.assertEqual(self.trigger_ids(unit), ["decision:D1", "decision:D4"])
-
-    def test_all_six_page_rules_are_identical_and_in_the_right_sections(self):
-        rules = []
-        for name, section in WORDING.items():
-            with self.subTest(skill=name):
-                text = (ROOT / "skills" / name).read_text(encoding="utf-8")
-                blocks = text.split("\n\n")
-                matching = [block for block in blocks if "serve <unit> --drive auto" in block]
-                self.assertEqual(len(matching), 1)
-                block = matching[0]
-                self.assertLess(text.index(section), text.index(block))
-                self.assertEqual(text.count("STREAM the serve command"), 1)
-                rules.append(block)
-        self.assertEqual(len(rules), len(WORDING))
-        self.assertEqual(len(set(rules)), 1)
-        for wording in (
-            "hand-off note on stdin",
-            "`driver: on`",
-            "the page has its own agent",
-            "END the turn",
-            "`driver: off <kind>`",
-            "kind and its action in one line",
-            "STREAM the serve command",
-            "wait <unit>",
-            'say "sent"',
-            "30 seconds",
-            "`driver: off crashed`",
-            "enrollment address",
-            "immediately",
-            "120 seconds from startup",
-            '"ask it in the page"',
-            "a session opened by the page",
-            "DO NOT run `serve`",
-        ):
-            self.assertIn(wording, rules[0])
-
-    def test_existing_wait_steps_are_preserved(self):
-        architect = (ROOT / "skills/architect-better/modes/design.md").read_text(encoding="utf-8")
-        self.assertIn(
-            "WAIT for the user's confirmation or correction and APPLY any corrections. DO NOT start step 3 before "
-            "the user confirms or corrects Before: HANDLE other actions and START `wait` again;",
-            architect,
-        )
-        discover = (ROOT / "skills/discover-better/SKILL.md").read_text(encoding="utf-8")
-        self.assertEqual(discover.count("WAIT for the analysts' and the quote verifiers' hand-backs."), 2)
-        research = (ROOT / "skills/research-better/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("WAIT for them, THEN SET the brief's `status` to `stopped`", research)

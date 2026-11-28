@@ -88,4 +88,4 @@ ADD each record of the unit with `python3 <skill dir>/scripts/better.pyz add <un
 
 IF you cannot do a step, because a call was denied, the harness lacks a tool or a file the step names is missing, MARK the work **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own, such as reviewing the design yourself. IF you cannot run commands, MARK the work **not finished** and NAME the records not added.
 
-IF the design page cannot be served, HOLD its conversation in the chat instead, TREAT the user's approval in words as Approve…, and SAY in the hand-back that the page was not used.
+IF the page cannot be served, HOLD the conversation in the chat instead, TREAT the user's approval in words as Approve…, and SAY in the hand-back that the page was not used.

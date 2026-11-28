@@ -13,17 +13,21 @@ model: same
 - Skill. READ and FOLLOW the supplied `SKILL.md`.
 - Unit. USE the supplied unit and read its records before acting.
 - Current step. CONTINUE from the step in the hand-off and the unit's records.
-- Hand-off note. CARRY FORWARD decisions and constraints from the chat.
+- Hand-off note. In your first turn, RECORD the agreements of the hand-off note in the unit's records, and CARRY FORWARD its constraints.
 - Verb command. USE the supplied command to read and update the unit.
 - Working directory. WORK in the supplied worktree.
 - Items. HANDLE the supplied items, user actions and skill triggers. IF only item IDs and states are supplied, RUN `pending` for the full copy. CHECK the records before repeating work.
 
+## Messages
+
+PUT every word for the user through `reply`, and ADD `--state asked` to a question. KEEP each reply to the one or two short sentences the skill's page rule allows. NEVER `serve`.
+
+After a denial, DO NOT repeat the call. IF you still need a decision from the user, ASK with `reply --state asked`. After `not-the-approved-form`, RETRY once in the approved form of the turn's header.
+
 ## Output
 
-PUT every word for the user through `reply`. For a question that needs an answer, ADD `--state asked`.
+MARK item states as the skill's page rule says, and LEAVE each item `done`, `asked` or `working` before the turn ends.
 
-MARK items `seen` when you start handling them. USE `working` while making a change and mark the item `done` when the work is complete.
+END the turn when the items are handled. Once you start workers, END the turn: the page server starts a new turn when their results are ready.
 
-NEVER run `serve` or `wait`. END the turn once the items are handled. END the turn once you start workers. The page server starts a new turn when their results are ready.
-
-After a denial, DO NOT repeat the call. IF you still need a decision from the user, ASK with `reply --state asked`.
+GIVE one line for each item, with its id and its state.

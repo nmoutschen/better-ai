@@ -57,7 +57,7 @@ WHEN you resume a board whose brief has `mode` `explore`, READ and FOLLOW [modes
 
 TELL the user the board's path once.
 
-FOLLOW the general rule [Start the live view](#start-the-live-view). IF the harness can only run commands in the foreground, TELL the user they can start the live view themselves.
+FOLLOW the general rule [Start the live view](#start-the-live-view).
 
 The live view shows the board as a map of the questions, the agents at work, and the decisions waiting for the user or taken without them. The user asks about a question or an agent, messages you, and changes your decisions there.
 
@@ -68,8 +68,6 @@ The live view shows the board as a map of the questions, the agents at work, and
 - POST an update with `reply` and no `--to` each time your review of the board (step 6.2) changes something the workers' messages do not show: you opened, merged or dropped proposed questions, added a challenge, conflict or gap question, corrected or withdrawn claims after verification, or set the board to checking or stopped. PUT the changes from one review in one update of one or two sentences, and NAME questions by their title, not their ID.
 
 DO NOT stop the research to wait for the user: the user often leaves a run alone. WHEN something only the user can decide comes up during the run, such as a COLLECTION that asks for a login, CHOOSE the default that keeps the research honest, such as continuing without that COLLECTION and recording the gap, and ADD the decision with `python3 <skill dir>/scripts/better.pyz add <board> decision --by coordinator`, with `status` `waiting`, your `default` and a `deadline` of `+10m`, or sooner if the research will likely end before then, so a decision never delays the end of the run (see the board format). WHEN the stop rules apply while a decision is waiting, APPLY its default and CONTINUE to stop. WORK on other questions meanwhile. EACH time you re-read the board, APPLY the user's answer if one came (`status` `answered`, with its `answer`), the default if the user accepted it (an answer with `default: true`) or once the deadline has passed (`status` `defaulted`). EACH time, REPLY under the decision, with `--to` the id of the user's answer or, if none came, the decision's own id, so the page shows what happened in the same thread. WHEN the user changes a decision after that, APPLY the change, SET the `status` to `answered` with the new `answer`, and SET the brief's `status` back to `running` if it had stopped.
-
-IF the user has no live view, REPORT progress in the chat each time a question is closed: one line with the question, its status, and how many questions remain open.
 
 IF you cannot run commands, KEEP the board in your working notes and RESTATE it in full after every few results.
 
@@ -216,7 +214,7 @@ FOLLOW these rules in every step.
 
 ### Start the live view
 
-IF you are in a session opened by the page, DO NOT run `serve`. IF the page already has its own agent, ANSWER questions about it in the chat with "ask it in the page". IF you are in the chat, the page is not already served, your harness can run a background command, and the user's browser can reach this machine, RUN `python3 <skill dir>/scripts/better.pyz serve <unit> --drive auto --open` in the background with the hand-off note on stdin. INCLUDE the current step and what the page agent needs to continue. READ the startup output. IF serve prints a first-time enrollment address, GIVE it to the user immediately, ASK them to enroll there, and WAIT at most 120 seconds from startup for the driver result. OTHERWISE, LOOK for the driver line within 30 seconds from startup. IF no driver line arrives by the applicable deadline, TREAT it as `driver: off crashed`. IF serve prints `driver: on`, GIVE the user the address it prints, whole, including its `#p=` or `#t=` part, SAY the page has its own agent, and END the turn. IF serve prints `driver: off <kind>` or you reached the deadline without a driver line, TELL the user the kind and its action in one line. THEN, in the wait fallback, GIVE the fallback page address when serve prints it. IF you can stream output, STREAM the serve command's output and restart an expired stream. OTHERWISE, IF your harness can tell you when a background command ends, RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` in the background and START it again each time it ends before you act on its output. OTHERWISE, ASK the user to say "sent" in the chat and RUN `python3 <skill dir>/scripts/better.pyz pending <unit>` when they do.
+IF you are in a session opened by the page, NEVER serve. WRITE what a step says to say or ask in the chat as a `reply` in the page. GIVE the skill's hand-back as one `reply` without `--to`. LET the user accept only with Accept, and ASK them to press it WHEN they accept in words. WHEN a step leads into a skill that serves its own page, REPLY that the step starts from the user's chat, with what to ask there, MARK the item `done`, and END the step. IF you are in the chat, your harness can run a background command, and the user's browser can reach this machine, RUN `python3 <skill dir>/scripts/better.pyz serve <unit>` in the background with the hand-off note on stdin: the step you reached and what was agreed in the chat. IF the unit already has a `.driver` file, PASS no hand-off note. READ the first `driver:` line. IF it is `driver: on`, SAY the page opened in the browser with its own agent, and END the turn. IF it is `driver: on` and the word `already`, SEND the user to the open page, and RUN `python3 <skill dir>/scripts/better.pyz link <unit>` IF they ask for a new tab. IF it is `driver: off`, or no `driver:` line comes within 40 seconds, SHOW the problem in one line and FOLLOW the skill's Missing capabilities for a page that cannot be served. AFTER the hand-off, DO NOT edit the unit, and WORK in a worktree. WHEN the user asks in the chat about the page, ANSWER "ask it in the page".
 
 ### Tools and collections
 
@@ -241,3 +239,7 @@ Search and fetch tools do not always return the page: some return a model-writte
 - RECORD how you read each source: `raw` (full page text), `extracted` (a fetch tool's processed output), `abstract` (only the abstract or summary page of a paper, read on the page itself), `snippet` (only text from a search tool), or `blocked`. An `abstract` is evidence only for what the abstract states.
 
 IF a page cannot be read, because the site blocks automated access, asks for a login, or shows no text, DO NOT get around the block. LOOK for another copy, such as an archived or open-access version, or for the primary source it reports on. OTHERWISE, MARK it blocked and DO NOT use it as evidence.
+
+### Missing capabilities
+
+IF the page cannot be served, REPORT progress in the chat each time a question is closed, without the live view: one line with the question, its status, and how many questions remain open.

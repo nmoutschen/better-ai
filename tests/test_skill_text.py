@@ -725,7 +725,7 @@ class SkillTextCommands(unittest.TestCase):
 
     def test_commands_are_named_by_their_common_names(self):
         """Every `better.pyz` command line in the text uses a verb the contract names."""
-        verbs = {"create", "add", "set", "check", "serve", "wait", "reply", "status", "pending", "render"}
+        verbs = {"create", "add", "set", "check", "serve", "link", "reply", "status", "pending", "render"}
         pattern = re.compile(r"scripts/better\.pyz (\S+)")
         for path in self.files():
             for verb in pattern.findall(path.read_text()):
@@ -755,11 +755,11 @@ class SkillTextCommands(unittest.TestCase):
                 self.assertNotIn("after every write", text.casefold(), path.name)
                 self.assertNotIn("START each record with", text, path.name)
 
-    def test_serve_opens_the_browser_only_with_open_and_reply_takes_its_words_on_stdin(self):
+    def test_serve_takes_no_flag_and_reply_takes_its_words_on_stdin(self):
         for path in self.files():
             text = path.read_text()
             for line in re.findall(r"better\.pyz serve [^`]*`", text):
-                self.assertIn("--open", line, path.name)
+                self.assertNotIn("--", line, path.name)
             for line in re.findall(r"better\.pyz reply [^`]*`", text):
                 self.assertNotIn('"', line, path.name)
 
@@ -839,7 +839,7 @@ class UnifiedCommandText(unittest.TestCase):
 
     def test_show_better_names_commands_only_and_design_better_approves(self):
         spec = (ROOT / "skills" / "show-better" / "formats" / "spec.md").read_text()
-        for verb in ("create", "check", "render", "serve", "wait", "reply", "status", "pending"):
+        for verb in ("create", "check", "render", "serve", "reply", "status", "pending"):
             self.assertIn(f"better.pyz {verb} ", spec)
         design = (ROOT / "skills" / "design-better" / "SKILL.md").read_text()
         self.assertIn("type `canvas`", design)

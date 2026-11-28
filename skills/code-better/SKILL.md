@@ -136,4 +136,4 @@ WHEN you commit, STAGE the files you changed by path, NEVER with `git add -A` or
 
 ### Missing capabilities
 
-IF you cannot do a step, because a call was denied or the harness lacks a tool, MARK the change **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own.
+IF you cannot do a step, because a call was denied or the harness lacks a tool, MARK the change **not finished**, and SAY which step, WHY, and what it leaves unchecked. DO NOT present that step as done, and DO NOT replace it with a step of your own. IF the page cannot be served, MARK the change **not finished**, and SAY that the dashboard was not shown.
