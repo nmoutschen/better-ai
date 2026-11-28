@@ -72,6 +72,20 @@ def wait_for(condition, seconds=10):
     return condition()
 
 
+def first_turn_ended(unit):
+    """Whether the unit's .driver.log holds a turn record with its end."""
+    try:
+        lines = (Path(unit) / ".driver.log").read_text().splitlines()
+    except OSError:
+        return False
+    for line in lines:
+        with contextlib.suppress(ValueError):
+            record = json.loads(line)
+            if isinstance(record, dict) and record.get("type") == "turn" and "end" in record:
+                return True
+    return False
+
+
 class Unit(unittest.TestCase):
     """A repository with one show-better unit, and the servers a test starts."""
 
@@ -794,6 +808,9 @@ class TestServersEndTest(unittest.TestCase):
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             folder = root / ".show" / "deck"
             better.serve_page("show-better", folder, cwd=root)
+            # The first turn starts once the tab pairs (S77, S93); the folder is removed only after it ended, so the
+            # driver's writes for that turn do not race the removal.
+            self.assertTrue(wait_for(lambda: first_turn_ended(folder)))
             state = json.loads((folder / ".driver").read_text())
         return folder, state
 

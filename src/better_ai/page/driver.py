@@ -340,12 +340,13 @@ class Driver:
             self._thread.join(timeout=4.75)
 
     def busy(self) -> bool:
-        """Something still needs the driver: a turn, an open approval, a worker, or work waiting."""
+        """Something still needs the driver: a turn, an open approval, a worker, or work waiting. Work waiting for a
+        tab to pair (S77) needs a tab, not the driver: it keeps the page only once a tab has paired (S32, S104)."""
         published = self._published
         return bool(
             published["state"] in ("starting", "working", "stalled", "stopping")
             or published["approvals"]
-            or published["waiting"]
+            or (published["waiting"] and self._paired.is_set())
             or self._worker_list()
             or self._workers_broken
             or not self._commands.empty()
