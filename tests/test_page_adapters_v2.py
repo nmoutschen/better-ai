@@ -659,15 +659,15 @@ class OtherHarnessModes(unittest.TestCase):
         self.assertEqual((ready[0].kind, ready[0].mode), ("ready", "auto"))
 
     def test_droid_maps_autonomy_and_sets_the_chat_mode(self):  # S11 L1
-        for value, label in (("off", "manual"), ("low", "accept edits")):
+        for value, label in (("off", "off"), ("low", "low"), ("medium", "medium"), ("high", "high")):
             with self.subTest(value=value):
                 _, start, events, _ = open_droid(value)
                 self.assertNotIn("autonomyLevel", start["params"])
                 self.assertEqual((events[0].kind, events[0].mode), ("ready", label))
-        _, _, events, _ = open_droid("high")
+        _, _, events, _ = open_droid("ultra")
         self.assertEqual((events[0].kind, events[0].outcome), ("failed", "unsafe-mode"))
         sent = []
-        adapter = DroidAdapter(sent.append, "accept edits")
+        adapter = DroidAdapter(sent.append, "low")
         adapter.open("/repo", None)
         self.assertEqual(sent[-1]["params"]["autonomyLevel"], "low")
         header = {"jsonrpc": "2.0", "factoryApiVersion": "1.0.0", "factoryProtocolVersion": "1.332.0"}
@@ -680,7 +680,7 @@ class OtherHarnessModes(unittest.TestCase):
                 "result": {"sessionId": "droid-1", "settings": settings},
             }
         )
-        self.assertEqual((ready[0].kind, ready[0].mode), ("ready", "accept edits"))
+        self.assertEqual((ready[0].kind, ready[0].mode), ("ready", "low"))
         update = {
             **header,
             "type": "notification",

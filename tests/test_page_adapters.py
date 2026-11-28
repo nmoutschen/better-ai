@@ -677,7 +677,7 @@ class AdapterTests(unittest.TestCase):
     def test_droid_requires_current_protocol_and_off_autonomy(self):
         for version, autonomy, failure in (
             ("1.331.0", "off", "version"),
-            ("1.332.0", "high", "unsafe-mode"),
+            ("1.332.0", "ultra", "unsafe-mode"),
         ):
             with self.subTest(version=version, autonomy=autonomy):
                 sent = []
