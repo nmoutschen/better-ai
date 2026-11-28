@@ -4,6 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { read, loadPage } = require('./harness');
+const { panelOn } = require('./dom');
 
 const source = read('page', 'page.js');
 
@@ -102,20 +103,27 @@ test('decisions enter the log among the events, nothing before what it answers',
 
 // ---- the decision question, the same on every page that shows decisions
 
+// The entry the panel gives a decision's renderer: the decision's thread from the one state machine (pageThreads), after
+// the conversation LOG.
+function entryOf(page, x, log = []) {
+  const t = Array.from(page.pageThreads(page.pageDecisionEvents([x], log), ['comment', 'note', 'answer'])).find(t => t.id === x.id);
+  return { kind: 'decision', e: t.root, replies: t.messages.slice(1), thread: t };
+}
 function decision(page, overrides, options) {
   const sent = [], boxes = [];
   const conversation = {
     send(method, params, what, done, fail) { sent.push({ method, params, what }); if (done) done(); },
     box(li, id, label, from, onSend) { boxes.push({ id, label, onSend }); },
-    progress(st) { const n = new Node('span'); n.textContent = st; return n; },
   };
   const d = page.pageDecision(Object.assign({
     conversation, now: () => Date.parse('2026-11-22T10:00:00Z') / 1000, md: t => '<p>' + t + '</p>', esc: t => String(t), id: p => p + '-1',
   }, options));
   const x = Object.assign({ id: 'D1', at: '2026-11-22T09:00:00Z', asked: 'Which size?', status: 'waiting', default: 'Take the small one', deadline: '2026-11-22T10:10:00Z' }, overrides);
-  const entry = { e: { x }, replies: [] };
-  return { d, x, entry, sent, boxes, render: (state, actions) => d.item(entry, state || {}, actions !== false) };
+  const entry = entryOf(page, x);
+  return { d, x, entry, sent, boxes, render: (log, actions) => d.item(log ? entryOf(page, x, log) : entry, {}, actions !== false) };
 }
+const ANSWER = { type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false, by: 'user', at: '2026-11-22T09:30:00Z' };
+const statusOf = (s, read = 1) => ({ type: 'status', to: 'a1', status: s, by: 'coordinator', read, at: '2026-11-22T09:31:00Z' });
 const buttons = foot => foot.children.filter(n => n.tag === 'button');
 
 test('a waiting decision shows its question, the default and the deadline, with Use the default and Answer', () => {
@@ -126,10 +134,9 @@ test('a waiting decision shows its question, the default and the deadline, with 
   assert.match(li.innerHTML, /If you don&#39;t answer|If you don't answer: Take the small one/);
   assert.match(li.innerHTML, /default in 10 min/);
   assert.match(li.className, /open-q/);
-  assert.equal(li.dataset.state, 'asked');
-  assert.match(foot.innerHTML, /Waiting for you/);
+  assert.equal(t.entry.thread.state, 'you');
+  assert.doesNotMatch(foot.innerHTML, /progress/);  // the row says the state once; the foot holds the buttons
   assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
-  assert.equal(t.d.waiting(t.entry, {}), true);
 });
 
 test('Use the default answers with the default text, marked as the default', () => {
@@ -164,20 +171,22 @@ test('a deadline that has passed says the default is due', () => {
   assert.match(t.render()[0].innerHTML, /default due now/);
 });
 
-test('the user\'s answer moves the question on: answered, waiting for the agent, then applied', () => {
+test('the user\'s answer moves the question on, by its thread: answered, waiting for the agent, then applied', () => {
   const page = load({ agent: 'coordinator', capabilities: ['decisions'] });
   const t = decision(page);
-  t.entry.replies = [{ type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false }];
-  let [li, foot] = t.render({ a1: undefined });
-  assert.match(foot.innerHTML, /You answered/);
+  let [li, foot] = t.render([ANSWER]);
   assert.match(li.innerHTML, /answered, waiting for the coordinator/);
-  assert.equal(t.d.waiting(t.entry, {}), false);
-  assert.equal(t.d.waiting(t.entry, { a1: 'asked' }), true);  // the agent asked back: the user is up again
-  [li, foot] = t.render({ a1: 'done' });
-  assert.match(foot.innerHTML, /Applied/);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Reply']);
+  [li, foot] = t.render([ANSWER, statusOf('asked')]);  // the agent asked back: the user's turn again
+  assert.match(li.className, /open-q/);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
+  const before = { type: 'note', id: 'm0', to: null, text: 'hi', by: 'user', at: '2026-11-22T09:10:00Z' };
+  [li] = t.render([before, ANSWER, statusOf('asked', 0)]);  // decided before reading the answer, line 1: changes nothing
+  assert.match(li.innerHTML, /answered, waiting for the coordinator/);
+  [li] = t.render([ANSWER, statusOf('done')]);
+  assert.match(li.innerHTML, /answered by you/);
   const applied = decision(page, { status: 'answered', answer: { type: 'page', event: 'a1' } });
-  applied.entry.replies = [{ type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false }];
-  assert.deepEqual(buttons(applied.render()[1]).map(b => b.textContent), ['Reply']);
+  assert.deepEqual(buttons(applied.render([ANSWER])[1]).map(b => b.textContent), ['Reply']);
 });
 
 test('a decision the agent took, or that fell to its default, can be replied to', () => {
@@ -194,7 +203,7 @@ test('a decision the agent took, or that fell to its default, can be replied to'
 
 test('a page without actions shows the decision without buttons', () => {
   const t = decision(load({ capabilities: ['decisions'] }));
-  assert.deepEqual(buttons(t.render({}, false)[1]), []);
+  assert.deepEqual(buttons(t.render(null, false)[1]), []);
 });
 
 // ---- the strips, on every served page
@@ -249,9 +258,7 @@ test('a page that does not stream hides the closed strip again once the server a
 
 test('an answered decision the agent applied says answered by you and hides the default line', () => {
   const t = decision(load({ agent: 'coordinator', capabilities: ['decisions'] }));
-  t.entry.replies = [{ type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false }];
-  const [li, foot] = t.render({ a1: 'done' });
-  assert.match(foot.innerHTML, /Applied/);
+  const [li] = t.render([ANSWER, statusOf('done')]);
   assert.match(li.innerHTML, /answered by you/);
   assert.doesNotMatch(li.innerHTML, /decided/);
   assert.doesNotMatch(li.innerHTML, /If you don't answer/);
@@ -353,7 +360,7 @@ test('when the redraw replaces the next question after the check, its new check 
   const items = questions(page, ['D1', 'D2']);
   Node.focused = items[0].use;
   items[0].use.click();
-  const [, foot] = items[0].t.d.item(items[1].t.entry, {}, true);  // one pageDecision draws every question of a page  // the thread redraws the question
+  const [, foot] = items[0].t.d.item(items[1].t.entry, {}, true);  // one pageDecision draws every question of a page: the thread redraws the question
   Node.focused = null;
   await Promise.resolve(); await Promise.resolve();
   assert.equal(Node.focused, buttons(foot)[0]);
@@ -381,11 +388,11 @@ test('code-better and research-better decisions render as before, with the deadl
 test('after the check on the middle of three questions, the focus goes to the third, though the thread redrew first', () => {
   const page = load({ capabilities: ['decisions'] });
   let rows = [];
-  const conversation = { box() {}, progress: () => new Node('span'),
+  const conversation = { box() {},
     send(m, p, w, done) { load.thread['li.open-q'] = [rows[0].n, rows[2].n]; done(); } };
   const d = page.pageDecision({ conversation, now: () => 0, md: t => t, esc: String, id: p => p + '-1' });
   rows = ['D1', 'D2', 'D3'].map(id => {
-    const [n, foot] = d.item({ e: { x: { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' } }, replies: [] }, {}, true);
+    const [n, foot] = d.item(entryOf(page, { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' }), {}, true);
     n.dataset.d = id; n.found = { '.use': buttons(foot)[0], '.answer': buttons(foot)[1] };
     return { n, use: buttons(foot)[0] };
   });
@@ -582,10 +589,10 @@ test('a page out of date shows only the out of date strip: /listening goes throu
 // A conversation whose send does not finish until the test says so.
 function slowRows(page, ids, options) {
   const finish = [];
-  const conversation = { box() {}, progress: () => new Node('span'), send(m, p, w, done) { finish.push(done); } };
+  const conversation = { box() {}, send(m, p, w, done) { finish.push(done); } };
   const d = page.pageDecision(Object.assign({ conversation, now: () => 0, md: t => t, esc: String, id: p => p + '-1' }, options));
   const draw = id => {
-    const [n, foot] = d.item({ e: { x: { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' } }, replies: [] }, {}, true);
+    const [n, foot] = d.item(entryOf(page, { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' }), {}, true);
     n.dataset.d = id; n.found = { '.use': buttons(foot)[0], '.answer': buttons(foot)[1] };
     return { n, use: buttons(foot)[0] };
   };
@@ -663,169 +670,10 @@ test('the accessible names of a question carry its words without Markdown marks'
 // pageConversation runs on a small stand-in DOM: elements keep their children, attributes, listeners and focus, and
 // answer the simple selectors page.js uses (tag, .class, #id, [attr], [attr="v"], and one space between parts).
 
-class El {
-  constructor(doc, tag) {
-    Object.assign(this, { ownerDocument: doc, tagName: tag.toUpperCase(), nodeType: 1, children: [], parentNode: null, attributes: {},
-      dataset: {}, className: '', hidden: false, value: '', listeners: {}, style: {}, scrollTop: 0, scrollHeight: 0, clientHeight: 0,
-      disabled: false });
-  }
-  get childNodes() { return this.children; }
-  get firstChild() { return this.children[0] || null; }
-  get classList() {
-    const n = this, list = () => n.className.split(/\s+/).filter(Boolean);
-    return { contains: c => list().includes(c), add: c => { if (!list().includes(c)) n.className = list().concat(c).join(' '); },
-      remove: c => { n.className = list().filter(x => x !== c).join(' '); },
-      toggle: (c, on) => { if (on === undefined ? !list().includes(c) : on) n.classList.add(c); else n.classList.remove(c); } };
-  }
-  get textContent() { return this.children.map(c => c.textContent).join(''); }
-  set textContent(v) { this.children.forEach(c => { c.parentNode = null; }); this.children = []; this._html = ''; if (String(v)) this.append(String(v)); }
-  set innerHTML(v) {
-    this.textContent = ''; this._html = String(v);
-    const words = String(v).replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e]);
-    if (words) this.append(words);
-  }
-  insertAdjacentHTML(_where, html) { const x = this.ownerDocument.createElement('span'), c = /class="([^"]*)"/.exec(html); x.className = c ? c[1] : ''; x.innerHTML = html; this.append(x); }
-  get innerHTML() { return this._html || ''; }
-  get id() { return this.attributes.id || ''; }
-  set id(v) { this.attributes.id = v; }
-  set htmlFor(v) { this.attributes.for = v; }
-  get htmlFor() { return this.attributes.for; }
-  set type(v) { this.attributes.type = v; }
-  get type() { return this.attributes.type; }
-  setAttribute(k, v) { if (k.startsWith('data-')) this.dataset[k.slice(5).replace(/-(\w)/g, (_, c) => c.toUpperCase())] = String(v); else this.attributes[k] = String(v); }
-  getAttribute(k) {
-    if (k === 'class') return this.className;
-    if (k.startsWith('data-')) { const v = this.dataset[k.slice(5).replace(/-(\w)/g, (_, c) => c.toUpperCase())]; return v === undefined ? null : v; }
-    return k in this.attributes ? this.attributes[k] : null;
-  }
-  removeAttribute(k) { delete this.attributes[k]; }
-  adopt(n) {
-    if (typeof n === 'string' || typeof n === 'number') n = this.ownerDocument.createTextNode(String(n));
-    if (n.parentNode) n.remove();
-    n.parentNode = this;
-    return n;
-  }
-  append(...nodes) { nodes.forEach(n => { const k = this.adopt(n); this.children.push(k); }); }
-  appendChild(n) { this.append(n); return n; }
-  prepend(...nodes) { nodes.reverse().forEach(n => { const k = this.adopt(n); this.children.unshift(k); }); }
-  insertBefore(n, ref) { const k = this.adopt(n), i = this.children.indexOf(ref); this.children.splice(i < 0 ? this.children.length : i, 0, k); return n; }
-  before(n) { this.parentNode.insertBefore(n, this); }
-  after(n) { const p = this.parentNode, i = p.children.indexOf(this); p.insertBefore(n, p.children[i + 1] || null); }
-  remove() { if (this.parentNode) { const p = this.parentNode; p.children.splice(p.children.indexOf(this), 1); this.parentNode = null; } }
-  replaceChildren(...nodes) { this.children.slice().forEach(c => c.remove && c.remove()); this._html = ''; this.append(...nodes); }
-  contains(n) { for (; n; n = n.parentNode) if (n === this) return true; return false; }
-  addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
-  dispatch(type, extra = {}) {
-    const ev = Object.assign({ type, target: this, defaultPrevented: false, preventDefault() { ev.defaultPrevented = true; }, stopPropagation() {} }, extra);
-    for (let n = this; n; n = n.parentNode) (n.listeners && n.listeners[type] || []).forEach(f => f(ev));
-    return ev;
-  }
-  click() { if (!this.disabled) this.dispatch('click'); }
-  key(key, extra = {}) { return this.dispatch('keydown', Object.assign({ key }, extra)); }
-  input(value) { this.value = value; this.selectionStart = this.selectionEnd = value.length; this.dispatch('input'); }
-  focus() { this.ownerDocument.activeElement = this; }
-  blur() { if (this.ownerDocument.activeElement === this) this.ownerDocument.activeElement = this.ownerDocument.body; }
-  setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; }
-  scrollIntoView() {}
-  scrollTo(o) { this.scrolledTo = o; this.scrollTop = o.top; }
-  getBoundingClientRect() { return this.rect || { top: 0, bottom: 0, height: 0 }; }
-  matches(sel) { return matchesSelector(this, sel); }
-  closest(sel) { for (let n = this; n && n.nodeType === 1; n = n.parentNode) if (n.matches(sel)) return n; return null; }
-  descendants() { return this.children.filter(c => c.nodeType === 1).flatMap(c => [c].concat(c.descendants())); }
-  querySelectorAll(sel) { return this.descendants().filter(n => sel.split(',').some(s => n.matches(s.trim()))); }
-  querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
-}
-function matchesOne(n, part) {
-  const re = /([.#]?[\w-]+)|\[([\w-]+)(?:="([^"]*)")?\]/g;
-  let m;
-  while ((m = re.exec(part))) {
-    if (m[1]) {
-      const s = m[1];
-      if (s[0] === '.' && !n.classList.contains(s.slice(1))) return false;
-      if (s[0] === '#' && n.id !== s.slice(1)) return false;
-      if (/^\w/.test(s) && n.tagName !== s.toUpperCase()) return false;
-    } else {
-      const v = n.getAttribute(m[2]);
-      if (v === null || (m[3] !== undefined && v !== m[3])) return false;
-    }
-  }
-  return true;
-}
-function matchesSelector(n, sel) {
-  const parts = sel.trim().split(/\s+/);
-  if (!matchesOne(n, parts.pop())) return false;
-  for (let p = n.parentNode; parts.length && p && p.nodeType === 1; p = p.parentNode) if (matchesOne(p, parts[parts.length - 1])) parts.pop();
-  return !parts.length;
-}
-function makeDocument() {
-  const doc = { activeElement: null };
-  doc.createElement = tag => new El(doc, tag);
-  doc.createTextNode = text => ({ nodeType: 3, textContent: text, parentNode: null, remove() { const p = this.parentNode; if (p) { p.children.splice(p.children.indexOf(this), 1); this.parentNode = null; } } });
-  doc.body = doc.createElement('body');
-  doc.activeElement = doc.body;
-  doc.contains = n => doc.body.contains(n);
-  doc.querySelectorAll = sel => doc.body.querySelectorAll(sel);
-  doc.querySelector = sel => doc.body.querySelector(sel);
-  doc.getElementById = id => doc.body.querySelector('#' + id);
-  return doc;
-}
-// The shell's parts the panel uses, as shell.html has them.
-function shellDocument() {
-  const doc = makeDocument(), make = (tag, attrs = {}, kids = []) => {
-    const x = doc.createElement(tag);
-    Object.entries(attrs).forEach(([k, v]) => (k === 'class' ? (x.className = v) : k === 'text' ? (x.textContent = v) : x.setAttribute(k, v)));
-    x.append(...kids);
-    return x;
-  };
-  doc.body.append(
-    make('header', { class: 'bar--stats' }, [make('div', { class: 'stats', id: 'status', text: 'Loading…' })]),
-    make('p', { class: 'offline', id: 'offline' }),
-    make('aside', { class: 'notes' }, [
-      make('div', { class: 'notes-top' }, [make('div', { class: 'seg' }, [
-        make('button', { type: 'button', 'data-filter': 'all', 'aria-pressed': 'false', text: 'All' }),
-        make('button', { type: 'button', 'data-filter': 'open', 'aria-pressed': 'true', text: 'Open' })])]),
-      make('p', { class: 'empty', id: 'empty', text: 'Nothing yet.' }),
-      make('ol', { class: 'thread', id: 'thread' }),
-      make('form', { class: 'composer', id: 'noteform' }, [
-        make('p', { class: 'unwatched', id: 'unwatched' }),
-        make('textarea', { id: 'note' }),
-        make('div', { class: 'send' }, [make('button', { type: 'submit', class: 'btn', text: 'Send' }), make('p', { class: 'status' })])])]),
-    make('div', { class: 'toast', id: 'toast' }));
-  doc.querySelector('.offline').hidden = true;
-  return doc;
-}
-
 const HOUR = 3600 * 1000;
 const at = hoursAgo => new Date(Date.now() - hoursAgo * HOUR).toISOString().slice(0, 19) + 'Z';
 // A panel on the stand-in shell, not served: what it sends goes to its own log, as on a page opened from a file.
-function panel(log, extra = {}, { config = { agent: 'coordinator' }, setup } = {}) {
-  const document = shellDocument(), timers = [];
-  let clock = 0;
-  const pageConfigEl = { textContent: JSON.stringify(config) };
-  const getById = document.getElementById;
-  document.getElementById = id => (id === 'page-config' ? pageConfigEl : getById(id));
-  const context = loadPage({
-    document, Date, JSON, Object, Math, String, Array, isNaN, Number, Promise,
-    setTimeout: (f, ms) => { timers.push({ f, at: clock + (ms || 0) }); return timers.length; },
-    clearTimeout: id => { if (timers[id - 1]) timers[id - 1].f = null; },
-    requestAnimationFrame: f => f(), CSS: { escape: s => s }, location: { hash: '' },
-    sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} }, history: { replaceState() {} },
-  });
-  const conv = context.pageConversation(Object.assign({ served: false }, typeof extra === 'function' ? extra(document) : extra));
-  if (setup) setup(context, conv);
-  if (log) conv.setLog(log);
-  const $ = sel => document.querySelector(sel), $$ = sel => document.querySelectorAll(sel);
-  const rows = () => $$('li.trow');
-  const rowOf = id => rows().find(li => li.dataset.id === id);
-  const tick = ms => {
-    clock += ms;
-    for (let due; (due = timers.find(t => t.f && t.at <= clock));) { const f = due.f; due.f = null; f(); }
-  };
-  const filter = name => $(`[data-filter="${name}"]`).click();
-  const label = n => n.getAttribute('aria-label');
-  const sent = () => conv.log().slice((log || []).length);
-  return { document, conv, $, $$, rows, rowOf, tick, filter, label, sent };
-}
+const panel = (log, extra, options) => panelOn(log, extra, options);
 const userNote = (id, text, h, more = {}) => Object.assign({ type: 'note', id, text, to: null, by: 'user', at: at(h) }, more);
 const agentReply = (id, to, text, h) => ({ type: 'reply', id, to, text, by: 'coordinator', at: at(h) });
 const status = (to, s, h, read) => Object.assign({ type: 'status', to, status: s, by: 'coordinator', at: at(h) }, read == null ? {} : { read });
@@ -1243,4 +1091,60 @@ test('reopen from a pin opens the thread with the reopen box, from All when it w
   p.conv.reopen('m6');
   assert.equal(p.$('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
   assert.equal(p.rowOf('m6').querySelector('.why label').textContent, 'Why reopen it?');
+});
+
+// ---- Page kinds in the rows, from the verifier's walk of the pages
+test('a done thread of a kind with its own buttons can still be confirmed and reopened: a decided decision keeps Reply between ✓ and Reopen', () => {
+  const p = decisionPanel({ status: 'decided', decision: 'Small' });
+  const row = p.rowOf('D1');
+  assert.equal(row.dataset.state, 'done');
+  assert.deepEqual(actions(row).map(b => b.textContent), ['✓', 'Reply', 'Reopen']);
+  assert.deepEqual(actions(row).map(p.label), ['Confirm done: Which size?', 'Reply to: Which size? Pick one.', 'Reopen: Which size?']);
+  actions(row)[0].click();
+  p.tick(6000);
+  assert.deepEqual(p.sent().filter(e => e.type === 'accept').map(e => e.to), ['D1']);
+  assert.equal(p.rowOf('D1'), undefined);  // closed: it left Open
+});
+
+test('the first sentence of a page kind without text is its words without its head, a space between its blocks', () => {
+  const p = panel([{ type: 'closed', id: 'x1', by: 'worker-2', question: 'Q-4', status: 'answered', at: at(1) }], doc => ({
+    kinds: { closed: () => {
+      const li = doc.createElement('li');
+      li.innerHTML = '<div class="head"><span class="who">worker-2</span><span class="when">19:54</span></div><p class="what">Answered: Who supports ACP</p><div class="body md"><p>Zed does.</p></div>';
+      return li;
+    } } }));
+  assert.equal(text(p.rowOf('x1').querySelector('.tgist')), 'Coordinator: Answered: Who supports ACP Zed does.');
+});
+
+test('rows shown elsewhere (nodes) are open, without actions, and their head is plain: nothing to fold', () => {
+  const p = panel(EVERY_STATE);
+  const [row] = Array.from(p.conv.nodes(e => e.id === 'm3'));
+  const head = row.querySelector('.thead');
+  assert.equal(head.tagName, 'DIV');
+  assert.equal(head.getAttribute('aria-expanded'), null);
+  assert.equal(row.querySelector('.tfold'), null);
+  assert.equal(row.querySelectorAll('.tacts button').length, 0);
+  assert.ok(row.querySelector('.tbody'));
+});
+
+test('a row keeps its buttons on one line: the left part wraps, the buttons do not', () => {
+  const css = read('page', 'page.css');
+  assert.match(css, /\.tfoot \{[^}]*flex-wrap:nowrap/);
+  assert.match(css, /\.tacts \{[^}]*flex:none/);
+  assert.match(css, /\.tleft \{[^}]*min-width:0[^}]*flex-wrap:wrap/);
+});
+
+test('a page places the figure in its own slot with stats, and puts it back after rewriting its header with figure()', () => {
+  const p = panel(EVERY_STATE, doc => {
+    const slot = doc.createElement('span'); slot.id = 'yourturn';
+    doc.querySelector('#status').append(slot);
+    return { stats: () => doc.getElementById('yourturn') };
+  });
+  assert.equal(text(p.$('#yourturn')), '1 your turn');
+  const status = p.$('#status');
+  status.innerHTML = '<span class="stat"><b>3</b>steps</span><span class="yourturn" id="yourturn"></span>';
+  assert.equal(p.$('#yourturn .stat'), null);
+  p.conv.figure();
+  assert.equal(text(p.$('#yourturn')), '1 your turn');
+  assert.equal(p.$$('#status .stat').length, 2);  // one figure of the page's, and the one figure for your turn
 });

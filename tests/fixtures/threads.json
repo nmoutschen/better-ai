@@ -15,7 +15,6 @@
    {"type": "note", "id": "m7", "to": null, "text": "t", "by": "user"},
    {"type": "accepted", "to": "m7", "by": "coordinator", "text": "yes"}
   ],
-  "work": [["m1", "new"], ["m2", "seen"], ["m3", "working"], ["m4", "asked"]],
   "threads": [
    {"id": "m1", "state": "agent", "step": "new", "closedByUser": false},
    {"id": "m2", "state": "agent", "step": "seen", "closedByUser": false},
@@ -32,7 +31,6 @@
    {"type": "reply", "id": "r1", "to": "m1", "text": "t", "by": "coordinator"},
    {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "replied"]],
   "threads": [
    {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
@@ -45,7 +43,6 @@
    {"type": "accept", "to": "m3", "by": "user"},
    {"type": "note", "id": "m4", "to": "m3", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "followup"], ["m3", "followup"]],
   "threads": [
    {"id": "m1", "state": "agent", "step": "new", "closedByUser": false},
    {"id": "m3", "state": "agent", "step": "new", "closedByUser": false}
@@ -56,7 +53,6 @@
    {"type": "status", "to": "m1", "status": "working", "by": "coordinator"},
    {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "working"]],
   "threads": [
    {"id": "m1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
@@ -71,7 +67,6 @@
    {"type": "accept", "to": "c3", "by": "user"},
    {"type": "comment", "id": "c3", "n": 3, "text": "edited", "by": "user"}
   ],
-  "work": [["c2", "new"]],
   "threads": [
    {"id": "c1", "state": "done", "step": "new", "closedByUser": false},
    {"id": "c2", "state": "agent", "step": "new", "closedByUser": false},
@@ -85,7 +80,6 @@
    {"type": "delete", "to": "c2", "by": "user"},
    {"type": "comment", "id": "c2", "n": 2, "text": "t", "by": "user"}
   ],
-  "work": [["c2", "new"]],
   "threads": [
    {"id": "c2", "state": "agent", "step": "new", "closedByUser": false}
   ]},
@@ -95,7 +89,6 @@
    {"type": "status", "to": "c1", "status": "done", "by": "coordinator"},
    {"type": "reopen", "to": "c1", "text": "still wrong", "by": "user"}
   ],
-  "work": [["c1", "reopened"]],
   "threads": [
    {"id": "c1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
@@ -106,7 +99,6 @@
    {"type": "reply", "id": "r1", "to": "c1", "text": "t", "by": "coordinator"},
    {"type": "note", "id": "m1", "to": "r1", "text": "t", "by": "user"}
   ],
-  "work": [["c1", "followup"]],
   "threads": [
    {"id": "c1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
@@ -118,7 +110,6 @@
    {"type": "note", "id": "m2", "to": "m1", "text": "t", "by": "user"},
    {"type": "note", "id": "m3", "to": "r1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "replied"], ["m3", "new"]],
   "threads": [
    {"id": "r1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
@@ -130,7 +121,6 @@
    {"type": "status", "to": "m1", "status": "asked", "by": "coordinator"},
    {"type": "note", "id": "m2", "to": "r1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "asked"], ["m2", "new"]],
   "threads": [
    {"id": "r1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
@@ -139,7 +129,6 @@
    {"type": "closed", "id": "x1", "by": "worker-2", "question": "Q4", "status": "answered"},
    {"type": "note", "id": "m1", "to": "x1", "text": "t", "by": "user"}
   ],
-  "work": [["m1", "new"]],
   "threads": [
    {"id": "x1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
@@ -452,23 +441,35 @@
    {"id": "a1", "state": "done", "step": "new", "closedByUser": false},
    {"id": "a2", "state": "agent", "step": "new", "closedByUser": false}
   ]},
- {"name": "kind: a confirmation is a thread of yours",
-  "items": ["comment", "note", "confirm"],
+ {"name": "kind (D8): a confirmation needs no reply: it starts closed by you, and the agent's statuses change nothing",
+  "items": ["comment", "note", "approve"],
   "log": [
    {"type": "confirm", "id": "k1", "requirement": "R1", "wording": "w", "text": "ok", "by": "user"},
-   {"type": "status", "to": "k1", "status": "seen", "by": "coordinator", "read": 0}
+   {"type": "status", "to": "k1", "status": "seen", "by": "coordinator", "read": 0},
+   {"type": "approve", "id": "a1", "option": "after", "label": "Ship After", "by": "user"}
   ],
   "threads": [
-   {"id": "k1", "state": "agent", "step": "seen", "closedByUser": false}
+   {"id": "k1", "state": "done", "step": "new", "closedByUser": true},
+   {"id": "a1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
- {"name": "kind: a verdict is shown, and nobody's turn",
+ {"name": "kind (D8): your message under a confirmation puts it back with the agent",
+  "items": ["comment", "note"],
+  "log": [
+   {"type": "confirm", "id": "k1", "requirement": "R1", "wording": "w", "text": "ok", "by": "user"},
+   {"type": "note", "id": "m1", "to": "k1", "text": "and R2?", "by": "user"},
+   {"type": "status", "to": "m1", "status": "working", "by": "coordinator", "read": 1}
+  ],
+  "threads": [
+   {"id": "k1", "state": "agent", "step": "working", "closedByUser": false}
+  ]},
+ {"name": "kind (D8): a verdict needs no reply: it starts closed by you, shown in All and never in Open",
   "items": ["comment", "note", "approve"],
   "log": [
    {"type": "verdict", "version": "v1", "verdict": "up", "by": "user"},
    {"type": "comment", "id": "c1", "n": 1, "text": "t", "verdict": "down", "on": {}, "by": "user"}
   ],
   "threads": [
-   {"id": null, "state": "done", "step": "new", "closedByUser": false},
+   {"id": null, "state": "done", "step": "new", "closedByUser": true},
    {"id": "c1", "state": "agent", "step": "new", "closedByUser": false}
   ]},
  {"name": "kind: answers to one decision are one thread, named by the decision",

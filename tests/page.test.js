@@ -1,5 +1,5 @@
-// The shared page.js (src/better_ai/page/): the thread model, which turns the log into each item's state, the entries and
-// what Open lists; Markdown in messages; the conversation's sending; the pin colours in page.css. Run with
+// The shared page.js (src/better_ai/page/): the thread model (pageThreads), which turns the log into each thread's one
+// state; Markdown in messages; the conversation's sending; the pin colours in page.css. Run with
 // `node --test tests/*.test.js`. The dashboard's and the research board's own code is tested in their own files.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -8,35 +8,7 @@ const { read, loadPage } = require('./harness');
 
 const context = loadPage();
 const ITEMS = ['comment', 'note'];
-const thread = (log, items) => context.pageThread(log, items || ITEMS);
-// Arrays made inside the vm context have that context's prototype, which deepStrictEqual rejects: copy them out.
-const ids = list => Array.from(list, c => c.e.id);
-
-// The items the agent has to work on, with their state, from the model of a log: the user's items that are not done or
-// accepted, and the answers to the agent's own messages. `pending` in page/__init__.py gives the same for the same log.
-function work(log) {
-  const model = thread(log), found = [];
-  model.entries.forEach(c => {
-    if (ITEMS.includes(c.kind)) { if (!c.deleted) found.push(c.e.id); }
-    else c.replies.forEach(r => { if (r.type === 'note' && r.to === c.e.id) found.push(r.id); });
-  });
-  const first = id => log.findIndex(e => e.id === id);
-  return found.filter(id => !['done', 'accepted'].includes(model.state[id])).sort((a, z) => first(a) - first(z))
-    .map(id => [id, model.state[id] || 'new']);
-}
-
 const TABLE = JSON.parse(fs.readFileSync(__dirname + '/fixtures/threads.json', 'utf8'));
-
-test('the shared table of logs gives the open items and states that `pending` gives, and Open shows each of them', () => {
-  // pageThread's per-item states, until the drawing moves to pageThreads: only the cases written for them.
-  for (const { name, log, work: expected } of TABLE.filter(c => c.work)) {
-    assert.deepEqual(work(log), expected, name);
-    const open = thread(log).open;
-    for (const [id] of expected) {
-      assert.ok(open.some(c => c.e.id === id || c.replies.some(r => r.id === id)), name + ': ' + id + ' is not under Open');
-    }
-  }
-});
 
 // The one state machine of every thread (.design/conversation-panel/states.md). `all_items` and `pending` in
 // src/better_ai/page/__init__.py give the same threads, with the same states, for every log in the table.
@@ -82,119 +54,47 @@ test("a decision from the records is a thread: waiting is your turn, your answer
   assert.deepEqual(states(fresh), [['D-2', 'done', 'new'], ['D-1', 'done', 'new'], ['m1', 'agent', 'seen']]);
 });
 
-test('every state the page gives an item has a pin colour in page.css', () => {
+test('every state the page gives a pin has a colour in page.css, and words for its title', () => {
   const css = read('page', 'page.css');
-  for (const state of Object.keys(context.PAGE_STATES)) assert.ok(css.includes(`.pin[data-state="${state}"]`), state);
+  assert.deepEqual(Object.keys(context.PAGE_PIN_STATES), ['new', 'seen', 'working', 'asked', 'done', 'accepted']);
+  for (const state of Object.keys(context.PAGE_PIN_STATES)) assert.ok(css.includes(`.pin[data-state="${state}"]`), state);
 });
-
-test("the user's answer ends the agent's wait", () => {
-  const t = thread([
-    { type: 'note', id: 'm1', text: 'hi' },
-    { type: 'status', to: 'm1', status: 'asked' },
-    { type: 'note', id: 'm2', to: 'm1', text: 'this one' },
-  ]);
-  assert.equal(t.state.m1, 'replied');
-  assert.deepEqual(ids(t.entries), ['m1']);  // the answer is part of the item, not a new one
-  assert.deepEqual(Array.from(t.entries[0].replies, r => r.id), ['m2']);
+test('an edited comment is one thread, in its latest form, marked edited', () => {
+  const [t] = Array.from(context.pageThreads([
+    { type: 'comment', id: 'c1', n: 1, text: 'first', by: 'user' },
+    { type: 'comment', id: 'c1', n: 1, text: 'second', by: 'user' },
+  ], ITEMS));
+  assert.equal(t.root.text, 'second');
+  assert.equal(t.messages.length, 1);
+  assert.equal(t.edited, true);
 });
-
-test("the agent's own message waits for the user until the user answers it or the agent closes it", () => {
-  const log = [
-    { type: 'reply', id: 'r1', text: 'Which size?', to: null },
-    { type: 'note', id: 'm1', text: 'later', to: null },
-  ];
-  assert.deepEqual(ids(thread(log).open), ['m1', 'r1']);
-  assert.deepEqual(ids(thread(log).entries), ['m1', 'r1']);  // waiting: last, next to the message box
-  for (const status of ['done', 'accepted']) {
-    const closed = thread(log.concat([{ type: 'status', to: 'r1', status }]));
-    assert.deepEqual(ids(closed.open), ['m1'], status);
-    assert.deepEqual(ids(closed.entries), ['r1', 'm1'], status);  // back in its place
-  }
-  const answered = thread(log.concat([{ type: 'note', id: 'm2', text: 'large', to: 'r1' }]));
-  // The user's answer is an item of its own: the message holding it stays under Open, back in its place in time.
-  assert.deepEqual(ids(answered.open), ['r1', 'm1']);
+test('replies join the thread they answer, an answer to a reply finds the same thread, and a reopen puts it back with the agent', () => {
+  const [t] = Array.from(context.pageThreads([
+    { type: 'comment', id: 'c1', n: 1, text: 'x', by: 'user' },
+    { type: 'reply', id: 'r1', to: 'c1', text: 'why?', by: 'agent' },
+    { type: 'status', to: 'c1', status: 'done', by: 'agent' },
+    { type: 'note', id: 'm1', to: 'r1', text: 'because', by: 'user' },
+    { type: 'status', to: 'm1', status: 'done', by: 'agent' },
+    { type: 'reopen', to: 'c1', text: 'not fixed', by: 'user' },
+  ], ITEMS));
+  assert.deepEqual(Array.from(t.messages, m => m.type), ['comment', 'reply', 'note', 'reopen']);
+  assert.deepEqual([t.state, t.step], ['agent', 'new']);
 });
-
-test('Open lists items not yet accepted, and not deleted comments', () => {
-  const t = thread([
-    { type: 'note', id: 'm1', text: 'open' },
-    { type: 'note', id: 'm2', text: 'accepted' },
-    { type: 'accept', to: 'm2' },
-    { type: 'comment', id: 'c1', n: 1, text: 'gone' },
-    { type: 'delete', to: 'c1' },
-    { type: 'note', id: 'm3', text: 'done' },
-    { type: 'status', to: 'm3', status: 'done' },
-  ]);
-  assert.deepEqual(ids(t.open), ['m1', 'm3']);
+test("a page's own item kinds are the agent's turn; a verdict, no message to the agent, starts closed (D8)", () => {
+  const log = [{ type: 'decide', id: 'd1', option: 'A', by: 'user' }, { type: 'verdict', version: 'A', verdict: 'up', by: 'user' }];
+  const shape = items => Array.from(context.pageThreads(log, items), t => [t.id, t.state, t.closedByUser]);
+  assert.deepEqual(shape(['comment', 'note', 'decide']), [['d1', 'agent', false], [null, 'done', true]]);
+  assert.deepEqual(shape(ITEMS), [['d1', 'done', true], [null, 'done', true]]);
 });
-
-test("the agent's own question is open and last until the user answers it", () => {
-  const log = [
-    { type: 'reply', id: 'r1', to: null, text: 'Which size?' },
-    { type: 'note', id: 'm1', text: 'later message' },
-  ];
-  let t = thread(log);
-  assert.deepEqual(ids(t.entries), ['m1', 'r1']);
-  assert.deepEqual(ids(t.open), ['m1', 'r1']);
-  t = thread(log.concat([{ type: 'note', id: 'm2', to: 'r1', text: 'Large' }]));
-  assert.deepEqual(ids(t.open), ['r1', 'm1']);  // it holds the user's answer, an item of its own
-  const accepted = log.concat([{ type: 'note', id: 'm2', to: 'r1', text: 'Large' }, { type: 'accept', to: 'm2' }]);
-  assert.deepEqual(ids(thread(accepted).open), ['m1']);  // until the answer is accepted
-  assert.deepEqual(ids(t.entries), ['r1', 'm1']);  // answered, it goes back to its place in time
-  assert.deepEqual(ids(thread([{ type: 'reply', to: null, text: 'FYI' }]).open), []);  // a reply without an id is not a question
+test("an answer to a decision joins its thread, and so does the coordinator's reply to that answer", () => {
+  const ts = Array.from(context.pageThreads([
+    { type: 'decision', id: 'D-1', x: { status: 'waiting' } },
+    { type: 'answer', id: 'a1', decision: 'D-1', text: 'Use the default.', by: 'user' },
+    { type: 'reply', id: 'r1', to: 'a1', text: 'Applied.', by: 'coordinator' },
+  ], ITEMS));
+  assert.deepEqual(ts.map(t => t.id), ['D-1']);
+  assert.deepEqual(Array.from(ts[0].messages, m => m.id), ['D-1', 'a1', 'r1']);
 });
-
-test('an edited comment shows once, in its latest form', () => {
-  const t = thread([
-    { type: 'comment', id: 'c1', n: 1, text: 'first' },
-    { type: 'comment', id: 'c1', n: 1, text: 'second' },
-  ]);
-  assert.equal(t.entries.length, 1);
-  assert.equal(t.entries[0].e.text, 'second');
-  assert.equal(t.entries[0].edited, true);
-});
-
-test('replies nest under the item they answer, and an answer to a reply finds the same item', () => {
-  const t = thread([
-    { type: 'comment', id: 'c1', n: 1, text: 'x' },
-    { type: 'reply', id: 'r1', to: 'c1', text: 'why?' },
-    { type: 'note', id: 'm1', to: 'r1', text: 'because' },
-    { type: 'reopen', to: 'c1', text: 'not fixed' },
-  ]);
-  assert.equal(t.entries.length, 1);
-  assert.deepEqual(Array.from(t.entries[0].replies, r => r.type), ['reply', 'note', 'reopen']);
-  assert.equal(t.state.c1, 'reopened');
-});
-
-test("a page's own item kinds count under Open", () => {
-  const log = [{ type: 'decide', id: 'd1', option: 'A' }, { type: 'verdict', version: 'A', verdict: 'up' }];
-  assert.deepEqual(ids(thread(log).open), []);
-  assert.deepEqual(ids(thread(log, ['comment', 'note', 'decide']).open), ['d1']);
-});
-
-test("an answer to a decision nests under it, and so does the coordinator's reply to that answer", () => {
-  const t = thread([
-    { type: 'decision', id: 'D-1', x: { status: 'pending' } },
-    { type: 'answer', id: 'a1', decision: 'D-1', text: 'Use the default.' },
-    { type: 'reply', id: 'r1', to: 'a1', text: 'Applied.' },
-  ]);
-  assert.deepEqual(ids(t.entries), ['D-1']);
-  assert.deepEqual(Array.from(t.entries[0].replies, r => r.id), ['a1', 'r1']);
-});
-
-test("a page's own rule for what waits for the user puts those entries last", () => {
-  const waiting = (c, state) => c.kind === 'decision' ? !c.replies.length : c.kind === 'note' && state[c.e.id] === 'asked';
-  const log = [
-    { type: 'decision', id: 'D-1', x: {} },
-    { type: 'note', id: 'm1', text: 'a question' },
-    { type: 'status', to: 'm1', status: 'asked' },
-    { type: 'note', id: 'm2', text: 'later' },
-  ];
-  assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'D-1', 'm1']);
-  const answered = log.concat([{ type: 'answer', id: 'a1', decision: 'D-1', text: 'yes' }]);
-  assert.deepEqual(ids(context.pageThread(answered, ITEMS, waiting).entries), ['D-1', 'm2', 'm1']);
-});
-
 // ---------- Markdown in messages: pageMarkdownTree, the tree page.js turns into elements ----------
 // The tree as plain JSON, so it compares across the vm boundary.
 const md = text => JSON.parse(JSON.stringify(context.pageMarkdownTree(text)));
@@ -282,32 +182,6 @@ test('nesting past the limit shows as written instead of overflowing', () => {
 
 test('a list can start at 0', () => {
   assert.equal(md('0. zero\n1. one')[0].start, 0);
-});
-
-test('with latestLast, an item whose reply is the newest message comes last, so the newest message is at the bottom', () => {
-  const log = [
-    { type: 'note', id: 'm1', text: 'first' },
-    { type: 'note', id: 'm2', text: 'second' },
-    { type: 'reply', id: 'r1', to: 'm1', text: 'answer to the first' },
-  ];
-  assert.deepEqual(ids(context.pageThread(log, ITEMS, null, true).entries), ['m2', 'm1']);
-  assert.deepEqual(ids(context.pageThread(log, ITEMS).entries), ['m1', 'm2']);  // the other pages keep their order
-  const later = log.concat({ type: 'note', id: 'm3', text: 'third' });
-  assert.deepEqual(ids(context.pageThread(later, ITEMS, null, true).entries), ['m2', 'm1', 'm3']);
-});
-
-test('with latestLast, threads sort by their latest message and a question waiting for the user stays at the bottom', () => {
-  const log = [
-    { type: 'reply', id: 'q1', to: null, text: 'Which size?' },
-    { type: 'note', id: 'm2', text: 'newer' },
-  ];
-  const waiting = c => c.e.id === 'q1';
-  assert.deepEqual(ids(context.pageThread(log, ITEMS, waiting).entries), ['m2', 'q1']);
-  const t = context.pageThread(log, ITEMS, waiting, true);
-  assert.deepEqual(ids(t.entries), ['m2', 'q1']);  // the newer message does not push the question up
-  assert.ok(ids(t.open).includes('q1'));  // it still counts as open
-  const more = log.concat([{ type: 'note', id: 'm3', text: 'third' }, { type: 'reply', id: 'r1', to: 'm2', text: 'answer' }]);
-  assert.deepEqual(ids(context.pageThread(more, ITEMS, waiting, true).entries), ['m3', 'm2', 'q1']);  // the rest by latest message
 });
 
 test('links with parentheses, as on Wikipedia, keep their whole address', () => {
@@ -497,19 +371,18 @@ test('a deletion points at its comment with to', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ method: 'delete', params: { to: 'c1' } }]);
 });
 
-test('delete, accept and reopen point at their item with to, and reopen carries its words in text', () => {
-  const t = thread([
-    { type: 'comment', id: 'c1', n: 1, text: 'x' },
-    { type: 'comment', id: 'c2', n: 2, text: 'y' },
-    { type: 'delete', to: 'c1' },
-    { type: 'status', to: 'c2', status: 'done' },
-    { type: 'reopen', to: 'c2', text: 'still wrong' },
-  ]);
-  assert.equal(t.entries[0].deleted, true);
-  assert.equal(t.state.c2, 'reopened');
-  assert.deepEqual(Array.from(t.entries[1].replies, r => r.text), ['still wrong']);
+test('delete, accept and reopen point at their thread with to, and reopen carries its words in text', () => {
+  const [c1, c2] = Array.from(context.pageThreads([
+    { type: 'comment', id: 'c1', n: 1, text: 'x', by: 'user' },
+    { type: 'comment', id: 'c2', n: 2, text: 'y', by: 'user' },
+    { type: 'delete', to: 'c1', by: 'user' },
+    { type: 'status', to: 'c2', status: 'done', by: 'agent' },
+    { type: 'reopen', to: 'c2', text: 'still wrong', by: 'user' },
+  ], ITEMS));
+  assert.equal(c1.deleted, true);
+  assert.equal(c2.state, 'agent');
+  assert.deepEqual(Array.from(c2.messages.slice(1), r => r.text), ['still wrong']);
 });
-
 // The agents at work (pageAgents): rows of who, what, since and the time of the last record, from any board.
 const MIN = 60000, T0 = Date.parse('2026-11-23T12:00:00Z');
 const ago = n => new Date(T0 - n * MIN).toISOString();
@@ -541,24 +414,16 @@ test('the quiet threshold comes from the data: from it on the row says no word c
 // The questions open for the user, one rule for every page: a decision waits until the user answers it on the page, and
 // again once the agent asked back about that answer; any other entry waits when the page's WAITING says so.
 const dec = (id, status, more) => ({ type: 'decision', id, status, asked: 'Login?', default: 'Go on', deadline: '2026-11-21T10:30:00Z', at: '2026-11-21T10:00:00Z', ...more });
-const openIds = (decisions, log, kinds, waiting) => Array.from(context.pageOpenDecisions(decisions, log, kinds, waiting), c => c.e.id);
+const openIds = (decisions, log) => Array.from(context.pageOpenDecisions(decisions, log), x => x.id);
 
 test('a waiting decision is open until the user answers it, and open again when the agent asks back about the answer', () => {
   const decisions = [dec('D1', 'waiting'), dec('D2', 'waiting'), dec('D3', 'defaulted'), dec('D4', 'decided', { decision: 'x' })];
-  const answer = { type: 'answer', id: 'a-1', decision: 'D2', text: 'go', default: false, at: '2026-11-21T10:05:00Z' };
+  const answer = { type: 'answer', id: 'a-1', decision: 'D2', text: 'go', default: false, by: 'user', at: '2026-11-21T10:05:00Z' };
   assert.deepEqual(openIds(decisions, []), ['D1', 'D2']);
   assert.deepEqual(openIds(decisions, [answer]), ['D1']);
-  const askedBack = { type: 'status', to: 'a-1', status: 'asked', at: '2026-11-21T10:06:00Z' };
+  const askedBack = { type: 'status', to: 'a-1', status: 'asked', by: 'coordinator', at: '2026-11-21T10:06:00Z' };
   assert.deepEqual(openIds(decisions, [answer, askedBack]), ['D1', 'D2']);
 });
-
-test('an entry that is not a decision is open only when the page says it waits', () => {
-  const log = [{ type: 'comment', id: 'c1', text: 'x', at: '2026-11-21T10:00:00Z' }, { type: 'status', to: 'c1', status: 'asked', at: '2026-11-21T10:01:00Z' },
-    { type: 'comment', id: 'c2', text: 'y', at: '2026-11-21T10:02:00Z' }];
-  assert.deepEqual(openIds([], log, ['comment']), []);
-  assert.deepEqual(openIds([], log, ['comment'], (c, state) => state[c.e.id] === 'asked'), ['c1']);
-});
-
 test('a second try says so, and a plain row does not', () => {
   assert.match(agents([{ who: 'a', what: 'x', second: true }]), /second try/);
   assert.doesNotMatch(agents([{ who: 'a', what: 'x' }]), /second try/);

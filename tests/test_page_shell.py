@@ -399,7 +399,7 @@ class ServerTest(Fixture):
         self.assertEqual(
             spec.sendable(), ("note", "comment", "delete", "accept", "reopen", "answer", "confirm", "approve")
         )
-        self.assertEqual(spec.tracked(), ("note", "comment", "answer", "confirm", "approve"))
+        self.assertEqual(spec.tracked(), ("note", "comment", "answer", "approve"))  # a confirmation needs no reply (D8)
         self.assertEqual(fixture_spec(capabilities=()).sendable(), ("note",))
 
     def test_a_failing_data_handler_prints_the_traceback_with_skill_and_hash_and_answers_500_S46(self):

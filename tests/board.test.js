@@ -60,7 +60,7 @@ const decision = (id, status, over) => ({ type: 'decision', id, status, asked: '
 test('a waiting decision counts as open until the user answers it', () => {
   const p = page();
   const d = { decisions: [decision('D1', 'waiting'), decision('D2', 'waiting'), decision('D3', 'defaulted'), decision('D4', 'decided', { decision: 'x' })],
-    conversation: [{ type: 'answer', id: 'a-1', decision: 'D2', text: 'go', default: false }] };
+    conversation: [{ type: 'answer', id: 'a-1', decision: 'D2', text: 'go', default: false, by: 'user' }] };
   assert.equal(p.waitingCount(d), 1);
   assert.equal(p.waitingCount({ ...d, conversation: [] }), 2);
 });
@@ -68,8 +68,8 @@ test('a waiting decision counts as open until the user answers it', () => {
 test('a decision the coordinator asked back about after the answer counts as open again, as on every page', () => {
   const p = page();
   const d = { decisions: [decision('D1', 'waiting', { at: '2026-11-21T10:00:00Z' })],
-    conversation: [{ type: 'answer', id: 'a-1', decision: 'D1', text: 'go', default: false, at: '2026-11-21T10:05:00Z' },
-      { type: 'status', to: 'a-1', status: 'asked', at: '2026-11-21T10:06:00Z' }] };
+    conversation: [{ type: 'answer', id: 'a-1', decision: 'D1', text: 'go', default: false, by: 'user', at: '2026-11-21T10:05:00Z' },
+      { type: 'status', to: 'a-1', status: 'asked', by: 'coordinator', at: '2026-11-21T10:06:00Z' }] };
   assert.equal(p.waitingCount(d), 1);
   assert.equal(p.waitingCount({ ...d, conversation: d.conversation.slice(0, 1) }), 0);
 });
@@ -226,20 +226,66 @@ test('the board has no list of its own: it feeds the shared one', () => {
   assert.doesNotMatch(boardJs, /class="verifier"|class="dry"/);
 });
 
-// The issue's thread: the agent's own message, the user's answer the coordinator asked about, a later comment.
-const ASKED_ANSWER = [
-  { type: 'reply', id: 'r1', to: null, text: 'Three questions' },
-  { type: 'note', id: 'm1', to: 'r1', text: 'answers' },
-  { type: 'reply', id: 'r2', to: 'm1', text: 'which one?' },
-  { type: 'status', to: 'm1', status: 'asked' },
-  { type: 'note', id: 'm2', to: 'r1', text: 'more' },
-  { type: 'comment', id: 'c1', n: 1, text: 'later' },
-];
+// ---- The board's own kinds inside the rows of the shared panel (S24, S25): board.js runs whole on the stand-in shell
+// (tests/dom.js), with the shared page.js's real panel.
+const { shellDocument, mixedDocument, panelOn, text, actions } = require('./dom');
+const at = h => new Date(Date.parse('2026-11-28T12:00:00Z') - h * 3600e3).toISOString().slice(0, 19) + 'Z';
+function liveBoard(data) {
+  const doc = shellDocument();
+  const shared = panelOn(null, null, { document: doc, config: { agent: 'coordinator', capabilities: ['pins', 'decisions'] } });
+  const c = shared.context;
+  const page = loadBoard('{render, conv}', {
+    document: mixedDocument(doc), pageConversation: o => c.pageConversation(Object.assign({}, o, { served: false })),
+    pageDecision: c.pageDecision, pageDecisionEvents: c.pageDecisionEvents, pageOpenDecisions: c.pageOpenDecisions,
+    pageMarkdown: c.pageMarkdown, pageMarkdownText: c.pageMarkdownText, pageTime: c.pageTime, pageEscape: c.pageEscape,
+  });
+  page.render(Object.assign({ now: Date.parse('2026-11-28T12:00:00Z') / 1000, brief: { title: 'Speed', status: 'running' }, logs: {}, sources: [], claims: [],
+    questions: [{ id: 'Q-1', status: 'answered', title: 'Page speed', priority: 'high', origin: { type: 'user' }, question: 'q?', summary: 's' }] }, data));
+  return Object.assign(shared, page);
+}
+const BOARD_LOG = {
+  decisions: [{ id: 'D1', at: at(3), asked: 'Search the forums too? They are slow.', status: 'waiting', default: 'No', deadline: '2026-11-28T13:00:00Z' }],
+  conversation: [
+    { type: 'closed', id: 'x1', by: 'worker-2', question: 'Q-1', status: 'answered', at: at(2) },
+    { type: 'comment', id: 'c1', on: { kind: 'question', id: 'Q-1', title: 'Page speed' }, text: 'Check mobile too.', by: 'user', at: at(1) },
+  ],
+};
 
-test("the user's answer the coordinator asked about waits for the user: its thread comes last, under Open", () => {
+test('the board draws its kinds inside rows: a decision as your turn with its default and controls, a worker\'s close as a report, a comment with its crumb', () => {
+  const b = liveBoard(BOARD_LOG);
+  const d1 = b.rowOf('D1'), x1 = b.rowOf('x1'), c1 = b.rowOf('c1');
+  assert.equal(text(d1.querySelector('.chip')), 'Your turn');
+  assert.equal(text(d1.querySelector('.tgist')), 'Coordinator: Search the forums too?');
+  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Answer']);
+  assert.equal(x1.dataset.state, 'done');
+  assert.deepEqual(actions(x1).map(x => x.textContent), ['✓', 'Reopen']);
+  assert.equal(text(c1.querySelector('.chip')), 'Agent’s turn');
+  assert.deepEqual(actions(c1).map(x => x.textContent), ['✓', 'Reply']);
+  x1.querySelector('.thead').click();
+  assert.match(text(b.rowOf('x1').querySelector('.tbody')), /Answered: Page speed/);
+  d1.querySelector('.thead').click();
+  assert.match(text(b.rowOf('D1').querySelector('.tbody')), /If you don't answer: No/);
+  b.rowOf('c1').querySelector('.thead').click();
+  assert.equal(text(b.rowOf('c1').querySelector('.crumb .el')), 'Page speed');
+  // The figure in the board's own header, in the slot it leaves for it.
+  assert.equal(text(b.$('#status #yourturn')), '1 your turn');
+  assert.equal(b.$('#status #yourturn .stat').tagName, 'BUTTON');
+});
+
+test('answering the decision from its row records the answer and makes it the agent\'s turn; the figure says 0', () => {
+  const b = liveBoard(BOARD_LOG);
+  actions(b.rowOf('D1'))[1].click();
+  const box = b.rowOf('D1').querySelector('.why textarea');
+  box.input('Yes, the forums too.');
+  box.key('Enter', { ctrlKey: true });
+  assert.deepEqual(b.conv.log().filter(e => e.type === 'answer').map(e => [e.decision, e.text, e.default]), [['D1', 'Yes, the forums too.', false]]);
+  assert.equal(text(b.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
+  assert.equal(text(b.$('#status #yourturn')), '0 your turn');
+});
+
+test('the board gives the panel none of the options of the old per-item drawing', () => {
   let o;
   loadBoard('0', { pageConversation: opts => { o = opts; return stand(); } });
-  const model = loadPage().pageThread(ASKED_ANSWER, o.itemKinds || ['comment', 'note'], o.waiting, o.latestLast);
-  assert.deepEqual(Array.from(model.entries, c => c.e.id), ['c1', 'r1']);
-  assert.ok(model.open.some(c => c.e.id === 'r1'));
+  for (const gone of ['steps', 'labels', 'shown', 'accept', 'filter', 'waiting', 'latestLast', 'agentKinds']) assert.ok(!(gone in o), gone);
+  assert.deepEqual(Object.keys(o.kinds).sort(), ['closed', 'decision']);
 });
