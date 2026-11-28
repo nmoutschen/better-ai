@@ -286,9 +286,12 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 ### Conversation
 
-- The right column of every board (`.notes`), built by page.js: the thread of items, each with its replies, its progress and its actions, then the message box.
-- Item states and their left edge: seen sand, asked umber, working terracotta, done and accepted moss-dark, reopened error. The progress row says the state in words.
-- Accept is a small umber button with ✓; Reply and Answer are quiet buttons.
+- The right column of every board (`.notes`), built by page.js: one row per thread, then the message box.
+- A row holds, left to right: the state chip, the agent's progress, "You:" or "Agent:" and the first sentence of the thread, a drawn equilateral triangle (▼ opens the thread, ▲ folds it; no outline), the message count, and the buttons for the state. An open thread's messages run flat across the row, with no box inside the row.
+- Item states and their left edge: seen sand, asked umber, working terracotta, done moss-dark, reopened error. The progress says the state in words.
+- Progress is three bars with a green Done step: Not seen shows none, Seen one, Working two, Done all three in moss-dark.
+- Buttons by state: Answer is the one filled (umber) button on a row, with ✓ beside it; ✓ and Reply are outlined; a done thread offers Reopen, outlined. Buttons differ by more than their text.
+- ✓ closes a thread. The row is replaced by a Close undo for 6 seconds, then leaves the list.
 - Do not rebuild any part of it. A page that needs the conversation embeds page.js.
 
 ### Pop-up
@@ -301,7 +304,8 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 ### Decision in the conversation
 
 - An agent's decision or question is a `li.msg.decision`, with an umber edge and the agent's name and time in umber.
-- An open question's footer is its state, a filled ✓ (use the default) and a quiet Answer, on one row (`.foot.question`). Each control's accessible name includes the question. After ✓ the focus goes to the next open question, then to what waits next.
+- An open question's footer is its state, a filled Answer and an outlined ✓ (use the default), on one row (`.foot.question`). Each control's accessible name includes the question. After ✓ the focus goes to the next open question, then to what waits next.
+- The top bar counts the threads that wait for the user as the figure "N your turn".
 - A page whose defaults never apply on a timer sets `pageDecision({suggested: true})`: the default reads "Suggested default" and no deadline shows.
 
 ### Notices

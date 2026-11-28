@@ -165,7 +165,7 @@ SUPPORT the choice USING `/decide-better` if available. OTHERWISE, GIVE each opt
 
 The user chooses on the page with Choose a move…, or in the chat. FOR Expand, Adopt or Stop in the chat, FIRST ASK a confirm question about that option, worded with the option's cost and how hard the move is to undo, and record their typed answer as the general rule [Ask the user](#ask-the-user) says.
 
-ADD the move with `python3 <skill dir>/scripts/better.pyz add <unit> move --by <coordinator>`, naming the option, the step, why, and the user's answer. IF it refuses, REPLY to the user's event with the reason and MARK it `done`, so the user can choose again. ONCE it is added as M<n>, MARK the user's event `done`, and MARK each older `choose` event with no move `done`, with the reply "replaced by M<n>". FOR Adopt or Stop, SET the head's `status` to `finished`.
+ADD the move with `python3 <skill dir>/scripts/better.pyz add <unit> move --by <coordinator>`, naming the option, the step, why, and the user's answer. IF it refuses, REPLY to the user's event with the reason, so the user can choose again. ONCE it is added as M<n>, REPLY done under the user's event, and REPLY "replaced by M<n>" under each older `choose` event with no move. FOR Adopt or Stop, SET the head's `status` to `finished`.
 
 WHEN the appetite changes, ADD the change about the discovery, THEN SET each option's `note` again: `proposed`, `ruled out by your appetite`, or none. The change shows in the decision log as the reason.
 
@@ -189,9 +189,9 @@ DO NOT copy evidence text into another record, such as a change, a move, a quest
 
 WHILE the page is served, PUT everything for the user in the page, and DO NOT repeat page events in the chat.
 
-- READ the user's open events with `python3 <skill dir>/scripts/better.pyz pending <unit>`. TURN each into the record it asks for, pointing to the event as formats/records.md shows. IF no record fits, or the records refuse it, REPLY with why and the next action, and MARK it `done`.
-- TRACK each event with `python3 <skill dir>/scripts/better.pyz status <unit> seen|asked|working|done <id>`, and REPLY with `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id>`, your words on stdin as [Add the records](#add-the-records) says.
-- REPLY in one or two short sentences. MARK `working` only what you are changing now. Once an answer leads to a change, MARK the item `done` and ASK the next question as a new message.
+- READ the user's open events with `python3 <skill dir>/scripts/better.pyz pending <unit>`. TURN each into the record it asks for, pointing to the event as formats/records.md shows. IF no record fits, or the records refuse it, REPLY with why and the next action.
+- TRACK each event with `python3 <skill dir>/scripts/better.pyz status <unit> seen|working <id>`, and REPLY with `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id>`, your words on stdin as [Add the records](#add-the-records) says.
+- REPLY in one or two short sentences. A reply sets the state of its item: `done` by default, `--state asked` when you wait for the user's answer, `--state working` when you reply before the change. MARK `working` only what you are changing now. ASK one question per message. POST a question with `reply --state asked` and a report without it: a report needs no answer and is done at once. ONCE an answer leads to a change, REPLY done and ASK the next question as a new message. ANY message from the user in a thread gives it back to you. The user closes a thread with ✓: an item is finished only when the user closes it.
 
 ### Run the sub-agents
 
