@@ -64,9 +64,10 @@ WORD = re.compile(r"[A-Za-z0-9_@%+=:,./-]+|'[^']*'(?:\"'\"'[^']*')*")
 BARE = re.compile(r"[A-Za-z0-9_@%+=:,./-]+")
 IDENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
 TAG = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,31}")
+LINE = re.compile(r"[0-9]+")  # the value of --read: a line of the log, as pending prints it
 FLAGS = {
-    "reply": {"--by", "--to", "--state"},
-    "status": {"--by"},
+    "reply": {"--by", "--to", "--state", "--read"},
+    "status": {"--by", "--read"},
     "pending": set(),
     "check": set(),
     "summary": set(),
@@ -89,6 +90,7 @@ def approved_form(command, unit, verbs):
     """The one sentence that says which command is approved without asking: the turn's header and the denial hold it."""
     return (
         f"{command} <verb> {shlex.quote(str(unit))} <arguments>, where <verb> is one of {', '.join(verbs_of(verbs))}, "
+        "--read <n> on reply and status with n the line pending gives, "
         "text only as a quoted heredoc (<<'EOF', the text, then EOF on its own line), "
         "and --by or --for naming an agent other than user"
     )
@@ -185,6 +187,10 @@ def verb_command(command, unit, archive, verbs, interpreter=None):
             if arg == "--raw":
                 # The file a record's rule reads to check a quote: an absolute path of bare characters only.
                 if not (value.startswith("/") and BARE.fullmatch(value) and "/../" not in value + "/"):
+                    return False
+                continue
+            if arg == "--read":
+                if not LINE.fullmatch(value):
                     return False
                 continue
             if not IDENT.fullmatch(value) or (arg in NAMES and value == "user"):

@@ -864,8 +864,9 @@ def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tup
 
 
 def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
-    """The batch this turn carried (`.page-delivery`), as it stands now: the agent's own writes since count. The user's
-    events after it belong to a later turn."""
+    """The batch this turn carried (`.page-delivery`), as it stands now: the agent's own writes since count, and so do
+    the user's events in the threads it carried, which a refused --read sends the agent here to read (D12), with a
+    --read that covers them. The user's other events after it belong to a later turn."""
     sent = _delivery_ids(active, "item_ids")
     position, actions = active.get("position"), active.get("actions")
     if (
@@ -875,9 +876,18 @@ def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
         and all(isinstance(a, dict) for a in actions)
     ):
         events = conv.events()
+        named: set = set()
+        for t in threads(events, conv.items):
+            if t["id"] in sent:
+                named |= {t["id"]} | {m.get("id") for m in t["messages"]}
+        named.discard(None)
+        later = list(enumerate(events))[position:]
+        mine = {n for n, e in later if from_user(e) and named & {e.get("id"), e.get("to"), e.get("decision")}}
         # Each event keeps its line (LINE), so a status's read is checked against the user's lines in the log.
-        snapshot = [{**e, LINE: n} for n, e in enumerate(events) if e and (n < position or not from_user(e))]
-        read = position - 1
+        snapshot = [
+            {**e, LINE: n} for n, e in enumerate(events) if e and (n < position or not from_user(e) or n in mine)
+        ]
+        read = max([position - 1, *mine])
         marks = active.get("sent_before") if isinstance(active.get("sent_before"), dict) else {}
         items = [
             {
