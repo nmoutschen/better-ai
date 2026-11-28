@@ -603,6 +603,8 @@ test('once the log shows a send the server saved without answering, the same tex
     const { conv, sent } = conversationOn(lostThenSaved());
     conv.send('note', { id: 'm-first', text: 'yes', to: null }, 'Send');
     await nextTick();
+    context.document.createElement = () => stubElement();
+    context.document.createTextNode = () => stubElement();
     conv.setLog([{ type: 'note', id: 'm-first', text: 'yes', to: null, at: '2026-11-28T15:00:00Z' }], 'k1');
     conv.send('note', { id: 'm-later', text: 'yes', to: null }, 'Send');
     await nextTick();

@@ -1471,10 +1471,16 @@ function pageConversation(o) {
   }
   // The page's whole log, when the page reads it itself; KEY is anything else the entries show, such as a deadline.
   // The thread is redrawn only when either changed, so focus and selection stay put between polls.
+  // A kept id whose event the log already holds was saved, even if its reply was lost: a later send is a new event.
+  function forgetSaved() {
+    Object.keys(unconfirmed).forEach(function (k) {
+      if (log.some(function (e) { return e.id === unconfirmed[k]; })) delete unconfirmed[k];
+    });
+  }
   function setLog(events, key) {
     var next = JSON.stringify([events, key]);
     if (next === fed) return;
-    fed = next; log = events.slice(); renderThread();
+    fed = next; log = events.slice(); forgetSaved(); renderThread();
   }
   // The user's items that match, without actions, such as the comments on one question.
   function nodes(match) {
@@ -1529,6 +1535,7 @@ function pageConversation(o) {
       pageFetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
+        forgetSaved();
         // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
         if (after > 0) r.events.forEach(function (e) { if (e.type === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
         if (r.events.length) renderThread();
