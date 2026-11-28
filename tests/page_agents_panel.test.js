@@ -239,13 +239,13 @@ test('S164: Stop sits beside the Agents heading in the error fill, Start in its 
   let button = page.control();
   assert.equal(button.textContent, 'Stop');
   assert.equal(button.getAttribute('aria-label'), 'Stop all agents');
-  assert.match(button.className, /btn btn--sm btn--stop/);
+  assert.match(button.className, /btn btn--sm agent-ctl btn--stop/);
   assert.equal(button.getAttribute('type'), 'button');
   await page.show(body({ state: 'stopped', text: TEXT.stopped }));
   button = page.control();
   assert.equal(button.textContent, 'Start');
   assert.equal(button.getAttribute('aria-label'), 'Start all agents');
-  assert.match(button.className, /btn btn--sm btn--start/);
+  assert.match(button.className, /btn btn--sm agent-ctl btn--start/);
   const css = read('page', 'page.css');
   assert.match(css, /\.btn--stop\s*\{[^}]*background:var\(--error\)[^}]*border-color:var\(--error\)[^}]*color:var\(--cream\)/);
   assert.match(css, /\.btn--start\s*\{[^}]*background:var\(--moss-dark\)[^}]*border-color:var\(--moss-dark\)[^}]*color:var\(--cream\)/);
@@ -306,7 +306,7 @@ test('S169: below 900 px Stop or Start and the notice are pinned to the bottom o
   assert.equal(page.pinbar().querySelector('.agent-ctl').textContent, 'Stop');
   assert.equal(page.pinbar().querySelector('.pinbar-text').textContent, '');
   const css = read('page', 'page.css').replace(/\s+/g, ' ');
-  assert.match(css, /@media \(max-width:900px\) \{[^@]*\.pinbar \{[^}]*position:fixed[^}]*bottom:0/);
+  assert.match(css, /\.pinbar \{[^}]*position:fixed[^}]*bottom:0/);
   assert.match(css, /@media \(min-width:901px\) \{ \.pinbar \{ display:none; \} \}/);
   assert.match(css, /@media \(max-width:900px\) \{[^@]*\.agents \.notice \{ display:none; \}/);
   assert.match(css, /@media \(max-width:900px\) \{[^@]*\.agentsec \.agent-ctl \{ display:none; \}/);

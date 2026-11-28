@@ -437,8 +437,12 @@
     });
   }
   function fraction(n) { return Number.isFinite(n) && n >= 0 && n <= 1; }
+  // A click from a frame acts only within 1 s of a real pointer event on that frame, and once for each: the frame says
+  // each pointer event as it happens, and this keeps the time of the last one.
+  var gestures = new WeakMap();
   function fromMock(frame, m) {
     if (!m || typeof m !== 'object') return;
+    if (m.kind === 'pointer') { gestures.set(frame, Date.now()); return; }
     if (m.kind === 'scroll' || m.kind === 'layout') {
       if (!fraction(m.fraction) || !Number.isFinite(m.height) || m.height < 0 || m.height > 1e8 ||
           !Number.isFinite(m.range) || m.range < 0 || m.range > m.height || !Array.isArray(m.marks) || m.marks.length > 512) return;
@@ -455,13 +459,19 @@
       if (m.key === 'c') setMode(!commenting);
     } else if (m.kind === 'click' && Number.isFinite(m.x) && Number.isFinite(m.y) &&
                m.x >= 0 && m.y >= 0 && m.x <= frame.clientWidth && m.y <= frame.clientHeight) {
+      var gesture = gestures.get(frame);
+      gestures.delete(frame);
+      if (gesture === undefined || Date.now() - gesture > 1000) return;
       if (!menu.hidden) openMenu(false);
       if (!pop.hidden) return comments.close();
       if (typeof m.id === 'string') {
         var it = byId(m.id);
         if (!it || it.version !== labels[+frame.dataset.i]) return;
         var state = comments.state()[it.id];
-        if (state === 'done' || state === 'accepted') conv.reopen(it.id);
+        if (state === 'accepted') pageDialog({ role: 'alertdialog', title: 'Reopen this accepted comment?', opener: document.activeElement, focus: 1,
+          body: pageEl('p', 'ask', 'You will reply under it, and it goes back to the agent.'),
+          buttons: [{ text: 'Reopen', click: function () { pageDialogClose(); conv.reopen(it.id); } }, { text: 'Cancel', quiet: true, click: pageDialogClose }] });
+        else if (state === 'done') conv.reopen(it.id);
         else openPop(frame, null, null, m.x, m.y, it);
       } else if (commenting && typeof m.selector === 'string' && m.selector.length > 0 && m.selector.length <= 4096 &&
                  typeof m.tag === 'string' && m.tag.length <= 100 && typeof m.text === 'string' && m.text.length <= 120 &&

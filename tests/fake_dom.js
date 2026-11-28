@@ -10,6 +10,8 @@ class El {
   }
   get id() { return this.attrs.id || ''; }
   set id(v) { this.attrs.id = v; }
+  get type() { return this.attrs.type; }
+  set type(v) { this.attrs.type = v; }
   get textContent() { return this.children.map(c => (typeof c === 'string' ? c : c.textContent)).join(''); }
   set textContent(v) { this.children.forEach(c => { if (typeof c !== 'string') c.parent = null; }); this.children = v === '' ? [] : [String(v)]; this._html = null; }
   get innerHTML() { return this._html !== null ? this._html : this.children.map(c => (typeof c === 'string' ? c : c.outer)).join(''); }
@@ -121,7 +123,8 @@ function fire(doc, target, type, extra) {
   run(doc.listeners[type], false);
   return event;
 }
-const click = (doc, target, extra) => (target.disabled ? null : fire(doc, target, 'click', extra));
+// A press reaches only a control that is on the page and not disabled.
+const click = (doc, target, extra) => (target.disabled || !target.isConnected ? null : fire(doc, target, 'click', extra));
 
 // Builds an element tree: h(doc, 'div.work#id', {attr: 'v'}, child, child...).
 function h(doc, spec, attrs, ...kids) {
