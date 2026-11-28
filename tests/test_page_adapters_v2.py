@@ -4,6 +4,7 @@ import builtins
 import copy
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from better_ai.page.adapters import (  # noqa: E402
+    HARNESS_FACTS,
+    AdapterEvent,
     CodexAdapter,
     DroidAdapter,
     OpenCodeAdapter,
@@ -24,6 +27,7 @@ from better_ai.page.adapters import (  # noqa: E402
     child_environment,
     version_supported,
 )
+from better_ai.page.adapters import _touches_config as touches_config  # noqa: E402
 from better_ai.page.transport import ProcessTransport  # noqa: E402
 
 WIRE = ROOT / "tests" / "fixtures" / "page_wire"
@@ -196,7 +200,8 @@ class ChatMode(unittest.TestCase):
             ("codex", ("--dangerously-bypass-approvals-and-sandbox",)): "skip approvals",
             ("codex", ("-a", "never")): "skip approvals",
             ("codex", ("--ask-for-approval", "on-request")): "manual",
-            ("cursor", ("--yolo",)): None,
+            ("cursor", ("--yolo",)): "skip approvals",
+            ("cursor", ("--auto-review",)): None,
         }
         for (name, flags), expected in cases.items():
             with self.subTest(name=name, flags=flags):
@@ -252,7 +257,8 @@ class ChatMode(unittest.TestCase):
         self.assertEqual(sent[-1]["params"]["approvalsReviewer"], "auto_review")
         self.assertEqual((events[0].kind, events[0].mode, events[0].session_id), ("ready", "auto", SESSION))
         _, _, sent, events = open_codex("-a", "on-request")
-        self.assertEqual(sent[-1]["params"]["approvalsReviewer"], "user")
+        self.assertEqual(sent[-1]["params"]["approvalPolicy"], "on-request")
+        self.assertNotIn("approvalsReviewer", sent[-1]["params"])
         self.assertEqual((events[0].kind, events[0].mode), ("ready", "manual"))
         _, _, sent, events = open_codex("-a", "never", policy="never")
         self.assertEqual(sent[-1]["params"]["approvalPolicy"], "never")
@@ -260,6 +266,8 @@ class ChatMode(unittest.TestCase):
         _, _, sent, events = open_codex("--approve-for-me", reviewer="user")
         self.assertEqual(events[0].outcome, "unsafe-mode")
         _, _, _, events = open_codex(reviewer="guardian_subagent")
+        self.assertEqual((events[0].kind, events[0].mode), ("ready", "auto"))
+        _, _, _, events = open_codex(reviewer="someone_else")
         self.assertEqual(events[0].outcome, "unsafe-mode")
 
     def test_codex_resume_keeps_the_reviewer(self):  # S160
@@ -600,7 +608,7 @@ def open_droid(autonomy, *chat):
 
 class OtherHarnessModes(unittest.TestCase):
     def test_cursor_maps_every_reported_approval_mode(self):  # S11 L1
-        for value, label in (("allowlist", "manual"), ("auto-review", "auto"), ("unrestricted", "skip approvals")):
+        for value, label in (("allowlist", "manual"), ("auto-review", "auto"), ("unrestricted", "unrestricted")):
             with self.subTest(value=value):
                 _, _, events = open_cursor(value)
                 self.assertEqual((events[0].kind, events[0].mode), ("ready", label))
@@ -609,20 +617,14 @@ class OtherHarnessModes(unittest.TestCase):
         _, _, events = open_cursor(None)
         self.assertEqual((events[0].kind, events[0].outcome), ("failed", "no-approvals"))
 
-    def test_cursor_is_set_to_the_chat_mode(self):  # S11
-        adapter, sent, events = open_cursor("allowlist", "--auto-review")
-        self.assertEqual(events, ())
-        self.assertEqual(sent[-1]["method"], "session/set_config_option")
-        self.assertEqual(sent[-1]["params"], {"sessionId": "cs1", "configId": "approvalMode", "value": "auto-review"})
-        ready = adapter.receive(
-            {"id": sent[-1]["id"], "result": {"configOptions": acp_option("approvalMode", "auto-review")}}
-        )
-        self.assertEqual((ready[0].kind, ready[0].mode, ready[0].session_id), ("ready", "auto", "cs1"))
-        adapter, sent, _ = open_cursor("allowlist", "--auto-review")
-        refused = adapter.receive(
-            {"id": sent[-1]["id"], "result": {"configOptions": acp_option("approvalMode", "allowlist")}}
-        )
-        self.assertEqual(refused[0].outcome, "unsafe-mode")
+    def test_a_forced_cursor_chat_passes_force_on(self):  # S11 B1
+        for flag in ("--force", "-f", "--yolo"):
+            with self.subTest(flag=flag):
+                plan = candidate("cursor", {}, lambda _: "/bin/agent", chat_argv=("agent", flag))
+                self.assertEqual(plan.argv, ("/bin/agent", "--force", "acp"))
+                adapter, sent, events = open_cursor("allowlist", flag)
+                self.assertNotIn("session/set_config_option", [frame.get("method") for frame in sent])
+                self.assertEqual((events[0].kind, events[0].mode), ("ready", "skip approvals"))
 
     def test_cursor_accepts_a_matching_update_and_refuses_another_mode(self):  # S11
         adapter, _, _ = open_cursor("auto-review")
@@ -647,6 +649,8 @@ class OtherHarnessModes(unittest.TestCase):
                 _, _, events = open_devin(value)
                 self.assertEqual((events[0].kind, events[0].mode), ("ready", label))
         _, _, events = open_devin("autonomous")
+        self.assertEqual((events[0].kind, events[0].mode), ("ready", "autonomous"))
+        _, _, events = open_devin("something-new")
         self.assertEqual((events[0].kind, events[0].outcome), ("failed", "unsafe-mode"))
 
     def test_devin_is_set_to_the_chat_mode(self):  # S11
@@ -695,7 +699,10 @@ class OtherHarnessModes(unittest.TestCase):
         self.assertEqual(chat_mode("devin", ("devin", "--permission-mode", "accept-edits")), "accept edits")
         self.assertEqual(chat_mode("devin", ("devin", "--permission-mode=yolo")), "skip approvals")
         self.assertEqual(chat_mode("devin", ("devin", "--permission-mode", "normal")), "manual")
-        self.assertEqual(chat_mode("cursor", ("agent", "--auto-review")), "auto")
+        self.assertEqual(chat_mode("devin", ("devin", "--permission-mode", "auto")), "manual")
+        self.assertEqual(chat_mode("devin", ("devin", "--sandbox", "--permission-mode", "autonomous")), "autonomous")
+        self.assertEqual(chat_mode("cursor", ("agent", "--yolo")), "skip approvals")
+        self.assertIsNone(chat_mode("cursor", ("agent", "--auto-review")))
 
 
 class ClaudeGrantsAndPaths(unittest.TestCase):
@@ -705,6 +712,8 @@ class ClaudeGrantsAndPaths(unittest.TestCase):
         adapter.answer(edit.request_id, "allow_session")
         self.assertEqual(adapter.mode, "accept edits")
         init = frame("system_init_auto", session_id=CLAUDE_SESSION, permissionMode="acceptEdits")
+        events = adapter.receive(init)
+        self.assertEqual([(event.kind, event.mode) for event in events], [("mode", "accept edits")])  # N4
         self.assertEqual(adapter.receive(init), ())
         self.assertEqual(adapter.session_id, CLAUDE_SESSION)
 
@@ -784,7 +793,130 @@ class CodexWithoutAChatMode(unittest.TestCase):
                 self.assertNotIn("approvalsReviewer", sent[-1]["params"])
                 self.assertEqual((events[0].kind, events[0].mode), ("ready", label))
         _, _, _, events = open_codex(reviewer="guardian_subagent")
-        self.assertEqual(events[0].outcome, "unsafe-mode")
+        self.assertEqual((events[0].kind, events[0].mode), ("ready", "auto"))
+
+
+class HarnessTable(unittest.TestCase):
+    """One walk over every harness fact the adapters rely on (D12, L1, L2)."""
+
+    SOURCE = re.compile(r"(https://\S+\.\S+|`[a-z]+ [^`]+`|tests/fixtures/\S+)")
+
+    def entries(self):
+        for name, harness in HARNESS_FACTS.items():
+            yield name, harness.set_by
+            yield from ((name, entry) for entry in harness.chat_flags)
+            yield from ((name, entry) for entry in harness.reported)
+            yield from ((name, entry) for entry in harness.config)
+
+    def test_every_entry_names_its_source(self):  # L1
+        self.assertEqual(set(HARNESS_FACTS), {"claude", "codex", "cursor", "opencode", "droid", "devin"})
+        for name, entry in self.entries():
+            with self.subTest(name=name, entry=entry):
+                self.assertRegex(entry.source, self.SOURCE)
+
+    def test_every_chat_flag_maps_and_is_passed_on(self):  # S11 B1
+        for name, harness in HARNESS_FACTS.items():
+            binary = {"cursor": "agent"}.get(name, name)
+            for flag in harness.chat_flags:
+                spellings = [(spelling,) for spelling in flag.names]
+                if flag.value is not None:
+                    spellings = [(spelling, flag.value) for spelling in flag.names]
+                    spellings += [(f"{spelling}={flag.value}",) for spelling in flag.names if spelling.startswith("--")]
+                for spelling in spellings:
+                    argv = (binary, "--verbose", *spelling)
+                    with self.subTest(name=name, argv=argv):
+                        self.assertEqual(chat_mode(name, argv), flag.mode)
+                        plan = candidate(name, {}, lambda found: f"/bin/{found}", chat_argv=argv)
+                        self.assertEqual(plan.mode, flag.mode)
+                        for token in flag.argv:
+                            self.assertIn(token, plan.argv)
+                        adapter = plan.codec(lambda _: None, CLAUDE_SESSION, None)
+                        self.assertEqual(adapter.chat.protocol, flag.protocol)
+                        if not flag.argv and flag.protocol is None:
+                            self.assertIn("no documented way", harness.set_by.text)
+            with self.subTest(name=name, argv="none"):
+                self.assertIsNone(chat_mode(name, (binary, "--verbose")))
+
+    def ready_mode(self, name, field, value):
+        if name == "claude":
+            init = copy.deepcopy(CLAUDE["initialize_default"])
+            init["response"]["response"]["current_permission_mode"] = value
+            sent = []
+            adapter = claude_plan().codec(sent.append, CLAUDE_SESSION, None)
+            adapter.open("/repo", None)
+            init["response"]["request_id"] = sent[-1]["request_id"]
+            return adapter.receive(init)[0]
+        if name == "codex":
+            if field == "approvalsReviewer":
+                return open_codex(reviewer=value)[3][0]
+            return open_codex(reviewer="user", policy=value)[3][0]
+        if name == "cursor":
+            return open_cursor(value)[2][0]
+        if name == "devin":
+            return open_devin(value)[2][0]
+        return open_droid(value)[2][0]
+
+    def test_every_reported_mode_is_accepted_by_its_own_name(self):  # S11 S157
+        for name, harness in HARNESS_FACTS.items():
+            for reported in harness.reported:
+                with self.subTest(name=name, value=reported.value):
+                    event = self.ready_mode(name, reported.field, reported.value)
+                    self.assertEqual((event.kind, event.mode), ("ready", reported.mode or "manual"))
+
+    def forms(self, path):
+        sample = path + "settings.json" if path.endswith("/") else path
+        if sample.startswith("~/"):
+            rest = sample[2:]
+            bases = [f"/Users/u/{rest}", f"~/{rest}", f"$HOME/{rest}", rest]
+        elif sample.startswith("/"):
+            bases = [sample]
+        else:
+            bases = [f"/repo/{sample}", f"./{sample}", sample, f"/repo/sub/dir/{sample}"]
+        forms = []
+        for base in bases:
+            forms += [base, base.upper(), f"echo x >{base}", f"echo x >> {base}", f"echo x>>{base}", f"cp a '{base}'"]
+        if path.endswith("/") and not path.startswith("/"):
+            forms.append(f"rm -rf {path.removeprefix('~/').rstrip('/')}")
+        return forms
+
+    def test_every_config_location_matches_in_every_real_form(self):  # S10 L2 B2
+        for name, harness in HARNESS_FACTS.items():
+            for location in harness.config:
+                for form in self.forms(location.path):
+                    with self.subTest(name=name, form=form):
+                        self.assertTrue(touches_config({"command": form}), form)
+
+    def test_ordinary_paths_are_not_config(self):  # S10
+        for path in (
+            "claude.py",
+            "src/opencode.py",
+            "my-opencode.json",
+            "mcp.json",
+            "/repo/notes.txt",
+            "/repo/docs/.claude-plugin-notes.md",
+            "/repo/src/claude/settings.py",
+            "/repo/devin/config.json",
+            "opencode.json.md",
+        ):
+            with self.subTest(path=path):
+                self.assertFalse(touches_config({"file_path": path}), path)
+
+    def test_the_named_locations_are_in_the_table(self):  # B2
+        for path in (
+            "~/.config/devin/config.json",
+            "/repo/.devin/config.local.json",
+            "/repo/opencode.json",
+            "/repo/opencode.jsonc",
+            "/repo/.opencode/opencode.jsonc",
+            "~/.config/opencode/opencode.json",
+            "~/.claude.json",
+            "/repo/.mcp.json",
+            "/Library/Application Support/ClaudeCode/managed-settings.json",
+            "~/.factory/settings.json",
+            "~/.cursor/cli-config.json",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(touches_config(path), path)
 
 
 class OneProcessAcrossTurns(unittest.TestCase):
