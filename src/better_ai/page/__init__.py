@@ -908,7 +908,8 @@ def unread_from(events: list, found: list[dict], item_types: tuple[str, ...]) ->
         if t["state"] == "agent" and t["step"] == "new" and not t["deleted"] and _held(t, item_types):
             writes = [lines[id(m)] for m in t["messages"] if m.get("by") == "user" and id(m) in lines]
             if isinstance(t["id"], str):
-                waiting[t["id"]] = min((n for n in writes if n > covered), default=t["user_at"])
+                # Bounded by the fold's own user_at: an edit keeps user_at at the first version's line (thread.tla A2).
+                waiting[t["id"]] = min([t["user_at"], *(n for n in writes if n > covered)])
     return waiting
 
 
