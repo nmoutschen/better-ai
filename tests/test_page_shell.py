@@ -552,7 +552,9 @@ class ThreadsTest(unittest.TestCase):
         """The same logs are run on page.js `pageThreads` in tests/page.test.js: both give the same threads."""
         for case in TABLE:
             with self.subTest(case["name"]):
-                got = [t for t in page.threads(case["log"], tuple(case.get("items", DEFAULT_KINDS))) if not t["deleted"]]
+                got = [
+                    t for t in page.threads(case["log"], tuple(case.get("items", DEFAULT_KINDS))) if not t["deleted"]
+                ]
                 self.assertEqual([shape(t) for t in got], [shape(t) for t in case["threads"]])
                 for thread, expected in zip(got, case["threads"], strict=True):
                     if "since" in expected:
@@ -682,7 +684,7 @@ class VerbsTest(Fixture):
                 items = [json.loads(line) for line in lines[:-1]]
                 expected = [[t["id"], t["step"]] for t in case["threads"] if t["state"] == "agent"]
                 self.assertEqual([[e["id"], e["status"]] for e in items], expected)
-                self.assertEqual(lines[-1], f"{len(items)} to act on.")
+                self.assertEqual(lines[-1], f"{len(items)} not done.")
                 for name, (item, field, value) in EXTRAS.items():
                     if name == case["name"]:
                         got = next(e[field] for e in items if e["id"] == item)
@@ -763,6 +765,7 @@ class VerbsTest(Fixture):
         _, host = self.serve()
         self.seed({"type": "note", "by": "user", "id": "m0", "text": "old", "to": None})
         self.cli("pending", self.unit_arg)
+        (self.unit_dir / ".conversation-seen").write_text("1")  # an earlier wait showed m0
         sender = threading.Timer(0.5, lambda: self.rpc(host, "note", {"id": "m1", "text": "hi", "to": "m0"}))
         sender.start()
         self.assertEqual(self.cli("wait", self.unit_arg, "--timeout", "20")[0], 0)

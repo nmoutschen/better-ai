@@ -230,7 +230,7 @@
    {"type": "accept", "to": "m2", "by": "user"}
   ],
   "threads": [
-   {"id": "m1", "state": "done", "step": "new", "closedByUser": true},
+   {"id": "m1", "state": "done", "step": "working", "closedByUser": true},
    {"id": "m2", "state": "done", "step": "new", "closedByUser": true}
   ]},
  {"name": "transition: the agent asks in a thread it finished",
