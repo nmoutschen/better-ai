@@ -248,6 +248,18 @@ class LogicFlowDrawing(unittest.TestCase):
         self.assertIn(shape["loops"]["e-poke"]["kind"], ("arc", "connector"))
         self.assert_drawn_clear(self.flow, shape)
 
+    def test_connectors_on_one_node_top_keep_their_labels_apart(self):
+        """A connector whose label would run over the next connector on the same node is lifted above it, and the node
+        above makes room."""
+        self.flow["edges"] += [
+            {"id": "e-recheck", "from": "ok", "to": "wait", "label": "recheck the open questions"},
+            {"id": "e-redraft", "from": "ok", "to": "draft", "label": "redraft from scratch"},
+        ]
+        shape = diagram.logic_layout(self.flow, self.layout)
+        kinds = {ident: loop["kind"] for ident, loop in shape["loops"].items()}
+        self.assertEqual([kinds[i] for i in ("e-recheck", "e-redraft")].count("connector"), 2)
+        self.assert_drawn_clear(self.flow, shape)
+
     def assert_drawn_clear(self, flow, shape):
         """No line crosses another, a node it does not join, a connector or a label; no label overlaps a node or
         another label."""
@@ -281,6 +293,9 @@ class LogicFlowDrawing(unittest.TestCase):
             for ident, loop in {**shape["loops"], **shape["jumps"]}.items()
             for cx, cy in loop.get("circles", [])
         ]
+        for ident, rect in labels:
+            for other, circle in circles:
+                self.assertFalse(other != ident and overlap(rect, circle), (ident, other))
         for ident, parts in lines.items():
             for other, rect in [*circles, *labels]:
                 if other == ident:
