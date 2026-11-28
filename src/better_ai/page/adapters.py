@@ -25,7 +25,11 @@ class Candidate:
     approval: str | None = None
     codec_factory: Callable[..., ACPAdapter | CodexAdapter | ClaudeAdapter | DroidAdapter] | None = None
     text: str = ""
-    mode: str | None = None
+    chat: ChatMode | None = None
+
+    @property
+    def mode(self) -> str | None:
+        return self.chat.mode if self.chat else None
 
     def command(self, session_id: str, resume: str | None) -> tuple[str, ...]:
         if self.kind is not None:
@@ -45,8 +49,8 @@ class Candidate:
             raise ValueError("no verified protocol for this harness")
         if self.name == "claude":
             expected = resume if session_id_valid("claude", resume) else session_id
-            return ClaudeAdapter(send, expected, self.mode)
-        return self.codec_factory(send, self.mode)
+            return ClaudeAdapter(send, expected, self.chat)
+        return self.codec_factory(send, self.chat)
 
 
 _REAL_BROWSER_TOOLS = (
@@ -56,28 +60,491 @@ _REAL_BROWSER_TOOLS = (
     "mcp__computer-use",
     "mcp__remote-devices__computer",
 )
-_MODES = ("manual", "accept edits", "auto", "skip approvals")
-_CLAUDE_CHAT = {
-    "manual": "manual",
-    "default": "manual",
-    "acceptEdits": "accept edits",
-    "auto": "auto",
-    "bypassPermissions": "skip approvals",
+
+
+@dataclass(frozen=True)
+class Fact:
+    text: str
+    source: str
+
+
+@dataclass(frozen=True)
+class ChatFlag:
+    """A flag the user's chat can start with, the mode it means, and how the page session is given it."""
+
+    names: tuple[str, ...]
+    value: str | None
+    mode: str
+    source: str
+    argv: tuple[str, ...] = ()  # added to the page session's command line
+    protocol: Any = None  # set in the protocol: an option value, or Codex thread parameters
+    reported: bool = True  # whether the session reports this mode back, so it can be checked
+
+
+@dataclass(frozen=True)
+class ReportedMode:
+    """A mode value the harness reports for its session, and the mode shown for it."""
+
+    field: str
+    value: str
+    mode: str | None  # None: the value leaves the mode to another field (Codex)
+    source: str
+
+
+@dataclass(frozen=True)
+class ConfigPath:
+    """A harness configuration location: ~/ for home, / for system, otherwise relative to a project."""
+
+    path: str
+    source: str
+
+
+@dataclass(frozen=True)
+class Harness:
+    set_by: Fact
+    chat_flags: tuple[ChatFlag, ...]
+    reported: tuple[ReportedMode, ...]
+    config: tuple[ConfigPath, ...]
+    flags_at: int | None = None  # where chat flags go in the page command; None appends them
+
+
+_CLAUDE_HELP = "`claude --help` (2.1.332)"
+_CLAUDE_WIRE = "tests/fixtures/page_wire/claude_2_1_332.json"
+_CODEX_HELP = "`codex --help` (0.172.0)"
+_CODEX_SCHEMA = "`codex app-server generate-json-schema` (0.172.0)"
+_CURSOR_FLAGS = "https://cursor.com/docs/cli/reference/parameters"
+_CURSOR_CONFIG = "https://cursor.com/docs/cli/reference/configuration"
+_CURSOR_MODES = "https://cursor.com/docs/agent/security/run-modes"
+_DEVIN_FLAGS = "https://docs.devin.ai/cli/reference/commands"
+_DEVIN_MODES = "https://docs.devin.ai/cli/reference/permissions"
+_DROID_FLAGS = "https://docs.factory.com/reference/cli-reference"
+_DROID_SETTINGS = "https://docs.factory.com/cli/configuration/settings"
+_DROID_SDK = "https://www.npmjs.com/package/@factory/droid-sdk/v/0.11.0"
+_OPENCODE_HELP = "`opencode --help` (2.4.1)"
+_OPENCODE_CONFIG = "https://opencode.ai/docs/config/"
+
+
+def _claude_mode(value: str, mode: str) -> ChatFlag:
+    return ChatFlag(("--permission-mode",), value, mode, _CLAUDE_HELP, argv=("--permission-mode", value))
+
+
+def _codex_config(value: str, mode: str, params: dict) -> ChatFlag:
+    return ChatFlag(("-c", "--config"), value, mode, _CODEX_SCHEMA + " Config", protocol=params)
+
+
+def _devin_mode(value: str, mode: str, canonical: str, argv: tuple[str, ...] = ()) -> ChatFlag:
+    return ChatFlag(("--permission-mode",), value, mode, _DEVIN_FLAGS, argv=argv, protocol=canonical)
+
+
+# Every harness fact the adapters rely on, each with where it comes from. chat_mode, the mode maps and
+# _CONFIG_PATH are generated from this table only. Modes without one of the four common names (manual,
+# accept edits, auto, skip approvals) are shown by their own name.
+HARNESS_FACTS: dict[str, Harness] = {
+    "claude": Harness(
+        set_by=Fact("the command line: the chat's own permission flag, passed on as it is", _CLAUDE_HELP),
+        chat_flags=(
+            _claude_mode("manual", "manual"),
+            _claude_mode("acceptEdits", "accept edits"),
+            _claude_mode("auto", "auto"),
+            _claude_mode("bypassPermissions", "skip approvals"),
+            _claude_mode("dontAsk", "don't ask"),
+            _claude_mode("plan", "plan"),
+            ChatFlag(
+                ("--dangerously-skip-permissions",),
+                None,
+                "skip approvals",
+                _CLAUDE_HELP,
+                argv=("--dangerously-skip-permissions",),
+            ),
+        ),
+        reported=(
+            ReportedMode("permission mode", "default", "manual", _CLAUDE_WIRE + " initialize_default"),
+            ReportedMode("permission mode", "manual", "manual", _CLAUDE_HELP),
+            ReportedMode("permission mode", "acceptEdits", "accept edits", _CLAUDE_HELP),
+            ReportedMode("permission mode", "auto", "auto", _CLAUDE_WIRE + " initialize_auto"),
+            ReportedMode("permission mode", "bypassPermissions", "skip approvals", _CLAUDE_HELP),
+            ReportedMode("permission mode", "dontAsk", "don't ask", _CLAUDE_HELP),
+            ReportedMode("permission mode", "plan", "plan", _CLAUDE_HELP),
+        ),
+        config=(
+            ConfigPath("~/.claude/", "https://code.claude.com/docs/en/settings"),
+            ConfigPath("~/.claude.json", "https://code.claude.com/docs/en/settings"),
+            ConfigPath(".claude/", "https://code.claude.com/docs/en/settings"),
+            ConfigPath(".mcp.json", "https://code.claude.com/docs/en/mcp"),
+            ConfigPath("/Library/Application Support/ClaudeCode/", "https://code.claude.com/docs/en/managed-settings"),
+            ConfigPath("/etc/claude-code/", "https://code.claude.com/docs/en/managed-settings"),
+        ),
+    ),
+    "codex": Harness(
+        set_by=Fact(
+            "the protocol: thread/start approvalPolicy and approvalsReviewer", _CODEX_SCHEMA + " ThreadStartParams"
+        ),
+        chat_flags=(
+            ChatFlag(("--approve-for-me",), None, "auto", _CODEX_HELP, protocol={"approvalsReviewer": "auto_review"}),
+            ChatFlag(
+                ("--dangerously-bypass-approvals-and-sandbox",),
+                None,
+                "skip approvals",
+                _CODEX_HELP,
+                protocol={"approvalPolicy": "never"},
+            ),
+            ChatFlag(
+                ("-a", "--ask-for-approval"),
+                "on-request",
+                "manual",
+                _CODEX_HELP,
+                protocol={"approvalPolicy": "on-request"},
+            ),
+            ChatFlag(
+                ("-a", "--ask-for-approval"),
+                "never",
+                "skip approvals",
+                _CODEX_HELP,
+                protocol={"approvalPolicy": "never"},
+            ),
+            _codex_config("approval_policy=untrusted", "manual", {"approvalPolicy": "untrusted"}),
+            _codex_config("approval_policy=on-request", "manual", {"approvalPolicy": "on-request"}),
+            _codex_config("approval_policy=never", "skip approvals", {"approvalPolicy": "never"}),
+            _codex_config("approvals_reviewer=user", "manual", {"approvalsReviewer": "user"}),
+            _codex_config("approvals_reviewer=auto_review", "auto", {"approvalsReviewer": "auto_review"}),
+            _codex_config("approvals_reviewer=guardian_subagent", "auto", {"approvalsReviewer": "guardian_subagent"}),
+        ),
+        reported=(
+            ReportedMode("approvalPolicy", "untrusted", None, _CODEX_SCHEMA + " AskForApproval"),
+            ReportedMode("approvalPolicy", "on-request", None, _CODEX_SCHEMA + " AskForApproval"),
+            ReportedMode("approvalPolicy", "never", "skip approvals", _CODEX_HELP),
+            ReportedMode("approvalsReviewer", "user", "manual", _CODEX_SCHEMA + " ApprovalsReviewer"),
+            ReportedMode("approvalsReviewer", "auto_review", "auto", _CODEX_SCHEMA + " ApprovalsReviewer"),
+            ReportedMode("approvalsReviewer", "guardian_subagent", "auto", _CODEX_SCHEMA + " ApprovalsReviewer"),
+        ),
+        config=(
+            ConfigPath("~/.codex/", _CODEX_HELP),
+            ConfigPath(".codex/", "https://learn.chatgpt.com/docs/hooks"),
+        ),
+    ),
+    "cursor": Harness(
+        set_by=Fact("the command line: --force, a global option; approvalMode is only reported", _CURSOR_FLAGS),
+        chat_flags=(
+            ChatFlag(
+                ("-f", "--force", "--yolo"), None, "skip approvals", _CURSOR_FLAGS, argv=("--force",), reported=False
+            ),
+        ),
+        reported=(
+            ReportedMode("approvalMode", "allowlist", "manual", _CURSOR_MODES),
+            ReportedMode("approvalMode", "auto-review", "auto", _CURSOR_MODES),
+            ReportedMode("approvalMode", "unrestricted", "unrestricted", _CURSOR_CONFIG),
+        ),
+        config=(
+            ConfigPath("~/.cursor/", _CURSOR_CONFIG),
+            ConfigPath(".cursor/", _CURSOR_CONFIG),
+        ),
+        flags_at=1,
+    ),
+    "devin": Harness(
+        set_by=Fact("the protocol: session/set_config_option permission_mode", _DEVIN_MODES),
+        chat_flags=(
+            _devin_mode("normal", "manual", "normal"),
+            _devin_mode("auto", "manual", "normal"),
+            _devin_mode("accept-edits", "accept edits", "accept-edits"),
+            _devin_mode("smart", "auto", "smart"),
+            _devin_mode("dangerous", "skip approvals", "dangerous"),
+            _devin_mode("yolo", "skip approvals", "dangerous"),
+            _devin_mode("bypass", "skip approvals", "dangerous"),
+            # autonomous requires --sandbox, so the page session gets it too.
+            _devin_mode("autonomous", "autonomous", "autonomous", argv=("--sandbox",)),
+        ),
+        reported=(
+            ReportedMode("permission_mode", "normal", "manual", _DEVIN_FLAGS),
+            ReportedMode("permission_mode", "auto", "manual", _DEVIN_FLAGS),
+            ReportedMode("permission_mode", "accept-edits", "accept edits", _DEVIN_FLAGS),
+            ReportedMode("permission_mode", "smart", "auto", _DEVIN_FLAGS),
+            ReportedMode("permission_mode", "dangerous", "skip approvals", _DEVIN_FLAGS),
+            ReportedMode("permission_mode", "yolo", "skip approvals", _DEVIN_FLAGS),
+            ReportedMode("permission_mode", "bypass", "skip approvals", _DEVIN_FLAGS),
+            ReportedMode("permission_mode", "autonomous", "autonomous", _DEVIN_FLAGS),
+        ),
+        config=(
+            ConfigPath("~/.config/devin/config.json", _DEVIN_MODES),
+            ConfigPath(".devin/", _DEVIN_MODES),
+        ),
+        flags_at=1,
+    ),
+    "droid": Harness(
+        set_by=Fact(
+            "the protocol: droid.initialize_session autonomyLevel; --skip-permissions-unsafe on the command line",
+            _DROID_SDK,
+        ),
+        chat_flags=(
+            *(ChatFlag(("--auto",), level, level, _DROID_FLAGS, protocol=level) for level in ("low", "medium", "high")),
+            ChatFlag(
+                ("--skip-permissions-unsafe",),
+                None,
+                "skip approvals",
+                _DROID_FLAGS,
+                argv=("--skip-permissions-unsafe",),
+                reported=False,
+            ),
+        ),
+        reported=tuple(
+            ReportedMode("autonomyLevel", level, level, _DROID_SETTINGS) for level in ("off", "low", "medium", "high")
+        ),
+        config=(
+            ConfigPath("~/.factory/", _DROID_SETTINGS),
+            ConfigPath(".factory/", _DROID_SETTINGS),
+        ),
+    ),
+    "opencode": Harness(
+        set_by=Fact("no documented way: opencode acp takes no --auto; the page asks for edit and bash", _OPENCODE_HELP),
+        chat_flags=(ChatFlag(("--auto",), None, "skip approvals", _OPENCODE_HELP),),
+        reported=(),
+        config=(
+            ConfigPath("~/.config/opencode/", _OPENCODE_CONFIG),
+            ConfigPath("opencode.json", _OPENCODE_CONFIG),
+            ConfigPath("opencode.jsonc", _OPENCODE_CONFIG),
+            ConfigPath(".opencode/", _OPENCODE_CONFIG),
+            ConfigPath("/etc/opencode/", _OPENCODE_CONFIG),
+            ConfigPath("/Library/Application Support/opencode/", _OPENCODE_CONFIG),
+            ConfigPath("ai.opencode.managed.plist", _OPENCODE_CONFIG),
+        ),
+    ),
 }
-_CLAUDE_FLAGS = {
-    "manual": ("--permission-mode", "manual"),
-    "accept edits": ("--permission-mode", "acceptEdits"),
-    "auto": ("--permission-mode", "auto"),
-    "skip approvals": ("--dangerously-skip-permissions",),
-}
-# Cursor's approvalMode: cursor.com/docs/cli/reference/configuration. Devin's permission modes:
-# docs.devin.ai/cli/reference/permissions. Droid's autonomy levels: docs.factory.com/cli/user-guides/auto-run.
-# Only the values those pages describe are mapped; any other value fails closed as unsafe-mode.
-_CURSOR_MODES = {"allowlist": "manual", "auto-review": "auto", "unrestricted": "skip approvals"}
-_DEVIN_MODES = {"normal": "manual", "accept-edits": "accept edits", "smart": "auto", "dangerous": "skip approvals"}
-_DEVIN_CHAT = {**_DEVIN_MODES, "auto": "manual", "yolo": "skip approvals", "bypass": "skip approvals"}
-_DROID_LEVELS = ("off", "low", "medium", "high")
-_CLAUDE_REPORTED = {**_CLAUDE_CHAT, "plan": "plan", "dontAsk": "don't ask"}
+
+
+# The top-level messages each protocol defines. A message outside these is reported as "unknown", so that a
+# renamed message is seen (D11); a known message the adapter does not use is ignored.
+# Codex: ServerNotification and ServerRequest in `codex app-server generate-json-schema` (0.172.0).
+_CODEX_NOTIFICATIONS = frozenset(
+    """
+    account/gatewayOAuth/changed
+    account/login/completed
+    account/rateLimits/updated
+    account/updated
+    app/list/updated
+    autoApprovalReview/strictReviewRequired
+    command/exec/outputDelta
+    configWarning
+    deprecationNotice
+    error
+    externalAgentConfig/import/completed
+    externalAgentConfig/import/progress
+    fs/changed
+    fuzzyFileSearch/sessionCompleted
+    fuzzyFileSearch/sessionUpdated
+    guardianWarning
+    hook/completed
+    hook/started
+    item/agentMessage/delta
+    item/autoApprovalReview/completed
+    item/autoApprovalReview/started
+    item/commandExecution/outputDelta
+    item/commandExecution/terminalInteraction
+    item/completed
+    item/fileChange/outputDelta
+    item/fileChange/patchUpdated
+    item/mcpToolCall/progress
+    item/plan/delta
+    item/reasoning/summaryPartAdded
+    item/reasoning/summaryTextDelta
+    item/reasoning/textDelta
+    item/started
+    mcpServer/event/stream/notification
+    mcpServer/oauthLogin/completed
+    mcpServer/startupStatus/updated
+    model/rerouted
+    model/safetyBuffering/updated
+    model/verification
+    modelProvider/authRecoveryCompleted
+    modelProvider/authRecoveryStarted
+    process/exited
+    process/outputDelta
+    project/changed
+    remoteControl/status/changed
+    serverRequest/resolved
+    skills/changed
+    thread/archived
+    thread/attachment/updated
+    thread/closed
+    thread/compacted
+    thread/deleted
+    thread/environment/connected
+    thread/environment/disconnected
+    thread/goal/cleared
+    thread/goal/updated
+    thread/name/updated
+    thread/prediction/updated
+    thread/project/updated
+    thread/queue/changed
+    thread/readState/changed
+    thread/realtime/closed
+    thread/realtime/error
+    thread/realtime/item/completed
+    thread/realtime/item/started
+    thread/realtime/item/transcript/delta
+    thread/realtime/itemAdded
+    thread/realtime/outputAudio/delta
+    thread/realtime/sdp
+    thread/realtime/started
+    thread/realtime/transcript/delta
+    thread/realtime/transcript/done
+    thread/reverted
+    thread/search/partial
+    thread/section/changed
+    thread/settings/updated
+    thread/started
+    thread/status/changed
+    thread/tokenUsage/updated
+    thread/unarchived
+    turn/completed
+    turn/diff/updated
+    turn/moderationMetadata
+    turn/plan/updated
+    turn/started
+    warning
+    windows/worldWritableWarning
+    windowsSandbox/setupCompleted
+    """.split()
+)
+_CODEX_REQUESTS = frozenset(
+    """
+    account/chatgptAuthTokens/refresh
+    applyPatchApproval
+    attestation/generate
+    execCommandApproval
+    item/commandExecution/requestApproval
+    item/fileChange/requestApproval
+    item/permissions/requestApproval
+    item/tool/call
+    item/tool/requestUserInput
+    mcpServer/elicitation/request
+    """.split()
+)
+# ACP v1 client methods (https://agentclientprotocol.com/protocol/schema); names starting with "_" are
+# extensions, which ACP says to ignore (https://agentclientprotocol.com/protocol/extensibility).
+_ACP_NOTIFICATIONS = frozenset({"session/update"})
+_ACP_REQUESTS = frozenset(
+    {
+        "session/request_permission",
+        "fs/read_text_file",
+        "fs/write_text_file",
+        "terminal/create",
+        "terminal/output",
+        "terminal/release",
+        "terminal/wait_for_exit",
+        "terminal/kill",
+    }
+)
+# Droid: @factory/droid-sdk 0.11.0.
+_DROID_NOTIFICATIONS = frozenset({"droid.session_notification"})
+_DROID_REQUESTS = frozenset({"droid.request_permission", "droid.ask_user"})
+# Claude Code stream-json: the SDKMessage union (https://code.claude.com/docs/en/agent-sdk/typescript) and
+# the control frames of tests/fixtures/page_wire/claude_2_1_332.json.
+_CLAUDE_TYPES = frozenset(
+    {
+        "assistant",
+        "user",
+        "result",
+        "system",
+        "stream_event",
+        "tool_progress",
+        "auth_status",
+        "rate_limit_event",
+        "prompt_suggestion",
+        "tool_use_summary",
+        "keep_alive",
+        "control_request",
+        "control_response",
+        "control_cancel_request",
+    }
+)
+
+
+def _unknown(name: Any) -> Events:
+    return (AdapterEvent("unknown", text=_text(name) or "message without a type"),)
+
+
+def _reported_modes(name: str, field: str) -> dict[str, str | None]:
+    return {item.value: item.mode for item in HARNESS_FACTS[name].reported if item.field == field}
+
+
+@dataclass(frozen=True)
+class ChatMode:
+    """The chat's approval mode and how the page session is given it."""
+
+    mode: str
+    argv: tuple[str, ...] = ()
+    protocol: Any = None
+    reported: bool = True
+
+
+def _chat_value(flag: ChatFlag, value: str) -> str:
+    # Codex parses a -c value as TOML: key="value" and key = value are the same setting.
+    return value.replace(" ", "").replace('"', "").replace("'", "") if "-c" in flag.names else value
+
+
+def _chat_flags(name: str, argv: tuple[str, ...]) -> list[ChatFlag]:
+    """The table's chat flags found in a command line, in their order."""
+    found = []
+    for index, arg in enumerate(argv):
+        for flag in HARNESS_FACTS[name].chat_flags:
+            for spelling in flag.names:
+                if flag.value is None:
+                    matched = arg == spelling
+                elif arg == spelling:
+                    matched = index + 1 < len(argv) and _chat_value(flag, argv[index + 1]) == flag.value
+                else:
+                    matched = (
+                        arg.startswith(f"{spelling}=") and _chat_value(flag, arg[len(spelling) + 1 :]) == flag.value
+                    )
+                if matched:
+                    found.append(flag)
+    return found
+
+
+def _resolve_chat(name: str, argv: tuple[str, ...] | list[str]) -> ChatMode | None:
+    flags = _chat_flags(name, tuple(argv))
+    if not flags:
+        return None
+    # The chat's own flags, in its order; the last one names the mode, as the harness reads them.
+    passed = tuple(token for flag in flags for token in flag.argv)
+    protocol = flags[-1].protocol
+    if isinstance(protocol, dict):
+        protocol = {
+            key: value for flag in flags if isinstance(flag.protocol, dict) for key, value in flag.protocol.items()
+        }
+    return ChatMode(flags[-1].mode, passed, protocol, flags[-1].reported)
+
+
+def _chat(name: str, chat: ChatMode | str | None) -> ChatMode | None:
+    """A chat mode given by its shown name (as tests and older callers do) becomes the table's first entry for it."""
+    if chat is None or isinstance(chat, ChatMode):
+        return chat
+    flag = next(flag for flag in HARNESS_FACTS[name].chat_flags if flag.mode == chat)
+    return ChatMode(flag.mode, flag.argv, flag.protocol, flag.reported)
+
+
+def chat_mode(name: str, argv: tuple[str, ...] | list[str]) -> str | None:
+    """The approval mode the user's chat session was started in, from its own command line, or None."""
+    chat = _resolve_chat(name, argv)
+    return chat.mode if chat else None
+
+
+def _config_pattern() -> re.Pattern:
+    parts = []
+    for harness in HARNESS_FACTS.values():
+        for location in harness.config:
+            path = location.path.removeprefix("~/")
+            folder = path.endswith("/")
+            body = r"[/\\]".join(
+                r"(?:\\?\s)".join(re.escape(word) for word in segment.split(" "))
+                for segment in path.rstrip("/").split("/")
+            )
+            # A folder matches itself and anything under it; a file matches only itself.
+            parts.append(rf"(?<![\w.-]){body}(?:[/\\]|(?![\w.-]))" if folder else rf"(?<![\w.-]){body}(?![\w.-])")
+    return re.compile("|".join(dict.fromkeys(parts)), re.IGNORECASE)
+
+
+_CONFIG_PATH = _config_pattern()
+
 
 # Prefer specific identifiers to generic markers if one harness is started from another.
 _HARNESSES = {
@@ -129,42 +596,6 @@ _UUID = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 _ACP_SESSION = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}")
 
 
-def _flag_values(argv: tuple[str, ...], *flags: str) -> list[str]:
-    values = []
-    for index, arg in enumerate(argv):
-        for flag in flags:
-            if arg == flag and index + 1 < len(argv):
-                values.append(argv[index + 1])
-            elif arg.startswith(f"{flag}="):
-                values.append(arg[len(flag) + 1 :])
-    return values
-
-
-def chat_mode(name: str, argv: tuple[str, ...] | list[str]) -> str | None:
-    """The approval mode the user's chat session was started in, from its own command line, or None."""
-    argv = tuple(argv)
-    if name == "claude":
-        if "--dangerously-skip-permissions" in argv:
-            return "skip approvals"
-        values = _flag_values(argv, "--permission-mode")
-        return _CLAUDE_CHAT.get(values[-1]) if values else None
-    if name == "devin":
-        values = _flag_values(argv, "--permission-mode")
-        return _DEVIN_CHAT.get(values[-1]) if values else None
-    if name == "cursor":
-        return "auto" if "--auto-review" in argv else None
-    if name == "codex":
-        if "--dangerously-bypass-approvals-and-sandbox" in argv:
-            return "skip approvals"
-        configs = [value.replace(" ", "").replace('"', "") for value in _flag_values(argv, "-c", "--config")]
-        if "--approve-for-me" in argv or "approvals_reviewer=auto_review" in configs:
-            return "auto"
-        policies = _flag_values(argv, "-a", "--ask-for-approval")
-        if policies:
-            return {"never": "skip approvals", "on-request": "manual", "untrusted": "manual"}.get(policies[-1])
-    return None
-
-
 def chat_argv(name: str, pid: int | None = None, run: Callable = subprocess.run) -> tuple[str, ...]:
     """The command line of the harness process that runs this one, found among its ancestors; () if none."""
     pid = os.getppid() if pid is None else pid
@@ -210,10 +641,9 @@ def candidate(
     executable = which(command[0])
     if executable is None:
         return Candidate(name, (), "not-installed", text=f"{name} is not installed. Install it, then serve again.")
-    argv = (executable, *command[1:])
-    mode = chat_mode(name, chat_argv)
-    if name == "claude" and mode:
-        argv += _CLAUDE_FLAGS[mode]
+    chat = _resolve_chat(name, chat_argv)
+    at = HARNESS_FACTS[name].flags_at or len(command)
+    argv = (executable, *command[1:at], *(chat.argv if chat else ()), *command[at:])
     factories = {
         "claude": ClaudeAdapter,
         "codex": CodexAdapter,
@@ -232,7 +662,7 @@ def candidate(
                 "unsafe-mode",
                 text="OpenCode's inline configuration is not valid. Fix OPENCODE_CONFIG_CONTENT, then serve again.",
             )
-    return Candidate(name, argv, None, "webauthn", factories[name], mode=mode)
+    return Candidate(name, argv, None, "webauthn", factories[name], chat=chat)
 
 
 def version_supported(name: str, version: str) -> bool:
@@ -333,15 +763,6 @@ def _wire_id(data: Any) -> bool:
     return type(data) in (int, str)
 
 
-# A harness's own configuration: its dot folder or dot file (.claude/, .claude.json, .mcp.json), however the
-# path is written (absolute, ~/, after a redirection such as ">"), and OpenCode's ~/.config/opencode.
-_CONFIG_PATH = re.compile(
-    r"(?<![\w.-])\.(?:claude|codex|cursor|factory|devin|opencode)(?![\w-])"
-    r"|(?<![\w.-])\.mcp\.json"
-    r"|(?<![\w-])\.config[/\\]opencode(?![\w-])"
-)
-
-
 def _touches_config(data: Any) -> bool:
     """Whether a request names a path under a harness's own configuration folder."""
     if isinstance(data, str):
@@ -381,10 +802,13 @@ def _error_kind(error: dict, default: str) -> str:
 
 class _RPCAdapter:
     _name = "the harness"
+    _harness = ""
+    _notifications: frozenset[str] = frozenset()
+    _requests: frozenset[str] = frozenset()
 
-    def __init__(self, send: Send, chat_mode: str | None = None):
+    def __init__(self, send: Send, chat_mode: ChatMode | str | None = None):
         self.send = send
-        self.chat_mode = chat_mode
+        self.chat = _chat(self._harness, chat_mode)
         self.session_id: str | None = None
         self.turn_id: str | None = None
         self._ids = itertools.count(1)
@@ -425,12 +849,17 @@ class _RPCAdapter:
         if isinstance(method, str):
             params = _object(message.get("params"))
             if not _wire_id(request_id):
-                return self._notification(method, params) if "id" not in message else ()
+                if "id" in message:
+                    return ()
+                return (
+                    self._notification(method, params) if self._known(method, self._notifications) else _unknown(method)
+                )
             if request_id in self._approvals:
                 # A second request cannot change what an open approval represents.
                 self.answer(request_id, "deny", "duplicate request id")
                 return (AdapterEvent("approval_closed", request_id=request_id, outcome="denied"),)
-            return self._request(request_id, method, params)
+            events = self._request(request_id, method, params)
+            return events if self._known(method, self._requests) else (*events, *_unknown(method))
         if _wire_id(request_id) and request_id in self._calls:
             called, done = self._calls.pop(request_id)
             if "error" in message:
@@ -441,6 +870,9 @@ class _RPCAdapter:
 
     def _call_failed(self, method: str, error: dict) -> Events:
         return _failure(_error_kind(error, "crashed"), _text(error.get("message")))
+
+    def _known(self, method: str, known: frozenset[str]) -> bool:
+        return method in known
 
     def _request(self, request_id: WireID, method: str, params: dict) -> Events:
         if any(keyword in method.casefold() for keyword in ("permission", "approval", "authorize", "consent")):
@@ -459,6 +891,11 @@ class ACPAdapter(_RPCAdapter):
     _name = "the agent"
     _mode = "manual"
     _client_info: dict = {}
+    _notifications = _ACP_NOTIFICATIONS
+    _requests = _ACP_REQUESTS
+
+    def _known(self, method: str, known: frozenset[str]) -> bool:
+        return method in known or method.startswith("_")
 
     def open(self, cwd: str, resume: str | None) -> None:
         self._cwd = cwd
@@ -590,6 +1027,8 @@ class ACPAdapter(_RPCAdapter):
 
 
 class OpenCodeAdapter(ACPAdapter):
+    _harness = "opencode"
+
     def _initialized(self, data: dict) -> Events:
         version = _text(_object(data.get("agentInfo")).get("version"))
         if not version_supported("opencode", version):
@@ -614,10 +1053,9 @@ class OpenCodeAdapter(ACPAdapter):
 
 
 class _ConfiguredACPAdapter(ACPAdapter):
-    """Read the peer's effective approval mode from its config option, and set it to the chat's mode."""
+    """Read the peer's approval mode from its config option, and set it to the chat's mode."""
 
     _permission_option: str
-    _modes: dict[str, str]
 
     def _reported(self, data: dict) -> tuple[str | None, str | None]:
         """The reported value and the failure kind, if any."""
@@ -633,19 +1071,25 @@ class _ConfiguredACPAdapter(ACPAdapter):
         )
         if len(values) != 1:
             return None, "no-approvals"
-        if values[0] not in self._modes:
+        if values[0] not in _reported_modes(self._harness, self._permission_option):
             return None, "unsafe-mode"
         return values[0], None
+
+    def _accept(self, value: str) -> None:
+        self._value = value
+        modes = _reported_modes(self._harness, self._permission_option)
+        # A mode set on the command line is not one the option reports, so the chat's name is shown.
+        self._mode = self.chat.mode if self.chat and not self.chat.reported else modes[value]
 
     def _opened(self, data: dict) -> Events:
         value, failure = self._reported(data)
         if failure:
             return _failure(failure)
-        self._mode = self._modes[value]
         session_id = data.get("sessionId", self._resume)
-        if self.chat_mode and self._mode != self.chat_mode:
-            wanted = next((value for value, label in self._modes.items() if label == self.chat_mode), None)
-            if wanted is None or not session_id_valid("opencode", session_id):
+        wanted = self.chat.protocol if self.chat else None
+        modes = _reported_modes(self._harness, self._permission_option)
+        if wanted is not None and modes[value] != modes.get(wanted):
+            if not session_id_valid("opencode", session_id):
                 return _failure("unsafe-mode")
             self._opening = {**data, "sessionId": session_id}
             self._call(
@@ -654,13 +1098,15 @@ class _ConfiguredACPAdapter(ACPAdapter):
                 self._configured,
             )
             return ()
+        self._accept(value)
         return self._finish(data)
 
     def _configured(self, result: dict) -> Events:
         value, failure = self._reported(result)
-        if failure or self._modes[value] != self.chat_mode:
+        modes = _reported_modes(self._harness, self._permission_option)
+        if failure or modes[value] != modes.get(self.chat.protocol):
             return _failure(failure or "unsafe-mode")
-        self._mode = self._modes[value]
+        self._accept(value)
         return self._finish({**self._opening, **result})
 
     def _finish(self, data: dict) -> Events:
@@ -671,7 +1117,8 @@ class _ConfiguredACPAdapter(ACPAdapter):
             update = _object(params.get("update"))
             if update.get("sessionUpdate") == "config_option_update":
                 value, failure = self._reported(update)
-                if failure or self._modes[value] != self._mode:
+                modes = _reported_modes(self._harness, self._permission_option)
+                if failure or modes[value] != modes[self._value]:
                     self.session_id = None
                     return _failure(failure or "unsafe-mode")
         return super()._notification(method, params)
@@ -680,8 +1127,8 @@ class _ConfiguredACPAdapter(ACPAdapter):
 class CursorAdapter(_ConfiguredACPAdapter):
     # The CLI documents allowlist, auto-review and unrestricted independently
     # of the agent/plan/ask profile. ACP does not require it to expose this choice.
+    _harness = "cursor"
     _permission_option = "approvalMode"
-    _modes = _CURSOR_MODES
     _client_info = {"clientInfo": {"name": "better-ai", "version": "0.1.0"}}
 
     def _initialized(self, data: dict) -> Events:
@@ -697,10 +1144,10 @@ class CursorAdapter(_ConfiguredACPAdapter):
 class DevinAdapter(_ConfiguredACPAdapter):
     # Devin documents normal mode, but does not promise that its ACP server
     # forwards tool prompts. Require an actual startup request for this session.
+    _harness = "devin"
     _permission_option = "permission_mode"
-    _modes = _DEVIN_MODES
 
-    def __init__(self, send: Send, chat_mode: str | None = None):
+    def __init__(self, send: Send, chat_mode: ChatMode | str | None = None):
         super().__init__(send, chat_mode)
         self._forwarded_sessions: set[str] = set()
 
@@ -747,6 +1194,9 @@ class CodexAdapter(_RPCAdapter):
     """Codex app-server stdio protocol version checked against the locally shipped schema."""
 
     _name = "codex"
+    _harness = "codex"
+    _notifications = _CODEX_NOTIFICATIONS
+    _requests = _CODEX_REQUESTS
 
     def open(self, cwd: str, resume: str | None) -> None:
         self._cwd = cwd
@@ -770,11 +1220,7 @@ class CodexAdapter(_RPCAdapter):
 
     def _open_thread(self) -> None:
         # No sandbox or network setting: the page session runs under the user's own Codex configuration.
-        params = {"cwd": self._cwd}
-        if reviewer := {"auto": "auto_review", "manual": "user"}.get(self.chat_mode):
-            params["approvalsReviewer"] = reviewer
-        if self.chat_mode == "skip approvals":
-            params["approvalPolicy"] = "never"
+        params = {"cwd": self._cwd, **(self.chat.protocol if self.chat else {})}
         if self._resume:
             self._call("thread/resume", {**params, "threadId": self._resume}, self._opened)
         else:
@@ -782,16 +1228,15 @@ class CodexAdapter(_RPCAdapter):
 
     def _opened(self, data: dict) -> Events:
         reviewer, policy = data.get("approvalsReviewer"), data.get("approvalPolicy")
-        if reviewer not in ("user", "auto_review"):
+        reviewers, policies = _reported_modes("codex", "approvalsReviewer"), _reported_modes("codex", "approvalPolicy")
+        if not isinstance(reviewer, str) or not isinstance(policy, str) or reviewer not in reviewers:
             return _failure("unsafe-mode")
-        if policy == "never":
-            mode = "skip approvals"
-        elif policy in ("untrusted", "on-request"):
-            mode = "auto" if reviewer == "auto_review" else "manual"
-        else:
+        if policy not in policies:
             return _failure("unsafe-mode")
-        if self.chat_mode and mode != self.chat_mode:
+        # The thread must run with every setting the chat's flags gave it.
+        if self.chat and any(data.get(key) != value for key, value in self.chat.protocol.items()):
             return _failure("unsafe-mode")
+        mode = policies[policy] or reviewers[reviewer]
         session_id = _object(data.get("thread")).get("id")
         if not session_id_valid("codex", session_id):
             return _failure("crashed", "missing or invalid Codex thread id")
@@ -919,11 +1364,12 @@ class ClaudeAdapter:
 
     _name = "claude"
 
-    def __init__(self, send: Send, expected_session: str | None = None, chat_mode: str | None = None):
+    def __init__(self, send: Send, expected_session: str | None = None, chat_mode: ChatMode | str | None = None):
         self.send = send
         self.expected_session = expected_session
-        self.chat_mode = chat_mode
+        self.chat = _chat("claude", chat_mode)
         self.mode: str | None = None
+        self._pending: list[AdapterEvent] = []
         self.session_id: str | None = None
         self._ids = itertools.count(1)
         self._initialize_id: str | None = None
@@ -970,9 +1416,11 @@ class ClaudeAdapter:
             if choice == "allow_session" and scope:
                 result["updatedPermissions"] = scope
                 # A granted setMode changes the mode the session reports from now on.
+                modes = _reported_modes("claude", "permission mode")
                 for item in scope:
-                    if item.get("type") == "setMode" and item.get("mode") in _CLAUDE_REPORTED:
-                        self.mode = _CLAUDE_REPORTED[item["mode"]]
+                    if item.get("type") == "setMode" and modes.get(item.get("mode")) not in (None, self.mode):
+                        self.mode = modes[item["mode"]]
+                        self._pending.append(AdapterEvent("mode", mode=self.mode))
         else:
             result = {"behavior": "deny", "message": reason or "the page denied permission"}
         self._response(request_id, result=result)
@@ -987,8 +1435,8 @@ class ClaudeAdapter:
         reported = _text(data.get("claude_code_version"))
         if not version_supported("claude", reported):
             return _failure("version", version_problem("claude", reported))
-        mode = _CLAUDE_REPORTED.get(_text(data.get("current_permission_mode")))
-        if mode is None or (self.chat_mode and mode != self.chat_mode):
+        mode = _reported_modes("claude", "permission mode").get(_text(data.get("current_permission_mode")))
+        if mode is None or (self.chat and mode != self.chat.mode):
             return _failure("unsafe-mode")
         account = _object(data.get("account"))
         if not any(account.get(key) for key in ("subscriptionType", "apiKeySource", "tokenSource")):
@@ -1056,7 +1504,14 @@ class ClaudeAdapter:
         return events
 
     def receive(self, message: dict) -> Events:
+        # A mode a grant changed is reported with the next frame from the harness.
+        pending, self._pending = tuple(self._pending), []
+        return (*pending, *self._receive(message))
+
+    def _receive(self, message: dict) -> Events:
         kind, subtype = message.get("type"), message.get("subtype")
+        if kind not in _CLAUDE_TYPES:
+            return _unknown(kind)
         if kind == "control_response":
             response = _object(message.get("response"))
             if self._initialize_id is not None and response.get("request_id") == self._initialize_id:
@@ -1067,7 +1522,7 @@ class ClaudeAdapter:
             self._reasons[message["tool_use_id"]] = _text(message.get("decision_reason"))
             return ()
         if kind == "system" and subtype == "init":
-            if _CLAUDE_REPORTED.get(_text(message.get("permissionMode"))) != self.mode:
+            if _reported_modes("claude", "permission mode").get(_text(message.get("permissionMode"))) != self.mode:
                 self.session_id = None
                 return _failure("unsafe-mode")
             if message.get("session_id") != self.session_id:
@@ -1132,12 +1587,16 @@ class DroidAdapter(_RPCAdapter):
     """Factory stream-jsonrpc as published in @factory/droid-sdk 0.11.0."""
 
     _name = "droid"
+    _harness = "droid"
+    _notifications = _DROID_NOTIFICATIONS
+    _requests = _DROID_REQUESTS
     _factory_api_version = "1.0.0"
     _factory_protocol_version = "1.332.0"
     _start_methods = ("droid.initialize_session", "droid.load_session")
 
-    def __init__(self, send: Send, chat_mode: str | None = None):
+    def __init__(self, send: Send, chat_mode: ChatMode | str | None = None):
         super().__init__(send, chat_mode)
+        self._level = "off"
         self._mode = "off"
         self._running = False
 
@@ -1196,20 +1655,23 @@ class DroidAdapter(_RPCAdapter):
 
     def _new_session(self) -> None:
         params = {"machineId": "default", "cwd": self._cwd, "interactionMode": "auto"}
-        if self.chat_mode in _DROID_LEVELS:
-            params["autonomyLevel"] = self.chat_mode
+        if self.chat and self.chat.protocol is not None:
+            params["autonomyLevel"] = self.chat.protocol
         self._call("droid.initialize_session", params, self._opened)
 
     def _opened(self, data: dict) -> Events:
         settings = _object(data.get("settings"))
-        mode = settings.get("autonomyLevel")
+        level = settings.get("autonomyLevel")
+        levels = _reported_modes("droid", "autonomyLevel")
         if (
-            mode not in _DROID_LEVELS
+            level not in levels
             or settings.get("interactionMode") != "auto"
-            or (self.chat_mode and mode != self.chat_mode)
+            or (self.chat and self.chat.reported and levels[level] != self.chat.mode)
         ):
             return _failure("unsafe-mode")
-        self._mode = mode
+        self._level = level
+        # --skip-permissions-unsafe is not an autonomy level, so the chat's name is shown.
+        self._mode = self.chat.mode if self.chat and not self.chat.reported else levels[level]
         session_id = data.get("sessionId", self._resume)
         if not session_id_valid("droid", session_id):
             return _failure("crashed", "missing or invalid Droid session id")
@@ -1306,7 +1768,7 @@ class DroidAdapter(_RPCAdapter):
         if kind == "settings_updated":
             settings = _object(data.get("settings"))
             if (
-                settings.get("autonomyLevel", self._mode) != self._mode
+                settings.get("autonomyLevel", self._level) != self._level
                 or settings.get("interactionMode", "auto") != "auto"
             ):
                 self.session_id = None

@@ -17,7 +17,6 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from better_ai.page.adapters import (  # noqa: E402
     HARNESS_FACTS,
-    AdapterEvent,
     CodexAdapter,
     DroidAdapter,
     OpenCodeAdapter,
@@ -339,7 +338,9 @@ class ClaudeApprovals(unittest.TestCase):
 
     def test_unknown_messages_are_ignored_or_refused(self):  # S33
         _, adapter, sent, _ = open_claude()
-        self.assertEqual(adapter.receive({"type": "vendor_notice", "subtype": "x"}), ())
+        self.assertEqual(
+            [event.kind for event in adapter.receive({"type": "vendor_notice", "subtype": "x"})], ["unknown"]
+        )
         before = len(sent)
         self.assertEqual(
             adapter.receive({"type": "control_request", "request_id": "u1", "request": {"subtype": "vendor"}}), ()
@@ -488,7 +489,8 @@ class CodexApprovals(unittest.TestCase):
 
     def test_unknown_requests_are_refused(self):  # S33
         adapter, sent = self.ready()
-        self.assertEqual(adapter.receive({"method": "vendor/notification", "params": {"threadId": SESSION}}), ())
+        unknown = adapter.receive({"method": "vendor/notification", "params": {"threadId": SESSION}})
+        self.assertEqual([(event.kind, event.text) for event in unknown], [("unknown", "vendor/notification")])
         adapter.receive({"method": "vendor/call", "id": 40, "params": {}})
         self.assertEqual(sent[-1]["error"]["code"], -32601)
         adapter.receive({"method": "item/vendor/requestApproval", "id": 41, "params": {}})
@@ -917,6 +919,45 @@ class HarnessTable(unittest.TestCase):
         ):
             with self.subTest(path=path):
                 self.assertTrue(touches_config(path), path)
+
+
+class UnknownMessages(unittest.TestCase):
+    """D11: a message the protocol does not define is reported as unknown; a defined one that is not used is not."""
+
+    def kinds(self, events):
+        return [event.kind for event in events]
+
+    def test_claude(self):
+        _, adapter, _, _ = open_claude()
+        renamed = {**frame("result_auto_blocked"), "type": "turn_result"}
+        self.assertEqual(self.kinds(adapter.receive(renamed)), ["unknown"])
+        self.assertEqual(adapter.receive({"type": "rate_limit_event", "rate_limit_info": {}}), ())
+        self.assertEqual(adapter.receive({"type": "system", "subtype": "hook_started"}), ())
+
+    def test_codex(self):
+        _, adapter, _, _ = open_codex()
+        renamed = {"method": "turn/finished", "params": {"threadId": SESSION, "turn": {"id": "t1"}}}
+        self.assertEqual([(e.kind, e.text) for e in adapter.receive(renamed)], [("unknown", "turn/finished")])
+        known = {"method": "thread/tokenUsage/updated", "params": {"threadId": SESSION}}
+        self.assertEqual(adapter.receive(known), ())
+
+    def test_acp_harnesses(self):
+        for name in ("cursor", "devin", "opencode"):
+            with self.subTest(name=name):
+                adapter = candidate(name, {}, lambda found: f"/bin/{found}").codec(lambda _: None, "s", None)
+                renamed = {"jsonrpc": "2.0", "method": "session/changed", "params": {"sessionId": "s"}}
+                self.assertEqual(self.kinds(adapter.receive(renamed)), ["unknown"])
+                known = {"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": "other"}}
+                self.assertEqual(adapter.receive(known), ())
+                self.assertEqual(adapter.receive({"jsonrpc": "2.0", "method": "_vendor/notice", "params": {}}), ())
+
+    def test_droid(self):
+        adapter = DroidAdapter(lambda _: None)
+        header = {"jsonrpc": "2.0", "factoryApiVersion": "1.0.0", "factoryProtocolVersion": "1.332.0"}
+        renamed = {**header, "type": "notification", "method": "droid.session_event", "params": {}}
+        self.assertEqual(self.kinds(adapter.receive(renamed)), ["unknown"])
+        known = {**header, "type": "notification", "method": "droid.session_notification", "params": {}}
+        self.assertEqual(adapter.receive(known), ())
 
 
 class OneProcessAcrossTurns(unittest.TestCase):

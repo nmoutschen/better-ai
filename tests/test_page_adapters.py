@@ -147,11 +147,11 @@ class AdapterTests(unittest.TestCase):
     def test_unknown_notifications_and_requests(self):
         sent = []
         adapter = ACPAdapter(sent.append)
-        self.assertEqual(adapter.receive({"method": "vendor/notification"}), ())
+        self.assertEqual([event.kind for event in adapter.receive({"method": "vendor/notification"})], ["unknown"])
         self.assertEqual(sent, [])
-        self.assertEqual(adapter.receive({"method": "vendor/rpc", "id": 1}), ())
+        self.assertEqual([event.kind for event in adapter.receive({"method": "vendor/rpc", "id": 1})], ["unknown"])
         self.assertEqual(sent[-1]["error"]["code"], -32601)
-        self.assertEqual(adapter.receive({"method": "vendor/requestApproval", "id": 2}), ())
+        adapter.receive({"method": "vendor/requestApproval", "id": 2})
         self.assertEqual(sent[-1]["error"]["message"], "permission denied")
 
     def test_codex_turn_interrupt_and_approval_policy(self):
