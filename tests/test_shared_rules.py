@@ -79,15 +79,14 @@ class LastWord(unittest.TestCase):
 
 
 class OpenDecisions(unittest.TestCase):
-    def test_every_page_counts_what_waits_for_the_user_with_the_shared_rule(self):
-        """One state machine counts: page.js's "N your turn" figure, in the page's own slot, and no figure of its own."""
+    def test_every_page_finds_open_decisions_with_the_shared_rule(self):
+        """One state machine says what waits for the user, in the conversation's rows: no page has a figure of its own."""
         src = HERE.parent / "src" / "better_ai"
         self.assertIn("function pageOpenDecisions(", (src / "page" / "page.js").read_text(encoding="utf-8"))
         self.assertIn("pageOpenDecisions(", (src / "research" / "board.js").read_text(encoding="utf-8"))
         for name in ("research/board.js", "architect/page.js", "code/dashboard.js", "discover/page.js"):
             text = (src / name).read_text(encoding="utf-8")
-            self.assertRegex(text, r"stats: \(\) => [\w$]+\(['\"]yourturn['\"]\)", name)
-            self.assertNotRegex(text, r"open questions?<|waiting for you</button>|id=\"to-waiting\"", name)
+            self.assertNotRegex(text, r"open questions?<|waiting for you</button>|id=\"to-waiting\"|yourturn", name)
 
 
 class CloseAndReopen(unittest.TestCase):

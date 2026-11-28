@@ -268,12 +268,9 @@ test('the board draws its kinds inside rows: a decision as your turn with its de
   assert.match(text(b.rowOf('D1').querySelector('.tbody')), /If you don't answer: No/);
   b.rowOf('c1').querySelector('.thead').click();
   assert.equal(text(b.rowOf('c1').querySelector('.crumb .el')), 'Page speed');
-  // The figure in the board's own header, in the slot it leaves for it.
-  assert.equal(text(b.$('#status #yourturn')), '1 your turn');
-  assert.equal(b.$('#status #yourturn .stat').tagName, 'BUTTON');
 });
 
-test('answering the decision from its row records the answer and makes it the agent\'s turn; the figure says 0', () => {
+test('answering the decision from its row records the answer and makes it the agent\'s turn', () => {
   const b = liveBoard(BOARD_LOG);
   actions(b.rowOf('D1'))[2].click();
   const box = b.rowOf('D1').querySelector('.why textarea');
@@ -281,7 +278,6 @@ test('answering the decision from its row records the answer and makes it the ag
   box.key('Enter', { ctrlKey: true });
   assert.deepEqual(b.conv.log().filter(e => e.type === 'answer').map(e => [e.decision, e.text, e.default]), [['D1', 'Yes, the forums too.', false]]);
   assert.equal(text(b.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
-  assert.equal(text(b.$('#status #yourturn')), '0 your turn');
 });
 
 test('the board gives the panel none of the options of the old per-item drawing', () => {

@@ -222,9 +222,9 @@ function threadComment(log, id) {
 function start(data) {
   const view = $('.view');
   const readOnly = !!data.static;  // a copy written by `render`: nothing can be sent
-  // The figures: sections accepted, open comments, and page.js's "N your turn" figure in #yourturn.
+  // The figures: sections accepted and open comments.
   byId('status').innerHTML = '<span class="stat"><b id="accepted-count"></b>sections accepted</span>' +
-    '<span class="stat"><b id="comment-count">0</b>open comments</span><span class="yourturn" id="yourturn"></span>';
+    '<span class="stat"><b id="comment-count">0</b>open comments</span>';
   const versions = data.versions || [];
   const alternatives = data.alternatives || [];
   const before = versions.length < 2;  // the design draws only the system as it is: nothing to approve yet
@@ -442,7 +442,7 @@ function start(data) {
   }
 
   const conversation = pageConversation({
-    served: !readOnly, readOnly, itemKinds: items, stats: () => byId('yourturn'),
+    served: !readOnly, readOnly, itemKinds: items,
     kinds: {approve: entry => pageApprovalItem(entry, conversation.log()), confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.text),
     byId: id => threadComment(conversation.log(), id),
     reveal, edit: editComment, remove: event => commentLayer.remove(event), showLabel: n => 'Show comment ' + n,

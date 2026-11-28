@@ -469,8 +469,6 @@ const DASH_LOG = {
 
 test('the dashboard draws a decision inside its row as your turn, with where it is from and its controls; a comment keeps its crumb', () => {
   const b = liveDashboard(DASH_LOG);
-  // The dashboard feeds the panel before it writes its header: the figure is in its slot all the same.
-  assert.equal(text(b.$('#status #yourturn')), '1 your turn');
   const d1 = b.rowOf('D1'), c1 = b.rowOf('c1');
   assert.equal(text(d1.querySelector('.chip')), 'Your turn');
   assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Use the default', 'Answer']);
@@ -482,17 +480,15 @@ test('the dashboard draws a decision inside its row as your turn, with where it 
   assert.deepEqual(actions(c1).map(x => x.textContent), ['✓', 'Reopen']);
   c1.querySelector('.thead').click();
   assert.equal(text(b.rowOf('c1').querySelector('.crumb .el')), 'T4 Six pages');
-  // Open and All, as on every page; the figure in the dashboard's own header.
+  // Open and All, as on every page.
   assert.equal(text(b.$('[data-filter="open"]')), 'Open (2)');
-  assert.equal(text(b.$('#status #yourturn')), '1 your turn');
 });
 
-test('the default answers the decision from its row, and the figure goes to 0', () => {
+test('the default answers the decision from its row', () => {
   const b = liveDashboard(DASH_LOG);
   actions(b.rowOf('D1'))[1].click();
   assert.deepEqual(b.conv.log().filter(e => e.type === 'answer').map(e => [e.decision, e.text, e.default]), [['D1', 'Keep it', true]]);
   assert.equal(text(b.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
-  assert.equal(text(b.$('#status #yourturn')), '0 your turn');
 });
 
 test('the dashboard gives the panel none of the options of the old per-item drawing', () => {

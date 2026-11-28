@@ -86,7 +86,6 @@ test('S80: the header, the badges and the conversation count open questions thro
   assert.equal(badges.problems, 1);
   assert.equal(badges.behaviours, 1);  // D2 is about a risk of B1
   assert.equal(badges.opportunities || 0, 0);  // D4 is answered
-  assert.match(a.headerHTML(d), /<span class="yourturn" id="yourturn"><\/span>/);  // page.js's figure counts the threads that are your turn
 });
 
 test('S1, A2: an answer from the page drops the question from the header, the Moves badge and the item badge together; so does an answer in the chat', () => {
@@ -107,22 +106,20 @@ test('A2: a tab with open questions has a badge with an accessible name; with no
   assert.equal(a.tabLabel('Problems', 0), 'Problems');
 });
 
-test('S106: the header has one figure for what waits for you: the shared "N your turn" (page.js), in the slot it leaves, never its own', () => {
+test('S106: the header has no figure for what waits for you: the rows of the conversation show it', () => {
   const a = api(), d = fixture();
   const html = a.headerHTML(d);
-  assert.equal((html.match(/id="yourturn"/g) || []).length, 1);
-  assert.doesNotMatch(html, /open question|id="questions"/);
-  assert.match(source, /stats: \(\) => byId\('yourturn'\)/);
+  assert.doesNotMatch(html, /your turn|yourturn|open question|id="questions"/);
 });
 
-test('S2: the header holds figures only: the step of ten, the brief version and the threads that are your turn; never a sentence', () => {
+test('S2: the header holds figures only: the step of ten and the brief version; never a sentence', () => {
   const a = api(), d = fixture({
     moves: [rec('move', { id: 'M1', option: 'K2', step: '3', why: 'Owners first.', answer: { type: 'page', event: 'c1' } })], chosen: 'K2',
     briefs: [rec('brief', { id: 'v1', move: 'M1', status: 'draft' })],
   });
   const html = a.headerHTML(d);
   const stats = [...html.matchAll(/<b>(.*?)<\/b>([^<]*)/g)].map(m => [m[1].replace(/<[^>]+>/g, ''), m[2]]);
-  assert.deepEqual(stats, [['5 / 10', 'step'], ['v1', 'brief']]);  // and the shared "N your turn" figure, in its slot
+  assert.deepEqual(stats, [['5 / 10', 'step'], ['v1', 'brief']]);
   assert.doesNotMatch(html, /Owners only|your calls|being written|last move/);
   assert.match(a.headerHTML(fixture()), /<b>–<\/b>brief/);  // no brief yet: a dash, not a sentence
   assert.equal(a.briefLabel(fixture({ moves: d.moves, briefs: [rec('brief', { id: 'v1', move: 'M1', status: 'final' })] })), 'v1, final');
@@ -648,10 +645,9 @@ test('the page draws its kinds inside rows: a decision as your turn with its def
   assert.equal(text(ch.querySelector('.chip')), 'Agent’s turn');
   assert.match(text(ch.querySelector('.tgist')), /^You: Chose Shrink: Owners only\./);
   assert.deepEqual(actions(ch).map(x => x.textContent), ['✓', 'Reply']);
-  assert.equal(text(p.$('#status #yourturn')), '3 your turn');
 });
 
-test('answering a decision from its row records the answer; the figure counts one fewer', () => {
+test('answering a decision from its row records the answer', () => {
   const p = liveDiscover(fixture());
   actions(p.rowOf('D1'))[2].click();
   const box = p.rowOf('D1').querySelector('.why textarea');
@@ -659,5 +655,4 @@ test('answering a decision from its row records the answer; the figure counts on
   box.key('Enter', { ctrlKey: true });
   assert.deepEqual(p.conv.log().filter(e => e.type === 'answer').map(e => [e.decision, e.text, e.default]), [['D1', 'No, P2 is.', false]]);
   assert.equal(text(p.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
-  assert.equal(text(p.$('#status #yourturn')), '2 your turn');
 });

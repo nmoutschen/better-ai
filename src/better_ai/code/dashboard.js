@@ -316,7 +316,7 @@ function crumb(e) {
 function commentBody(e) { return pageMarkdown(e.text); }
 const conv = pageConversation({
   served: !STATIC, stream: false, thread: $("thread"),
-  kinds: {decision: decisionItem}, crumb, commentBody, stats: () => $("yourturn"),
+  kinds: {decision: decisionItem}, crumb, commentBody,
   afterSend: () => tick(),
 });
 const dec = pageDecision({conversation: conv, now: () => D.now, md, esc, id: uid});
@@ -394,9 +394,7 @@ function render(d) {
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   setHTML($("status"), (tasks.length ? `<span class="stat"><b>${done}<span class="of"> / ${tasks.length}</span></b>tasks done
       <span class="meter" aria-hidden="true"><i style="width:${(100 * done / tasks.length).toFixed(0)}%"></i></span></span>` : "")
-    + `<span class="yourturn" id="yourturn"></span>`  // page.js's "N your turn" figure
     + (d.start ? stat(esc(runningWord(d)), "running") : ""));
-  conv.figure();
   pageShowErrors($("errors"), d.errors);
   drawRange();
   drawTables(d);

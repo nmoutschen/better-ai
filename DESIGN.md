@@ -156,7 +156,6 @@ Padding is `--space-edge` at the sides of the header, the view and the side colu
 - In the stats header the title wraps to two lines at most, then cuts off with an ellipsis. The question header wraps its controls under the title on a narrow window.
 - In the question header, keep to the controls used on every visit. Put settings changed rarely in a menu, as the canvas's Display menu.
 - A board never has both: figures go in the stats header, a question goes in the question header.
-- The one exception is page.js's "N your turn" figure, on every page that talks to the agent. A page with a stats header places it among its own figures (`.yourturn` slot) and has no other figure for what waits for you; a page with a question header places it among its controls, one line at their size.
 
 ### View patterns
 
@@ -307,7 +306,6 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 - An agent's decision or question is a `li.msg.decision`, with an umber edge and the agent's name and time in umber.
 - An open question's row offers ✓ (Close), an outlined "Use the default" in words, and a filled Answer, on one row. ✓ always closes or confirms a thread, never answers it. Each control's accessible name includes the question. After Use the default the focus goes to the next open question, then to what waits next.
-- The top bar counts the threads that wait for the user as the figure "N your turn".
 - A page whose defaults never apply on a timer sets `pageDecision({suggested: true})`: the default reads "Suggested default" and no deadline shows.
 
 ### Notices

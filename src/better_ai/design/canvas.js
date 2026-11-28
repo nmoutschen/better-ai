@@ -550,8 +550,6 @@
     showLabel: function (n) { return 'Show where comment ' + n + ' is'; },
     crumb: function (e) { var on = e.on || e; return crumb(on.version, on.target || {}); }, commentBody: commentBody,
     kinds: { approve: approvalItem, verdict: verdictItem }, itemKinds: ['comment', 'note', 'approve'],
-    // A question header has no figures: the "N your turn" figure sits among the controls.
-    stats: controls,
     sendMode: function () { return approval ? approval.sendMode() : null; },
     busy: function () { return !pop.hidden; },
     beforeReload: function () {

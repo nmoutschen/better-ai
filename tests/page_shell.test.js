@@ -791,35 +791,34 @@ test('S15 the list opens on its end, and a button says how many rows are above t
   p.conv.setLog(EVERY_STATE);
   assert.equal(list.scrollTop, 900);
   list.rect = { top: 100 };
-  p.rows().forEach((li, k) => { li.rect = { top: 100 + k * 150 - 600 }; });
+  p.rows().forEach((li, k) => { li.rect = { top: 100 + k * 150 - 600, bottom: 100 + k * 150 - 450 }; });
   list.dispatch('scroll');
   const cue = p.$('.tabove');
   assert.equal(cue.hidden, false);
   assert.equal(cue.textContent, '▲ 4 more threads above');
   cue.click();
   assert.equal(list.scrolledTo.top, 0);
-  p.rows().forEach(li => { li.rect = { top: 200 }; });
+  p.rows().forEach(li => { li.rect = { top: 200, bottom: 300 }; });
   list.dispatch('scroll');
   assert.equal(cue.hidden, true);
 });
 
-test('S16 the top bar says how many threads are your turn, and takes you to the first one\'s Answer', () => {
+test('S15 a row in view is not above, even when its top is: one long thread scrolled into its middle shows no button', () => {
+  const p = panel(null);
+  const list = p.$('.thread');
+  list.scrollHeight = 900; list.clientHeight = 300;
+  p.conv.setLog(EVERY_STATE.slice(0, 1));
+  list.rect = { top: 100 };
+  p.rows()[0].rect = { top: -500, bottom: 400 };
+  list.dispatch('scroll');
+  assert.equal(p.$('.tabove').hidden, true);
+});
+
+test('S16 the top bar has no figure of the panel\'s: what is your turn shows in the rows, not as a count', () => {
   const log = EVERY_STATE.concat([agentReply('r2', 'm2', 'Which part?', 1), status('m2', 'asked', 1)]);
   const p = panel(log);
-  const fig = p.$('#status button.stat');
-  assert.ok(fig);
-  assert.equal(text(fig), '2 your turn');
-  assert.equal(text(fig.querySelector('b')), '2');
-  assert.doesNotMatch(text(p.$('#status')), /Loading/);
-  p.filter('all');
-  fig.click();
-  assert.equal(p.$('[data-filter="open"]').getAttribute('aria-pressed'), 'true');
-  const focused = p.document.activeElement;
-  assert.equal(focused.textContent, 'Answer');
-  assert.equal(focused.closest('li.trow').dataset.id, 'm1');
-  const none = panel([userNote('m1', 'x', 1)]);
-  assert.equal(none.$('#status button.stat'), null);
-  assert.equal(text(none.$('#status .stat')), '0 your turn');
+  assert.equal(p.$('#status .stat'), null);
+  assert.doesNotMatch(text(p.$('#status')), /your turn/);
 });
 
 test('S17 Answer opens the thread with a labelled box under its last message; Ctrl+Enter sends a note to the thread', () => {
@@ -900,7 +899,6 @@ test('S19 the check closes after a 6-second window with its own Undo, and two cl
   close('m1');  // the second close keeps its own Undo, and the first one's window runs on
   assert.equal(p.$$('li.trow.closing').length, 2);
   assert.equal(p.$('[data-filter="open"]').textContent, 'Open (5)');  // still in place while it can be undone
-  assert.equal(text(p.$('#status .stat')), '0 your turn');
   p.tick(3000);
   assert.deepEqual(p.sent().map(e => [e.type, e.to]), [['accept', 'm2']]);
   assert.equal(p.rowOf('m2'), undefined);
@@ -1055,7 +1053,6 @@ test('a waiting decision keeps its default, deadline, use-the-default check and 
   assert.equal(answer.textContent, 'Answer');
   assert.doesNotMatch(answer.className, /btn--quiet/);
   assert.equal(row.querySelectorAll('.tacts .progress').length, 0);  // the row's state says it once
-  assert.equal(text(p.$('#status .stat')), '1 your turn');
   row.querySelector('.thead').click();
   const body = text(p.rowOf('D1').querySelector('.tbody'));
   assert.match(body, /If you don't answer: Small/);
@@ -1147,19 +1144,4 @@ test('a row keeps its buttons on one line: the count keeps a readable width, the
   assert.match(css, /\.tleft \{[^}]*flex:1 1 9rem/);
   assert.match(css, /\.tacts \{[^}]*flex:none/);
   assert.match(css, /\.tleft \{[^}]*min-width:0[^}]*flex-wrap:wrap/);
-});
-
-test('a page places the figure in its own slot with stats, and puts it back after rewriting its header with figure()', () => {
-  const p = panel(EVERY_STATE, doc => {
-    const slot = doc.createElement('span'); slot.id = 'yourturn';
-    doc.querySelector('#status').append(slot);
-    return { stats: () => doc.getElementById('yourturn') };
-  });
-  assert.equal(text(p.$('#yourturn')), '1 your turn');
-  const status = p.$('#status');
-  status.innerHTML = '<span class="stat"><b>3</b>steps</span><span class="yourturn" id="yourturn"></span>';
-  assert.equal(p.$('#yourturn .stat'), null);
-  p.conv.figure();
-  assert.equal(text(p.$('#yourturn')), '1 your turn');
-  assert.equal(p.$$('#status .stat').length, 2);  // one figure of the page's, and the one figure for your turn
 });
