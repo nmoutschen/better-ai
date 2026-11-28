@@ -4,7 +4,7 @@ description: Reads the behaviours of a discovery and their testable forms, and h
 capabilities: [read files]
 edits: false
 model: Sonnet, Terra or similar
-model_reason: A design choice to save cost; it reports ambiguity, and the coordinator words each finding itself.
+model_reason: Saves cost; it only reports ambiguity, and the coordinator words each finding.
 ---
 
 # Agent: behaviour-verifier

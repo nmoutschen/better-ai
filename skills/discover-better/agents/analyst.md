@@ -4,7 +4,7 @@ description: Looks for evidence for and against the items of a discovery, or run
 capabilities: [search the web, read pages, read files, use the connectors named, run commands]
 edits: true
 model: Sonnet, Terra or similar
-model_reason: A design choice to save cost; the coordinator checks each quote it adds with a quote verifier.
+model_reason: Saves cost; a quote verifier checks each quote it adds.
 ---
 
 # Agent: analyst

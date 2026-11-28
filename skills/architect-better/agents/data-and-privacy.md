@@ -4,7 +4,7 @@ description: Reviews a design it did not make, or a system against its design, f
 capabilities: [read files]
 edits: false
 model: Opus, Sol or similar
-model_reason: It needs judgement about the design, but not the top tier.
+model_reason: Weighing the design from this perspective needs a strong model, not the strongest.
 ---
 
 # Agent: data-and-privacy

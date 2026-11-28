@@ -4,7 +4,7 @@ description: Builds one part of a larger change in the mode it is given, on its 
 capabilities: [read files, run commands, write files, commit]
 edits: true
 model: Sonnet, Terra or similar
-model_reason: A design choice to save cost; the coordinate mode moves a task to a more capable model when its rounds fail or its requirements are security-sensitive.
+model_reason: Saves cost; the coordinator moves a task to a stronger model when it fails review or touches security.
 ---
 
 # Agent: builder

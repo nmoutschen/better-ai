@@ -4,7 +4,7 @@ description: Runs a throwaway proof of concept that answers questions a design r
 capabilities: [read files, run commands, write files]
 edits: false
 model: Sonnet, Terra or similar
-model_reason: It writes throwaway code and reports what it did, with no judgement of the design.
+model_reason: It writes throwaway code and reports what it did; it does not judge the design.
 ---
 
 # Agent: proof-of-concept

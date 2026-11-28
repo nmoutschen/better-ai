@@ -4,7 +4,7 @@ description: Checks claims that other agents recorded on a shared research board
 capabilities: [read pages, read files, run commands]
 edits: true
 model: Sonnet, Terra or similar
-model_reason: A design choice to save cost; cheap and frontier judges matched on whether a source supports a citation.
+model_reason: Saves cost; cheap models matched the strongest on whether a source supports a citation.
 ---
 
 # Agent: verifier

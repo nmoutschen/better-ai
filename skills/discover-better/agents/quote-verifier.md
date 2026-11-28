@@ -4,7 +4,7 @@ description: Checks that a quote an analyst added as evidence occurs in the raw 
 capabilities: [use web tools, run commands, read files, write files, use the connectors the sources name]
 edits: true
 model: Haiku or similar
-model_reason: It checks that a quote occurs in its source, which is mechanical.
+model_reason: Checking that a quote occurs in its source is mechanical.
 ---
 
 # Agent: quote-verifier

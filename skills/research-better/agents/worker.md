@@ -4,7 +4,7 @@ description: Takes questions from a shared research board, researches them in th
 capabilities: [search and read the board's collections, read files, run commands]
 edits: true
 model: Sonnet, Terra or similar
-model_reason: A design choice to save cost; verifiers check each claim it records against its source.
+model_reason: Saves cost; verifiers check each claim it records against its source.
 ---
 
 # Agent: worker
