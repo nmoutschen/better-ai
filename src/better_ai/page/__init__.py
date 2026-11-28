@@ -699,7 +699,12 @@ def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
     )
 
 
-@cli.verb("pending", help="list the user's actionable items and events", arguments=_unit_argument)
+@cli.verb(
+    "pending",
+    help="list the user's actionable items and events",
+    arguments=_unit_argument,
+    machine_output=True,
+)
 def pending(args: argparse.Namespace, run: cli.Run) -> int:
     """Read current item states and the events after the delivered position of the unit's `.driver`, including after an
     interruption."""
@@ -787,6 +792,7 @@ def static_page(spec: PageSpec, data: Mapping[str, Any]) -> str:
     arguments=_unit_argument,
     # discover-better is live only: a static copy would keep words a redact removes.
     skills=("architect-better", "code-better", "design-better", "research-better"),
+    machine_output=True,
 )
 def render(args: argparse.Namespace, run: cli.Run) -> int:
     unit = _unit(args, run)
@@ -1090,13 +1096,41 @@ def command_of(pid: Any) -> str | None:
     return done.stdout.strip() or None
 
 
+def cwd_of(pid: int) -> str | None:
+    """The working folder of a process, or None where it cannot be read."""
+    try:
+        return os.readlink(f"/proc/{pid}/cwd")
+    except OSError:
+        pass
+    try:
+        done = subprocess.run(
+            ["lsof", "-a", "-d", "cwd", "-p", str(pid), "-Fn"], capture_output=True, text=True, timeout=5, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return next((line[1:] for line in done.stdout.splitlines() if line.startswith("n")), None)
+
+
 def is_serve_of(pid: Any, unit: Unit) -> bool:
-    """Whether the process is a `serve` of this unit: the word `serve` and then an argument that names the unit."""
+    """Whether the process is a `serve` of this unit: the word `serve` and then an argument that names the unit, in any
+    spelling (a trailing slash, a relative path from the serve's own folder, a symlink)."""
     words = (command_of(pid) or "").split()
     if "serve" not in words:
         return False
-    names = (str(unit.path), unit.label)
-    return any(w in names or w.endswith("/" + unit.label) for w in words[words.index("serve") + 1 :])
+    here = cwd_of(pid)
+    target = os.path.realpath(unit.path)
+    for word in words[words.index("serve") + 1 :]:
+        if word.startswith("-"):
+            continue
+        if os.path.isabs(word):
+            candidate = word
+        elif here:
+            candidate = os.path.join(here, word)
+        else:
+            continue
+        if os.path.realpath(candidate) == target:
+            return True
+    return False
 
 
 def process_gone(pid: int) -> bool:
@@ -1157,7 +1191,7 @@ def live_server(unit: Unit) -> dict:
     if not state:
         return {}
     info = server_answer(unit)
-    if not info or not is_serve_of(state.get("server_pid"), unit):
+    if not info or info.get("pid") != state.get("server_pid"):
         return {}
     return {**state, "alive": info}
 
@@ -1165,7 +1199,6 @@ def live_server(unit: Unit) -> dict:
 # ---------------------------------------------------------------- what a chat agent's verbs say on a driven unit
 
 WRITING = ("add", "set", "status", "reply", "create")  # the verbs a chat agent may not run on a driven unit
-MACHINE_OUTPUT = ("pending", "render")  # the verbs whose output an agent reads as data: their notice goes to stderr
 AGENT_STATE = {
     "idle": "this page's agent is idle since {}",
     "working": "this page's agent is working since {}",
@@ -1205,13 +1238,14 @@ def drive_guard(args: argparse.Namespace, run: cli.Run) -> int | None:
     if not unit.target(DRIVER).exists():
         return None
     state = live_server(unit)
-    if not state or os.environ.get("BETTER_PAGE_SESSION") == state["alive"].get("session"):
+    mine = os.environ.get("BETTER_PAGE_SESSION")
+    if not state or (mine and mine in (state["alive"].get("session"), state["alive"].get("tag"))):
         return None
     text = notice_text(unit, state)
     if name in WRITING:
         run.err(f"{run.skill.name}: {text}")
         return cli.EXIT_BUSY
-    (run.err if name in MACHINE_OUTPUT else run.out)(text)
+    (run.err if args._verb.machine_output else run.out)(text)
     return None
 
 
@@ -1276,12 +1310,13 @@ class DrivenPage:
 
     def alive(self):
         """What `/alive` says without the secret: enough for a verb to know the page has an agent and what it does."""
-        info = {"unit": self.identity, "session": self.session}
+        info = {"unit": self.identity, "session": self.session, "pid": os.getpid()}
         if not self.driver or not self.session:
             return {**info, "state": "starting", "mark_age": 0, "waiting": 0}
         snapshot = self.driver.snapshot()
         return {
             **info,
+            "tag": self.driver.tag,
             "state": snapshot["state"],
             "since": snapshot.get("since"),
             "mark_age": snapshot["age"],
@@ -1622,7 +1657,7 @@ def report_last_end(run: cli.Run, unit: Unit) -> None:
 
 def refuse_repeat(unit: Unit, build: str) -> None:
     ended = driver_error(unit)
-    if type(ended.get("repeats")) is int and ended["repeats"] >= 2 and ended.get("build") == build:
+    if type(ended.get("repeats")) is int and ended["repeats"] >= 1 and ended.get("build") == build:
         raise Off(
             "driver",
             f"the same error came back: {' '.join(str(ended.get('reason')).split())}; "

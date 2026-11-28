@@ -75,7 +75,8 @@ def fixture_spec(agent="coordinator", capabilities=("pins", "approve"), **more):
 class FakeDriver:
     """What the page server needs of the driver, with nothing behind it."""
 
-    session, harness = "00000000-0000-4000-8000-000000000000", "claude"
+    session = tag = "00000000-0000-4000-8000-000000000000"
+    harness = "claude"
 
     def snapshot(self):
         return {"state": "idle", "since": time.time(), "age": 0.0}

@@ -1,7 +1,10 @@
 """`serve` and the verbs of a driven page: the one-line answer, the detached server, the notice a chat agent gets.
 
 Every test serves a unit with the stub harness of tests/fixtures/stub-harness, as a real process (serve forks), and
-ends what it left in `tearDown`. Nothing here opens a browser: `--no-browser` is honoured with the stub's marker."""
+ends what it left in `tearDown`. Nothing here opens a browser: `--no-browser` is honoured with the stub's marker.
+
+Note for T2: the tests of `serve --link` (a new tab for a running server) went with test_page_driven_serve.py, whose
+flow no longer exists; they are T2's to write again against the one-tab pairing."""
 
 import contextlib
 import http.client
@@ -621,18 +624,21 @@ class SpellingsTest(Unit):
     """One unit has many spellings; each is the same unit to the notice, the refusal and the old-server check."""
 
     def spellings(self):
+        if hasattr(self, "forms"):
+            return self.forms
         link = self.root.parent / f"link-{self.root.name}"
         link.symlink_to(self.root)
         self.addCleanup(link.unlink)
         sub = self.root / "sub"
         sub.mkdir()
-        return [
+        self.forms = [
             (".show/deck/", self.root),
             ("./.show/deck", self.root),
             (str(self.folder), self.root),
             ("../.show/deck", sub),
             (str(link / ".show" / "deck"), self.root),
         ]
+        return self.forms
 
     def run_in(self, cwd, *args, stdin=""):
         return subprocess.run(
@@ -705,6 +711,7 @@ class MachineOutputTest(Unit):
         self.assertEqual(set(machine), {"pending", "render", "summary", "specs"})
         os.environ["BETTER_AI_SKILL"] = "show-better"
         unit = better_unit(self.root, self.folder)
+        (self.folder / ".driver").write_text("{}")
         alive_state = {"alive": {"session": "s", "state": "idle", "since": 0, "waiting": 0}}
         for name in machine:
             with self.subTest(name), mock.patch.object(page, "live_server", return_value=alive_state):

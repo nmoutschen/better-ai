@@ -101,7 +101,9 @@ STUB = Path(__file__).resolve().parent / "fixtures" / "stub-harness"
 def stub_env(skill: str, **changes: str | None) -> dict[str, str]:
     """The environment of a run that finds the stub harness as the user's own; a value of None removes a variable."""
     env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "BETTER_PAGE_SESSION")}
-    env.update(PATH=f"{STUB}{os.pathsep}{env.get('PATH', '')}", CLAUDECODE="1", BETTER_AI_STUB_HARNESS="1")
+    env.update(
+        PATH=f"{STUB}{os.pathsep}{env.get('PATH', '')}", CLAUDECODE="1", BETTER_AI_STUB_HARNESS="1", BROWSER="false"
+    )
     env["BETTER_AI_SKILL"] = skill
     for key, value in changes.items():
         if value is None:

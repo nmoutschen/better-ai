@@ -26,7 +26,9 @@ def stub_env():
     """The environment of every test module: the stub harness first on PATH, as the one a served page finds, and the
     marker that lets `serve` skip the browser."""
     env = dict(os.environ)
-    env.update(PATH=f"{STUB_DIR}{os.pathsep}{env.get('PATH', '')}", CLAUDECODE="1", BETTER_AI_STUB_HARNESS="1")
+    env.update(
+        PATH=f"{STUB_DIR}{os.pathsep}{env.get('PATH', '')}", CLAUDECODE="1", BETTER_AI_STUB_HARNESS="1", BROWSER="false"
+    )
     return env
 
 

@@ -82,6 +82,7 @@ class Verb:
     run: Callable[[argparse.Namespace, Run], int | None]
     arguments: Callable[[argparse.ArgumentParser], None] | None = None
     skills: tuple[str, ...] | None = None  # the skills that have it; None for every skill
+    machine_output: bool = False  # its output is read by a program: no notice may be printed on stdout
 
 
 VERBS: list[Verb] = []
@@ -99,6 +100,7 @@ def verb(
     help: str,
     arguments: Callable[[argparse.ArgumentParser], None] | None = None,
     skills: tuple[str, ...] | None = None,
+    machine_output: bool = False,
 ):
     """Register a verb. A name registered twice for the same skill is a bug in the source."""
 
@@ -109,7 +111,7 @@ def verb(
         for old in VERBS:
             if old.name == name and (old.skills is None or skills is None or set(old.skills) & set(skills)):
                 raise ValueError(f"verb {name!r} is registered twice")
-        VERBS.append(Verb(name, help, function, arguments, skills))
+        VERBS.append(Verb(name, help, function, arguments, skills, machine_output))
         return function
 
     return register

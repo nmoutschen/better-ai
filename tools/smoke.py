@@ -36,7 +36,9 @@ def stub_env() -> dict[str, str]:
     """The environment of a run with the stub harness: it is found first on PATH, and the marker lets `serve` skip the
     browser."""
     env = dict(os.environ)
-    env.update(PATH=f"{STUB_DIR}{os.pathsep}{env.get('PATH', '')}", CLAUDECODE="1", BETTER_AI_STUB_HARNESS="1")
+    env.update(
+        PATH=f"{STUB_DIR}{os.pathsep}{env.get('PATH', '')}", CLAUDECODE="1", BETTER_AI_STUB_HARNESS="1", BROWSER="false"
+    )
     return env
 
 
