@@ -661,3 +661,21 @@ test('N4: the notice is one status region at every width', async () => {
   assert.match(css, /@media \(max-width:900px\) \{[^@]*\.agents \.notice \{ display:none; \}/);
   assert.match(css, /@media \(min-width:901px\) \{ \.pinbar \{ display:none; \} \}/);
 });
+
+// ---------- round 3: the own-agent request stays reachable below 900 px ----------
+
+test('round 3: below 900 px the CSS hides nothing of the own-agent row and its Open the request button', async () => {
+  const page = boot({ width: 800 });
+  await page.show(body({ state: 'waiting', approvals: [approval({ who: 'coordinator' })], workers: [] }));
+  const own = page.agentsHtml().split('</li>').find(li => li.includes('Open the request'));
+  assert.ok(own, 'the own-agent row is in the Agents list');
+  const classes = new Set((own.match(/class="([^"]*)"/g) || []).flatMap(c => c.slice(7, -1).split(/\s+/)));
+  const css = read('page', 'page.css').replace(/\s+/g, ' ');
+  const narrow = [...css.matchAll(/@media \(max-width:900px\) \{((?:[^{}]*\{[^}]*\})*)\s*\}/g)].map(m => m[1]).join(' ');
+  const hidden = [...narrow.matchAll(/([^{}]+)\{[^}]*display:none[^}]*\}/g)].flatMap(m => m[1].split(','));
+  for (const selector of hidden.map(s => s.trim())) {
+    const m = selector.match(/^\.agents \.([\w-]+)$/);
+    if (m) assert.ok(!classes.has(m[1]), selector + ' hides the own-agent row');
+  }
+  assert.ok(hidden.some(s => s.trim() === '.agents .notice'), 'the state notice is still hidden there (it is in the pinned bar)');
+});
