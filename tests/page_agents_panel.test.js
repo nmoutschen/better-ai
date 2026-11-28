@@ -162,6 +162,24 @@ test('S24: a liveness mark older than 3 s, or no answer, shows the driver stoppe
   assert.ok(page.agentsHtml().includes(page.escaped(TEXT.down)));
 });
 
+test('S105: once the page showed closed, a failed poll or an old mark keeps the closed notice, not the driver stopped', async () => {
+  const page = boot({ agent: body({ state: 'working' }) });
+  await page.tick();
+  await page.show(body({ state: 'closed', kind: 'idle', text: TEXT.closed }));
+  assert.ok(page.agentsHtml().includes(page.escaped(TEXT.closed)));
+  await page.show(body({ state: 'closed', kind: 'idle', text: TEXT.closed, mark_age: 9 }));  // the driver no longer marks
+  assert.ok(page.agentsHtml().includes(page.escaped(TEXT.closed)), 'an old mark after closed');
+  assert.ok(!page.agentsHtml().includes(page.escaped(TEXT.down)));
+  await page.show(500);                        // the server is gone
+  assert.ok(page.agentsHtml().includes(page.escaped(TEXT.closed)), 'a failed poll after closed');
+  assert.ok(!page.agentsHtml().includes(page.escaped(TEXT.down)));
+  assert.equal(page.pinbar().querySelector('.pinbar-text').textContent, TEXT.closed, 'the pinned bar too');
+  await page.show(null);                       // no answer at all
+  await page.tick();
+  assert.ok(page.agentsHtml().includes(page.escaped(TEXT.closed)), 'no answer after closed');
+  assert.ok(!page.control() || page.control().hidden, 'no Stop or Start on a closed page');
+});
+
 test('S166: a tab the server no longer knows says so, and stops asking', async () => {
   const page = boot({ agent: 403 });
   await page.tick();

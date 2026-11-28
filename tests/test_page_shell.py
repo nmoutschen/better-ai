@@ -7,6 +7,7 @@ borrows (`code-better`, `.code/<slug>`), and its main section and events schema 
 
 import contextlib
 import http.client
+import inspect
 import io
 import json
 import os
@@ -87,6 +88,10 @@ class FakeDriver:
     def check_alive(self):
         return True
 
+    @property
+    def error(self):
+        return None
+
     def idle_expired(self):
         return False
 
@@ -94,6 +99,9 @@ class FakeDriver:
         return True
 
     def enqueue(self, event):
+        pass
+
+    def tab_paired(self):
         pass
 
 
@@ -747,6 +755,87 @@ class ServeTest(Fixture):
         self.assertFalse(thread.is_alive())
         self.assertEqual(result, [0])
         self.assertFalse((self.unit_dir / ".server").exists())
+
+
+class EndingTest(Fixture):
+    """How a served page ends: the reason of a driver failure, and the closed state a planned exit leaves the page."""
+
+    def driven_page(self, driver):
+        unit = self.unit()
+        conv = page.Conversation(unit, self.spec, self.docs)
+        server = page.make_server(unit, self.spec, conv, resources.build_info())
+        serving = page.run_http(server)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        driven = page.DrivenPage(server, unit)
+        driven.driver, driven.ready = driver, True
+        host = f"127.0.0.1:{server.server_port}"
+        self.tokens[host] = driven.pairing.exchange(driven.pairing.issue(), driven.origin)
+        driven.tab_paired()
+        return unit, conv, server, serving, driven, host
+
+    def test_a_driver_failure_keeps_its_reason_B2(self):
+        class Failed(FakeDriver):
+            def check_alive(self):
+                return False
+
+            @property
+            def error(self):
+                return "boom"
+
+        unit, conv, _, _, driven, _ = self.driven_page(Failed())
+        run = mock.Mock(skill=code.SKILL)
+        args = mock.Mock(once=False, linger=60)
+        with mock.patch.object(page, "DRIVER_GRACE", 0):
+            self.assertEqual(page.wait_until_done(args, run, unit, conv, driven), ("driver", "boom"))
+
+    def test_after_a_planned_exit_the_server_still_answers_closed_for_one_poll_B1_S105(self):
+        published = threading.Event()
+
+        class Closing(FakeDriver):
+            state = "idle"
+
+            def agent(self):
+                return {**super().agent(), "state": self.state}
+
+            def close(self, kind="stopped", reason="server stopped"):
+                self.state = "closed"
+                published.set()
+
+        unit, _, server, serving, driven, host = self.driven_page(Closing())
+        stopper = threading.Thread(
+            target=page.stop_serving, args=(server, serving, driven, unit, None, ("idle", "no page was open")), daemon=True
+        )
+        with mock.patch.object(page, "CLOSED_GRACE", 10, create=True):
+            stopper.start()
+            self.assertTrue(published.wait(5))
+            time.sleep(0.5)  # longer than the server takes to shut down at once
+            status, body = self.get(host, "/agent")
+            self.assertEqual((status, json.loads(body)["state"]), (200, "closed"))
+            stopper.join(5)
+        self.assertFalse(stopper.is_alive(), "the server waits for no more than the page's poll of closed")
+
+
+class FakeDriverShapeTest(unittest.TestCase):
+    def test_each_fake_driver_has_the_members_of_driver_in_the_same_shape(self):
+        """A fake that calls a property as a method, or the reverse, hides a TypeError of the real one (B2)."""
+        from better_ai.page.driver import Driver
+
+        import test_page_pairing_v2
+
+        source = inspect.getsource(Driver)
+
+        def shape(cls, name):
+            member = inspect.getattr_static(cls, name, None)
+            if member is None:
+                return "value" if f"self.{name} =" in source or f"self.{name}," in source else None
+            if isinstance(member, property):
+                return "property"
+            return "method" if callable(member) else "value"
+
+        for fake in (FakeDriver, test_page_pairing_v2.FakeDriver):
+            for name in [n for n in vars(fake) if not n.startswith("_")]:
+                self.assertEqual(shape(fake, name), shape(Driver, name), f"{fake.__module__}.FakeDriver.{name}")
 
 
 class RegisterTest(unittest.TestCase):
