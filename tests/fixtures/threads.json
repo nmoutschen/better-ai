@@ -20,7 +20,7 @@
    {"id": "m2", "state": "agent", "step": "seen", "closedByUser": false},
    {"id": "m3", "state": "agent", "step": "working", "closedByUser": false},
    {"id": "m4", "state": "you", "step": "new", "closedByUser": false},
-   {"id": "m5", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "m5", "state": "done", "step": "new", "closedByUser": true},
    {"id": "m6", "state": "done", "step": "new", "closedByUser": true},
    {"id": "m7", "state": "done", "step": "new", "closedByUser": true}
   ]},
@@ -68,7 +68,7 @@
    {"type": "comment", "id": "c3", "n": 3, "text": "edited", "by": "user"}
   ],
   "threads": [
-   {"id": "c1", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "c1", "state": "done", "step": "new", "closedByUser": true},
    {"id": "c2", "state": "agent", "step": "new", "closedByUser": false},
    {"id": "c3", "state": "done", "step": "new", "closedByUser": true}
   ]},
@@ -412,7 +412,7 @@
   "threads": [
    {"id": "r1", "state": "done", "step": "new", "closedByUser": false}
   ]},
- {"name": "an old log without read: every status counts",
+ {"name": "an old log without read: every status counts, and a done counts as closed by you (D13)",
   "log": [
    {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
    {"type": "status", "to": "m1", "status": "seen", "by": "coordinator"},
@@ -427,8 +427,26 @@
   ],
   "threads": [
    {"id": "m1", "state": "agent", "step": "working", "closedByUser": false},
-   {"id": "m3", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "m3", "state": "done", "step": "new", "closedByUser": true},
    {"id": "r2", "state": "you", "step": "new", "closedByUser": false}
+  ]},
+ {"name": "old done (D13): a done without read starts closed by you, your message puts it back with the agent, a done with read is not closed",
+  "log": [
+   {"type": "note", "id": "m1", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m1", "status": "done", "by": "coordinator"},
+   {"type": "note", "id": "m2", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m2", "status": "done", "by": "coordinator", "read": 2},
+   {"type": "note", "id": "m3", "to": null, "text": "t", "by": "user"},
+   {"type": "status", "to": "m3", "status": "done", "by": "coordinator"},
+   {"type": "note", "id": "m4", "to": "m3", "text": "t", "by": "user"},
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "status", "to": "r1", "status": "done", "by": "coordinator"}
+  ],
+  "threads": [
+   {"id": "m1", "state": "done", "step": "new", "closedByUser": true},
+   {"id": "m2", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "m3", "state": "agent", "step": "new", "closedByUser": false},
+   {"id": "r1", "state": "done", "step": "new", "closedByUser": true}
   ]},
  {"name": "kind: an approval is a thread of yours",
   "items": ["comment", "note", "approve"],

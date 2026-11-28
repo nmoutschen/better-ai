@@ -105,7 +105,7 @@ class ConversationLines(unittest.TestCase):
         done = better.call("code-better", "pending", str(folder))
         listed = [json.loads(line) for line in done.stdout.splitlines()[:-1]]
         self.assertEqual([(e["id"], e["status"]) for e in listed], [("m1", "new")], done.stderr)
-        self.assertEqual((folder / ".conversation-read").read_text(), "3")  # the cut-off line counts
+        self.assertEqual(done.stdout.splitlines()[-1], "1 not done. Pass --read 3 to status and reply.")  # the cut-off line counts
         self.served("code dashboard", unit, dashboard.SPEC, dashboard.load(unit))
         self.wait_counts_the_cut_off_line(folder, unit)
 
@@ -140,10 +140,9 @@ class ConversationLines(unittest.TestCase):
             self.assertEqual(drawn["threads"], drawn["positional"], drawn["label"])
 
     def wait_counts_the_cut_off_line(self, folder, unit):
-        """`wait` records the last line it showed, counting the cut-off line, so the agent's next status counts."""
+        """`wait` prints the line of each event it shows, counting the cut-off line, so the agent's next status counts."""
         write_log(folder, LINES[:2])
         (folder / ".conversation-seen").write_text("2")  # an earlier wait showed m1 and the cut-off line
-        (folder / ".conversation-read").unlink(missing_ok=True)
         conv = page.Conversation(unit, dashboard.SPEC, {})  # it only serves: nothing is checked
         skill = mock.patch.dict(os.environ, {"BETTER_AI_SKILL": "code-better"})
         skill.start()
@@ -163,8 +162,8 @@ class ConversationLines(unittest.TestCase):
         self.addCleanup(writer.cancel)
         done = better.call("code-better", "wait", str(folder), "--timeout", "20")
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual((folder / ".conversation-read").read_text(), "2")
-        self.assertEqual(better.call("code-better", "status", str(folder), "asked", "m1").returncode, 0)
+        self.assertEqual(json.loads(done.stdout.splitlines()[-1])["_i"], 2)
+        self.assertEqual(better.call("code-better", "status", str(folder), "asked", "m1", "--read", "2").returncode, 0)
         (m1,) = page.threads(conv.events(), dashboard.SPEC.tracked())
         self.assertEqual((m1["state"], m1["step"]), ("you", "new"))
         write_log(folder)
