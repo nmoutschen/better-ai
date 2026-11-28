@@ -782,7 +782,8 @@ class Driver:
 
     def _events_once(self) -> bool:
         if self._peer is not None:
-            timeout = 0 if self._wake and self._state == "idle" else POLL
+            # Work that waits for a tab to pair (S77) cannot start, so it waits on the harness like an idle loop.
+            timeout = 0 if self._wake and self._state == "idle" and self._paired.is_set() else POLL
             for _ in range(100):
                 event = self._peer.poll(timeout)
                 if event is None:
