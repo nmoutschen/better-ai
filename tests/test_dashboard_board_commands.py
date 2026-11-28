@@ -9,11 +9,9 @@ so no reply is left without one.
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 import urllib.request
 from pathlib import Path
@@ -268,20 +266,13 @@ class ServedPage(unittest.TestCase):
     """`serve` shows the page, takes what the user sends in the schema's terms, and `pending` lists it."""
 
     def start(self, folder: Path):
-        env = {**os.environ, "BETTER_AI_SKILL": "code-better"}
-        cmd = better_module.command("serve", str(folder), "--no-browser")
-        server = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
-        self.addCleanup(lambda: (server.send_signal(signal.SIGTERM), server.communicate(timeout=10)))
-        for _ in range(100):
-            if (folder / ".server").exists():
-                break
-            time.sleep(0.1)
-        self.token = (folder / ".server-token").read_text().strip()  # what `serve` leaves for the page's requests
-        return (folder / ".server").read_text().strip()
+        url, self.token = better_module.serve_page("code-better", folder)
+        self.addCleanup(better_module.stop_page, folder)
+        return url
 
     def send(self, url, method, params):
         body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-        headers = {"Content-Type": "application/json", "Origin": url.rstrip("/"), "X-Page-Token": self.token}
+        headers = {"Content-Type": "application/json", **better_module.page_headers(self.token, url.rstrip("/"))}
         request = urllib.request.Request(url + "rpc", data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(request, timeout=5) as r:
             return json.loads(r.read())
@@ -300,7 +291,7 @@ class ServedPage(unittest.TestCase):
                 self.assertIn(part, page)
             self.assertNotIn("__PAGE_", page)
             with urllib.request.urlopen(
-                urllib.request.Request(url + "data", headers={"X-Page-Token": self.token}), timeout=5
+                urllib.request.Request(url + "data", headers=better_module.page_headers(self.token)), timeout=5
             ) as r:
                 data = json.loads(r.read())
             self.assertEqual(data["decisions"][0]["status"], "waiting")
@@ -343,15 +334,16 @@ class ServedPage(unittest.TestCase):
             checked = run(folder, "check", str(folder))
             self.assertEqual(checked.returncode, 0)
             self.assertIn("written in the format before this change", checked.stdout)
-            env = {**os.environ, "BETTER_AI_SKILL": "code-better"}
-            cmd = better_module.command("serve", str(folder), "--no-browser")
-            server = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
-            for _ in range(100):
-                if (folder / ".server").exists():
-                    break
-                time.sleep(0.1)
-            server.send_signal(signal.SIGTERM)
-            _, err = server.communicate(timeout=10)
+            served = subprocess.run(
+                better_module.command("serve", str(folder), "--no-browser"),
+                input="",
+                capture_output=True,
+                text=True,
+                env=better_module.stub_env("code-better"),
+                timeout=60,
+            )
+            better_module.stop_page(folder)
+            err = served.stderr
         self.assertIn("notice:", err)
         self.assertNotIn("warning:", err)
 
@@ -581,13 +573,12 @@ class Create(unittest.TestCase):
                 ("pending", str(folder)),
                 ("status", str(folder), "seen", "m-1"),
                 ("reply", str(folder)),
-                ("wait", str(folder), "--timeout", "1"),
             ]
             for command in commands:
                 with self.subTest(command[0]):
                     done = run(folder, *command, stdin=task)
                     self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-                    self.assertIn("run create .code/c", done.stderr)
+                    self.assertIn("run create .code/c", done.stderr + done.stdout)
             self.assertEqual(run(folder, "create", str(folder), "--by", "coordinator").returncode, 0)
             self.assertEqual(run(folder, "check", str(folder)).returncode, 0)
 

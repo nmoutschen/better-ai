@@ -3,6 +3,7 @@
 Run with `python3 -m unittest tests.test_design_unit`. No test opens a browser.
 """
 
+import contextlib
 import json
 import os
 import re
@@ -39,8 +40,12 @@ def tearDownModule():
 
 
 def run(repo, *args, stdin=None):
-    """The command in this process; `better.run` starts one only where a test needs a process."""
-    return better.call(SKILL, *args, stdin=stdin, cwd=repo)
+    """The command in this process; `better.run` starts one only where a test needs a process. Where the unit is served,
+    it runs as the page's own agent: a chat agent may not write there."""
+    env = {}
+    with contextlib.suppress(OSError, ValueError, KeyError):
+        env["BETTER_PAGE_SESSION"] = json.loads((Path(repo) / ".design" / "pay" / ".driver").read_text())["session"]
+    return better.call(SKILL, *args, stdin=stdin, cwd=repo, env=env)
 
 
 def make_repo(root: Path) -> Path:
@@ -127,8 +132,8 @@ class Unit(unittest.TestCase):
             "conversation.jsonl": "one of the live page's own files",
             "Conversation.JSONL": "one of the live page's own files",
             ".server": "one of the live page's own files",
-            ".server-token": "one of the live page's own files",
-            ".Conversation-Seen": "one of the live page's own files",
+            ".driver": "one of the live page's own files",
+            ".Driver.Log": "one of the live page's own files",
         }
         for name, reason in names.items():
             with self.subTest(name=name):
@@ -219,7 +224,7 @@ class Unit(unittest.TestCase):
 
     def test_the_skill_has_render_and_the_shared_verbs_only(self):
         done = run(self.root, "--help")
-        for verb in ("create", "add", "set", "check", "serve", "wait", "reply", "status", "pending", "render"):
+        for verb in ("create", "add", "set", "check", "serve", "reply", "status", "pending", "render"):
             self.assertIn(verb, done.stdout)
         self.assertNotRegex(done.stdout, r"(?m)^    show\b")
 
@@ -236,24 +241,12 @@ class Script(unittest.TestCase):
 
 
 def serve(root: Path) -> tuple:
-    """A `serve` process on the unit .design/pay of `root`, its address and its page token."""
-    env = {**os.environ, "BETTER_AI_SKILL": SKILL, "PYTHONUNBUFFERED": "1"}
-    server = subprocess.Popen(
-        better.command("serve", ".design/pay", "--no-browser", "--linger", "0.2"),
-        cwd=root,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-    )
-    line = server.stdout.readline()  # printed as it happens, on a pipe too
-    return server, re.search(r"http://\S+/", line).group(0), re.search(r"#t=([\w-]+)", line).group(1)
+    """A `serve` on the unit .design/pay of `root`: its address and the secret of a paired tab."""
+    return better.serve_page(SKILL, root / ".design" / "pay", "--linger", "0.2", cwd=root)
 
 
-def stop(server):
-    server.terminate()
-    server.stdout.close()
-    server.wait(timeout=20)
+def stop(root: Path):
+    better.stop_page(root / ".design" / "pay")
 
 
 class Served(unittest.TestCase):
@@ -268,31 +261,29 @@ class Served(unittest.TestCase):
         done = run(cls.root, "create", ".design/pay", "--by", "designer", stdin=json.dumps(HEAD))
         assert done.returncode == 0, done.stderr
         cls.files = {p.name: p.read_bytes() for p in cls.folder.iterdir()}
-        cls.server, cls.url, cls.token = serve(cls.root)
+        cls.url, cls.token = serve(cls.root)
 
     @classmethod
     def tearDownClass(cls):
-        stop(cls.server)
+        stop(cls.root)
         cls.tmp.cleanup()
 
     def setUp(self):
         for path in self.folder.iterdir():
-            if path.name not in self.files:
+            if path.name not in self.files and not path.name.startswith((".driver", ".server", ".page", ".gitignore")):
                 path.unlink()
         for name, data in self.files.items():
             (self.folder / name).write_bytes(data)
-        (self.folder / ".server").write_text(self.url)
-        (self.folder / ".server-token").write_text(self.token)
 
     def get(self, path):
         with urllib.request.urlopen(
-            urllib.request.Request(self.url + path, headers={"X-Page-Token": self.token}), timeout=10
+            urllib.request.Request(self.url + path, headers=better.page_headers(self.token)), timeout=10
         ) as r:
             return r.read().decode()
 
     def send(self, method, params):
         body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-        headers = {"Content-Type": "application/json", "Origin": self.url.rstrip("/"), "X-Page-Token": self.token}
+        headers = {"Content-Type": "application/json", **better.page_headers(self.token, self.url.rstrip("/"))}
         request = urllib.request.Request(self.url + "rpc", data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(request, timeout=10) as r:
             return json.loads(r.read())

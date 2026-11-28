@@ -1,7 +1,0 @@
-body { margin: 0; overflow: auto; display: block; }
-main { max-width: 52rem; height: auto; margin: var(--space-group) auto; padding: 0 var(--space-section); }
-h1 { color: var(--heading); }
-section article { border-top: 1px solid var(--line); margin-top: var(--space-section); }
-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-button, a { padding: var(--space-control) var(--space-item); margin-right: var(--space-tight); font:inherit; }
-#error { color: var(--error); }

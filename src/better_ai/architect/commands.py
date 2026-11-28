@@ -150,6 +150,7 @@ def specs_md(records_: list[dict], meta: dict) -> str:
     help="print specs.md, made from spec.jsonl and starting with the generated marker",
     arguments=_unit_argument,
     skills=(SKILL.name,),
+    machine_output=True,
 )
 def specs(args: argparse.Namespace, run: cli.Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)

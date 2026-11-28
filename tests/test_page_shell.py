@@ -72,6 +72,31 @@ def fixture_spec(agent="coordinator", capabilities=("pins", "approve"), **more):
     )
 
 
+class FakeDriver:
+    """What the page server needs of the driver, with nothing behind it."""
+
+    session = tag = "00000000-0000-4000-8000-000000000000"
+    harness = "claude"
+
+    def snapshot(self):
+        return {"state": "idle", "since": time.time(), "age": 0.0}
+
+    def agent(self):
+        return {"state": "idle", "mark_age": 0.0, "approvals": []}
+
+    def check_alive(self):
+        return True
+
+    def idle_expired(self):
+        return False
+
+    def can_linger(self):
+        return True
+
+    def enqueue(self, event):
+        pass
+
+
 class Fixture(unittest.TestCase):
     """A scratch unit `.code/fix` with a page spec registered for code-better, and no real browser."""
 
@@ -79,6 +104,9 @@ class Fixture(unittest.TestCase):
     capabilities = ("pins", "approve")
 
     def setUp(self):
+        environment = mock.patch.dict(os.environ, better.stub_env("code-better"))  # a stub harness is the user's own
+        environment.start()
+        self.addCleanup(environment.stop)
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(os.path.realpath(tmp.name))
@@ -136,12 +164,16 @@ class Fixture(unittest.TestCase):
         self.addCleanup(server.shutdown)
         self.conv = conv
         host = f"127.0.0.1:{server.server_address[1]}"
-        page.publish(unit, server)  # the address and the token, as `serve` leaves them
-        self.tokens[host] = server.token
+        driven = page.DrivenPage(server, unit)
+        driven.driver, driven.ready = FakeDriver(), True
+        paths.write_state(unit, ".server", f"http://{host}/".encode())
+        self.tokens[host] = driven.pairing.exchange(driven.pairing.issue(), driven.origin)  # a paired tab
         return server, host
 
     def with_token(self, host, headers):
-        return {**headers, "X-Page-Token": self.tokens[host]} if host in self.tokens else headers
+        if host not in self.tokens:
+            return headers
+        return {**headers, "X-Page-Token": self.tokens[host], "Sec-Fetch-Site": "same-origin"}
 
     def get(self, host, path, with_type=False):
         connection = http.client.HTTPConnection(host, timeout=10)
@@ -273,11 +305,11 @@ class ServerTest(Fixture):
         ):
             self.assertEqual(self.get(host, path)[0], 404, path)
 
-    def test_data_carries_the_page_data_and_the_listening_state(self):
+    def test_data_carries_the_page_data(self):
         _, host = self.serve()
         status, body = self.get(host, "/data")
         data = json.loads(body)
-        self.assertEqual((status, data["unit"], data["items"], data["listening"]), (200, "fix", [1, 2], None))
+        self.assertEqual((status, data["unit"], data["items"]), (200, "fix", [1, 2]))
         self.assertIsInstance(data["now"], float)
 
     def test_a_request_for_another_host_is_refused(self):
@@ -354,9 +386,6 @@ class ServerTest(Fixture):
             self.assertEqual(status, 500)
             self.assertIn("conversation.jsonl", body.decode())
             self.assertNotIn("hit a bug", body.decode())
-            status, body = self.get(host, "/wait?after=0&seconds=1")
-            self.assertEqual(status, 500)
-            self.assertIn("conversation.jsonl", body.decode())
             sent = self.rpc(host, "note", {"id": "m1", "text": "hi", "to": None})
             self.assertIn("conversation.jsonl", sent["error"]["message"])
             self.assertNotIn("hit a bug", sent["error"]["message"])
@@ -365,9 +394,9 @@ class ServerTest(Fixture):
 
     def test_serve_refuses_to_start_on_a_log_that_is_a_folder(self):
         (self.unit_dir / "conversation.jsonl").mkdir()
-        code_, _, err = self.cli("serve", self.unit_arg, "--no-browser", "--once")
+        code_, out, err = self.cli("serve", self.unit_arg, "--no-browser", "--once")
         self.assertEqual(code_, 1, err)
-        self.assertIn("conversation.jsonl", err)
+        self.assertRegex(out, r"^driver: off refused: .*conversation\.jsonl")
         self.assertFalse((self.unit_dir / ".server").exists())
 
     def test_a_post_from_another_origin_is_refused(self):
@@ -430,26 +459,16 @@ class ServerTest(Fixture):
         # the server is still up
         self.assertEqual(self.get(host, "/")[0], 200)
 
-    def test_listening_is_none_until_a_wait_connects_then_true_then_false(self):
-        _, host = self.serve()
-        self.assertEqual(json.loads(self.get(host, "/listening")[1]), None)
-        with mock.patch.object(page, "LISTEN_GAP", 0.2):
-            self.conv.waiters.update({"open": 0, "last": time.time()})
-            self.assertTrue(self.conv.listening())
-            time.sleep(0.3)
-            self.assertFalse(self.conv.listening())
-
 
 class ConversationTest(Fixture):
     def test_a_log_that_is_a_folder_or_unreadable_is_a_file_error_not_a_bug(self):
         log = self.unit_dir / "conversation.jsonl"
         log.mkdir()
-        for argv in (("pending", self.unit_arg), ("wait", self.unit_arg, "--timeout", "1"), ("reply", self.unit_arg)):
+        for argv in (("pending", self.unit_arg), ("reply", self.unit_arg)):
             with self.subTest(argv[0]):
                 code_, _, err = self.cli(*argv, stdin="hi")
                 self.assertEqual(code_, 1, err)
-                if argv[0] != "wait":  # wait finds no served page first
-                    self.assertIn("conversation.jsonl", err)
+                self.assertIn("conversation.jsonl", err)
                 self.assertNotIn("bug in", err)
         log.rmdir()
         log.write_text("")
@@ -657,41 +676,6 @@ class VerbsTest(Fixture):
                             got = [{k: v for k, v in t.items() if k != "at"} for t in got]
                         self.assertEqual(got, expected)
 
-    def test_wait_prints_the_users_events_saves_its_place_and_times_out_with_exit_3(self):
-        _, host = self.serve()
-        sender = threading.Timer(0.5, lambda: self.rpc(host, "note", {"id": "m1", "text": "hi", "to": None}))
-        sender.start()
-        code_, out, _ = self.cli("wait", self.unit_arg, "--timeout", "20")
-        self.assertEqual(code_, 0)
-        self.assertEqual(json.loads(out.splitlines()[-1])["id"], "m1")  # the server, in this process, prints it too
-        receipt = json.loads((self.unit_dir / ".page-wait").read_text())
-        self.assertEqual(receipt["position"], 1)
-        # the agent's own events are not printed, and nothing new ends in exit 3
-        self.cli("reply", self.unit_arg, stdin="ok")
-        started = time.time()
-        code_, out, err = self.cli("wait", self.unit_arg, "--timeout", "1")
-        self.assertEqual(code_, 3)
-        self.assertIn("no new action before the timeout", err)
-        self.assertLess(time.time() - started, 60)
-
-    def test_wait_defaults_to_600_seconds_in_every_skill_S34(self):
-        parser = cli._parser(cli.load(resources.build_info()), resources.build_info())
-        self.assertEqual(parser.parse_args(["wait", "x"]).timeout, 600)
-
-    def test_wait_says_what_to_run_when_nothing_is_served(self):
-        code_, _, err = self.cli("wait", self.unit_arg, "--timeout", "1")
-        self.assertEqual(code_, 1)
-        self.assertIn("no page is served", err)
-        self.assertIn("run serve", err)
-
-    def test_a_corrupt_address_file_is_a_one_line_refusal_naming_the_file(self):
-        (self.unit_dir / ".server").write_text("not an address")
-        code_, _, err = self.cli("wait", self.unit_arg, "--timeout", "1")
-        refusal = [line for line in err.splitlines() if not line.startswith("warning:")]
-        self.assertEqual(code_, 1, err)
-        self.assertEqual(len(refusal), 1, err)
-        self.assertIn(".server: does not hold an address", refusal[0])
-
     def test_a_skill_without_a_page_refuses(self):
         with mock.patch.object(page, "PAGES", {}):
             code_, _, err = self.cli("pending", self.unit_arg)
@@ -726,20 +710,7 @@ class ServeTest(Fixture):
         thread.join(15)
         self.assertEqual(result, [0])
         self.assertFalse((self.unit_dir / ".server").exists())
-        self.assertEqual((self.unit_dir / ".conversation-seen").read_text(), "0")
         self.opened.assert_not_called()
-
-    def test_serve_without_a_flag_opens_no_browser_and_open_opens_one(self):
-        thread, result, url, *_ = self.run_serve("--once")
-        self.get(url.removeprefix("http://").rstrip("/"), "/")
-        thread.join(15)
-        self.opened.assert_not_called()
-        thread, result, url, out, _ = self.run_serve("--once", "--open")
-        self.get(url.removeprefix("http://").rstrip("/"), "/")
-        thread.join(15)
-        self.opened.assert_called_once()
-        self.assertRegex(self.opened.call_args.args[0], "^" + url + r"#t=[\w-]{32,}$")
-        self.assertFalse((self.unit_dir / ".server-token").exists())  # gone with the server
 
     def test_a_port_in_use_is_a_refusal_in_one_line_not_a_bug(self):
         """S29, S30: an address that is taken is not an internal error, as it was not for the scripts before."""
@@ -750,13 +721,10 @@ class ServeTest(Fixture):
         code_, out, err = self.cli("serve", self.unit_arg, "--no-browser", "--port", str(busy.getsockname()[1]))
         self.assertEqual(code_, 1)
         self.assertNotIn("bug in better.pyz", err)
-        refusal = [line for line in err.splitlines() if not line.startswith("warning:")]
-        self.assertEqual(len(refusal), 1, err)
-        self.assertRegex(refusal[0], r"cannot be served on port \d+ \(.*(in use|ddress).*\)\. ")
+        lines = [line for line in out.splitlines() if line.startswith("driver:")]
+        self.assertEqual(len(lines), 1, out)
+        self.assertRegex(lines[0], r"^driver: off refused: .*cannot be served on port \d+ \(.*(in use|ddress).*\)\. ")
         self.assertFalse((self.unit_dir / ".server").exists())
-
-    def test_open_and_no_browser_together_are_a_usage_error(self):
-        self.assertEqual(self.cli("serve", self.unit_arg, "--open", "--no-browser")[0], 2)
 
     def test_serve_warns_on_an_invalid_record_and_still_serves_S72(self):
         self.seed({"type": "note", "by": "user", "id": "m1"})  # no text
@@ -778,7 +746,6 @@ class ServeTest(Fixture):
         thread.join(20)
         self.assertFalse(thread.is_alive())
         self.assertEqual(result, [0])
-        self.assertIn("exiting", out.getvalue())
         self.assertFalse((self.unit_dir / ".server").exists())
 
 

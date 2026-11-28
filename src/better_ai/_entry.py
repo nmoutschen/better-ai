@@ -44,7 +44,7 @@ def main() -> int:
     except BaseException as error:  # an import error in the package itself: still the one bug line
         skill, hash = _build()
         return report_bug(skill, hash, error)
-    return cli.main()
+    return cli.main(detach=True)
 
 
 if __name__ == "__main__":
