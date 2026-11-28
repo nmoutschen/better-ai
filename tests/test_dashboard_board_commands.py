@@ -233,7 +233,9 @@ class Reply(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             self.comment(folder)
-            done = run(folder, "reply", str(folder), "--to", "m-1", stdin="T2 holds the schema.", process=True)
+            done = run(
+                folder, "reply", str(folder), "--to", "m-1", "--read", "0", stdin="T2 holds the schema.", process=True
+            )
             self.assertEqual(done.returncode, 0, done.stderr)
             events = lines(folder / "conversation.jsonl")
             self.assertEqual([e["type"] for e in events], ["comment", "reply", "status"])
@@ -244,7 +246,9 @@ class Reply(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             self.comment(folder)
-            asked = run(folder, "reply", str(folder), "--to", "m-1", "--state", "asked", stdin="Which T2?")
+            asked = run(
+                folder, "reply", str(folder), "--to", "m-1", "--state", "asked", "--read", "0", stdin="Which T2?"
+            )
             self.assertEqual(asked.returncode, 0, asked.stderr)
             self.assertEqual(self.statuses(folder), [("m-1", "asked")])
 

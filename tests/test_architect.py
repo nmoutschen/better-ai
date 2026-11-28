@@ -640,13 +640,15 @@ class Architect(unittest.TestCase):
                 "text": "Design approved",
             }
         )
-        self.assertIn('"id": "A1"', self.command("pending"))
-        self.assertIn("Marked working: A1", self.command("status", "working", "A1"))
-        self.command("reply", "--to", "A1", "--state", "working", stdin="Checking the server.")
+        listed = self.command("pending")
+        self.assertIn('"id": "A1"', listed)
+        read = listed.split("--read ")[1].split()[0]  # the line pending read up to, which the agent passes (D12)
+        self.assertIn("Marked working: A1", self.command("status", "working", "A1", "--read", read))
+        self.command("reply", "--to", "A1", "--state", "working", "--read", read, stdin="Checking the server.")
         item = next(json.loads(line) for line in self.command("pending").splitlines() if '"id": "A1"' in line)
         self.assertEqual(item["status"], "working")
         self.assertEqual(item["thread"][0]["text"], "Checking the server.")
-        self.command("status", "done", "A1")
+        self.command("status", "done", "A1", "--read", read)
         self.assertNotIn('"id": "A1"', self.command("pending"))
 
     def test_the_page_declares_the_capabilities_its_events_need(self):

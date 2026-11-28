@@ -594,7 +594,9 @@ class VerbsTest(Fixture):
         code_, out, _ = self.cli("reply", self.unit_arg, "--to", "m1", stdin="ok")
         self.assertEqual(code_, 1)  # no such item
         self.seed({"type": "note", "by": "user", "id": "m1", "text": "q", "to": None})
-        self.assertIn("Reply shown in the page.", self.cli("reply", self.unit_arg, "--to", "m1", "--read", "0", stdin="ok")[1])
+        self.assertIn(
+            "Reply shown in the page.", self.cli("reply", self.unit_arg, "--to", "m1", "--read", "0", stdin="ok")[1]
+        )
         server.shutdown()
         server.server_close()  # the address file stays, as after a SIGKILL
         self.assertTrue((self.unit_dir / ".server").exists())
@@ -613,7 +615,9 @@ class VerbsTest(Fixture):
         self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--read", "0", stdin="Which size?")[0], 0)
         self.assertEqual([e["type"] for e in self.log()], ["note", "reply", "status"])
         self.assertEqual(self.log()[-1]["status"], "done")
-        self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m1", "--state", "asked", "--read", "0", stdin="More?")[0], 0)
+        self.assertEqual(
+            self.cli("reply", self.unit_arg, "--to", "m1", "--state", "asked", "--read", "0", stdin="More?")[0], 0
+        )
         self.assertEqual(self.log()[-1]["status"], "asked")
         code_, _, err = self.cli("reply", self.unit_arg, "--to", "nope", stdin="x")
         self.assertEqual(code_, 1)
@@ -764,7 +768,10 @@ class VerbsTest(Fixture):
 
     def test_status_and_reply_to_without_read_are_refused_and_write_nothing_S2(self):
         self.seed({"type": "note", "by": "user", "id": "m1", "text": "a", "to": None})
-        for argv, stdin in ((("status", self.unit_arg, "seen", "m1"), ""), (("reply", self.unit_arg, "--to", "m1"), "x")):
+        for argv, stdin in (
+            (("status", self.unit_arg, "seen", "m1"), ""),
+            (("reply", self.unit_arg, "--to", "m1"), "x"),
+        ):
             with self.subTest(argv[0]):
                 code_, _, err = self.cli(*argv, stdin=stdin)
                 self.assertEqual(code_, 1, err)

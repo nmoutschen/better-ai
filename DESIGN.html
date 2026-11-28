@@ -1508,7 +1508,8 @@ function pageTime(at) {
 // a worker's `closed`, a decision from pageDecisionEvents (your turn while it waits), the user's action that is no
 // message to the agent (such as a verdict or a confirmation: closed by the user), or anything else the page shows (done). An answer names its decision; the rest name the thread, or a message in it, in `to`.
 // An agent status counts only if its `read` (the log index of the last event the agent was shown) covers the user's
-// latest event in the thread; a status without `read` counts (logs before `read`). Indexes are the conversation log's
+// latest event in the thread; a status without `read` counts (logs before `read`), and a done without it closes the
+// thread as your ✓ does (D13). Indexes are the conversation log's
 // own: pageDecisionEvents keeps each event's in `_i`.
 var PAGE_CONTROL = ['status', 'accept', 'accepted', 'reopen', 'delete'];
 function pageThreads(log, itemKinds) {
@@ -1566,7 +1567,11 @@ function pageThreads(log, itemKinds) {
         // A thread you closed changes only when you act on it again.
         var was = t.state + t.step;
         if (e.status === 'asked') t.state = 'you';
-        else if (e.status === 'done') t.state = 'done';
+        else if (e.status === 'done') {
+          t.state = 'done';
+          // A done from before `read` (an old log) closes the thread as your ✓ does: in All, not in Open (D13).
+          if (typeof e.read !== 'number') t.closedByUser = true;
+        }
         else if (t.state === 'agent' && (e.status === 'seen' || e.status === 'working')) t.step = e.status;
         if (t.state + t.step !== was) t.since = e.at;
       }

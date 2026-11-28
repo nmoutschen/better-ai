@@ -352,7 +352,7 @@ class Served(unittest.TestCase):
         """Issue #120: such a message waited at the bottom of the page for good. page.test.js checks it leaves Open."""
         self.assertEqual(run(self.root, "reply", ".design/pay", stdin="Which size first?").returncode, 0)
         started = next(e["id"] for e in self.log() if e["type"] == "reply")
-        done = run(self.root, "status", ".design/pay", "done", started)
+        done = run(self.root, "status", ".design/pay", "done", started, "--read", "0")
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual((self.log()[-1]["type"], self.log()[-1]["to"]), ("status", started))
 

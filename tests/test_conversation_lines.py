@@ -105,7 +105,9 @@ class ConversationLines(unittest.TestCase):
         done = better.call("code-better", "pending", str(folder))
         listed = [json.loads(line) for line in done.stdout.splitlines()[:-1]]
         self.assertEqual([(e["id"], e["status"]) for e in listed], [("m1", "new")], done.stderr)
-        self.assertEqual(done.stdout.splitlines()[-1], "1 not done. Pass --read 3 to status and reply.")  # the cut-off line counts
+        self.assertEqual(
+            done.stdout.splitlines()[-1], "1 not done. Pass --read 3 to status and reply."
+        )  # the cut-off line counts
         self.served("code dashboard", unit, dashboard.SPEC, dashboard.load(unit))
         self.wait_counts_the_cut_off_line(folder, unit)
 

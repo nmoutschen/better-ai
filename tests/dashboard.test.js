@@ -463,7 +463,7 @@ const DASH_LOG = {
     deadline: '2026-11-28T13:00:00Z', raised_by: 'builder-t4', task: 'T4' }],
   conversation: [
     { type: 'comment', id: 'c1', on: { kind: 'task', id: 'T4', title: 'T4 Six pages' }, text: 'Check the canvas too.', by: 'user', at: at(2) },
-    { type: 'reply', id: 'r1', to: 'c1', text: 'Done.', by: 'coordinator', at: at(1) }, { type: 'status', to: 'c1', status: 'done', by: 'coordinator', at: at(1) },
+    { type: 'reply', id: 'r1', to: 'c1', text: 'Done.', by: 'coordinator', at: at(1) }, { type: 'status', to: 'c1', status: 'done', by: 'coordinator', read: 0, at: at(1) },
   ],
 };
 

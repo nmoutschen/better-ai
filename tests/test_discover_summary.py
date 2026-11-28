@@ -43,8 +43,9 @@ def put_json(unit: Path, name: str, record: dict) -> None:
     path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
 
-def status(to, state="done"):
-    return {"type": "status", "at": R.AT, "by": R.COORD, "to": to, "status": state}
+def status(to, state="done", read=9):
+    """The agent's status, with the `read` every status now carries (D12): past each short log here, all of it read."""
+    return {"type": "status", "at": R.AT, "by": R.COORD, "to": to, "status": state, "read": read}
 
 
 def reply(to, ident="rp1"):

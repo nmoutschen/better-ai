@@ -219,9 +219,10 @@ class PageContract(unittest.TestCase):
                 self.assertEqual(refused["error"]["code"], -32602)
                 self.assertIn("by", refused["error"]["message"])
                 self.assertEqual(log.read_text(), saved)
+                last = str(len(log.read_text().splitlines()) - 1)  # the agent read the whole log (D12)
                 for verb, extra, text in (
                     ("wait", ["--timeout", "10"], None),
-                    ("reply", ["--to", "m-x"], "seen it"),
+                    ("reply", ["--to", "m-x", "--read", last], "seen it"),
                     ("status", ["accepted", "m-x", "--text"], "fine"),
                     ("pending", [], None),
                 ):  # the agent's side, with this skill's events schema
