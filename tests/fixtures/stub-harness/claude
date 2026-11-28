@@ -72,7 +72,7 @@ def run_commands(message):
     for number, template in enumerate(json.loads(os.environ["STUB_COMMANDS"])):
         command = template.replace("{python}", shlex.quote(python)).replace("{pyz}", shlex.quote(pyz))
         command = command.replace("{unit}", unit)
-        request = {"subtype": "can_use_tool", "tool_name": "Bash", "input": {"command": command}}
+        request = {"subtype": "can_use_tool", "tool_name": "Bash", "input": {"command": command, "description": "Run a page verb"}}
         say({"type": "control_request", "request_id": f"verb-{number}", "request": request})
         response = json.loads(sys.stdin.readline()).get("response", {}).get("response", {})
         code = None

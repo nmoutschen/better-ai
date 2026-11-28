@@ -223,7 +223,7 @@ class TurnsTest(Flow):
 
 
 class StopStartTest(Flow):
-    def test_stop_denies_the_open_approval_ends_the_harness_and_holds_comments_until_start(self):  # S19, S20, S43, S89
+    def test_stop_denies_the_open_approval_ends_the_harness_and_holds_comments_until_start(self):  # S19, S20, S43
         self.start("ask")
         self.an_approval()
         first = self.state()["child_pid"]
@@ -232,7 +232,7 @@ class StopStartTest(Flow):
         self.assertTrue(self.state_is("stopped"), self.agent())
         self.assertTrue(self.stopped_process(first, 5), "the harness is still running 5 s after Stop")
         self.assertEqual(self.agent()["approvals"], [])
-        self.assertIn("stopped by the user", (self.folder / ".driver.log").read_text())
+        self.assertEqual([a.get("reason") for a in self.records("approval")], ["stopped by the user"])
         # a comment while stopped starts nothing
         self.assertEqual(self.call("note", note("m-stopped", "while stopped"))["result"], "saved")
         time.sleep(3)
@@ -275,8 +275,11 @@ class RestartTest(Flow):
         os.kill(server, signal.SIGTERM)
         self.assertTrue(wait_for(lambda: not alive(server), 10))
         self.assertTrue(self.stopped_process(child, 5), "the harness's process group must be gone within 5 s (S47)")
-        text = (self.folder / ".driver.log").read_text()
-        self.assertRegex(text, r"expired|denied", "the open approval is closed with its reason (S43)")
+        approvals = self.records("approval")
+        self.assertTrue(approvals, "the approval is logged")
+        for record in approvals:
+            self.assertIn(record.get("answer"), ("denied", "expired"), "the open approval is closed (S43)")
+            self.assertTrue(record.get("reason"), "with its reason (S43)")
         ended = self.state()["ended"]
         self.assertTrue(ended["reason"])
         done = self.served(env=self.env())
@@ -471,7 +474,8 @@ class LinkTest(Browser):
             source,
         )
 
-    def test_the_page_is_driven_on_only_after_the_tab_paired(self):  # S76
+    def test_serve_with_a_pairing_browser_prints_driver_on_and_pairs_once(self):
+        # S76 itself (driver: on only after pairing) is checked in test_page_pairing_v2, with a browser that never loads.
         done = self.serve_in_browser(self.env())
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertRegex(done.stdout.splitlines()[0], rf"^driver: on claude {UUID}$")
