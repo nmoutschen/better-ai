@@ -996,8 +996,8 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
 
     spot, lift, wraps, need, loops, above = {}, {}, {}, {}, {}, {}
     for node in nodes:
-        start = nodes[node]["type"] == "start"
-        bx, bw = (x[node] + COLW - START, START) if start else (x[node], COLW)
+        is_start = nodes[node]["type"] == "start"
+        bx, bw = (x[node] + COLW - START, START) if is_start else (x[node], COLW)
         spots, own = on_top.get(node, []), selfs.get(node, [])
         here = [
             edges[e]["from"] == node and plans[e][0] == "connector" and (edges[e].get("label") or removable(edges[e]))
@@ -1008,7 +1008,7 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
             14 + max(width(line, LABEL) for line in _label_lines(edges[e])) + 15 if h else 26
             for e, h in zip(spots, here, strict=True)
         ]
-        if start:
+        if is_start:
             xs = [bx + bw / 2] * len(spots)
         elif not own:
             xs = [bx + bw * (i + 1) / (len(spots) + 1) for i in range(len(spots))]
@@ -1020,26 +1020,26 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
         widths, lines = {}, {}
         for i, e in enumerate(spots):
             if here[i]:
-                limit = bx + bw - 12 * len(own) - 6 if own and not start else xs[i] + 14 + GAP - 70
-                limit = min([limit] + [xs[j] - 6 for j in range(i + 1, len(spots)) if plans[spots[j]][0] == "arc"])
-                wraps[e] = min(GAP - 70, max(word(edges[e]), limit - xs[i] - 14))
+                limit = bx + bw - 12 * len(own) - 6 - xs[i] - 14 if own and not is_start else GAP - 70
+                wraps[e] = min(GAP - 70, max(word(edges[e]) + 1, limit))  # + 1: the longest word stays whole
                 lines[i] = _label_lines(edges[e], wraps[e])
                 widths[i] = max(width(line, LABEL) for line in lines[i])
         rises, first = [], None
         if own:
             ends = [xs[i] + 14 + widths[i] + 6 for i in widths]
             first = min(max([bx + bw - 36 - 12 * (len(own) - 1), *ends]), bx + bw - 12 * len(own))
-            rise = 14
-            for edge in own:
-                labelled = edge.get("label") or removable(edge)
+            rise, heights = 14, [15 * len(_label_lines(e)) if e.get("label") or removable(e) else 0 for e in own]
+            for height in heights:
                 rises.append(rise)
-                rise += max(16, 15 * len(_label_lines(edge)) + 3) if labelled else 16
+                need[node] = max(need.get(node, 0), rise + 2, rise - 8 + height)
+                rise += max(16, height + 3)
             loops[node] = (first, rises)
-        # A label that a long word still keeps over the loops' start is lifted above the loops.
+        # A label that a long word still keeps over the loops' start is lifted above the loops. On the start, every
+        # spot is its centre: nothing is lifted.
         tops = [0] * len(spots)
         for i in reversed(range(len(spots))):
             e = spots[i]
-            if plans[e][0] == "arc":
+            if plans[e][0] == "arc" or is_start:
                 continue
             if i in widths:
                 end = xs[i] + 14 + widths[i]
@@ -1049,11 +1049,8 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
                 over += [rises[-1] + 2] if own and end + 2 > first else []
                 lift[e] = max([0] + [t - 15 for t in over])
             tops[i] = lift.get(e, 0) + max(31, 15 + 15 * len(lines.get(i, [])))
-        need[node] = max(tops, default=0)
-        for edge, rise in zip(own, rises, strict=True):
-            labelled = edge.get("label") or removable(edge)
-            need[node] = max(need[node], rise + 2, rise - 8 + 15 * len(_label_lines(edge)) if labelled else 0)
-        if need[node] > 31:  # more than one connector with a one-line label
+        need[node] = max([need.get(node, 0), *tops])
+        if need[node] > 31:  # more than one connector with a one-line label needs
             above[node] = need[node] + 2
     return {
         "plans": plans,
@@ -1089,7 +1086,7 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
             neighbors.setdefault(b, []).append(a)
         incoming[target].append(edge)
         outgoing[source].append(edge)
-        labels[ident] = wrap(edge.get("label", ""), LABEL, GAP - 70) + (["REMOVED"] if removable(edge) else [])
+        labels[ident] = _label_lines(edge)
 
     def last(item):
         """Where an item sits in its column: nodes first, then the edges passing through it, then exits."""
@@ -1187,8 +1184,7 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
     def place_label(ident, anchor_start):
         """The lines of an edge drawn apart, wrapped to its room, and its label's box."""
         loop, edge = loops[ident], edges[ident]
-        lines = wrap(edge.get("label", ""), LABEL, top["wrap"].get(ident, GAP - 70))
-        loop["lines"] = lines = lines + (["REMOVED"] if removable(edge) else [])
+        loop["lines"] = lines = _label_lines(edge, top["wrap"].get(ident, GAP - 70))
         if not edge.get("label") and not removable(edge):
             return
         lx, ly = loop["label_at"]
