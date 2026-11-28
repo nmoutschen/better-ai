@@ -251,7 +251,7 @@ class ChatMode(unittest.TestCase):
         self.assertEqual(sent[-1]["method"], "thread/start")
         self.assertEqual(sent[-1]["params"]["approvalsReviewer"], "auto_review")
         self.assertEqual((events[0].kind, events[0].mode, events[0].session_id), ("ready", "auto", SESSION))
-        _, _, sent, events = open_codex()
+        _, _, sent, events = open_codex("-a", "on-request")
         self.assertEqual(sent[-1]["params"]["approvalsReviewer"], "user")
         self.assertEqual((events[0].kind, events[0].mode), ("ready", "manual"))
         _, _, sent, events = open_codex("-a", "never", policy="never")
@@ -536,6 +536,252 @@ class OtherHarnessesOfferTheirOwnSessionScope(unittest.TestCase):
         self.assertEqual(event.options, ("allow_once", "allow_session", "deny"))
         adapter.answer("r1", "allow_session")
         self.assertEqual(sent[-1]["result"], {"selectedOption": "proceed_always"})
+
+
+def acp_option(config_id, value):
+    return [{"id": config_id, "name": config_id, "type": "select", "currentValue": value, "options": []}]
+
+
+def open_cursor(reported, *chat):
+    """Cursor ACP: approvalMode values allowlist, auto-review and unrestricted (cursor.com/docs/cli/reference/configuration)."""
+    sent = []
+    adapter = candidate("cursor", {}, lambda _: "/bin/agent", chat_argv=("agent", *chat)).codec(sent.append, "s", None)
+    adapter.open("/repo", None)
+    adapter.receive({"id": sent[-1]["id"], "result": {"protocolVersion": 1, "authMethods": [{"id": "cursor_login"}]}})
+    adapter.receive({"id": sent[-1]["id"], "result": {}})
+    events = adapter.receive(
+        {"id": sent[-1]["id"], "result": {"sessionId": "cs1", "configOptions": acp_option("approvalMode", reported)}}
+    )
+    return adapter, sent, events
+
+
+def open_devin(reported, *chat):
+    """Devin permission modes normal, accept-edits, smart, dangerous (docs.devin.ai/cli/reference/permissions)."""
+    sent = []
+    adapter = candidate("devin", {}, lambda _: "/bin/devin", chat_argv=("devin", *chat)).codec(sent.append, "s", None)
+    adapter.open("/repo", None)
+    adapter.receive({"id": sent[-1]["id"], "result": {"protocolVersion": 1}})
+    new = sent[-1]["id"]
+    request = {
+        "sessionId": "ds1",
+        "toolCall": {"toolCallId": "c", "name": "Bash", "rawInput": {"command": "pwd"}},
+        "options": [{"kind": "allow_once", "optionId": "once"}, {"kind": "reject_once", "optionId": "no"}],
+    }
+    adapter.receive({"id": "perm", "method": "session/request_permission", "params": request})
+    events = adapter.receive(
+        {"id": new, "result": {"sessionId": "ds1", "configOptions": acp_option("permission_mode", reported)}}
+    )
+    return adapter, sent, events
+
+
+def open_droid(autonomy, *chat):
+    """Droid autonomy levels off, low, medium, high (docs.factory.com/cli/user-guides/auto-run)."""
+    sent = []
+    adapter = candidate("droid", {}, lambda _: "/bin/droid", chat_argv=("droid", *chat)).codec(sent.append, "s", None)
+    adapter.open("/repo", None)
+    start = sent[-1]
+    header = {"jsonrpc": "2.0", "factoryApiVersion": "1.0.0", "factoryProtocolVersion": "1.332.0"}
+    events = adapter.receive(
+        {
+            **header,
+            "type": "response",
+            "id": start["id"],
+            "result": {
+                "sessionId": "droid-1",
+                "settings": {"autonomyLevel": autonomy, "interactionMode": "auto"},
+            },
+        }
+    )
+    return adapter, start, events, header
+
+
+class OtherHarnessModes(unittest.TestCase):
+    def test_cursor_maps_every_reported_approval_mode(self):  # S11 L1
+        for value, label in (("allowlist", "manual"), ("auto-review", "auto"), ("unrestricted", "skip approvals")):
+            with self.subTest(value=value):
+                _, _, events = open_cursor(value)
+                self.assertEqual((events[0].kind, events[0].mode), ("ready", label))
+        _, _, events = open_cursor("something-new")
+        self.assertEqual((events[0].kind, events[0].outcome), ("failed", "unsafe-mode"))
+        _, _, events = open_cursor(None)
+        self.assertEqual((events[0].kind, events[0].outcome), ("failed", "no-approvals"))
+
+    def test_cursor_is_set_to_the_chat_mode(self):  # S11
+        adapter, sent, events = open_cursor("allowlist", "--auto-review")
+        self.assertEqual(events, ())
+        self.assertEqual(sent[-1]["method"], "session/set_config_option")
+        self.assertEqual(sent[-1]["params"], {"sessionId": "cs1", "configId": "approvalMode", "value": "auto-review"})
+        ready = adapter.receive(
+            {"id": sent[-1]["id"], "result": {"configOptions": acp_option("approvalMode", "auto-review")}}
+        )
+        self.assertEqual((ready[0].kind, ready[0].mode, ready[0].session_id), ("ready", "auto", "cs1"))
+        adapter, sent, _ = open_cursor("allowlist", "--auto-review")
+        refused = adapter.receive(
+            {"id": sent[-1]["id"], "result": {"configOptions": acp_option("approvalMode", "allowlist")}}
+        )
+        self.assertEqual(refused[0].outcome, "unsafe-mode")
+
+    def test_cursor_accepts_a_matching_update_and_refuses_another_mode(self):  # S11
+        adapter, _, _ = open_cursor("auto-review")
+        update = lambda value: {  # noqa: E731
+            "method": "session/update",
+            "params": {
+                "sessionId": "cs1",
+                "update": {"sessionUpdate": "config_option_update", "configOptions": acp_option("approvalMode", value)},
+            },
+        }
+        self.assertEqual(adapter.receive(update("auto-review")), ())
+        self.assertEqual(adapter.receive(update("unrestricted"))[0].outcome, "unsafe-mode")
+
+    def test_devin_maps_every_reported_permission_mode(self):  # S11 L1
+        for value, label in (
+            ("normal", "manual"),
+            ("accept-edits", "accept edits"),
+            ("smart", "auto"),
+            ("dangerous", "skip approvals"),
+        ):
+            with self.subTest(value=value):
+                _, _, events = open_devin(value)
+                self.assertEqual((events[0].kind, events[0].mode), ("ready", label))
+        _, _, events = open_devin("autonomous")
+        self.assertEqual((events[0].kind, events[0].outcome), ("failed", "unsafe-mode"))
+
+    def test_devin_is_set_to_the_chat_mode(self):  # S11
+        adapter, sent, events = open_devin("normal", "--permission-mode", "smart")
+        self.assertEqual(events, ())
+        self.assertEqual(sent[-1]["params"], {"sessionId": "ds1", "configId": "permission_mode", "value": "smart"})
+        ready = adapter.receive(
+            {"id": sent[-1]["id"], "result": {"configOptions": acp_option("permission_mode", "smart")}}
+        )
+        self.assertEqual((ready[0].kind, ready[0].mode), ("ready", "auto"))
+
+    def test_droid_maps_autonomy_and_sets_the_chat_mode(self):  # S11 L1
+        for value, label in (("off", "manual"), ("low", "accept edits")):
+            with self.subTest(value=value):
+                _, start, events, _ = open_droid(value)
+                self.assertNotIn("autonomyLevel", start["params"])
+                self.assertEqual((events[0].kind, events[0].mode), ("ready", label))
+        _, _, events, _ = open_droid("high")
+        self.assertEqual((events[0].kind, events[0].outcome), ("failed", "unsafe-mode"))
+        sent = []
+        adapter = DroidAdapter(sent.append, "accept edits")
+        adapter.open("/repo", None)
+        self.assertEqual(sent[-1]["params"]["autonomyLevel"], "low")
+        header = {"jsonrpc": "2.0", "factoryApiVersion": "1.0.0", "factoryProtocolVersion": "1.332.0"}
+        settings = {"autonomyLevel": "low", "interactionMode": "auto"}
+        ready = adapter.receive(
+            {
+                **header,
+                "type": "response",
+                "id": sent[-1]["id"],
+                "result": {"sessionId": "droid-1", "settings": settings},
+            }
+        )
+        self.assertEqual((ready[0].kind, ready[0].mode), ("ready", "accept edits"))
+        update = {
+            **header,
+            "type": "notification",
+            "method": "droid.session_notification",
+            "params": {"sessionId": "droid-1", "notification": {"type": "settings_updated", "settings": settings}},
+        }
+        self.assertEqual(adapter.receive(update), ())
+        update["params"]["notification"]["settings"] = {"autonomyLevel": "off", "interactionMode": "auto"}
+        self.assertEqual(adapter.receive(update)[0].outcome, "unsafe-mode")
+
+    def test_chat_mode_of_devin_and_cursor_comes_from_their_flags(self):  # S11
+        self.assertEqual(chat_mode("devin", ("devin", "--permission-mode", "accept-edits")), "accept edits")
+        self.assertEqual(chat_mode("devin", ("devin", "--permission-mode=yolo")), "skip approvals")
+        self.assertEqual(chat_mode("devin", ("devin", "--permission-mode", "normal")), "manual")
+        self.assertEqual(chat_mode("cursor", ("agent", "--auto-review")), "auto")
+
+
+class ClaudeGrantsAndPaths(unittest.TestCase):
+    def test_a_set_mode_grant_changes_the_mode_the_session_may_report(self):  # F2 L3
+        _, adapter, _, _ = open_claude()
+        edit = adapter.receive(frame("edit_request"))[0]
+        adapter.answer(edit.request_id, "allow_session")
+        self.assertEqual(adapter.mode, "accept edits")
+        init = frame("system_init_auto", session_id=CLAUDE_SESSION, permissionMode="acceptEdits")
+        self.assertEqual(adapter.receive(init), ())
+        self.assertEqual(adapter.session_id, CLAUDE_SESSION)
+
+    def test_a_grant_without_a_mode_keeps_the_mode(self):  # F2
+        _, adapter, _, _ = open_claude()
+        event = adapter.receive(frame("bash_prefix_request"))[0]
+        adapter.answer(event.request_id, "allow_session")
+        self.assertEqual(adapter.mode, "manual")
+
+    def test_config_paths_in_every_real_form_offer_no_session_scope(self):  # F3 L2
+        paths = (
+            "/home/u/.claude.json",
+            "~/.claude.json",
+            "/repo/.mcp.json",
+            "/home/u/.config/opencode/opencode.json",
+            "~/.config/opencode/agents/x.md",
+            "/repo/.claude/settings.json",
+            ".claude/settings.local.json",
+            "~/.codex/config.toml",
+        )
+        commands = (
+            "echo {} >.claude/settings.local.json",
+            "echo {} >>.claude/settings.local.json",
+            "tee ~/.claude.json",
+            "cat x>.mcp.json",
+            "cp a '.cursor/rules/x'",
+        )
+        _, adapter, _, _ = open_claude()
+        for number, path in enumerate(paths):
+            request = frame("write_request", request_id=f"w{number}")
+            request["request"]["input"]["file_path"] = path
+            self.assertEqual(adapter.receive(request)[0].options, ("allow_once", "deny"), path)
+        for number, command in enumerate(commands):
+            request = frame("bash_prefix_request", request_id=f"b{number}")
+            request["request"]["input"]["command"] = command
+            self.assertEqual(adapter.receive(request)[0].options, ("allow_once", "deny"), command)
+
+    def test_ordinary_paths_still_offer_session_scope(self):  # F3
+        _, adapter, _, _ = open_claude()
+        for number, path in enumerate(
+            ("/repo/notes.txt", "/repo/src/claude.py", "/repo/docs/.claude-plugin-notes.md", "/repo/mcp.json")
+        ):
+            request = frame("write_request", request_id=f"o{number}")
+            request["request"]["input"]["file_path"] = path
+            self.assertIn("allow_session", adapter.receive(request)[0].options, path)
+
+
+class ChatCommandLine(unittest.TestCase):
+    def ps(self, table):
+        def run(command, **_):
+            self.assertIn("-ww", command)
+            line = table.get(command[-1], "")
+            return subprocess.CompletedProcess(command, 0 if line else 1, stdout=line + "\n", stderr="")
+
+        return run
+
+    def test_an_apostrophe_in_the_command_line_keeps_the_mode(self):  # N1
+        table = {"3": "2 /bin/zsh -c x", "2": "1 claude --append-system-prompt it's --permission-mode auto"}
+        self.assertEqual(chat_mode("claude", chat_argv("claude", 3, self.ps(table))), "auto")
+
+    def test_a_node_run_harness_is_found(self):  # N1
+        table = {"3": "2 /bin/zsh -c x", "2": "1 node /opt/lib/node_modules/@anthropic/claude --permission-mode auto"}
+        self.assertEqual(chat_mode("claude", chat_argv("claude", 3, self.ps(table))), "auto")
+
+    def test_a_missing_ps_gives_no_command_line(self):  # N1
+        def missing(*_, **__):
+            raise FileNotFoundError("ps")
+
+        self.assertEqual(chat_argv("claude", 3, missing), ())
+
+
+class CodexWithoutAChatMode(unittest.TestCase):
+    def test_no_reviewer_is_sent_and_either_is_accepted(self):  # N2
+        for reviewer, label in (("user", "manual"), ("auto_review", "auto")):
+            with self.subTest(reviewer=reviewer):
+                _, _, sent, events = open_codex(reviewer=reviewer)
+                self.assertNotIn("approvalsReviewer", sent[-1]["params"])
+                self.assertEqual((events[0].kind, events[0].mode), ("ready", label))
+        _, _, _, events = open_codex(reviewer="guardian_subagent")
+        self.assertEqual(events[0].outcome, "unsafe-mode")
 
 
 class OneProcessAcrossTurns(unittest.TestCase):

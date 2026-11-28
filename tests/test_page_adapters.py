@@ -164,7 +164,7 @@ class AdapterTests(unittest.TestCase):
         adapter.receive({"id": sent[-1]["id"], "result": {"account": {"type": "chatgpt"}}})
         self.assertEqual(sent[-1]["method"], "thread/resume")
         self.assertEqual(sent[-1]["params"]["threadId"], SESSION)
-        self.assertEqual(sent[-1]["params"]["approvalsReviewer"], "user")
+        self.assertNotIn("approvalsReviewer", sent[-1]["params"])
         result = adapter.receive(
             {
                 "id": sent[-1]["id"],
@@ -454,7 +454,12 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(adapter.answer("running", "allow_once"))
 
     def test_cursor_authenticates_and_requires_reported_approval_policy(self):
-        for mode, outcome in (("allowlist", None), ("unrestricted", "unsafe-mode"), (None, "no-approvals")):
+        for mode, outcome in (
+            ("allowlist", None),
+            ("unrestricted", None),
+            ("surprise", "unsafe-mode"),
+            (None, "no-approvals"),
+        ):
             with self.subTest(mode=mode):
                 sent = []
                 plan = candidate("cursor", {}, lambda _: "/bin/agent")
@@ -554,7 +559,6 @@ class AdapterTests(unittest.TestCase):
             {
                 "machineId": "default",
                 "cwd": "/repo",
-                "autonomyLevel": "off",
                 "interactionMode": "auto",
             },
         )
