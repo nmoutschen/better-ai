@@ -93,6 +93,16 @@ CLAUDE_BASH_KEYS = frozenset({"command", "description", "timeout"})
 LOGIN_SHELLS = frozenset({"bash", "sh", "zsh"})
 
 
+# The harnesses whose shell request shape is on record (shell_request): only on these is a call approved without asking.
+AUTO_APPROVING = frozenset({"claude", "codex"})
+NO_FORM = "none: each call is asked on the page"
+
+
+def header_form(harness, command, unit, verbs):
+    """What a turn's header says is approved without asking on `harness` (S95; D24 for the harnesses not on record)."""
+    return approved_form(command, unit, verbs) if harness in AUTO_APPROVING else NO_FORM
+
+
 def shell_request(harness, tool, arguments):
     """(the shell command a tool request runs, whether it runs it as written), or None for a request that runs no
     shell command in a shape on record. ACP and Droid record no shell request shape, so theirs are asked."""

@@ -787,7 +787,6 @@ class LingerTests(Case):
         driver.agent()
         self.assertFalse(driver.idle_expired())
 
-
     def test_work_held_until_a_tab_pairs_does_not_keep_the_page(self):
         # S77 holds the turn until a tab pairs; with no tab, a stopped unit still lingers out (S32) and the idle limit
         # still ends the server (S104). Once a tab pairs, the held turn starts and keeps the page again.

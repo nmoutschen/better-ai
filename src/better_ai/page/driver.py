@@ -16,7 +16,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass, field
 
 from .. import paths, resources
-from .approvals import approved_form, own_call, shell_request, verb_command
+from .approvals import approved_form, header_form, own_call, shell_request, verb_command
 from .delivery import CONTINUE, NOTE, Delivery, ended_label, turn_prompt
 from .driver_state import (
     ACTIVE_DELIVERY,
@@ -941,7 +941,7 @@ class Driver:
         self._turn.note = bool(note)
         prompt = turn_prompt(
             unit=str(self.unit.path),
-            form=approved_form(self.command, self.unit.path, self.verbs),
+            form=header_form(self.harness, self.command, self.unit.path, self.verbs),
             batch=shown,
             triggers=available,
             first=self._opening() if self._first_prompt else "",
