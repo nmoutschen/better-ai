@@ -1305,10 +1305,11 @@ function pageAgents(rows, o) {
   rows = rows.filter(function (r) { return waiting.indexOf(r.who) >= 0; }).concat(rows.filter(function (r) { return waiting.indexOf(r.who) < 0; }));
   var notice = pageAgentNotice();
   pageAgentRows = { rows: given, o: o };
-  // A request from an agent that has no row here, the page's own, has no row to press: a notice with a button instead.
+  // A request from an agent that has no row here, the page's own, has no row to press: a row with its sentence and a button
+  // instead. It is not the state notice, which narrow windows show in the pinned bar, so it stays in the list at every width.
   var own = pageApprovals().filter(function (a) { return !pageAgentState.workers.some(function (w) { return w.name === a.who; }); })[0];
   var list = (notice ? '<li class="notice" role="status"><div>' + pageEscape(notice) + '</div></li>' : '') +
-    (own ? '<li class="notice"><div>' + pageEscape(PAGE_OWN_WAITING) + '<button type="button" class="btn btn--sm" data-approval-for="' + pageEscape(own.who) + '">Open the request</button></div></li>' : '') +
+    (own ? '<li><div>' + pageEscape(PAGE_OWN_WAITING) + '<button type="button" class="btn btn--sm" data-approval-for="' + pageEscape(own.who) + '">Open the request</button></div></li>' : '') +
     rows.map(function (r) {
     var waits = waiting.indexOf(r.who) >= 0;
     var attrs = Object.keys(r.data || {}).map(function (k) { return ' data-' + pageEscape(k) + '="' + pageEscape(r.data[k]) + '"'; }).join('');

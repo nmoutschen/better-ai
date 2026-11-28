@@ -329,11 +329,10 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .pop.center::before { flex:none; }
 .pop.center > * { flex:none; }
 .pop.center .args { flex:0 1 auto; overflow-y:auto; min-height:0; }
-.pop.center .row2 { flex:none; }
+.pop.center .row2 { flex:none; flex-wrap:wrap; }
 .pop .args { margin:0; padding:var(--space-control); background:var(--linen); font:var(--font-code); white-space:pre-wrap; overflow-wrap:anywhere; }
 .pop .ask { margin:0; font:var(--font-message); }
-.pop.center .row2 { flex-wrap:wrap; }
-.agents .notice .btn { display:inline-block; width:auto; margin:var(--space-control) 0 0; border:1px solid var(--umber); background:var(--umber); color:var(--cream); padding:var(--space-tight) var(--space-item); font:var(--font-small-strong); }
+.agents .btn { display:inline-block; width:auto; margin:var(--space-control) 0 0; border:1px solid var(--umber); background:var(--umber); color:var(--cream); padding:var(--space-tight) var(--space-item); font:var(--font-small-strong); }
 /* A details pop-up: a header with what it is (.kind), its title and the full question; then sections, each under a
    section label, ending with the conversation about it. */
 .qpop .hd { padding:var(--space-item) var(--space-edge) var(--space-section); border-bottom:1px solid var(--line); }
