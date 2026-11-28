@@ -1427,8 +1427,9 @@ function pageConversation(o) {
   }
 
   // ---------- Live updates ----------
+  // A close in its undo window counts too: a reload would end its timer, and the close would never be sent.
   function busy() {
-    return !!(noteBox && noteBox.value.trim()) || !!(o.busy && o.busy()) ||
+    return !!(noteBox && noteBox.value.trim()) || !!(o.busy && o.busy()) || Object.keys(closing).length > 0 ||
       Object.keys(drafts).some(function (k) { return !!(drafts[k] || '').trim(); });
   }
   // Lines in the format before this change are one count under the header, the same on every page: kept as they are.
