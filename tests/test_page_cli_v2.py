@@ -285,7 +285,7 @@ class StartTest(Unit):
         state = self.state()
         self.assertEqual(state["harness"], "claude")
         self.assertIsInstance(state["server_pid"], int)
-        self.assertIsInstance(state["server_started"], float)
+        self.assertIsInstance(state["server_started"], str)
         self.assertEqual(state["child_argv"][0], str(STUB / "claude"))
         self.assertTrue(alive(state["child_pid"]))
         self.assertEqual(os.getpgid(state["child_pid"]), state["child_pid"])
@@ -383,7 +383,7 @@ class OffTest(Unit):
     def test_a_note_is_ignored_when_the_driver_is_off(self):  # S141
         self.off(self.serve(env=stub_env(STUB_MODE="login"), stdin="what we agreed"), "login")
         self.assertNotIn("what we agreed", json.dumps(self.state()))
-        self.assertNotIn("note", self.state())
+        self.assertFalse(self.state().get("note"))
 
     def test_each_exit_prints_one_driver_line(self):  # S75
         for changes in ({"CLAUDECODE": None}, {"PATH": ""}, {"STUB_MODE": "old"}, {"BETTER_PAGE_SESSION": "s"}):
@@ -488,29 +488,27 @@ def better_unit(root, folder):
 
 
 class DriverErrorTest(Unit):
-    BOOT = "from better_ai.page import driver\n\ndef boom(self):\n    raise RuntimeError('boom')\n\ndriver.Driver._checkpoint = boom\n"
+    BOOT = "from better_ai.page import driver\n\ndef boom(self, *args):\n    raise RuntimeError('boom')\n\ndriver.Driver._open = boom\n"
 
-    def test_the_same_driver_error_three_times(self):  # S106, S107
+    def test_the_same_driver_error_refuses_the_serve_after_it_came_back_twice(self):  # S106, S107
         first = self.serve(boot=self.BOOT)
         self.assertEqual(first.returncode, 1, first.stdout)
-        self.assertRegex(
-            first.stdout, r"^driver: off driver: RuntimeError: boom; see \S+\.driver\.log\n$|^driver: off driver: boom"
-        )
+        self.assertRegex(first.stdout, r"^driver: off driver: boom; see \S+\.driver\.log\n$")
         self.assertNotIn("the last session ended", first.stderr)
         second = self.serve(boot=self.BOOT)
         self.assertRegex(second.stderr, r"the last session ended at \d\d:\d\d: .*boom")
+        self.assertEqual(self.serve(boot=self.BOOT).returncode, 1)
         self.assertEqual(self.state()["ended"]["repeats"], 2)
-        third = self.serve(boot=self.BOOT)
-        self.assertEqual(third.returncode, 1)
+        fourth = self.serve(boot=self.BOOT)
+        self.assertEqual(fourth.returncode, 1)
         self.assertRegex(
-            third.stdout,
+            fourth.stdout,
             r"^driver: off driver: the same error came back: .*boom; see \S+; this is a better-ai problem\n$",
         )
-        self.assertEqual(self.state()["ended"]["repeats"], 2)
 
     def test_a_changed_build_is_not_refused(self):  # S106
-        self.serve(boot=self.BOOT)
-        self.serve(boot=self.BOOT)
+        for _ in range(3):
+            self.serve(boot=self.BOOT)
         self.assertEqual(self.state()["ended"]["repeats"], 2)
         self.assertEqual(self.serve().returncode, 1)  # the same program: refused
         update = json.loads((self.folder / ".driver").read_text())
@@ -621,7 +619,7 @@ class PendingTest(Unit):
     def test_pending_reads_the_delivered_position_of_driver_state(self):  # S58
         self.write({"type": "note", "id": "n-1", "text": "one", "to": None, "on": {"slide": 1, "part": None}})
         self.write({"type": "reopen", "to": "n-1", "text": "again"})
-        (self.folder / ".driver").write_text(json.dumps({"version": 1, "delivered": 2}))
+        (self.folder / ".driver").write_text(json.dumps({"version": 1, "delivered": {"id": None, "position": 2}}))
         (self.folder / ".driver").chmod(0o600)
         done = self.verb("pending", ".show/deck")
         events = [json.loads(line) for line in done.stdout.splitlines() if line.startswith("{")]

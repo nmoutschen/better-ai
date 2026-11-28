@@ -80,6 +80,18 @@ class FakeDriver:
     def snapshot(self):
         return {"state": "idle", "since": time.time(), "age": 0.0}
 
+    def agent(self):
+        return {"state": "idle", "mark_age": 0.0, "approvals": []}
+
+    def check_alive(self):
+        return True
+
+    def idle_expired(self):
+        return False
+
+    def can_linger(self):
+        return True
+
     def enqueue(self, event):
         pass
 
@@ -151,7 +163,7 @@ class Fixture(unittest.TestCase):
         self.addCleanup(server.shutdown)
         self.conv = conv
         host = f"127.0.0.1:{server.server_address[1]}"
-        driven = page.DrivenPage(server, unit, None, ())
+        driven = page.DrivenPage(server, unit)
         driven.driver, driven.ready = FakeDriver(), True
         paths.write_state(unit, ".server", f"http://{host}/".encode())
         self.tokens[host] = driven.pairing.exchange(driven.pairing.issue(), driven.origin)  # a paired tab

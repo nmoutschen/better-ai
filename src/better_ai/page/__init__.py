@@ -710,7 +710,9 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
     if session and active.get("session") == session:
         found = _active_batch(conv, active)
     else:
-        found = conv.delivery(delivered_position(current_state(unit)))
+        from .driver_state import delivered_position
+
+        found = conv.delivery(delivered_position(current_state(unit).get("delivered"), conv.events()))
     for event in [*found.items, *found.events]:
         run.out(terminal_json(event))
     run.out(f"{len(found.items)} not done.")
@@ -1075,20 +1077,6 @@ def current_state(unit: Unit) -> dict:
     return load_state(unit) or {}
 
 
-def update_state(unit: Unit, **fields) -> None:
-    """Set fields of `.driver` and keep the others, as the driver does."""
-    from .driver_state import STATE, encode, write_private
-
-    write_private(unit, STATE, encode({"version": 1, **current_state(unit), **fields}))
-
-
-def delivered_position(state: dict) -> int:
-    delivered = state.get("delivered")
-    if isinstance(delivered, dict):
-        delivered = delivered.get("position")
-    return delivered if type(delivered) is int and delivered >= 0 else 0
-
-
 def command_of(pid: Any) -> str | None:
     """The command line of a process, or None when there is none such."""
     if type(pid) is not int or pid <= 1:
@@ -1109,15 +1097,6 @@ def is_serve_of(pid: Any, unit: Unit) -> bool:
         return False
     names = (str(unit.path), unit.label)
     return any(w in names or w.endswith("/" + unit.label) for w in words[words.index("serve") + 1 :])
-
-
-def has_command(pid: Any, argv: Any) -> bool:
-    """Whether the process runs this argument list, possibly behind an interpreter, which `ps` shows first."""
-    command = command_of(pid)
-    if not command or not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
-        return False
-    joined = " ".join(argv)
-    return command == joined or command.endswith(" " + joined)
 
 
 def process_gone(pid: int) -> bool:
@@ -1263,22 +1242,20 @@ def run_http(server):
 
 
 class DrivenPage:
-    """What the handlers share with `serve`: the pairing, the approvals and the driver."""
+    """What the handlers share with `serve`: the pairing and the driver."""
 
-    def __init__(self, server, unit, archive, record_verbs):
-        from .approvals import ApprovalGate, Pairing
+    def __init__(self, server, unit):
+        from .approvals import Pairing
 
         self.server, self.unit = server, unit
         self.identity = unit_identity(unit)
         self.origin = f"http://127.0.0.1:{server.server_port}"
         self.driver = None
         self.ready = False
-        self.child_argv: list[str] = []
         self.requests = 0  # the requests served, for `--once`
         self.paired = threading.Event()
         self.routing_lock = threading.RLock()
         self.pairing = Pairing(self.origin)
-        self.gate = ApprovalGate(unit.path, archive=archive, record_verbs=record_verbs)
         server.handler.driven = self
 
     @property
@@ -1294,9 +1271,8 @@ class DrivenPage:
             return f"{self.origin}/#p={self.pairing.issue()}"
 
     def status(self):
-        if self.driver and self.session:
-            return {**self.driver.snapshot(), "harness": self.driver.harness, **self.available_controls()}
-        return {"state": "starting", "age": 0}
+        """The body of /agent, as the driver builds it."""
+        return self.driver.agent() if self.driver and self.session else {"state": "starting", "mark_age": 0}
 
     def alive(self):
         """What `/alive` says without the secret: enough for a verb to know the page has an agent and what it does."""
@@ -1309,33 +1285,25 @@ class DrivenPage:
             "state": snapshot["state"],
             "since": snapshot.get("since"),
             "mark_age": snapshot["age"],
-            "waiting": len(self.gate.snapshot()["approvals"]),
-        }
-
-    def available_controls(self):
-        snapshot = self.driver.snapshot()
-        live = snapshot["age"] <= 3 and snapshot.get("kind") != "driver"
-        return {
-            "can_start": bool(live and snapshot["state"] in ("stopped", "failed")),
-            "can_stop": bool(live and snapshot["state"] in ("idle", "working", "stalled")),
+            "waiting": 1 if snapshot["state"] == "waiting" else 0,
         }
 
     def control(self, method, params):
-        if not self.driver or not self.session or self.driver.snapshot()["age"] > 3:
+        if not self.driver or not self.session:
             raise ValueError("The page's agent driver stopped. Ask the agent in your chat to serve this page again.")
         if method == "permission_answer":
-            return self.gate.answer(params.get("id"), params.get("choice"))
-        if method == "agent_stop" and self.available_controls()["can_stop"]:
+            return bool(self.driver.answer_approval(params.get("id"), params.get("choice")).result(timeout=5))
+        if method == "agent_stop":
             self.driver.request_stop()
             return True
-        if method == "agent_start" and self.available_controls()["can_start"]:
+        if method == "agent_start":
             self.driver.request_start()
             return True
         raise ValueError("Unknown method")
 
-    def close(self):
+    def close(self, kind: str = "stopped", reason: str = "server stopped"):
         if self.driver:
-            self.driver.close()
+            self.driver.close(kind, reason)
 
 
 LINK_SOCKET = ".page-link"
@@ -1441,6 +1409,7 @@ START_TIMEOUT = 25  # seconds from the start of `serve` to its first line
 CALLER_WAIT = 15  # seconds the calling process waits past START_TIMEOUT before it gives up on its server process
 NOTE_WAIT = 2  # seconds `serve` reads the hand-off note from stdin
 STALE_WAIT = 10  # seconds a server with a late liveness mark is given to exit
+DRIVER_GRACE = 5  # seconds a dead driver's last answer stays up for the page
 ERROR_WINDOW = 60  # seconds between two server_error lines in .driver.log
 OFF_KINDS = (
     "no-harness",
@@ -1515,17 +1484,18 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
         try:
             unit = _unit(args, run)
             conv = _conversation(run, unit)
+            from .driver_state import newer_version
+
             state = current_state(unit)
-            if type(state.get("version")) is int and state["version"] > 1:
+            if newer_version(unit):
                 raise Off(
                     "state-version",
                     f"{unit.label}/{DRIVER} was written by a newer better-ai; update better-ai, or delete the file",
                 )
             note = read_note(run)
             settle_old_server(unit, state)
-            end_orphan(unit, state, run.info.hash)
-            report_last_end(run, unit, state)
-            refuse_repeat(unit, state, run.info.hash)
+            report_last_end(run, unit)
+            refuse_repeat(unit, run.info.hash)
         except Refused as error:
             raise Off("refused", str(error)) from None
     except Off as off:
@@ -1620,18 +1590,6 @@ def settle_old_server(unit: Unit, state: dict) -> None:
         remove_if_ours(unit, ADDRESS, address.encode())
 
 
-def end_orphan(unit: Unit, state: dict, build: str) -> None:
-    """The harness process a server of an earlier run left behind: ended, if it is the one `.driver` names."""
-    pid = state.get("child_pid")
-    if type(pid) is not int or pid <= 1 or not has_command(pid, state.get("child_argv")):
-        return
-    end_process(pid, group=True)
-    from .driver_state import record_end
-
-    record_end(unit, "orphan", "orphan", build)
-    update_state(unit, child_pid=None)
-
-
 def clock(moment: Any) -> str:
     """HH:MM, local, of an ISO time."""
     try:
@@ -1641,19 +1599,21 @@ def clock(moment: Any) -> str:
     return when.astimezone().strftime("%H:%M")
 
 
-def driver_error(state: dict) -> dict:
-    ended = state.get("ended")
-    return ended if isinstance(ended, dict) and ended.get("kind") == "driver" else {}
+def driver_error(unit: Unit) -> dict:
+    from .driver_state import last_ended
+
+    ended = last_ended(unit)
+    return ended if ended.get("kind") == "driver" else {}
 
 
-def report_last_end(run: cli.Run, unit: Unit, state: dict) -> None:
-    ended = driver_error(state)
+def report_last_end(run: cli.Run, unit: Unit) -> None:
+    ended = driver_error(unit)
     if ended:
         run.err(f"the last session ended at {clock(ended.get('at'))}: {' '.join(str(ended.get('reason')).split())}")
 
 
-def refuse_repeat(unit: Unit, state: dict, build: str) -> None:
-    ended = driver_error(state)
+def refuse_repeat(unit: Unit, build: str) -> None:
+    ended = driver_error(unit)
     if type(ended.get("repeats")) is int and ended["repeats"] >= 2 and ended.get("build") == build:
         raise Off(
             "driver",
@@ -1720,6 +1680,7 @@ def detach(unit: Unit) -> None:
 def run_server(args, run, unit, conv, note, deadline, signal_fd) -> int:
     """The server process: start the page and its driver, say so to the caller, detach and serve until the unit stops."""
     server = driven = address = serving = None
+    ending = ("stopped", "server stopped")
     told = {"line": False, "done": False}
 
     detached = signal_fd is not None
@@ -1759,7 +1720,7 @@ def run_server(args, run, unit, conv, note, deadline, signal_fd) -> int:
                     ) from None
                 address = f"http://127.0.0.1:{server.server_port}/".encode()
                 archive = Path(sys.argv[0]).resolve() if run.info.hash != "source" else None
-                driven = DrivenPage(server, unit, archive, ("add", "set"))
+                driven = DrivenPage(server, unit)
                 serving = run_http(server)
                 paths.write_state(unit, ADDRESS, address)
                 link = driven.main_link()
@@ -1779,14 +1740,13 @@ def run_server(args, run, unit, conv, note, deadline, signal_fd) -> int:
                     step = "pairing the page in the browser"
                     if not driven.paired.wait(max(0.0, deadline - time.monotonic())):
                         raise Off("timeout", step)
-                record_server(unit, driven)
                 tell(f"driver: on {wanted.name} {driven.session}")
                 tell(f"Serving {unit.label} at {link if show_link else address.decode()}")
                 finish(0)
                 if detached:
                     detach(unit)
                 with link_control(driven):
-                    wait_until_done(args, run, unit, conv, driven)
+                    ending = wait_until_done(args, run, unit, conv, driven)
         except Refused as error:
             raise Off("refused", str(error)) from None
         except (Off, KeyboardInterrupt):
@@ -1797,8 +1757,6 @@ def run_server(args, run, unit, conv, note, deadline, signal_fd) -> int:
             raise Off("driver", f"{type(error).__name__}: {error}") from None
     except Off as off:
         stop_serving(server, serving, driven, unit, address)
-        if off.kind == "driver":
-            note_driver_error(unit, off.text, run.info.hash)
         drop_note(unit)
         off = Off(off.kind, with_log_path(unit, off), off.code)
         if not told["line"]:
@@ -1806,12 +1764,12 @@ def run_server(args, run, unit, conv, note, deadline, signal_fd) -> int:
         finish(off.code)
         return off.code
     except KeyboardInterrupt:
-        stop_serving(server, serving, driven, unit, address)
+        stop_serving(server, serving, driven, unit, address, ("server", "the server was stopped by a signal"))
         if not told["line"]:
             tell(Off("crashed", "serve was stopped while it started").line())
         finish(1)
         return 0
-    stop_serving(server, serving, driven, unit, address)
+    stop_serving(server, serving, driven, unit, address, ending)
     return 0
 
 
@@ -1836,43 +1794,24 @@ def find_harness():
     return wanted
 
 
-def record_server(unit: Unit, driven: DrivenPage) -> None:
-    """Put this server, and the harness command it started, in `.driver` for the next serve and for the verbs."""
-    fields: dict[str, Any] = {
-        "server_pid": os.getpid(),
-        "server_started": time.time(),
-        "child_argv": driven.child_argv,
-    }
-    update_state(unit, **fields)
-
-
 def drop_note(unit: Unit) -> None:
     """A serve that gives `driver: off` leaves no hand-off note behind."""
-    from .driver_state import STATE, encode, write_private
+    from .driver_state import save_state
 
-    state = current_state(unit)
-    if "note" in state:
-        del state["note"]
+    if current_state(unit).get("note"):
         with contextlib.suppress(OSError, Refused):
-            write_private(unit, STATE, encode(state))
+            save_state(unit, {"note": ""})
 
 
 def with_log_path(unit: Unit, off: Off) -> str:
     return f"{off.text}; see {unit.target(DRIVER_LOG)}" if off.kind == "driver" else off.text
 
 
-def note_driver_error(unit: Unit, text: str, build: str) -> None:
-    """Record a driver error that ended a serve."""
-    from .driver_state import record_end
-
-    with contextlib.suppress(OSError, Refused):
-        record_end(unit, "driver", text, build)
-
-
-def stop_serving(server, serving, driven, unit: Unit, address) -> None:
-    """End the harness's process group, close the server and take the address file away if it is still ours."""
+def stop_serving(server, serving, driven, unit: Unit, address, ending=("stopped", "server stopped")) -> None:
+    """End the harness's process group, close the server and take the address file away if it is still ours. `ending`
+    is the kind and reason the page shows as `closed`."""
     if driven:
-        driven.close()
+        driven.close(*ending)
     if server is not None:
         if serving is not None:
             server.shutdown()
@@ -1951,7 +1890,7 @@ def start_driver(driven, candidate, conv, run, deadline, note, archive) -> None:
         step=step if isinstance(step, str) else "",
         handoff=note,
         triggers=lambda: conv.spec.triggers(conv.unit) if conv.spec.triggers else (),
-        approvals=driven.gate,
+        build=run.info.hash,
         valid_session=lambda session: session_id_valid(candidate.name, session),
     )
     remaining = deadline - time.monotonic()
@@ -1968,16 +1907,22 @@ def start_driver(driven, candidate, conv, run, deadline, note, archive) -> None:
     driven.ready = True
 
 
-def wait_until_done(args, run, unit, conv, driven) -> None:
-    """Serve until the unit stops (`--once`: until one request has been answered)."""
+def wait_until_done(args, run, unit, conv, driven) -> tuple[str, str]:
+    """Serve until the unit stops, the driver dies or nobody has used the page for a while (`--once`: until one request
+    has been answered); the kind and reason of the planned end."""
     spec = spec_of(run.skill)
     stopped_at = None
     while True:
         time.sleep(TICK if not args.once else POLL)
         if args.once:
             if driven.requests >= 1:
-                return
+                return "server", "one request was served"
             continue
+        if not driven.driver.check_alive():
+            time.sleep(DRIVER_GRACE)  # the page keeps getting its answer for a moment: the driver stopped
+            return "driver", driven.driver.error() or "the driver stopped"
+        if driven.driver.idle_expired():
+            return "idle", "no page was open for 30 minutes"
         try:
             if spec.tick:
                 spec.tick(unit, conv)
@@ -1992,8 +1937,7 @@ def wait_until_done(args, run, unit, conv, driven) -> None:
         if not stopped:
             stopped_at = None
         if stopped_at is not None and time.monotonic() - stopped_at > args.linger:
-            run.out("The unit stopped; the page server is exiting. The open page keeps the last state.")
-            return
+            return "server", "the unit stopped"
 
 
 def revision_of(*parts: Any) -> str:
