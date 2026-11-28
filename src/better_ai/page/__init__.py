@@ -1522,19 +1522,43 @@ STALE_WAIT = 10  # seconds a server with a late liveness mark is given to exit
 DRIVER_GRACE = 5  # seconds a dead driver's last answer stays up for the page
 CLOSED_GRACE = 5  # seconds the server still answers closed after a planned exit: longer than the page's 2 s poll
 ERROR_WINDOW = 60  # seconds between two server_error lines in .driver.log
-OFF_KINDS = (
-    "no-harness",
-    "login",
-    "not-installed",
-    "version",
-    "state-version",
-    "no-approvals",
-    "no-browser",
-    "crashed",
-    "driver",
-    "refused",
-    "timeout",
-)
+# Each kind a start can fail with: the kind its `driver: off` line shows (one of S75's) and the problem and action it
+# shows when the harness gave no text of its own.
+OFF_REASONS = {
+    "no-harness": (
+        "no-harness",
+        "no harness better-ai can drive runs this command; run serve from Claude Code, Codex, Cursor, Devin, Droid or "
+        "OpenCode",
+    ),
+    "login": ("login", "the harness is not logged in; log in to it in a terminal, then run serve again"),
+    "not-installed": ("not-installed", "the harness's CLI is not on PATH; install it, then run serve again"),
+    "version": ("version", "this version of the harness is not supported; update it, then run serve again"),
+    "state-version": (
+        "state-version",
+        "the unit's .driver file comes from a newer better-ai; update better-ai, then run serve again",
+    ),
+    "no-approvals": (
+        "no-approvals",
+        "the harness does not send its approval requests to better-ai; run serve from another harness",
+    ),
+    "unsafe-mode": (
+        "no-approvals",
+        "the harness runs in a mode that approves tool calls without asking; change its approval mode, then run serve "
+        "again",
+    ),
+    "no-browser": ("no-browser", "could not open a browser on this machine; run serve where your browser runs"),
+    "crashed": ("crashed", "the harness ended while it started; run serve again"),
+    "limit": ("crashed", "the harness reached its usage limit; run serve again after it resets"),
+    "protocol": (
+        "crashed",
+        "the harness sent a message better-ai does not know; update better-ai, or use a harness version it was tested "
+        "with",
+    ),
+    "missing-session": ("crashed", "the harness gave no session to resume; run serve again"),
+    "driver": ("driver", "the page's driver stopped because of an error; run serve again"),
+    "refused": ("refused", "this unit cannot be served; check its path, then run serve again"),
+    "timeout": ("timeout", "the start took too long; run serve again"),
+}
 SERVER_ERROR_SINK: Callable[[str], None] | None = None  # set after serve detaches: where an error a handler hit goes
 
 
@@ -1542,8 +1566,10 @@ class Off(Exception):
     """`serve` cannot go on: it prints `driver: off <kind>: <text>` and exits with `code`."""
 
     def __init__(self, kind: str, text: str, code: int = 1):
+        shown, problem = OFF_REASONS.get(kind, OFF_REASONS["crashed"])
+        text = text if text and text != kind else problem  # a StartError without text reads as its kind
         super().__init__(text)
-        self.kind, self.text, self.code = kind if kind in OFF_KINDS else "crashed", text, code
+        self.kind, self.text, self.code = shown, text, code
 
     def line(self) -> str:
         return f"driver: off {self.kind}: {' '.join(self.text.split())}"
