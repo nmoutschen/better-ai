@@ -463,7 +463,9 @@ class Driver:
             kind = "crashed-again"
         if kind == "login":
             return NOTICES[kind].format(display_name(self.harness))
-        if kind == "not-handling":  # one value, the log's path; the items, final message and denied calls are there (D30)
+        if (
+            kind == "not-handling"
+        ):  # one value, the log's path; the items, final message and denied calls are there (D30)
             return NOTICES[kind].format(details.get("log", self.unit.target(LOG)))
         if kind == "driver":
             return NOTICES[kind].format(message, details.get("log", self.unit.target(LOG)))

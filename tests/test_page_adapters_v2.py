@@ -205,7 +205,9 @@ class DisplayNames(unittest.TestCase):
         from better_ai.page import adapters
 
         found = adapters.candidate("codex", {}, which=lambda command: None)
-        self.assertEqual((found.kind, found.text), ("not-installed", "Codex is not installed. Install it, then serve again."))
+        self.assertEqual(
+            (found.kind, found.text), ("not-installed", "Codex is not installed. Install it, then serve again.")
+        )
 
 
 class ChatMode(unittest.TestCase):

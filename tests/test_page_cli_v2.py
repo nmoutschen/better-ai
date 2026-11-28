@@ -362,7 +362,9 @@ class OffTest(Unit):
 
     def test_not_installed_names_the_harness(self):  # S147
         done = self.serve(env=stub_env(PATH=""))
-        self.assertEqual(self.off(done, "not-installed"), "driver: off not-installed: Claude Code CLI not found on PATH")
+        self.assertEqual(
+            self.off(done, "not-installed"), "driver: off not-installed: Claude Code CLI not found on PATH"
+        )
 
     def test_login(self):  # S75, N6
         line = self.off(self.serve(env=stub_env(STUB_MODE="login")), "login")
@@ -453,7 +455,9 @@ class OffTextTest(unittest.TestCase):
         from better_ai import page
 
         self.assertRegex(page.Off("unsafe-mode", "").line(), r"^driver: off no-approvals: ")
-        self.assertRegex(page.Off("unsafe-mode", "Fix the setting.").line(), r"^driver: off no-approvals: Fix the setting\.$")
+        self.assertRegex(
+            page.Off("unsafe-mode", "Fix the setting.").line(), r"^driver: off no-approvals: Fix the setting\.$"
+        )
 
     def test_a_given_text_is_kept(self):
         from better_ai import page
@@ -465,8 +469,8 @@ class StartFailureTest(Unit):
     def failed_start(self, kind):
         boot = (
             "from better_ai.page import driver\n\n"
-            "def fail(self, deadline):\n    raise driver.StartError(%r)\n\n"
-            "driver.Driver._open = fail\n" % kind
+            f"def fail(self, deadline):\n    raise driver.StartError({kind!r})\n\n"
+            "driver.Driver._open = fail\n"
         )
         done = self.serve(boot=boot)
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)

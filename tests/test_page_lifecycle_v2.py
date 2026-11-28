@@ -328,13 +328,12 @@ class DriverErrorTest(Flow):
         self.assertEqual(self.state()["ended"]["repeats"], 1)
         self.assertEqual(self.launches(), [], "no harness ran")
 
-
     def test_a_driver_error_while_served_keeps_its_reason_in_ended_and_on_the_page(self):  # S62, B2
         flag = self.root / "boom.flag"
         boot = (
             "import os\nfrom better_ai.page import driver\n\n_check = driver.Driver._check_unit\n\n"
-            "def check(self):\n    if os.path.exists(%r):\n        raise RuntimeError('boom')\n    _check(self)\n\n"
-            "driver.Driver._check_unit = check\n" % str(flag)
+            f"def check(self):\n    if os.path.exists({str(flag)!r}):\n        raise RuntimeError('boom')\n    _check(self)\n\n"
+            "driver.Driver._check_unit = check\n"
         )
         done = self.served(env=self.env(), boot=boot)
         self.secret = self.pair(done)

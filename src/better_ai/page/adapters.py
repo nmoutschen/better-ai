@@ -656,7 +656,9 @@ def candidate(
     command, _ = _HARNESSES[name]
     executable = which(command[0])
     if executable is None:
-        return Candidate(name, (), "not-installed", text=f"{display_name(name)} is not installed. Install it, then serve again.")
+        return Candidate(
+            name, (), "not-installed", text=f"{display_name(name)} is not installed. Install it, then serve again."
+        )
     chat = _resolve_chat(name, chat_argv)
     at = HARNESS_FACTS[name].flags_at or len(command)
     argv = (executable, *command[1:at], *(chat.argv if chat else ()), *command[at:])

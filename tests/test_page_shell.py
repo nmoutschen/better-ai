@@ -804,7 +804,9 @@ class EndingTest(Fixture):
 
         unit, _, server, serving, driven, host = self.driven_page(Closing())
         stopper = threading.Thread(
-            target=page.stop_serving, args=(server, serving, driven, unit, None, ("idle", "no page was open")), daemon=True
+            target=page.stop_serving,
+            args=(server, serving, driven, unit, None, ("idle", "no page was open")),
+            daemon=True,
         )
         with mock.patch.object(page, "CLOSED_GRACE", 10, create=True):
             stopper.start()
@@ -860,9 +862,9 @@ class LinkReplyTest(Fixture):
 class FakeDriverShapeTest(unittest.TestCase):
     def test_each_fake_driver_has_the_members_of_driver_in_the_same_shape(self):
         """A fake that calls a property as a method, or the reverse, hides a TypeError of the real one (B2)."""
-        from better_ai.page.driver import Driver
-
         import test_page_pairing_v2
+
+        from better_ai.page.driver import Driver
 
         source = inspect.getsource(Driver)
 

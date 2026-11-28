@@ -2056,7 +2056,9 @@ def start_driver(driven, candidate, conv, run, deadline, note, archive) -> None:
         if time.monotonic() >= deadline:
             raise Off("timeout", "starting the agent's session") from None
         if error.kind == "login":
-            raise Off("login", f"log in to {display_name(candidate.name)} in a terminal, then run serve again") from None
+            raise Off(
+                "login", f"log in to {display_name(candidate.name)} in a terminal, then run serve again"
+            ) from None
         raise Off(error.kind, str(error)) from None
     driven.ready = True
 
