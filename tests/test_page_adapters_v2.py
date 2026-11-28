@@ -665,7 +665,7 @@ class OtherHarnessModes(unittest.TestCase):
         self.assertEqual((ready[0].kind, ready[0].mode), ("ready", "auto"))
 
     def test_droid_maps_autonomy_and_sets_the_chat_mode(self):  # S11 L1
-        for value, label in (("off", "off"), ("low", "low"), ("medium", "medium"), ("high", "high")):
+        for value, label in (("off", "manual"), ("low", "low"), ("medium", "medium"), ("high", "high")):
             with self.subTest(value=value):
                 _, start, events, _ = open_droid(value)
                 self.assertNotIn("autonomyLevel", start["params"])
@@ -950,6 +950,20 @@ class UnknownMessages(unittest.TestCase):
                 known = {"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": "other"}}
                 self.assertEqual(adapter.receive(known), ())
                 self.assertEqual(adapter.receive({"jsonrpc": "2.0", "method": "_vendor/notice", "params": {}}), ())
+
+    def test_documented_vendor_messages_are_not_unknown(self):
+        # verifier-t5c V1: Cursor's ACP extensions (https://cursor.com/docs/cli/acp) and Claude's
+        # SDKConversationResetMessage are defined messages, so they must never count as unknown.
+        cursor = candidate("cursor", {}, lambda found: f"/bin/{found}").codec(lambda _: None, "s", None)
+        for method in ("cursor/update_todos", "cursor/task", "cursor/generate_image"):
+            with self.subTest(method=method):
+                self.assertEqual(cursor.receive({"jsonrpc": "2.0", "method": method, "params": {"sessionId": "s"}}), ())
+        for number, method in enumerate(("cursor/ask_question", "cursor/create_plan")):
+            with self.subTest(method=method):
+                request = {"jsonrpc": "2.0", "id": 900 + number, "method": method, "params": {"sessionId": "s"}}
+                self.assertEqual(cursor.receive(request), ())
+        _, claude, _, _ = open_claude()
+        self.assertEqual(claude.receive({"type": "conversation_reset", "session_id": SESSION}), ())
 
     def test_droid(self):
         adapter = DroidAdapter(lambda _: None)
