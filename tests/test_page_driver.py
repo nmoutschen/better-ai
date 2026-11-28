@@ -80,7 +80,10 @@ class Unit:
 class Batch:
     def __init__(self, items, events, position):
         self.items, self.events, self.position = items, events, position
-        self.read = position - 1  # the line the batch shows last, as Delivery holds it
+        self.last, self.unread = (
+            position - 1,
+            {},
+        )  # the log's last line, and no thread waiting unread, as Delivery holds
 
     def prompt_items(self):
         return self.items

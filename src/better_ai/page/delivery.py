@@ -2,7 +2,8 @@
 
 import json
 import shlex
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 # An item's status in a batch, as `pending` prints it: its thread's step (new, seen or working) while it is the agent's
 # turn, else asked (the user's turn) or done (page `threads`, the one thread state machine).
@@ -52,10 +53,23 @@ def item_entry(item: dict, state: str, extra: dict) -> dict:
 
 @dataclass(frozen=True)
 class Delivery:
+    """A batch for the agent: ITEMS and EVENTS as `pending` prints them, read from the log's first POSITION lines.
+    LAST is the log's last line then, and UNREAD names each thread waiting on the agent unread with the line of the
+    user's first write in it that no read covers (page `unread_from`)."""
+
     items: list[dict]
     events: list[dict]
     position: int
-    read: int = -1  # the line of the last event the batch shows, which the agent passes as --read
+    last: int = -1
+    unread: Mapping[str, int] = field(default_factory=dict)
+
+    @property
+    def read(self) -> int:
+        """The --read the agent passes: the last line, or the line before the first unread write in a thread the batch
+        does not show (thread.tla A2). It follows ITEMS, so a batch the driver cuts down reads no further than it
+        shows."""
+        shown = {item.get("id") for item in self.items}
+        return min([self.last, *(line - 1 for ident, line in self.unread.items() if ident not in shown)])
 
     def prompt_items(self) -> list[dict]:
         if len(self.items) <= MOST:
@@ -99,13 +113,16 @@ def select(
     *,
     admitted_edits: set[tuple[str, str]] | None = None,
     all_working: bool = False,
-    read_only: frozenset[str] = frozenset(),
+    every_turn: bool = False,
+    unread: Mapping[str, int] | None = None,
+    answered: frozenset[int] = frozenset(),
 ) -> Delivery:
     """The items the agent may be given: those new (the user wrote in the thread: a new item, an answer, a follow-up, a
-    reopen), those seen only by a --read that covered them (READ_ONLY: no status of the agent's since the user's latest
-    event, so it may never have been delivered), an edited one that is not settled, the items the last normal turn left
-    seen, those an abnormal end left seen or working, and, with `all_working`, every item still working. Never one asked
-    or done (SETTLED), also when the user edits it. ITEMS are page `all_items`."""
+    reopen), an edited one that is not settled, the items the last normal turn left seen, those an abnormal end left
+    seen or working, with `all_working` every item still working, and with `every_turn` every item that is the agent's
+    turn. Never one asked or done (SETTLED), also when the user edits it. ITEMS are page `all_items`. The events are
+    the user's after AFTER, but those on lines in ANSWERED, which the agent has read and answered. UNREAD is page
+    `unread_from`, for the batch's --read."""
     if after > len(events):
         after = 0
     updated = _updated_items(events, item_types, after)
@@ -117,7 +134,7 @@ def select(
         status = entry["status"]
         if (
             status in READY
-            or (status == "seen" and item["id"] in read_only)
+            or (every_turn and status in ("new", "seen", "working"))
             or ((item["type"], item["id"]) in updated and status not in SETTLED)
             or (status == "seen" and item["id"] in carry_ids)
             or (status in ("seen", "working") and item["id"] in recover_ids)
@@ -128,14 +145,15 @@ def select(
     # A note attached to another item is a user event, even when the parent is working and cannot be delivered.
     other = [
         event
-        for event in events[after:]
+        for line, event in enumerate(events[after:], after)
         if from_user(event)
+        and line not in answered
         and (
             event.get("type") not in item_types
             or (event.get("type") == "note" and event.get("to") and event.get("id") not in item_ids)
         )
     ]
-    return Delivery(selected, other, len(events), len(events) - 1)
+    return Delivery(selected, other, len(events), len(events) - 1, dict(unread or {}))
 
 
 def turn_prompt(

@@ -450,23 +450,16 @@ class Conversation:
         admitted_edits: set[tuple[str, str]] | None = None,
         thread_parents: dict[str, str] | None = None,
         all_working: bool = False,
+        every_turn: bool = False,
     ) -> delivery.Delivery:
-        """The batch `pending` prints and a turn carries (delivery.select). THREAD_PARENTS, when given, is filled with
-        the thread each message id belongs to, so the driver can admit an item by an answer or a reply under it."""
+        """The batch a turn carries (delivery.select), and with `every_turn` the one `pending` prints outside a page
+        session. THREAD_PARENTS, when given, is filled with the thread each message id belongs to, so the driver can
+        admit an item by an answer or a reply under it."""
         events = self.events()
-        home, user_at = {}, {}
-        for t in threads(events, self.items):
-            user_at[t["id"]] = t["user_at"]
-            home.update((m["id"], t["id"]) for m in t["messages"] if isinstance(m.get("id"), str))
+        found = threads(events, self.items)
+        home = {m["id"]: t["id"] for t in found for m in t["messages"] if isinstance(m.get("id"), str)}
         if thread_parents is not None:
             thread_parents.update((i, t) for i, t in home.items() if i != t)
-        # A thread is seen by the agent's own status, or by a --read that covers the user's latest event in it (page
-        # `threads`); one seen only by a read may never have been delivered, so it is ready again.
-        marked = {
-            home[e["to"]]
-            for n, e in enumerate(events)
-            if e.get("type") == "status" and not from_user(e) and e.get("to") in home and n > user_at[home[e["to"]]]
-        }
         return delivery.select(
             events,
             all_items(events, self.items, self.agent),
@@ -476,7 +469,9 @@ class Conversation:
             recover_ids,
             admitted_edits=admitted_edits,
             all_working=all_working,
-            read_only=frozenset(user_at) - marked,
+            every_turn=every_turn,
+            unread=unread_from(events, found, self.items),
+            answered=answered(events, home),
         )
 
     def has(self, event: dict) -> bool:
@@ -841,8 +836,7 @@ def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tup
     call these."""
     found = []
     for t in threads(events, item_types):
-        held = [m for m in t["messages"] if m.get("by") == "user" and m.get("type") in (*item_types, "reopen")]
-        if t["deleted"] or not held:
+        if t["deleted"] or not _held(t, item_types):
             continue
         root = {k: v for k, v in t["root"].items() if k != LINE}
         extra: dict[str, Any] = {"step": t["step"], "since": t["since"], "closed_by_user": t["closed_by_user"]}
@@ -863,10 +857,88 @@ def all_items(events: list, item_types: tuple[str, ...], agent: str) -> list[tup
     return found
 
 
+def _held(t: dict, item_types: tuple[str, ...]) -> bool:
+    """Whether a thread holds an item of the user's: the threads `all_items` gives, and `pending` lists."""
+    return any(m.get("by") == "user" and m.get("type") in (*item_types, "reopen") for m in t["messages"])
+
+
+def _lines(events: list) -> dict[int, int]:
+    """Each event's line, by the identity of the dict `threads` keeps of it: its LINE, or its place in EVENTS."""
+    found = {}
+    for index, e in enumerate(events):
+        line = e.get(LINE) if isinstance(e, dict) else None
+        found[id(e)] = line if isinstance(line, int) and not isinstance(line, bool) else index
+    return found
+
+
+def _thread_reads(events: list, found: list[dict]) -> int:
+    """The highest `read` the fold (`threads`) counts: every agent event's, but a status's on a thread that held nothing
+    of the user's yet, such as the agent's own report."""
+    lines, home, first = _lines(events), {}, {}
+    for t in found:
+        home.update((m["id"], t["id"]) for m in t["messages"] if isinstance(m.get("id"), str))
+        writes = [lines[id(m)] for m in t["messages"] if m.get("by") == "user" and id(m) in lines]
+        first[t["id"]] = -1 if t["root"].get("by") == "user" else min(writes, default=None)
+    for e in events:  # the user's ✓, or their words of acceptance, count as the user's event in the thread
+        if isinstance(e, dict) and (
+            (e.get("type") == "accept" and e.get("by") == "user") or e.get("type") == "accepted"
+        ):
+            t, line = home.get(e.get("to")), lines[id(e)]
+            if t in first and (first[t] is None or line < first[t]):
+                first[t] = line
+    read = -1
+    for e in events:
+        number = e.get("read") if isinstance(e, dict) else None
+        if not isinstance(e, dict) or e.get("by") == "user" or not isinstance(number, int) or isinstance(number, bool):
+            continue
+        target = e.get("decision") if e.get("type") == "answer" else e.get("to")
+        t = home.get(target) if isinstance(target, str) else None
+        if e.get("type") == "status" and t in first and (first[t] is None or first[t] > lines[id(e)]):
+            continue
+        read = max(read, number)
+    return read
+
+
+def unread_from(events: list, found: list[dict], item_types: tuple[str, ...]) -> dict[str, int]:
+    """The threads `pending` can list that wait on the agent unread (Agent's turn, not seen), each with the line of the
+    user's first write in it that no read covers yet. A --read that reaches that line marks the thread seen, so a batch
+    that does not show the thread reads no further (thread.tla A2; `delivery.Delivery.read`). FOUND is `threads`."""
+    lines, covered, waiting = _lines(events), _thread_reads(events, found), {}
+    for t in found:
+        if t["state"] == "agent" and t["step"] == "new" and not t["deleted"] and _held(t, item_types):
+            writes = [lines[id(m)] for m in t["messages"] if m.get("by") == "user" and id(m) in lines]
+            if isinstance(t["id"], str):
+                waiting[t["id"]] = min((n for n in writes if n > covered), default=t["user_at"])
+    return waiting
+
+
+def answered(events: list, home: dict[str, str]) -> frozenset[int]:
+    """The lines of the user's notes that a later status of the agent's in the same thread answers, its read at or past
+    the note: the agent read them (through `pending` in its session) and acted, so no later turn carries them again.
+    HOME maps each message id to its thread."""
+    lines = _lines(events)
+    statuses = [
+        (lines[id(e)], home.get(e.get("to")), e.get("read"))
+        for e in events
+        if isinstance(e, dict) and e.get("type") == "status" and e.get("by") != "user" and e.get("to") in home
+    ]
+    found = set()
+    for e in events:
+        if isinstance(e, dict) and from_user(e) and e.get("type") == "note" and e.get("to") in home:
+            line, thread = lines[id(e)], home[e["to"]]
+            if any(
+                n > line and t == thread and (read is None or (isinstance(read, int) and read >= line))
+                for n, t, read in statuses
+            ):
+                found.add(line)
+    return frozenset(found)
+
+
 def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
     """The batch this turn carried (`.page-delivery`), as it stands now: the agent's own writes since count, and so do
-    the user's events in the threads it carried, which a refused --read sends the agent here to read (D12), with a
-    --read that covers them. The user's other events after it belong to a later turn."""
+    the user's events in the threads it carried, which a refused --read sends the agent here to read (D12). The user's
+    other events after it belong to a later turn, and its --read stops before a write in a thread it does not show
+    (`delivery.Delivery.read`)."""
     sent = _delivery_ids(active, "item_ids")
     position, actions = active.get("position"), active.get("actions")
     if (
@@ -876,8 +948,9 @@ def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
         and all(isinstance(a, dict) for a in actions)
     ):
         events = conv.events()
+        found = threads(events, conv.items)
         named: set = set()
-        for t in threads(events, conv.items):
+        for t in found:
             if t["id"] in sent:
                 named |= {t["id"]} | {m.get("id") for m in t["messages"]}
         named.discard(None)
@@ -887,7 +960,6 @@ def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
         snapshot = [
             {**e, LINE: n} for n, e in enumerate(events) if e and (n < position or not from_user(e) or n in mine)
         ]
-        read = max([position - 1, *mine])
         marks = active.get("sent_before") if isinstance(active.get("sent_before"), dict) else {}
         items = [
             {
@@ -897,7 +969,7 @@ def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
             for item, state, extra in all_items(snapshot, conv.items, conv.agent)
             if item["id"] in sent
         ]
-        return delivery.Delivery(items, actions, position, read)
+        return delivery.Delivery(items, actions, position, len(events) - 1, unread_from(events, found, conv.items))
     # Older drivers did not capture a turn boundary or its non-item actions.
     return conv.delivery(
         _delivery_position(active, "after"),
@@ -913,9 +985,10 @@ def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
     machine_output=True,
 )
 def pending(args: argparse.Namespace, run: cli.Run) -> int:
-    """Read current item states and the events after the delivered position of the unit's `.driver`, including after an
-    interruption; in a page session, the batch its turn carried. The last line gives the line of the last event it
-    shows, which the agent passes to `status` and `reply --to` as `--read`."""
+    """Print each thread that is the agent's turn, the event that started it in its latest form, with its step as
+    `status` (`new`, `seen` or `working`) and the messages under it, so work can resume after an interruption (D31). A
+    thread waiting on the user (`asked`) or done is not listed. In a page session, print the batch its turn carried
+    instead (`_active_batch`). The last line gives the line to pass to `status` and `reply --to` as `--read`."""
     unit = _unit(args, run)
     conv = _conversation(run, unit)
     session = os.environ.get("BETTER_PAGE_SESSION")
@@ -923,9 +996,8 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
     if session and active.get("session") == session:
         found = _active_batch(conv, active)
     else:
-        from .driver_state import delivered_position
-
-        found = conv.delivery(delivered_position(current_state(unit).get("delivered"), conv.events()))
+        every = conv.delivery(every_turn=True)  # the threads only, as on main: no events
+        found = delivery.Delivery(every.items, [], every.position, every.last, every.unread)
     for line in found.lines():
         run.out(line)
     return 0
