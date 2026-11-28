@@ -191,6 +191,24 @@ class ReadTest(shell.Fixture):
     """A --read the agent is given never covers a user write it was not shown (thread.tla A2): the turn prompt and
     pending in a page session give the line before the first write in a thread the batch does not show."""
 
+    def test_a_comment_edited_before_it_was_shown_stays_not_seen(self):  # verifier-t10b B1, thread.tla A2
+        conv = shell.page.Conversation(self.unit(), self.spec, self.docs)
+        self.seed(note("m1"))
+        (self.unit_dir / ".page-delivery").write_text(
+            json.dumps({"session": "live", "position": 1, "item_ids": ["m1"], "actions": []})
+        )
+        self.seed(
+            {"type": "comment", "id": "c2", "by": "user", "text": "first", "pin": 1},
+            {"type": "comment", "id": "c2", "by": "user", "text": "edited", "pin": 1},
+        )
+        with mock.patch.dict(os.environ, {"BETTER_PAGE_SESSION": "live"}):
+            code, out, err = self.cli("pending", self.unit_arg)
+        read = int(out.splitlines()[-1].split("--read ")[1].split()[0])
+        code, out, err = self.cli("status", self.unit_arg, "done", "m1", "--read", str(read))
+        self.assertEqual(code, 0, err)
+        found = {t["id"]: (t["state"], t["step"]) for t in shell.page.threads(self.log(), conv.items)}
+        self.assertEqual(found["c2"], ("agent", "new"), "c2 was never shown to the agent")
+
     def setUp(self):
         super().setUp()
         self.conv = shell.page.Conversation(self.unit(), self.spec, self.docs)
