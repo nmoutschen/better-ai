@@ -935,6 +935,10 @@ def _segments_cross(s, t):
     return False
 
 
+def _boxes_meet(r, s):
+    return r[0] < s[0] + s[2] and s[0] < r[0] + r[2] and r[1] < s[1] + s[3] and s[1] < r[1] + r[3]
+
+
 def _segment_through(segment, box):
     (a, b), (x, y, w, h) = segment, box
     if a[0] == b[0]:
@@ -958,7 +962,7 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed):
     on a node's own corner take its right end: the other attachments share the rest, from the left end, each one after
     the label before it when they all fit, and the labels end before the loops start. Several loops nest: each next
     one starts further left, rises higher above the label of the one inside it, reaches further out and comes back
-    lower; their labels stand in a column right of the outermost one, each at the height of its own loop's top.
+    lower; their labels stand in a column right of the outermost one, each just above its own loop's top.
 
     The labels that reach right of a column share the gap after it with the labels of the routed edges that enter the
     next column, which end 12 before it: when the widest of each would not fit side by side, each side wraps to its
@@ -1050,7 +1054,7 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed):
                 widths[i] = max(width(line, LABEL) for line in lines[i])
                 end = xs[i] + 14 + widths[i] - x[node] - COLW
                 reach[column(node)] = max(reach.get(column(node), 0), end)
-        rises, first = [], None
+        first = None
         if own:
             ends = [xs[i] + 14 + widths[i] + 6 for i in widths]
             first = min(max([bx + bw - 36 - 12 * (len(own) - 1), *ends]), bx + bw - 12 * len(own))
@@ -1066,12 +1070,11 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed):
                     reach[column(node)] = max(reach.get(column(node), 0), end)
             rise = 14
             for height in heights:
-                rises.append(rise)
-                need[node] = max(need.get(node, 0), rise + 2, rise - 8 + height)
+                need[node] = max(need.get(node, 0), rise + 2, rise + 1 + height)
                 rise += max(16, height + 3)
-            loops[node] = (first, rises)
-        # A label that a long word still keeps over the loops' start is lifted above the loops and their labels. On the start, every
-        # spot is its centre: nothing is lifted.
+            loops[node] = first
+        # A label that a long word still keeps over the loops' start is lifted above the loops and their labels. On
+        # the start, every spot is its centre: nothing is lifted.
         tops = [0] * len(spots)
         for i in reversed(range(len(spots))):
             e = spots[i]
@@ -1199,38 +1202,12 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
     # Edges back, and forward edges drawn apart: an arc above the drawing, or a pair of numbered connectors on top of
     # their ends (see `_plan_tops`). An edge to its own node loops on that node's corner.
     plans, spot, lift, selfs = top["plans"], top["spot"], top["lift"], top["selfs"]
-    # Arcs run 40 above the highest node, and higher still when what sits on a node's top needs more.
-    ceiling = min((box[1] - max(0, top["need"].get(ident, 0) + 2 - 40) for ident, box in boxes.items()), default=0)
     loops, number = {}, 0
-    for edge in flow["edges"]:
-        ident, source, target = edge["id"], edge["from"], edge["to"]
-        if ident not in plans:
-            continue
-        kind, lane = plans[ident]
-        sx, tx = spot[source, ident], spot[target, ident]
-        sy, ty = boxes[source][1], boxes[target][1]
-        if kind == "arc":
-            lane_y = ceiling - 40 - LANE * (lane - 1)
-            loops[ident] = {
-                "kind": "arc",
-                "paths": [[(sx, sy), (sx, lane_y), (tx, lane_y), (tx, ty)]],
-                "label_at": ((sx + tx) / 2, lane_y - 6),
-            }
-        else:
-            number += 1
-            up = lift.get(ident, 0)
-            loops[ident] = {
-                "kind": "connector",
-                "number": number,
-                "circles": [(sx, sy - 22 - up), (tx, ty - 22)],
-                "paths": [[(sx, sy), (sx, sy - 13 - up)], [(tx, ty - 13), (tx, ty)]],
-                "label_at": (sx + 14, sy - 18 - up),
-            }
 
-    def place_label(ident, anchor_start):
+    def place_label(ident, anchor_start, limit=None):
         """The lines of an edge drawn apart, wrapped to its room, and its label's box."""
         loop, edge = loops[ident], edges[ident]
-        loop["lines"] = lines = _label_lines(edge, top["wrap"].get(ident, GAP - 70))
+        loop["lines"] = lines = _label_lines(edge, limit or top["wrap"].get(ident, GAP - 70))
         if not edge.get("label") and not removable(edge):
             return
         lx, ly = loop["label_at"]
@@ -1238,13 +1215,27 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
         anchor = lx if anchor_start else lx - w / 2
         label_boxes[ident] = (anchor, ly - 15 * len(lines) + 3, w, 15 * (len(lines) - 1) + 13)
 
-    for ident, loop in loops.items():
-        place_label(ident, loop["kind"] != "arc")
+    for edge in flow["edges"]:
+        ident, source, target = edge["id"], edge["from"], edge["to"]
+        if plans.get(ident, ("arc",))[0] == "arc":
+            continue
+        number += 1
+        sx, tx = spot[source, ident], spot[target, ident]
+        sy, ty = boxes[source][1], boxes[target][1]
+        up = lift.get(ident, 0)
+        loops[ident] = {
+            "kind": "connector",
+            "number": number,
+            "circles": [(sx, sy - 22 - up), (tx, ty - 22)],
+            "paths": [[(sx, sy), (sx, sy - 13 - up)], [(tx, ty - 13), (tx, ty)]],
+            "label_at": (sx + 14, sy - 18 - up),
+        }
+        place_label(ident, True)
     for node, own in selfs.items():
         bx, by_, bw, _ = boxes[node]
-        start, rises = top["loops"][node]
+        start, rise = top["loops"][node], 14
         far = bx + bw + 14 + 12 * (len(own) - 1)
-        for k, (edge, rise) in enumerate(zip(own, rises, strict=True)):
+        for k, edge in enumerate(own):
             out, low = 14 + 12 * k, 8 + 8 * k
             path = [
                 (start + 12 * (len(own) - 1 - k), by_),
@@ -1253,8 +1244,38 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
                 (bx + bw + out, by_ + low),
                 (bx + bw, by_ + low),
             ]
-            loops[edge["id"]] = {"kind": "self", "paths": [path], "label_at": (far + 6, by_ - rise + 5)}
-            place_label(edge["id"], True)
+            loops[edge["id"]] = {"kind": "self", "paths": [path], "label_at": (far + 6, by_ - rise - 4)}
+            # Its label is planned narrow enough to share the gap after the column with the labels entering the
+            # next one; it takes its full width where that meets no other label and no line. It is never taller.
+            place_label(edge["id"], True, GAP - 70)
+            box = label_boxes.get(edge["id"])
+            others = [other for ident, other in label_boxes.items() if ident != edge["id"]]
+            lines = [segment for points in routes.values() for segment in pairwise(points)]
+            if box and (
+                any(_boxes_meet(box, other) for other in others) or any(_segment_through(t, box) for t in lines)
+            ):
+                place_label(edge["id"], True)
+            labelled = edge.get("label") or removable(edge)
+            rise += max(16, 15 * len(loops[edge["id"]]["lines"]) + 3) if labelled else 16
+
+    # Arcs run 40 above the highest node, and higher still when what sits on a node's top reaches higher.
+    tops = [y for loop in loops.values() for points in loop["paths"] for _, y in points]
+    tops += [cy - 9 for loop in loops.values() for _, cy in loop.get("circles", [])]
+    tops += [box[1] for box in label_boxes.values()]
+    ceiling = min([box[1] for box in boxes.values()] + [y + 38 for y in tops], default=0)
+    for edge in flow["edges"]:
+        ident, source, target = edge["id"], edge["from"], edge["to"]
+        if plans.get(ident, ("",))[0] != "arc":
+            continue
+        sx, tx = spot[source, ident], spot[target, ident]
+        sy, ty = boxes[source][1], boxes[target][1]
+        lane_y = ceiling - 40 - LANE * (plans[ident][1] - 1)
+        loops[ident] = {
+            "kind": "arc",
+            "paths": [[(sx, sy), (sx, lane_y), (tx, lane_y), (tx, ty)]],
+            "label_at": ((sx + tx) / 2, lane_y - 6),
+        }
+        place_label(ident, False)
 
     apart_forward = {ident: loops.pop(ident) for ident in list(loops) if ident in jumps}
     points = [point for path in routes.values() for point in path]
