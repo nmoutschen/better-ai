@@ -190,11 +190,11 @@ An agent file ADDS:
 ```yaml
 capabilities: [<what it needs, from: read files, run commands, write files, commit, search the web, sub-agents, message the starting agent>]
 edits: <true | false — whether it may change the work it is given>
-model: <cheaper | same | most capable — relative to the agent that starts it>
+model: <cheaper | same | capable | most capable>
 model_reason: <one sentence: why this model for this agent>
 ```
 
-CHOOSE each agent's model for its own work, not one rule for all agents of a kind. BASE the choice on evidence where there is some, such as an eval of the agent on several models, and SAY in `model_reason` when there is none.
+`cheaper` is a cheaper model than the agent that starts it runs, and `same` is whatever model that agent runs. `capable` is a vendor's usual top tier, such as Opus, Sol or similar. `most capable` is the tier above it, such as Fable, Astra or similar. CHOOSE each agent's model for its own work, not one rule for all agents of a kind. BASE the choice on evidence where there is some, such as an eval of the agent on several models, and SAY in `model_reason` when there is none.
 
 AFTER the frontmatter, an agent file HAS these sections, in this order: `## Input`, the named fields the starting agent fills in, each required; `## Messages`, only when the agent sends messages while it works or is limited in the messages it may send or act on: what it tells the starting agent, in plain words; `## Output`, what its one hand-back must contain. The input is strict, because the agent sees nothing else. Messages and output are plain language, because how agents talk depends on the harness: the starting agent's skill or mode SAYS how it acts on each kind of message and each outcome.
 

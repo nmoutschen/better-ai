@@ -6,7 +6,7 @@ from pathlib import Path
 
 SKILLS = Path(__file__).resolve().parent.parent / "skills"
 FIELDS = ["name", "description", "capabilities", "edits", "model", "model_reason"]
-MODELS = {"cheaper", "same", "most capable"}
+MODELS = {"cheaper", "same", "capable", "most capable"}
 
 
 def frontmatter(text: str) -> dict[str, str]:
