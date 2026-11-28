@@ -127,7 +127,7 @@ The report keeps three claims apart: the scenarios can be completed, the checks 
 | Python 3 | If it can still render, it writes one HTML page with the versions side by side at the same width. |
 | A browser that can reach the machine | It publishes the page, whose Copy all button copies your feedback for the chat. If it cannot publish, it opens the page and gives you its path. |
 | Rendering a page | It shows each version as a plain text outline and says the choice may change once rendered. |
-| Being told about your feedback as it arrives | It asks you to say "sent" in the chat, then reads your feedback from `conversation.jsonl`. |
+| A harness that can run the page's own agent | It shows the problem in one line, then publishes or renders the versions as above. |
 | Operating the page by pointer and keyboard | It looks for a headless browser or automation library first. If none works, it marks the work not finished and lists the walks for you to do. |
 | An accessibility checker | It says none ran, and relies on the walks and reading the markup. |
 | Sub-agents | It stops and marks the work not finished: the review needs a reviewer that did not design the interface. |

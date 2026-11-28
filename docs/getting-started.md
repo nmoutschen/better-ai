@@ -39,6 +39,14 @@ You rarely need to call these yourself:
 - [`/review-better`](review-better.md) runs the reviews in `/code-better` and `/design-better`.
 - [`/decide-better`](decide-better.md) runs the choices other skills bring you.
 
+### Live pages and their own agent
+
+`/architect-better`, `/code-better`, `/design-better`, `/discover-better`, `/research-better` and `/show-better` open a live page in your browser when it can reach the machine the agent runs on. The page has its own agent, run by the same harness as your chat (Claude Code, Codex, Cursor, Devin, Droid or OpenCode). It reads what you write in the page and answers there, so your chat stays free.
+
+- **Approvals.** When the page's agent or one of its workers needs a tool call your harness would ask you about, a pop-up on the page shows who asks, the tool and its arguments, with Allow once, Allow for this session and Deny. The tab title starts with "Waiting for you" until you answer.
+- **Stop and Start.** The Agents section shows what the agents are doing. Stop ends them and denies any request waiting for you; what they recorded is kept. Start has them read your messages again. When they stop on their own, for example because the harness is not logged in, the section says why and what to do.
+- **Reopen the page.** The page works in one tab. To get it back, ask the agent in your chat to reopen it: it runs `link`, which opens a new tab and disconnects the old one. After 30 minutes with no tab open, the page closes; ask the agent in your chat to serve it again.
+
 ## 3. When the result is wrong, use `/do-better`
 
 ```

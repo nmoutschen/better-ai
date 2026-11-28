@@ -164,7 +164,7 @@ IF you are in a session opened by the page, NEVER serve. WRITE what a step says 
 On the served page, the user reads the slides, switches to Comment and clicks any part of a slide to comment on it, or writes a message in the column on the right. A comment names the slide, its part and headline, the clicked text, the nearest drawn item and where the click fell: WORK OUT what the user pointed at from all of these.
 
 1. TREAT each action as the user's reply. WHILE the user works in the page, PUT everything for them in the page, and DO NOT answer each page action in the chat.
-   - TRACK each comment and message with `python3 <skill dir>/scripts/better.pyz status .show/<slug> seen|asked|working|done <id>...` (and `python3 <skill dir>/scripts/better.pyz status .show/<slug> accepted <id>... --text`, with the user's words on stdin, when the user accepts in the chat): MARK it `seen` when it arrives, `asked` when you asked the user something and wait for the answer, `working` only while you are changing it now, and `done` once the answer or the change is in the page. READ a note the user adds under an item as part of that item's thread, in the order of the `at` times. ONCE an answer leads to a change, MARK the item `done` and ASK the next question as a new message. TREAT an item as finished only when the user accepts it, in the page or in words (then MARK it `accepted`).
+   - TRACK each comment and message with `python3 <skill dir>/scripts/better.pyz status .show/<slug> seen|asked|working|done <id>...`: MARK it `seen` when it arrives, `asked` when you asked the user something and wait for the answer, `working` only while you are changing it now, and `done` once the answer or the change is in the page. READ a note the user adds under an item as part of that item's thread, in the order of the `at` times. ONCE an answer leads to a change, MARK the item `done` and ASK the next question as a new message. TREAT an item as finished only when the user accepts it with Accept.
    - REPLY in the page with `python3 <skill dir>/scripts/better.pyz reply .show/<slug> --to <id>`, with your words on stdin, in one or two short sentences: what you changed, or the one thing you need.
    - TO change slides, UPDATE the spec with `set`, CHECK it, and the open page loads the new slides by itself once the user is not typing.
    - RUN `python3 <skill dir>/scripts/better.pyz pending .show/<slug>` after each batch of changes, and after an interruption: FINISH or ANSWER what it lists.
@@ -172,7 +172,7 @@ On the served page, the user reads the slides, switches to Comment and clicks an
 
 ## 7. Hand it over
 
-GIVE the user the page's address, link or path once, or the text output. STATE the document's answer in one or two sentences in the chat, so a reader who does not open the page still has it. STATE any assumption you made about the GOAL or the reader, and any gap in the vocabulary (section 3.1, rule 4), next to the result it affects. DO NOT repeat the slides in the chat.
+GIVE the user the published link or the path once, or the text output. FOR a served page, GIVE no address: the page opened in the browser, and `python3 <skill dir>/scripts/better.pyz link <unit>` opens it again. STATE the document's answer in one or two sentences in the chat, so a reader who does not open the page still has it. STATE any assumption you made about the GOAL or the reader, and any gap in the vocabulary (section 3.1, rule 4), next to the result it affects. DO NOT repeat the slides in the chat.
 
 ## 8. Missing capabilities
 

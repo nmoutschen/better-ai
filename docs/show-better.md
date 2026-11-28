@@ -97,7 +97,7 @@ If your project has its own colours and fonts, the slides and their drawings tak
 | Capability | Without it |
 |---|---|
 | Python 3, and a browser that can reach the machine where the agent runs | It publishes the slides as a page without the conversation if it can, or renders text or Markdown for the terminal or chat. |
-| A way to hear about page actions as they happen | It asks you to say "sent" in the chat, then reads what you sent from the page's log. |
+| A harness that can run the page's own agent | It shows the problem in one line, then renders the slides as text. |
 | Python 3 at all | It writes the slides in Markdown by hand: tables for comparisons, lists for structure, and plain-text diagrams only for flows of four short steps or fewer. It checks every value against the document by hand. |
 | Viewing the page or a screenshot | It says it could not look at the result. |
 

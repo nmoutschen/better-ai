@@ -137,7 +137,7 @@ When the board's server stops, a strip says the board is closed; ask the agent t
 | Sub-agents | It runs the research loop itself, one question at a time. |
 | Background sub-agents | It starts a group of workers, waits for them, then starts the next group. |
 | Choosing a worker's model | It runs workers on a cheaper model, such as Sonnet or Terra, when it can, and does not create or edit harness configuration without your permission. |
-| Background commands and a browser that can reach the machine | It tells you how to start the live view yourself, or posts progress in the chat. |
+| Background commands, a browser that can reach the machine, and a harness that can run the page's own agent | It posts one line in the chat each time a question closes. |
 | Writing files | It keeps the board in its working notes and restates it every few results. |
 | Asking through a tool | It asks in plain text and waits for your answer. |
 
