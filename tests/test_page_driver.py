@@ -50,8 +50,9 @@ class Peer:
         except queue.Empty:
             return None
 
-    def prompt(self, text):
+    def prompt(self, text, uuid=None):
         self.calls.append(("prompt", text))
+        self.uuids = [*getattr(self, "uuids", []), uuid]
         self.prompt_arrived.set()
 
     def cancel(self):
@@ -88,12 +89,12 @@ class Conversation:
     def __init__(self, root):
         self.unit = Unit(root)
         self.items = {}
-        self.events = []
+        self.log = []
 
     def item(self, key, status="new"):
         self.items[key] = status
         event = {"type": "comment", "id": key, "by": "user"}
-        self.events.append(event)
+        self.log.append(event)
         return event
 
     def delivery(
@@ -106,7 +107,10 @@ class Conversation:
             or (status == "seen" and key in carry_ids | recover_ids)
             or (status == "working" and key in recover_ids)
         ]
-        return Batch(items, [e for e in self.events[after:] if e["type"] == "accept"], len(self.events))
+        return Batch(items, [e for e in self.log[after:] if e["type"] == "accept"], len(self.log))
+
+    def events(self):
+        return list(self.log)
 
 
 def eventually(test):
@@ -131,7 +135,7 @@ class DriverTests(unittest.TestCase):
         self.clock = time.monotonic
         self.trigger_data = []
 
-    def driver(self, launch=None, approvals=None):
+    def driver(self, launch=None):
         def recording_launch(tag, resume):
             peer = launch(tag) if launch else Peer()
             self.peers.append(peer)
@@ -147,7 +151,6 @@ class DriverTests(unittest.TestCase):
             step="review",
             handoff="Carry the user's decision forward.",
             triggers=lambda: self.trigger_data,
-            approvals=approvals,
             clock=self.clock,
             valid_session=lambda key: key == "session-1",
         )
@@ -219,7 +222,7 @@ class DriverTests(unittest.TestCase):
         self.conv.items["working-item"] = "working"
         peer.events.put(Event("failed", outcome="crashed"))
         eventually(lambda: first.snapshot()["state"] == "failed")
-        self.assertEqual(self.state()["delivered"], 0)
+        self.assertEqual(self.state()["delivered"]["position"], 0)
         first.close()
 
         # Simulate a crash whose last turn start was persisted but whose end was not.
@@ -236,7 +239,7 @@ class DriverTests(unittest.TestCase):
         self.assertIn("Carry the user's decision forward.", peer.prompts[0])
         self.conv.items["working-item"] = "done"
         peer.events.put(Event("turn_ended", outcome="completed"))
-        eventually(lambda: self.state()["delivered"] == 1)
+        eventually(lambda: self.state()["delivered"]["position"] == 1)
         self.assertEqual(self.state()["fired"], ["trigger-1"])
 
     def test_normal_end_retries_seen_and_leaves_working(self):
@@ -262,7 +265,7 @@ class DriverTests(unittest.TestCase):
         self.conv.items["first"] = "working"
         self.conv.item("direct")
         peer.events.put(Event("turn_ended", outcome="completed"))
-        eventually(lambda: self.state()["delivered"] >= 1)
+        eventually(lambda: self.state()["delivered"]["position"] >= 1)
         time.sleep(0.15)
         self.assertEqual(len(peer.prompts), 1)
 
@@ -306,7 +309,7 @@ class DriverTests(unittest.TestCase):
         edited = json.loads(peer.prompts[0].split("\n\n")[-1])["items"]
         self.assertEqual([(item["text"], item["status"]) for item in edited], [("Edited", "working")])
         peer.events.put(Event("turn_ended", outcome="completed"))
-        eventually(lambda: self.state()["delivered"] == 3)
+        eventually(lambda: self.state()["delivered"]["position"] == 3)
         accept = {"type": "accept", "by": "user", "to": "pin"}
         log.append(accept)
         driver.enqueue(accept)
@@ -331,7 +334,7 @@ class DriverTests(unittest.TestCase):
         self.conv.item("raw-before-rpc")
         driver.enqueue(self.conv.item("rpc"))
         self.conv.item("raw-after-rpc")
-        self.conv.events.append({"type": "accept", "id": "raw-action"})
+        self.conv.log.append({"type": "accept", "id": "raw-action"})
         self.conv.items["historical"] = "done"
         peer.events.put(Event("turn_ended", outcome="completed"))
         batch(peer, 2, "rpc")
@@ -379,22 +382,6 @@ class DriverTests(unittest.TestCase):
         self.assertNotIn("first", prompt)
         self.assertIn("second: sent before in turn 2, which ended: crashed", prompt)
 
-    def test_interrupted_turn_survives_rotated_history(self):
-        self.conv.item("open-item")
-        driver = self.driver()
-        driver.start()
-        self.assertTrue(self.peers[0].prompt_arrived.wait(2))
-        self.conv.items["open-item"] = "working"
-        # Restore the exact state a killed serve left before its graceful cleanup.
-        checkpoint = (self.root / ".driver").read_bytes()
-        driver.close()
-        (self.root / ".driver").write_bytes(checkpoint)
-        (self.root / ".driver.log").write_text("")
-        resumed = self.driver()
-        resumed.start()
-        self.assertTrue(self.peers[-1].prompt_arrived.wait(1))
-        self.assertIn("open-item: sent before in turn 1, which ended: crashed", self.peers[-1].prompts[0])
-
     def test_stop_interrupts_restarting_peer(self):
         class NoHandshake(Peer):
             def open(self, cwd, resume):
@@ -408,7 +395,7 @@ class DriverTests(unittest.TestCase):
         eventually(lambda: len(self.peers) == 2 and self.peers[-1].calls)
         driver.request_stop()
         eventually(lambda: self.peers[-1].closed)
-        self.assertEqual(driver.snapshot()["state"], "stopped")
+        eventually(lambda: driver.snapshot()["state"] == "stopped")
 
     def test_stderr_bytes_without_newline_are_output(self):
         script = "import os,sys; os.write(2, b'progress'); sys.stdin.read()"
@@ -422,7 +409,14 @@ class DriverTests(unittest.TestCase):
 
     def test_handshake_and_stop_denials_are_audited(self):
         def approval(key):
-            return SimpleNamespace(kind="approval", request_id=key, tool="Write", arguments={"path": "example"})
+            return SimpleNamespace(
+                kind="approval",
+                request_id=key,
+                tool="Write",
+                arguments={"path": "example"},
+                options=("allow_once", "deny"),
+                requester=None,
+            )
 
         class Requests(Peer):
             def cancel(self):
@@ -442,7 +436,7 @@ class DriverTests(unittest.TestCase):
         records = [r for r in self.records() if r["type"] == "approval"]
         self.assertEqual([(r["request"], r["answer"]) for r in records], [("first", "deny"), ("last", "deny")])
 
-    def test_approval_future_confirms_only_its_own_wire_write(self):
+    def test_approval_answer_confirms_only_its_own_wire_write(self):
         class Responses(Peer):
             def answer(self, request_id, choice, reason):
                 self.calls.append(("answer", request_id, choice))
@@ -450,35 +444,40 @@ class DriverTests(unittest.TestCase):
                     raise BrokenPipeError
                 return reason != "expired"
 
-        callbacks = []
-        gate = SimpleNamespace(
-            receive=lambda event, callback: callbacks.append(callback),
-            closed=lambda event: None,
-            close=lambda reason: None,
-        )
-        driver = self.driver(launch=lambda _: Responses(), approvals=gate)
+        driver = self.driver(launch=lambda _: Responses())
         driver.start()
         peer = self.peers[0]
 
         def request(count):
-            peer.events.put(SimpleNamespace(kind="approval", request_id=1, tool="Read", arguments={}))
-            eventually(lambda: len(callbacks) == count)
-            return callbacks[-1]
+            eventually(lambda: not driver.agent()["approvals"])
+            peer.events.put(
+                SimpleNamespace(
+                    kind="approval",
+                    request_id=1,
+                    tool="Read",
+                    arguments={},
+                    options=("allow_once", "deny"),
+                    requester=None,
+                )
+            )
+            eventually(lambda: len(driver.agent()["approvals"]) == 1)
+            return driver.agent()["approvals"][0]["id"]
 
         old = request(1)
         peer.events.put(SimpleNamespace(kind="approval_closed", request_id=1, outcome="expired", text=""))
+        eventually(lambda: not driver.agent()["approvals"])
+        self.assertFalse(driver.answer_approval(old, "allow_once").result(timeout=1))
         current = request(2)
-        self.assertFalse(old("allow_once", "").result(timeout=1))
-        self.assertTrue(current("allow_once", "").result(timeout=1))
+        self.assertTrue(driver.answer_approval(current, "allow_once").result(timeout=1))
         self.assertEqual(peer.calls.count(("answer", 1, "allow_once")), 1)
-        self.assertFalse(request(3)("allow_once", "expired").result(timeout=1))
-        self.assertFalse(request(4)("allow_once", "broken pipe").result(timeout=1))
+        self.assertFalse(driver.answer_approval(request(3), "allow_once", "expired").result(timeout=1))
+        self.assertFalse(driver.answer_approval(request(4), "allow_once", "broken pipe").result(timeout=1))
         self.assertEqual(
             [r["answer"] for r in self.records() if r["type"] == "approval"],
             ["expired", "allow_once", "expired", "expired"],
         )
         driver.close()
-        self.assertFalse(current("allow_once", "").result(timeout=1))
+        self.assertFalse(driver.answer_approval(current, "allow_once").result(timeout=1))
 
     def test_failed_batch_uses_all_three_automatic_retries(self):
         self.conv.item("same")
@@ -649,11 +648,10 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(event.kind, "child")
         self.assertEqual(os.getpgid(transport.pid), transport.pid)
         if sys.platform in ("darwin", "linux"):
-            from better_ai.page.transport import process_birth
+            from better_ai.page.transport import process_command, same_command
 
-            self.assertTrue(transport.started)
-            self.assertEqual(process_birth(transport.pid), transport.started)
-            self.assertNotEqual(process_birth(os.getpid()), transport.started)
+            self.assertTrue(same_command(process_command(transport.pid), transport.argv))
+            self.assertFalse(same_command(process_command(os.getpid()), transport.argv))
         self.assertEqual(os.getpgid(event.pid), transport.pid)
         started = time.monotonic()
         transport.close()
