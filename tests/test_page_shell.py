@@ -538,6 +538,7 @@ EXTRAS = {
     "a comment sent again keeps its state, and is the same item": ("c2", "text", "edited"),
     "a reopened item is work again": ("c1", "reopened_because", "still wrong"),
     "an answer to what a worker closed is an item": ("x1", "about", "worker-2 closed Q4 as answered"),
+    "transition: you reopen a report the agent posted on its own": ("r1", "reopened_because", "why"),
 }
 TABLE = json.loads((HERE / "fixtures" / "threads.json").read_text())
 DEFAULT_KINDS = ("comment", "note")

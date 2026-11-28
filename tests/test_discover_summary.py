@@ -391,6 +391,13 @@ class Warnings(Discovery):
         put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), reply("a1")])
         self.quiet("done-event-unanswered")
 
+    def test_S55_an_event_the_user_closed_is_no_done_event_to_answer(self):
+        accept = {"type": "accept", "at": R.AT, "by": "user", "to": "a1"}
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), accept])
+        self.quiet("done-event-unanswered")
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), accept])
+        self.quiet("done-event-unanswered")
+
     def test_S55_a_record_that_points_to_the_event_answers_it(self):
         put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1")])
         given = {"type": "page", "event": "a1"}
