@@ -417,3 +417,5 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
   .agentsec .agent-ctl { display:none; }
 }
 @media (min-width:901px) { .pinbar { display:none; } }
+/* Below 900 px, scrolling to a focused element keeps it above the pinned bar. */
+@media (max-width:900px) { html { scroll-padding-bottom:6rem; } }

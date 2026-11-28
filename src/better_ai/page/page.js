@@ -93,12 +93,13 @@ function pageFlash(text, kind) {
 // The requests waiting for the user, the oldest first; none while the driver is gone, as it could not take an answer.
 function pageApprovals() {
   if (!pageAgentState || pageDriverDown) return [];
-  return pageAgentState.approvals.slice().sort(function (a, z) { return a.since < z.since ? -1 : a.since > z.since ? 1 : 0; });
+  return (pageAgentState.approvals || []).slice().sort(function (a, z) { return a.since < z.since ? -1 : a.since > z.since ? 1 : 0; });
 }
 function pageWaitingWorkers() {
-  return pageAgentState && !pageDriverDown ? pageAgentState.workers.filter(function (w) { return w.waiting; }) : [];
+  return pageAgentState && !pageDriverDown ? (pageAgentState.workers || []).filter(function (w) { return w.waiting; }) : [];
 }
 // The words under the Agents heading: what the driver says of the agents' state, or that the driver is gone.
+var PAGE_REQUEST_WAITS = 'A request waits for you.';
 function pageAgentNotice() {
   if (pageDriverDown) return PAGE_DRIVER_DOWN;
   return (pageAgentState && pageAgentState.text) || '';
@@ -223,6 +224,10 @@ function pageAgentSection() {
 function pageAgentControls() {
   var section = pageAgentSection(), bar = pageEl('div', 'pinbar'), notice = pageEl('p', 'pinbar-text');
   notice.setAttribute('role', 'status'); bar.append(notice);
+  // Below 900 px the Agents section is out of view, so the bar also opens the oldest request (D18).
+  var open = pageEl('button', 'btn btn--sm pin-open'); open.type = 'button'; open.hidden = true; open.textContent = 'Open the request';
+  open.addEventListener('click', function () { pageOpenApproval(null, open); });
+  bar.append(open);
   var buttons = [section.querySelector('.notes-top'), bar].map(function (host) {
     var button = pageEl('button', 'btn btn--sm agent-ctl'); button.type = 'button'; button.hidden = true;
     button.addEventListener('click', function () {
@@ -233,7 +238,7 @@ function pageAgentControls() {
     return button;
   });
   document.body.append(bar);
-  return { buttons: buttons, notice: notice, bar: bar };
+  return { buttons: buttons, notice: notice, bar: bar, open: open };
 }
 function pageAgentDraw(chrome) {
   var act = pageAgentControl(), notice = pageAgentNotice();
@@ -244,8 +249,10 @@ function pageAgentDraw(chrome) {
     button.className = 'btn btn--sm agent-ctl ' + (act === 'stop' ? 'btn--stop' : 'btn--start');
     button.setAttribute('aria-label', act === 'stop' ? 'Stop all agents' : 'Start all agents');
   });
-  chrome.notice.textContent = notice;
-  chrome.bar.hidden = !act && !notice;
+  var waits = pageApprovals().length > 0;
+  chrome.open.hidden = !waits;
+  chrome.notice.textContent = notice || (waits ? PAGE_REQUEST_WAITS : '');
+  chrome.bar.hidden = !act && !notice && !waits;
   pageAgentsRefresh();
   pageSetTitle();
   if (pageDialogOpen && pageDialogOpen.approval && !pageApprovals().some(function (a) { return a.id === pageDialogOpen.approval; })) pageDialogClose();
@@ -652,7 +659,7 @@ function pageConversation(o) {
     });
     if (filter === 'open' && started && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
     // A call that auto mode blocked has nothing to answer: a notice, last, which says what to do instead.
-    if (pageAgentState) pageAgentState.blocked.forEach(function (b) {
+    if (pageAgentState) (pageAgentState.blocked || []).forEach(function (b) {
       thread.appendChild(el('li', 'sys', 'Auto mode blocked ' + b.tool + ' ' + b.arguments + ' (' + b.reason + '). Run it yourself, or tell the agent how to go on.'));
     });
     pageWaitingItems = model.waiting.length; pageSetTitle();
@@ -1300,14 +1307,14 @@ function pageAgents(rows, o) {
   var given = rows;
   rows = rows.slice();
   waiting.forEach(function (name) {
-    if (!rows.some(function (r) { return r.who === name; })) rows.push({ who: name, what: pageAgentState.workers.filter(function (w) { return w.name === name; })[0].item });
+    if (!rows.some(function (r) { return r.who === name; })) rows.push({ who: name, what: (pageAgentState.workers || []).filter(function (w) { return w.name === name; })[0].item });
   });
   rows = rows.filter(function (r) { return waiting.indexOf(r.who) >= 0; }).concat(rows.filter(function (r) { return waiting.indexOf(r.who) < 0; }));
   var notice = pageAgentNotice();
   pageAgentRows = { rows: given, o: o };
   // A request from an agent that has no row here, the page's own, has no row to press: a row with its sentence and a button
   // instead. It is not the state notice, which narrow windows show in the pinned bar, so it stays in the list at every width.
-  var own = pageApprovals().filter(function (a) { return !pageAgentState.workers.some(function (w) { return w.name === a.who; }); })[0];
+  var own = pageApprovals().filter(function (a) { return !(pageAgentState.workers || []).some(function (w) { return w.name === a.who; }); })[0];
   var list = (notice ? '<li class="notice" role="status"><div>' + pageEscape(notice) + '</div></li>' : '') +
     (own ? '<li><div>' + pageEscape(PAGE_OWN_WAITING) + '<button type="button" class="btn btn--sm" data-approval-for="' + pageEscape(own.who) + '">Open the request</button></div></li>' : '') +
     rows.map(function (r) {
