@@ -16,6 +16,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass, field
 
 from .. import paths, resources
+from .adapters import display_name
 from .approvals import approved_form, header_form, own_call, shell_request, verb_command
 from .delivery import CONTINUE, NOTE, Delivery, ended_label, turn_prompt
 from .driver_state import (
@@ -68,7 +69,8 @@ ACTIONS = {
     "driver": "Serve the page again.",
     "protocol": "Update better-ai, or use a harness version it was tested with.",
     "unsafe-mode": "Change the harness's approval mode, then serve again.",
-    "no-approvals": "This harness can't be driven safely. The chat agent listens instead.",
+    "no-approvals": "All agents are stopped because this harness does not send its approval requests to the page. "
+    "Ask the agent in your chat to serve this page from another harness.",
 }
 
 # The sentence the page shows for a state or failed kind: fixed words with at most one inserted value.
@@ -77,7 +79,8 @@ NOTICES = {
     "limit": "All agents are stopped because the harness hit its limit: {}. Press Start after it resets.",
     "crashed": "All agents are stopped because the harness failed: {}. Press Start to resume.",
     "crashed-again": "The same error came back: {}. Fix it in a terminal, then press Start.",
-    "not-handling": "All agents are stopped because they did not handle {}. Press Start to retry, or reword the comment.",
+    "not-handling": "All agents are stopped because they did not handle your message. Their last reply and denied calls "
+    "are in {}. Press Start to retry, or reword your message.",
     "driver": "The page's agents stopped because of an error: {}. Ask the agent in your chat to serve this page again. Log: {}.",
     "protocol": "All agents are stopped because the harness protocol is unknown: {}. Update better-ai, or use a version it was tested with.",
     "stopped": "All agents are stopped. Press Start to have them read your messages.",
@@ -459,9 +462,9 @@ class Driver:
         if kind == "crashed" and details.get("again"):
             kind = "crashed-again"
         if kind == "login":
-            return NOTICES[kind].format(self.harness)
-        if kind == "not-handling":
-            return NOTICES[kind].format(", ".join(details.get("items", ())))
+            return NOTICES[kind].format(display_name(self.harness))
+        if kind == "not-handling":  # one value, the log's path; the items, final message and denied calls are there (D30)
+            return NOTICES[kind].format(details.get("log", self.unit.target(LOG)))
         if kind == "driver":
             return NOTICES[kind].format(message, details.get("log", self.unit.target(LOG)))
         if kind in NOTICES:
@@ -816,7 +819,9 @@ class Driver:
             and self._unknown_since is not None
             and self.clock() - self._unknown_since >= PROTOCOL_TIMEOUT
         ):
-            self._failed("protocol", f"{self.harness} {self.version or 'unknown version'}; tested {self.tested}")
+            self._failed(
+                "protocol", f"{display_name(self.harness)} {self.version or 'unknown version'}; tested {self.tested}"
+            )
         return True
 
     def _receive(self, event) -> None:
@@ -1029,7 +1034,7 @@ class Driver:
         number = outstanding["turn"].record["number"]
         self._log("error", kind="unechoed", message=f"turn {number} ended without echoing its prompt")
         if self._unechoed >= MAX_UNECHOED:
-            self._failed("protocol", f"{self.harness} did not echo {MAX_UNECHOED} prompts in a row")
+            self._failed("protocol", f"{display_name(self.harness)} did not echo {MAX_UNECHOED} prompts in a row")
 
     def _end(self, outcome: str, by_user: bool = False) -> None:
         turn, self._turn = self._turn, None

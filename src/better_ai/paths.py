@@ -318,9 +318,8 @@ def write_atomic(unit: Unit, relative: str, data: bytes) -> None:
 
 
 def write_state(unit: Unit, relative: str, data: bytes, mode: int | None = None) -> None:
-    """Write a small state file of the page (`.server`, `.server-token`, `.conversation-seen`), opened with O_NOFOLLOW;
-    `mode`, when given, is the file's,
-    also when it was there before; otherwise a new file gets the umask's."""
+    """Write a small state file of the page (`.server`, `.page-link`), opened with O_NOFOLLOW; `mode`, when given, is
+    the file's, also when it was there before; otherwise a new file gets the umask's."""
     fd = _open(unit, relative, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644 if mode is None else mode)
     try:
         if mode is not None:

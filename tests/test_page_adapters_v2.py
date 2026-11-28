@@ -100,7 +100,7 @@ class SelectionAndLaunch(unittest.TestCase):
         self.assertTrue(none.text.startswith("No supported harness"))
         missing = candidate("auto", {"CODEX_THREAD_ID": SESSION}, lambda _: None)
         self.assertEqual(
-            (missing.kind, missing.text), ("not-installed", "codex is not installed. Install it, then serve again.")
+            (missing.kind, missing.text), ("not-installed", "Codex is not installed. Install it, then serve again.")
         )
 
     def test_claude_starts_with_the_host_approval_channel_and_replay(self):  # S130 S158 S96 S50
@@ -387,13 +387,13 @@ class ClaudeApprovals(unittest.TestCase):
         old["response"]["response"]["claude_code_version"] = "2.1.301"
         event = adapter.receive(old)[0]
         self.assertEqual((event.kind, event.outcome), ("failed", "version"))
-        self.assertEqual(event.text, "claude reported 2.1.301. Version 2.1.332 or later is required.")
+        self.assertEqual(event.text, "Claude Code reported 2.1.301. Version 2.1.332 or later is required.")
         self.assertTrue(version_supported("claude", "2.9.0 (Claude Code)"))
         sent = []
         adapter = CodexAdapter(sent.append)
         adapter.open("/repo", None)
         event = adapter.receive({"id": sent[-1]["id"], "result": {"userAgent": "codex-cli/0.171.0 (Mac)"}})[0]
-        self.assertEqual(event.text, "codex reported 0.171.0. Version 0.172.0 or later is required.")
+        self.assertEqual(event.text, "Codex reported 0.171.0. Version 0.172.0 or later is required.")
 
     def test_each_prompt_carries_its_uuid_and_its_echo_is_reported(self):  # S96 S50
         _, adapter, sent, _ = open_claude()

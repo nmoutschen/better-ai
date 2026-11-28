@@ -100,6 +100,7 @@ class ConfigPath:
 
 @dataclass(frozen=True)
 class Harness:
+    display: str  # the name every notice uses, as the user knows the harness
     set_by: Fact
     chat_flags: tuple[ChatFlag, ...]
     reported: tuple[ReportedMode, ...]
@@ -139,6 +140,7 @@ def _devin_mode(value: str, mode: str, canonical: str, argv: tuple[str, ...] = (
 # accept edits, auto, skip approvals) are shown by their own name.
 HARNESS_FACTS: dict[str, Harness] = {
     "claude": Harness(
+        display="Claude Code",
         set_by=Fact("the command line: the chat's own permission flag, passed on as it is", _CLAUDE_HELP),
         chat_flags=(
             _claude_mode("manual", "manual"),
@@ -174,6 +176,7 @@ HARNESS_FACTS: dict[str, Harness] = {
         ),
     ),
     "codex": Harness(
+        display="Codex",
         set_by=Fact(
             "the protocol: thread/start approvalPolicy and approvalsReviewer", _CODEX_SCHEMA + " ThreadStartParams"
         ),
@@ -221,6 +224,7 @@ HARNESS_FACTS: dict[str, Harness] = {
         ),
     ),
     "cursor": Harness(
+        display="Cursor",
         set_by=Fact(
             "the command line: --force, a global option; approvalMode is only reported (unverified: no recorded ACP session; an unknown value fails closed)",
             _CURSOR_FLAGS,
@@ -242,6 +246,7 @@ HARNESS_FACTS: dict[str, Harness] = {
         flags_at=1,
     ),
     "devin": Harness(
+        display="Devin",
         set_by=Fact(
             "the protocol: session/set_config_option permission_mode (unverified: the docs do not describe ACP; an unknown value fails closed)",
             _DEVIN_MODES,
@@ -274,6 +279,7 @@ HARNESS_FACTS: dict[str, Harness] = {
         flags_at=1,
     ),
     "droid": Harness(
+        display="Droid",
         set_by=Fact(
             "the protocol: droid.initialize_session autonomyLevel; --skip-permissions-unsafe on the command line",
             _DROID_SDK,
@@ -299,6 +305,7 @@ HARNESS_FACTS: dict[str, Harness] = {
         ),
     ),
     "opencode": Harness(
+        display="OpenCode",
         set_by=Fact("no documented way: opencode acp takes no --auto; the page asks for edit and bash", _OPENCODE_HELP),
         chat_flags=(ChatFlag(("--auto",), None, "skip approvals", _OPENCODE_HELP),),
         reported=(),
@@ -649,7 +656,7 @@ def candidate(
     command, _ = _HARNESSES[name]
     executable = which(command[0])
     if executable is None:
-        return Candidate(name, (), "not-installed", text=f"{name} is not installed. Install it, then serve again.")
+        return Candidate(name, (), "not-installed", text=f"{display_name(name)} is not installed. Install it, then serve again.")
     chat = _resolve_chat(name, chat_argv)
     at = HARNESS_FACTS[name].flags_at or len(command)
     argv = (executable, *command[1:at], *(chat.argv if chat else ()), *command[at:])
@@ -688,11 +695,17 @@ def version_supported(name: str, version: str) -> bool:
     return release >= minimum
 
 
+def display_name(name: str) -> str:
+    """The harness's name as the user knows it (Claude Code, not claude); an unknown id as it is."""
+    facts = HARNESS_FACTS.get(name)
+    return facts.display if facts else name
+
+
 def version_problem(name: str, reported: str) -> str:
     match = None if name == "cursor" else _VERSION.search(reported)
     found = match.group(0) if match else reported.strip()[:80] or "no version"
     needed = ".".join(str(part) for part in _MIN_VERSION[name])
-    return f"{name} reported {found}. Version {needed} or later is required."
+    return f"{display_name(name)} reported {found}. Version {needed} or later is required."
 
 
 def session_id_valid(name: str, session_id: Any) -> bool:

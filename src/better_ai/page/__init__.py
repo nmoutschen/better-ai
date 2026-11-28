@@ -1418,7 +1418,7 @@ def link_request(unit) -> str:
                 reply = stream.readline(512).decode(errors="replace").strip()
     except OSError:
         return nothing
-    return reply if re.fullmatch(r"on|off (no-browser|timeout): [^\n]+", reply) else nothing
+    return reply if re.fullmatch(r"on|off [a-z-]+: [^\n]+", reply) else nothing
 
 
 @cli.verb(
@@ -1492,9 +1492,13 @@ def remove_if_ours(unit: Unit, name: str, value: bytes) -> None:
             unit.target(name).unlink()
 
 
+# The lock file stays: removing a file others may hold open lets two serves lock two different files.
+SERVE_LOCK = ".page-serve-lock"
+
+
 @contextlib.contextmanager
 def serve_lock(unit: Unit):
-    fd = os.open(unit.target(".page-serve-lock"), os.O_RDWR | os.O_CREAT | paths.NOFOLLOW, 0o600)
+    fd = os.open(unit.target(SERVE_LOCK), os.O_RDWR | os.O_CREAT | paths.NOFOLLOW, 0o600)
     try:
         try:
             lock_unit(fd)
@@ -1769,7 +1773,7 @@ def ignore_driver_files(unit: Unit) -> None:
     except FileNotFoundError:
         text = ""
     listed = text.splitlines()
-    missing = [name for name in (DRIVER, DRIVER_LOG) if name not in listed]
+    missing = [name for name in (DRIVER, DRIVER_LOG, LINK_SOCKET, ACTIVE_DELIVERY, SERVE_LOCK) if name not in listed]
     if missing:
         gap = "" if not text or text.endswith("\n") else "\n"
         paths.write_atomic(unit, ".gitignore", (text + gap + "\n".join(missing) + "\n").encode())
@@ -1920,16 +1924,17 @@ def find_harness():
     if found.kind == "no-harness":
         raise Off("no-harness", found.text)
     if found.kind == "not-installed":
-        raise Off("not-installed", f"{found.name} CLI not found on PATH")
+        raise Off("not-installed", f"{adapters.display_name(found.name)} CLI not found on PATH")
     wanted = adapters.candidate(found.name, os.environ, chat_argv=adapters.chat_argv(found.name))
     if wanted.kind == "not-installed":
-        raise Off("not-installed", f"{wanted.name} CLI not found on PATH")
+        raise Off("not-installed", f"{adapters.display_name(wanted.name)} CLI not found on PATH")
     if wanted.kind is not None:
         raise Off(wanted.kind, wanted.text)
     if not wanted.codec_factory:
         raise Off(
             "no-approvals",
-            f"{wanted.name} does not forward approval requests to better-ai; run serve from another harness",
+            f"{adapters.display_name(wanted.name)} does not send its approval requests to better-ai; run serve from "
+            "another harness",
         )
     return wanted
 
@@ -1978,7 +1983,7 @@ def preflight(run, unit, conv):
 
 
 def check_harness(candidate, unit: Unit, deadline: float) -> None:
-    from .adapters import version_problem, version_supported
+    from .adapters import display_name, version_problem, version_supported
 
     try:
         version = subprocess.run(
@@ -1993,14 +1998,14 @@ def check_harness(candidate, unit: Unit, deadline: float) -> None:
     except subprocess.TimeoutExpired:
         raise Off("timeout", "checking the harness version") from None
     except FileNotFoundError:
-        raise Off("not-installed", f"{candidate.name} CLI not found on PATH") from None
+        raise Off("not-installed", f"{display_name(candidate.name)} CLI not found on PATH") from None
     if version.returncode or not version_supported(candidate.name, version.stdout):
         raise Off("version", version_problem(candidate.name, version.stdout))
 
 
 def start_driver(driven, candidate, conv, run, deadline, note, archive) -> None:
     from . import triggers as skill_triggers
-    from .adapters import child_environment, session_id_valid
+    from .adapters import child_environment, display_name, session_id_valid
     from .driver import Driver, StartError
     from .transport import ProcessTransport
 
@@ -2051,7 +2056,7 @@ def start_driver(driven, candidate, conv, run, deadline, note, archive) -> None:
         if time.monotonic() >= deadline:
             raise Off("timeout", "starting the agent's session") from None
         if error.kind == "login":
-            raise Off("login", f"log in to {candidate.name} in a terminal, then run serve again") from None
+            raise Off("login", f"log in to {display_name(candidate.name)} in a terminal, then run serve again") from None
         raise Off(error.kind, str(error)) from None
     driven.ready = True
 

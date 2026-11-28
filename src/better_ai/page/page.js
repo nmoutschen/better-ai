@@ -108,13 +108,15 @@ function pageAgentNotice() {
   if (pageDriverDown) return PAGE_DRIVER_DOWN;
   return (pageAgentState && pageAgentState.text) || '';
 }
-// Stop while the agents run, Start once they stopped or failed (except on the driver's own error, which needs serving the
-// page again), nothing while they stop, after the page closed or while the driver is gone.
+// Stop while the agents run, Start once they stopped or failed, nothing while they stop, after the page closed or while the
+// driver is gone. A failure that only serving the page again resolves has no Start: the driver's own error, and a harness
+// that sends no approval requests.
+var PAGE_NO_START = ['driver', 'no-approvals'];
 function pageAgentControl() {
   var a = pageAgentState;
   if (!a || pageDriverDown || pageIsStale) return '';
   if (['idle', 'working', 'waiting', 'stalled'].indexOf(a.state) >= 0) return 'stop';
-  return (a.state === 'stopped' || a.state === 'failed') && a.kind !== 'driver' ? 'start' : '';
+  return a.state === 'stopped' || (a.state === 'failed' && PAGE_NO_START.indexOf(a.kind) < 0) ? 'start' : '';
 }
 
 // The call to the page's server for what is not a message: the answers to requests, Stop and Start. Resolves when the
