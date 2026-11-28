@@ -48,6 +48,22 @@ def approval(key=1, requester=None, tool="Write", arguments=None):
     )
 
 
+def gone(pid, wait=2.0):
+    """True once pid no longer runs. A killed grandchild can stay a zombie until init reaps it: that counts as gone."""
+    deadline = time.monotonic() + wait
+    while True:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        state = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+        if state.startswith("Z"):
+            return True
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.05)
+
+
 class Answering(Peer):
     def answer(self, request_id, choice, reason):
         self.calls.append(("answer", request_id, choice, reason))
@@ -342,8 +358,7 @@ class LifecycleTests(Case):
         transport.close()
         self.assertLess(time.monotonic() - started, 5)
         for pid in (transport.pid, child):
-            with self.assertRaises(ProcessLookupError):
-                os.kill(pid, 0)
+            self.assertTrue(gone(pid), f"process {pid} still runs after close")
 
     def test_a_planned_close_cancels_the_turn_and_publishes_closed_with_the_reason(self):
         # S47, S105
