@@ -110,8 +110,15 @@ class DeliveryTest(shell.Fixture):
         self.assertEqual((code, err), (0, ""))
         records = [{k: v for k, v in r.items() if k != "since"} for r in map(json.loads, out.splitlines()[:-1])]
         expected = [{**item, "status": {0: "working", 1: "seen"}.get(n, "new")} for n, item in enumerate(sent[:-1])]
+        # The turn keeps its items, and m21, sent since, stays for a later turn. The user's writes since in the turn's
+        # own threads are shown, with a --read that covers them, as a --read before them is refused (D12): the agent
+        # sent here by that refusal reads them, then sends again. A note sent again keeps its first text (page
+        # `threads`: only a comment is edited).
+        answer = self.log()[len(sent) + 2]
+        thread = [{"from": "user", "at": answer["at"], "text": "later-answer", "id": "later-answer"}]
+        expected[0] = {**expected[0], "thread": thread}
         self.assertEqual(records, [*expected, sent[-1]])
-        self.assertEqual(out.splitlines()[-1], f"21 not done. Pass --read {len(sent) - 1} to status and reply.")
+        self.assertEqual(out.splitlines()[-1], f"21 not done. Pass --read {len(sent) + 2} to status and reply.")
 
     def test_an_rpc_edit_reaches_pending_only_while_the_item_is_not_settled(self):
         _, host = self.serve()

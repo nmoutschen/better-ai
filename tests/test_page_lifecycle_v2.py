@@ -460,6 +460,81 @@ class VerbFormTest(Unit):
         self.assertIn("word for word", text)
 
 
+class ReadInASessionTest(Unit):
+    """The page agent passes --read in the header's form: approved without asking, refused when the user wrote in the
+    thread since, then approved again with the --read that pending gives (D12, S9)."""
+
+    def setUp(self):
+        super().setUp()
+        if not PYZ.exists():
+            self.skipTest("the built better.pyz of show-better is missing")
+        self.dump, self.result = self.root / "stub.dump", self.root / "stub.result"
+        with (self.folder / "conversation.jsonl").open("a") as log:
+            log.write(json.dumps({"type": "note", "at": "2026-11-28T10:00:00Z", "by": "user", **note("m1")}) + "\n")
+        reply = "{python} {pyz} reply {unit} --to m1 --read {read} <<'EOF'\n%s\nEOF"
+        self.commands = [
+            "true",  # asked on the page: the user writes in m1 while it waits
+            reply % "first",  # its --read is now before the user's note: refused
+            "{python} {pyz} pending {unit}",  # shows the note, with a --read that covers it
+            reply % "second",
+        ]
+        env = stub_env(STUB_DUMP=str(self.dump), STUB_RESULT=str(self.result))
+        env.update(STUB_MODE="verb", STUB_COMMANDS=json.dumps(self.commands))
+        done = subprocess.run(
+            [sys.executable, str(PYZ), "serve", ".show/deck", "--no-browser"],
+            cwd=self.root,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.addCleanup(self.end_everything)
+        self.secret = self.pair(done)
+
+    def answers(self):
+        return [json.loads(line) for line in self.result.read_text().splitlines()] if self.result.exists() else []
+
+    def agent(self):
+        status, text = self.request("GET", "/agent", secret=self.secret)
+        self.assertEqual(status, 200, text)
+        return json.loads(text)
+
+    def test_a_stale_reply_is_refused_then_sent_again_after_pending_all_without_asking(self):  # D12, S9
+        self.assertTrue(wait_for(lambda: self.agent()["approvals"], 30), "the first command is asked on the page")
+        (asked,) = self.agent()["approvals"]
+        more = {**note("m1-more", "and make it blue"), "to": "m1"}
+        status, text = self.request("POST", "/rpc", rpc("note", more), self.secret)
+        self.assertEqual((status, json.loads(text).get("result")), (200, "saved"), text)
+        status, text = self.request(
+            "POST", "/rpc", rpc("permission_answer", {"id": asked["id"], "choice": "allow_once"}), self.secret
+        )
+        self.assertEqual(status, 200, text)
+        self.assertTrue(wait_for(lambda: len(self.answers()) == len(self.commands), 30), self.answers())
+        answers = self.answers()
+        self.assertEqual([a["behavior"] for a in answers], ["allow"] * 4)
+        self.assertEqual([a["exit"] for a in answers], [0, 1, 0, 0], "the stale reply is refused, the next one is not")
+        self.assertEqual([a["message"] for a in answers[1:]], [None] * 3)
+        approvals = [
+            r
+            for r in map(json.loads, (self.folder / ".driver.log").read_text().splitlines())
+            if r["type"] == "approval"
+        ]
+        self.assertEqual([a["reason"] for a in approvals[1:]], ["Approved page command"] * 3, "no verb call is asked")
+        log = [json.loads(line) for line in (self.folder / "conversation.jsonl").read_text().splitlines()]
+        replies = [e["text"] for e in log if e["type"] == "reply"]
+        self.assertEqual(replies, ["second"])
+        line = next(n for n, e in enumerate(log) if e.get("id") == "m1-more")
+        (done,) = [e for e in log if e["type"] == "status" and e["to"] == "m1"]
+        self.assertGreaterEqual(done["read"], line, "the --read pending gave covers the user's note")
+        # Nothing on the page is broken meanwhile: no failure, no request left open, no blocked call, no problem line.
+        body = self.agent()
+        self.assertNotEqual(body["state"], "failed", body)
+        self.assertEqual((body["approvals"], body["blocked"], body.get("problems", [])), ([], [], []))
+
+
 class LinkTest(Browser):
     def test_link_opens_a_newer_tab_and_the_old_one_is_refused_everywhere(self):  # S84, S85
         env = self.env(STUB_MODE="ask")

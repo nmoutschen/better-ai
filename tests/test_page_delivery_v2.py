@@ -1065,6 +1065,34 @@ class TheApprovedForm(Turns):
                 call = head + " C-w1-1 --by verifier-1 " + bad + body
                 self.assertFalse(approvals.verb_command(call, self.unit_dir, archive, ("add", "set")))
 
+    def test_reply_and_status_take_read_with_the_line_pending_gives_and_the_header_says_so_D12(self):
+        # The CLI refuses a status or a reply under a thread without --read (D12): the approved form carries it, as a
+        # line number only, on reply and status alone.
+        head = lambda verb: f"{COMMAND} {verb} {self.unit_dir}"  # noqa: E731
+        body = " <<'EOF'\nDone.\nEOF"
+        for call in (
+            head("reply") + " --to m1 --read 12" + body,
+            head("reply") + " --to m1 --state asked --read 0 --by page-agent" + body,
+            head("status") + " seen m1 m2 --read 3",
+            head("status") + " done m1 --read 40 --by builder-t3",
+        ):
+            with self.subTest(call=call):
+                self.assertTrue(approvals.verb_command(call, self.unit_dir, ARCHIVE, ("add", "set")))
+        for call in (
+            head("reply") + " --to m1 --read x" + body,
+            head("reply") + " --to m1 --read -1" + body,
+            head("reply") + " --to m1 --read 1.5" + body,
+            head("reply") + " --to m1 --read" + body,
+            head("status") + " seen m1 --read ٣",
+            head("pending") + " --read 3",
+            head("add") + " decision --read 3",
+        ):
+            with self.subTest(call=call):
+                self.assertFalse(approvals.verb_command(call, self.unit_dir, ARCHIVE, ("add", "set")))
+        form = approvals.approved_form(COMMAND, self.unit_dir, ("add", "set"))
+        self.assertIn("--read <n> on reply and status", form)
+        self.assertIn("the line pending gives", form)
+
     def test_the_page_agent_reads_ids_only_past_the_most_items_a_prompt_holds_N3(self):
         self.assertIn("IF only item IDs are supplied, RUN `pending` for the full copy.", PAGE_AGENT.read_text())
 

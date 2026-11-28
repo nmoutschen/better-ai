@@ -15,7 +15,7 @@ It answers `--version`, and the stream-json messages the Claude Code adapter sen
 STUB_DUMP, if set, is a file the stub appends its environment and every line it reads to.
 STUB_COMMANDS (verb mode) is a JSON list of shell commands. In each, {python}, {pyz} and {unit} stand for what the
 prompt's header names as approved without asking: the interpreter, the archive and the unit, quoted as the header quotes
-it. STUB_RESULT is the file that gets one JSON line for each answer: its behavior, its message and the exit code of the
+it; {read} stands for the --read the prompt's last line gives, or the one the output of a command run since gave. STUB_RESULT is the file that gets one JSON line for each answer: its behavior, its message and the exit code of the
 command, which runs when it is allowed.
 STUB_HANDLE, if set, makes the stub do what a page agent does with the items of a prompt: it runs `status <unit> done
 <id> --read <n>` for each item whose status is new, with the --read the prompt's last line gives, so that the driver sees
@@ -68,17 +68,20 @@ def prompt_text(message):
 
 
 def run_commands(message):
-    """Verb mode: each command is asked in turn, with the header's form filled in."""
+    """Verb mode: each command is asked in turn, with the header's form filled in. {read} is the line the prompt's last
+    line gives to pass as --read, or the one a command's output gave since, as `pending` prints it."""
     python, pyz, unit = header_form(prompt_text(message))
+    read = read_line(prompt_text(message)) or "0"
     for number, template in enumerate(json.loads(os.environ["STUB_COMMANDS"])):
         command = template.replace("{python}", shlex.quote(python)).replace("{pyz}", shlex.quote(pyz))
-        command = command.replace("{unit}", unit)
+        command = command.replace("{unit}", unit).replace("{read}", read)
         request = {"subtype": "can_use_tool", "tool_name": "Bash", "input": {"command": command, "description": "Run a page verb"}}
         say({"type": "control_request", "request_id": f"verb-{number}", "request": request})
         response = json.loads(sys.stdin.readline()).get("response", {}).get("response", {})
         code = None
         if response.get("behavior") == "allow":
-            code = subprocess.run(["bash", "-c", command], capture_output=True, check=False).returncode
+            done = subprocess.run(["bash", "-c", command], capture_output=True, text=True, check=False)
+            code, read = done.returncode, read_line(done.stdout) or read
         answer = {"behavior": response.get("behavior"), "message": response.get("message"), "exit": code}
         with open(os.environ["STUB_RESULT"], "a") as result:
             result.write(json.dumps(answer) + "\n")
