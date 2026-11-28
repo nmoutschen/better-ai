@@ -17,13 +17,17 @@ log at that moment; A3 the page shows the user the log as it is when they act. A
 not modelled. The runs are bounded by `MaxLog` (and `MaxItems`), so a pass means no violation within that bound.
 
 Invariants: `NoLostWrite` (a user event the agent has not read puts the thread in the agent's turn), `CloseSticks`
-(a close the agent has not read stays closed), `NoDeadThread` (every open thread can move), `AskedAfterReading`
+(in `conversation.tla`, a close the agent has not read stays closed; in `thread.tla`, a thread the user closed stays
+closed until the user acts on it again, whatever the agent does), `NoDeadThread` (every open thread can move), `AskedAfterReading`
 (Your turn only for a question asked after reading the user's latest message), `SeenIsTrue` (Not seen yet only
-while the agent has not read the user's latest event), `TypeOK`.
+while the agent has not read the user's latest event), `TypeOK`. `thread.tla` also states S4 and `InOpen` (S6) as comments: no config checks them.
 
 ## Configs
 
-Must fail, with the invariant named in the trace:
+Must fail, with the invariant named in the trace. TLC searches breadth first and checks the invariants in the order
+the config lists them, so it reports the shortest violation of the first one: `as-built-item` also breaks
+`CloseSticks` (one step deeper), and `thread-without-stale-guard` also breaks `AskedAfterReading` (in the same
+state, listed after `NoLostWrite`).
 
 | Config | Fails with | Shows |
 | --- | --- | --- |

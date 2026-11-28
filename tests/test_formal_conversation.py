@@ -36,6 +36,10 @@ CONFIGS = {
 }
 
 
+# The slowest config takes about 15 minutes; a run past an hour has hung, and fails the test with TimeoutExpired.
+TLC_TIMEOUT = 3600
+
+
 def run_tlc(config, module):
     with tempfile.TemporaryDirectory() as meta:
         proc = subprocess.run(
@@ -44,6 +48,7 @@ def run_tlc(config, module):
             cwd=MODELS,
             capture_output=True,
             text=True,
+            timeout=TLC_TIMEOUT,
         )
     return proc.stdout + proc.stderr
 
