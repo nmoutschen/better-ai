@@ -255,30 +255,30 @@ sys.exit(cli.main())
         self.assertEqual(self.request(url + "agent", token=token)[0], 404)
         self.assertTrue((self.root / "harness-started").exists())
 
-    def test_orphan_cleanup_checks_the_exact_process_birth(self):
-
-        from better_ai.page.transport import process_birth
+    def test_orphan_cleanup_checks_the_exact_command_line(self):
+        from better_ai.page.transport import process_command
 
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"], start_new_session=True)
         self.addCleanup(child.wait, timeout=3)
         self.addCleanup(child.kill)
-        birth = process_birth(child.pid)
-        if not birth:
-            self.skipTest("Process birth is not available on this OS")
+        command = process_command(child.pid)
+        if not command:
+            self.skipTest("Process command lines are not available on this OS")
         state_file = self.folder / ".driver"
         state = {
             "version": 1,
             "harness": "opencode",
             "session": "session-old",
+            "opened": 1.0,
             "child_pid": child.pid,
         }
-        for recorded in ("from-a-previous-boot", birth):
-            state_file.write_text(json.dumps({**state, "child_started": recorded}))
+        for argv in (["another", "command"], command.split(" ")):
+            state_file.write_text(json.dumps({**state, "child_argv": argv}))
             state_file.chmod(0o600)
             server = self.serve()
             server.terminate()
             server.communicate(timeout=3)
-            if recorded != birth:
+            if argv[0] == "another":
                 self.assertIsNone(child.poll())
             else:
                 self.assertLess(child.wait(timeout=3), 0)

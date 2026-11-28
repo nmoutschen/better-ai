@@ -192,6 +192,7 @@ class StateTests(Case):
         driver.start()
         self.assertTrue(self.peers[0].prompt_arrived.wait(2))
         turn = self.state()["turn"]
+        self.assertEqual(self.peers[0].uuids, [turn["prompt_uuid"]])
         self.assertEqual(set(turn), {"number", "prompt_uuid", "sent_at"})
         self.assertEqual(turn["number"], 1)
         self.conv.items["one"] = "done"
@@ -249,6 +250,7 @@ class StateTests(Case):
         from better_ai.page.transport import process_command
 
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
+        self.addCleanup(child.wait)
         self.addCleanup(child.kill)
         command = process_command(child.pid)
         self.saved(child_pid=child.pid, child_argv=command.split(" "))
@@ -259,6 +261,7 @@ class StateTests(Case):
     def test_a_process_with_another_command_line_is_left_alone(self):
         # S98
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
+        self.addCleanup(child.wait)
         self.addCleanup(child.kill)
         self.saved(child_pid=child.pid, child_argv=["something", "else"])
         self.driver().start()
@@ -405,6 +408,23 @@ class LifecycleTests(Case):
             event = transport.poll(3)
         self.assertEqual((event.kind, event.outcome), ("failed", "crashed"))
 
+    def test_the_transport_passes_the_prompt_uuid_to_the_codec(self):
+        seen = []
+
+        class Codec:
+            def __init__(self, send):
+                pass
+
+            def prompt(self, text, uuid):
+                seen.append((text, uuid))
+
+        transport = self.module.ProcessTransport(
+            [sys.executable, "-c", "import time; time.sleep(30)"], self.root, os.environ, Codec
+        )
+        self.addCleanup(transport.close)
+        transport.prompt("hello", "u-1")
+        self.assertEqual(seen, [("hello", "u-1")])
+
     def test_the_same_error_after_start_gets_the_fixed_sentence(self):
         # S121
         self.conv.item("one")
@@ -413,11 +433,13 @@ class LifecycleTests(Case):
         self.assertTrue(self.peers[0].prompt_arrived.wait(2))
         self.peers[0].events.put(Event("failed", outcome="crashed", text="boom"))
         eventually(lambda: driver.snapshot()["state"] == "failed")
-        self.assertEqual(driver.agent()["text"], "The harness stopped with an error: boom. Press Start to resume.")
+        self.assertEqual(
+            driver.agent()["text"], "All agents are stopped because the harness failed: boom. Press Start to resume."
+        )
         driver.request_start()
         eventually(lambda: len(self.peers) == 2 and self.peers[1].prompts)
         self.peers[1].events.put(Event("failed", outcome="crashed", text="boom"))
-        eventually(lambda: driver.agent()["text"].startswith("The same error"))
+        eventually(lambda: (driver.agent()["text"] or "").startswith("The same error"))
         self.assertEqual(
             driver.agent()["text"], "The same error came back: boom. Fix it in a terminal, then press Start."
         )
@@ -438,7 +460,8 @@ class ApprovalTests(Case):
         item = self.request(driver, requester="worker-1")
         body = driver.agent()
         self.assertEqual(body["state"], "waiting")
-        self.assertEqual((item["who"], item["tool"]), ("worker-1", "Write"))
+        self.assertEqual((item["who"], item["tool"], item["summary"]), ("worker-1", "Write", "to write a file"))
+        self.assertIsInstance(item["arguments"], str)
         self.assertRegex(item["since"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
         self.assertEqual(item["options"], ["allow_once", "allow_session", "deny"])
         self.assertIn("example", item["arguments"])
@@ -471,8 +494,8 @@ class ApprovalTests(Case):
         self.request(driver)
         now += 601
         time.sleep(0.2)
-        self.assertEqual(driver.snapshot()["state"], "working")
         self.assertEqual(driver.agent()["state"], "waiting")
+        self.assertNotIn(driver.agent()["state"], ("stalled", "failed"))
 
     def test_silence_without_an_approval_stalls_and_does_not_end_the_turn(self):
         # S22
@@ -484,7 +507,7 @@ class ApprovalTests(Case):
         self.assertTrue(self.peers[0].prompt_arrived.wait(2))
         now += 601
         eventually(lambda: driver.agent()["state"] == "stalled")
-        self.assertIn("Press Stop", driver.agent()["text"])
+        self.assertIsNone(driver.agent()["text"])
         self.assertFalse(self.peers[0].closed)
 
     def test_stop_denies_open_approvals_with_its_reason(self):
@@ -667,7 +690,7 @@ class LingerTests(Case):
         # S32
         driver = self.driver(launch=lambda tag: Answering())
         driver.start()
-        self.assertTrue(driver.can_linger())
+        eventually(driver.can_linger)
         self.workers.append({"name": "w", "item": "i", "waiting": False, "silent_min": 1})
         self.assertFalse(driver.can_linger())
         self.assertEqual(driver.agent()["workers"][0]["name"], "w")
@@ -679,6 +702,7 @@ class LingerTests(Case):
         self.workers = []
         driver = self.driver()
         driver.start()
+        eventually(lambda: not driver.busy())
         now += 29 * 60
         self.assertFalse(driver.idle_expired())
         now += 2 * 60

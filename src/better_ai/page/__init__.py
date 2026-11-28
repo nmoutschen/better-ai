@@ -1196,11 +1196,10 @@ def unit_identity(unit: Unit) -> str:
 def live_driver(unit: Unit, conv: Conversation | None = None) -> dict:
     if not unit.target(".driver").exists():
         return {}
-    from .adapters import session_id_valid
-    from .driver_state import read_driver_state
+    from .driver_state import load_state
 
-    state = read_driver_state(unit, valid_session=session_id_valid)
-    if not state:
+    state = load_state(unit)
+    if not state or not state["session"]:
         return {}
     try:
         address = conv.address() if conv else paths.read_bytes(unit, ADDRESS).decode().strip()
@@ -1257,27 +1256,12 @@ def lock_unit(fd: int) -> None:
 
 
 def stop_orphan(unit: Unit) -> None:
-    if not unit.target(".driver").exists():
-        return
-    from .adapters import session_id_valid
-    from .driver_state import read_driver_state
-    from .transport import process_birth
+    from .driver_state import load_state
+    from .transport import end_orphan
 
-    state = read_driver_state(unit, valid_session=session_id_valid)
-    pid, birth = state.get("child_pid"), state.get("child_started")
-    if type(pid) is not int or pid <= 1 or not birth:
-        return
-    for signum in (signal.SIGTERM, signal.SIGKILL):
-        try:
-            if process_birth(pid) != birth or os.getpgid(pid) != pid:
-                return
-            os.killpg(pid, signum)
-        except ProcessLookupError:
-            return
-        except PermissionError:
-            raise Refused(f"{unit.label}: the previous page agent's process group could not be stopped") from None
-        if signum == signal.SIGTERM:
-            time.sleep(0.2)
+    state = load_state(unit)
+    if state:
+        end_orphan(state["child_pid"], state["child_argv"])
 
 
 LINK_SOCKET = ".page-link"
@@ -1617,7 +1601,6 @@ def start_driven(driven, candidate, conv, run, deadline, notes, archive, skill_p
         step=step if isinstance(step, str) else "",
         handoff=notes[0] if notes else "",
         triggers=lambda: conv.spec.triggers(conv.unit) if conv.spec.triggers else (),
-        approvals=driven.gate,
         valid_session=lambda session: session_id_valid(candidate.name, session),
     )
     remaining = deadline - time.monotonic()

@@ -4,35 +4,47 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import os
 import queue
 import threading
 import time
 import uuid
-from collections import Counter
+from collections import Counter, deque
 from concurrent.futures import Future
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from .. import paths, resources
 from .driver_state import (
     ACTIVE_DELIVERY,
     LOG,
-    STATE,
+    delivered_field,
+    delivered_position,
     encode,
+    load_state,
     log_records,
-    read_driver_state,
     recent_turn,
+    save_state,
     store_log,
-    write_private,
+    with_defaults,
 )
 from .transport import ProcessTransport as ProcessTransport
+from .transport import end_orphan, process_started
 
 POLL = 0.05
 START_TIMEOUT = 30
+RESUME_TIMEOUT = 10
 STOP_TIMEOUT = 3
 STALL_TIMEOUT = 600
+PROTOCOL_TIMEOUT = 60
+IDLE_LIMIT = 30 * 60
+ALIVE_LIMIT = 10
+MAX_APPROVAL_TEXT = 131072
+OPTIONS = ["allow_once", "allow_session", "deny"]
 
 ACTIONS = {
+    "no-harness": "Start a harness this machine can drive, then serve again.",
     "login": "Log in to the harness, then press Start.",
     "not-installed": "Install the harness, then serve again.",
     "version": "Update the harness, then serve again.",
@@ -40,8 +52,34 @@ ACTIONS = {
     "crashed": "Press Start to resume.",
     "not-handling": "Check the page agent's last reply and log, then press Start.",
     "driver": "Serve the page again.",
+    "protocol": "Update better-ai, or use a harness version it was tested with.",
     "unsafe-mode": "Change the harness's approval mode, then serve again.",
     "no-approvals": "This harness can't be driven safely. The chat agent listens instead.",
+}
+
+# The sentence the page shows for a state or failed kind: fixed words with at most one inserted value.
+NOTICES = {
+    "login": "All agents are stopped because {} isn't logged in. Log in from a terminal, then press Start.",
+    "limit": "All agents are stopped because the harness hit its limit: {}. Press Start after it resets.",
+    "crashed": "All agents are stopped because the harness failed: {}. Press Start to resume.",
+    "crashed-again": "The same error came back: {}. Fix it in a terminal, then press Start.",
+    "not-handling": "All agents are stopped because they did not handle {}. Press Start to retry, or reword the comment.",
+    "driver": "The page's agents stopped because of an error: {}. Ask the agent in your chat to serve this page again. Log: {}.",
+    "protocol": "All agents are stopped because the harness protocol is unknown: {}. Update better-ai, or use a version it was tested with.",
+    "stopped": "All agents are stopped. Press Start to have them read your messages.",
+    "idle": "This page is closed after 30 minutes with no activity. Ask the agent in your chat to reopen it.",
+    "closed": "This page has closed: {}.",
+}
+
+# What an approval asks for, in the words after "<who> wants".
+WANTS = {
+    "Read": "to read a file",
+    "Write": "to write a file",
+    "Edit": "to edit a file",
+    "MultiEdit": "to edit a file",
+    "Bash": "to run a command",
+    "WebFetch": "to fetch a web page",
+    "WebSearch": "to search the web",
 }
 
 
@@ -66,6 +104,29 @@ class Turn:
         return frozenset(self.record["items"])
 
 
+@dataclass
+class Approval:
+    id: str
+    event: object
+    peer: object
+    who: str
+    tool: str
+    arguments: str
+    since: float
+    record: dict
+    key: tuple
+    requester: str | None
+    summary: str
+
+
+def iso(moment: float) -> str:
+    return datetime.fromtimestamp(moment, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def display(value) -> str:
+    return value if isinstance(value, str) else json.dumps(value, sort_keys=True, indent=2, allow_nan=False)
+
+
 class Driver:
     """The loop owns the transport and durable state; HTTP handlers only post commands or read a snapshot."""
 
@@ -81,7 +142,10 @@ class Driver:
         step: str = "",
         handoff: str = "",
         triggers=lambda: (),
-        approvals=None,
+        workers=lambda: (),
+        auto_approve=None,
+        version: str = "",
+        tested: str = "",
         clock=time.monotonic,
         valid_session,
     ):
@@ -90,45 +154,61 @@ class Driver:
         self.harness = harness
         self.launch = launch
         self.cwd = str(cwd)
-        self.step, self.handoff = step, handoff
+        self.step = step
         self.skill_path, self.command = str(skill_path), command
-        self.triggers, self.approvals, self.clock = triggers, approvals, clock
+        self.triggers, self.workers, self.auto_approve, self.clock = triggers, workers, auto_approve, clock
+        self.version, self.tested = version, tested
         self.valid_session = valid_session
-        saved = read_driver_state(self.unit, harness, valid_session=lambda name, key: valid_session(key))
-        self.session = saved.get("session")
-        tag = saved.get("tag")
-        try:
-            self.tag = str(uuid.UUID(tag))
-        except (AttributeError, TypeError, ValueError):
-            self.tag = str(uuid.uuid4())
+        saved = load_state(self.unit) or with_defaults({})
+        self._saved = saved
+        # A session is resumed only if this driver opened it for this unit, in the same harness (S48, S131).
+        opened = saved["opened"]
+        resumable = (
+            saved["harness"] == harness
+            and isinstance(opened, (int, float))
+            and opened > 0
+            and isinstance(saved["session"], str)
+            and valid_session(saved["session"])
+        )
+        self.session = saved["session"] if resumable else None
+        self._opened = opened if resumable else 0
+        self.tag = str(uuid.uuid4())
+        self._server_started = process_started(os.getpid())
 
-        delivered = saved.get("delivered")
-        self._delivered = delivered if type(delivered) is int and delivered >= 0 else 0
-        self._fired = self._strings(saved.get("fired"))
+        events = conversation.events()
+        self._delivered = delivered_position(saved["delivered"], events)
+        self._delivered_field = delivered_field(self._delivered, events)
+        self._fired = self._strings(saved["fired"])
+        self._note = handoff or saved["note"] or ""
+        self._handoff_delivered = False if handoff else bool(saved["handoff_delivered"])
+        self._ended = dict(saved["ended"])
+        self._turn_state = None
         self._records = log_records(self.unit)
         for record in self._records:
             if record.get("type") == "approval" and "answer" not in record:
                 record.update(answer="expired", reason="driver restarted")
-        audit_turn = recent_turn(self._records, self.session)
-        # Older checkpoints stored turn membership only in the bounded audit history.
-        last = saved.get("last_turn", audit_turn)
-        self._last_turn = last if isinstance(last, dict) else {}
-        self._number = self._last_turn.get("number", 0)
-        if type(self._number) is not int:
-            self._number = 0
         self._carry = frozenset()
         self._recover = frozenset()
         self._recover_turn = 0
         self._recover_kind = ""
-        if self._last_turn:
-            items = self._strings(self._last_turn.get("items"))
-            outcome = self._last_turn.get("outcome") or "crashed"
+        self._number = 0
+        # A turn still set in .driver ended without the driver seeing it: it crashed (S72).
+        crashed = saved["turn"] if isinstance(saved["turn"], dict) else None
+        turns = [record for record in self._records if record.get("type") == "turn"]
+        last = turns[-1] if turns else {}
+        if crashed:
+            last = next((r for r in reversed(turns) if r.get("number") == crashed.get("number")), last)
+        number = (crashed or last).get("number", 0)
+        self._number = number if type(number) is int else 0
+        if last:
+            items = self._strings(last.get("items"))
+            outcome = "crashed" if crashed else (last.get("outcome") or "crashed")
             if outcome == "completed":
                 self._carry = items
             else:
-                self._recover, self._recover_turn, self._recover_kind = items, self._number, outcome
-            if audit_turn.get("number") == self._number and "end" not in audit_turn:
-                audit_turn.update(end=time.time(), outcome=outcome)
+                self._recover, self._recover_turn, self._recover_kind = items, last.get("number", 0), outcome
+            if "end" not in last:
+                last.update(end=time.time(), outcome=outcome)
         self._retry = False
         self._admitted_items = set()
         self._admitted_edits = set()
@@ -148,15 +228,27 @@ class Driver:
         self._deadline = 0.0
         self._commands = queue.Queue()
         self._answer_lock = threading.Lock()
-        self._published = ("starting", time.time(), clock(), False, {})
+        self._log_lock = threading.RLock()
         self._thread = threading.Thread(target=self._run, name="page-agent", daemon=True)
         self._state = "starting"
         self._since = time.time()
         self._details = {}
         self._last_output = self.clock()
+        self._last_poll = self.clock()
         self._first_prompt = True
-        self._opened = 0.0
-        self._approval_records = {}
+        self._open_approvals = {}
+        self._grants = set()
+        self._blocked = deque(maxlen=20)
+        self._auto_used = False
+        self._unknown_since = None
+        self._unit_checked = 0.0
+        self._closed = None
+        self._close_reason = "server stopped"
+        self._driver_failed = False
+        self._failed_error = None
+        self._last_stderr = ""
+        self._published = {}
+        self._publish()
 
     @staticmethod
     def _strings(values) -> frozenset[str]:
@@ -166,6 +258,8 @@ class Driver:
 
     def start(self, timeout=START_TIMEOUT) -> str:
         self._deadline = time.monotonic() + timeout
+        if end_orphan(self._saved["child_pid"], self._saved["child_argv"]):
+            self._record_end("orphan ended at start")
         self._thread.start()
         if not self._started.wait(timeout):
             self._closing.set()
@@ -183,34 +277,166 @@ class Driver:
     def request_stop(self) -> None:
         self._commands.put(("stop", None))
 
-    def close(self) -> None:
+    def close(self, kind: str = "stopped", reason: str = "server stopped") -> None:
+        """A planned end: publish closed with the reason at once, cancel as Stop does, and end the process group."""
+        self._closed = (kind, reason, time.time())
+        self._close_reason = reason
+        self._force("closed", {"kind": kind, "message": reason}, self._closed[2])
         self._closing.set()
         if self._thread.ident is not None:
             self._thread.join(timeout=4.75)
 
+    def busy(self) -> bool:
+        """Something still needs the driver: a turn, an open approval, a worker, or work waiting."""
+        published = self._published
+        return bool(
+            published["state"] in ("starting", "working", "stalled", "stopping")
+            or published["approvals"]
+            or published["waiting"]
+            or self._worker_list()
+            or not self._commands.empty()
+        )
+
     def can_linger(self) -> bool:
-        state, _, _, waiting, _ = self._published
-        return state not in ("starting", "working", "stalled", "stopping") and not waiting and self._commands.empty()
+        return not self.busy()
+
+    def idle_expired(self, limit: float = IDLE_LIMIT) -> bool:
+        """No tab has polled /agent for `limit` seconds and nothing needs the driver (S104)."""
+        return not self.busy() and self.clock() - self._last_poll >= limit
+
+    def check_alive(self, limit: float = ALIVE_LIMIT) -> bool:
+        """For the server's watchdog: False once the loop is dead or its liveness mark is older than `limit`."""
+        if self._driver_failed or self._failed_error is not None:
+            return False
+        if self._closing.is_set() or not self._started.is_set():
+            return True
+        if self.clock() - self._published["at"] > limit:
+            self.fail_driver("the driver loop stopped responding")
+            return False
+        return True
+
+    def fail_driver(self, error: str) -> None:
+        """Publish failed, kind driver, from outside the loop, and end the harness and its approvals (S62)."""
+        if self._driver_failed:
+            return
+        self._driver_failed = True
+        self._failed_error = error
+        self._force("failed", {"kind": "driver", "message": error, "log": str(self.unit.target(LOG))})
+        self._record_end(error)
+        self._closing.set()
+        with contextlib.suppress(Exception):
+            self._close_peer(error)
+
+    @property
+    def error(self) -> str | None:
+        return self._failed_error
 
     def snapshot(self) -> dict:
-        state, since, at, waiting, details = self._published
+        published = self._published
+        return {
+            "state": published["state"],
+            "since": published["since"],
+            "age": max(0, self.clock() - published["at"]),
+            "waiting": published["waiting"],
+            **published["details"],
+        }
+
+    def agent(self) -> dict:
+        """The body of /agent (decision D1). Each call counts as a tab polling."""
+        self._last_poll = self.clock()
+        published = self._published
+        state, details = published["state"], published["details"]
         return {
             "state": state,
-            "since": since,
-            "age": max(0, self.clock() - at),
-            "waiting": waiting,
-            **details,
+            "since": iso(published["since"]),
+            "kind": details.get("kind") if state in ("failed", "closed") else None,
+            "text": self._text(state, details),
+            "mark_age": max(0, self.clock() - published["at"]),
+            "approvals": published["approvals"],
+            "workers": self._worker_list(),
+            "blocked": published["blocked"],
+            "auto_approved_once": published["auto"],
+        }
+
+    def _worker_list(self) -> list:
+        try:
+            return [dict(worker) for worker in self.workers()]
+        except Exception:
+            return []
+
+    def _text(self, state: str, details: dict) -> str | None:
+        """The finished notice for stopped, failed and closed; null for every other state (decision D7)."""
+        message = str(details.get("message", ""))[:500]
+        if state == "closed":
+            return NOTICES["idle"] if details.get("kind") == "idle" else NOTICES["closed"].format(message)
+        if state == "stopped":
+            return NOTICES["stopped"]
+        if state != "failed":
+            return None
+        kind = details.get("kind", "crashed")
+        if kind == "crashed" and details.get("repeats", 0) >= 1:
+            kind = "crashed-again"
+        if kind == "login":
+            return NOTICES[kind].format(self.harness)
+        if kind == "not-handling":
+            return NOTICES[kind].format(", ".join(details.get("items", ())))
+        if kind == "driver":
+            return NOTICES[kind].format(message, details.get("log", self.unit.target(LOG)))
+        if kind in NOTICES:
+            return NOTICES[kind].format(message)
+        return ACTIONS.get(kind, message)
+
+    def _force(self, state: str, details: dict, since: float | None = None) -> None:
+        """Publish a state from outside the loop thread and keep the loop from replacing it."""
+        self._published = {
+            **self._published,
+            "state": state,
+            "since": since or time.time(),
+            "details": details,
+            "approvals": [],
+            "at": self.clock(),
         }
 
     def _publish(self) -> None:
-        self._published = (self._state, self._since, self.clock(), self._wake or self._retry, self._details)
+        if self._driver_failed or self._closed:
+            return
+        state, since = self._state, self._since
+        approvals = [
+            {
+                "id": a.id,
+                "who": a.who,
+                "tool": a.tool,
+                "arguments": a.arguments,
+                "summary": a.summary,
+                "since": iso(a.since),
+                "options": list(OPTIONS),
+            }
+            for a in self._open_approvals.values()
+        ]
+        if approvals and state in ("idle", "working", "stalled"):
+            state, since = "waiting", min(a.since for a in self._open_approvals.values())
+        self._published = {
+            "state": state,
+            "since": since,
+            "at": self.clock(),
+            "waiting": self._wake or self._retry,
+            "details": self._details,
+            "approvals": approvals,
+            "blocked": list(self._blocked),
+            "auto": self._auto_used,
+        }
 
-    def _log(self, record_type: str, **fields) -> None:
-        self._records.append({"type": record_type, "at": time.time(), "session": self.session, **fields})
-        self._flush_log()
+    def log(self, record_type: str, **fields) -> None:
+        """Add one line to .driver.log; the server calls this for pairing events, refused calls and its errors."""
+        with self._log_lock:
+            self._records.append({"type": record_type, "at": time.time(), "session": self.session, **fields})
+            self._flush_log()
+
+    _log = log
 
     def _flush_log(self) -> None:
-        self._records = store_log(self.unit, self._records)
+        with self._log_lock:
+            self._records = store_log(self.unit, self._records)
 
     def _status(self, state: str, **details) -> None:
         if self._state != state or self._details != details:
@@ -219,28 +445,38 @@ class Driver:
         self._publish()
 
     def _checkpoint(self) -> None:
-        write_private(
+        peer = self._peer
+        save_state(
             self.unit,
-            STATE,
-            encode(
-                {
-                    "version": 1,
-                    "harness": self.harness,
-                    "session": self.session,
-                    "tag": self.tag,
-                    "server_pid": os.getpid(),
-                    "child_pid": self._peer.pid if self._peer else None,
-                    "child_started": getattr(self._peer, "started", None),
-                    "opened": self._opened,
-                    "last_turn": self._last_turn,
-                    "delivered": self._delivered,
-                    "fired": sorted(self._fired),
-                }
-            ),
+            {
+                "harness": self.harness,
+                "session": self.session,
+                "server_pid": os.getpid(),
+                "server_started": self._server_started,
+                "child_pid": getattr(peer, "pid", None),
+                "child_argv": list(getattr(peer, "argv", [])) if peer else [],
+                "opened": self._opened,
+                "delivered": self._delivered_field,
+                "note": self._note,
+                "fired": sorted(self._fired),
+                "handoff_delivered": self._handoff_delivered,
+                "turn": self._turn_state,
+                "ended": self._ended,
+            },
         )
+
+    def _record_end(self, reason: str) -> None:
+        """Note when the harness process ended and why; repeats counts the same reason in a row (S98, S121)."""
+        reason = reason[:2000]
+        repeats = self._ended.get("repeats", 0) + 1 if self._ended.get("reason") == reason else 0
+        self._ended = {"at": iso(time.time()), "reason": reason, "repeats": repeats}
+        # The record stays in memory when the write fails.
+        with contextlib.suppress(OSError, ValueError, paths.Refused):
+            self._checkpoint()
 
     def _open(self, deadline: float) -> None:
         resume = self.session
+        resume_deadline = time.monotonic() + RESUME_TIMEOUT
         self._status("starting")
         self._launch(resume)
         while not self._closing.is_set() and time.monotonic() < deadline:
@@ -254,6 +490,8 @@ class Driver:
                     if self._state == "stopped":
                         return
                 self._publish()
+            if resume and time.monotonic() > resume_deadline:
+                resume = self._open_fresh("the resume took more than 10 s")
             event = self._peer.poll(POLL)
             if event is None:
                 continue
@@ -262,26 +500,31 @@ class Driver:
                     raise StartError("crashed", "harness returned an invalid session ID")
                 if self.session != event.session_id:
                     self._first_prompt = True
+                    self._opened = time.time()
                 self.session = event.session_id
                 self._last_output = self.clock()
                 self._checkpoint()
                 self._status("idle")
                 return
             if event.kind == "failed":
-                if resume and event.outcome == "missing-session":
-                    resume = None
-                    self._close_peer("session missing")
-                    self._launch(None)
+                if resume:
+                    resume = self._open_fresh(event.text or event.outcome or "the resume failed")
                     continue
                 raise StartError(event.outcome or "crashed", event.text)
             if event.kind == "approval":
                 self._request_approval(event, deny_reason="the page is starting")
         raise StartError("crashed", "harness startup timed out")
 
+    def _open_fresh(self, why: str) -> None:
+        """A session that cannot be resumed is replaced by a new one from the records (S30, S111)."""
+        self._log("error", kind="resume", message=why)
+        self._close_peer("session could not be resumed")
+        self.session = None
+        self._launch(None)
+
     def _launch(self, resume: str | None) -> None:
         try:
             self._peer = self.launch(self.tag, resume)
-            self._opened = time.time()
             self._peer.open(self.cwd, resume)
         except FileNotFoundError as error:
             raise StartError("not-installed", str(error)) from None
@@ -290,6 +533,10 @@ class Driver:
 
     def _run(self) -> None:
         try:
+            # The state is written before anything is served, so a working turn left by a crash is gone (S120).
+            self._flush_log()
+            self._checkpoint()
+            self._log("version", harness=self.harness, version=self.version, tested=self.tested)
             self._open(self._deadline)
             # On serve startup the existing log is the recovery source. Once start returns,
             # new work must enter through enqueue, including while a turn is busy or failed.
@@ -297,8 +544,11 @@ class Driver:
             self._admitted_items.update(item["id"] for item in historical.items)
             self._admitted_edits.update((item.get("type"), item["id"]) for item in historical.items)
             self._admitted_events.extend(historical.events)
+            self._last_poll = self.clock()
+            self._ended["repeats"] = 0
             self._started.set()
             while not self._closing.is_set():
+                self._check_unit()
                 self._commands_once()
                 drained = self._events_once()
                 if self._state not in ("stopping", "failed"):
@@ -308,18 +558,21 @@ class Driver:
                     if self._state == "idle" and (self._wake or self._retry) and drained:
                         self._deliver(available)
                 self._publish()
-            self._stop("server stopped")
+            if not self._driver_failed:
+                self._stop(self._close_reason)
         except StartError as error:
             self._start_error = error
             self._failed(error.kind, str(error))
         except Exception as error:
             self._start_error = StartError("driver", str(error))
+            self._failed_error = str(error)
             # An error in the state/log writer must still leave a readable status in memory.
             try:
                 self._failed("driver", str(error))
             except Exception:
                 self._state, self._since = "failed", time.time()
-                self._details = {"kind": "driver", "action": ACTIONS["driver"], "message": str(error)}
+                self._details = {"kind": "driver", "message": str(error), "log": str(self.unit.target(LOG))}
+                self._record_end(str(error))
                 self._publish()
         finally:
             try:
@@ -338,6 +591,13 @@ class Driver:
                         if receipt.set_running_or_notify_cancel():
                             receipt.set_result(False)
                 self._started.set()
+
+    def _check_unit(self) -> None:
+        now = time.monotonic()
+        if now - self._unit_checked >= 1:
+            self._unit_checked = now
+            if not os.path.isdir(self.unit.path):
+                raise FileNotFoundError("the unit folder is gone")
 
     def _available_triggers(self) -> tuple[dict, ...]:
         return tuple(record for record in self.triggers() if record["id"] not in self._fired)
@@ -402,18 +662,26 @@ class Driver:
             else:
                 # Process pending page commands before draining the next burst of harness output.
                 return False
-        if (
-            self._state == "working"
-            and self.clock() - self._last_output >= STALL_TIMEOUT
-            and not (self.approvals and self.approvals.waiting())
-        ):
+        if self._state == "working" and self.clock() - self._last_output >= STALL_TIMEOUT and not self._open_approvals:
             self._status("stalled")
+        if (
+            self._state in ("working", "stalled")
+            and self._unknown_since is not None
+            and self.clock() - self._unknown_since >= PROTOCOL_TIMEOUT
+        ):
+            self._failed("protocol", f"{self.harness} {self.version or 'unknown version'}; tested {self.tested}")
         return True
 
     def _receive(self, event) -> None:
         self._last_output = self.clock()
         if self._state == "stalled":
             self._status("working")
+        # An unknown message after the last known one starts a clock; any known message ends it (S112).
+        if event.kind == "unknown":
+            if self._unknown_since is None:
+                self._unknown_since = self.clock()
+        elif event.kind != "output":
+            self._unknown_since = None
         if event.kind == "failed":
             self._failed(event.outcome or "crashed", event.text)
         elif event.kind == "turn_started":
@@ -427,6 +695,8 @@ class Driver:
             if event.text:
                 self._turn.final_message = event.text[-500:]
             if event.outcome in ("normal", "completed"):
+                # Only the approvals of the agent whose turn ended close; a worker's stay open (S44).
+                self._close_approvals("the turn ended", "expired", only=lambda a: a.requester is None)
                 self._end("completed")
                 self._crash_retries = 0
                 self._status("idle")
@@ -435,9 +705,18 @@ class Driver:
         elif event.kind == "approval":
             self._request_approval(event)
         elif event.kind == "approval_closed":
-            if self.approvals:
-                self.approvals.closed(event)
-            self._record_approval_end(event, event.outcome or "expired", event.text)
+            for approval in list(self._open_approvals.values()):
+                if approval.event.request_id == event.request_id:
+                    self._finish_approval(approval, "expired", event.text or event.outcome or "expired")
+        elif event.kind == "blocked":
+            entry = {
+                "tool": event.tool,
+                "arguments": display(event.arguments),
+                "reason": event.text,
+                "at": iso(time.time()),
+            }
+            self._blocked.append(entry)
+            self._log("blocked", **entry)
 
     def _deliver(self, available: tuple[dict, ...]) -> None:
         # An RPC append can be visible to a previous turn before its enqueue reaches
@@ -507,18 +786,20 @@ class Driver:
         self._turn.actions = actions
         prompt = self._prompt(batch, available)
         try:
-            self._peer.prompt(prompt)
+            self._peer.prompt(prompt, self._turn_state["prompt_uuid"])
         except OSError as error:
             self._failed("crashed", str(error))
         else:
             self._first_prompt = False
+            if self._note and not self._handoff_delivered:
+                self._handoff_delivered = True
+                self._checkpoint()
 
     def _prompt(self, batch, available: tuple[dict, ...]) -> str:
-        parts = []
+        parts = [self._note] if self._note and not self._handoff_delivered else []
         if self._first_prompt:
             parts.extend(
                 [
-                    self.handoff,
                     resources.read_text("page/page-agent.md"),
                     f"Skill: {self.skill_path}\nUnit: {self.unit.label}\nCurrent step: {self.step}",
                     f"Verb command: {self.command}\nWorking directory: {self.cwd}",
@@ -554,11 +835,13 @@ class Driver:
             "items": sorted(items),
         }
         self._turn = Turn(record, position, triggers)
-        self._last_turn = {"number": self._number, "items": sorted(items)}
+        # The turn stays in .driver until it ends normally; a restart that finds it set treats it as crashed (S153).
+        self._turn_state = {"number": self._number, "prompt_uuid": str(uuid.uuid4()), "sent_at": time.time()}
         self._checkpoint()
         self._records.append(record)
         self._flush_log()
         self._last_output = self.clock()
+        self._unknown_since = None
         self._status("working")
 
     def _end(self, outcome: str) -> None:
@@ -567,6 +850,7 @@ class Driver:
             return
         if outcome == "completed" and turn.position is not None:
             self._delivered = turn.position
+            self._delivered_field = delivered_field(turn.position, self.conversation.events())
             self._fired |= frozenset(turn.triggers)
             self._carry = turn.items
             self._recover = frozenset()
@@ -578,37 +862,43 @@ class Driver:
             self._recover = turn.items
             self._carry = frozenset()
             self._recover_turn, self._recover_kind = turn.record["number"], outcome
-        self._last_turn["outcome"] = outcome
-        self._checkpoint()
+        self._turn_state = None
         peer_stderr = self._peer.stderr if self._peer else ""
         turn.record.update(
             end=time.time(),
             outcome=outcome,
             denied=turn.denied,
-            final_message=turn.final_message,
+            final_message=turn.final_message[:500],
             stderr=peer_stderr[-2000:],
         )
         if not any(record is turn.record for record in self._records):
             self._records.append(turn.record)
+        # The log says how the turn ended before the state forgets that it ran.
         self._flush_log()
+        self._checkpoint()
         with contextlib.suppress(FileNotFoundError):
             self.unit.target(ACTIVE_DELIVERY).unlink()
 
     def _failed(self, kind: str, message: str = "", **details) -> None:
         kind = kind if kind in ACTIONS else "crashed"
         self._end(kind)
-        self._close_peer(kind)
-        self._log("error", kind=kind, message=message)
-        self._status("failed", kind=kind, action=ACTIONS.get(kind, ACTIONS["crashed"]), message=message, **details)
+        self._record_end(message or kind)
+        self._close_peer(message or kind)
+        self._log("error", kind=kind, message=message, stderr=self._last_stderr[-2000:])
+        if kind == "driver":
+            details.setdefault("log", str(self.unit.target(LOG)))
+        self._status("failed", kind=kind, message=message, repeats=self._ended["repeats"], **details)
 
     def _stop(self, reason: str) -> None:
+        """Show stopping, cancel, wait up to 3 s for the turn to end, then end the process group in every case."""
         self._status("stopping")
-        self._close_approvals(reason)
+        self._close_approvals(reason, "denied")
         if self._peer is not None:
             with contextlib.suppress(OSError):
                 self._peer.cancel()
                 deadline = time.monotonic() + STOP_TIMEOUT
                 while self._turn is not None and time.monotonic() < deadline:
+                    self._publish()
                     event = self._peer.poll(POLL)
                     if event is None:
                         continue
@@ -617,87 +907,138 @@ class Driver:
                     if event.kind == "approval":
                         self._request_approval(event, deny_reason=reason)
         self._end(reason)
+        if self._peer is not None:
+            self._record_end(reason)
         self._close_peer(reason)
         self._status("stopped")
 
+    # Approvals: the driver keeps every open request in memory and relays the user's answer (decision D8).
+
     def _request_approval(self, event, deny_reason=None) -> None:
-        peer = self._peer
-
-        def answer(choice: str, reason: str = "") -> Future[bool]:
-            receipt = Future()
-            values = (peer, event, record, choice, reason, receipt)
-            if threading.current_thread() is self._thread:
-                self._answer(*values)
-            else:
-                with self._answer_lock:
-                    if self._closing.is_set():
-                        receipt.set_result(False)
-                    else:
-                        self._commands.put(("answer", values))
-            return receipt
-
+        try:
+            arguments = display(event.arguments)
+            tool = event.tool
+            if not isinstance(tool, str) or not tool or len(tool) + len(arguments) > MAX_APPROVAL_TEXT:
+                raise ValueError
+        except (ValueError, TypeError, RecursionError):
+            arguments, tool = "", str(getattr(event, "tool", ""))[:200]
+            deny_reason = "Cannot display the full tool request"
+        if "allow_once" not in event.options:
+            deny_reason = deny_reason or "Request has no allow-once option"
         record = {
             "type": "approval",
             "at": time.time(),
             "session": self.session,
             "request": event.request_id,
-            "tool": event.tool,
-            "arguments_sha256": hashlib.sha256(encode({"arguments": event.arguments})).hexdigest(),
+            "tool": tool,
+            "arguments_sha256": hashlib.sha256(encode({"arguments": event.arguments}).strip()).hexdigest(),
+            "where": "turn" if self._turn else "between-turns",
         }
-        self._approval_records[event.request_id] = record
+        approval = Approval(
+            id=uuid.uuid4().hex[:16],
+            event=event,
+            peer=self._peer,
+            who=event.requester or "page agent",
+            tool=tool,
+            arguments=arguments,
+            since=time.time(),
+            record=record,
+            key=(tool, arguments),
+            requester=event.requester,
+            summary=WANTS.get(tool, f"to use {tool}"),
+        )
+        self._open_approvals[approval.id] = approval
         self._records.append(record)
         self._flush_log()
         if deny_reason:
-            answer("deny", deny_reason)
-        elif self.approvals is None:
-            answer("deny", "no page approval controller")
-        else:
-            self.approvals.receive(event, answer)
+            self._answer_open(approval, "deny", deny_reason)
+        elif approval.key in self._grants:
+            self._log("allowed", tool=tool, arguments_sha256=record["arguments_sha256"])
+            self._answer_open(approval, "allow_once", "Allowed earlier for this session")
+        elif self.auto_approve is not None and self.auto_approve(event):
+            self._auto_used = True
+            self._answer_open(approval, "allow_once", "Approved page command")
 
-    def _answer(self, peer, event, record, choice: str, reason: str, receipt: Future[bool]) -> None:
+    def answer_approval(self, approval_id: str, choice: str, reason: str = "") -> Future[bool]:
+        """The user's answer to an open approval. The result is True once the harness was told."""
+        if choice not in OPTIONS:
+            raise ValueError("Invalid approval choice")
+        receipt = Future()
+        values = (approval_id, choice, reason, receipt)
+        if threading.current_thread() is self._thread:
+            self._answer(*values)
+        else:
+            with self._answer_lock:
+                if self._closing.is_set():
+                    receipt.set_result(False)
+                else:
+                    self._commands.put(("answer", values))
+        return receipt
+
+    def _answer(self, approval_id: str, choice: str, reason: str, receipt: Future[bool]) -> None:
         if not receipt.set_running_or_notify_cancel():
             return
         delivered = False
         try:
-            if self._peer is not peer or self._approval_records.get(event.request_id) is not record:
+            approval = self._open_approvals.get(approval_id)
+            # An approval is relayed only while it is still waiting; otherwise it already expired.
+            if approval is None or (self._closing.is_set() and choice != "deny"):
                 return
-            if self._closing.is_set() and choice != "deny":
-                return
-            try:
-                delivered = peer.answer(event.request_id, choice, reason) is True
-            except OSError:
-                delivered = False
-            if not delivered:
-                self._record_approval_end(event, "expired", "approval response was not delivered")
-                return
-            self._last_output = self.clock()
-            self._record_approval_end(event, choice, reason)
-            if self._turn and choice == "deny":
-                self._turn.denied.append({"tool": event.tool, "reason": reason})
+            delivered = self._answer_open(approval, choice, reason)
         finally:
             receipt.set_result(delivered)
 
-    def _record_approval_end(self, event, choice: str, reason: str) -> None:
-        record = self._approval_records.pop(event.request_id, None)
-        if record is not None:
-            record.update(answer=choice, reason=reason[:2000])
-            if not any(item is record for item in self._records):
-                self._records.append(record)
-            self._flush_log()
+    def _answer_open(self, approval: Approval, choice: str, reason: str) -> bool:
+        if approval.peer is not self._peer:
+            self._finish_approval(approval, "expired", "the harness process ended")
+            return False
+        text = (
+            reason
+            or {
+                "allow_once": "allowed once",
+                "allow_session": "allowed for this session",
+                "deny": "denied by the user",
+            }[choice]
+        )
+        try:
+            delivered = approval.peer.answer(
+                approval.event.request_id, "deny" if choice == "deny" else "allow_once", text
+            )
+        except OSError:
+            delivered = False
+        if delivered is not True:
+            self._finish_approval(approval, "expired", "approval response was not delivered")
+            return False
+        if choice == "allow_session":
+            self._grants.add(approval.key)
+        self._last_output = self.clock()
+        self._finish_approval(approval, choice, text)
+        if self._turn and choice == "deny":
+            self._turn.denied.append({"tool": approval.tool, "reason": text})
+        return True
 
-    def _close_approvals(self, reason: str) -> None:
-        if self.approvals:
-            self.approvals.close(reason)
-        if self._approval_records:
-            for record in self._approval_records.values():
-                record.update(answer="expired", reason=reason)
-            self._approval_records.clear()
-            self._flush_log()
+    def _finish_approval(self, approval: Approval, answer: str, reason: str) -> None:
+        if self._open_approvals.pop(approval.id, None) is None:
+            return
+        approval.record.update(answer=answer, reason=reason[:2000], wait=round(time.time() - approval.since, 3))
+        self._flush_log()
+
+    def _close_approvals(self, reason: str, answer: str = "expired", only=None) -> None:
+        """Close open approvals with their reason, and tell the harness where its protocol carries text (S43)."""
+        for approval in list(self._open_approvals.values()):
+            if only is not None and not only(approval):
+                continue
+            if approval.peer is not None and approval.peer is self._peer:
+                with contextlib.suppress(Exception):
+                    approval.peer.answer(approval.event.request_id, "deny", reason)
+            self._finish_approval(approval, answer, reason)
 
     def _close_peer(self, reason: str) -> None:
         try:
             self._close_approvals(reason)
+            self._grants.clear()
         finally:
             if self._peer is not None:
                 peer, self._peer = self._peer, None
+                self._last_stderr = getattr(peer, "stderr", "")
                 peer.close()

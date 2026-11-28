@@ -3,78 +3,79 @@
 from __future__ import annotations
 
 import contextlib
-import ctypes
 import json
 import os
 import queue
 import select
 import signal
 import subprocess
-import sys
 import threading
 import time
 from collections import deque
-from pathlib import Path
 from types import SimpleNamespace
 
 STDERR_OUTPUT = object()
+WRITE_FAILED = object()
 MAX_LINE = 4 * 1024 * 1024
+WRITE_TIMEOUT = 5
 
 
-def _darwin_birth(pid: int) -> str | None:
-    # PROC_PIDTBSDINFO's public layout in XNU's bsd/sys/proc_info.h.
-    class BSDInfo(ctypes.Structure):
-        _fields_ = [
-            ("flags", ctypes.c_uint32),
-            ("status", ctypes.c_uint32),
-            ("xstatus", ctypes.c_uint32),
-            ("pid", ctypes.c_uint32),
-            ("before_names", ctypes.c_uint32 * 8),
-            ("comm", ctypes.c_char * 16),
-            ("name", ctypes.c_char * 32),
-            ("after_names", ctypes.c_uint32 * 6),
-            ("seconds", ctypes.c_uint64),
-            ("microseconds", ctypes.c_uint64),
-        ]
-
-    native = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
-    native.proc_pidinfo.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
-    info = BSDInfo()
-    if native.proc_pidinfo(pid, 3, 0, ctypes.byref(info), ctypes.sizeof(info)) != ctypes.sizeof(info):
-        return None
-    if info.pid != pid or not info.seconds or not 0 <= info.microseconds < 1_000_000:
-        return None
-    native.sysctlbyname.argtypes = [
-        ctypes.c_char_p,
-        ctypes.c_void_p,
-        ctypes.POINTER(ctypes.c_size_t),
-        ctypes.c_void_p,
-        ctypes.c_size_t,
-    ]
-    boot = ctypes.create_string_buffer(64)
-    size = ctypes.c_size_t(len(boot))
-    if native.sysctlbyname(b"kern.bootsessionuuid", boot, ctypes.byref(size), None, 0) or not boot.value:
-        return None
-    return f"{boot.value.decode('ascii')}:{info.seconds}:{info.microseconds}"
-
-
-def process_birth(pid: int | None) -> str | None:
-    """An OS birth marker for comparison before touching a recorded process."""
+def _ps(field: str, pid: int) -> str | None:
+    """One `ps` field of a process, or None when it does not exist."""
     if type(pid) is not int or pid <= 0 or pid > 2**31 - 1:
         return None
     try:
-        if sys.platform == "darwin":
-            return _darwin_birth(pid)
-        if sys.platform == "linux":
-            boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
-            # The command name in field 2 can contain spaces and parentheses. Fields start after its last ')'.
-            _, separator, fields = Path(f"/proc/{pid}/stat").read_text(errors="replace").rpartition(")")
-            started = fields.split()[19]  # field 22: start ticks since boot
-            if separator and boot and started.isascii() and started.isdigit():
-                return f"{boot}:{started}"
-    except (OSError, AttributeError, IndexError, UnicodeError):
+        done = subprocess.run(
+            ["ps", "-o", f"{field}=", "-p", str(pid)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
         return None
-    return None
+    text = done.stdout.strip()
+    return text if done.returncode == 0 and text else None
+
+
+def process_command(pid: int | None) -> str | None:
+    """The command line of a running process, to compare with what was recorded before ending it."""
+    return _ps("command", pid) if pid is not None else None
+
+
+def process_started(pid: int | None) -> str | None:
+    """When a running process started, as `ps` prints it."""
+    return _ps("lstart", pid) if pid is not None else None
+
+
+def same_command(command: str | None, argv) -> bool:
+    """Whether a `ps` command line is the recorded argv. `ps` shows the resolved path of argv[0], so only its name counts."""
+    if not command or not isinstance(argv, list) or not argv:
+        return False
+    rest = " ".join(str(part) for part in argv[1:])
+    name = os.path.basename(str(argv[0]))
+    if rest:
+        return command.endswith(" " + rest) and os.path.basename(command[: -len(rest) - 1]).startswith(name[:15])
+    return os.path.basename(command) == name
+
+
+def end_orphan(pid, argv) -> bool:
+    """End the process group of an earlier server's harness child, only if its command line is the recorded one."""
+    if type(pid) is not int or pid <= 1 or not isinstance(argv, list) or not argv:
+        return False
+    if not same_command(process_command(pid), argv):
+        return False
+    for signum in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            if os.getpgid(pid) != pid:
+                return False
+            os.killpg(pid, signum)
+        except ProcessLookupError:
+            return True
+        if signum == signal.SIGTERM:
+            time.sleep(0.2)
+    return True
 
 
 class ProcessTransport:
@@ -87,6 +88,8 @@ class ProcessTransport:
         self._tail = deque(maxlen=10)
         self._tail_lock = threading.Lock()
         self._closed = threading.Event()
+        self._outbox = queue.Queue()
+        self.argv = [str(part) for part in argv]
         self._proc = subprocess.Popen(
             argv,
             cwd=cwd,
@@ -98,13 +101,13 @@ class ProcessTransport:
             pass_fds=pass_fds,
         )
         self.pid = self._proc.pid
-        self.started = process_birth(self.pid)
         os.set_blocking(self._proc.stdin.fileno(), False)
         self._readers = [
             threading.Thread(target=target, daemon=True) for target in (self._read_messages, self._read_stderr)
         ]
-        for reader in self._readers:
-            reader.start()
+        self._writer = threading.Thread(target=self._write_messages, daemon=True)
+        for thread in (*self._readers, self._writer):
+            thread.start()
 
     @property
     def stderr(self) -> str:
@@ -144,23 +147,33 @@ class ProcessTransport:
             pass
 
     def _send(self, message: dict) -> None:
-        data = memoryview((json.dumps(message, ensure_ascii=True) + "\n").encode("ascii"))
+        """Hand the message to the writer thread, so a harness that stops reading never blocks the driver loop."""
+        self._outbox.put((json.dumps(message, ensure_ascii=True) + "\n").encode("ascii"))
+
+    def _write_messages(self) -> None:
         fd = self._proc.stdin.fileno()
-        deadline = time.monotonic() + 0.5
-        while data:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0 or not select.select([], [fd], [], remaining)[1]:
-                raise TimeoutError("harness did not read its stdin")
+        while (data := self._outbox.get()) is not None:
+            data = memoryview(data)
+            deadline = time.monotonic() + WRITE_TIMEOUT
             try:
-                data = data[os.write(fd, data) :]
-            except BlockingIOError:
-                continue
+                while data:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0 or not select.select([], [fd], [], remaining)[1]:
+                        raise TimeoutError("harness did not read its stdin")
+                    try:
+                        data = data[os.write(fd, data) :]
+                    except BlockingIOError:
+                        continue
+            except (OSError, ValueError):
+                # A write that is late or partial leaves the harness in an unknown state: the driver ends it.
+                self._put(WRITE_FAILED)
+                return
 
     def open(self, cwd: str, resume: str | None) -> None:
         self.codec.open(cwd, resume)
 
-    def prompt(self, text: str) -> None:
-        self.codec.prompt(text)
+    def prompt(self, text: str, uuid: str | None = None) -> None:
+        self.codec.prompt(text, uuid)
 
     def cancel(self) -> None:
         self.codec.cancel()
@@ -177,6 +190,8 @@ class ProcessTransport:
             return None
         if message is STDERR_OUTPUT:
             return SimpleNamespace(kind="output")
+        if message is WRITE_FAILED:
+            return SimpleNamespace(kind="failed", outcome="crashed", text="the harness did not read its input")
         if message is None:
             return SimpleNamespace(kind="failed", outcome="crashed", text=self.stderr)
         self._events.extend(self.codec.receive(message))
@@ -184,10 +199,13 @@ class ProcessTransport:
         return self._events.popleft() if self._events else SimpleNamespace(kind="output")
 
     def close(self) -> None:
+        """End the harness's process group and return only once it is gone."""
         if self._closed.is_set():
             return
         self._closed.set()
-        self._proc.stdin.close()
+        self._outbox.put(None)
+        with contextlib.suppress(OSError, ValueError):
+            self._proc.stdin.close()
         signal_error = None
         for signum in (signal.SIGTERM, signal.SIGKILL):
             try:
@@ -210,3 +228,16 @@ class ProcessTransport:
             self._proc.returncode is None or any(reader.is_alive() for reader in self._readers)
         ):
             raise signal_error
+        deadline = time.monotonic() + 2
+        while self._group_alive() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        if self._group_alive():
+            raise OSError("the harness's process group did not end")
+
+    def _group_alive(self) -> bool:
+        self._proc.poll()
+        try:
+            os.killpg(self.pid, 0)
+        except (ProcessLookupError, PermissionError):
+            return False
+        return True
