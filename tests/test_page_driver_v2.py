@@ -739,6 +739,20 @@ class FailureTests(Case):
         self.assertIn("No space left", driver.agent()["text"])
         self.assertIn("No space left", driver._ended["reason"])
 
+    def test_closing_after_a_driver_error_keeps_the_error_and_its_reason_on_the_page(self):
+        # B2 of the whole-change review: serve ends a failed driver with close("driver", reason); the page keeps the
+        # error's notice, not a closed one, and .driver keeps the reason.
+        driver = self.driver()
+        driver.start()
+        with mock.patch.object(self.module, "store_log", side_effect=OSError(28, "No space left on device")):
+            driver.enqueue(self.conv.item("one"))
+            eventually(lambda: driver.snapshot()["state"] == "failed")
+        driver.close("driver", driver.error)
+        body = driver.agent()
+        self.assertEqual((body["state"], body["kind"]), ("failed", "driver"))
+        self.assertIn("No space left", body["text"])
+        self.assertIn("No space left", self.state()["ended"]["reason"])
+
     def test_a_unit_removed_while_served_fails_the_driver(self):
         # S62
         driver = self.driver()

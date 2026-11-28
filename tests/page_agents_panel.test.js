@@ -180,6 +180,17 @@ test('S105: once the page showed closed, a failed poll or an old mark keeps the 
   assert.ok(!page.control() || page.control().hidden, 'no Stop or Start on a closed page');
 });
 
+test('B2: the driver\'s own error keeps its text once the server is gone', async () => {
+  const page = boot({ agent: body({ state: 'working' }) });
+  await page.tick();
+  await page.show(body({ state: 'failed', kind: 'driver', text: TEXT.driver }));
+  await page.show(500);
+  assert.ok(page.agentsHtml().includes(page.escaped(TEXT.driver)), 'a failed poll after the driver error');
+  assert.ok(!page.agentsHtml().includes(page.escaped(TEXT.down)));
+  await page.show(body({ state: 'failed', kind: 'login', text: TEXT.login, mark_age: 9 }));
+  assert.ok(page.agentsHtml().includes(page.escaped(TEXT.down)), 'any other failure is still taken for a gone driver');
+});
+
 test('S166: a tab the server no longer knows says so, and stops asking', async () => {
   const page = boot({ agent: 403 });
   await page.tick();
