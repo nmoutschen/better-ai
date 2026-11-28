@@ -366,6 +366,7 @@ class Driver:
             "since": published["since"],
             "age": max(0, self.clock() - published["at"]),
             "waiting": published["waiting"],
+            "open_approvals": len(published["approvals"]),
             **published["details"],
         }
 

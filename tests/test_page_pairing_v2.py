@@ -2,14 +2,13 @@
 
 Two kinds of check. The ones on `Pairing` and on a server in this process, with a fake driver, are fast and look at
 single routes. The ones on `serve` and `link` run the real command with the stub harness (tests/fixtures/stub-harness) and
-the stub browser (tests/fixtures/stub-browser, set as BROWSER, which pairs the way the page does): nothing opens a real
+the stub browser (tests/fixtures/stub-browser, which pairs the way the page does, called in place of webbrowser.open): nothing opens a real
 browser, and every unit is a fresh one, with no .server, .server-token, .driver or .driver.log of another run."""
 
 import concurrent.futures
 import http.client
 import json
 import os
-import shlex
 import signal
 import socket
 import stat
@@ -25,10 +24,19 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
-import better  # noqa: E402
 from test_page_cli_v2 import BOOT, NOTE, UUID, Unit, alive, better_unit, stub_env, wait_for  # noqa: E402
 
 BROWSER = HERE / "fixtures" / "stub-browser"
+# What a served page's `webbrowser.open` is in these tests: the stub browser and nothing else. The environment's BROWSER
+# is not enough: when its command fails, `webbrowser` goes on to the next browser it knows, the user's real one.
+BROWSER_BOOT = """
+import os, subprocess, webbrowser
+
+def stub_open(url, new=0, autoraise=True):
+    return subprocess.run([os.environ["STUB_BROWSER"], url], check=False).returncode == 0
+
+webbrowser.open = stub_open
+"""
 AGENT_FIELDS = {"state", "since", "kind", "text", "mark_age", "approvals", "workers", "blocked", "auto_approved_once"}
 
 
@@ -78,13 +86,17 @@ class Browser(Tabs):
         self.dump = self.root / "stub.dump"
 
     def env(self, mode="pair", **changes):
-        return stub_env(
-            BROWSER=f"{shlex.quote(str(BROWSER))} %s",
-            STUB_BROWSER_OUT=str(self.out),
-            STUB_BROWSER_MODE=mode,
-            STUB_DUMP=str(self.dump),
+        values = {
+            "STUB_BROWSER": str(BROWSER),
+            "STUB_BROWSER_OUT": str(self.out),
+            "STUB_BROWSER_MODE": mode,
+            "STUB_DUMP": str(self.dump),
             **changes,
-        )
+        }
+        return stub_env(**values)
+
+    def serve(self, *args, boot=None, **kw):
+        return super().serve(*args, boot=BROWSER_BOOT + (boot or ""), **kw)
 
     def browser_lines(self, kind):
         if not self.out.exists():
@@ -93,11 +105,9 @@ class Browser(Tabs):
 
     def serve_in_browser(self, env, boot=None, timeout=90):
         """`serve` as a person runs it, with no --no-browser: the server opens the browser itself."""
-        argv = better.command("serve", str(self.folder))
-        if boot:
-            script = self.root / "boot.py"
-            script.write_text(boot)
-            argv = [sys.executable, "-I", "-c", BOOT, str(ROOT / "src"), str(script), "serve", str(self.folder)]
+        script = self.root / "boot.py"
+        script.write_text(BROWSER_BOOT + (boot or ""))
+        argv = [sys.executable, "-I", "-c", BOOT, str(ROOT / "src"), str(script), "serve", str(self.folder)]
         return subprocess.run(
             argv, cwd=self.root, env=env, input="", capture_output=True, text=True, timeout=timeout, check=False
         )
@@ -302,6 +312,7 @@ class InProcess(Tabs):
         )
 
     def test_the_right_call_is_answered(self):  # S46, S69
+        self.call(self.secret, "note", NOTE)  # /events waits for news when the log holds none
         for path in ("/data", "/events?after=0", "/old", "/rev", "/agent"):
             self.assertEqual(self.raw("GET", path, secret=self.secret)[0], 200, path)
 
@@ -393,6 +404,7 @@ class InProcess(Tabs):
         self.assertNotEqual(old, new)
         for path in ("/data", "/events?after=0", "/agent"):
             self.assertEqual(self.raw("GET", path, secret=old)[0], 403, path)
+        for path in ("/data", "/agent"):
             self.assertEqual(self.raw("GET", path, secret=new)[0], 200, path)
         self.assertEqual(self.raw("POST", "/rpc", body=rpc("agent_stop"), secret=old)[0], 403)
 
@@ -421,6 +433,36 @@ class InProcess(Tabs):
         source = (ROOT / "src" / "better_ai" / "page" / "page.js").read_text()
         self.assertIn("sessionStorage.setItem('pageToken'", source)
         self.assertNotIn("localStorage", source)
+
+
+class VerbsKnowThePageAgentTest(Unit):
+    def notice_for(self, session):
+        from unittest import mock
+
+        from better_ai import cli, page, resources
+
+        unit = better_unit(self.root, self.folder)
+        (self.folder / ".driver").write_text("{}")
+        found = {"tag": "the-tag", "alive": {"session": "the-session", "state": "idle", "waiting": 0}}
+        run = cli.Run(cli.load(resources.build_info()), resources.build_info())
+        out = []
+        run.out = run.err = out.append
+        verb = next(v for v in cli.VERBS if v.name == "check")
+        args = type("Args", (), {"_verb": verb, "unit": str(unit.path)})()
+        env = {"BETTER_PAGE_SESSION": session} if session else {}
+        with (
+            mock.patch.object(page, "live_server", return_value=found),
+            mock.patch.dict(os.environ, env),
+            mock.patch.dict(os.environ, {} if session else {"BETTER_PAGE_SESSION": ""}),
+        ):
+            page.drive_guard(args, run)
+        return out
+
+    def test_the_page_agent_is_known_by_its_tag_or_its_session(self):  # S37, S86
+        self.assertTrue(self.notice_for(None))
+        self.assertTrue(self.notice_for("another"))
+        self.assertEqual(self.notice_for("the-tag"), [])
+        self.assertEqual(self.notice_for("the-session"), [])
 
 
 class StaticTest(unittest.TestCase):
@@ -477,7 +519,7 @@ class ServedTest(Browser):
         self.assertFalse((self.folder / ".server").exists())
 
     def test_a_launcher_that_fails_is_driver_off_no_browser(self):  # S76, S75
-        done = self.serve_in_browser(self.env(BROWSER="false"))
+        done = self.serve_in_browser(self.env("fail"))
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertRegex(done.stdout.strip(), r"^driver: off no-browser: \S")
 
@@ -505,6 +547,11 @@ class ServedTest(Browser):
         self.assertTrue(wait_for(lambda: not alive(pid)))
         self.assertTrue(wait_for(lambda: not recorded.exists() and not recorded.parent.exists()))
         self.assertFalse((self.folder / ".page-link").exists())
+
+    def test_the_tag_is_kept_in_driver_state_not_in_alive(self):  # S86
+        self.served(env=self.env())
+        self.assertRegex(self.state()["tag"], UUID)
+        self.assertNotIn("tag", json.loads(self.request("GET", "/alive")[1]))
 
     def test_link_with_no_server_says_so(self):  # S68
         done = self.link()
@@ -543,7 +590,7 @@ class ServedTest(Browser):
         self.assertEqual(self.request("GET", "/agent", secret=second)[0], 200)
 
     def test_a_launcher_that_fails_gives_no_browser_and_the_old_tab_stays(self):  # S85, S68
-        old = self.pair(self.served(env=self.env(BROWSER="false")))
+        old = self.pair(self.served(env=self.env("fail")))
         done = self.link()
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertRegex(done.stdout.strip(), r"^link: off no-browser: \S")
