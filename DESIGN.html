@@ -2098,10 +2098,13 @@ function pageAgents(rows, o) {
   // A request from an agent that has no row here, the page's own, has no row to press: a row with its sentence and a button
   // instead. It is not the state notice, which narrow windows show in the pinned bar, so it stays in the list at every width.
   var own = pageApprovals().filter(function (a) { return !(pageAgentState.workers || []).some(function (w) { return w.name === a.who; }); })[0];
-  // Each record line the scan could not read is one fixed sentence (decision D21).
-  var problems = pageAgentState && !pageDriverDown ? (pageAgentState.problems || []) : [];
+  // Each file with a record line the scan could not read is one fixed sentence (decision D21). It is no notice, which
+  // narrow windows hide in favour of the pinned bar, so it shows at every width.
+  var problems = (pageAgentState && !pageDriverDown ? (pageAgentState.problems || []) : [])
+    .map(function (p) { return p.file; })
+    .filter(function (file, i, all) { return all.indexOf(file) === i; });
   var list = (notice ? '<li class="notice" role="status"><div>' + pageEscape(notice) + '</div></li>' : '') +
-    problems.map(function (p) { return '<li class="notice" role="status"><div>' + pageEscape("A line in " + p.file + " can't be read. Ask the agent to fix it.") + '</div></li>'; }).join('') +
+    problems.map(function (file) { return '<li class="problem" role="status"><div>' + pageEscape("A line in " + file + " can't be read. Ask the agent to fix it.") + '</div></li>'; }).join('') +
     (own ? '<li><div>' + pageEscape(PAGE_OWN_WAITING) + '<button type="button" class="btn btn--sm" data-approval-for="' + pageEscape(own.who) + '">Open the request</button></div></li>' : '') +
     rows.map(function (r) {
     var waits = waiting.indexOf(r.who) >= 0;

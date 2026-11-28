@@ -5,6 +5,7 @@ import json
 import os
 import re
 import secrets
+import shlex
 import stat
 import sys
 import threading
@@ -114,6 +115,37 @@ def approved_form(command, unit, verbs):
         "text only as a quoted heredoc (<<'EOF', the text, then EOF on its own line), "
         "and --by or --for naming an agent other than user"
     )
+
+
+# Claude Code's Bash input is {command, description} and may add timeout (bash_prefix_request in
+# tests/fixtures/page_wire/claude_2_1_332.json); run_in_background and dangerouslyDisableSandbox, from the same tool's
+# input schema, run the command another way than the form says.
+CLAUDE_BASH_KEYS = frozenset({"command", "description", "timeout"})
+# Codex runs a command as "<shell> -lc <command>" and sends that line in `command` (command_request in
+# tests/fixtures/page_wire/codex_0_172_0.json); a zsh-exec-bridge subcommand comes as the command itself (approvalId
+# in CommandExecutionRequestApprovalParams, `codex app-server generate-json-schema` 0.172.0). The params are the same
+# under every approvalPolicy and sandbox. Only kind command runs a command; writeStdin and humanCommand do not.
+LOGIN_SHELLS = frozenset({"bash", "sh", "zsh"})
+
+
+def shell_request(harness, tool, arguments):
+    """(the shell command a tool request runs, whether it runs it as written), or None for a request that runs no
+    shell command in a shape on record. ACP and Droid record no shell request shape, so theirs are asked."""
+    if not isinstance(arguments, dict) or not isinstance(arguments.get("command"), str):
+        return None
+    command = arguments["command"]
+    if harness == "claude" and tool == "Bash":
+        return command, set(arguments) <= CLAUDE_BASH_KEYS
+    if harness == "codex" and tool == "Command" and arguments.get("kind") in (None, "command"):
+        try:
+            words = shlex.split(command)
+        except ValueError:
+            return command, True
+        shell, *rest = words or [""]
+        if len(rest) == 2 and rest[0] in ("-lc", "-c") and os.path.isabs(shell) and Path(shell).name in LOGIN_SHELLS:
+            return rest[1], True
+        return command, True
+    return None
 
 
 def own_call(command, archive):

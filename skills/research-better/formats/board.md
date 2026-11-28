@@ -117,7 +117,7 @@ ADD one record per event, with `--for` the log's agent name; only that agent add
 {"type": "chain", "after": "<Q-... you just closed>"}
 {"type": "gap", "text": "<what could not be found>", "queries": ["<a query you tried>"]}
 {"type": "strategy", "text": "<what changed and why>"}
-{"type": "stop", "text": "<why you stopped while questions were left>"}
+{"type": "stop", "text": "<why you stopped>"}
 {"type": "failure", "collection": "<the COLLECTION that failed>", "text": "<what failed>"}
 {"type": "checked", "claim": "<C-... you checked>"}
 ```

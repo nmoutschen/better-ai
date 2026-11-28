@@ -16,7 +16,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass, field
 
 from .. import paths, resources
-from .approvals import approved_form, own_call, verb_command
+from .approvals import approved_form, own_call, shell_request, verb_command
 from .delivery import CONTINUE, NOTE, Delivery, ended_label, turn_prompt
 from .driver_state import (
     ACTIVE_DELIVERY,
@@ -49,7 +49,6 @@ TRIGGER_INTERVAL = 1.0  # the least time between two scans of the skill's trigge
 TRIGGER_BUDGET = 2.0  # a scan that takes longer is logged and its result skipped
 ECHOING = frozenset({"claude"})  # the harnesses that echo each prompt's uuid back (decision D5)
 MAX_UNECHOED = 3
-SHELL_KEYS = frozenset({"command", "description", "timeout"})
 ALIVE_LIMIT = 10
 MAX_APPROVAL_TEXT = 131072
 OPTIONS = ["allow_once", "allow_session", "deny"]
@@ -1132,16 +1131,12 @@ class Driver:
 
     def _command_form(self, event) -> bool | None:
         """True for a command in the approved form, False for another call to the driver's own better.pyz, else None."""
-        arguments = event.arguments
-        # Claude Code's Bash input is {command, description} and may add timeout (tests/fixtures/page_wire/claude_2_1_332.json).
-        # Codex wraps the command in a login shell and sends more keys, so it never matches and is asked as any call is.
-        # Any other key, such as run_in_background, makes it no call of the form.
-        shaped = isinstance(arguments, dict) and "command" in arguments and set(arguments) <= SHELL_KEYS
-        command = arguments["command"] if shaped else None
+        request = shell_request(self.harness, event.tool, event.arguments)
         words = shlex.split(self.command)
-        if len(words) != 2 or not own_call(command, words[1]):
+        if request is None or len(words) != 2 or not own_call(request[0], words[1]):
             return None
-        return verb_command(command, self.unit.path, words[1], self.verbs, words[0])
+        command, as_written = request
+        return as_written and verb_command(command, self.unit.path, words[1], self.verbs, words[0])
 
     def answer_approval(self, approval_id: str, choice: str, reason: str = "") -> Future[bool]:
         """The user's answer to an open approval. The result is True once the harness was told."""
