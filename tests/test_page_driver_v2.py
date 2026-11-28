@@ -443,7 +443,9 @@ class LifecycleTests(Case):
         self.assertEqual(
             driver.agent()["text"], "The same error came back: boom. Fix it in a terminal, then press Start."
         )
-        self.assertEqual(self.state()["ended"]["repeats"], 1)
+        # Only a repeated driver error counts in ended.repeats (D11).
+        self.assertEqual(self.state()["ended"]["repeats"], 0)
+        self.assertEqual(self.state()["ended"]["kind"], "crashed")
 
 
 class ApprovalTests(Case):
@@ -463,7 +465,7 @@ class ApprovalTests(Case):
         self.assertEqual((item["who"], item["tool"], item["summary"]), ("worker-1", "Write", "to write a file"))
         self.assertIsInstance(item["arguments"], str)
         self.assertRegex(item["since"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
-        self.assertEqual(item["options"], ["allow_once", "allow_session", "deny"])
+        self.assertEqual(item["options"], ["allow_once", "deny"])
         self.assertIn("example", item["arguments"])
         self.assertEqual(
             set(body),
@@ -507,7 +509,10 @@ class ApprovalTests(Case):
         self.assertTrue(self.peers[0].prompt_arrived.wait(2))
         now += 601
         eventually(lambda: driver.agent()["state"] == "stalled")
-        self.assertIsNone(driver.agent()["text"])
+        self.assertEqual(
+            driver.agent()["text"],
+            "The agents have shown no output for 10 minutes. Press Stop to end them, or keep waiting.",
+        )
         self.assertFalse(self.peers[0].closed)
 
     def test_stop_denies_open_approvals_with_its_reason(self):
@@ -557,15 +562,42 @@ class ApprovalTests(Case):
         self.peers[0].events.put(Event("turn_ended", outcome="completed"))
         eventually(lambda: [a["who"] for a in driver.agent()["approvals"]] == ["worker-1"])
 
-    def test_allow_for_the_session_approves_the_same_call_and_logs_it(self):
-        # S60
+    def test_the_options_are_the_adapters_and_the_choice_goes_to_the_harness(self):
+        # B2: D5, D8, S10
         driver = self.driver(launch=lambda tag: Answering())
         driver.start()
-        item = self.request(driver, key=1)
+        wide = approval(key=1)
+        wide.options = ("allow_once", "allow_session", "deny")
+        self.peers[0].events.put(wide)
+        eventually(lambda: driver.agent()["approvals"])
+        item = driver.agent()["approvals"][0]
+        self.assertEqual(item["options"], ["allow_once", "allow_session", "deny"])
         self.assertTrue(driver.answer_approval(item["id"], "allow_session").result(timeout=2))
-        self.peers[0].events.put(approval(key=2))
-        eventually(lambda: ("answer", 2, "allow_once", "Allowed earlier for this session") in self.peers[0].calls)
-        self.assertEqual(driver.agent()["approvals"], [])
+        self.assertEqual([c[:3] for c in self.peers[0].calls if c[0] == "answer"], [("answer", 1, "allow_session")])
+
+    def test_a_choice_outside_the_events_options_is_refused(self):
+        # B2
+        driver = self.driver(launch=lambda tag: Answering())
+        driver.start()
+        item = self.request(driver)
+        with self.assertRaises(ValueError):
+            driver.answer_approval(item["id"], "allow_session")
+        self.assertEqual(len(driver.agent()["approvals"]), 1)
+        self.assertFalse([c for c in self.peers[0].calls if c[0] == "answer"])
+
+    def test_a_repeat_after_allow_for_the_session_is_logged_and_still_asked(self):
+        # S60, B2: the harness applies its own scope, so a repeat that reaches the page is asked again
+        driver = self.driver(launch=lambda tag: Answering())
+        driver.start()
+        wide = approval(key=1)
+        wide.options = ("allow_once", "allow_session", "deny")
+        self.peers[0].events.put(wide)
+        eventually(lambda: driver.agent()["approvals"])
+        driver.answer_approval(driver.agent()["approvals"][0]["id"], "allow_session").result(timeout=2)
+        again = approval(key=2)
+        again.options = wide.options
+        self.peers[0].events.put(again)
+        eventually(lambda: driver.agent()["approvals"])
         self.assertTrue(self.records("allowed"))
 
     def test_auto_approval_is_reported_once_it_happened(self):
@@ -712,6 +744,191 @@ class LingerTests(Case):
         self.assertTrue(driver.idle_expired())
         driver.agent()
         self.assertFalse(driver.idle_expired())
+
+
+class RoundTwoTests(Case):
+    def test_interrupted_turn_survives_a_lost_log(self):
+        # B1: S72 with the log gone; the items come from .page-delivery
+        self.conv.item("open-item")
+        driver = self.driver()
+        driver.start()
+        self.assertTrue(self.peers[0].prompt_arrived.wait(2))
+        self.conv.items["open-item"] = "working"
+        kept = (self.root / ".driver").read_bytes()
+        driver.close()
+        (self.root / ".driver").write_bytes(kept)
+        os.chmod(self.root / ".driver", 0o600)
+        (self.root / ".driver.log").write_text("")
+        os.chmod(self.root / ".driver.log", 0o600)
+        (self.root / ".page-delivery").write_text(json.dumps({"item_ids": ["open-item"]}))
+        self.driver().start()
+        self.assertTrue(self.peers[-1].prompt_arrived.wait(2))
+        self.assertIn("open-item: sent before in turn 1, which ended: crashed", self.peers[-1].prompts[0])
+
+    def test_a_missing_turn_record_never_falls_back_to_an_older_turn(self):
+        # B1
+        self.conv.items.update({"old": "seen", "new": "working"})
+        self.saved(turn={"number": 2, "prompt_uuid": "u", "sent_at": 1.0})
+        older = {"type": "turn", "number": 1, "session": "session-1", "items": ["old"], "start": 1, "end": 2}
+        (self.root / ".driver.log").write_text(json.dumps({**older, "outcome": "completed"}) + "\n")
+        os.chmod(self.root / ".driver.log", 0o600)
+        (self.root / ".page-delivery").write_text(json.dumps({"item_ids": ["new"]}))
+        self.driver().start()
+        self.assertTrue(self.peers[-1].prompt_arrived.wait(2))
+        self.assertIn("new: sent before in turn 2, which ended: crashed", self.peers[-1].prompts[0])
+        self.assertNotIn("old: sent before", self.peers[-1].prompts[0])
+
+    def test_an_unknown_message_from_a_real_transport_drives_the_protocol_failure(self):
+        # B3 (lesson L1): a stub codec returns kind "unknown" through ProcessTransport
+        script = (
+            "import sys\n"
+            'print(\'{"t": "ready"}\', flush=True)\n'
+            "for line in sys.stdin:\n"
+            '    print(\'{"t": "odd"}\', flush=True)\n'
+        )
+
+        class Codec:
+            def __init__(self, send):
+                self.send = send
+
+            def open(self, cwd, resume):
+                pass
+
+            def prompt(self, text, uuid=None):
+                self.send({"prompt": text})
+
+            def receive(self, message):
+                if message["t"] == "ready":
+                    return (SimpleNamespace(kind="ready", session_id="session-1"),)
+                return (SimpleNamespace(kind="unknown"),)
+
+        self.conv.item("one")
+        driver = self.driver(
+            launch=lambda tag: self.module.ProcessTransport(
+                [sys.executable, "-c", script], self.root, os.environ, Codec
+            ),
+            version="9.0.1",
+            tested="1.0 to 2.0",
+        )
+        with mock.patch.object(self.module, "PROTOCOL_TIMEOUT", 0.4):
+            driver.start()
+            eventually(lambda: driver.snapshot()["state"] == "failed")
+        self.assertEqual(driver.agent()["kind"], "protocol")
+
+    def test_verb_calls_are_attached_to_the_turn_record(self):
+        # B4, S60, D11
+        from better_ai.page.driver_state import log_verb
+
+        self.conv.item("one")
+        driver = self.driver()
+        driver.start()
+        self.assertTrue(self.peers[0].prompt_arrived.wait(2))
+        log_verb(self.conv.unit, "reply", 0)
+        log_verb(self.conv.unit, "set", 2)
+        self.conv.items["one"] = "done"
+        self.peers[0].events.put(Event("turn_ended", outcome="completed"))
+        eventually(lambda: any("end" in r for r in self.records("turn")))
+        turn = self.records("turn")[0]
+        self.assertEqual([(v["verb"], v["exit"]) for v in turn["verbs"]], [("reply", 0), ("set", 2)])
+        self.assertEqual(self.records("verb"), [])
+        self.assertEqual((self.root / ".driver.log").stat().st_mode & 0o777, 0o600)
+
+    def test_log_verb_line_carries_the_current_turn_number(self):
+        # B4
+        from better_ai.page.driver_state import log_verb
+
+        self.saved(turn={"number": 7, "prompt_uuid": "u", "sent_at": 1.0})
+        log_verb(self.conv.unit, "pending", 0)
+        line = self.records("verb")[0]
+        self.assertEqual((line["verb"], line["exit"], line["turn"]), ("pending", 0, 7))
+
+    def test_ended_has_one_writer_and_counts_only_repeated_driver_errors(self):
+        # D11
+        from better_ai.page.driver_state import last_ended
+
+        def fail(build):
+            driver = self.driver(build=build)
+            driver.start()
+            self.conv.delivery = lambda *a, **k: (_ for _ in ()).throw(ValueError("broken"))
+            driver.enqueue(self.conv.item(f"x{len(self.peers)}"))
+            eventually(lambda: driver.snapshot()["state"] == "failed")
+            driver.close()
+            self.conv.__dict__.pop("delivery")
+
+        fail("b1")
+        ended = last_ended(self.conv.unit)
+        self.assertEqual(set(ended), {"at", "reason", "kind", "build", "repeats"})
+        self.assertEqual((ended["kind"], ended["build"], ended["repeats"]), ("driver", "b1", 0))
+        # Reaching driver: on resets the count, so a second serve that fails the same way is the first again.
+        fail("b1")
+        self.assertEqual(last_ended(self.conv.unit)["repeats"], 0)
+
+    def test_repeats_count_within_one_serve_and_a_new_build_resets_them(self):
+        # D11
+        self.saved(
+            ended={"at": "2026-01-01T00:00:00Z", "reason": "broken", "kind": "driver", "build": "b1", "repeats": 1}
+        )
+        driver = self.driver(build="b2")
+        self.assertEqual(driver._ended["repeats"], 0)
+        again = self.driver(build="b1")
+        self.assertEqual(again._ended["repeats"], 1)
+
+    def test_stopping_and_stalled_have_their_fixed_text(self):
+        # D10
+        driver = self.driver()
+        driver.start()
+        self.assertEqual(driver._text("stopping", {}), "The agents are stopping.")
+        self.assertEqual(
+            driver._text("stalled", {}),
+            "The agents have shown no output for 10 minutes. Press Stop to end them, or keep waiting.",
+        )
+
+    def test_a_long_command_line_is_read_in_full(self):
+        # N4
+        from better_ai.page.transport import process_command
+
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)", "x" * 900])
+        self.addCleanup(child.wait)
+        self.addCleanup(child.kill)
+        self.assertTrue(process_command(child.pid).endswith("x" * 900))
+
+    def test_the_writer_thread_closes_stdin(self):
+        # N5
+        transport = self.module.ProcessTransport(
+            [sys.executable, "-c", "import time; time.sleep(30)"], self.root, os.environ, lambda send: None
+        )
+        transport.close()
+        transport._writer.join(timeout=2)
+        self.assertFalse(transport._writer.is_alive())
+        self.assertTrue(transport._proc.stdin.closed)
+
+    def test_a_process_group_that_did_not_end_is_reported(self):
+        # N6
+        class Stuck(Peer):
+            def close(self):
+                raise OSError("the harness's process group did not end")
+
+        driver = self.driver(launch=lambda tag: Stuck())
+        driver.start()
+        driver.fail_driver("loop stopped")
+        self.assertIn("did not end", " ".join(r.get("message", "") for r in self.records("error")))
+
+    def test_a_broken_workers_callback_keeps_the_page(self):
+        # N6
+        driver = self.driver()
+        driver.start()
+        eventually(lambda: not driver.busy())
+        driver.workers = lambda: 1 / 0
+        self.assertTrue(driver.busy())
+        self.assertFalse(driver.idle_expired(0))
+
+    def test_a_delivered_position_whose_id_is_gone_is_clamped_not_reset(self):
+        # N7
+        from better_ai.page.driver_state import delivered_position
+
+        events = [{"id": "a"}, {"id": "b"}]
+        self.assertEqual(delivered_position({"id": "zzz", "position": 5}, events), 2)
+        self.assertEqual(delivered_position({"id": "zzz", "position": 1}, events), 1)
 
 
 if __name__ == "__main__":
