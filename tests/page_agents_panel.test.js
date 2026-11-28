@@ -29,6 +29,9 @@ const TEXT = {
   tab: 'This tab is no longer connected. Use the newer tab, or ask the agent in your chat to reopen the page.',
   blocked: 'Auto mode blocked Bash rm -rf build (the command deletes files). Run it yourself, or tell the agent how to go on.',
   stopAsk: 'All agents stop now, and any request waiting for you is denied. Recorded work is kept; work in progress is lost. Press Start to continue.',
+  stopping: 'The agents are stopping.',
+  stalledText: 'The agents have shown no output for 10 minutes. Press Stop to end them, or keep waiting.',
+  own: "The page's agent is waiting for you to allow a tool call. Open the request to answer it.",
   unsent: 'May not have been sent; check after the page reopens.',
 };
 
@@ -37,7 +40,7 @@ function build(doc, o) {
   const b = doc.body, x = (spec, attrs, ...kids) => h(doc, spec, attrs, ...kids);
   const agents = o.agents === false ? null : x('section.agentsec', { 'aria-labelledby': 'agents-h' },
     x('div.notes-top', {}, x('h2.section-h#agents-h', {}, 'Agents')), x('ul.agents#agents'));
-  const config = x('script#page-config');
+  const config = x('script#page-config'), title = x('title');
   config.textContent = JSON.stringify({ agent: 'coordinator', capabilities: [], driven: true });
   b.append(x('div.band'), x('header.bar--stats', {}, x('div', {}, x('h1#title', {}, 'Research'), x('p.goal#goal')), x('div.stats#status')),
     x('p.offline#offline', { hidden: true }), x('p.oldnote#oldnote', { hidden: true }),
@@ -49,7 +52,7 @@ function build(doc, o) {
         x('form.composer#noteform', {}, x('p.unwatched#unwatched', { hidden: true }), x('label', {}, 'Message'), x('textarea#note'),
           x('div.send', {}, x('button.btn', { type: 'submit' }, 'Send'), x('p.status'))))),
     x('div.pop', { role: 'dialog', 'aria-label': 'Comment', hidden: true }, x('p.target'), x('textarea'), x('div.row2', {}, x('button.btn.ok', {}, 'Send'), x('button.btn.btn--quiet.cancel', {}, 'Cancel'), x('button.btn.btn--quiet.remove', {}, 'Delete'))),
-    x('div.toast#toast', { hidden: true }), config);
+    x('div.toast#toast', { hidden: true }), config, title);
 }
 
 // A page that has loaded: /agent answers with ctx.agent (a body, a status number or null for no answer), /rpc is recorded.
@@ -82,6 +85,7 @@ function boot(o = {}) {
     document: doc, fetch, URLSearchParams, AbortController, Date, JSON, innerWidth: o.width || 1440, innerHeight: 900,
     location: { hash: '', pathname: '/', search: '' }, history: { replaceState() {} },
     sessionStorage: { getItem: () => 'secret', setItem() {}, removeItem() {} },
+    MutationObserver: class { constructor(fn) { page.observed = fn; } observe(node) { page.observing = node; } },
     setTimeout: (fn, delay) => { timers.push({ fn, delay }); return timers.length; }, clearTimeout() {}, requestAnimationFrame: f => f(),
   });
   page.timers = timers;
@@ -106,8 +110,8 @@ test('S23: /agent is polled every 2 s and each state shows within one poll', asy
   assert.deepEqual(page.timers.map(t => t.delay), [2000]);
   const cases = [
     ['idle', body({ state: 'idle' }), 'Stop', null], ['working', body({ state: 'working' }), 'Stop', null],
-    ['waiting', waitingBody(), 'Stop', null], ['stalled', body({ state: 'stalled' }), 'Stop', null],
-    ['stopping', body({ state: 'stopping' }), null, null],
+    ['waiting', waitingBody(), 'Stop', null], ['stalled', body({ state: 'stalled', text: TEXT.stalledText }), 'Stop', TEXT.stalledText],
+    ['stopping', body({ state: 'stopping', text: TEXT.stopping }), null, TEXT.stopping],
     ['stopped', body({ state: 'stopped', text: TEXT.stopped }), 'Start', TEXT.stopped],
     ['failed', body({ state: 'failed', kind: 'login', text: TEXT.login }), 'Start', TEXT.login],
     ['closed', body({ state: 'closed', kind: 'idle', text: TEXT.closed }), null, TEXT.closed],
@@ -558,4 +562,102 @@ test('the shared page keeps no code of the separate approvals tab', () => {
   const js = read('page', 'page.js');
   assert.doesNotMatch(js, /approval tab|agent-controls|agent-status|Use Stop in/);
   assert.doesNotMatch(js, /function pageDriverText/);
+});
+
+// ---------- round 2: the page's own agent, the title, a long request, answers in flight, focus, live regions ----------
+
+test('B1: an approval from the page\'s own agent, which has no Agents row, shows a notice with a button that opens it', async () => {
+  const page = boot();
+  await page.show(body({ state: 'waiting', approvals: [approval({ who: 'coordinator' })], workers: [] }));
+  const html = page.agentsHtml();
+  assert.ok(html.includes(page.escaped(TEXT.own)));
+  assert.match(html, /<button[^>]*data-approval-for="coordinator"[^>]*>Open the request<\/button>/);
+  assert.doesNotMatch(html, /chip wait/, 'not an agent row');
+  const button = h(page.doc, 'button', { 'data-approval-for': 'coordinator' }, 'Open the request');
+  page.doc.body.append(button);
+  click(page.doc, button);
+  assert.equal(page.dialog().querySelector('.target').textContent, 'coordinator wants to read a file. Allow it?');
+  // A worker's request is the worker's row, not this notice.
+  await page.show(waitingBody());
+  assert.ok(!page.agentsHtml().includes(page.escaped(TEXT.own)));
+  // The page's pages with a waiting figure count requests and open the oldest on a press.
+  for (const file of [['research', 'board.js'], ['code', 'dashboard.js'], ['architect', 'page.js'], ['discover', 'page.js']]) {
+    const source = read(...file);
+    assert.match(source, /pageApprovals\(\)\.length/, file.join('/'));
+    assert.match(source, /pageOpenApproval\(\)/, file.join('/'));
+  }
+});
+
+test('B2: the title prefix comes back at once when another writer resets the title, with no poll between', async () => {
+  const page = boot({ title: 'Research · Board' });
+  await page.show(waitingBody());
+  assert.ok(page.observing && page.observing.tag === 'title', 'it watches the <title> element');
+  page.doc.title = 'Research · Board';       // the board's own redraw
+  page.observed();
+  assert.equal(page.doc.title, 'Waiting for you: Research · Board');
+  page.observed();
+  assert.equal(page.doc.title, 'Waiting for you: Research · Board', 'idempotent');
+  await page.show(body({ state: 'working' }));
+  page.doc.title = 'Waiting for you: Research · Board';
+  page.observed();
+  assert.equal(page.doc.title, 'Research · Board', 'and goes when nothing waits');
+});
+
+test('B3: the pop-up keeps its buttons in view: only the request scrolls, and it still wraps', async () => {
+  const css = read('page', 'page.css');
+  assert.match(css, /\.pop\.center\s*\{[^}]*max-height:calc\(100vh - 108px\)[^}]*display:flex[^}]*flex-direction:column/);
+  assert.match(css, /\.pop\.center \.args\s*\{[^}]*overflow-y:auto[^}]*min-height:0/);
+  assert.match(css, /\.pop\.center \.row2\s*\{[^}]*flex:none/);
+  assert.match(css, /\.pop \.args\s*\{[^}]*white-space:pre-wrap[^}]*overflow-wrap:anywhere/);
+  for (const width of [1440, 800]) {
+    const page = boot({ width });
+    await page.show(waitingBody({ approvals: [approval({ arguments: 'y'.repeat(10000) })] }));
+    page.ctx.pageOpenApproval();
+    const pop = page.dialog();
+    assert.equal(pop.querySelector('.args').textContent.length, 'Read\n'.length + 10000);
+    // the buttons are siblings of the scrolling block, not inside it
+    assert.deepEqual(pop.elements.map(n => n.className), ['target', 'args', 'row2']);
+  }
+});
+
+test('N1: the answer buttons are disabled while an answer is on its way', async () => {
+  const page = boot();
+  await page.show(waitingBody());
+  page.ctx.pageOpenApproval();
+  const buttons = page.dialog().querySelectorAll('button');
+  click(page.doc, buttons[0]);
+  assert.ok(buttons.every(b => b.disabled));
+  click(page.doc, buttons[1]);
+  click(page.doc, buttons[2]);
+  await settle();
+  assert.equal(page.rpcs.length, 1);
+  page.ctx.pageOpenApproval();
+  page.rpcFails = true;
+  const again = page.dialog().querySelectorAll('button');
+  click(page.doc, again[0]);
+  await settle();
+  assert.ok(again.every(b => !b.disabled), 'enabled again after a failure');
+});
+
+test('N3: after a redraw the focus goes back to the new copy of the row the pop-up opened from', async () => {
+  const page = boot();
+  await page.show(waitingBody());
+  const row = h(page.doc, 'button', { 'data-approval-for': 'w3' }, 'w3');
+  page.doc.body.append(row);
+  click(page.doc, row);
+  row.remove();
+  const fresh = h(page.doc, 'button', { 'data-approval-for': 'w3' }, 'w3');
+  page.doc.body.append(fresh);
+  fire(page.doc, page.dialog().querySelectorAll('button')[1], 'keydown', { key: 'Escape' });
+  assert.equal(page.doc.activeElement, fresh);
+});
+
+test('N4: the notice is one status region at every width', async () => {
+  const page = boot({ agent: body({ state: 'stopped', text: TEXT.stopped }) });
+  await page.tick();
+  assert.match(page.agentsHtml(), /<li class="notice" role="status">/);
+  assert.equal(page.pinbar().querySelector('.pinbar-text').getAttribute('role'), 'status');
+  const css = read('page', 'page.css').replace(/\s+/g, ' ');
+  assert.match(css, /@media \(max-width:900px\) \{[^@]*\.agents \.notice \{ display:none; \}/);
+  assert.match(css, /@media \(min-width:901px\) \{ \.pinbar \{ display:none; \} \}/);
 });
