@@ -72,7 +72,7 @@ FLAGS = {
     "summary": set(),
     "specs": set(),
     "add": {"--by", "--for", "--id"},
-    "set": {"--by", "--for", "--unset"},
+    "set": {"--by", "--for", "--unset", "--raw"},
 }
 # Every skill has these verbs; the others are approved only where the unit's skill has them.
 SHARED_VERBS = ("status", "reply", "pending", "check")
@@ -182,6 +182,11 @@ def verb_command(command, unit, archive, verbs, interpreter=None):
             return False
         else:
             value = next(it, "")
+            if arg == "--raw":
+                # The file a record's rule reads to check a quote: an absolute path of bare characters only.
+                if not (value.startswith("/") and BARE.fullmatch(value) and "/../" not in value + "/"):
+                    return False
+                continue
             if not IDENT.fullmatch(value) or (arg in NAMES and value == "user"):
                 return False
             if arg == "--state" and value not in REPLY_STATES:
