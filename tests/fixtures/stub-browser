@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""A stand-in for the user's browser, for tests. It never ships in a better.pyz. The page server's
+webbrowser.open is replaced by a call of this file with the page's address.
+
+STUB_BROWSER_OUT is the file it appends to: `url <address>` for each run, and, in the default mode, `secret <secret>`
+for the session secret the page would keep, which it gets as the page does, by posting the token to /pair.
+STUB_BROWSER_MODE: pair (default) posts the token; none opens nothing more, as a browser that never loads the page;
+fail exits 1, as a launcher that cannot start a browser.
+
+Tests do not set BROWSER for it: webbrowser.open falls back to the user's own browser when a BROWSER command fails, so
+they replace webbrowser.open in the served process with a call of this file (tests/test_page_pairing_v2.py)."""
+
+import http.client
+import json
+import os
+import sys
+import urllib.parse
+
+
+def main(argv):
+    address = argv[1]
+    if os.environ.get("STUB_BROWSER_MODE") == "fail":
+        return 1
+    with open(os.environ["STUB_BROWSER_OUT"], "a") as out:
+        out.write(f"url {address}\n")
+        if os.environ.get("STUB_BROWSER_MODE", "pair") == "pair":
+            parts = urllib.parse.urlsplit(address)
+            token = urllib.parse.parse_qs(parts.fragment)["p"][0]
+            connection = http.client.HTTPConnection(parts.netloc, timeout=10)
+            headers = {"Origin": f"http://{parts.netloc}", "Sec-Fetch-Site": "same-origin"}
+            connection.request(
+                "POST", "/pair", json.dumps({"token": token}), {"Content-Type": "application/json", **headers}
+            )
+            reply = connection.getresponse()
+            body = reply.read().decode()
+            out.write(f"secret {json.loads(body)['secret']}\n" if reply.status == 200 else f"refused {reply.status}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

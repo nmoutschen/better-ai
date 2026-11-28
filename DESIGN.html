@@ -1261,8 +1261,14 @@ function pageConversation(o) {
   // DONE runs once the server saved the action; FAIL when it did not, such as to enable a button again. The user's text
   // stays where it was typed: DONE is what clears it. A refusal by the server, such as an event its schema rejects, shows
   // the server's reason; when it cannot be reached, the send may or may not have arrived.
+  // A send whose reply was lost may have been saved. Each path makes its id when the user clicks, so the page keeps the id of
+  // a send the server has not confirmed or refused, and a repeat of the same method and content goes out under it: the
+  // server then stores the event once (S127). The id is dropped once the server answers.
+  var unconfirmed = {};
   function send(method, params, what, done, fail) {
     if (o.readOnly) return;
+    var key = typeof params.id === 'string' ? method + JSON.stringify(Object.assign({}, params, { id: 0 })) : null;
+    if (key) { params = Object.assign({}, params, { id: unconfirmed[key] || params.id }); unconfirmed[key] = params.id; }
     var event = Object.assign({ type: method, at: new Date().toISOString().slice(0, 19) + 'Z', by: 'user' }, params);
     if (o.apply) o.apply(event, true);
     if (!o.served) { log.push(event); renderThread(); flash(what + ' saved on this page. ' + (o.unsent || ''), 'ok'); if (done) done(); return; }
@@ -1275,10 +1281,12 @@ function pageConversation(o) {
         return r;
       })
       .then(function () {
+        if (key) delete unconfirmed[key];
         flash('✓ ' + what + ' sent to the ' + agent.toLowerCase(), 'ok'); say(''); if (done) done(); if (o.afterSend) o.afterSend();
       }, function (error) {
         undo();
         var refused = error && error.refused;
+        if (refused && key) delete unconfirmed[key];
         flash(refused ? 'Not sent: ' + what.toLowerCase() + '. ' + error.message : PAGE_UNSENT, 'error');
         say(refused ? 'Not sent: ' + error.message : PAGE_UNSENT, true);
         if (fail) fail();
@@ -1464,10 +1472,16 @@ function pageConversation(o) {
   }
   // The page's whole log, when the page reads it itself; KEY is anything else the entries show, such as a deadline.
   // The thread is redrawn only when either changed, so focus and selection stay put between polls.
+  // A kept id whose event the log already holds was saved, even if its reply was lost: a later send is a new event.
+  function forgetSaved() {
+    Object.keys(unconfirmed).forEach(function (k) {
+      if (log.some(function (e) { return e.id === unconfirmed[k]; })) delete unconfirmed[k];
+    });
+  }
   function setLog(events, key) {
     var next = JSON.stringify([events, key]);
     if (next === fed) return;
-    fed = next; log = events.slice(); renderThread();
+    fed = next; log = events.slice(); forgetSaved(); renderThread();
   }
   // The user's items that match, without actions, such as the comments on one question.
   function nodes(match) {
@@ -1522,6 +1536,7 @@ function pageConversation(o) {
       pageFetch('/events?after=' + after).then(function (r) { return r.json(); }).then(function (r) {
         connected(true);
         r.events.forEach(function (e) { log.push(e); if (o.apply) o.apply(e, false); });
+        forgetSaved();
         // A new reply from the agent is announced once, in the toast, which screen readers read as a status.
         if (after > 0) r.events.forEach(function (e) { if (e.type === 'reply') flash(agent + ': ' + pageMarkdownText(e.text).slice(0, 120), 'ok'); });
         if (r.events.length) renderThread();

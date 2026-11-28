@@ -149,12 +149,17 @@ class Unit(unittest.TestCase):
         return json.loads(path.read_text()) if path.exists() else {}
 
     def end_everything(self):
+        """End the servers a test started: SIGTERM first, so a server removes its link socket, then SIGKILL."""
         state = self.state()
-        for pid in (state.get("server_pid"), state.get("child_pid")):
-            if type(pid) is int and pid > 1 and pid != os.getpid():
-                with_group = pid == state.get("child_pid")
-                with contextlib.suppress(ProcessLookupError, PermissionError):
-                    (os.killpg if with_group else os.kill)(pid, signal.SIGKILL)
+        pids = [state.get("server_pid"), state.get("child_pid")]
+        pids = [pid for pid in pids if type(pid) is int and pid > 1 and pid != os.getpid()]
+        if type(state.get("server_pid")) is int and state["server_pid"] in pids:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.kill(state["server_pid"], signal.SIGTERM)
+            wait_for(lambda: not alive(state["server_pid"]), 5)
+        for pid in pids:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                (os.killpg if pid == state.get("child_pid") else os.kill)(pid, signal.SIGKILL)
 
     def served(self, *args, **kw):
         done = self.serve(*args, **kw)
@@ -573,7 +578,7 @@ class VerbNoticeTest(Unit):
 
     def test_the_notice_names_the_agents_state(self):  # S122
         done = self.verb("pending", ".show/deck")
-        self.assertRegex(done.stderr, r"this page's agent is idle since \d\d:\d\d")
+        self.assertRegex(done.stderr, r"this page's agent is idle")
 
     def test_the_page_agent_gets_no_notice(self):  # S37
         done = self.verb("pending", ".show/deck", env=stub_env(BETTER_PAGE_SESSION=self.session))
@@ -854,7 +859,7 @@ class MachineOutputTest(Unit):
         os.environ["BETTER_AI_SKILL"] = "show-better"
         unit = better_unit(self.root, self.folder)
         (self.folder / ".driver").write_text("{}")
-        alive_state = {"alive": {"session": "s", "state": "idle", "since": 0, "waiting": 0}}
+        alive_state = {"alive": {"session": "s", "state": "idle", "waiting": 0}}
         for name in machine:
             with self.subTest(name), mock.patch.object(page, "live_server", return_value=alive_state):
                 out, err = [], []
@@ -868,13 +873,14 @@ class MachineOutputTest(Unit):
 
 
 class WaitingNoticeTest(Unit):
-    def test_the_notice_says_the_agent_waits_for_an_approval_since_when(self):  # S122
+    def test_the_notice_says_the_agent_waits_for_an_approval(self):  # S122
         from better_ai import page
 
         unit = better_unit(self.root, self.folder)
-        since = time.mktime((2026, 11, 28, 14, 2, 0, 0, 0, -1))
-        state = {"alive": {"session": "s", "state": "waiting", "since": since, "waiting": 1}}
-        self.assertIn("this page's agent is waiting for your approval since 14:02", page.notice_text(unit, state))
+        state = {"alive": {"session": "s", "state": "idle", "waiting": 1}}
+        self.assertIn("this page's agent is waiting for your approval", page.notice_text(unit, state))
+        state = {"alive": {"session": "s", "state": "working", "waiting": 0}}
+        self.assertIn("this page's agent is working", page.notice_text(unit, state))
 
     def test_a_real_open_approval_shows_in_the_notice(self):  # S122
         done = self.served(env=stub_env(STUB_MODE="ask"))
@@ -882,7 +888,7 @@ class WaitingNoticeTest(Unit):
         self.request("POST", "/rpc", {"jsonrpc": "2.0", "id": 1, "method": "note", "params": NOTE}, secret)
         self.assertTrue(wait_for(lambda: json.loads(self.request("GET", "/alive")[1])["state"] == "waiting", 20))
         check = self.verb("check", ".show/deck")
-        self.assertRegex(check.stdout, r"this page's agent is waiting for your approval since \d\d:\d\d")
+        self.assertIn("this page's agent is waiting for your approval", check.stdout)
 
 
 class PendingTest(Unit):

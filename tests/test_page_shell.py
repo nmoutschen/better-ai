@@ -79,7 +79,7 @@ class FakeDriver:
     harness = "claude"
 
     def snapshot(self):
-        return {"state": "idle", "since": time.time(), "age": 0.0}
+        return {"state": "idle", "since": time.time(), "age": 0.0, "open_approvals": 0}
 
     def agent(self):
         return {"state": "idle", "mark_age": 0.0, "approvals": []}

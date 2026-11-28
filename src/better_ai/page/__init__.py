@@ -59,6 +59,8 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import Future
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -99,6 +101,9 @@ CONTENT_TYPES = {
     ".svg": "image/svg+xml",
 }
 DRIVER_METHODS = ("permission_answer", "agent_stop", "agent_start")  # what /rpc hands to the driver, not to the log
+ANSWER_WAIT = 5  # seconds a permission answer waits for the driver to take it
+LINK_WAIT = 15  # seconds `link` waits for the new tab to pair
+ANSWERED_KEPT = 200  # approval answers the server remembers, to answer a send that came twice
 SHARED_ASSETS = {"/page.js": "page/page.js", "/page.css": "page/page.css"}
 
 # The driven shell and its srcdoc previews may run only bundled scripts.
@@ -450,6 +455,14 @@ class Conversation:
             admitted_edits=admitted_edits,
             all_working=all_working,
         )
+
+    def has(self, event: dict) -> bool:
+        """Whether the latest event of this type and id has this content, whatever its time: a send that came twice
+        (S127). An edit that goes back to an earlier text is a new line. An event with no id is never the same one."""
+        if not isinstance(event.get("id"), str):
+            return False
+        same = [old for old in self.events() if old.get("type") == event["type"] and old.get("id") == event["id"]]
+        return bool(same) and {k: v for k, v in same[-1].items() if k != "at"} == event
 
     def write(self, *events: dict) -> list:
         """Append the agent's own events; one that fails its schema is refused with the validator's message."""
@@ -910,19 +923,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send_error(413)
         return json.loads(self.rfile.read(int(size)))
 
-    def pair(self, pairing, new_page=None, unauthorized=401):
+    def pair(self, pairing):
         try:
             request = self.read_json()
             if request is None:
                 return
             origin = "http://" + self.headers["Host"]
-            secret = pairing.exchange(request.get("token", ""), origin) if isinstance(request, dict) else None
+            with self.driven.routing_lock:
+                secret = pairing.exchange(request.get("token", ""), origin) if isinstance(request, dict) else None
         except ValueError:
             secret = None
         if not secret:
-            return self.send(unauthorized, b"Pairing link expired. Ask for a new link.", "text/plain")
+            return self.send(403, b"Pairing link expired. Ask for a new link.", "text/plain")
         self.driven.tab_paired()
-        return self.send_json({"secret": secret, **({"page": new_page()} if new_page else {})})
+        return self.send_json({"secret": secret})
 
     def send(self, code: int, body: bytes, kind: str, *, policy: str | None = None) -> None:
         self.send_response(code)
@@ -990,10 +1004,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     @answers_any_failure
     def do_POST(self):
-        with self.driven.routing_lock:
-            self.post()
-
-    def post(self):
         # Only this page may send: the same host and origin, and a JSON body that a cross-site form cannot send.
         origin = self.headers.get("Origin", "")
         if not self.local() or origin != "http://" + (self.headers.get("Host") or ""):
@@ -1002,7 +1012,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not driven.main_host(self.headers.get("Host")) or not self.browser_origin():
             return self.send_error(403)
         if self.path == "/pair":
-            return self.pair(driven.pairing, unauthorized=403)
+            return self.pair(driven.pairing)
         if self.path != "/rpc":
             return self.send_error(404)
         if not self.driven_token(driven.pairing):
@@ -1038,11 +1048,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if "by" in params:
             return self.send_json(rpc_error(rid, -32602, "by: not allowed in what a page sends; the server sets it"))
         params = {k: v for k, v in params.items() if k not in ("type", "at")}
-        try:
-            (line,) = self.conversation.append({"type": msg["method"], "by": "user", **params})
-        except EventError as error:
-            return self.send_json(rpc_error(rid, -32602, str(error)))
-        driven.driver.enqueue(json.loads(line))
+        event = {"type": msg["method"], "by": "user", **params}
+        with driven.routing_lock:  # the tab is still the paired one when its event is written
+            if not self.driven_token(driven.pairing):
+                return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+            if self.conversation.has(event):  # the page sent it again, as it does when a reply was lost
+                return self.send_json({"jsonrpc": "2.0", "id": rid, "result": "saved"})
+            try:
+                (line,) = self.conversation.append(event)
+            except EventError as error:
+                return self.send_json(rpc_error(rid, -32602, str(error)))
+            driven.driver.enqueue(json.loads(line))
         return self.send_json({"jsonrpc": "2.0", "id": rid, "result": "saved"})
 
     def finish(self) -> None:
@@ -1171,7 +1187,7 @@ def live_server(unit: Unit) -> dict:
     if not state:
         return {}
     info = server_answer(unit)
-    if not info or info.get("pid") != state.get("server_pid"):
+    if not info or not is_serve_of(state.get("server_pid"), unit):
         return {}
     return {**state, "alive": info}
 
@@ -1180,14 +1196,14 @@ def live_server(unit: Unit) -> dict:
 
 WRITING = ("add", "set", "status", "reply", "create")  # the verbs a chat agent may not run on a driven unit
 AGENT_STATE = {
-    "idle": "this page's agent is idle since {}",
-    "working": "this page's agent is working since {}",
-    "waiting": "this page's agent is waiting for your approval since {}",
-    "stopping": "this page's agent is stopping since {}",
-    "stopped": "this page's agent is stopped since {}",
-    "stalled": "this page's agent has stalled since {}",
-    "failed": "this page's agent has failed since {}",
-    "closed": "this page has closed since {}",
+    "idle": "this page's agent is idle",
+    "working": "this page's agent is working",
+    "waiting": "this page's agent is waiting for your approval",
+    "stopping": "this page's agent is stopping",
+    "stopped": "this page's agent is stopped",
+    "stalled": "this page's agent has stalled",
+    "failed": "this page's agent has failed",
+    "closed": "this page has closed",
 }
 
 
@@ -1198,9 +1214,8 @@ def notice_text(unit: Unit, state: dict) -> str:
         f"or run `link {unit.label}` to reopen it; do not work on this unit"
     )
     kind = "waiting" if info.get("waiting") else info.get("state")
-    since = info.get("since")
-    if kind in AGENT_STATE and isinstance(since, (int, float)):
-        notice += "\n" + AGENT_STATE[kind].format(time.strftime("%H:%M", time.localtime(since)))
+    if kind in AGENT_STATE:
+        notice += "\n" + AGENT_STATE[kind]
     return notice
 
 
@@ -1219,7 +1234,7 @@ def drive_guard(args: argparse.Namespace, run: cli.Run) -> int | None:
         return None
     state = live_server(unit)
     mine = os.environ.get("BETTER_PAGE_SESSION")
-    if not state or (mine and mine in (state["alive"].get("session"), state["alive"].get("tag"))):
+    if not state or (mine and mine in (state["alive"].get("session"), state.get("tag"))):
         return None
     text = notice_text(unit, state)
     if name in WRITING:
@@ -1268,8 +1283,11 @@ class DrivenPage:
         self.ready = False
         self.requests = 0  # the requests served, for `--once`
         self.paired = threading.Event()
-        self.routing_lock = threading.RLock()
+        self.routing_lock = threading.RLock()  # the pairing and the log agree while an event is written
         self.pairing = Pairing(self.origin)
+        self.answered: dict[str, tuple[str, Future]] = {}  # each approval's first answer, for a send that came twice
+        self.answer_lock = threading.Lock()  # held to look up and record an answer, never while one is awaited
+        self.link_lock = threading.Lock()  # one new tab at a time
         server.handler.driven = self
 
     @property
@@ -1287,40 +1305,84 @@ class DrivenPage:
 
     def main_link(self):
         """The address that pairs one tab: its token is good once."""
-        with self.routing_lock:
-            return f"{self.origin}/#p={self.pairing.issue()}"
+        return f"{self.origin}/#p={self.pairing.issue()}"
 
     def status(self):
         """The body of /agent, as the driver builds it."""
-        return self.driver.agent() if self.driver and self.session else {"state": "starting", "mark_age": 0}
+        if self.driver:
+            return self.driver.agent()
+        return {
+            "state": "starting",
+            "since": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "kind": None,
+            "text": None,
+            "mark_age": 0,
+            "approvals": [],
+            "workers": [],
+            "blocked": [],
+            "auto_approved_once": False,
+        }
 
     def alive(self):
         """What `/alive` says without the secret: enough for a verb to know the page has an agent and what it does."""
-        info = {"unit": self.identity, "session": self.session, "pid": os.getpid()}
+        info = {"unit": self.identity, "session": self.session}
         if not self.driver or not self.session:
             return {**info, "state": "starting", "mark_age": 0, "waiting": 0}
         snapshot = self.driver.snapshot()
-        return {
-            **info,
-            "tag": self.driver.tag,
-            "state": snapshot["state"],
-            "since": snapshot.get("since"),
-            "mark_age": snapshot["age"],
-            "waiting": 1 if snapshot["state"] == "waiting" else 0,
-        }
+        return {**info, "state": snapshot["state"], "mark_age": snapshot["age"], "waiting": snapshot["open_approvals"]}
 
     def control(self, method, params):
+        """Stop, Start and the answer to an approval. A refusal is a ValueError with the words the page shows."""
         if not self.driver or not self.session:
             raise ValueError("The page's agent driver stopped. Ask the agent in your chat to serve this page again.")
-        if method == "permission_answer":
-            return bool(self.driver.answer_approval(params.get("id"), params.get("choice")).result(timeout=5))
         if method == "agent_stop":
-            self.driver.request_stop()
+            self.driver.request_stop()  # while stopping or stopped, the driver has nothing more to do: still success
             return True
         if method == "agent_start":
             self.driver.request_start()
             return True
-        raise ValueError("Unknown method")
+        return self.answer(params.get("id"), params.get("choice"))
+
+    def answer(self, approval_id, choice):
+        if not isinstance(approval_id, str) or not isinstance(choice, str):
+            raise ValueError("This request cannot be answered.")
+        with self.answer_lock:
+            known = self.answered.get(approval_id)
+            if known is None:
+                try:
+                    receipt = self.driver.answer_approval(approval_id, choice)
+                except ValueError:
+                    raise ValueError("This request cannot be answered that way.") from None
+                known = self.answered[approval_id] = (choice, receipt)
+                if len(self.answered) > ANSWERED_KEPT:
+                    del self.answered[next(iter(self.answered))]
+            elif known[0] != choice:
+                raise ValueError("This request was already answered.")
+        try:
+            delivered = known[1].result(timeout=ANSWER_WAIT)
+        except FutureTimeout:
+            raise ValueError("The agent did not take the answer. Try again.") from None
+        if delivered is not True:
+            raise ValueError("This request is no longer waiting.")
+        return True
+
+    def open_tab(self) -> str:
+        """Open a freshly paired tab and wait for it to pair; the answer `link` prints: `on`, or `off <kind>: <problem>`.
+        The old tab is unpaired only when the new one pairs, so a tab that never loads leaves it as it was."""
+        with self.link_lock:
+            before = self.pairing.generation
+            address = self.main_link()
+            try:
+                opened = webbrowser.open(address)
+            except webbrowser.Error:
+                opened = False
+            if not opened:
+                self.pairing.revoke()
+                return "off no-browser: could not open a browser on this machine; run link where your browser runs"
+            if not self.pairing.wait_after(before, LINK_WAIT):
+                self.pairing.revoke()
+                return "off timeout: the new tab did not open the page in time; the old tab is still paired"
+            return "on"
 
     def close(self, kind: str = "stopped", reason: str = "server stopped"):
         if self.driver:
@@ -1328,30 +1390,45 @@ class DrivenPage:
 
 
 LINK_SOCKET = ".page-link"
+LINK_REQUEST = "open-tab"
 
 
-def link_existing(unit, conv):
-    """Ask the live server over its private local control socket. Its path is not a browser credential."""
+def link_request(unit) -> str:
+    """Ask the unit's running server, over its user-only socket, to open a freshly paired tab: its answer, `on` or
+    `off <kind>: <problem>`. The path of the socket is not a browser credential."""
     from .driver_state import private_bytes
 
-    address = conv.address()
-    if not live_server(unit):
-        raise Refused(f"{unit.label}: no driven page is running at {address or 'this unit'}")
+    nothing = f"off no-server: no page is being served for {unit.label}; run serve {unit.label} again"
     try:
         path = Path(private_bytes(unit, LINK_SOCKET).decode())
-        if path.parent.parent != Path("/tmp") or not path.parent.name.startswith("better-page-") or path.name != "link":
-            raise ValueError()
+    except ValueError:
+        return nothing
+    if path.parent.parent != Path("/tmp") or not path.parent.name.startswith("better-page-") or path.name != "link":
+        return nothing
+    try:
         with socket.socket(socket.AF_UNIX) as control:
-            control.settimeout(2)
+            control.settimeout(LINK_WAIT + 10)
             control.connect(str(path))
-            control.sendall(unit_identity(unit).encode())
+            control.sendall(f"{LINK_REQUEST} {unit_identity(unit)}\n".encode())
             with control.makefile("rb") as stream:
-                url = stream.readline(512).decode().strip()
-            if not url.startswith("http://127.0.0.1:"):
-                raise ValueError()
-            return url
-    except (OSError, ValueError):
-        raise Refused(f"{unit.label}: could not pair a tab with the running server at {address}") from None
+                reply = stream.readline(512).decode(errors="replace").strip()
+    except OSError:
+        return nothing
+    return reply if re.fullmatch(r"on|off (no-browser|timeout): [^\n]+", reply) else nothing
+
+
+@cli.verb(
+    "link",
+    help="open a new tab of the unit's running page, and move the page to it",
+    arguments=_unit_argument,
+)
+def link(args: argparse.Namespace, run: cli.Run) -> int:
+    """Ask the page's server for a new tab and wait for it to load the page. Prints `link: on`, or `link: off <kind>:
+    <problem>` with the kind no-server, no-browser or timeout, and exits 0 or 1. The tab's address is never printed."""
+    unit = _unit(args, run)
+    reply = link_request(unit)
+    run.out(f"link: {reply}")
+    return 0 if reply == "on" else 1
 
 
 @contextlib.contextmanager
@@ -1368,6 +1445,22 @@ def link_control(driven):
         control.settimeout(0.2)
         stopping = threading.Event()
 
+        def answer(connection):
+            with connection:
+                connection.settimeout(2)
+                try:
+                    with connection.makefile("rb") as stream:
+                        asked = stream.readline(128)
+                    # The one request this socket takes: open a paired tab of this unit.
+                    reply = driven.open_tab() if asked == f"{LINK_REQUEST} {driven.identity}\n".encode() else "refused"
+                    connection.sendall(reply.encode() + b"\n")
+                except OSError:
+                    pass
+                except Exception:  # whatever went wrong, the one who asked gets an answer and no token is left open
+                    driven.pairing.revoke()
+                    with contextlib.suppress(OSError):
+                        connection.sendall(b"off no-server: the page server could not open a tab; run serve again\n")
+
         def serve_links():
             while not stopping.is_set():
                 try:
@@ -1376,15 +1469,7 @@ def link_control(driven):
                     continue
                 except OSError:
                     return
-                with connection:
-                    connection.settimeout(0.2)
-                    try:
-                        with connection.makefile("rb") as stream:
-                            identity = stream.read(64)
-                        if identity == driven.identity.encode():
-                            connection.sendall(driven.main_link().encode() + b"\n")
-                    except OSError:
-                        continue
+                threading.Thread(target=answer, args=(connection,), daemon=True).start()
 
         paths.write_state(unit, LINK_SOCKET, os.fsencode(path), 0o600)
         thread = threading.Thread(target=serve_links, daemon=True)
@@ -1480,7 +1565,6 @@ def _serve_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--no-browser", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--linger", type=float, default=10, help="seconds to keep serving after the unit stops")
     parser.add_argument("--once", action="store_true", help="serve one request, then exit")
-    parser.add_argument("--link", action="store_true", help="pair a new tab with an already driven page")
 
 
 @cli.verb(
@@ -1492,10 +1576,6 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
     """Check the unit, then start its page and the agent that works on it, and return once the page is served: the
     server goes on in its own session. Its first line is `driver: on <harness> <session>` or `driver: off <kind>: <what
     is wrong>`; where the driver cannot start nothing is served and the exit code is 1."""
-    if args.link:
-        unit = _unit(args, run)
-        run.out(link_existing(unit, _conversation(run, unit)))
-        return 0
     started = time.monotonic()
     try:
         if os.environ.get("BETTER_PAGE_SESSION"):

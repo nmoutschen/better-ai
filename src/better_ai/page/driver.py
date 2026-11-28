@@ -395,6 +395,7 @@ class Driver:
             "since": published["since"],
             "age": max(0, self.clock() - published["at"]),
             "waiting": published["waiting"],
+            "open_approvals": len(published["approvals"]),
             **published["details"],
         }
 
@@ -540,6 +541,7 @@ class Driver:
             {
                 "harness": self.harness,
                 "session": self.session,
+                "tag": self.tag,  # the name the page agent's verbs carry (BETTER_PAGE_SESSION), for the verbs' notice
                 "server_pid": os.getpid(),
                 "server_started": self._server_started,
                 "child_pid": getattr(peer, "pid", None),

@@ -139,7 +139,10 @@ class StateTests(Case):
         driver = self.driver()
         driver.start()
         state = self.state()
-        self.assertEqual(set(state), FIELDS)
+        self.assertEqual(
+            set(state) - {"tag"}, FIELDS
+        )  # tag: the name the page agent's verbs carry, for the verbs' notice
+        self.assertEqual(state["tag"], driver.tag)
         self.assertEqual(state["version"], 1)
         self.assertEqual(set(state["ended"]), {"at", "reason", "kind", "build", "repeats"})
         self.assertEqual(state["server_pid"], os.getpid())
@@ -151,7 +154,7 @@ class StateTests(Case):
         os.chmod(self.root / ".driver", 0o600)
         self.driver().start()
         state = self.state()
-        self.assertEqual(set(state) - FIELDS, {"extra"})
+        self.assertEqual(set(state) - FIELDS - {"tag"}, {"extra"})
         self.assertEqual(state["extra"], {"a": 1})
         self.assertEqual(state["fired"], [])
 
