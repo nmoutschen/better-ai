@@ -4,7 +4,7 @@ description: Reviews a change it did not build against the spec and the recorded
 capabilities: [read files, run commands]
 edits: false
 model: most capable
-model_reason: No eval compares models on this review, and no model is shown to review better than a more capable one of another family.
+model_reason: No eval compares models on this review yet.
 ---
 
 # Agent: verifier

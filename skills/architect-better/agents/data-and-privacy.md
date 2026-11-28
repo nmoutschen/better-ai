@@ -4,7 +4,7 @@ description: Reviews a design it did not make, or a system against its design, f
 capabilities: [read files]
 edits: false
 model: most capable
-model_reason: No eval compares models on this perspective, and no model is shown to review better than a more capable one of another family.
+model_reason: No eval compares models on this perspective yet.
 ---
 
 # Agent: data-and-privacy

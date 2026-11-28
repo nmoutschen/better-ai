@@ -4,7 +4,7 @@ description: Reviews an interface or a design language it did not design, by wal
 capabilities: [read files, run commands]
 edits: false
 model: most capable
-model_reason: No eval compares models on this review, and no model is shown to review better than a more capable one of another family.
+model_reason: No eval compares models on this review yet.
 ---
 
 # Agent: reviewer
