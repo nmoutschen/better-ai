@@ -4,7 +4,6 @@ description: Reviews a change it did not build against the spec and the recorded
 capabilities: [read files, run commands]
 edits: false
 model: Opus, Sol or similar
-model_reason: Checking code against its spec needs a strong model, not the strongest.
 ---
 
 # Agent: verifier

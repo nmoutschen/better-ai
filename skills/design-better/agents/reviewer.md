@@ -4,7 +4,6 @@ description: Reviews an interface or a design language it did not design, by wal
 capabilities: [read files, run commands]
 edits: false
 model: Opus, Sol or similar
-model_reason: Walking the interface through its scenarios needs a strong model, not the strongest.
 ---
 
 # Agent: reviewer

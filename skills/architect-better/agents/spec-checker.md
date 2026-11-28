@@ -4,7 +4,6 @@ description: Checks, in both directions, the links between a spec and the approv
 capabilities: [read files]
 edits: false
 model: Sonnet, Terra or similar
-model_reason: Checking links between a spec and its sources is mostly mechanical; cheap models matched the strongest on whether a source supports a claim.
 ---
 
 # Agent: spec-checker

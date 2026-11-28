@@ -1,11 +1,11 @@
-"""Every agent file of every skill has the frontmatter of PRINCIPLES 6.9, with a model and the reason for it."""
+"""Every agent file of every skill has the frontmatter of PRINCIPLES 6.9, with the models it runs on."""
 
 import re
 import unittest
 from pathlib import Path
 
 SKILLS = Path(__file__).resolve().parent.parent / "skills"
-FIELDS = ["name", "description", "capabilities", "edits", "model", "model_reason"]
+FIELDS = ["name", "description", "capabilities", "edits", "model"]
 
 
 def frontmatter(text: str) -> dict[str, str]:
@@ -20,7 +20,7 @@ def frontmatter(text: str) -> dict[str, str]:
 
 
 class AgentFrontmatter(unittest.TestCase):
-    def test_each_agent_names_its_model_and_why(self):
+    def test_each_agent_names_its_model(self):
         paths = sorted(SKILLS.glob("*/agents/*.md"))
         self.assertTrue(paths)
         for path in paths:
@@ -29,7 +29,6 @@ class AgentFrontmatter(unittest.TestCase):
                 self.assertEqual(list(head), FIELDS)
                 self.assertEqual(head["name"], path.stem)
                 self.assertTrue(head["model"].endswith(" or similar"))
-                self.assertTrue(head["model_reason"].endswith("."))
 
 
 if __name__ == "__main__":

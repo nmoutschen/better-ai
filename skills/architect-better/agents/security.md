@@ -4,7 +4,6 @@ description: Reviews a design it did not make, or a system against its design, f
 capabilities: [read files]
 edits: false
 model: Fable, Astra or similar
-model_reason: A missed threat is costly and hard to undo, and finding one means following how steps chain into an attack.
 ---
 
 # Agent: security

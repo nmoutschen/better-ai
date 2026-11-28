@@ -4,7 +4,6 @@ description: Reviews a design it did not make, or a system against its design, a
 capabilities: [read files]
 edits: false
 model: Sonnet, Terra or similar
-model_reason: Checking a design against one written standard is close to mechanical.
 ---
 
 # Agent: repo-standards

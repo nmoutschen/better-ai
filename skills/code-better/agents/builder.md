@@ -4,7 +4,6 @@ description: Builds one part of a larger change in the mode it is given, on its 
 capabilities: [read files, run commands, write files, commit]
 edits: true
 model: Sonnet, Terra or similar
-model_reason: Saves cost; the coordinator moves a task to a stronger model when it fails review or touches security.
 ---
 
 # Agent: builder

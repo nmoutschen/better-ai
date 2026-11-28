@@ -474,7 +474,7 @@ class Agents(unittest.TestCase):
             with self.subTest(name):
                 self.assertTrue(text, f"{path} is missing")
                 head = frontmatter(text)
-                self.assertEqual(list(head), ["name", "description", "capabilities", "edits", "model", "model_reason"])
+                self.assertEqual(list(head), ["name", "description", "capabilities", "edits", "model"])
                 self.assertEqual(head["name"], name)
                 self.assertIn(head["model"], {"Sonnet, Terra or similar", "Haiku or similar"})
                 places = [text.find(h) for h in ("\n## Input\n", "\n## Output\n")]
