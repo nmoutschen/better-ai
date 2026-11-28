@@ -76,7 +76,7 @@ _CLAUDE_FLAGS = {
 _CURSOR_MODES = {"allowlist": "manual", "auto-review": "auto", "unrestricted": "skip approvals"}
 _DEVIN_MODES = {"normal": "manual", "accept-edits": "accept edits", "smart": "auto", "dangerous": "skip approvals"}
 _DEVIN_CHAT = {**_DEVIN_MODES, "auto": "manual", "yolo": "skip approvals", "bypass": "skip approvals"}
-_DROID_MODES = {"off": "manual", "low": "accept edits"}
+_DROID_LEVELS = ("off", "low", "medium", "high")
 _CLAUDE_REPORTED = {**_CLAUDE_CHAT, "plan": "plan", "dontAsk": "don't ask"}
 
 # Prefer specific identifiers to generic markers if one harness is started from another.
@@ -1138,7 +1138,7 @@ class DroidAdapter(_RPCAdapter):
 
     def __init__(self, send: Send, chat_mode: str | None = None):
         super().__init__(send, chat_mode)
-        self._mode = "manual"
+        self._mode = "off"
         self._running = False
 
     def _request_id(self) -> str:
@@ -1196,15 +1196,18 @@ class DroidAdapter(_RPCAdapter):
 
     def _new_session(self) -> None:
         params = {"machineId": "default", "cwd": self._cwd, "interactionMode": "auto"}
-        level = next((level for level, label in _DROID_MODES.items() if label == self.chat_mode), None)
-        if level:
-            params["autonomyLevel"] = level
+        if self.chat_mode in _DROID_LEVELS:
+            params["autonomyLevel"] = self.chat_mode
         self._call("droid.initialize_session", params, self._opened)
 
     def _opened(self, data: dict) -> Events:
         settings = _object(data.get("settings"))
-        mode = _DROID_MODES.get(settings.get("autonomyLevel"))
-        if mode is None or settings.get("interactionMode") != "auto" or (self.chat_mode and mode != self.chat_mode):
+        mode = settings.get("autonomyLevel")
+        if (
+            mode not in _DROID_LEVELS
+            or settings.get("interactionMode") != "auto"
+            or (self.chat_mode and mode != self.chat_mode)
+        ):
             return _failure("unsafe-mode")
         self._mode = mode
         session_id = data.get("sessionId", self._resume)
@@ -1303,7 +1306,7 @@ class DroidAdapter(_RPCAdapter):
         if kind == "settings_updated":
             settings = _object(data.get("settings"))
             if (
-                _DROID_MODES.get(settings.get("autonomyLevel"), self._mode) != self._mode
+                settings.get("autonomyLevel", self._mode) != self._mode
                 or settings.get("interactionMode", "auto") != "auto"
             ):
                 self.session_id = None
