@@ -3,7 +3,7 @@ name: verifier
 description: Reviews a change it did not build against the spec and the recorded decisions, and reports findings to the agent that started it, without editing the code.
 capabilities: [read files, run commands]
 edits: false
-model: most capable
+model: Fable, Astra or similar
 model_reason: No eval compares models on this review yet.
 ---
 

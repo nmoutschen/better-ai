@@ -476,7 +476,7 @@ class Agents(unittest.TestCase):
                 head = frontmatter(text)
                 self.assertEqual(list(head), ["name", "description", "capabilities", "edits", "model", "model_reason"])
                 self.assertEqual(head["name"], name)
-                self.assertEqual(head["model"], "cheaper")
+                self.assertEqual(head["model"], "Sonnet, Terra or similar")
                 places = [text.find(h) for h in ("\n## Input\n", "\n## Output\n")]
                 self.assertNotIn(-1, places)
                 self.assertEqual(places, sorted(places))

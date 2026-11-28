@@ -3,7 +3,7 @@ name: builder
 description: Builds one part of a larger change in the mode it is given, on its own branch, and reports to the coordinator that started it.
 capabilities: [read files, run commands, write files, commit]
 edits: true
-model: cheaper
+model: Sonnet, Terra or similar
 model_reason: A design choice to save cost; the coordinate mode moves a task to a more capable model when its rounds fail or its requirements are security-sensitive.
 ---
 

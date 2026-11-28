@@ -6,7 +6,6 @@ from pathlib import Path
 
 SKILLS = Path(__file__).resolve().parent.parent / "skills"
 FIELDS = ["name", "description", "capabilities", "edits", "model", "model_reason"]
-MODELS = {"cheaper", "same", "capable", "most capable"}
 
 
 def frontmatter(text: str) -> dict[str, str]:
@@ -29,7 +28,7 @@ class AgentFrontmatter(unittest.TestCase):
                 head = frontmatter(path.read_text(encoding="utf-8"))
                 self.assertEqual(list(head), FIELDS)
                 self.assertEqual(head["name"], path.stem)
-                self.assertIn(head["model"], MODELS)
+                self.assertTrue(head["model"].endswith(" or similar"))
                 self.assertTrue(head["model_reason"].endswith("."))
 
 
