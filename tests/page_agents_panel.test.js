@@ -679,3 +679,37 @@ test('round 3: below 900 px the CSS hides nothing of the own-agent row and its O
   }
   assert.ok(hidden.some(s => s.trim() === '.agents .notice'), 'the state notice is still hidden there (it is in the pinned bar)');
 });
+
+// ---------- D18: below 900 px the pinned bar carries an opener whenever a request waits ----------
+
+test('D18: the pinned bar says a request waits and its button opens it, for a worker or the page agent', async () => {
+  for (const [who, workers] of [['w3', [{ name: 'w3', item: 'Q-w3-1', waiting: true, silent_min: null }]], ['coordinator', []]]) {
+    const page = boot({ width: 800 });
+    await page.show(body({ state: 'waiting', approvals: [approval({ who })], workers }));
+    const bar = page.pinbar();
+    assert.ok(bar && !bar.hidden, who);
+    const open = bar.querySelector('.pin-open');
+    assert.ok(open && !open.hidden, who);
+    assert.equal(open.textContent, 'Open the request');
+    assert.equal(bar.querySelector('.pinbar-text').textContent, 'A request waits for you.');
+    click(page.doc, open);
+    assert.equal(page.dialog().querySelector('.target').textContent, who + ' wants to read a file. Allow it?');
+  }
+  const page = boot({ width: 800 });
+  await page.show(body({ state: 'working' }));
+  assert.ok(page.pinbar().querySelector('.pin-open').hidden, 'no request, no opener');
+  assert.equal(page.pinbar().querySelector('.pinbar-text').textContent, '');
+});
+
+test('D18: a focused row is not hidden under the pinned bar', () => {
+  const css = read('page', 'page.css').replace(/\s+/g, ' ');
+  assert.match(css, /@media \(max-width:900px\) \{[^@]*html \{ scroll-padding-bottom:[^}]+\}/);
+});
+
+test('D18: an /agent body from an older driver, without approvals, workers or blocked, does not stop the page', async () => {
+  const page = boot({ width: 800 });
+  await page.show({ state: 'working', since: '2026-11-28T10:00:00Z', kind: null, text: null, mark_age: 0.2 });
+  assert.ok(!page.agentsHtml().includes(page.escaped(page.ctx.PAGE_DRIVER_DOWN)), 'the page does not take the driver for gone');
+  assert.ok(page.ctx.PAGE_DRIVER_DOWN);
+  assert.equal(page.pinbar().querySelector('.agent-ctl').textContent, 'Stop');
+});
