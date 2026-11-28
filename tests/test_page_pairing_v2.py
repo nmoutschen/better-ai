@@ -194,6 +194,9 @@ class FakeDriver:
         self.hold = False
         self.approvals = [{"id": "a1", "options": ["allow_once", "deny"]}]
 
+    def tab_paired(self):
+        """The real driver starts no turn before this (S77); this one runs no turns."""
+
     def agent(self):
         return {
             "state": "idle",

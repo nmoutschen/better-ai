@@ -806,6 +806,22 @@ class LingerTests(Case):
         self.assertTrue(self.peers[0].prompt_arrived.wait(2))
         self.assertFalse(driver.can_linger())
 
+    def test_work_held_until_a_tab_pairs_does_not_spin_the_loop(self):
+        # S77: while no tab has paired, the held turn cannot start, so the loop waits on the harness as when idle
+        # instead of polling it without a timeout (a busy loop starves the server's other threads).
+        class Counting(Peer):
+            def poll(self, timeout):
+                self.polls = getattr(self, "polls", 0) + 1
+                return super().poll(timeout)
+
+        self.conv.item("one")
+        driver = self.driver(launch=lambda tag: Counting(), paired=False)
+        driver.start()
+        eventually(driver.can_linger)
+        before = self.peers[0].polls
+        time.sleep(0.5)
+        self.assertLess(self.peers[0].polls - before, 50)
+
 
 class RoundTwoTests(Case):
     def test_interrupted_turn_survives_a_lost_log(self):
