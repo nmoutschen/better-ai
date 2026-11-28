@@ -275,6 +275,7 @@ function pageConversation(o) {
     if (s < 36 * 3600) return Math.round(s / 3600) + ' h';
     return Math.round(s / 86400) + ' days';
   }
+  function aged(words, at) { var a = age(at); return a ? words + ', ' + a : words; }
   // The first sentence of the message that started the thread, without its marks; nobody names threads.
   function rootText(e) { return e.type === 'decision' ? (e.x && e.x.asked) || '' : e.text || e.label || e.option || ''; }
   function gist(text) {
@@ -301,7 +302,7 @@ function pageConversation(o) {
     var chip = el('span', 'progress' + (step === 'new' ? '' : ' ' + step)), bars = el('span', 'bars');
     bars.setAttribute('aria-hidden', 'true');
     for (var j = 0; j < BARS.length; j++) bars.append(el('i', j <= k ? 'on' : ''));
-    chip.append(bars, el('span', '', STEP_WORDS[step] + ', ' + age(t.since)));
+    chip.append(bars, el('span', '', aged(STEP_WORDS[step], t.since)));
     return chip;
   }
   function body(text) { return pageMarkdown(text); }
@@ -412,7 +413,7 @@ function pageConversation(o) {
     var said = t.state === 'you' ? 'Your turn' : t.state === 'done' ? 'Done' : 'Agent’s turn, ' + STEP_WORDS[t.step].toLowerCase();
     head.setAttribute('aria-label', said + '. ' + whoOf(t.root) + ': ' + first.replace(/[.?!…]$/, '') + '. ' + (open ? 'Fold the thread' : 'Open the thread'));
     if (t.state !== 'done') chips.append(stateChip(t));
-    if (t.state === 'you') chips.append(el('span', 'tage', 'Waiting, ' + age(t.since)));
+    if (t.state === 'you') chips.append(el('span', 'tage', aged('Waiting', t.since)));
     else chips.append(progress(t));
     // A drawn equilateral triangle, sharp as the n14n style has it: down to open, up to fold.
     var fold = el('span', 'tfold'); fold.setAttribute('aria-hidden', 'true');
