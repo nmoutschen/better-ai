@@ -145,6 +145,14 @@ test('S61: a failed agent shows the text of its kind, in the Agents section', as
   }
 });
 
+test('N3: a harness that sends no approval requests gets no Start, which could only fail the same way', async () => {
+  const page = boot();
+  const text = 'All agents are stopped because this harness does not send its approval requests to the page. Ask the agent in your chat to serve this page from another harness.';
+  await page.show(body({ state: 'failed', kind: 'no-approvals', text }));
+  assert.ok(page.agentsHtml().includes(page.escaped(text)));
+  assert.ok(!page.control() || page.control().hidden, 'no Start for no-approvals');
+});
+
 test('S24: a liveness mark older than 3 s, or no answer, shows the driver stopped within 5 s', async () => {
   const page = boot({ agent: body({ state: 'working' }) });
   await page.tick();

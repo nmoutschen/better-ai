@@ -360,10 +360,11 @@ class OffTest(Unit):
 
     def test_not_installed_names_the_harness(self):  # S147
         done = self.serve(env=stub_env(PATH=""))
-        self.assertEqual(self.off(done, "not-installed"), "driver: off not-installed: claude CLI not found on PATH")
+        self.assertEqual(self.off(done, "not-installed"), "driver: off not-installed: Claude Code CLI not found on PATH")
 
-    def test_login(self):  # S75
-        self.off(self.serve(env=stub_env(STUB_MODE="login")), "login")
+    def test_login(self):  # S75, N6
+        line = self.off(self.serve(env=stub_env(STUB_MODE="login")), "login")
+        self.assertEqual(line, "driver: off login: log in to Claude Code in a terminal, then run serve again")
 
     def test_version_too_old(self):  # S75
         self.off(self.serve(env=stub_env(STUB_MODE="old")), "version")

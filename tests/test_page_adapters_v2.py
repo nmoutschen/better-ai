@@ -184,6 +184,30 @@ class SelectionAndLaunch(unittest.TestCase):
             adapter.receive(frame("edit_request"))
 
 
+class DisplayNames(unittest.TestCase):
+    def test_each_harness_has_its_display_name(self):  # N6
+        from better_ai.page import adapters
+
+        self.assertEqual(
+            {name: adapters.display_name(name) for name in adapters.HARNESS_FACTS},
+            {
+                "claude": "Claude Code",
+                "codex": "Codex",
+                "cursor": "Cursor",
+                "devin": "Devin",
+                "droid": "Droid",
+                "opencode": "OpenCode",
+            },
+        )
+        self.assertEqual(adapters.display_name("stub"), "stub")
+
+    def test_not_installed_names_the_harness_by_its_display_name(self):  # N6, S147
+        from better_ai.page import adapters
+
+        found = adapters.candidate("codex", {}, which=lambda command: None)
+        self.assertEqual((found.kind, found.text), ("not-installed", "Codex is not installed. Install it, then serve again."))
+
+
 class ChatMode(unittest.TestCase):
     def test_chat_mode_comes_from_the_chat_command_line(self):  # S11
         cases = {

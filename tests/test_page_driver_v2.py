@@ -984,6 +984,23 @@ class RoundTwoTests(Case):
         again = self.driver(build="b1")
         self.assertEqual(again._ended["repeats"], 1)
 
+    def test_notices_name_the_harness_by_its_display_name(self):
+        # N6: the page says Claude Code, not the adapter's id
+        driver = self.driver(harness="claude")
+        self.assertEqual(
+            driver._text("failed", {"kind": "login"}),
+            "All agents are stopped because Claude Code isn't logged in. Log in from a terminal, then press Start.",
+        )
+
+    def test_no_approvals_is_a_fixed_sentence_with_its_action(self):
+        # N3: no word of a chat agent that listens; serving from another harness is the action
+        driver = self.driver()
+        self.assertEqual(
+            driver._text("failed", {"kind": "no-approvals"}),
+            "All agents are stopped because this harness does not send its approval requests to the page. "
+            "Ask the agent in your chat to serve this page from another harness.",
+        )
+
     def test_stopping_and_stalled_have_their_fixed_text(self):
         # D10
         driver = self.driver()
