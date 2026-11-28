@@ -92,6 +92,10 @@ class Case(unittest.TestCase):
         self.workers = []
 
     def driver(self, launch=None, harness="stub", **options):
+        if not (self.root / ".driver").exists():
+            # A session that was opened earlier is resumed: a new one starts with a turn of its own (S93).
+            self.saved()
+
         def recording_launch(tag, resume):
             peer = launch(tag) if launch else Peer()
             self.peers.append(peer)
@@ -112,6 +116,7 @@ class Case(unittest.TestCase):
             **options,
         )
         self.addCleanup(driver.close)
+        driver.tab_paired()
         return driver
 
     def state(self):
@@ -229,7 +234,10 @@ class StateTests(Case):
         resumed = self.driver()
         resumed.start()
         self.assertTrue(self.peers[-1].prompt_arrived.wait(2))
-        self.assertIn("work: sent before in turn 1, which ended: crashed", self.peers[-1].prompts[0])
+        self.assertIn(
+            '"id": "work", "status": "working", "sent_before": {"turn": 1, "ended": "crashed"}',
+            self.peers[-1].prompts[0],
+        )
 
     def test_the_state_is_written_before_the_driver_serves(self):
         # S120
@@ -600,8 +608,8 @@ class ApprovalTests(Case):
         self.assertEqual(len(driver.agent()["approvals"]), 1)
         self.assertFalse([c for c in self.peers[0].calls if c[0] == "answer"])
 
-    def test_a_repeat_after_allow_for_the_session_is_logged_and_still_asked(self):
-        # S60, B2: the harness applies its own scope, so a repeat that reaches the page is asked again
+    def test_a_repeat_after_allow_for_the_session_is_approved_and_logged(self):
+        # S145: the same tool and arguments in the same session are approved without asking, and logged
         driver = self.driver(launch=lambda tag: Answering())
         driver.start()
         wide = approval(key=1)
@@ -611,16 +619,17 @@ class ApprovalTests(Case):
         driver.answer_approval(driver.agent()["approvals"][0]["id"], "allow_session").result(timeout=2)
         again = approval(key=2)
         again.options = wide.options
-        eventually(lambda: not driver.agent()["approvals"])
         self.peers[0].events.put(again)
-        eventually(lambda: driver.agent()["approvals"])
-        self.assertTrue(self.records("allowed"))
+        eventually(lambda: ("answer", 2, "allow_once", "Allowed earlier for this session") in self.peers[0].calls)
+        self.assertEqual(driver.agent()["approvals"], [])
+        self.assertEqual(len(self.records("allowed")), 1)
 
     def test_auto_approval_is_reported_once_it_happened(self):
-        driver = self.driver(launch=lambda tag: Answering(), auto_approve=lambda event: True)
+        driver = self.driver(launch=lambda tag: Answering(), verbs=("add", "set"))
         driver.start()
         self.assertFalse(driver.agent()["auto_approved_once"])
-        self.peers[0].events.put(approval())
+        command = f"/usr/bin/python3 /plugins/code/better.pyz pending {self.root}"
+        self.peers[0].events.put(approval(tool="Bash", arguments={"command": command}))
         eventually(lambda: driver.agent()["auto_approved_once"])
 
     def test_auto_mode_blocks_are_listed(self):
@@ -779,7 +788,10 @@ class RoundTwoTests(Case):
         (self.root / ".page-delivery").write_text(json.dumps({"item_ids": ["open-item"]}))
         self.driver().start()
         self.assertTrue(self.peers[-1].prompt_arrived.wait(2))
-        self.assertIn("open-item: sent before in turn 1, which ended: crashed", self.peers[-1].prompts[0])
+        self.assertIn(
+            '"id": "open-item", "status": "working", "sent_before": {"turn": 1, "ended": "crashed"}',
+            self.peers[-1].prompts[0],
+        )
 
     def test_a_missing_turn_record_never_falls_back_to_an_older_turn(self):
         # B1
@@ -791,8 +803,11 @@ class RoundTwoTests(Case):
         (self.root / ".page-delivery").write_text(json.dumps({"item_ids": ["new"]}))
         self.driver().start()
         self.assertTrue(self.peers[-1].prompt_arrived.wait(2))
-        self.assertIn("new: sent before in turn 2, which ended: crashed", self.peers[-1].prompts[0])
-        self.assertNotIn("old: sent before", self.peers[-1].prompts[0])
+        self.assertIn(
+            '"id": "new", "status": "working", "sent_before": {"turn": 2, "ended": "crashed"}',
+            self.peers[-1].prompts[0],
+        )
+        self.assertNotIn('"id": "old"', self.peers[-1].prompts[0])
 
     def test_an_unknown_message_from_a_real_transport_drives_the_protocol_failure(self):
         # B3 (lesson L1): a stub codec returns kind "unknown" through ProcessTransport

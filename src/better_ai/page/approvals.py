@@ -81,52 +81,76 @@ def load_credential(path):
     return key
 
 
-# Only these literal shell words are accepted outside the single-quoted input.
-WORD = re.compile(r"[A-Za-z0-9_./-]+|'[^'\n]*'")
+# Only these literal shell words are accepted outside the quoted heredoc.
+# They are the characters shlex.quote leaves bare, so a path that needs no quoting is a word; one that does is never approved.
+WORD = re.compile(r"[A-Za-z0-9_@%+=:,./-]+")
 IDENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
+TAG = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,31}")
 FLAGS = {
     "reply": {"--by", "--to", "--state"},
     "status": {"--by", "--text"},
     "pending": set(),
+    "check": set(),
+    "summary": set(),
+    "specs": set(),
     "add": {"--by", "--for", "--id"},
     "set": {"--by", "--for", "--unset"},
 }
+# Every skill has these verbs; the others are approved only where the unit's skill has them.
+SHARED_VERBS = ("status", "reply", "pending", "check")
+SKILL_VERBS = ("summary", "specs", "add", "set")
+NAMES = {"--by", "--for"}
 
 
-def verb_command(command, unit, archive, record_verbs):
-    """Recognize a small grammar directly; never interpret or normalize arbitrary shell syntax."""
+def verbs_of(skill_verbs):
+    """The verbs approved without asking for a unit whose skill has `skill_verbs`, in a fixed order."""
+    return SHARED_VERBS + tuple(verb for verb in SKILL_VERBS if verb in skill_verbs)
+
+
+def approved_form(command, unit, verbs):
+    """The one sentence that says which command is approved without asking: the turn's header and the denial hold it."""
+    return (
+        f"{command} <verb> {unit} <arguments>, where <verb> is one of {', '.join(verbs_of(verbs))}, "
+        "text only as a quoted heredoc (<<'EOF', the text, then EOF on its own line), "
+        "and --by or --for naming an agent other than user"
+    )
+
+
+def own_call(command, archive):
+    """Whether a shell command names the driver's own better.pyz by its absolute path."""
+    return isinstance(command, str) and str(archive) in command
+
+
+def verb_command(command, unit, archive, verbs, interpreter=None):
+    """Recognize the approved form directly; never interpret or normalize arbitrary shell syntax."""
     if not isinstance(command, str) or "\0" in command or "\r" in command:
         return False
     head, sep, body = command.partition("\n")
     if sep:
         head, marker, tag = head.rpartition(" <<'")
-        if not marker or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,31}'", tag):
+        if not marker or not tag.endswith("'") or not TAG.fullmatch(tag[:-1]):
             return False
         lines = body.removesuffix("\n").split("\n")
         if lines[-1] != tag[:-1] or tag[:-1] in lines[:-1]:
             return False
-    else:
-        literal = re.fullmatch(r"(.+) <<<'[^'\n]*'", head)
-        if literal:
-            head = literal[1]
     words = []
     while head:
         match = WORD.match(head)
         if not match:
             return False
-        words.append(match[0].strip("'"))
+        words.append(match[0])
         head = head[match.end() :]
         if head and not head.startswith(" "):
             return False
         head = head.lstrip(" ")
     if len(words) < 4:
         return False
-    interpreter, script, verb, target, *args = words
+    first, script, verb, target, *args = words
     if (
-        interpreter != sys.executable
+        first != (interpreter or sys.executable)
         or script != str(archive)
         or target != str(unit)
-        or verb not in ({"pending", "reply", "status"} | (set(record_verbs) & {"add", "set"}))
+        or verb not in verbs_of(verbs)
     ):
         return False
     positional = []
@@ -134,8 +158,12 @@ def verb_command(command, unit, archive, record_verbs):
     for arg in it:
         if IDENT.fullmatch(arg):
             positional.append(arg)
-        elif arg not in FLAGS[verb] or (arg != "--text" and not IDENT.fullmatch(next(it, ""))):
+        elif arg not in FLAGS[verb]:
             return False
+        elif arg != "--text":
+            value = next(it, "")
+            if not IDENT.fullmatch(value) or (arg in NAMES and value == "user"):
+                return False
     if verb == "status":
         return len(positional) >= 2 and positional[0] in {"seen", "asked", "working", "done", "accepted"}
     return len(positional) == int(verb in {"add", "set"})

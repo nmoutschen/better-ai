@@ -69,6 +69,7 @@ from ..paths import Refused, Unit
 from ..skill import Skill
 from . import delivery
 from .delivery import from_user as from_user
+from .delivery import terminal_json as terminal_json
 
 COMMON = "conversation.schema.json"
 LOG, SEEN, ADDRESS, TOKEN = "conversation.jsonl", ".conversation-seen", ".server", ".server-token"
@@ -214,17 +215,6 @@ def spec_of(skill: Skill) -> PageSpec:
 
 
 # ---------------------------------------------------------------- small helpers
-
-
-def terminal_json(value) -> str:
-    """JSON for a terminal: readable, and escaped where UTF-8 cannot hold a character (a lone surrogate), so printing
-    it never fails."""
-    text = json.dumps(value, ensure_ascii=False)
-    try:
-        text.encode("utf-8")
-    except UnicodeEncodeError:
-        return json.dumps(value)
-    return text
 
 
 def terminal_text(text: str) -> str:
@@ -475,10 +465,20 @@ class Conversation:
         recover_ids: frozenset[str] = frozenset(),
         admitted_edits: set[tuple[str, str]] | None = None,
         thread_parents: dict[str, str] | None = None,
+        all_working: bool = False,
     ) -> delivery.Delivery:
         events = self.events()
         found = all_items(events, self.items, self.agent, thread_parents=thread_parents)
-        return delivery.select(events, found, self.items, after, carry_ids, recover_ids, admitted_edits=admitted_edits)
+        return delivery.select(
+            events,
+            found,
+            self.items,
+            after,
+            carry_ids,
+            recover_ids,
+            admitted_edits=admitted_edits,
+            all_working=all_working,
+        )
 
     def write(self, *events: dict) -> list:
         """Append the agent's own events; one that fails its schema is refused with the validator's message."""
@@ -771,8 +771,9 @@ def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
         snapshot.extend(
             event for event in events[position:] if event.get("type") in ("status", "accepted") and not from_user(event)
         )
+        marks = active.get("sent_before") if isinstance(active.get("sent_before"), dict) else {}
         items = [
-            {**item, "status": state, **extra}
+            {**item, "status": state, **extra, **({"sent_before": marks[item["id"]]} if item["id"] in marks else {})}
             for item, state, extra in all_items(snapshot, conv.items, conv.agent)
             if item["id"] in sent
         ]
@@ -797,9 +798,8 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
     else:
         receipt = _read_delivery_state(unit, WAIT_RECEIPT)
         found = conv.delivery(_delivery_position(receipt, "after"), carry_ids=_delivery_ids(receipt, "item_ids"))
-    for event in [*found.items, *found.events]:
-        run.out(terminal_json(event))
-    run.out(f"{len(found.items)} not done.")
+    for line in found.lines():
+        run.out(line)
     return 0
 
 
@@ -990,7 +990,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send_error(413)
         return json.loads(self.rfile.read(int(size)))
 
-    def pair(self, pairing, new_page=None, unauthorized=401):
+    def pair(self, pairing, new_page=None, unauthorized=401, paired=None):
         try:
             request = self.read_json()
             if request is None:
@@ -1001,6 +1001,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             secret = None
         if not secret:
             return self.send(unauthorized, b"Pairing link expired. Ask for a new link.", "text/plain")
+        if paired:
+            paired()
         return self.send_json({"secret": secret, **({"page": new_page()} if new_page else {})})
 
     def send(self, code: int, body: bytes, kind: str, *, policy: str | None = None) -> None:
@@ -1112,7 +1114,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not driven.main_host(self.headers.get("Host")) or not self.browser_origin():
                 return self.send_error(403)
             if self.path == "/pair":
-                return self.pair(driven.main_pair, unauthorized=403)
+                return self.pair(driven.main_pair, unauthorized=403, paired=driven.tab_paired)
             if self.path != "/rpc":
                 return self.send_error(404)
             if not self.driven_token(driven.main_pair):
@@ -1347,6 +1349,7 @@ class DrivenPage:
         self.identity = unit_identity(unit)
         self.main_origin = f"http://127.0.0.1:{server.server_port}"
         self.driver, self.off, self.ready = None, None, False
+        self.paired = threading.Event()
         self.enrollment = threading.Event()
         self.routing_lock = threading.RLock()
 
@@ -1380,6 +1383,12 @@ class DrivenPage:
 
     def main_host(self, host):
         return host == self.main_origin.removeprefix("http://")
+
+    def tab_paired(self):
+        """The driver starts no turn before a tab has paired (S77): tell it now, or when it exists."""
+        self.paired.set()
+        if self.driver:
+            self.driver.tab_paired()
 
     def panel_link(self):
         with self.routing_lock:
@@ -1548,6 +1557,7 @@ def handoff_note(run: cli.Run):
 
 
 def start_driven(driven, candidate, conv, run, deadline, notes, archive, skill_path):
+    from . import triggers as skill_triggers
     from .adapters import _MIN_VERSION, child_environment, session_id_valid, version_supported
     from .driver import Driver, StartError
     from .transport import ProcessTransport
@@ -1598,8 +1608,12 @@ def start_driven(driven, candidate, conv, run, deadline, notes, archive, skill_p
         step=step if isinstance(step, str) else "",
         handoff=notes[0] if notes else "",
         triggers=lambda: conv.spec.triggers(conv.unit) if conv.spec.triggers else (),
+        workers=lambda: skill_triggers.workers(conv.unit),
+        verbs=tuple(verb.name for verb in cli._verbs_of(run.skill)),
         valid_session=lambda session: session_id_valid(candidate.name, session),
     )
+    if driven.paired.is_set():
+        driven.driver.tab_paired()
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         raise StartError("crashed", "harness startup timed out")

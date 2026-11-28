@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import queue
+import shlex
 import threading
 import time
 import uuid
@@ -15,6 +16,8 @@ from concurrent.futures import Future
 from dataclasses import dataclass, field
 
 from .. import paths, resources
+from .approvals import approved_form, own_call, verb_command
+from .delivery import CONTINUE, NOTE, SETTLED, Delivery, ended_label, turn_prompt
 from .driver_state import (
     ACTIVE_DELIVERY,
     LOG,
@@ -42,6 +45,10 @@ STOP_TIMEOUT = 3
 STALL_TIMEOUT = 600
 PROTOCOL_TIMEOUT = 60
 IDLE_LIMIT = 30 * 60
+TRIGGER_INTERVAL = 1.0  # the least time between two scans of the skill's triggers (S115)
+TRIGGER_BUDGET = 2.0  # a scan that takes longer is logged and its result skipped
+ECHOING = frozenset({"claude"})  # the harnesses that echo each prompt's uuid back (decision D5)
+MAX_UNECHOED = 3
 ALIVE_LIMIT = 10
 MAX_APPROVAL_TEXT = 131072
 OPTIONS = ["allow_once", "allow_session", "deny"]
@@ -101,6 +108,8 @@ class Turn:
     triggers: tuple[str, ...] = ()
     actions: list[dict] = field(default_factory=list)
     changed: bool = False
+    echoed: bool = False
+    note: bool = False
     final_message: str = ""
     denied: list[dict] = field(default_factory=list)
 
@@ -145,7 +154,7 @@ class Driver:
         handoff: str = "",
         triggers=lambda: (),
         workers=lambda: (),
-        auto_approve=None,
+        verbs=(),
         version: str = "",
         tested: str = "",
         build: str = "",
@@ -159,7 +168,7 @@ class Driver:
         self.cwd = str(cwd)
         self.step = step
         self.skill_path, self.command = str(skill_path), command
-        self.triggers, self.workers, self.auto_approve, self.clock = triggers, workers, auto_approve, clock
+        self.triggers, self.workers, self.verbs, self.clock = triggers, workers, tuple(verbs), clock
         self.version, self.tested, self.build = version, tested, build
         self.valid_session = valid_session
         saved = load_state(self.unit) or with_defaults({})
@@ -182,7 +191,8 @@ class Driver:
         self._delivered = delivered_position(saved["delivered"], events)
         self._delivered_field = delivered_field(self._delivered, events)
         self._fired = self._strings(saved["fired"])
-        self._note = handoff or saved["note"] or ""
+        # The note is labelled when it is taken in, so a note kept for a later turn still says when it was written.
+        self._note = f"{NOTE.format(iso(time.time()))}:\n{handoff}" if handoff else saved["note"] or ""
         self._handoff_delivered = False if handoff else bool(saved["handoff_delivered"])
         self._ended = dict(saved["ended"])
         if self._ended.get("build") != build:
@@ -198,6 +208,11 @@ class Driver:
         self._recover = frozenset()
         self._recover_turn = 0
         self._recover_kind = ""
+        self._recover_stop = False
+        # The events a turn that ended badly carried; the next turn marks them as sent before (S54).
+        self._resent = Counter()
+        # Why the harness process last ended, until a turn tells the agent (S99).
+        self._ended_reason = self._ended.get("reason") or ""
         self._number = 0
         # A turn still set in .driver ended without the driver seeing it: it crashed (S72).
         crashed = saved["turn"] if isinstance(saved["turn"], dict) else None
@@ -221,6 +236,7 @@ class Driver:
                 self._carry = items
             else:
                 self._recover, self._recover_turn, self._recover_kind = items, self._number, outcome
+                self._recover_stop = outcome == "stopped by the user"
             if "end" not in last:
                 last.update(end=time.time(), outcome=outcome)
         self._retry = False
@@ -231,6 +247,13 @@ class Driver:
 
         # Startup replays persisted work. During a live session only /rpc can wake for user actions.
         self._wake = True
+        self._paired = threading.Event()
+        self._new_session = False
+        self._unechoed = 0
+        self._scanned = ()
+        self._scan_error = None
+        self._scan_slow = None
+        self._seen_unreadable = set()
         self._last_prompt_items = frozenset()
         self._repeats = 0
         self._crash_retries = 0
@@ -285,6 +308,7 @@ class Driver:
         self._deadline = time.monotonic() + timeout
         if end_orphan_child(self.unit):
             self._ended = dict(load_state(self.unit)["ended"])
+            self._ended_reason = self._ended.get("reason") or ""
         self._thread.start()
         if not self._started.wait(timeout):
             self._closing.set()
@@ -295,6 +319,10 @@ class Driver:
 
     def enqueue(self, event: dict) -> None:
         self._commands.put(("event", event))
+
+    def tab_paired(self) -> None:
+        """A tab has paired: from now on the driver may start a turn (S77)."""
+        self._paired.set()
 
     def request_start(self) -> None:
         self._commands.put(("start", None))
@@ -388,7 +416,11 @@ class Driver:
 
     def _worker_list(self) -> list:
         try:
-            return [dict(worker) for worker in self.workers()]
+            asking = {a.requester for a in list(self._open_approvals.values())}
+            return [
+                {**worker, "waiting": bool(worker.get("waiting")) or worker.get("name") in asking}
+                for worker in self.workers()
+            ]
         except Exception as error:
             # A callback that fails must not look like no workers: the page stays up, and the failure is logged once.
             if not self._workers_broken:
@@ -519,6 +551,7 @@ class Driver:
         same = previous.get("reason") == reason and previous.get("kind") == kind
         repeats = previous.get("repeats", 0) + 1 if kind == "driver" and same and self._streak_open else 0
         self._ended = {"at": iso(time.time()), "reason": reason, "kind": kind, "build": self.build, "repeats": repeats}
+        self._ended_reason = reason
         self._same_end = same
         # The record stays in memory when the write fails.
         with contextlib.suppress(OSError, ValueError, paths.Refused):
@@ -549,7 +582,7 @@ class Driver:
                 if not self.valid_session(event.session_id):
                     raise StartError("crashed", "harness returned an invalid session ID")
                 if self.session != event.session_id:
-                    self._first_prompt = True
+                    self._first_prompt = self._new_session = True
                     self._opened = time.time()
                 self.session = event.session_id
                 self._last_output = self.clock()
@@ -594,7 +627,11 @@ class Driver:
             self._admitted_items.update(item["id"] for item in historical.items)
             self._admitted_edits.update((item.get("type"), item["id"]) for item in historical.items)
             self._admitted_events.extend(historical.events)
+            if self._recover_kind:
+                # What the turn that ended badly may have carried comes again, marked as sent before (S54).
+                self._resent.update(encode(event) for event in historical.events)
             self._last_poll = self.clock()
+            threading.Thread(target=self._scan_loop, name="page-triggers", daemon=True).start()
             self._ended["repeats"] = 0
             self._streak_open = False
             self._started.set()
@@ -606,7 +643,7 @@ class Driver:
                     available = self._available_triggers()
                     if available:
                         self._wake = True
-                    if self._state == "idle" and (self._wake or self._retry) and drained:
+                    if self._state == "idle" and (self._wake or self._retry) and drained and self._paired.is_set():
                         self._deliver(available)
                 self._publish()
             if not self._driver_failed:
@@ -650,8 +687,36 @@ class Driver:
             if not os.path.isdir(self.unit.path):
                 raise FileNotFoundError("the unit folder is gone")
 
+    def _scan_loop(self) -> None:
+        """Ask the skill for its triggers at most once a second, away from the loop: a scan over its budget is skipped,
+        and one that fails stops the driver with its error (S115)."""
+        while not self._closing.is_set():
+            began = time.monotonic()
+            try:
+                found = tuple(self.triggers())
+            except Exception as error:
+                self._scan_error = error
+                return
+            took = time.monotonic() - began
+            if took > TRIGGER_BUDGET:
+                self._scan_slow = took
+            else:
+                self._scanned = found
+            self._closing.wait(max(0.0, TRIGGER_INTERVAL - took))
+
     def _available_triggers(self) -> tuple[dict, ...]:
-        return tuple(record for record in self.triggers() if record["id"] not in self._fired)
+        if self._scan_error is not None:
+            raise self._scan_error
+        if self._scan_slow is not None:
+            slow, self._scan_slow = self._scan_slow, None
+            self._log("error", kind="triggers", message=f"a scan of the triggers took {slow:.1f} s and was skipped")
+        found = tuple(record for record in self._scanned if record["id"] not in self._fired)
+        for record in found:
+            # A line that cannot be read is logged once; the turn it starts is to check on it (S118).
+            if record.get("type") == "unreadable" and record["id"] not in self._seen_unreadable:
+                self._seen_unreadable.add(record["id"])
+                self._log("error", kind="unreadable", message=f"{record.get('file')}: {record.get('problem')}")
+        return found
 
     def _commands_once(self) -> None:
         if self._peer is None:
@@ -680,7 +745,11 @@ class Driver:
                 self._repeats = 0
                 if self._turn:
                     self._turn.changed = True
-            if self._state == "failed" and self._details.get("kind") == "crashed" and self._crash_retries < 3:
+            if (
+                self._state == "failed"
+                and self._details.get("kind") in ("crashed", "limit")
+                and self._crash_retries < 3
+            ):
                 self._crash_retries += 1
                 self._restart()
         elif kind == "start" and self._state in ("failed", "stopped"):
@@ -740,6 +809,9 @@ class Driver:
                 self._begin(None, frozenset(), ())
             self._turn.record["turn_id"] = event.turn_id
             self._flush_log()
+        elif event.kind == "prompt_echoed":
+            if self._turn is not None and getattr(event, "uuid", None) == self._turn_state["prompt_uuid"]:
+                self._turn.echoed = True
         elif event.kind == "text" and self._turn:
             self._turn.final_message = (self._turn.final_message + event.text)[-500:]
         elif event.kind == "turn_ended" and self._turn:
@@ -750,7 +822,10 @@ class Driver:
                 self._close_approvals("the turn ended", "expired", only=lambda a: a.requester is None)
                 self._end("completed")
                 self._crash_retries = 0
-                self._status("idle")
+                if self._unechoed >= MAX_UNECHOED:
+                    self._failed("protocol", f"{self.harness} did not echo {MAX_UNECHOED} prompts in a row")
+                else:
+                    self._status("idle")
             else:
                 self._failed(event.outcome or "crashed", event.text)
         elif event.kind == "approval":
@@ -774,12 +849,14 @@ class Driver:
         # this thread. Select from the session's original cursor, then admit exact
         # events and item IDs so an intervening completion cannot skip that RPC.
         parents = {}
+        ended = self._ended_reason
         batch = self.conversation.delivery(
             self._scan_after,
             carry_ids=self._carry,
             recover_ids=self._recover,
             admitted_edits=self._admitted_edits,
             thread_parents=parents,
+            all_working=bool(ended),
         )
         parent_ids = {parents[target] for target in self._admitted_items if target in parents}
         if parent_ids & self._last_prompt_items:
@@ -788,7 +865,12 @@ class Driver:
         batch.items[:] = [
             item
             for item in batch.items
-            if item["id"] in admitted or (item["id"] in self._carry and item["status"] in ("new", "seen"))
+            if item["status"] not in SETTLED  # a turn never carries asked, done or accepted items (S15)
+            and (
+                item["id"] in admitted
+                or (item["id"] in self._carry and item["status"] in ("new", "seen"))
+                or (ended and item["status"] == "working")
+            )
         ]
         events = Counter(encode(event) for event in self._admitted_events)
         actions = []
@@ -813,11 +895,24 @@ class Driver:
         self._admitted_items.clear()
         self._admitted_edits.clear()
         self._admitted_events.clear()
-        if not (items or actions or available):
+        note = self._note if self._note and not self._handoff_delivered else ""
+        # Opening a session, or resuming one with a hand-off note, is itself a reason for a turn (S93).
+        if not (items or actions or available or self._new_session or note):
             return
         if items != self._last_prompt_items:
             self._repeats = 0
         self._last_prompt_items = items
+        marks = {"turn": self._recover_turn, "ended": ended_label(self._recover_kind)}
+        sent_before = {item["id"]: marks for item in batch.items if item["id"] in self._recover}
+        marked = [{**event, "sent_before": marks} if self._resent[encode(event)] else event for event in actions]
+        shown = Delivery(
+            [
+                {**item, "sent_before": sent_before[item["id"]]} if item["id"] in sent_before else item
+                for item in batch.items
+            ],
+            marked,
+            batch.position,
+        )
         paths.write_atomic(
             self.unit,
             ACTIVE_DELIVERY,
@@ -829,52 +924,43 @@ class Driver:
                     "recover_ids": sorted(self._recover),
                     "item_ids": sorted(items),
                     "position": batch.position,
-                    "actions": actions,
+                    "actions": shown.events,
+                    "sent_before": sent_before,
                 }
             ),
         )
         self._begin(batch.position, items, tuple(r["id"] for r in available))
         self._turn.actions = actions
-        prompt = self._prompt(batch, available)
+        self._turn.note = bool(note)
+        prompt = turn_prompt(
+            unit=str(self.unit.path),
+            form=approved_form(self.command, self.unit.path, self.verbs),
+            batch=shown,
+            triggers=available,
+            first=self._opening() if self._first_prompt else "",
+            note=note,
+            ended=ended if any(item["status"] == "working" for item in shown.items) else "",
+            resent=bool(sent_before) or marked != actions,
+            after_stop=self._recover_stop,
+        )
         try:
             self._peer.prompt(prompt, self._turn_state["prompt_uuid"])
         except OSError as error:
             self._failed("crashed", str(error))
         else:
             self._first_prompt = False
-            if self._note and not self._handoff_delivered:
-                self._handoff_delivered = True
-                self._checkpoint()
+            self._ended_reason = ""
+            self._resent = Counter()
 
-    def _prompt(self, batch, available: tuple[dict, ...]) -> str:
-        parts = [self._note] if self._note and not self._handoff_delivered else []
-        if self._first_prompt:
-            parts.extend(
-                [
-                    resources.read_text("page/page-agent.md"),
-                    f"Skill: {self.skill_path}\nUnit: {self.unit.label}\nCurrent step: {self.step}",
-                    f"Verb command: {self.command}\nWorking directory: {self.cwd}",
-                ]
-            )
-        if self._recover:
-            notes = [
-                f"{item['id']}: sent before in turn {self._recover_turn}, which ended: {self._recover_kind}"
-                for item in batch.items
-                if item["id"] in self._recover
+    def _opening(self) -> str:
+        """What the first prompt of a session says besides the turn's work: the page-agent prompt and where things are."""
+        return "\n\n".join(
+            [
+                resources.read_text("page/page-agent.md"),
+                f"Skill: {self.skill_path}\nUnit: {self.unit.label}\nCurrent step: {self.step}; {CONTINUE}\n"
+                f"Verb command: {self.command}\nWorking directory: {self.cwd}",
             ]
-            if notes:
-                parts.extend(notes)
-                if self._recover_kind == "stopped by the user":
-                    parts.append(
-                        "do not resume stopped work unless the user asks; "
-                        "check the records and the working tree before redoing a change"
-                    )
-        if len(batch.items) > 20:
-            parts.append(f"For the full copy of the items, run pending {self.unit.label}.")
-        parts.append(
-            encode({"items": batch.prompt_items(), "user_actions": batch.events, "triggers": available}).decode()
         )
-        return "\n\n".join(part for part in parts if part)
 
     def _begin(self, position: int | None, items: frozenset[str], triggers: tuple[str, ...]) -> None:
         self._number += 1
@@ -895,24 +981,38 @@ class Driver:
         self._unknown_since = None
         self._status("working")
 
-    def _end(self, outcome: str) -> None:
+    def _end(self, outcome: str, by_user: bool = False) -> None:
         turn, self._turn = self._turn, None
         if turn is None:
             return
         if outcome == "completed" and turn.position is not None:
-            self._delivered = turn.position
-            self._delivered_field = delivered_field(turn.position, self.conversation.events())
-            self._fired |= frozenset(turn.triggers)
+            # A turn that never echoed the prompt's uuid is another turn: it advances nothing (S97).
+            advanced = turn.echoed or not self._echoes()
             self._carry = turn.items
-            self._recover = frozenset()
-            self._retry = bool(turn.items)
+            self._retry = bool(turn.items) or not advanced
+            if advanced:
+                self._unechoed = 0
+                self._delivered = turn.position
+                self._delivered_field = delivered_field(turn.position, self.conversation.events())
+                self._fired |= frozenset(turn.triggers)
+                self._recover = frozenset()
+                self._new_session = False
+                if turn.note:
+                    # The note stays in .driver until a turn that carried it ends normally (S148).
+                    self._handoff_delivered = True
+            else:
+                self._unechoed += 1
+                self._log(
+                    "error", kind="unechoed", message=f"turn {turn.record['number']} ended without echoing its prompt"
+                )
             if not turn.changed:
                 self._repeats += 1
         elif outcome != "completed":
             self._admitted_events.extend(turn.actions)
+            self._resent.update(encode(event) for event in turn.actions)
             self._recover = turn.items
             self._carry = frozenset()
-            self._recover_turn, self._recover_kind = turn.record["number"], outcome
+            self._recover_turn, self._recover_kind, self._recover_stop = turn.record["number"], outcome, by_user
         self._turn_state = None
         peer_stderr = self._peer.stderr if self._peer else ""
         turn.record.update(
@@ -930,6 +1030,9 @@ class Driver:
         with contextlib.suppress(FileNotFoundError):
             self.unit.target(ACTIVE_DELIVERY).unlink()
 
+    def _echoes(self) -> bool:
+        return self.harness in ECHOING
+
     def _failed(self, kind: str, message: str = "", **details) -> None:
         kind = kind if kind in ACTIONS else "crashed"
         self._end(kind)
@@ -942,6 +1045,7 @@ class Driver:
 
     def _stop(self, reason: str) -> None:
         """Show stopping, cancel, wait up to 3 s for the turn to end, then end the process group in every case."""
+        outcome = "stalled" if self._state == "stalled" else reason
         self._status("stopping")
         self._close_approvals(reason, "denied")
         if self._peer is not None:
@@ -957,7 +1061,7 @@ class Driver:
                         break
                     if event.kind == "approval":
                         self._request_approval(event, deny_reason=reason)
-        self._end(reason)
+        self._end(outcome, by_user=reason == "stopped by the user")
         if self._peer is not None:
             self._record_end(reason, "stopped" if reason == "stopped by the user" else "server")
         self._close_peer(reason)
@@ -1003,14 +1107,30 @@ class Driver:
         self._open_approvals[approval.id] = approval
         self._records.append(record)
         self._flush_log()
-        if approval.key in self._grants:
-            # The harness asks again for a call the user allowed for the session: record it, and ask as usual.
-            self._log("allowed", tool=tool, arguments_sha256=record["arguments_sha256"])
+        form = self._command_form(event)
         if deny_reason:
             self._answer_open(approval, "deny", deny_reason)
-        elif self.auto_approve is not None and self.auto_approve(event):
+        elif form is False:
+            # A call to this unit's own better.pyz outside the approved form is denied without asking (S78).
+            self._answer_open(
+                approval, "deny", f"not-the-approved-form: {approved_form(self.command, self.unit.path, self.verbs)}"
+            )
+        elif form:
             self._auto_used = True
             self._answer_open(approval, "allow_once", "Approved page command")
+        elif approval.key in self._grants:
+            # The user allowed this tool and these arguments for the session: approve the repeat and log it (S145).
+            self._log("allowed", tool=tool, arguments_sha256=record["arguments_sha256"])
+            self._answer_open(approval, "allow_once", "Allowed earlier for this session")
+
+    def _command_form(self, event) -> bool | None:
+        """True for a command in the approved form, False for another call to the driver's own better.pyz, else None."""
+        arguments = event.arguments
+        command = arguments.get("command") if isinstance(arguments, dict) and set(arguments) == {"command"} else None
+        words = shlex.split(self.command)
+        if len(words) != 2 or not own_call(command, words[1]):
+            return None
+        return verb_command(command, self.unit.path, words[1], self.verbs, words[0])
 
     def answer_approval(self, approval_id: str, choice: str, reason: str = "") -> Future[bool]:
         """The user's answer to an open approval. The result is True once the harness was told."""

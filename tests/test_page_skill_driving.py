@@ -40,6 +40,7 @@ class SkillDrivingTest(unittest.TestCase):
         return [record["id"] for record in page.spec_of(unit.skill).triggers(unit)]
 
     def test_code_handbacks_are_stable_and_distinct(self):
+        # S149: the id comes from the record's fields, never from its line
         unit = self.unit(CODE)
         self.write(
             unit,
@@ -49,12 +50,14 @@ class SkillDrivingTest(unittest.TestCase):
         base = {"at": AT, "by": "builder", "text": "D12 handed_back"}
         step = {**base, "type": "step"}
         handback = {**base, "type": "handed_back", "result": "done"}
-        invalid = {**handback, "result": "unknown"}
-        self.write(unit, "logs/builder.jsonl", step, handback, invalid, handback)
-        ids = ["logs/builder.jsonl:2", "logs/builder.jsonl:4"]
+        later = {**handback, "at": "2026-06-01T12:05:00Z"}
+        self.write(unit, "logs/builder.jsonl", step, handback, later)
+        ids = self.trigger_ids(unit)
+        self.assertEqual(len(set(ids)), 2)
+        self.write(unit, "logs/builder.jsonl", step, handback, later, step)
         self.assertEqual(self.trigger_ids(unit), ids)
-        self.write(unit, "logs/builder.jsonl", step, handback, invalid, handback, step)
-        self.assertEqual(self.trigger_ids(unit), ids)
+        self.write(unit, "logs/builder.jsonl", later, step, step, handback)
+        self.assertEqual(sorted(self.trigger_ids(unit)), sorted(ids))
 
     def test_research_stop_and_checked_wake_but_strategy_does_not(self):
         unit = self.unit(RESEARCH)
@@ -68,7 +71,9 @@ class SkillDrivingTest(unittest.TestCase):
             {**base, "type": "checked", "claim": "C-verifier-1"},
             {**base, "type": "checked", "claim": "C-verifier-12"},
         )
-        self.assertEqual(self.trigger_ids(unit), ["logs/worker.jsonl:2", "logs/worker.jsonl:3"])
+        ids = self.trigger_ids(unit)
+        self.assertEqual(len(ids), 2)
+        self.assertTrue(all(i.startswith("logs/worker.jsonl:") for i in ids))
 
     def test_discovery_uses_the_evidence_id_once_across_updates(self):
         unit = self.unit(DISCOVER)

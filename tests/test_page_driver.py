@@ -98,19 +98,40 @@ class Conversation:
         return event
 
     def delivery(
-        self, after=0, *, carry_ids=frozenset(), recover_ids=frozenset(), admitted_edits=None, thread_parents=None
+        self,
+        after=0,
+        *,
+        carry_ids=frozenset(),
+        recover_ids=frozenset(),
+        admitted_edits=None,
+        thread_parents=None,
+        all_working=False,
     ):
         items = [
             {"id": key, "status": status}
             for key, status in self.items.items()
             if status == "new"
             or (status == "seen" and key in carry_ids | recover_ids)
-            or (status == "working" and key in recover_ids)
+            or (status == "working" and (key in recover_ids or all_working))
         ]
         return Batch(items, [e for e in self.log[after:] if e["type"] == "accept"], len(self.log))
 
     def events(self):
         return list(self.log)
+
+
+def sent(prompt):
+    """What a prompt carries, read from its lines in the format of `pending`: items, user actions and skill triggers."""
+    found, listing = {"items": [], "user_actions": [], "triggers": []}, "items"
+    for line in prompt.splitlines():
+        if line == "Skill triggers:":
+            listing = "triggers"
+        elif line.startswith("{"):
+            record = json.loads(line)
+            found[listing if listing == "triggers" else "items" if "status" in record else "user_actions"].append(
+                record
+            )
+    return found
 
 
 def eventually(test):
@@ -135,7 +156,13 @@ class DriverTests(unittest.TestCase):
         self.clock = time.monotonic
         self.trigger_data = []
 
-    def driver(self, launch=None):
+    def resumable(self):
+        """A session opened earlier is resumed: a new one starts with a turn of its own (S93)."""
+        from better_ai.page.driver_state import save_state
+
+        save_state(self.conv.unit, {"harness": "stub", "session": "session-1", "opened": 1.0})
+
+    def driver(self, launch=None, handoff="Carry the user's decision forward."):
         def recording_launch(tag, resume):
             peer = launch(tag) if launch else Peer()
             self.peers.append(peer)
@@ -149,12 +176,13 @@ class DriverTests(unittest.TestCase):
             command="/usr/bin/python3 /plugins/code/better.pyz",
             cwd=self.root,
             step="review",
-            handoff="Carry the user's decision forward.",
+            handoff=handoff,
             triggers=lambda: self.trigger_data,
             clock=self.clock,
             valid_session=lambda key: key == "session-1",
         )
         self.addCleanup(driver.close)
+        driver.tab_paired()
         return driver
 
     def state(self):
@@ -167,7 +195,8 @@ class DriverTests(unittest.TestCase):
         # S12, S13, S14 and S66.
         now = time.monotonic()
         self.clock = lambda: now
-        driver = self.driver()
+        self.resumable()
+        driver = self.driver(handoff="")
         self.assertEqual(driver.start(), "session-1")
         peer = self.peers[0]
         now += 20 * 60
@@ -235,7 +264,7 @@ class DriverTests(unittest.TestCase):
         peer = self.peers[-1]
         self.assertEqual(peer.calls[0], ("open", str(self.root), "session-1"))
         self.assertTrue(peer.prompt_arrived.wait(2))
-        self.assertIn("sent before in turn 1, which ended: crashed", peer.prompts[0])
+        self.assertIn('"sent_before": {"turn": 1, "ended": "crashed"}', peer.prompts[0])
         self.assertIn("Carry the user's decision forward.", peer.prompts[0])
         self.conv.items["working-item"] = "done"
         peer.events.put(Event("turn_ended", outcome="completed"))
@@ -283,14 +312,15 @@ class DriverTests(unittest.TestCase):
             {"type": "status", "status": "asked", "to": "parent"},
         ]
         self.real_conversation(log)
-        driver = self.driver()
+        self.resumable()
+        driver = self.driver(handoff="")
         driver.start()
         answer = {"type": "note", "by": "user", "id": "answer", "to": "reply", "text": "PDF"}
         log.append(answer)
         driver.enqueue(answer)
         peer = self.peers[0]
         self.assertTrue(peer.prompt_arrived.wait(2))
-        payload = json.loads(peer.prompts[0].split("\n\n")[-1])
+        payload = sent(peer.prompts[0])
         self.assertEqual([item["id"] for item in payload["items"]], ["parent"])
         self.assertEqual([message["text"] for message in payload["items"][0]["thread"]], ["Which format?", "PDF"])
         self.assertEqual(payload["user_actions"], [answer])
@@ -299,14 +329,15 @@ class DriverTests(unittest.TestCase):
         item = {"type": "comment", "by": "user", "id": "pin", "text": "Original"}
         log = [item, {"type": "status", "to": "pin", "status": "working"}]
         self.real_conversation(log)
-        driver = self.driver()
+        self.resumable()
+        driver = self.driver(handoff="")
         driver.start()
         edit = {**item, "text": "Edited"}
         log.append(edit)
         driver.enqueue(edit)
         peer = self.peers[0]
         self.assertTrue(peer.prompt_arrived.wait(2))
-        edited = json.loads(peer.prompts[0].split("\n\n")[-1])["items"]
+        edited = sent(peer.prompts[0])["items"]
         self.assertEqual([(item["text"], item["status"]) for item in edited], [("Edited", "working")])
         peer.events.put(Event("turn_ended", outcome="completed"))
         eventually(lambda: self.state()["delivered"]["position"] == 3)
@@ -314,7 +345,7 @@ class DriverTests(unittest.TestCase):
         log.append(accept)
         driver.enqueue(accept)
         eventually(lambda: len(peer.prompts) == 2)
-        payload = json.loads(peer.prompts[1].split("\n\n")[-1])
+        payload = sent(peer.prompts[1])
         self.assertEqual(payload["items"], [])
         self.assertEqual(payload["user_actions"], [accept])
 
@@ -326,7 +357,7 @@ class DriverTests(unittest.TestCase):
 
         def batch(peer, number, *expected):
             eventually(lambda: len(peer.prompts) >= number)
-            data = json.loads(peer.prompts[number - 1].split("\n\n")[-1])
+            data = sent(peer.prompts[number - 1])
             self.assertCountEqual([item["id"] for item in data["items"]], expected)
             self.assertEqual(data["user_actions"], [])
 
@@ -379,8 +410,9 @@ class DriverTests(unittest.TestCase):
         driver.request_start()
         eventually(lambda: self.peers[-1] is not peer and self.peers[-1].prompts)
         prompt = self.peers[-1].prompts[0]
-        self.assertNotIn("first", prompt)
-        self.assertIn("second: sent before in turn 2, which ended: crashed", prompt)
+        # The first item is still working, so it comes too (S99); only the second was in the turn that ended badly.
+        self.assertIn('"id": "first", "status": "working"}', prompt)
+        self.assertIn('"id": "second", "status": "working", "sent_before": {"turn": 2, "ended": "crashed"}', prompt)
 
     def test_stop_interrupts_restarting_peer(self):
         class NoHandshake(Peer):
@@ -568,6 +600,11 @@ class DriverTests(unittest.TestCase):
                 eventually(lambda driver=driver, kind=kind: driver.snapshot().get("kind") == kind)
                 driver.enqueue(self.conv.item("after-" + kind))
                 time.sleep(0.1)
+                if kind == "limit":
+                    # S21: a limit end, like a crash, restarts on the next user event.
+                    eventually(lambda peer=peer: self.peers[-1] is not peer and self.peers[-1].prompts)
+                    driver.close()
+                    continue
                 self.assertIs(peer, self.peers[-1])
                 driver.request_start()
                 eventually(lambda peer=peer: self.peers[-1] is not peer and self.peers[-1].prompts)
@@ -602,7 +639,8 @@ class DriverTests(unittest.TestCase):
 
     def test_autonomous_turn_blocks_another_prompt(self):
         # S49.
-        driver = self.driver()
+        self.resumable()
+        driver = self.driver(handoff="")
         driver.start()
         peer = self.peers[0]
         peer.events.put(Event("turn_started", turn_id="background"))
@@ -616,7 +654,8 @@ class DriverTests(unittest.TestCase):
 
     def test_driver_exception_is_visible_and_cleans_up(self):
         # S62.
-        driver = self.driver()
+        self.resumable()
+        driver = self.driver(handoff="")
         driver.start()
         self.assertEqual(driver.snapshot()["state"], "idle")
         self.conv.delivery = lambda *args, **kwargs: (_ for _ in ()).throw(ValueError("broken"))

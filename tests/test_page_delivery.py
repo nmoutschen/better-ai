@@ -49,14 +49,14 @@ class DeliveryTest(shell.Fixture):
         self.assertEqual([(event["type"], event["to"]) for event in result.events], [("accept", "accepted")])
         self.assertEqual(result.position, 17)
 
-    def test_prompt_uses_full_items_through_twenty_then_ids_and_states(self):
+    def test_prompt_uses_full_items_through_twenty_then_ids_only(self):
         self.conv = shell.page.Conversation(self.unit(), self.spec, self.docs)
         self.seed(*(note(f"m{n}") for n in range(20)))
         result = self.conv.delivery()
         self.assertEqual(result.prompt_items(), result.items)
         self.seed(*(note(f"m{n}") for n in range(20, 25)))
         result = self.conv.delivery()
-        self.assertEqual(result.prompt_items(), [{"id": f"m{n}", "status": "new"} for n in range(25)])
+        self.assertEqual(result.prompt_items(), [{"id": f"m{n}"} for n in range(25)])
         self.assertEqual(len(result.items), 25)
 
     def test_pending_for_driven_turn_uses_matching_active_batch(self):
@@ -94,6 +94,7 @@ class DeliveryTest(shell.Fixture):
             valid_session=lambda key: key == "session-1",
         )
         self.addCleanup(driver.close)
+        driver.tab_paired()
         driver.start()
         self.assertTrue(peer.prompt_arrived.wait(2))
         self.seed(
