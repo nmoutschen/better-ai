@@ -389,7 +389,9 @@ class LifecycleTests(Case):
         body = driver.agent()
         self.assertEqual(body["state"], "closed")
         self.assertEqual(body["kind"], "finished")
-        self.assertEqual(body["text"], "This page has closed: the unit finished.")
+        self.assertEqual(
+            body["text"], "This page has closed: the unit finished. Ask the agent in your chat to reopen it."
+        )
 
     def test_unknown_message_then_silence_fails_as_protocol_with_the_versions(self):
         # S112
@@ -1056,7 +1058,9 @@ class RoundTwoTests(Case):
             driver._text("failed", {"kind": "crashed", "message": "", "again": True}),
             "The same error came back. Fix it in a terminal, then press Start.",
         )
-        self.assertEqual(driver._text("closed", {"message": ""}), "This page has closed.")
+        self.assertEqual(
+            driver._text("closed", {"message": ""}), "This page has closed. Ask the agent in your chat to reopen it."
+        )
 
     def test_the_driver_error_gives_the_log_on_a_line_of_its_own_S166(self):
         # One value per sentence: the error in the notice, the log path on its own line.
