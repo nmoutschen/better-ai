@@ -681,10 +681,11 @@ const status = (to, s, h, read) => Object.assign({ type: 'status', to, status: s
 const EVERY_STATE = [
   userNote('m1', 'Can we merge this into the board start? It would save a step.', 10),
   agentReply('r1', 'm1', 'Yes. Shall I?', 9.5), status('m1', 'asked', 9.5),
+  // Done by the agent, with the line it had read (D12): written in the log before m2, so it has not read m2.
+  userNote('m5', "What's next?", 3), agentReply('r5', 'm5', 'Step 4.', 2), status('m5', 'done', 2, 3),
   userNote('m2', 'How about AG-UI?', 8),
   userNote('m3', 'Q3 exactly once delivery semantics are hard to achieve.', 7), status('m3', 'seen', 6),
   userNote('m4', 'Check the schema.', 5), status('m4', 'working', 4),
-  userNote('m5', "What's next?", 3), agentReply('r5', 'm5', 'Step 4.', 2), status('m5', 'done', 2),
   userNote('m6', 'Old question.', 30), status('m6', 'done', 29), { type: 'accept', to: 'm6', by: 'user', at: at(28) },
 ];
 const text = n => n.textContent.replace(/\s+/g, ' ').trim();
@@ -726,6 +727,7 @@ test('S11 each thread is one row: its state, who started it and its first senten
 test('S11 a thread the agent started says Agent: (its name) and a deleted comment shows no row', () => {
   const p = panel([
     { type: 'reply', id: 'r9', to: null, text: 'Spec check 1 found 16 gaps. Details below.', by: 'coordinator', at: at(1) },
+    { type: 'status', to: 'r9', status: 'done', by: 'coordinator', read: 0, at: at(1) },  // a report's own done (D13)
     { type: 'comment', id: 'c1', n: 1, text: 'gone', on: {}, by: 'user', at: at(1) }, { type: 'delete', to: 'c1', by: 'user', at: at(1) },
   ], { crumb: () => null, commentBody: () => null });
   assert.deepEqual(p.rows().map(li => li.dataset.id), ['r9']);
@@ -770,7 +772,7 @@ test('S14 Open lists done, then the agent\'s turn, then your turn last; All list
   assert.equal(p.$('[data-filter="open"]').textContent, 'Open (5)');
   assert.equal(p.$('[data-filter="all"]').textContent, 'All (6)');
   p.filter('all');
-  assert.deepEqual(p.rows().map(li => li.dataset.id), ['m1', 'm2', 'm3', 'm4', 'm5', 'm6']);
+  assert.deepEqual(p.rows().map(li => li.dataset.id), ['m1', 'm5', 'm2', 'm3', 'm4', 'm6']);  // the order they started in the log
   assert.equal(p.$('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
 });
 

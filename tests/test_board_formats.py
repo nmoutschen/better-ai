@@ -1389,7 +1389,9 @@ class Replies(unittest.TestCase):
             write_lines(board_dir, "conversation.jsonl", [event])
             pending = better.run(SKILL, "pending", str(board_dir), cwd=d)
             self.assertIn("c-1", pending.stdout)
-            done = better.run(SKILL, "reply", str(board_dir), "--to", "c-1", stdin="Because it fell.", cwd=d)
+            done = better.run(
+                SKILL, "reply", str(board_dir), "--to", "c-1", "--read", "0", stdin="Because it fell.", cwd=d
+            )
             self.assertEqual(done.returncode, 0, done.stderr)
             events = [json.loads(x) for x in (board_dir / "conversation.jsonl").read_text().splitlines()]
             self.assertEqual(

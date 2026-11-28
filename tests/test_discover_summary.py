@@ -43,8 +43,9 @@ def put_json(unit: Path, name: str, record: dict) -> None:
     path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
 
-def status(to, state="done"):
-    return {"type": "status", "at": R.AT, "by": R.COORD, "to": to, "status": state}
+def status(to, read, state="done"):
+    """The agent's status, with the `read` every status now carries (D12): the line of the user event it follows."""
+    return {"type": "status", "at": R.AT, "by": R.COORD, "to": to, "status": state, "read": read}
 
 
 def reply(to, ident="rp1"):
@@ -169,13 +170,15 @@ class Summary(Discovery):
 
     def test_S54_only_open_events_and_only_checking_evidence_are_listed(self):
         self.compacted()
-        put(self.unit, "conversation.jsonl", [R.event("choose", id="c1", option="K1"), R.event("edit"), status("h1")])
+        put(
+            self.unit, "conversation.jsonl", [R.event("choose", id="c1", option="K1"), R.event("edit"), status("h1", 1)]
+        )
         _, lines = self.summary()
         self.assertEqual([x["id"] for x in lines if x["type"] == "event"], ["c1"])
         self.assertEqual([x["id"] for x in lines if x["type"] == "evidence"], ["E-a1-2"])
 
     def events(self, *lines):
-        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), *lines])
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1", 0), *lines])
         _, out = self.summary()
         return [x for x in out if x["type"] == "event"]
 
@@ -386,30 +389,30 @@ class Warnings(Discovery):
         self.quiet("brief-holds-removed")
 
     def test_S55_a_done_event_that_no_record_and_no_reply_points_to(self):
-        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1")])
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1", 0)])
         self.warns("done-event-unanswered", "a1")
-        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), reply("a1")])
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1", 0), reply("a1")])
         self.quiet("done-event-unanswered")
 
     def test_S55_an_event_the_user_closed_is_no_done_event_to_answer(self):
         accept = {"type": "accept", "at": R.AT, "by": "user", "to": "a1"}
-        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), accept])
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1", 0), accept])
         self.quiet("done-event-unanswered")
         put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), accept])
         self.quiet("done-event-unanswered")
 
     def test_S55_a_record_that_points_to_the_event_answers_it(self):
-        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1")])
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1", 0)])
         given = {"type": "page", "event": "a1"}
         put_json(self.unit, "sources/S-coord-1.json", R.record(R.YOU_SOURCE, origin={"type": "you", "given": given}))
         self.quiet("done-event-unanswered")
 
     def test_S55_a_done_event_the_user_followed_up_is_open_not_done(self):
         note = {"type": "note", "at": R.AT, "by": "user", "id": "n9", "to": "a1", "text": "Also this."}
-        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), note])
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1", 0), note])
         self.quiet("done-event-unanswered")
         reopen = {"type": "reopen", "at": R.AT, "by": "user", "to": "a1", "text": "No."}
-        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1"), reopen])
+        put(self.unit, "conversation.jsonl", [R.event("add_evidence", id="a1"), status("a1", 0), reopen])
         self.quiet("done-event-unanswered")
 
     def test_S55_an_open_event_is_not_a_done_event(self):
@@ -421,7 +424,7 @@ class Warnings(Discovery):
         put(
             self.unit,
             "conversation.jsonl",
-            [R.event("choose", id="c1", at=ago(60)), R.event("choose", id="c2", at=ago(30)), status("c2")],
+            [R.event("choose", id="c1", at=ago(60)), R.event("choose", id="c2", at=ago(30)), status("c2", 1)],
         )
         put(self.unit, "moves.jsonl", [R.record(R.MOVE, at=ago(10), answer={"type": "page", "event": "c2"})])
         self.warns("open-event-older", "c1")
@@ -431,9 +434,9 @@ class Warnings(Discovery):
             "conversation.jsonl",
             [
                 R.event("choose", id="c1", at=ago(60)),
-                status("c1"),
+                status("c1", 0),
                 R.event("choose", id="c2", at=ago(30)),
-                status("c2"),
+                status("c2", 2),
             ],
         )
         self.quiet("open-event-older")
