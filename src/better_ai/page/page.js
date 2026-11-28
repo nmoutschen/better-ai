@@ -576,7 +576,8 @@ function pageConversation(o) {
     return figureEl;
   }
   function figure(yours) {
-    if (!figureSlot()) return;
+    // Built even while its slot is missing, such as before a page writes its header: figure() places it then.
+    if (typeof document.createElement !== 'function') return;
     var tag = yours.length ? 'BUTTON' : 'SPAN';
     if (!figureEl || figureEl.tagName !== tag) {
       if (figureEl) figureEl.remove();
