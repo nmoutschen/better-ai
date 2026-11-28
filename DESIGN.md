@@ -288,10 +288,10 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 
 - The right column of every board (`.notes`), built by page.js: one row per thread, then the message box.
 - A row holds, left to right: the state chip, the agent's progress, "You:" or "Agent:" and the first sentence of the thread, a drawn equilateral triangle (▼ opens the thread, ▲ folds it; no outline), the message count, and the buttons for the state. An open thread's messages run flat across the row, with no box inside the row.
-- Item states and their left edge: seen sand, asked umber, working terracotta, done moss-dark, reopened error. The progress says the state in words.
+- Thread states and their left edge: Your turn umber, Agent's turn sand (Not seen, Seen) or terracotta (Working), Done moss-dark. The progress says the state in words.
 - Progress is three bars with a green Done step: Not seen shows none, Seen one, Working two, Done all three in moss-dark.
-- Buttons by state: Answer is the one filled (umber) button on a row, with ✓ beside it; ✓ and Reply are outlined; a done thread offers Reopen, outlined. Buttons differ by more than their text.
-- ✓ closes a thread. The row is replaced by a Close undo for 6 seconds, then leaves the list.
+- Buttons by state: Answer is the one filled (umber) button on a row, with ✓ beside it; ✓ and Reply are outlined; a thread done by the agent offers ✓ (Confirm done) and Reopen; one you closed offers Reopen. Buttons differ by more than their text.
+- ✓ closes a thread. The row stays in place as Closed with its own Undo for 6 seconds, then leaves Open and shows Done in All.
 - Do not rebuild any part of it. A page that needs the conversation embeds page.js.
 
 ### Pop-up
