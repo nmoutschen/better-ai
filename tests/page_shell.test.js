@@ -1124,6 +1124,7 @@ test('the first sentence of a page kind without text is its words without its he
       li.innerHTML = '<div class="head"><span class="who">worker-2</span><span class="when">19:54</span></div><p class="what">Answered: Who supports ACP</p><div class="body md"><p>Zed does.</p></div>';
       return li;
     } } }));
+  p.filter('all');  // a worker's report starts closed (D10)
   assert.equal(text(p.rowOf('x1').querySelector('.tgist')), 'Coordinator: Answered: Who supports ACP.');  // a stop ends each block
 });
 
