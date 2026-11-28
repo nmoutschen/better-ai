@@ -3,12 +3,10 @@ page.js, and no skill draws a count of its own. Each skill's page is served as a
 on a unit holding one line in that skill's old format."""
 
 import json
-import os
 import re
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 import urllib.request
 from pathlib import Path
@@ -90,18 +88,6 @@ CASES = {
 }
 
 
-def served(skill, repo, unit):
-    full = {**os.environ, "BETTER_AI_SKILL": skill}
-    return subprocess.Popen(
-        better.command("serve", unit, "--no-browser"),
-        cwd=repo,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=full,
-    )
-
-
 class OldFormatCountTest(unittest.TestCase):
     def test_every_shipped_skill_has_an_old_format_count_case(self):
         self.assertEqual(set(CASES), set(pyz.skill_names()))
@@ -114,25 +100,16 @@ class OldFormatCountTest(unittest.TestCase):
                 folder = repo / unit
                 if make_old:
                     make_old(folder)
-                server = served(skill, repo, unit)
+                url, secret = better.serve_page(skill, folder, cwd=repo)
                 try:
-                    address = folder / ".server"
-                    url = ""
-                    for _ in range(100):
-                        if address.exists():
-                            url = address.read_text().strip()
-                            if url:
-                                break
-                        time.sleep(0.1)
-                    self.assertTrue(url, "serve did not publish its address")
-                    with urllib.request.urlopen(url + "old", timeout=10) as response:  # noqa: S310
+                    request = urllib.request.Request(url + "old", headers=better.page_headers(secret))
+                    with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
                         self.assertEqual(json.loads(response.read()), expected)
                     with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
                         shell = response.read().decode()
                     self.assertEqual(len(re.findall(r'id="oldnote"', shell)), 1)
                 finally:
-                    server.terminate()
-                    server.communicate(timeout=10)
+                    better.stop_page(folder)
 
     def test_a_rendered_page_carries_the_same_count_as_the_served_one(self):
         outputs = {

@@ -6,16 +6,14 @@ import os
 import re
 import secrets
 import shlex
-import stat
 import sys
 import threading
-import time
 from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import REPLY_STATES, webauthn
+from . import REPLY_STATES
 
 
 class Pairing:
@@ -47,39 +45,6 @@ class Pairing:
     def valid(self, secret, origin):
         with self.lock:
             return origin == self.origin and self.matches(secret, self.secret)
-
-
-def credential_file():
-    if sys.platform == "darwin":
-        data = Path.home() / "Library" / "Application Support"
-    elif os.name == "nt":
-        data = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    else:
-        data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    if not data.is_absolute():
-        data = Path.home() / ".local" / "share"
-    return data / "better-ai" / "page-credential.json"
-
-
-def load_credential(path):
-    try:
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
-    except FileNotFoundError:
-        return None
-    with os.fdopen(fd) as stream:
-        info = os.fstat(stream.fileno())
-        if (
-            not stat.S_ISREG(info.st_mode)
-            or info.st_size > 8192
-            or (os.name == "posix" and (info.st_mode & 0o077 or info.st_uid != os.getuid()))
-        ):
-            raise ValueError("Credential file must be private")
-        key = json.load(stream)
-    if not isinstance(key, dict) or not all(isinstance(key.get(k), str) for k in ("id", "x", "y")):
-        raise ValueError("Invalid stored credential")
-    webauthn.decode(key["id"])
-    webauthn.public_point(bytes.fromhex(key["x"]), bytes.fromhex(key["y"]))
-    return key
 
 
 # Only these literal shell words are accepted outside the quoted heredoc.
@@ -265,21 +230,11 @@ class Request:
     options: tuple
     callback: Callable[[str, str], Future[bool]]
     sending: bool = False
-    challenge: str = ""
-    choice: str = ""
 
 
 class ApprovalGate:
-    def __init__(
-        self, unit_path, origin, *, require_presence=True, credential_path=None, archive=None, record_verbs=()
-    ):
+    def __init__(self, unit_path, *, archive=None, record_verbs=()):
         self.unit = Path(unit_path).absolute()
-        self.origin = origin
-        self.require_presence = require_presence
-        self.path = Path(credential_path) if credential_path is not None else credential_file()
-        self.credential = load_credential(self.path) if require_presence else None
-        self.deadline = time.monotonic() + 120
-        self.enrollment_challenge = ""
         self.archive = Path(archive).absolute() if archive else None
         self.record_verbs = tuple(record_verbs)
         self.digest = self._hash()
@@ -297,46 +252,6 @@ class ApprovalGate:
             except OSError:
                 return None
         return None
-
-    def enrolled(self):
-        with self.lock:
-            return not self.require_presence or self.credential is not None
-
-    def _enrolling(self):
-        if self.enrolled() or time.monotonic() >= self.deadline:
-            raise ValueError("Enrollment is closed")
-
-    def begin_enrollment(self):
-        with self.lock:
-            self._enrolling()
-            self.enrollment_challenge = secrets.token_urlsafe(32)
-            return {
-                "challenge": self.enrollment_challenge,
-                "rp": {"id": "localhost", "name": "Better AI approvals"},
-                "user": {"id": secrets.token_urlsafe(32), "name": "local-user", "displayName": "Local user"},
-                "pubKeyCredParams": [{"type": "public-key", "alg": -7}],
-                "attestation": "none",
-                "authenticatorSelection": {"userVerification": "preferred"},
-            }
-
-    def finish_enrollment(self, proof):
-        with self.lock:
-            self._enrolling()
-            challenge, self.enrollment_challenge = self.enrollment_challenge, ""
-            if not challenge:
-                raise ValueError("Begin enrollment first")
-            key = webauthn.register(proof, challenge, self.origin)
-            self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            # Publish only complete bytes and never replace the winning enrollment of another server.
-            temp = self.path.with_name(".credential-" + secrets.token_hex(12))
-            with os.fdopen(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as output:
-                try:
-                    json.dump(key, output)
-                    output.flush()
-                    os.link(temp, self.path)
-                finally:
-                    temp.unlink()
-            self.credential = key
 
     def receive(self, event, callback):
         with self.lock:
@@ -391,23 +306,6 @@ class ApprovalGate:
             raise ValueError("Approval answer is being delivered")
         return self.pending[rid]
 
-    def challenge(self, rid, choice):
-        with self.lock:
-            item = self._get(rid)
-            if choice not in item.options or choice == "deny":
-                raise ValueError("Invalid approval choice")
-            if not self.require_presence:
-                return None
-            if not self.credential:
-                raise ValueError("Enroll first")
-            item.challenge, item.choice = secrets.token_urlsafe(32), choice
-            return {
-                "challenge": item.challenge,
-                "rpId": "localhost",
-                "userVerification": "preferred",
-                "allowCredentials": [{"type": "public-key", "id": self.credential["id"]}],
-            }
-
     def _finish(self, rid, reason):
         del self.pending[rid]
         self.last_outcome = self.outcomes[rid] = reason
@@ -436,16 +334,11 @@ class ApprovalGate:
             if rid in self.pending:
                 self._finish(rid, "expired")
 
-    def answer(self, rid, choice, proof=None):
+    def answer(self, rid, choice):
         with self.lock:
             item = self._get(rid)
             if choice not in item.options:
                 raise ValueError("Invalid approval choice")
-            if choice != "deny" and self.require_presence:
-                challenge, item.challenge = item.challenge, ""
-                if not self.credential or not challenge or item.choice != choice:
-                    raise ValueError("Request needs a fresh WebAuthn assertion")
-                webauthn.verify(proof, challenge, self.origin, self.credential)
             allowed = choice != "deny"
             reason = (
                 "allowed for this session"

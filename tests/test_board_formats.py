@@ -12,7 +12,6 @@ import io
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import tempfile
@@ -1037,27 +1036,21 @@ class Verbs(unittest.TestCase):
             self.assertEqual(refused.returncode, 1)
             self.assertFalse((empty / "board.html").exists())
 
+    def temp_dir(self) -> str:
+        """A temporary folder removed when the test ends, after the server stop that start registered later."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return tmp.name
+
     def served(self, board_dir: Path):
-        process = subprocess.Popen(
-            better.command("serve", str(board_dir), "--no-browser", "--linger", "0.2"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env={**os.environ, "BETTER_AI_SKILL": SKILL},
-        )
-        self.addCleanup(process.communicate)
-        self.addCleanup(process.send_signal, signal.SIGTERM)
-        for _ in range(100):
-            if (board_dir / ".server").exists():
-                break
-            time.sleep(0.1)
-        self.token = (board_dir / ".server-token").read_text().strip()  # what `serve` leaves for the page's requests
-        return process, (board_dir / ".server").read_text().strip()
+        url, self.token = better.serve_page(SKILL, board_dir, "--linger", "0.2")
+        self.addCleanup(better.stop_page, board_dir)
+        return None, url
 
     def get(self, url: str):
         try:
             with urllib.request.urlopen(
-                urllib.request.Request(url, headers={"X-Page-Token": self.token}), timeout=5
+                urllib.request.Request(url, headers=better.page_headers(self.token)), timeout=5
             ) as r:
                 return r.status, r.read().decode()
         except urllib.error.HTTPError as error:
@@ -1070,43 +1063,50 @@ class Verbs(unittest.TestCase):
         request = urllib.request.Request(
             url + "rpc",
             body,
-            {"Content-Type": "application/json", "Origin": origin, "X-Page-Token": self.token},
+            {"Content-Type": "application/json", **better.page_headers(self.token, origin)},
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=5) as r:
             return json.loads(r.read())
 
     def test_the_served_page_has_the_boards_files_takes_its_events_and_refuses_the_rest(self):
-        with tempfile.TemporaryDirectory() as d:
-            board_dir = made_board(Path(d))
-            write_entry(
-                board_dir, claim("C-w2-9", question="Q-w9-1")
-            )  # a bad record: the page is served, with its error
-            process, url = self.served(board_dir)
-            status, text = self.get(url)
-            self.assertEqual(status, 200)
-            for linked in ('href="/board.css"', 'src="/board.js"', 'src="/page.js"', 'href="/page.css"', 'id="map"'):
-                self.assertIn(linked, text)
-            for asset in ("board.js", "board.css", "page.js", "page.css"):
-                self.assertEqual(self.get(url + asset)[0], 200, asset)
-            self.assertEqual(self.get(url + "board.html")[0], 404)  # only the fixed table is served
-            self.assertEqual(self.get(url + "brief.json")[0], 404)
-            status, text = self.get(url + "data")
-            data = json.loads(text)
-            self.assertEqual((status, data["brief"]["status"]), (200, "running"))
-            self.assertEqual(({e["file"] for e in data["errors"]}, len(data["claims"])), ({"claims/C-w2-9.json"}, 1))
-            self.assertIn("listening", data)
-            closed = self.rpc(url, "closed", id="c-0", question="Q-w2-4", status="answered")  # the page may not send it
-            self.assertEqual(closed["error"]["code"], -32601)
-            self.assertFalse((board_dir / "conversation.jsonl").exists())
-            for method in ("accept", "approve", "confirm", "delete"):  # shared parts this page does not declare
-                self.assertEqual(self.rpc(url, method, to="c-1")["error"]["code"], -32601, method)
+        d = self.temp_dir()  # removed after stop_page, which addCleanup runs first
+        board_dir = made_board(Path(d))
+        write_entry(board_dir, claim("C-w2-9", question="Q-w9-1"))  # a bad record: the page is served, with its error
+        process, url = self.served(board_dir)
+        status, text = self.get(url)
+        self.assertEqual(status, 200)
+        for linked in ('href="/board.css"', 'src="/board.js"', 'src="/page.js"', 'href="/page.css"', 'id="map"'):
+            self.assertIn(linked, text)
+        for asset in ("board.js", "board.css", "page.js", "page.css"):
+            self.assertEqual(self.get(url + asset)[0], 200, asset)
+        self.assertEqual(self.get(url + "board.html")[0], 404)  # only the fixed table is served
+        self.assertEqual(self.get(url + "brief.json")[0], 404)
+        status, text = self.get(url + "data")
+        data = json.loads(text)
+        self.assertEqual((status, data["brief"]["status"]), (200, "running"))
+        self.assertEqual(({e["file"] for e in data["errors"]}, len(data["claims"])), ({"claims/C-w2-9.json"}, 1))
+        closed = self.rpc(url, "closed", id="c-0", question="Q-w2-4", status="answered")  # the page may not send it
+        self.assertEqual(closed["error"]["code"], -32601)
+        self.assertFalse((board_dir / "conversation.jsonl").exists())
+        for method in ("accept", "approve", "confirm", "delete"):  # shared parts this page does not declare
+            self.assertEqual(self.rpc(url, method, to="c-1")["error"]["code"], -32601, method)
 
     def test_a_worker_closing_a_question_is_announced_once_and_the_board_stopped_ends_serve(self):
         with tempfile.TemporaryDirectory() as d:
             board_dir = made_board(Path(d))
-            with mock.patch.object(board.page, "stop_like_ctrl_c"):
+            with (
+                mock.patch.object(board.page, "stop_like_ctrl_c"),
+                mock.patch.dict(os.environ, better.stub_env(SKILL)),
+            ):
                 runner = serve_until_stopped(board_dir, io.StringIO())
+                for _ in range(200):  # the driver is up once it has written its session
+                    if (board_dir / ".driver").exists() and json.loads((board_dir / ".driver").read_text()).get(
+                        "session"
+                    ):
+                        break
+                    time.sleep(0.05)
+                os.environ["BETTER_PAGE_SESSION"] = json.loads((board_dir / ".driver").read_text())["session"]
                 time.sleep(0.3)  # the first tick takes the questions already closed as old news
                 question = {
                     **seeded("Q-w2-4"),

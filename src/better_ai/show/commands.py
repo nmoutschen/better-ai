@@ -106,6 +106,7 @@ def _render_arguments(parser: argparse.ArgumentParser) -> None:
     help="check the spec, then write the page into the unit (html) or print the slides as text (text, md)",
     arguments=_render_arguments,
     skills=("show-better",),
+    machine_output=True,
 )
 def render(args: argparse.Namespace, run: cli.Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)

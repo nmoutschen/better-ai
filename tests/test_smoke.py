@@ -19,6 +19,7 @@ SMOKE = build_fixture.ROOT / "tools" / "smoke.py"
 
 ENTRY = """import http.server
 import json
+import os
 import sys
 import zipfile
 from pathlib import Path
@@ -34,8 +35,13 @@ elif args[0] == "add":
     Path(args[1], "added.jsonl").open("a").write(sys.stdin.read() + "\\n")
 elif args[0] == "serve":
     server = http.server.HTTPServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
-    print("http://127.0.0.1:%d/" % server.server_port, flush=True)
-    server.handle_request()
+    print("driver: on claude 00000000-0000-4000-8000-000000000000", flush=True)
+    print("Serving unit at http://127.0.0.1:%d/" % server.server_port, flush=True)
+    if os.fork() == 0:  # like the real serve: the caller returns, the server goes on in the background
+        os.setsid()
+        server.timeout = 20  # a fixture server nobody asks ends by itself
+        server.handle_request()
+        os._exit(0)
 elif args[0] in ("set", "check", "render"):
     pass
 else:

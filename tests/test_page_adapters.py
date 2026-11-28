@@ -28,14 +28,13 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(found.name, "codex")
         self.assertEqual(found.argv, ("/bin/codex", "app-server"))
         self.assertIsNone(found.kind)
-        self.assertEqual((found.approval, found.codec_factory), ("webauthn", CodexAdapter))
+        self.assertEqual(found.codec_factory, CodexAdapter)
         opencode = candidate("opencode", {}, lambda _: "/bin/opencode")
-        self.assertEqual((opencode.approval, opencode.codec_factory), ("webauthn", OpenCodeAdapter))
+        self.assertEqual(opencode.codec_factory, OpenCodeAdapter)
         for name in ("cursor", "droid", "devin"):
             self.assertEqual(candidate(name, {}, lambda _: None).kind, "not-installed")
             found = candidate(name, {}, lambda _: "/bin/harness")
             self.assertIsNone(found.kind)
-            self.assertEqual(found.approval, "webauthn")
         for name in ("claude", "codex", "cursor", "opencode", "droid", "devin"):
             with self.subTest(name=name):
                 self.assertEqual(candidate(name, {}, lambda _: "/bin/harness").name, name)
@@ -230,7 +229,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_claude_reuses_one_stream_for_multiple_prompts(self):
         plan, adapter, sent, ready = self.open_claude()
-        self.assertEqual((plan.approval, ready.kind, ready.session_id), ("webauthn", "ready", SESSION))
+        self.assertEqual((ready.kind, ready.session_id), ("ready", SESSION))
         self.assertEqual(plan.command(SESSION, None)[-1], f"--session-id={SESSION}")
         self.assertEqual(plan.command(SESSION, SESSION)[-1], f"--resume={SESSION}")
         self.assertEqual(plan.command(SESSION, "--dangerously-skip-permissions")[-1], f"--session-id={SESSION}")

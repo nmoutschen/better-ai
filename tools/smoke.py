@@ -5,8 +5,8 @@
 
 For each skill the runner makes a fresh git repository in a temporary folder and runs, in order: `--help` (its first
 line must be `better.pyz <skill> <hash>` with the hash from the .pyz's own _build.json), then the steps of
-tests/fixtures/units/<skill>/smoke.json (create, add, set, check, render, serve --no-browser --once), then the
-steps listed as `worktree_steps` from a second git worktree of the same repository, such as an `add` into the main
+tests/fixtures/units/<skill>/smoke.json (create, add, set, check, render, serve --no-browser --once, run with the
+stub harness of tests/fixtures/stub-harness first on PATH), then the steps listed as `worktree_steps` from a second git worktree of the same repository, such as an `add` into the main
 checkout's unit. tests/fixtures/units/README.md says what a fixture holds.
 
 Runs on every Python the project supports (3.10 and later) with the standard library only. Exit 0 when every step
@@ -17,16 +17,31 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 STEP_TIMEOUT = 60
+STUB_DIR = ROOT / "tests" / "fixtures" / "stub-harness"
+
+
+def stub_env() -> dict[str, str]:
+    """The environment of a run with the stub harness: it is found first on PATH, and the marker lets `serve` skip the
+    browser."""
+    env = dict(os.environ)
+    # BROWSER=true: a browser command that succeeds and opens nothing. With a failing one (false), Python's
+    # webbrowser falls back to the real browser.
+    env.update(
+        PATH=f"{STUB_DIR}{os.pathsep}{env.get('PATH', '')}", CLAUDECODE="1", BETTER_AI_STUB_HARNESS="1", BROWSER="true"
+    )
+    return env
 
 
 def skill_names(src: Path) -> list[str]:
@@ -61,7 +76,9 @@ def run_step(pyz: Path, step: dict, cwd: Path, fixture: Path, repo: Path) -> str
     if step.get("serve"):
         return run_serve(args, cwd, label)
     try:
-        result = subprocess.run(args, cwd=cwd, input=stdin, capture_output=True, text=True, timeout=STEP_TIMEOUT)
+        result = subprocess.run(
+            args, cwd=cwd, input=stdin, capture_output=True, text=True, timeout=STEP_TIMEOUT, env=stub_env()
+        )
     except subprocess.TimeoutExpired:
         return f"{label}: no answer in {STEP_TIMEOUT}s"
     expected = step.get("exit", 0)
@@ -74,23 +91,28 @@ def run_step(pyz: Path, step: dict, cwd: Path, fixture: Path, repo: Path) -> str
 
 
 def run_serve(args: list[str], cwd: Path, label: str) -> str | None:
-    """`serve --no-browser --once`: read the URL from stdout, fetch it once, expect exit 0."""
-    proc = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    """`serve --no-browser --once`: the first line says `driver: on`, the second holds the address; fetch it once and the
+    server, which went on in its own session, exits."""
+    proc = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=stub_env())
     try:
-        url = None
-        for line in proc.stdout:
-            found = re.search(r"https?://\S+", line)
-            if found:
-                url = found.group(0).rstrip(".")  # the sentence around the address ends with a period
-                break
-        if url is None:
+        first = proc.stdout.readline().strip()
+        if not first.startswith("driver: on "):
+            return f"{label}: first line {first!r}; stderr: {proc.stderr.read().strip()[:200]}"
+        found = re.search(r"https?://\S+", proc.stdout.readline())
+        if found is None:
             return f"{label}: printed no URL; stderr: {proc.stderr.read().strip()[:200]}"
+        url = found.group(0)
+        if proc.wait(timeout=10) != 0:
+            return f"{label}: exit {proc.returncode}: {proc.stderr.read().strip()[:200]}"
         with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
             if response.status != 200:
                 return f"{label}: {url} answered {response.status}"
-        if proc.wait(timeout=10) != 0:
-            return f"{label}: exit {proc.returncode} after one request: {proc.stderr.read().strip()[:200]}"
-        return None
+        unit = cwd / next(a for a in args[args.index("serve") + 1 :] if not a.startswith("-"))
+        for _ in range(100):  # --once: the server ends itself after that one request
+            if not (unit / ".server").exists():
+                return None
+            time.sleep(0.1)
+        return f"{label}: the server did not exit after one request"
     except Exception as err:  # a failed fetch or a wait that timed out is a failed step, not a crash
         return f"{label}: {type(err).__name__}: {err}"
     finally:

@@ -112,27 +112,7 @@ class DeliveryTest(shell.Fixture):
         expected = [{**item, "status": {0: "working", 1: "seen"}.get(n, "new")} for n, item in enumerate(sent[:-1])]
         self.assertEqual(records, [*expected, sent[-1]])
 
-    def test_wait_ignores_legacy_cursor_and_keeps_an_action_for_resume(self):
-        self.serve()
-        self.seed(note("m1"), status("m1", "done"), {"type": "reopen", "to": "m1", "by": "user", "text": "again"})
-        legacy = self.unit_dir / ".conversation-seen"
-        legacy.write_text("9000")
-        code, out, err = self.cli("wait", self.unit_arg, "--timeout", "1")
-        self.assertEqual((code, err), (0, ""))
-        item, event = map(json.loads, out.splitlines())
-        self.assertEqual((item["id"], item["status"]), ("m1", "reopened"))
-        self.assertEqual((event["type"], event["to"]), ("reopen", "m1"))
-        self.assertEqual(legacy.read_text(), "9000")
-        self.seed(status("m1", "seen"))
-        code, _, _ = self.cli("wait", self.unit_arg, "--timeout", "1")
-        self.assertEqual(code, 3)
-        code, out, err = self.cli("pending", self.unit_arg)
-        self.assertEqual((code, err), (0, ""))
-        item, event = map(json.loads, out.splitlines()[:-1])
-        self.assertEqual((item["id"], item["status"]), ("m1", "seen"))
-        self.assertEqual((event["type"], event["to"]), ("reopen", "m1"))
-
-    def test_an_rpc_edit_reaches_pending_and_wait_only_while_the_item_is_not_settled(self):
+    def test_an_rpc_edit_reaches_pending_only_while_the_item_is_not_settled(self):
         _, host = self.serve()
         states = ["working", "asked", "done", "accepted"]
         for number, state in enumerate([*states, "stale"], 1):
@@ -140,7 +120,6 @@ class DeliveryTest(shell.Fixture):
                 self.rpc(host, "comment", {"id": f"c{number}", "n": number, "on": {}, "text": state}).get("result"),
                 "saved",
             )
-        self.assertEqual(self.cli("wait", self.unit_arg, "--timeout", "1")[0], 0)
         for number, state in enumerate([*states, "working"], 1):
             self.assertEqual(self.cli("status", self.unit_arg, state, f"c{number}", "--text", stdin="Agreed")[0], 0)
         for number, state in enumerate(states, 1):
@@ -150,19 +129,14 @@ class DeliveryTest(shell.Fixture):
                 ),
                 "saved",
             )
-        # An edit of a working item is delivered; one of an asked, done or accepted item is not (S15).
-        expected = [("c1", "working", "edited working")]
-        for verb, args in (("pending", ()), ("wait", ("--timeout", "1"))):
-            with self.subTest(verb=verb):
-                code, out, err = self.cli(verb, self.unit_arg, *args)
-                self.assertEqual((code, err), (0, ""))
-                lines = out.splitlines()
-                if verb == "pending":
-                    lines = lines[:-1]
-                self.assertEqual(
-                    [(item["id"], item["status"], item["text"]) for item in map(json.loads, lines)], expected
-                )
-        self.assertEqual(self.cli("wait", self.unit_arg, "--timeout", "1")[0], 3)
+        # An edit of a working item is delivered; one of an asked, done or accepted item is not (S15, S58).
+        code, out, err = self.cli("pending", self.unit_arg)
+        self.assertEqual((code, err), (0, ""))
+        lines = out.splitlines()[:-1]
+        self.assertEqual(
+            [(item["id"], item["status"], item["text"]) for item in map(json.loads, lines)],
+            [("c1", "working", "edited working")],
+        )
         self.assertEqual(self.conv.delivery(after=len(self.log())).items, [])
 
     def test_pending_reads_all_sent_ids_once_active_prompt_items_are_seen(self):

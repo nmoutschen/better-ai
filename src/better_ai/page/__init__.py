@@ -1,12 +1,13 @@
 """The live page: one server, one conversation log and one set of verbs for every skill.
 
-A page talks to the agent through `conversation.jsonl` in its unit. `serve` shows the page and takes what the user sends;
-the agent reads it with `wait`, answers with `reply` and `status`, and lists what is still open with `pending`. The five
-verbs are registered here for every skill; what differs between skills is a `PageSpec`, which the skill's package
-registers with `register(SKILL, PageSpec(...))` when it is imported:
+A page talks to the agent through `conversation.jsonl` in its unit. `serve` shows the page, takes what the user sends and
+runs the agent that works on it (the driver, `driver.py`): the user's comments reach that agent with no chat input. The
+agent answers with `reply` and `status` and lists what is still open with `pending`. The verbs are registered here for
+every skill; what differs between skills is a `PageSpec`, which the skill's package registers with
+`register(SKILL, PageSpec(...))` when it is imported:
 
-- `title`, `agent`: the page's title, and the agent's role name (such as "coordinator"), which the shared "not watching" and
-  "closed" strips and the thread say;
+- `title`, `agent`: the page's title, and the agent's role name (such as "coordinator"), which the shared "closed" strip
+  and the thread say;
 - `main`: the bundled HTML of the page's main section (a name under `better_ai/`, such as "research/board.html");
 - `aside`: optional bundled HTML put at the top of the side column, above the conversation;
 - `assets`, `css`, `js`: the fixed table of files the page serves, by URL path (`{"/board.js": "research/board.js"}`),
@@ -16,16 +17,17 @@ registers with `register(SKILL, PageSpec(...))` when it is imported:
 - `methods`, `items`: events a page may send that no capability names, and the events the agent tracks with a status
   (by default: notes, and the events of the declared capabilities that ask for an answer);
 - `events`: the file name of the page's own events schema, in its package's `schemas/` folder;
-- `load(unit)`: the page's data, a JSON object, served at `/data` (with `listening`, `now` and `quiet_after` added);
+- `load(unit)`: the page's data, a JSON object, served at `/data` (with `now` and `quiet_after` added);
 - `rendered`, `static_data(unit, run)`: the `render` verb writes the page as one static file, `rendered` (a path
   in the unit; it prints the file's path), with `static_data` (default: `load`) embedded; the hook may refuse, warn on `run.err` or write other
   files first (the architect's SVGs);
 - `revision(unit)`, `stopped(unit)`, `tick(unit, conversation)`: optional. A page reloads itself when `/rev` changes;
   `serve` ends `--linger` seconds after `stopped` becomes true; `tick` runs every TICK seconds (one) while serving.
 
-`serve` makes a random token, keeps it in the unit's `.server-token` (private to the user) and gives it to the browser
-only in the fragment of the address it opens (`#t=...`, which a browser does not send). `/rpc`, `/data`, `/events` and
-`/wait` need it in the `X-Page-Token` header; `wait` reads it from the file. The shell, its files and `/listening` do not.
+`serve` is always driven: it finds the user's harness, opens a session in it, opens the page in the browser with a
+single-use pairing token that it never prints or writes, prints one `driver:` line and detaches. Where the driver cannot
+start it prints `driver: off <kind>: <problem>` and serves nothing. A tab pairs once (`/pair`), and the secret it gets
+goes in the `X-Page-Token` header of `/rpc`, `/data`, `/events` and `/agent`. The shell, its files and `/alive` need none.
 
 The shell (`shell.html`) is filled only with bundled files and `html.escape`d constants, never with record data.
 """
@@ -36,13 +38,13 @@ import argparse
 import contextlib
 import functools
 import hashlib
-import hmac
 import html
 import http.client
 import http.server
 import json
 import os
-import secrets
+import re
+import select
 import shlex
 import signal
 import socket
@@ -57,8 +59,6 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from collections.abc import Callable, Iterable, Mapping
-from concurrent.futures import Future
-from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -72,14 +72,10 @@ from .delivery import from_user as from_user
 from .delivery import terminal_json as terminal_json
 
 COMMON = "conversation.schema.json"
-LOG, SEEN, ADDRESS, TOKEN = "conversation.jsonl", ".conversation-seen", ".server", ".server-token"
-WAIT_RECEIPT = ".page-wait"
+LOG, ADDRESS = "conversation.jsonl", ".server"
 ACTIVE_DELIVERY = ".page-delivery"
 TOKEN_HEADER = "X-Page-Token"
-OUT_OF_DATE = "page out of date: open the address the agent gave"  # what a page without the token is told; page.js shows it and keeps the typing
 MAX_BODY = 200_000
-LISTEN_GAP = 10  # seconds without a `wait` connected before the page says the agent is not watching
-WAIT_DEFAULT = 600  # seconds `wait` waits, in every skill
 TICK = 1  # seconds between the ticks of a served page; tests set it shorter
 POLL = 0.05  # seconds serve_forever waits for a request before it looks whether it was told to stop
 STATES = ("seen", "asked", "working", "done", "accepted")  # `accepted` is written as its own event, `accepted`
@@ -102,6 +98,7 @@ CONTENT_TYPES = {
     ".json": "application/json",
     ".svg": "image/svg+xml",
 }
+DRIVER_METHODS = ("permission_answer", "agent_stop", "agent_start")  # what /rpc hands to the driver, not to the log
 SHARED_ASSETS = {"/page.js": "page/page.js", "/page.css": "page/page.css"}
 
 # The driven shell and its srcdoc previews may run only bundled scripts.
@@ -201,8 +198,6 @@ def register(skill: Skill, spec: PageSpec) -> PageSpec:
         raise ValueError(f"{skill.name}: the main section {spec.main!r} is not bundled")
     if spec.aside and not resources.exists(spec.aside):
         raise ValueError(f"{skill.name}: the side section {spec.aside!r} is not bundled")
-    if skill.name not in PAGES:
-        paths.unit_guard(skill.name)(driven_notice)
     PAGES[skill.name] = spec
     return spec
 
@@ -339,18 +334,14 @@ def old_count_of(unit: Unit) -> int:
 
 
 class Conversation:
-    """One unit's log, `conversation.jsonl`, one ASCII JSON event per line, and the files that say where the unit is
-    served (`.server`) and what fallback wait handed back (`.page-wait`). Everything is read and written through
-    `paths`, so no file is opened with a symlink on the way."""
+    """One unit's log, `conversation.jsonl`, one ASCII JSON event per line, and the file that says where the unit is
+    served (`.server`). Everything is read and written through `paths`, so no file is opened with a symlink on the
+    way."""
 
     def __init__(self, unit: Unit, spec: PageSpec, docs: dict[str, dict]):
         self.unit, self.spec, self.docs = unit, spec, docs
         self.items, self.agent = spec.tracked(), spec.agent
         self.lock = threading.RLock()
-        # Whether a `wait` is listening: None until one first connects (the agent may stream the server's output
-        # instead), then True while one is connected or reconnected within LISTEN_GAP seconds. The page warns the user
-        # when it is False.
-        self.waiters: dict[str, Any] = {"open": 0, "last": None}
 
     # ---------- The log ----------
 
@@ -409,28 +400,11 @@ class Conversation:
 
     # ---------- The server's side ----------
 
-    def listening(self):
-        if self.waiters["last"] is None:
-            return None
-        return self.waiters["open"] > 0 or time.time() - self.waiters["last"] < LISTEN_GAP
-
     def wait_for_more(self, after: int, seconds: float) -> int:
         deadline = time.time() + seconds
         while len(self.lines()) <= after and time.time() < deadline:
             time.sleep(0.25)
         return len(self.lines())
-
-    def waited(self, after: int, seconds: float = 25) -> int:
-        """Long poll for `wait`: the number of events, as soon as there are more than `after`."""
-        with self.lock:
-            self.waiters["open"] += 1
-            self.waiters["last"] = time.time()
-        try:
-            return self.wait_for_more(after, min(seconds, 25))
-        finally:
-            with self.lock:
-                self.waiters["open"] -= 1
-                self.waiters["last"] = time.time()
 
     # ---------- The agent's side ----------
 
@@ -450,11 +424,8 @@ class Conversation:
         """Whether a server answers at the address file's address: the file stays when the server is killed."""
         try:
             address = self.address()
-            if address is None:
-                return False
-            with urllib.request.urlopen(f"{address}listening", timeout=2):
-                return True
-        except (OSError, ValueError, Refused):  # no server there, or an address file that holds no address
+            return address is not None and alive_at(address, 2) is not None
+        except Refused:  # an address file that holds no address
             return False
 
     def delivery(
@@ -532,11 +503,6 @@ def _text(run: cli.Run, what: str) -> str:
     return text
 
 
-def _wait_arguments(parser: argparse.ArgumentParser) -> None:
-    _unit_argument(parser)
-    parser.add_argument("--timeout", type=float, default=WAIT_DEFAULT, help=f"seconds to wait (default {WAIT_DEFAULT})")
-
-
 def _read_delivery_state(unit: Unit, name: str) -> dict:
     try:
         data = json.loads(paths.read_bytes(unit, name))
@@ -553,62 +519,6 @@ def _delivery_position(data: dict, key: str) -> int:
 def _delivery_ids(data: dict, key: str) -> frozenset[str]:
     ids = data.get(key)
     return frozenset(ids) if isinstance(ids, list) and all(isinstance(ident, str) for ident in ids) else frozenset()
-
-
-def _wait_total(address: str, after: int, seconds: float, headers: dict, unit: Unit) -> int:
-    request = urllib.request.Request(f"{address}wait?after={after}&seconds={max(1, int(seconds))}", headers=headers)
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return int(response.read())
-    except urllib.error.HTTPError as error:
-        if error.code == 401:
-            raise paths.refusal(
-                unit.label, "the page's server does not accept this token", f"run serve {unit.label} again"
-            ) from None
-    except (OSError, ValueError):
-        pass
-    raise paths.refusal(unit.label, "the page's server is not answering", f"run serve {unit.label} again")
-
-
-@cli.verb(
-    "wait", help="wait for the user's next actions on the served page, print them and exit", arguments=_wait_arguments
-)
-def wait(args: argparse.Namespace, run: cli.Run) -> int:
-    """Print the actionable batch when the user acts. Exit 3 when none came in time."""
-    unit = _unit(args, run)
-    conv = _conversation(run, unit)
-    if os.environ.get("BETTER_PAGE_SESSION") or live_driver(unit, conv):
-        raise Refused(f"{unit.label}: wait cannot run on a driven page")
-    address = conv.address()
-    if address is None:
-        raise paths.refusal(unit.label, "no page is served", f"run serve {unit.label} first")
-    receipt = _read_delivery_state(unit, WAIT_RECEIPT)
-    after = _delivery_position(receipt, "position")
-    if after > len(conv.lines()):
-        after = 0
-    carry_ids = _delivery_ids(receipt, "item_ids")
-    headers = {}
-    with contextlib.suppress(FileNotFoundError):  # a server from before the token has no file, and ignores the header
-        headers[TOKEN_HEADER] = paths.read_bytes(unit, TOKEN).decode("ascii", errors="replace").strip()
-    deadline = time.monotonic() + args.timeout
-    scan = after
-    while (remaining := deadline - time.monotonic()) > 0:
-        total = _wait_total(address, scan, remaining, headers, unit)
-        if total <= scan:
-            continue
-        events = conv.events()
-        if any(from_user(event) for event in events[scan:]):
-            found = delivery.select(
-                events, all_items(events, conv.items, conv.agent), conv.items, after, carry_ids, frozenset()
-            )
-            if found.items or found.events:
-                run.out("\n".join(terminal_json(event) for event in [*found.items, *found.events]))
-                # The listener has no turn-end signal. Keep its last batch visible to pending for an interrupted chat.
-                state = {"after": after, "position": found.position, "item_ids": [item["id"] for item in found.items]}
-                paths.write_atomic(unit, WAIT_RECEIPT, json.dumps(state).encode())
-                return 0
-        scan = len(events)
-    raise cli.TimedOut("no new action before the timeout")
 
 
 def _reply_arguments(parser: argparse.ArgumentParser) -> None:
@@ -660,6 +570,10 @@ def status(args: argparse.Namespace, run: cli.Run) -> int:
     records an acceptance the user gave in words, the same as the page's Accept button, as an `accepted` event with
     those words (on stdin, with `--text`)."""
     unit = _unit(args, run)
+    if args.state == "accepted" and os.environ.get("BETTER_PAGE_SESSION"):
+        raise paths.refusal(
+            unit.label, "the page's agent cannot record an acceptance", "ask the user to press Accept in the page"
+        )
     conv = _conversation(run, unit)
     by = paths.check_by(args.by) if args.by else conv.agent
     words = None
@@ -786,9 +700,15 @@ def _active_batch(conv: Conversation, active: dict) -> delivery.Delivery:
     )
 
 
-@cli.verb("pending", help="list the user's actionable items and events", arguments=_unit_argument)
+@cli.verb(
+    "pending",
+    help="list the user's actionable items and events",
+    arguments=_unit_argument,
+    machine_output=True,
+)
 def pending(args: argparse.Namespace, run: cli.Run) -> int:
-    """Read current item states and the latest batch's non-item events, including after an interruption."""
+    """Read current item states and the events after the delivered position of the unit's `.driver`, including after an
+    interruption."""
     unit = _unit(args, run)
     conv = _conversation(run, unit)
     session = os.environ.get("BETTER_PAGE_SESSION")
@@ -796,8 +716,9 @@ def pending(args: argparse.Namespace, run: cli.Run) -> int:
     if session and active.get("session") == session:
         found = _active_batch(conv, active)
     else:
-        receipt = _read_delivery_state(unit, WAIT_RECEIPT)
-        found = conv.delivery(_delivery_position(receipt, "after"), carry_ids=_delivery_ids(receipt, "item_ids"))
+        from .driver_state import delivered_position
+
+        found = conv.delivery(delivered_position(current_state(unit).get("delivered"), conv.events()))
     for line in found.lines():
         run.out(line)
     return 0
@@ -871,6 +792,7 @@ def static_page(spec: PageSpec, data: Mapping[str, Any]) -> str:
     arguments=_unit_argument,
     # discover-better is live only: a static copy would keep words a redact removes.
     skills=("architect-better", "code-better", "design-better", "research-better"),
+    machine_output=True,
 )
 def render(args: argparse.Namespace, run: cli.Run) -> int:
     unit = _unit(args, run)
@@ -901,9 +823,12 @@ def answers_any_failure(handle):
             self.answer_failure(str(error), "500 Internal Server Error")
         except Exception as error:
             with contextlib.suppress(Exception):
-                print(f"page server: {self.bug_prefix}: {self.command} {self.path} failed", file=sys.stderr)
-                traceback.print_exception(error, file=sys.stderr)
-                sys.stderr.flush()
+                if SERVER_ERROR_SINK is not None:  # detached: one line in .driver.log in each rate window
+                    SERVER_ERROR_SINK(f"{self.command} {self.path}: {''.join(traceback.format_exception(error))}")
+                else:
+                    print(f"page server: {self.bug_prefix}: {self.command} {self.path} failed", file=sys.stderr)
+                    traceback.print_exception(error, file=sys.stderr)
+                    sys.stderr.flush()
             self.answer_failure(BUG_TEXT, "500 Internal Server Error")
         return None
 
@@ -920,10 +845,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     assets: dict
     bug_prefix = "bug"
     cutoff: str | None = None
-    token = ""
     answer_started = False
     old_cache: tuple[float, int] = (0.0, 0)
-    driven: DrivenPage | None = None
+    driven: DrivenPage
 
     def answer_failure(self, text: str, status: str) -> None:
         """Answer a failed request with one line, `text`: for a JSON-RPC request the error object -32603, else plain
@@ -958,15 +882,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 print(f"page server: {self.bug_prefix}: a request failed: {type(error).__name__}", file=sys.stderr)
 
     def setup(self) -> None:
-        if self.driven:
-            self.request.settimeout(2)
+        self.request.settimeout(2)
         self.guarded(super().setup)
 
     def handle(self) -> None:
         self.guarded(super().handle)
-
-    def finish(self) -> None:
-        self.guarded(super().finish)
 
     def local(self) -> bool:
         # Only answer requests addressed to this machine, so a web page cannot reach it via DNS rebinding.
@@ -990,7 +910,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send_error(413)
         return json.loads(self.rfile.read(int(size)))
 
-    def pair(self, pairing, new_page=None, unauthorized=401, paired=None):
+    def pair(self, pairing, new_page=None, unauthorized=401):
         try:
             request = self.read_json()
             if request is None:
@@ -1001,8 +921,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             secret = None
         if not secret:
             return self.send(unauthorized, b"Pairing link expired. Ask for a new link.", "text/plain")
-        if paired:
-            paired()
+        self.driven.tab_paired()
         return self.send_json({"secret": secret, **({"page": new_page()} if new_page else {})})
 
     def send(self, code: int, body: bytes, kind: str, *, policy: str | None = None) -> None:
@@ -1014,14 +933,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Security-Policy", policy)
         self.end_headers()
         self.wfile.write(body)
-
-    def has_token(self) -> bool:
-        """Whether the request carries this server's token: what keeps another process on this machine from reading
-        or writing the conversation as the user. Compared in constant time."""
-        if not self.token:
-            return False  # a server made without a token answers nobody
-        given = self.headers.get(TOKEN_HEADER) or ""
-        return hmac.compare_digest(given.encode("utf-8", "replace"), self.token.encode())
 
     def send_json(self, value) -> None:
         self.send(200, json.dumps(value).encode(), "application/json")
@@ -1046,62 +957,40 @@ class Handler(http.server.BaseHTTPRequestHandler):
         parts = urllib.parse.urlsplit(self.path)
         path, c = parts.path, self.conversation
         driven = self.driven
-        paired = bool(driven and not driven.off)
-        if paired:
-            if not driven.main_host(self.headers.get("Host")):
-                return self.send_error(403)
-            if path == "/listening":
-                return self.send_json({"unit": driven.identity, "session": driven.session})
-            if path == "/wait":
-                return self.send_error(403)
-            if path in ("/data", "/events", "/old", "/rev", "/agent") and not self.driven_token(driven.main_pair):
-                return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
-            if path == "/agent":
-                return self.send_json(driven.status())
+        if not driven.main_host(self.headers.get("Host")):
+            return self.send_error(403)
+        if path == "/alive":
+            return self.send_json(driven.alive())
+        if path in ("/data", "/events", "/old", "/rev", "/agent") and not self.driven_token(driven.pairing):
+            return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+        if path == "/agent":
+            return self.send_json(driven.status())
         if path in ("/", "/index.html"):
-            return self.send(
-                200,
-                shell(self.spec, paired).encode(),
-                CONTENT_TYPES[".html"],
-                policy=DRIVEN_SHELL_POLICY if paired else None,
-            )
+            return self.send(200, shell(self.spec, True).encode(), CONTENT_TYPES[".html"], policy=DRIVEN_SHELL_POLICY)
         if path in self.assets:
             kind = CONTENT_TYPES[os.path.splitext(path)[1]]
             return self.send(200, resources.read_bytes(self.assets[path]), kind)
-        if not paired and path in ("/data", "/events", "/wait") and not self.has_token():
-            return self.send(401, f"{OUT_OF_DATE}\n".encode(), "text/plain; charset=utf-8")
         if path == "/data":
-            return self.send_json(
-                page_data({**self.spec.load(self.unit), "listening": c.listening(), "now": time.time()})
-            )
+            return self.send_json(page_data({**self.spec.load(self.unit), "now": time.time()}))
         if path == "/old":
             return self.send_json(self.old_format_count())
         if path == "/rev":
             rev = self.spec.revision(self.unit) if self.spec.revision else "0"
             return self.send(200, str(rev).encode(), "text/plain")
-        if path == "/listening":
-            return self.send_json(c.listening())
         if path == "/events":
             # Long poll for the page: every event after the first `after`, the agent's included.
             after = self.after(parts.query)
             total = c.wait_for_more(after, 20)
             reply = {"total": total, "events": c.events()[after:total]}
-            if paired:
-                with driven.routing_lock:
-                    if driven.off or not self.driven_token(driven.main_pair):
-                        return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
-                    return self.send_json(reply)
-            return self.send_json(reply)
-        if path == "/wait":
-            seconds = urllib.parse.parse_qs(parts.query).get("seconds", ["25"])[0]
-            seconds = int(seconds) if seconds.isdigit() and len(seconds) <= 4 else 25
-            return self.send(200, str(c.waited(self.after(parts.query), seconds)).encode(), "text/plain")
+            with driven.routing_lock:
+                if not self.driven_token(driven.pairing):
+                    return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+                return self.send_json(reply)
         return self.send_error(404)
 
     @answers_any_failure
     def do_POST(self):
-        lock = self.driven.routing_lock if self.driven else contextlib.nullcontext()
-        with lock:
+        with self.driven.routing_lock:
             self.post()
 
     def post(self):
@@ -1110,21 +999,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self.local() or origin != "http://" + (self.headers.get("Host") or ""):
             return self.send_error(403)
         driven = self.driven
-        if driven and not driven.off:
-            if not driven.main_host(self.headers.get("Host")) or not self.browser_origin():
-                return self.send_error(403)
-            if self.path == "/pair":
-                return self.pair(driven.main_pair, unauthorized=403, paired=driven.tab_paired)
-            if self.path != "/rpc":
-                return self.send_error(404)
-            if not self.driven_token(driven.main_pair):
-                return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
-            if not driven.driver or not driven.session:
-                return self.send_error(503)
-        elif self.path != "/rpc":
+        if not driven.main_host(self.headers.get("Host")) or not self.browser_origin():
             return self.send_error(403)
-        elif not self.has_token():
-            return self.send_json(rpc_error(None, -32001, OUT_OF_DATE))
+        if self.path == "/pair":
+            return self.pair(driven.pairing, unauthorized=403)
+        if self.path != "/rpc":
+            return self.send_error(404)
+        if not self.driven_token(driven.pairing):
+            return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
+        if not driven.driver or not driven.session:
+            return self.send_error(503)
         try:
             msg = self.read_json()
         except ValueError:
@@ -1135,12 +1019,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if (
             not isinstance(msg, dict)
             or msg.get("jsonrpc") != "2.0"
-            or msg.get("method") not in self.methods
+            or not isinstance(msg.get("method"), str)
             or not isinstance(msg.get("params"), dict)
         ):
             return self.send_json(rpc_error(rid, -32601, "Unknown method"))
+        if msg["method"] in DRIVER_METHODS:
+            try:
+                return self.send_json(
+                    {"jsonrpc": "2.0", "id": rid, "result": driven.control(msg["method"], msg["params"])}
+                )
+            except ValueError as error:
+                return self.send_json(rpc_error(rid, -32602, str(error)))
+        if msg["method"] not in self.methods:
+            return self.send_json(rpc_error(rid, -32601, "Unknown method"))
         # The page sets only its own fields: the type is the method, the time is the server's, and "by" is the user's,
-        # so a page cannot write an event as the agent's or hide one from `wait`.
+        # so a page cannot write an event as the agent's.
         params = clean(msg["params"])
         if "by" in params:
             return self.send_json(rpc_error(rid, -32602, "by: not allowed in what a page sends; the server sets it"))
@@ -1149,19 +1042,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             (line,) = self.conversation.append({"type": msg["method"], "by": "user", **params})
         except EventError as error:
             return self.send_json(rpc_error(rid, -32602, str(error)))
-        if driven and not driven.off:
-            driven.driver.enqueue(json.loads(line))
-        else:
-            with contextlib.suppress(OSError):  # a closed stdout is not a failed save
-                print(line, flush=True)
+        driven.driver.enqueue(json.loads(line))
         return self.send_json({"jsonrpc": "2.0", "id": rid, "result": "saved"})
+
+    def finish(self) -> None:
+        self.guarded(super().finish)
+        self.driven.requests += 1
 
     def log_message(self, *args):
         pass
 
 
 def make_server(unit: Unit, spec: PageSpec, conv: Conversation, info: resources.BuildInfo, port: int = 0):
-    """The HTTP server for a unit's page, on 127.0.0.1; not started. Its `token` is made here, new for each server."""
+    """The HTTP server for a unit's page, on 127.0.0.1; not started."""
 
     class PageHandler(Handler):
         pass
@@ -1170,169 +1063,190 @@ def make_server(unit: Unit, spec: PageSpec, conv: Conversation, info: resources.
     PageHandler.methods, PageHandler.assets = spec.sendable(), spec.table()
     PageHandler.bug_prefix = f"{unit.skill.name} {info.hash}"
     PageHandler.cutoff = info.cutoff
-    PageHandler.token = secrets.token_urlsafe(32)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), PageHandler)
     server.handler = PageHandler
-    server.token = PageHandler.token  # type: ignore[attr-defined]
     return server
-
-
-def page_url(server: http.server.HTTPServer) -> str:
-    """The address a browser opens, with the token in its fragment, which a browser does not send to any server."""
-    return f"http://127.0.0.1:{server.server_address[1]}/#t={server.token}"  # type: ignore[attr-defined]
-
-
-def publish(unit: Unit, server: http.server.HTTPServer) -> str:
-    """Write the server's token (private to the user) and then its address to the unit, as an agent finds them; returns
-    the address a browser opens (`page_url`)."""
-    url = f"http://127.0.0.1:{server.server_address[1]}/"
-    paths.write_state(unit, TOKEN, server.token.encode(), 0o600)  # type: ignore[attr-defined]
-    paths.write_state(unit, ADDRESS, url.encode())
-    return page_url(server)
 
 
 def unit_identity(unit: Unit) -> str:
     return hashlib.sha256(os.fsencode(unit.path)).hexdigest()
 
 
-def live_driver(unit: Unit, conv: Conversation | None = None) -> dict:
-    if not unit.target(".driver").exists():
-        return {}
+# ---------------------------------------------------------------- what `.driver` and the processes say
+
+
+def current_state(unit: Unit) -> dict:
+    """What the unit's `.driver` holds, `{}` when there is none or it is not the user's: the one place `serve` and the
+    verbs read it."""
     from .driver_state import load_state
 
-    state = load_state(unit)
-    if not state or not state["session"]:
-        return {}
+    return load_state(unit) or {}
+
+
+def command_of(pid: Any) -> str | None:
+    """The command line of a process, or None when there is none such."""
+    if type(pid) is not int or pid <= 1:
+        return None
     try:
-        address = conv.address() if conv else paths.read_bytes(unit, ADDRESS).decode().strip()
-        parsed = urllib.parse.urlsplit(address or "")
-        if parsed.scheme != "http" or parsed.netloc != f"127.0.0.1:{parsed.port}" or parsed.path != "/":
-            return {}
-        with contextlib.closing(http.client.HTTPConnection("127.0.0.1", parsed.port, timeout=1)) as connection:
-            connection.request("GET", "/listening")
-            reply = connection.getresponse()
-            marker = json.loads(reply.read(4096)) if reply.status == 200 else {}
-    except (OSError, ValueError, Refused, http.client.HTTPException):
-        return {}
-    return state if marker == {"unit": unit_identity(unit), "session": state["session"]} else {}
-
-
-def driven_notice(unit: Unit) -> None:
-    state = live_driver(unit)
-    if state and os.environ.get("BETTER_PAGE_SESSION") not in (state["session"], state.get("tag", "")):
-        print(f"this unit's page is driven by session {state['session']}", file=sys.stderr)
-
-
-def remove_if_ours(unit: Unit, name: str, value: bytes) -> None:
-    with contextlib.suppress(OSError, Refused):
-        if paths.read_bytes(unit, name) == value:
-            unit.target(name).unlink()
-
-
-@contextlib.contextmanager
-def serve_lock(unit: Unit, conv: Conversation):
-    fd = os.open(unit.target(".page-serve-lock"), os.O_RDWR | os.O_CREAT | paths.NOFOLLOW, 0o600)
-    try:
-        try:
-            lock_unit(fd)
-        except OSError:
-            raise Refused(
-                f"{unit.label}: a page server is already serving at {conv.address() or 'a port opening now'}"
-            ) from None
-        if conv.answering():
-            raise Refused(f"{unit.label}: a page server is already serving at {conv.address()}")
-        yield
-    finally:
-        os.close(fd)
-
-
-def lock_unit(fd: int) -> None:
-    if os.name == "nt":
-        import msvcrt
-
-        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-    else:
-        import fcntl
-
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-
-def stop_orphan(unit: Unit) -> None:
-    from .driver_state import end_orphan_child
-
-    end_orphan_child(unit)
-
-
-LINK_SOCKET = ".page-link"
-PANEL_ASSETS = {
-    "/page.css": "page/page.css",
-    "/approvals.html": "page/approvals.html",
-    "/approvals.js": "page/approvals.js",
-    "/approvals.css": "page/approvals.css",
-}
-START_TIMEOUT = 30
-ENROLL_TIMEOUT = 120
-
-
-class ApprovalHandler(Handler):
-    """Only bundled panel assets and session-specific control run on this origin."""
-
-    def end_headers(self):
-        self.send_header(
-            "Content-Security-Policy",
-            "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+        done = subprocess.run(
+            ["ps", "-ww", "-o", "args=", "-p", str(pid)], capture_output=True, text=True, timeout=5, check=False
         )
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
-        super().end_headers()
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout.strip() or None
 
-    @answers_any_failure
-    def do_GET(self):
-        driven = self.driven
-        if self.headers.get("Host") != driven.panel_host:
-            return self.send_error(403)
-        if self.path in PANEL_ASSETS:
-            kind = CONTENT_TYPES[os.path.splitext(self.path)[1]]
-            return self.send(200, resources.read_bytes(PANEL_ASSETS[self.path]), kind)
-        if self.path != "/agent":
-            return self.send_error(404)
-        if not self.driven_token(driven.panel_pair):
-            return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
-        return self.send_json(driven.panel_status())
 
-    @answers_any_failure
-    def do_POST(self):
-        with self.driven.routing_lock:
-            self.post()
+def process_started(pid: Any) -> str | None:
+    """When a process started, as `ps` prints it, or None when nothing runs at that pid."""
+    from .transport import process_started as started
 
-    def post(self):
-        driven = self.driven
-        if (
-            self.headers.get("Host") != driven.panel_host
-            or self.headers.get("Origin") != driven.panel_origin
-            or not self.browser_origin()
-        ):
-            return self.send_error(403)
-        if self.path == "/pair":
-            return self.pair(driven.panel_pair, driven.main_link, unauthorized=403)
-        if self.path != "/rpc":
-            return self.send_error(404)
-        if not self.driven_token(driven.panel_pair):
-            return self.send(403, b"Opened elsewhere. Ask for a new link.", "text/plain")
-        rid = None
-        try:
-            message = self.read_json()
-            if message is None and self.answer_started:
+    return started(pid) if type(pid) is int and pid > 1 else None
+
+
+def is_serve_of(pid: Any, unit: Unit) -> bool:
+    """Whether the process is the server `.driver` recorded for this unit: the same pid and the same start time, so a
+    reused pid never matches, and no command line is parsed (a path can hold any character, D22)."""
+    state = current_state(unit)
+    started = state.get("server_started")
+    if pid == os.getpid():
+        return False  # this process is the one serving now, never the old server to end
+    return bool(started) and pid == state.get("server_pid") and process_started(pid) == started
+
+
+def process_gone(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    return command_of(pid) is None  # a zombie that nobody has reaped yet
+
+
+def end_process(pid: int, *, group: bool) -> None:
+    """End a process, or its whole group, politely first."""
+    send = os.killpg if group else os.kill
+    for signum in (signal.SIGTERM, signal.SIGKILL):
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            send(pid, signum)
+        for _ in range(20):
+            if process_gone(pid):
                 return
-            if not isinstance(message, dict):
-                raise ValueError("Invalid request")
-            rid, method, params = message.get("id"), message.get("method"), message.get("params")
-            if message.get("jsonrpc") != "2.0" or not isinstance(params, dict):
-                raise ValueError("Invalid request")
-            result = driven.control(method, params)
-        except (TypeError, ValueError) as error:
-            return self.send_json(rpc_error(rid, -32602, str(error)))
-        return self.send_json({"jsonrpc": "2.0", "id": rid, "result": result})
+            time.sleep(0.05)
+
+
+def alive_at(address: str, timeout: float) -> dict | None:
+    """What a server's `/alive` says, or None when nothing answers there in time."""
+    try:
+        parsed = urllib.parse.urlsplit(address)
+        if parsed.scheme != "http" or parsed.netloc != f"127.0.0.1:{parsed.port}" or parsed.path != "/":
+            return None
+        with contextlib.closing(http.client.HTTPConnection("127.0.0.1", parsed.port, timeout=timeout)) as connection:
+            connection.request("GET", "/alive")
+            reply = connection.getresponse()
+            body = json.loads(reply.read(4096)) if reply.status == 200 else None
+    except (OSError, ValueError, http.client.HTTPException):
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def served_address(unit: Unit) -> str | None:
+    try:
+        return paths.read_bytes(unit, ADDRESS).decode("utf-8", errors="replace").strip() or None
+    except (OSError, Refused):
+        return None
+
+
+def server_answer(unit: Unit, timeout: float = 2) -> dict | None:
+    """The `/alive` answer of this unit's recorded server, None when it does not answer, or answers for another unit."""
+    address = served_address(unit)
+    info = alive_at(address, timeout) if address else None
+    return info if info and info.get("unit") == unit_identity(unit) else None
+
+
+def live_server(unit: Unit) -> dict:
+    """`.driver`, with the server's `/alive` answer under `alive`, when the unit's `.driver` names a `serve` of this unit
+    that answers; `{}` otherwise."""
+    state = current_state(unit)
+    if not state:
+        return {}
+    info = server_answer(unit)
+    if not info or info.get("pid") != state.get("server_pid"):
+        return {}
+    return {**state, "alive": info}
+
+
+# ---------------------------------------------------------------- what a chat agent's verbs say on a driven unit
+
+WRITING = ("add", "set", "status", "reply", "create")  # the verbs a chat agent may not run on a driven unit
+AGENT_STATE = {
+    "idle": "this page's agent is idle since {}",
+    "working": "this page's agent is working since {}",
+    "waiting": "this page's agent is waiting for your approval since {}",
+    "stopping": "this page's agent is stopping since {}",
+    "stopped": "this page's agent is stopped since {}",
+    "stalled": "this page's agent has stalled since {}",
+    "failed": "this page's agent has failed since {}",
+    "closed": "this page has closed since {}",
+}
+
+
+def notice_text(unit: Unit, state: dict) -> str:
+    info = state["alive"]
+    notice = (
+        f"this page has its own agent (session {info.get('session')}); tell the user to use the page, "
+        f"or run `link {unit.label}` to reopen it; do not work on this unit"
+    )
+    kind = "waiting" if info.get("waiting") else info.get("state")
+    since = info.get("since")
+    if kind in AGENT_STATE and isinstance(since, (int, float)):
+        notice += "\n" + AGENT_STATE[kind].format(time.strftime("%H:%M", time.localtime(since)))
+    return notice
+
+
+def drive_guard(args: argparse.Namespace, run: cli.Run) -> int | None:
+    """Before any verb on a unit with a live page: a caller that is not the page's agent is told so, and its writes are
+    refused (exit 4)."""
+    name = args._verb.name
+    argument = getattr(args, "unit", None)
+    if name in ("serve", "link") or not isinstance(argument, str):
+        return None
+    try:
+        unit = paths.resolve_unit(argument, run.skill)
+    except Refused:
+        return None  # the verb itself says what is wrong with the unit
+    if not unit.target(DRIVER).exists():
+        return None
+    state = live_server(unit)
+    mine = os.environ.get("BETTER_PAGE_SESSION")
+    if not state or (mine and mine in (state["alive"].get("session"), state["alive"].get("tag"))):
+        return None
+    text = notice_text(unit, state)
+    if name in WRITING:
+        run.err(f"{run.skill.name}: {text}")
+        return cli.EXIT_BUSY
+    (run.err if args._verb.machine_output else run.out)(text)
+    return None
+
+
+def log_page_verb(args: argparse.Namespace, run: cli.Run, code: int) -> None:
+    """A verb run by the page's agent goes in `.driver.log`."""
+    argument = getattr(args, "unit", None)
+    if not os.environ.get("BETTER_PAGE_SESSION") or not isinstance(argument, str):
+        return
+    from .driver_state import log_verb
+
+    with contextlib.suppress(Refused, OSError):
+        unit = paths.resolve_unit(argument, run.skill)
+        if unit.target(DRIVER).exists():
+            log_verb(unit, args._verb.name, code)
+
+
+cli.BEFORE_VERB.append(drive_guard)
+cli.AFTER_VERB.append(log_page_verb)
+
+
+# ---------------------------------------------------------------- the page's own server state
 
 
 def run_http(server):
@@ -1342,47 +1256,28 @@ def run_http(server):
 
 
 class DrivenPage:
-    def __init__(self, server, unit, archive, record_verbs, require_presence):
-        from .approvals import ApprovalGate, Pairing
+    """What the handlers share with `serve`: the pairing and the driver."""
+
+    def __init__(self, server, unit):
+        from .approvals import Pairing
 
         self.server, self.unit = server, unit
         self.identity = unit_identity(unit)
-        self.main_origin = f"http://127.0.0.1:{server.server_port}"
-        self.driver, self.off, self.ready = None, None, False
+        self.origin = f"http://127.0.0.1:{server.server_port}"
+        self.driver = None
+        self.ready = False
+        self.requests = 0  # the requests served, for `--once`
         self.paired = threading.Event()
-        self.enrollment = threading.Event()
         self.routing_lock = threading.RLock()
-
-        class PanelHandler(ApprovalHandler):
-            pass
-
-        PanelHandler.driven = self
-        self.panel = http.server.ThreadingHTTPServer(("127.0.0.1", 0), PanelHandler)
-        self.panel_host = f"localhost:{self.panel.server_port}"
-        self.panel_origin = "http://" + self.panel_host
-        try:
-            self.main_pair = Pairing(self.main_origin)
-            self.panel_pair = Pairing(self.panel_origin)
-            self.gate = ApprovalGate(
-                unit.path,
-                self.panel_origin,
-                require_presence=require_presence,
-                archive=archive,
-                record_verbs=record_verbs,
-            )
-            self.enrollment_needed = require_presence and not self.gate.enrolled()
-        except BaseException:
-            self.panel.server_close()
-            raise
+        self.pairing = Pairing(self.origin)
         server.handler.driven = self
-        run_http(self.panel)
 
     @property
     def session(self):
         return self.driver.session if self.ready else None
 
     def main_host(self, host):
-        return host == self.main_origin.removeprefix("http://")
+        return host == self.origin.removeprefix("http://")
 
     def tab_paired(self):
         """The driver starts no turn before a tab has paired (S77): tell it now, or when it exists."""
@@ -1390,85 +1285,49 @@ class DrivenPage:
         if self.driver:
             self.driver.tab_paired()
 
-    def panel_link(self):
-        with self.routing_lock:
-            self.main_pair.issue()  # invalidate the previous conversation tab as soon as a new link is issued
-            return f"{self.panel_origin}/approvals.html#p={self.panel_pair.issue()}"
-
     def main_link(self):
+        """The address that pairs one tab: its token is good once."""
         with self.routing_lock:
-            if self.off:
-                return page_url(self.server)
-            return f"{self.main_origin}/#p={self.main_pair.issue()}"
+            return f"{self.origin}/#p={self.pairing.issue()}"
 
     def status(self):
-        if self.off:
-            return self.off
-        if self.driver and self.session:
-            return {**self.driver.snapshot(), "harness": self.driver.harness}
-        return {"state": "starting", "age": 0}
+        """The body of /agent, as the driver builds it."""
+        return self.driver.agent() if self.driver and self.session else {"state": "starting", "mark_age": 0}
 
-    def panel_status(self):
-        status = self.status()
+    def alive(self):
+        """What `/alive` says without the secret: enough for a verb to know the page has an agent and what it does."""
+        info = {"unit": self.identity, "session": self.session, "pid": os.getpid()}
+        if not self.driver or not self.session:
+            return {**info, "state": "starting", "mark_age": 0, "waiting": 0}
+        snapshot = self.driver.snapshot()
         return {
-            **status,
-            **self.available_controls(status),
-            **(self.gate.snapshot() if not self.off else {"approvals": [], "page": page_url(self.server)}),
-            "enrollment_needed": self.enrollment_needed and not self.off,
-        }
-
-    def available_controls(self, status):
-        live = self.ready and not self.off and status.get("age", 4) <= 3 and status.get("kind") != "driver"
-        return {
-            "can_start": bool(live and status["state"] in ("stopped", "failed")),
-            "can_stop": bool(live and status["state"] in ("idle", "working", "stalled")),
+            **info,
+            "tag": self.driver.tag,
+            "state": snapshot["state"],
+            "since": snapshot.get("since"),
+            "mark_age": snapshot["age"],
+            "waiting": 1 if snapshot["state"] == "waiting" else 0,
         }
 
     def control(self, method, params):
-        if method == "open_conversation" and not params and (self.ready or self.off):
-            return self.main_link()
-        if self.off:
-            raise ValueError("This page has no driver")
-        if self.enrollment_needed and method == "enroll_begin":
-            return self.gate.begin_enrollment()
-        if self.enrollment_needed and method == "enroll_finish":
-            self.gate.finish_enrollment(params.get("proof"))
-            self.enrollment_needed = False
-            self.enrollment.set()
-            return True
-        if not self.driver or not self.session or self.driver.snapshot()["age"] > 3:
-            raise ValueError("The page's agent driver stopped. Serve the page again.")
-        if method == "permission_challenge":
-            return self.gate.challenge(params.get("id"), params.get("choice"))
+        if not self.driver or not self.session:
+            raise ValueError("The page's agent driver stopped. Ask the agent in your chat to serve this page again.")
         if method == "permission_answer":
-            return self.gate.answer(params.get("id"), params.get("choice"), params.get("proof"))
-        if method == "agent_stop" and self.available_controls(self.status())["can_stop"]:
+            return bool(self.driver.answer_approval(params.get("id"), params.get("choice")).result(timeout=5))
+        if method == "agent_stop":
             self.driver.request_stop()
             return True
-        if method == "agent_start" and self.available_controls(self.status())["can_start"]:
+        if method == "agent_start":
             self.driver.request_start()
             return True
         raise ValueError("Unknown method")
 
-    def fail(self, kind, message):
-        from .driver import ACTIONS
-
-        with self.routing_lock:
-            self.off = {"state": "failed", "kind": kind, "message": message, "action": startup_action(kind, ACTIONS)}
-
-    def close(self):
+    def close(self, kind: str = "stopped", reason: str = "server stopped"):
         if self.driver:
-            self.driver.close()
-        self.panel.shutdown()
-        self.panel.server_close()
+            self.driver.close(kind, reason)
 
 
-def startup_action(kind, actions):
-    if kind == "login":
-        return "Log in to the harness in a terminal, then serve again."
-    if kind in ("crashed", "limit", "not-handling", "driver"):
-        return "Serve again."
-    return actions.get(kind, "")
+LINK_SOCKET = ".page-link"
 
 
 def link_existing(unit, conv):
@@ -1476,7 +1335,7 @@ def link_existing(unit, conv):
     from .driver_state import private_bytes
 
     address = conv.address()
-    if not live_driver(unit, conv):
+    if not live_server(unit):
         raise Refused(f"{unit.label}: no driven page is running at {address or 'this unit'}")
     try:
         path = Path(private_bytes(unit, LINK_SOCKET).decode())
@@ -1488,7 +1347,7 @@ def link_existing(unit, conv):
             control.sendall(unit_identity(unit).encode())
             with control.makefile("rb") as stream:
                 url = stream.readline(512).decode().strip()
-            if not url.startswith("http://localhost:"):
+            if not url.startswith("http://127.0.0.1:"):
                 raise ValueError()
             return url
     except (OSError, ValueError):
@@ -1497,9 +1356,6 @@ def link_existing(unit, conv):
 
 @contextlib.contextmanager
 def link_control(driven):
-    if not driven or not driven.session:
-        yield
-        return
     unit = driven.unit
     with (
         tempfile.TemporaryDirectory(prefix="better-page-", dir="/tmp") as folder,
@@ -1526,7 +1382,7 @@ def link_control(driven):
                         with connection.makefile("rb") as stream:
                             identity = stream.read(64)
                         if identity == driven.identity.encode():
-                            connection.sendall(driven.panel_link().encode() + b"\n")
+                            connection.sendall(driven.main_link().encode() + b"\n")
                     except OSError:
                         continue
 
@@ -1541,124 +1397,456 @@ def link_control(driven):
             remove_if_ours(unit, LINK_SOCKET, os.fsencode(path))
 
 
-def handoff_note(run: cli.Run):
-    """Read the hand-off without letting an open pipe hold startup past either deadline."""
-    notes = []
-    stream = run.stdin or sys.stdin
-    if stream.isatty():
-        return notes
-
-    def read():
-        with contextlib.suppress(OSError, ValueError):
-            notes.append(stream.read(64 * 1024))
-
-    threading.Thread(target=read, daemon=True).start()
-    return notes
+def remove_if_ours(unit: Unit, name: str, value: bytes) -> None:
+    with contextlib.suppress(OSError, Refused):
+        if paths.read_bytes(unit, name) == value:
+            unit.target(name).unlink()
 
 
-def start_driven(driven, candidate, conv, run, deadline, notes, archive, skill_path):
-    from . import triggers as skill_triggers
-    from .adapters import _MIN_VERSION, child_environment, session_id_valid, version_supported
-    from .driver import Driver, StartError
-    from .transport import ProcessTransport
-
-    env = os.environ.copy()
+@contextlib.contextmanager
+def serve_lock(unit: Unit):
+    fd = os.open(unit.target(".page-serve-lock"), os.O_RDWR | os.O_CREAT | paths.NOFOLLOW, 0o600)
     try:
-        remaining = max(0.0, deadline - time.monotonic())
-        version = subprocess.run(
-            [candidate.argv[0], "--version"],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=remaining,
-            check=False,
-            cwd=conv.unit.root,
-            env=env,
-        )
-    except subprocess.TimeoutExpired:
-        raise StartError("crashed", "harness startup timed out") from None
-    except FileNotFoundError:
-        raise StartError("not-installed") from None
-    detected = version.stdout.strip()[:500] or "unknown"
-    needed = ".".join(str(part) for part in _MIN_VERSION[candidate.name])
-    version_message = f"{candidate.name} reported {detected}. Version {needed} or later is required."
-    if version.returncode or not version_supported(candidate.name, version.stdout):
-        raise StartError("version", version_message)
+        try:
+            lock_unit(fd)
+        except OSError:
+            raise Refused("another serve of this unit is starting") from None
+        yield
+    finally:
+        os.close(fd)
 
-    def launch(tag, resume):
-        return ProcessTransport(
-            candidate.command(tag, resume),
-            conv.unit.root,
-            child_environment(candidate.name, env, tag),
-            lambda send: candidate.codec(send, tag, resume),
-        )
 
-    try:
-        head = json.loads(paths.read_bytes(conv.unit, conv.unit.kind.head))
-        step = head.get("step", "") if isinstance(head, dict) else ""
-    except (OSError, ValueError, Refused):
-        step = ""
-    driven.driver = Driver(
-        conv,
-        candidate.name,
-        launch,
-        skill_path=skill_path,
-        command=shlex.join((os.path.abspath(sys.executable), str(archive or sys.argv[0]))),
-        cwd=conv.unit.root,
-        step=step if isinstance(step, str) else "",
-        handoff=notes[0] if notes else "",
-        triggers=lambda: conv.spec.triggers(conv.unit) if conv.spec.triggers else (),
-        workers=lambda: skill_triggers.workers(conv.unit),
-        verbs=tuple(verb.name for verb in cli._verbs_of(run.skill)),
-        valid_session=lambda session: session_id_valid(candidate.name, session),
-    )
-    if driven.paired.is_set():
-        driven.driver.tab_paired()
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        raise StartError("crashed", "harness startup timed out")
-    try:
-        driven.driver.start(remaining)
-    except StartError as error:
-        if error.kind != "version":
-            raise
-        raise StartError("version", f"{version_message} The harness protocol reported: {error}.") from None
-    driven.ready = True
+def lock_unit(fd: int) -> None:
+    import fcntl
+
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+# ---------------------------------------------------------------- serve
+
+STUB = "BETTER_AI_STUB_HARNESS"  # set where a stub harness stands in for a real one: tests and tools/smoke.py
+DRIVER, DRIVER_LOG = ".driver", ".driver.log"
+START_TIMEOUT = 25  # seconds from the start of `serve` to its first line
+CALLER_WAIT = 15  # seconds the calling process waits past START_TIMEOUT before it gives up on its server process
+NOTE_WAIT = 2  # seconds `serve` reads the hand-off note from stdin
+STALE_WAIT = 10  # seconds a server with a late liveness mark is given to exit
+DRIVER_GRACE = 5  # seconds a dead driver's last answer stays up for the page
+ERROR_WINDOW = 60  # seconds between two server_error lines in .driver.log
+OFF_KINDS = (
+    "no-harness",
+    "login",
+    "not-installed",
+    "version",
+    "state-version",
+    "no-approvals",
+    "no-browser",
+    "crashed",
+    "driver",
+    "refused",
+    "timeout",
+)
+SERVER_ERROR_SINK: Callable[[str], None] | None = None  # set after serve detaches: where an error a handler hit goes
+
+
+class Off(Exception):
+    """`serve` cannot go on: it prints `driver: off <kind>: <text>` and exits with `code`."""
+
+    def __init__(self, kind: str, text: str, code: int = 1):
+        super().__init__(text)
+        self.kind, self.text, self.code = kind if kind in OFF_KINDS else "crashed", text, code
+
+    def line(self) -> str:
+        return f"driver: off {self.kind}: {' '.join(self.text.split())}"
+
+
+class AlreadyServed(Off):
+    """Not a failure: the page already has its server, so `serve` says so and exits 3."""
+
+    def __init__(self, harness: str, session: Any):
+        super().__init__("refused", "", 3)
+        self.harness, self.session = harness, session
+
+    def line(self) -> str:
+        return f"driver: on {self.harness} {self.session} already"
+
+
+def say_off(off: Off) -> None:
+    print(off.line(), flush=True)
 
 
 def _serve_arguments(parser: argparse.ArgumentParser) -> None:
     _unit_argument(parser)
     parser.add_argument("--port", type=int, default=0, help="port to serve on (default: any free port)")
-    opening = parser.add_mutually_exclusive_group()
-    opening.add_argument("--open", action="store_true", help="open the page in a browser")
-    opening.add_argument("--no-browser", action="store_true", help="do not open a browser (the default)")
+    parser.add_argument("--no-browser", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--linger", type=float, default=10, help="seconds to keep serving after the unit stops")
     parser.add_argument("--once", action="store_true", help="serve one request, then exit")
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--drive", choices=("auto", "claude", "codex", "cursor", "opencode", "droid", "devin"))
-    mode.add_argument("--link", action="store_true", help="pair a new tab with an already driven page")
+    parser.add_argument("--link", action="store_true", help="pair a new tab with an already driven page")
 
 
 @cli.verb(
     "serve",
-    help="serve the unit's live page; prints each action the user takes as one JSON line",
+    help="serve the unit's live page with its own agent; prints one driver: line, then the address, and detaches",
     arguments=_serve_arguments,
 )
 def serve(args: argparse.Namespace, run: cli.Run) -> int:
-    """Check every record, then serve the page until the unit stops (or Ctrl+C). A record that is not valid is a warning
-    on stderr: the page still opens and shows it."""
-    deadline = time.monotonic() + START_TIMEOUT
-    unit = _unit(args, run)
-    if os.environ.get("BETTER_PAGE_SESSION"):
-        raise Refused(f"{unit.label}: serve cannot run from a page agent session")
-    spec = spec_of(run.skill)
-    conv = Conversation(unit, spec, load_docs(run.skill))
+    """Check the unit, then start its page and the agent that works on it, and return once the page is served: the
+    server goes on in its own session. Its first line is `driver: on <harness> <session>` or `driver: off <kind>: <what
+    is wrong>`; where the driver cannot start nothing is served and the exit code is 1."""
     if args.link:
-        run.out(link_existing(unit, conv))
+        unit = _unit(args, run)
+        run.out(link_existing(unit, _conversation(run, unit)))
         return 0
-    with serve_lock(unit, conv):
-        stop_orphan(unit)
-        return serve_page(args, run, unit, spec, conv, deadline)
+    started = time.monotonic()
+    try:
+        if os.environ.get("BETTER_PAGE_SESSION"):
+            raise Off("refused", "a page session never serves")
+        if args.no_browser and not os.environ.get(STUB):
+            raise Off("refused", "--no-browser is only for tests with a stub harness")
+        try:
+            unit = _unit(args, run)
+            conv = _conversation(run, unit)
+            from .driver_state import newer_version
+
+            state = current_state(unit)
+            if newer_version(unit):
+                raise Off(
+                    "state-version",
+                    f"{unit.label}/{DRIVER} was written by a newer better-ai; update better-ai, or delete the file",
+                )
+            note = read_note(run)
+            settle_old_server(unit, state)
+            stop_orphan(unit)
+            report_last_end(run, unit)
+            refuse_repeat(unit, run.info.hash)
+        except Refused as error:
+            raise Off("refused", str(error)) from None
+    except Off as off:
+        say_off(off)
+        return off.code
+    if not run.detach:  # called from a program, not from the command line: serve here, and never open a browser
+        return run_server(args, run, unit, conv, note, started + START_TIMEOUT, None)
+    read_end, write_end = os.pipe()
+    sys.stdout.flush()
+    if (child := os.fork()) != 0:
+        os.close(write_end)
+        return wait_for_server(read_end, child, unit)
+    os.close(read_end)
+    code = 1
+    try:
+        os.setsid()
+        code = run_server(args, run, unit, conv, note, started + START_TIMEOUT, write_end)
+    except BaseException:
+        traceback.print_exc()
+    finally:
+        with contextlib.suppress(Exception):
+            sys.stdout.flush()
+            sys.stderr.flush()
+        os._exit(code)
+
+
+def wait_for_server(read_end: int, child: int, unit: Unit) -> int:
+    """The calling process's side of `serve`: it returns when its server process says it is done starting."""
+    heard, spoke = b"", False
+    deadline = time.monotonic() + START_TIMEOUT + CALLER_WAIT
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not select.select([read_end], [], [], remaining)[0]:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(child, signal.SIGKILL)
+            if not spoke:
+                print("driver: off timeout: the server process did not finish starting", flush=True)
+            return 1
+        data = os.read(read_end, 64)
+        heard += data
+        spoke = spoke or b"L" in heard
+        done = re.search(rb"X(\d+)\n", heard)
+        if done:
+            return int(done.group(1))
+        if not data:
+            if not spoke:
+                print(
+                    f"driver: off crashed: the server process ended before it started; see {unit.label}/{DRIVER_LOG}",
+                    flush=True,
+                )
+            return 1
+
+
+def read_note(run: cli.Run) -> str:
+    """The hand-off note on stdin, read to end of input for at most NOTE_WAIT seconds; empty when stdin is a terminal."""
+    stream = run.stdin or sys.stdin
+    notes: list[str] = []
+    try:
+        if stream.isatty():
+            return ""
+    except (OSError, ValueError):
+        return ""
+
+    def read():
+        with contextlib.suppress(OSError, ValueError):
+            notes.append(stream.read(64 * 1024))
+
+    thread = threading.Thread(target=read, daemon=True)
+    thread.start()
+    thread.join(NOTE_WAIT)
+    return notes[0] if notes else ""
+
+
+def settle_old_server(unit: Unit, state: dict) -> None:
+    """A server recorded for this unit: exit 3 when it is serving well, wait for one that is slow, end one that does not
+    answer."""
+    info = server_answer(unit)
+    pid = state.get("server_pid") if type(state.get("server_pid")) is int and state["server_pid"] > 1 else 0
+    if info is not None:
+        age = info.get("mark_age")
+        age = age if isinstance(age, (int, float)) else float("inf")
+        if age < 3:
+            raise AlreadyServed(state.get("harness") or "unknown", info.get("session"))
+        if age <= STALE_WAIT:
+            end = time.monotonic() + STALE_WAIT
+            while time.monotonic() < end and server_answer(unit, 0.5) is not None and not (pid and process_gone(pid)):
+                time.sleep(0.2)
+    if type(pid) is int and not process_gone(pid) and is_serve_of(pid, unit):
+        end_process(pid, group=False)
+    address = served_address(unit)
+    if address and server_answer(unit, 0.5) is None:
+        remove_if_ours(unit, ADDRESS, address.encode())
+
+
+def stop_orphan(unit: Unit) -> None:
+    """End the harness process an earlier server left behind, and record that, before the driver looks at the unit."""
+    from .driver_state import end_orphan_child
+
+    end_orphan_child(unit)
+
+
+def clock(moment: Any) -> str:
+    """HH:MM, local, of an ISO time."""
+    try:
+        when = datetime.strptime(moment, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return "an unknown time"
+    return when.astimezone().strftime("%H:%M")
+
+
+def driver_error(unit: Unit) -> dict:
+    from .driver_state import last_ended
+
+    ended = last_ended(unit)
+    return ended if ended.get("kind") == "driver" else {}
+
+
+def report_last_end(run: cli.Run, unit: Unit) -> None:
+    ended = driver_error(unit)
+    if ended:
+        run.err(f"the last session ended at {clock(ended.get('at'))}: {' '.join(str(ended.get('reason')).split())}")
+
+
+def refuse_repeat(unit: Unit, build: str) -> None:
+    ended = driver_error(unit)
+    if type(ended.get("repeats")) is int and ended["repeats"] >= 1 and ended.get("build") == build:
+        raise Off(
+            "driver",
+            f"the same error came back: {' '.join(str(ended.get('reason')).split())}; "
+            f"see {unit.target(DRIVER_LOG)}; this is a better-ai problem",
+        )
+
+
+def ignore_driver_files(unit: Unit) -> None:
+    """The unit folder's .gitignore lists the files only `better.pyz` reads, so a commit never takes them."""
+    try:
+        text = paths.read_bytes(unit, ".gitignore").decode("utf-8", errors="replace")
+    except FileNotFoundError:
+        text = ""
+    listed = text.splitlines()
+    missing = [name for name in (DRIVER, DRIVER_LOG) if name not in listed]
+    if missing:
+        gap = "" if not text or text.endswith("\n") else "\n"
+        paths.write_atomic(unit, ".gitignore", (text + gap + "\n".join(missing) + "\n").encode())
+
+
+def write_server_error(unit: Unit) -> Callable[[str], None]:
+    """A function that adds one `server_error` line to .driver.log, at most one in each ERROR_WINDOW seconds."""
+    last = [None]
+    lock = threading.Lock()
+
+    def write(text: str) -> None:
+        with lock:
+            if last[0] is not None and time.monotonic() - last[0] < ERROR_WINDOW:
+                return
+            last[0] = time.monotonic()
+        line = {"type": "server_error", "at": time.time(), "text": text[-2000:]}
+        with contextlib.suppress(OSError, Refused):
+            paths.append_line(unit, DRIVER_LOG, (json.dumps(line, ensure_ascii=True) + "\n").encode("ascii"))
+
+    return write
+
+
+def detach(unit: Unit) -> None:
+    """From here the server has no terminal: stdin is empty, and what it prints goes to .driver.log."""
+    global SERVER_ERROR_SINK
+    sys.stdout.flush()
+    sys.stderr.flush()
+    null = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(null, 0)
+    os.close(null)
+    log = os.open(unit.target(DRIVER_LOG), os.O_WRONLY | os.O_CREAT | os.O_APPEND | paths.NOFOLLOW, 0o600)
+    os.dup2(log, 1)
+    os.dup2(log, 2)
+    os.close(log)
+    write = write_server_error(unit)
+    SERVER_ERROR_SINK = write
+
+    def hook(kind, error, trace):
+        write("".join(traceback.format_exception(kind, error, trace)))
+
+    def thread_hook(info):
+        hook(info.exc_type, info.exc_value, info.exc_traceback)
+
+    sys.excepthook = hook
+    threading.excepthook = thread_hook
+
+
+def run_server(args, run, unit, conv, note, deadline, signal_fd) -> int:
+    """The server process: start the page and its driver, say so to the caller, detach and serve until the unit stops."""
+    server = driven = address = serving = None
+    ending = ("stopped", "server stopped")
+    told = {"line": False, "done": False}
+
+    detached = signal_fd is not None
+    show_link = args.no_browser or not detached  # no browser: the paired address is printed for the caller
+
+    def tell(text: str) -> None:
+        run.out(text)
+        if not told["line"]:
+            told["line"] = True
+            if detached:
+                os.write(signal_fd, b"L")
+
+    def finish(code: int) -> None:
+        if not told["done"]:
+            told["done"] = True
+            if detached:
+                os.write(signal_fd, f"X{code}\n".encode())
+                os.close(signal_fd)
+
+    if detached:
+        stop_like_ctrl_c()
+    try:
+        step = "checking the unit"
+        try:
+            with serve_lock(unit):
+                preflight(run, unit, conv)
+                ignore_driver_files(unit)
+                step = "starting the page server"
+                try:
+                    server = make_server(unit, spec_of(run.skill), conv, run.info, args.port)
+                except OSError as error:
+                    reason = (error.strerror or type(error).__name__).lower()
+                    raise paths.refusal(
+                        unit.label,
+                        f"cannot be served on port {args.port} ({reason})",
+                        f"serve {unit.label} on a free port",
+                    ) from None
+                address = f"http://127.0.0.1:{server.server_port}/".encode()
+                archive = Path(sys.argv[0]).resolve() if run.info.hash != "source" else None
+                driven = DrivenPage(server, unit)
+                serving = run_http(server)
+                paths.write_state(unit, ADDRESS, address)
+                link = driven.main_link()
+                if not show_link:
+                    step = "opening the browser"
+                    if not webbrowser.open(link):
+                        raise Off(
+                            "no-browser", "could not open a browser on this machine; run serve where your browser runs"
+                        )
+                step = "finding the harness"
+                wanted = find_harness()
+                step = "checking the harness version"
+                check_harness(wanted, unit, deadline)
+                step = "starting the agent's session"
+                start_driver(driven, wanted, conv, run, deadline, note, archive)
+                if not show_link:
+                    step = "pairing the page in the browser"
+                    if not driven.paired.wait(max(0.0, deadline - time.monotonic())):
+                        raise Off("timeout", step)
+                tell(f"driver: on {wanted.name} {driven.session}")
+                tell(f"Serving {unit.label} at {link if show_link else address.decode()}")
+                finish(0)
+                if detached:
+                    detach(unit)
+                with link_control(driven):
+                    ending = wait_until_done(args, run, unit, conv, driven)
+        except Refused as error:
+            raise Off("refused", str(error)) from None
+        except (Off, KeyboardInterrupt):
+            raise
+        except Exception as error:
+            if time.monotonic() >= deadline and not told["done"]:
+                raise Off("timeout", step) from None
+            raise Off("driver", f"{type(error).__name__}: {error}") from None
+    except Off as off:
+        stop_serving(server, serving, driven, unit, address)
+        drop_note(unit)
+        off = Off(off.kind, with_log_path(unit, off), off.code)
+        if not told["line"]:
+            tell(off.line())
+        finish(off.code)
+        return off.code
+    except KeyboardInterrupt:
+        stop_serving(server, serving, driven, unit, address, ("server", "the server was stopped by a signal"))
+        if not told["line"]:
+            tell(Off("crashed", "serve was stopped while it started").line())
+        finish(1)
+        return 0
+    stop_serving(server, serving, driven, unit, address, ending)
+    return 0
+
+
+def find_harness():
+    from . import adapters
+
+    found = adapters.candidate("auto", os.environ)
+    if found.kind == "no-harness":
+        raise Off("no-harness", found.text)
+    if found.kind == "not-installed":
+        raise Off("not-installed", f"{found.name} CLI not found on PATH")
+    wanted = adapters.candidate(found.name, os.environ, chat_argv=adapters.chat_argv(found.name))
+    if wanted.kind == "not-installed":
+        raise Off("not-installed", f"{wanted.name} CLI not found on PATH")
+    if wanted.kind is not None:
+        raise Off(wanted.kind, wanted.text)
+    if not wanted.codec_factory:
+        raise Off(
+            "no-approvals",
+            f"{wanted.name} does not forward approval requests to better-ai; run serve from another harness",
+        )
+    return wanted
+
+
+def drop_note(unit: Unit) -> None:
+    """A serve that gives `driver: off` leaves no hand-off note behind."""
+    from .driver_state import save_state
+
+    if current_state(unit).get("note"):
+        with contextlib.suppress(OSError, Refused):
+            save_state(unit, {"note": ""})
+
+
+def with_log_path(unit: Unit, off: Off) -> str:
+    return f"{off.text}; see {unit.target(DRIVER_LOG)}" if off.kind == "driver" else off.text
+
+
+def stop_serving(server, serving, driven, unit: Unit, address, ending=("stopped", "server stopped")) -> None:
+    """End the harness's process group, close the server and take the address file away if it is still ours. `ending`
+    is the kind and reason the page shows as `closed`."""
+    if driven:
+        driven.close(*ending)
+    if server is not None:
+        if serving is not None:
+            server.shutdown()
+        server.server_close()
+    if address:
+        remove_if_ours(unit, ADDRESS, address)
 
 
 def preflight(run, unit, conv):
@@ -1674,158 +1862,106 @@ def preflight(run, unit, conv):
     conv.lines()  # a log that cannot be read is refused here, not found by the first request
 
 
-def prepare_serve(args, run, unit, conv, deadline):
-    if not args.drive:
-        preflight(run, unit, conv)
-        return True
-    complete = Future()
+def check_harness(candidate, unit: Unit, deadline: float) -> None:
+    from .adapters import version_problem, version_supported
 
-    def check():
-        try:
-            preflight(run, unit, conv)
-        except BaseException as error:
-            complete.set_exception(error)
-        else:
-            complete.set_result(None)
-
-    threading.Thread(target=check, daemon=True).start()
     try:
-        complete.result(timeout=max(0, deadline - time.monotonic()))
-        return True
-    except FutureTimeout:
-        if complete.done():
-            complete.result()
-        run.out("driver: off crashed")
-        # The driver is abandoned at the deadline. The legacy page still needs all its usual checks.
-        complete.result()
-        return False
+        version = subprocess.run(
+            [candidate.argv[0], "--version"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=max(0.1, deadline - time.monotonic()),
+            check=False,
+            cwd=unit.root,
+        )
+    except subprocess.TimeoutExpired:
+        raise Off("timeout", "checking the harness version") from None
+    except FileNotFoundError:
+        raise Off("not-installed", f"{candidate.name} CLI not found on PATH") from None
+    if version.returncode or not version_supported(candidate.name, version.stdout):
+        raise Off("version", version_problem(candidate.name, version.stdout))
 
 
-def serve_page(args, run, unit, spec, conv, deadline):
-    can_drive = prepare_serve(args, run, unit, conv, deadline)
-    try:
-        server = make_server(unit, spec, conv, run.info, args.port)
-    except OSError as error:
-        reason = (error.strerror or type(error).__name__).lower()
-        raise paths.refusal(
-            unit.label, f"cannot be served on port {args.port} ({reason})", f"serve {unit.label} on a free port"
-        ) from None
-    address = f"http://127.0.0.1:{server.server_port}/".encode()
-    url = page_url(server)
-    driven, serving, token = None, None, None
-    opened = False
-    try:
-        if args.drive and can_drive:
-            from .adapters import candidate
-            from .driver import ACTIONS, StartError
+def start_driver(driven, candidate, conv, run, deadline, note, archive) -> None:
+    from . import triggers as skill_triggers
+    from .adapters import child_environment, session_id_valid
+    from .driver import Driver, StartError
+    from .transport import ProcessTransport
 
-            wanted = candidate(args.drive, os.environ)
-            kind = wanted.kind
-            if kind is None and (os.name != "posix" or wanted.approval not in ("os", "webauthn")):
-                kind = "no-approvals"
-            if kind is None:
-                stop_like_ctrl_c()
-                archive = Path(sys.argv[0]).resolve() if run.info.hash != "source" else None
-                skill_path = (
-                    archive.parent.parent / "SKILL.md"
-                    if archive
-                    else (Path(__file__).resolve().parents[3] / "skills" / run.skill.name / "SKILL.md")
-                )
-                # A previous server can leave a legacy token after SIGKILL. Never leave that file in driven mode.
-                with contextlib.suppress(FileNotFoundError):
-                    unit.target(TOKEN).unlink()
-                try:
-                    driven = DrivenPage(server, unit, archive, ("add", "set"), wanted.approval == "webauthn")
-                except (OSError, ValueError):
-                    kind = "no-approvals"
-                    run.err("Could not load the approval credential or start the approval panel.")
-            if driven is not None:
-                notes = handoff_note(run)
-                serving = run_http(server)
-                url = driven.panel_link()
-                if driven.enrollment_needed:
-                    deadline += ENROLL_TIMEOUT - START_TIMEOUT
-                    run.out(f"Enrollment at {url}")
-                    if args.open:
-                        open_page(run, url)
-                        opened = True
-                try:
-                    if driven.enrollment_needed:
-                        # Leave the ordinary startup allowance after a touch when there is enough time.
-                        enrolled = driven.enrollment.wait(max(0, deadline - time.monotonic()))
-                        if not enrolled:
-                            raise StartError("no-approvals", "Approval enrollment timed out")
-                        deadline = min(deadline, time.monotonic() + START_TIMEOUT)
-                    start_driven(driven, wanted, conv, run, deadline, notes, archive, skill_path)
-                except (OSError, StartError) as error:
-                    kind = error.kind if isinstance(error, StartError) else "crashed"
-                    # Report the mode at the deadline even if cleaning up the harness takes a moment.
-                    run.out(f"driver: off {kind}")
-                    action = startup_action(kind, ACTIONS)
-                    run.err(f"{str(error).rstrip('.')}. {action}")
-                    driven.fail(kind, str(error))
-                    url = page_url(server)
-            if kind is None:
-                run.out(f"driver: on {wanted.name} {driven.session}")
-            elif driven is None:
-                run.out(f"driver: off {kind}")
+    env = os.environ.copy()
 
-        if args.once and serving is not None and driven.off:
-            server.shutdown()
-            serving = None
-        with link_control(driven):
-            if driven and not driven.off:
-                run.out(f"Serving {unit.label} at {url}")
-                paths.write_state(unit, ADDRESS, address)
-            else:
-                run.out(f"Each action the user takes is printed here as one JSON line. Serving {unit.label} at {url}")
-                token = server.token.encode()
-                publish(unit, server)
-                if driven and driven.driver:
-                    driven.driver.close()
-            if not unit.target(SEEN).exists():
-                paths.write_state(unit, SEEN, b"0")
-            if args.open and (not opened or (driven and driven.off)):
-                open_page(run, url)
-            stop_like_ctrl_c()
-            if args.once and serving is None:
-                server.daemon_threads = False
-                server.handle_request()
-                return 0
-            if serving is None:
-                serving = run_http(server)
-            serve_until_stopped(args, run, unit, spec, conv, driven)
-    except KeyboardInterrupt:
-        return 0
-    finally:
-        if serving is not None:
-            server.shutdown()
-        server.server_close()
-        if driven:
-            driven.close()
-        remove_if_ours(unit, ADDRESS, address)
-        if token:
-            remove_if_ours(unit, TOKEN, token)
-    return 0
-
-
-def open_page(run, url):
-    if not webbrowser.open(url):
-        run.out(
-            "Could not open a browser on this machine. If the user's browser runs on another machine, "
-            "this address does not reach it."
+    def launch(tag, resume):
+        driven.child_argv = list(candidate.command(tag, resume))
+        return ProcessTransport(
+            candidate.command(tag, resume),
+            conv.unit.root,
+            child_environment(candidate.name, env, tag),
+            lambda send: candidate.codec(send, tag, resume),
         )
 
+    skill_path = (
+        archive.parent.parent / "SKILL.md"
+        if archive
+        else (Path(__file__).resolve().parents[3] / "skills" / run.skill.name / "SKILL.md")
+    )
+    try:
+        head = json.loads(paths.read_bytes(conv.unit, conv.unit.kind.head))
+        step = head.get("step", "") if isinstance(head, dict) else ""
+    except (OSError, ValueError, Refused):
+        step = ""
+    driven.driver = Driver(
+        conv,
+        candidate.name,
+        launch,
+        skill_path=skill_path,
+        command=shlex.join((os.path.abspath(sys.executable), str(archive or sys.argv[0]))),
+        cwd=conv.unit.root,
+        step=step if isinstance(step, str) else "",
+        handoff=note,
+        triggers=lambda: conv.spec.triggers(conv.unit) if conv.spec.triggers else (),
+        workers=lambda: skill_triggers.workers(conv.unit),
+        verbs=tuple(verb.name for verb in cli._verbs_of(run.skill)),
+        build=run.info.hash,
+        valid_session=lambda session: session_id_valid(candidate.name, session),
+    )
+    if driven.paired.is_set():
+        driven.driver.tab_paired()
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise Off("timeout", "starting the agent's session")
+    try:
+        driven.driver.start(remaining)
+    except StartError as error:
+        if time.monotonic() >= deadline:
+            raise Off("timeout", "starting the agent's session") from None
+        if error.kind == "login":
+            raise Off("login", f"log in to {candidate.name} in a terminal, then run serve again") from None
+        raise Off(error.kind, str(error)) from None
+    driven.ready = True
 
-def serve_until_stopped(args, run, unit, spec, conv, driven):
+
+def wait_until_done(args, run, unit, conv, driven) -> tuple[str, str]:
+    """Serve until the unit stops, the driver dies or nobody has used the page for a while (`--once`: until one request
+    has been answered); the kind and reason of the planned end."""
+    spec = spec_of(run.skill)
     stopped_at = None
     while True:
-        time.sleep(TICK)
+        time.sleep(TICK if not args.once else POLL)
+        if args.once:
+            if driven.requests >= 1:
+                return "server", "one request was served"
+            continue
+        if not driven.driver.check_alive():
+            time.sleep(DRIVER_GRACE)  # the page keeps getting its answer for a moment: the driver stopped
+            return "driver", driven.driver.error() or "the driver stopped"
+        if driven.driver.idle_expired():
+            return "idle", "no page was open for 30 minutes"
         try:
             if spec.tick:
                 spec.tick(unit, conv)
             stopped = bool(spec.stopped and spec.stopped(unit))
-            if stopped and driven and not driven.off:
+            if stopped:
                 stopped = driven.driver.can_linger()
         except Exception as error:
             run.err(f"page server: tick failed: {type(error).__name__}: {error}")
@@ -1835,8 +1971,7 @@ def serve_until_stopped(args, run, unit, spec, conv, driven):
         if not stopped:
             stopped_at = None
         if stopped_at is not None and time.monotonic() - stopped_at > args.linger:
-            run.out("The unit stopped; the page server is exiting. The open page keeps the last state.")
-            return
+            return "server", "the unit stopped"
 
 
 def revision_of(*parts: Any) -> str:

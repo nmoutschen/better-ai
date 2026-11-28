@@ -15,8 +15,8 @@ nothing was written), `Busy` (4) or `TimedOut` (3); the message is printed as `<
 only names it: `@verb(..., skills=("show-better",))`. The shared modules (`records`, `page`) and the skill's package
 register their verbs when they are imported, which `load` does for the running skill.
 
-Exit codes: 0 done, 1 refused or invalid (nothing written), 2 usage error (argparse), 3 `wait` timed out, 4 busy (the
-file changed during the command: run it again), 5 internal error. An internal error is one line,
+Exit codes: 0 done, 1 refused or invalid (nothing written), 2 usage error (argparse), 3 `serve` found the page already
+served, 4 busy (the file changed during the command: run it again; or a chat agent's write on a driven unit), 5 internal error. An internal error is one line,
 `bug in better.pyz <skill> <hash>: <what> ...; set BETTER_AI_TRACEBACK=1 for the full trace`, and the full traceback
 when that variable is 1.
 """
@@ -48,7 +48,7 @@ class Busy(Exception):
 
 
 class TimedOut(Exception):
-    """`wait` found nothing in time (exit 3)."""
+    """A command found nothing in time (exit 3)."""
 
 
 @dataclass
@@ -60,6 +60,7 @@ class Run:
     stdin: Any = None  # a text stream, read with `stdin_text`
     stdout: Any = field(default=None)
     stderr: Any = field(default=None)
+    detach: bool = False  # set by the real entry point: `serve` may then fork its server into the background
 
     def out(self, text: str = "") -> None:
         print(text, file=self.stdout or sys.stdout, flush=True)  # a served page's address must reach a reader at once
@@ -81,9 +82,15 @@ class Verb:
     run: Callable[[argparse.Namespace, Run], int | None]
     arguments: Callable[[argparse.ArgumentParser], None] | None = None
     skills: tuple[str, ...] | None = None  # the skills that have it; None for every skill
+    machine_output: bool = False  # its output is read by a program: no notice may be printed on stdout
 
 
 VERBS: list[Verb] = []
+# Functions `hook(args, run, code)` that run after every verb, with its exit code.
+AFTER_VERB: list[Callable[[argparse.Namespace, Run, int], None]] = []
+# Functions `hook(args, run) -> int | None` that run before every verb; one that returns an exit code ends the command
+# with it. A module adds its own at import time (the page's check that a chat agent keeps off a driven unit).
+BEFORE_VERB: list[Callable[[argparse.Namespace, Run], int | None]] = []
 SHARED_PACKAGES = {"page", "schemas"}  # packages under better_ai/ that every skill shares; every other one is a skill
 
 
@@ -93,6 +100,7 @@ def verb(
     help: str,
     arguments: Callable[[argparse.ArgumentParser], None] | None = None,
     skills: tuple[str, ...] | None = None,
+    machine_output: bool = False,
 ):
     """Register a verb. A name registered twice for the same skill is a bug in the source."""
 
@@ -103,7 +111,7 @@ def verb(
         for old in VERBS:
             if old.name == name and (old.skills is None or skills is None or set(old.skills) & set(skills)):
                 raise ValueError(f"verb {name!r} is registered twice")
-        VERBS.append(Verb(name, help, function, arguments, skills))
+        VERBS.append(Verb(name, help, function, arguments, skills, machine_output))
         return function
 
     return register
@@ -143,7 +151,7 @@ def _parser(skill: Skill, info: resources.BuildInfo) -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None, *, stdin: Any = None) -> int:
+def main(argv: list[str] | None = None, *, stdin: Any = None, detach: bool = False) -> int:
     """Run one command and return its exit code. Whatever a verb raises that it did not mean to is an internal error."""
     for stream in (sys.stdout, sys.stderr):  # a value that is not text prints escaped, never as a failure
         with contextlib.suppress(Exception):
@@ -159,19 +167,24 @@ def main(argv: list[str] | None = None, *, stdin: Any = None) -> int:
         skill = load(info)
         parser = _parser(skill, info)
         args = parser.parse_args(argv if argv is not None else sys.argv[1:])
-        run = Run(skill, info, stdin)
+        run = Run(skill, info, stdin, detach=detach)
         try:
-            code = args._verb.run(args, run)
+            code = next((c for c in (hook(args, run) for hook in BEFORE_VERB) if c is not None), None)
+            if code is None:
+                code = args._verb.run(args, run)
         except Refused as refusal:
             run.err(f"{skill.name}: {refusal}")
-            return EXIT_REFUSED
+            code = EXIT_REFUSED
         except Busy as busy:
             run.err(f"{skill.name}: busy: {busy}")
-            return EXIT_BUSY
+            code = EXIT_BUSY
         except TimedOut as late:
             run.err(f"{skill.name}: {late}")
-            return EXIT_TIMEOUT
-        return EXIT_DONE if code is None else int(code)
+            code = EXIT_TIMEOUT
+        code = EXIT_DONE if code is None else int(code)
+        for hook in AFTER_VERB:
+            hook(args, run, code)
+        return code
     except SystemExit as stop:  # argparse: --help is 0, a usage error is 2
         return stop.code if isinstance(stop.code, int) else (EXIT_DONE if stop.code is None else EXIT_USAGE)
     except KeyboardInterrupt:

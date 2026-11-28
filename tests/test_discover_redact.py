@@ -528,8 +528,9 @@ class Stopping(Fixture):
             self.redact(evidence=PAGE)
         stopped = self.verb("serve", "--once")
         self.assertEqual(stopped.returncode, 1)
-        self.assertIn("redact", stopped.stderr)
-        self.assertIn(PAGE, stopped.stderr)
+        self.assertRegex(stopped.stdout, r"^driver: off refused: ")
+        self.assertIn("redact", stopped.stdout)
+        self.assertIn(PAGE, stopped.stdout)
         self.assertEqual(self.redact(evidence=PAGE).returncode, 0)
         for guard in page.SERVE_GUARDS[
             discover.SKILL.name

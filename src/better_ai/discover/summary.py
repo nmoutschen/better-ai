@@ -482,6 +482,7 @@ def _summary_arguments(parser: argparse.ArgumentParser) -> None:
     help="print where a discovery stands as JSON lines, so an agent can resume it; exit 1 if a record is invalid",
     arguments=_summary_arguments,
     skills=(SKILL.name,),
+    machine_output=True,
 )
 def summary(args: argparse.Namespace, run: cli.Run) -> int:
     unit = paths.resolve_unit(args.unit, run.skill)

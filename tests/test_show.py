@@ -10,7 +10,6 @@ import copy
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import tempfile
@@ -26,7 +25,7 @@ ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "src"))
 import better  # noqa: E402
-from better import call, run  # noqa: E402
+from better import call, page_headers, run, serve_page, stop_page  # noqa: E402
 
 from better_ai import page, paths, resources  # noqa: E402
 from better_ai import show as package  # noqa: E402
@@ -211,38 +210,18 @@ class LivePage(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.cwd = repository(self.tmp.name)
         self.unit = made(self.cwd, SMALL)
-        env = {**os.environ, "BETTER_AI_SKILL": SKILL}
-        from better import command
-
-        self.server = subprocess.Popen(
-            [*command("serve", UNIT, "--no-browser")],
-            cwd=self.cwd,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        for _ in range(100):
-            if (self.unit / ".server").exists():
-                break
-            time.sleep(0.1)
-        self.base = (self.unit / ".server").read_text().strip().rstrip("/")
-        self.token = (self.unit / ".server-token").read_text().strip()  # what the page sends with each request
-        self.addCleanup(self.stop)
-
-    def stop(self):
-        if self.server.poll() is None:
-            self.server.send_signal(signal.SIGTERM)  # as a harness ends a command
-        self.server.communicate(timeout=10)
+        address, self.token = serve_page(SKILL, self.unit, cwd=self.cwd)
+        self.base = address.rstrip("/")
+        self.addCleanup(stop_page, self.unit)
 
     def get(self, path):
-        request = urllib.request.Request(self.base + path, headers={"X-Page-Token": self.token})
+        request = urllib.request.Request(self.base + path, headers=page_headers(self.token))
         with urllib.request.urlopen(request, timeout=5) as r:
             return r.status, r.read().decode()
 
     def send(self, method, params):
         body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-        headers = {"Content-Type": "application/json", "Origin": self.base, "X-Page-Token": self.token}
+        headers = {"Content-Type": "application/json", **page_headers(self.token, self.base)}
         request = urllib.request.Request(self.base + "/rpc", data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(request, timeout=5) as r:
             return json.loads(r.read())
@@ -265,7 +244,16 @@ class LivePage(unittest.TestCase):
         self.assertEqual((data["title"], data["question"], data["lang"]), ("The answer is yes.", "Why?", "en"))
         self.assertEqual(data["slides"].count('<section class="slide'), 2)  # the opening slide and the panel
         _, before = self.get("/rev")
-        done = better(self.cwd, "set", UNIT, "slides", stdin=json.dumps({"title": "The answer is no."}))
+        session = json.loads((self.unit / ".driver").read_text())["session"]  # the page's own agent edits its unit
+        done = call(
+            SKILL,
+            "set",
+            UNIT,
+            "slides",
+            stdin=json.dumps({"title": "The answer is no."}),
+            cwd=self.cwd,
+            env={"BETTER_PAGE_SESSION": session},
+        )
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertNotEqual(self.get("/rev")[1], before)
         self.assertEqual(json.loads(self.get("/data")[1])["title"], "The answer is no.")
@@ -292,22 +280,14 @@ class OnceAndRegistry(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             repository(d)
             unit = made(d, SMALL)
-            from better import command
 
-            env = {**os.environ, "BETTER_AI_SKILL": SKILL}
-            server = subprocess.Popen(
-                command("serve", UNIT, "--no-browser", "--once"),
-                cwd=d,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            line = server.stdout.readline()
-            url = re.search(r"http://\S+/", line).group(0)
-            with urllib.request.urlopen(url, timeout=5) as r:
+            address, secret = serve_page(SKILL, unit, "--once", cwd=d)
+            with urllib.request.urlopen(address, timeout=5) as r:
                 self.assertEqual(r.status, 200)
-            self.assertEqual(server.wait(timeout=10), 0)
+            for _ in range(100):
+                if not (unit / ".server").exists():
+                    break
+                time.sleep(0.1)
             self.assertFalse((unit / ".server").exists())
 
     def test_the_page_is_registered_with_bundled_files_and_the_events_of_pins_and_accept(self):

@@ -22,7 +22,6 @@ class Candidate:
     name: str | None
     argv: tuple[str, ...]
     kind: str | None
-    approval: str | None = None
     codec_factory: Callable[..., ACPAdapter | CodexAdapter | ClaudeAdapter | DroidAdapter] | None = None
     text: str = ""
     chat: ChatMode | None = None
@@ -672,7 +671,7 @@ def candidate(
                 "unsafe-mode",
                 text="OpenCode's inline configuration is not valid. Fix OPENCODE_CONFIG_CONTENT, then serve again.",
             )
-    return Candidate(name, argv, None, "webauthn", factories[name], chat=chat)
+    return Candidate(name, argv, None, factories[name], chat=chat)
 
 
 def version_supported(name: str, version: str) -> bool:
