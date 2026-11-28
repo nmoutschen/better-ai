@@ -1,9 +1,11 @@
 """Driver delivery and turns (task T3 of the page protocol): which work a turn carries, when a turn starts, what its
 prompt says, which tool calls the driver approves without asking, and the skill triggers that wake it."""
 
+import copy
 import json
 import os
 import re
+import shlex
 import sys
 import tempfile
 import time
@@ -14,14 +16,14 @@ from types import SimpleNamespace
 from unittest import mock
 
 import test_page_shell as shell
-from test_page_adapters_v2 import CODEX, SESSION, frame, open_claude, open_codex
+from test_page_adapters_v2 import CODEX, SESSION, frame, open_claude
 from test_page_driver import Event, Peer, eventually, sent
 
 from better_ai import page  # noqa: E402
 from better_ai.code import SKILL as CODE  # noqa: E402
 from better_ai.page import approvals, triggers  # noqa: E402
 from better_ai.page import driver as driver_module
-from better_ai.page.adapters import child_environment  # noqa: E402
+from better_ai.page.adapters import candidate, child_environment  # noqa: E402
 from better_ai.paths import Unit  # noqa: E402
 from better_ai.research import SKILL as RESEARCH  # noqa: E402
 
@@ -736,10 +738,40 @@ class TheApprovedForm(Turns):
         self.peers[0].events.put(approval(tool=tool, command=command))
         eventually(lambda: self.peers[0].answers() or driver.agent()["approvals"])
 
-    def test_the_approved_calls_run_without_asking_per_tool_name_S9(self):
-        driver = self.make()
+    def codex(self, policy, sandbox):
+        """A Codex adapter on a thread started with this approval policy and sandbox, both of which it accepts."""
+        sent = []
+        adapter = candidate("codex", {}, lambda _: "/bin/codex", chat_argv=("codex",)).codec(sent.append, SESSION, None)
+        adapter.open("/repo", None)
+        for name in ("initialize_response", "account_response"):
+            adapter.receive({"id": sent[-1]["id"], "result": CODEX[name]["result"]})
+        result = copy.deepcopy(CODEX["thread_start_response_user"]["result"])
+        result["thread"]["id"] = SESSION
+        result.update(approvalPolicy=policy, sandbox={"type": sandbox, "networkAccess": False})
+        (ready,) = adapter.receive({"id": sent[-1]["id"], "result": result})
+        self.assertEqual(ready.kind, "ready", (policy, sandbox))
+        return adapter
+
+    def codex_request(self, adapter, command, number, **params):
+        # The params of item/commandExecution/requestApproval: command_request in tests/fixtures/page_wire/codex_0_172_0.json.
+        request = frame("command_request", CODEX, id=number)
+        request["params"].update(threadId=SESSION, command=command, **params)
+        (event,) = adapter.receive(request)
+        return event
+
+    def answered(self, driver, event, key):
+        """The driver's answer to a request, or None once it is open on the page instead."""
+        self.peers[0].events.put(event)
+        eventually(lambda: any(a[1] == key for a in self.peers[0].answers()) or driver.agent()["approvals"])
+        answer = next((a[2:] for a in self.peers[0].answers() if a[1] == key), None)
+        for open_request in driver.agent()["approvals"]:
+            driver.answer_approval(open_request["id"], "deny").result(timeout=2)
+        eventually(lambda: not driver.agent()["approvals"])
+        return answer
+
+    def approved_calls(self):
         heredoc = " <<'EOF'\nIt's done:\nline two\nEOF"
-        calls = [
+        return [
             self.command(heredoc),
             self.command(" <<'END_1'\nno quote problem\nEND_1\n"),
             f"{COMMAND} pending {self.unit_dir}",
@@ -749,28 +781,31 @@ class TheApprovedForm(Turns):
             f"{COMMAND} set {self.unit_dir} T3 --by builder-t3 --unset note <<'EOF'\n{{}}\nEOF",
             f"{COMMAND} add {self.unit_dir} log --for builder-t3 --by builder-t3 <<'EOF'\n{{}}\nEOF",
         ]
-        for number, command in enumerate(calls):
-            for tool in ("Bash", "bash", "Command"):
-                key = number * 10 + len(tool)
-                self.peers[0].events.put(approval(key=key, tool=tool, command=command))
-                eventually(lambda key=key: any(a[1] == key for a in self.peers[0].answers()))
-                answer = next(a for a in self.peers[0].answers() if a[1] == key)
-                self.assertEqual(answer[2:], ("allow_once", "Approved page command"), (command, tool))
-        self.assertEqual(driver.agent()["approvals"], [])
+
+    def test_the_approved_calls_run_without_asking_in_claude_code_S9(self):
+        # A Bash request's input is {command, description} (bash_prefix_request in claude_2_1_332.json).
+        driver = self.make(harness="claude")
+        for number, command in enumerate(self.approved_calls()):
+            event = approval(key=number, arguments={"command": command, "description": "Reply on the page"})
+            self.assertEqual(self.answered(driver, event, number), ("allow_once", "Approved page command"), command)
 
     def test_the_requests_claude_code_really_sends_are_approved_or_denied_by_their_form_S9_S78(self):
-        # The input of a Bash request carries description (tests/fixtures/page_wire/claude_2_1_332.json), and may carry timeout.
+        # The input of a Bash request carries description (tests/fixtures/page_wire/claude_2_1_332.json), and may carry
+        # timeout, run_in_background or dangerouslyDisableSandbox (the Bash tool's input schema in Claude Code 2.1.332).
         _, adapter, _, _ = open_claude()
-        driver = self.make()
+        driver = self.make(harness="claude")
         form = approvals.approved_form(COMMAND, self.unit_dir, ("add", "set"))
+        denied = ("deny", f"not-the-approved-form: {form}")
         ok = f"{COMMAND} reply {self.unit_dir} --to m1 --state done --by b <<'EOF'\nIt's done\nEOF"
         for number, (command, extra, expected) in enumerate(
             [
                 (ok, {}, ("allow_once", "Approved page command")),
                 (ok, {"timeout": 5000}, ("allow_once", "Approved page command")),
-                (f"{COMMAND} reply .code/rel --to m1", {}, ("deny", f"not-the-approved-form: {form}")),
-                (f"{COMMAND} status {self.unit_dir} accepted m1", {}, ("deny", f"not-the-approved-form: {form}")),
-                (ok, {"run_in_background": True}, None),
+                (f"{COMMAND} reply .code/rel --to m1", {}, denied),
+                (f"{COMMAND} status {self.unit_dir} accepted m1", {}, denied),
+                # These run the command another way than the form says, so they are no call of the form.
+                (ok, {"run_in_background": True}, denied),
+                (ok, {"dangerouslyDisableSandbox": True}, denied),
                 ("ls", {}, None),
             ]
         ):
@@ -778,28 +813,57 @@ class TheApprovedForm(Turns):
             request["request"]["input"].update({"command": command, **extra})
             (event,) = adapter.receive(request)
             self.assertIn("description", event.arguments)
-            self.peers[0].events.put(event)
-            if expected is None:
-                eventually(lambda: len(driver.agent()["approvals"]) == 1)
-                driver.answer_approval(driver.agent()["approvals"][0]["id"], "deny").result(timeout=2)
-                continue
-            eventually(lambda number=number: any(a[1] == f"r{number}" for a in self.peers[0].answers()))
-            answer = next(a for a in self.peers[0].answers() if a[1] == f"r{number}")
-            self.assertEqual(answer[2:], expected, command)
-
-    def test_a_codex_command_request_is_asked_not_approved_or_denied_S9(self):
-        # Codex sends the command wrapped in a login shell (command_request in tests/fixtures/page_wire/codex_0_172_0.json),
-        # so it can never match the form and is asked on the page like any other call; Codex asks only for commands
-        # outside its sandbox (the fixture's reason), not for a write inside the unit.
-        _, adapter, _, _ = open_codex()
-        driver = self.make()
-        request = frame("command_request", CODEX)
-        request["params"]["threadId"] = SESSION
-        request["params"]["command"] = f"/bin/zsh -lc '{COMMAND} pending {self.unit_dir}'"
+            self.assertEqual(self.answered(driver, event, f"r{number}"), expected, (command, extra))
+        # A tool that runs no shell command is asked, even when it names the archive.
+        request = frame("write_request", request_id="w1")
+        request["request"]["input"] = {"file_path": f"{self.unit_dir}/x.txt", "content": ok}
         (event,) = adapter.receive(request)
-        self.peers[0].events.put(event)
-        eventually(lambda: len(driver.agent()["approvals"]) == 1)
-        self.assertEqual(self.peers[0].answers(), [])
+        self.assertIsNone(self.answered(driver, event, "w1"))
+
+    def test_codex_requests_are_approved_or_denied_by_their_form_under_every_policy_and_sandbox_S9_S78(self):
+        # Codex asks for in-unit verb calls too under approvalPolicy untrusted or a read-only sandbox (verifier-t3b F3).
+        # It sends the command as its shell runs it, "<shell> -lc <command>" (command_request in codex_0_172_0.json),
+        # and a zsh-exec-bridge subcommand as the command itself (approvalId in CommandExecutionRequestApprovalParams,
+        # `codex app-server generate-json-schema` 0.172.0). The params name no policy or sandbox: the shape is the same.
+        form = approvals.approved_form(COMMAND, self.unit_dir, ("add", "set"))
+        denied = ("deny", f"not-the-approved-form: {form}")
+        allowed = ("allow_once", "Approved page command")
+        reply = f"{COMMAND} reply {self.unit_dir} --to m1 --state done --by b <<'EOF'\nIt's done\nline two\nEOF"
+        driver = self.make(harness="codex")
+        number = 100
+        for policy in ("untrusted", "on-request"):
+            for sandbox in ("readOnly", "workspaceWrite"):
+                adapter = self.codex(policy, sandbox)
+                cases = [
+                    *((f"/bin/zsh -lc {shlex.quote(call)}", allowed) for call in self.approved_calls()),
+                    (f"/bin/bash -lc {shlex.quote(reply)}", allowed),
+                    ("/bin/zsh -lc '" + reply.replace("'", "'\\''") + "'", allowed),
+                    (reply, allowed),
+                    (f"/bin/zsh -lc {shlex.quote(f'{COMMAND} reply .code/rel --to m1')}", denied),
+                    (f"/bin/zsh -lc {shlex.quote(f'{COMMAND} pending {self.unit_dir}; pwd')}", denied),
+                    (f"/bin/zsh -c {shlex.quote(f'{COMMAND} status {self.unit_dir} accepted m1 --by b')}", denied),
+                    (f"/usr/bin/env zsh -lc {shlex.quote(f'{COMMAND} pending {self.unit_dir}')}", denied),
+                    ("/bin/zsh -lc 'ls'", None),
+                ]
+                for command, expected in cases:
+                    number += 1
+                    event = self.codex_request(adapter, command, number)
+                    with self.subTest(policy=policy, sandbox=sandbox, command=command):
+                        self.assertEqual(self.answered(driver, event, number), expected)
+                # Input for a terminal that is already running is no command of the form: it is asked.
+                number += 1
+                event = self.codex_request(adapter, f"{COMMAND} pending {self.unit_dir}", number, kind="writeStdin")
+                self.assertIsNone(self.answered(driver, event, number))
+
+    def test_a_harness_with_no_recorded_shell_request_shape_is_asked_S9(self):
+        # No recorded request or schema gives the shape of an ACP or Droid shell call, so none is approved or denied.
+        for harness in ("cursor", "devin", "droid", "opencode"):
+            with self.subTest(harness=harness):
+                driver = self.make(harness=harness)
+                event = approval(key=harness, tool="bash", command=f"{COMMAND} pending {self.unit_dir}")
+                self.assertIsNone(self.answered(driver, event, harness))
+                driver.close()
+                self.peers.clear()
 
     def test_the_skill_verbs_are_approved_only_where_the_skill_has_them_S9(self):
         form = lambda verb: f"{COMMAND} {verb} {self.unit_dir}"  # noqa: E731
@@ -817,7 +881,7 @@ class TheApprovedForm(Turns):
                 )
 
     def test_a_call_outside_the_form_is_denied_without_asking_with_the_form_S78(self):
-        driver = self.make()
+        driver = self.make(harness="claude")
         form = approvals.approved_form(COMMAND, self.unit_dir, ("add", "set"))
         bad = [
             f"{COMMAND} reply .code/rel --to m1 <<'EOF'\nx\nEOF",
@@ -856,7 +920,7 @@ class TheApprovedForm(Turns):
         self.assertEqual(self.peers[0].answers(), [])
 
     def test_the_page_says_once_that_it_approves_the_form_S67(self):
-        driver = self.make()
+        driver = self.make(harness="claude")
         self.assertFalse(driver.agent()["auto_approved_once"])
         self.peers[0].events.put(approval(command=f"{COMMAND} pending {self.unit_dir}"))
         eventually(lambda: driver.agent()["auto_approved_once"])
@@ -990,6 +1054,25 @@ class SkillTriggers(unittest.TestCase):
         self.assertEqual([t for t in page.spec_of(unit.skill).triggers(unit) if t["type"] == "overdue"], [])
         log(("start", 90, {}), ("handed_back", 80, done))
         self.assertEqual(triggers.workers(unit), [])
+
+    def test_every_research_agent_writes_a_stop_line_when_it_stops_so_its_row_ends_S116_S117(self):
+        # A research worker or verifier that stopped without a stop line stayed a row and was overdue 30 minutes later.
+        agents = Path(__file__).resolve().parents[1] / "skills" / "research-better" / "agents"
+        for name in ("worker.md", "verifier.md"):
+            with self.subTest(agent=name):
+                self.assertIn(
+                    "WHEN you stop, for any reason, ADD a `stop` line to your log", (agents / name).read_text()
+                )
+        unit = self.unit(RESEARCH)
+        old = (datetime.now(timezone.utc) - timedelta(minutes=45)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.write(
+            unit,
+            "logs/verifier-1.jsonl",
+            {"type": "checked", "at": old, "by": "verifier-1", "claim": "C-w1-1"},
+            {"type": "stop", "at": old, "by": "verifier-1", "text": "No unchecked claim is left."},
+        )
+        self.assertEqual(triggers.workers(unit), [])
+        self.assertEqual([t for t in page.spec_of(unit.skill).triggers(unit) if t["type"] == "overdue"], [])
 
     def test_a_worker_that_wrote_lately_is_not_overdue_S117(self):
         unit = self.unit(CODE)

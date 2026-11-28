@@ -725,6 +725,14 @@ test('S118, D21: each record line the scan cannot read is one fixed sentence in 
     assert.ok(html.includes(page.escaped("A line in " + file + " can't be read. Ask the agent to fix it.")), file);
   }
   assert.ok(!html.includes('not valid JSON'), 'the sentence holds the file only');
+  // Below 900 px the state notice moves to the pinned bar and .agents .notice is hidden: a problem line is no notice.
+  assert.ok(!/<li class="notice"[^>]*><div>A line in/.test(html), 'a problem line is not hidden with the notice');
+  // Two lines of one file give one sentence.
+  await page.show(body({ problems: [
+    { file: 'logs/b1.jsonl', line: 4, text: '(record): not valid JSON' },
+    { file: 'logs/b1.jsonl', line: 9, text: '(record): not valid JSON' },
+  ] }));
+  assert.equal(page.agentsHtml().split("A line in logs/b1.jsonl can").length, 2);
   // A file name that holds markup is shown as text.
   await page.show(body({ problems: [{ file: '<b>x</b>.jsonl', line: 1, text: 'bad' }] }));
   assert.ok(!page.agentsHtml().includes('<b>x</b>'));

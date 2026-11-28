@@ -175,13 +175,18 @@ class StateTests(Case):
         self.assertEqual(self.peers[0].calls[0], ("open", str(self.root), None))
 
     def test_resume_only_a_session_this_driver_opened_in_the_same_harness(self):
-        # S48, S131
+        # S48, S131. One driver owns .driver at a time (decision D2): each ends before the next state is written,
+        # since a new session's first turn (S93) writes .driver after start returns.
         self.saved()
-        self.driver().start()
+        driver = self.driver()
+        driver.start()
         self.assertEqual(self.peers[-1].calls[0], ("open", str(self.root), "session-1"))
+        driver.close()
         self.saved(opened=0)
-        self.driver().start()
+        driver = self.driver()
+        driver.start()
         self.assertEqual(self.peers[-1].calls[0], ("open", str(self.root), None))
+        driver.close()
         self.saved(harness="codex")
         self.driver().start()
         self.assertEqual(self.peers[-1].calls[0], ("open", str(self.root), None))
@@ -636,7 +641,7 @@ class ApprovalTests(Case):
         self.assertEqual(len(self.records("asked_again")), 1)
 
     def test_auto_approval_is_reported_once_it_happened(self):
-        driver = self.driver(launch=lambda tag: Answering(), verbs=("add", "set"))
+        driver = self.driver(launch=lambda tag: Answering(), harness="claude", verbs=("add", "set"))
         driver.start()
         self.assertFalse(driver.agent()["auto_approved_once"])
         command = f"/usr/bin/python3 /plugins/code/better.pyz pending {self.root}"
