@@ -946,7 +946,7 @@ def _label_lines(edge, limit=GAP - 70):
     return wrap(edge.get("label", ""), LABEL, limit) + (["REMOVED"] if removable(edge) else [])
 
 
-def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
+def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed):
     """What sits on top of each node of a logic flow, from the columns alone, before the nodes are placed: each edge
     back or forward edge drawn apart as an arc (both ends the top of their column, and no earlier arc ends at either
     or spans only part of it) or a pair of connectors; where each one meets each node's top; how labels wrap; how far
@@ -958,7 +958,11 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
     on a node's own corner take its right end: the other attachments share the rest, from the left end, each one after
     the label before it when they all fit, and the labels end before the loops start. Several loops nest: each next
     one starts further left, rises higher above the label of the one inside it, reaches further out and comes back
-    lower; their labels stand in a column right of the outermost one, each at the height of its own loop's top."""
+    lower; their labels stand in a column right of the outermost one, each at the height of its own loop's top.
+
+    The labels that reach right of a column share the gap after it with the labels of the routed edges that enter the
+    next column, which end 12 before it: when the widest of each would not fit side by side, each side wraps to its
+    share, and `route_wrap` gives the routed edges' wraps."""
     top_items = {slot[0] for slot in slots if slot}
     apart = [edge for edge in flow["edges"] if edge["id"] in back | jumps and edge["from"] != edge["to"]]
     apart.sort(key=lambda e: abs(x[e["from"]] - x[e["to"]]))
@@ -994,6 +998,26 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
     def word(edge):
         return max((width(w, LABEL) for w in edge.get("label", "").split()), default=0)
 
+    def column(node):
+        return round(x[node] / (COLW + GAP))
+
+    share = GAP - 18  # the gap less the 12 before the next column and 6 between two labels
+    entering = {}
+    for edge in routed:
+        if edge.get("label") or removable(edge):
+            widest = max(width(line, LABEL) for line in _label_lines(edge))
+            entering[column(edge["to"])] = max(entering.get(column(edge["to"]), 0), widest)
+    reach = {}  # how far the labels of a column reach into the gap after it
+
+    def gap_limit(node, offset):
+        """The widest a label that starts `offset` right of the node's column may be."""
+        if column(node) + 1 not in entering:
+            return GAP - 70
+        return max(share / 2, share - entering[column(node) + 1]) - offset
+
+    def fit(edge, limit):
+        return min(GAP - 70, max(word(edge) + 1, limit))  # + 1: the longest word stays whole
+
     spot, lift, wraps, need, loops, above = {}, {}, {}, {}, {}, {}
     for node in nodes:
         is_start = nodes[node]["type"] == "start"
@@ -1021,20 +1045,32 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
         for i, e in enumerate(spots):
             if here[i]:
                 limit = bx + bw - 12 * len(own) - 6 - xs[i] - 14 if own and not is_start else GAP - 70
-                wraps[e] = min(GAP - 70, max(word(edges[e]) + 1, limit))  # + 1: the longest word stays whole
+                wraps[e] = fit(edges[e], min(limit, gap_limit(node, xs[i] + 14 - x[node] - COLW)))
                 lines[i] = _label_lines(edges[e], wraps[e])
                 widths[i] = max(width(line, LABEL) for line in lines[i])
+                end = xs[i] + 14 + widths[i] - x[node] - COLW
+                reach[column(node)] = max(reach.get(column(node), 0), end)
         rises, first = [], None
         if own:
             ends = [xs[i] + 14 + widths[i] + 6 for i in widths]
             first = min(max([bx + bw - 36 - 12 * (len(own) - 1), *ends]), bx + bw - 12 * len(own))
-            rise, heights = 14, [15 * len(_label_lines(e)) if e.get("label") or removable(e) else 0 for e in own]
+            offset = bx + bw + 20 + 12 * (len(own) - 1) - x[node] - COLW
+            heights = []
+            for edge in own:
+                wraps[edge["id"]] = fit(edge, gap_limit(node, offset))
+                own_lines = _label_lines(edge, wraps[edge["id"]])
+                labelled = edge.get("label") or removable(edge)
+                heights.append(15 * len(own_lines) if labelled else 0)
+                if labelled:
+                    end = offset + max(width(line, LABEL) for line in own_lines)
+                    reach[column(node)] = max(reach.get(column(node), 0), end)
+            rise = 14
             for height in heights:
                 rises.append(rise)
                 need[node] = max(need.get(node, 0), rise + 2, rise - 8 + height)
                 rise += max(16, height + 3)
             loops[node] = (first, rises)
-        # A label that a long word still keeps over the loops' start is lifted above the loops. On the start, every
+        # A label that a long word still keeps over the loops' start is lifted above the loops and their labels. On the start, every
         # spot is its centre: nothing is lifted.
         tops = [0] * len(spots)
         for i in reversed(range(len(spots))):
@@ -1046,15 +1082,23 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc):
                 over = [
                     tops[j] for j in range(i + 1, len(spots)) if plans[spots[j]][0] != "arc" and xs[j] - 9 < end + 2
                 ]
-                over += [rises[-1] + 2] if own and end + 2 > first else []
+                over += [need[node]] if own and end + 2 > first else []  # the loops and their labels
                 lift[e] = max([0] + [t - 15 for t in over])
             tops[i] = lift.get(e, 0) + max(31, 15 + 15 * len(lines.get(i, [])))
         need[node] = max([need.get(node, 0), *tops])
         if need[node] > 31:  # more than one connector with a one-line label needs
             above[node] = need[node] + 2
+    route_wrap = {}
+    for edge in routed:
+        before = column(edge["to"]) - 1
+        if before in reach and (edge.get("label") or removable(edge)):
+            limit = share - reach[before]
+            if max(width(line, LABEL) for line in _label_lines(edge)) > limit:
+                route_wrap[edge["id"]] = fit(edge, limit)
     return {
         "plans": plans,
         "selfs": selfs,
+        "route_wrap": route_wrap,
         "spot": spot,
         "lift": lift,
         "wrap": wraps,
@@ -1109,6 +1153,11 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
     for slot in slots:
         slot.sort(key=last)  # edges passing through, then exits, sit below the nodes of their column
 
+    x = {item: column * (COLW + GAP) for column, slot in enumerate(slots) for item in slot}
+    edges = {edge["id"]: edge for edge in flow["edges"]}
+    top = _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed)
+    for ident, limit in top["route_wrap"].items():
+        labels[ident] = _label_lines(edges[ident], limit)
     box_heights = {ident: logic_box_height(node, boxes_of) for ident, node in nodes.items()}
     heights = {
         ident: max(box_heights[ident], sum(15 * len(labels[e["id"]]) + 14 for e in incoming[ident]) + 16)
@@ -1116,9 +1165,6 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
         else START
         for ident in nodes
     }
-    x = {item: column * (COLW + GAP) for column, slot in enumerate(slots) for item in slot}
-    edges = {edge["id"]: edge for edge in flow["edges"]}
-    top = _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc)
     y, _, total = place_bands(slots, heights, [], chains, x, top["above"])
     for ident, node in nodes.items():
         # The start lines up with the arrow it sends, which enters its target below that target's other labels.

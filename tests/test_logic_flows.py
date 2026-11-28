@@ -260,6 +260,28 @@ class LogicFlowDrawing(unittest.TestCase):
         self.assertEqual([kinds[i] for i in ("e-recheck", "e-redraft")].count("connector"), 2)
         self.assert_drawn_clear(self.flow, shape)
 
+    def test_labels_share_the_gap_before_the_next_column(self):
+        """A self-loop's label right of its node and the label of an edge entering the next column wrap to share the
+        gap between the columns."""
+        flow = {
+            "id": "gap",
+            "name": "Gap",
+            "kind": "logic",
+            "nodes": [
+                {"id": "s", "type": "start"},
+                {"id": "wait", "type": "step", "label": "Wait"},
+                {"id": "ship", "type": "step", "label": "Ship"},
+                {"id": "redo", "type": "step", "label": "Redo"},
+            ],
+            "edges": [
+                {"id": "e-s", "from": "s", "to": "wait"},
+                {"id": "e-ship", "from": "wait", "to": "ship", "label": "the reviewer approves all of it"},
+                {"id": "e-redo", "from": "wait", "to": "redo"},
+                {"id": "e-remind", "from": "wait", "to": "wait", "label": "remind the reviewer again"},
+            ],
+        }
+        self.assert_drawn_clear(flow, diagram.logic_layout(flow, self.layout))
+
     def assert_drawn_clear(self, flow, shape):
         """No line crosses another, a node it does not join, a connector or a label; no label overlaps a node or
         another label."""
