@@ -179,9 +179,8 @@ function shellDocument() {
 
 // What a page's own code sees as its document: the stand-in shell's elements where it has them, and a stand-in that
 // takes anything for the rest, so a page runs whole without its main view.
-// ABSENT names the ids the page must find missing: page-data on a served page, the pop-up until one opens, and the
-// figure's slot until the page writes its header.
-function mixedDocument(doc, absent = ['page-data', 'pop', 'yourturn']) {
+// ABSENT names the ids the page must find missing: page-data on a served page and the pop-up until one opens.
+function mixedDocument(doc, absent = ['page-data', 'pop']) {
   return new Proxy(stand(), {
     get: (t, k) => {
       if (k === 'createElement' || k === 'createTextNode') return doc[k];

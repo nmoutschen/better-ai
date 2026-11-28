@@ -62,12 +62,6 @@ header.bar--stats h1 { display:-webkit-box; -webkit-box-orient:vertical; -webkit
 .stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
 .stat b { font:var(--font-figure); }
 .stat .of { font-size:var(--text-message); opacity:.8; }
-/* A figure that takes the user somewhere is a button, underlined like a link; a plain figure is not. */
-button.stat { border:0; background:none; padding:0; color:inherit; font:inherit; cursor:pointer; }
-button.stat b { text-decoration:underline; text-underline-offset:3px; }
-button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px; }
-/* The slot a page that writes its own figures leaves for page.js's "N your turn" figure: the figure stands among the others. */
-.yourturn { display:contents; }
 /* Progress under a figure: a cream outline that fills. */
 .meter { width:140px; height:8px; border:1px solid var(--cream); margin-top:var(--space-tight); display:flex; }
 .meter i { display:block; height:100%; background:var(--cream); }
@@ -89,9 +83,6 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .controls > .seg.cycle button[aria-pressed="false"] { visibility:hidden; }
 .controls > .seg.cycle button:first-child[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
 .controls > .seg.cycle button:last-child[aria-pressed="true"] { background:transparent; color:var(--cream); }
-/* A question header has no figures: the "N your turn" figure sits among the controls, one line at their size. */
-.controls .stat { flex-direction:row; align-items:baseline; gap:var(--space-tight); margin:0; font:var(--font-small-strong); letter-spacing:0; color:var(--cream); }
-.controls .stat b { font:inherit; }
 
 /* Segmented controls: one of several options, the chosen one filled. */
 .seg { display:inline-flex; border:1px solid var(--cream); }

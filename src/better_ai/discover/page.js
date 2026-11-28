@@ -209,15 +209,13 @@ function pendingChoose(log, states, moves) {
 }
 
 // ---------- The header ----------
-// The header holds figures only (DESIGN.md, stats header): the step of ten, the brief version, and the shared figure of
-// the threads that are your turn (page.js puts it in #yourturn). The step's name, the last move and the brief's state
-// live on their tabs.
+// The header holds figures only (DESIGN.md, stats header): the step of ten and the brief version. The step's name, the
+// last move and the brief's state live on their tabs.
 function headerHTML(data) {
   const head = data.head || {}, briefs = data.briefs || [];
   const stat = (big, label) => '<span class="stat"><b>' + big + '</b>' + esc(label) + '</span>';
   const version = briefs.length ? 'v' + Math.max(...briefs.map(b => briefNumber(b.id))) : '–';
-  return stat(esc(s(head.step) || '–') + '<span class="of"> / 10</span>', 'step') + stat(esc(version), 'brief') +
-    '<span class="yourturn" id="yourturn"></span>';
+  return stat(esc(s(head.step) || '–') + '<span class="of"> / 10</span>', 'step') + stat(esc(version), 'brief');
 }
 
 // ---------- Tables ----------
@@ -613,7 +611,6 @@ function paint() {
   const goal = byId('goal');
   goal.textContent = s(head.idea); goal.hidden = !s(head.idea);
   setHTML(byId('status'), headerHTML(data));
-  conv.figure();  // the shared "N your turn" figure, in its place among the header's figures
   setHTML(panel('moves'), movesPanel(data, c));
   KIND_ORDER.forEach(kind => setHTML(panel(KIND_TAB[kind]), itemsTable(kind, data, c)));
   setHTML(panel('evidence'), evidencePanel(data, c));
@@ -873,7 +870,7 @@ function tick() {
 }
 conv = pageConversation({
   served: true, stream: false, agent: 'Coordinator', thread: byId('thread'), itemKinds: ITEM_KINDS,
-  kinds: eventKinds, afterSend: () => tick(), busy: formOpen, stats: () => byId('yourturn'),
+  kinds: eventKinds, afterSend: () => tick(), busy: formOpen,
 });
 decision = pageDecision({ conversation: conv, now: nowSec, md, esc, id: uid, suggested: true, next: () => { const open = DATA && currentOpen(); return open && dueMove(open) ? pickerButton : null; } });
 eventKinds.decision = (c, state, actions) => {

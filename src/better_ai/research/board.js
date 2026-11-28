@@ -208,7 +208,7 @@ function commentBody(e) { return pageMarkdown(e.text); }
 const kinds = {closed: closedItem};
 const conv = pageConversation({
   served: !SNAPSHOT, readOnly: !!SNAPSHOT, stream: false, name: "board", agent: "Coordinator", thread: $("thread"),
-  kinds, crumb, commentBody, stats: () => $("yourturn"),
+  kinds, crumb, commentBody,
   afterSend: () => tick(),
 });
 const uid = p => p + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
@@ -358,8 +358,7 @@ function render(d) {
   setHTML($("status"), `<span class="stat"><b>${answered}<span class="of"> / ${qs.length}</span></b>questions closed
       <span class="meter" aria-hidden="true"><i style="width:${qs.length ? (100 * answered / qs.length).toFixed(0) : 0}%"></i></span></span>`
     + (live ? stat(workers, workers === 1 ? "worker on questions" : "workers on questions") + (answered >= 3 && left ? stat(leftText, "left at this pace") : "") : "")
-    + `<span class="yourturn" id="yourturn"></span>` + phase);  // page.js's "N your turn" figure
-  conv.figure();
+    + phase);
   const key = JSON.stringify(qs.map(q => [q.id, q.parent, q.view, q.label, q.searches, q.owner, q._errors && q._errors[0], OPEN && OPEN.id === q.id]).concat([b.short]));
   if (key !== LAYOUT) { LAYOUT = key; drawMap(D); if (FITTED) fit(); }
   const replies = (d.conversation || []).filter(e => e.type === "reply");

@@ -193,8 +193,6 @@ function pageCommentPosition(x, y, pop) {
 // o.beforeReload()  keep the page's place before a new render loads
 // o.rendered(state)  called after each redraw with the state of every user item, by id, for its pin: new, seen,
 //                working, asked (your turn), done, accepted (you closed it); PAGE_PIN_STATES words them
-// o.stats        where the top bar's "N your turn" figure goes: an element, or a function that gives it (default the
-//                header's #status). A page that rewrites its own figures calls figure() after, to put it back.
 function pageConversation(o) {
   var rpcId = 0, log = [], state = {}, fed = null, itemKinds = o.itemKinds || ['comment', 'note'], kinds = o.kinds || {};
   var agent = o.agent || pageRole().replace(/^./, function (c) { return c.toUpperCase(); });
@@ -526,7 +524,6 @@ function pageConversation(o) {
     var openBtn = document.querySelector('[data-filter="open"]'), allBtn = document.querySelector('[data-filter="all"]');
     if (openBtn) openBtn.textContent = 'Open (' + live.length + ')';
     if (allBtn) allBtn.textContent = 'All (' + all.length + ')';
-    figure(yours.filter(function (t) { return !closing[keyOf(t)]; }));
     var empty = document.querySelector('.notes .empty');
     if (empty) empty.hidden = !!all.length;
     thread.replaceChildren();
@@ -553,7 +550,8 @@ function pageConversation(o) {
     above();
     if (o.rendered) o.rendered(state);
   }
-  // While rows are out of view above, a button says how many and takes the user there.
+  // While rows are wholly out of view above, a button says how many and takes the user there. A row partly in view,
+  // such as a long thread the user reads in its middle, is not above.
   var cue = null;
   function above() {
     if (!thread.getBoundingClientRect || !thread.parentNode) return;
@@ -563,44 +561,10 @@ function pageConversation(o) {
       thread.parentNode.insertBefore(cue, thread);
     }
     var top = thread.getBoundingClientRect().top, n = 0;
-    thread.querySelectorAll('li.trow').forEach(function (li) { if (li.getBoundingClientRect().top < top - 4) n++; });
+    thread.querySelectorAll('li.trow').forEach(function (li) { if (li.getBoundingClientRect().bottom <= top + 4) n++; });
     cue.hidden = !n; cue.textContent = '▲ ' + n + (n === 1 ? ' more thread above' : ' more threads above');
   }
   thread.addEventListener('scroll', above);
-  // The top bar's figure: how many threads are your turn; a button to the first one's Answer, or plain at none. It goes
-  // where the page says (o.stats), else in the header's #status.
-  var figureEl = null;
-  function figureSlot() {
-    if (typeof o.stats === 'function') return o.stats();
-    return o.stats || (document.getElementById ? document.getElementById('status') : null);
-  }
-  function placeFigure() {
-    var slot = figureSlot();
-    if (!slot || !figureEl) return figureEl;
-    if (slot.textContent.trim() === 'Loading…') slot.replaceChildren();
-    if (figureEl.parentNode !== slot) slot.append(figureEl);
-    return figureEl;
-  }
-  function figure(yours) {
-    // Built even while its slot is missing, such as before a page writes its header: figure() places it then.
-    if (typeof document.createElement !== 'function') return;
-    var tag = yours.length ? 'BUTTON' : 'SPAN';
-    if (!figureEl || figureEl.tagName !== tag) {
-      if (figureEl) figureEl.remove();
-      figureEl = el(tag.toLowerCase(), 'stat');
-      if (yours.length) { figureEl.type = 'button'; figureEl.addEventListener('click', goYourTurn); }
-    }
-    figureEl.replaceChildren(el('b', '', String(yours.length)), ' your turn');
-    if (yours.length) figureEl.setAttribute('aria-label', yours.length + ' your turn: go to the first');
-    figureEl.first = yours[0];
-    placeFigure();
-  }
-  function goYourTurn() {
-    var t = figureEl.first; if (!t) return;
-    if (filter !== 'open') document.querySelector('[data-filter="open"]').click();
-    var b = find('act:reply:' + keyOf(t)) || find('toggle:' + keyOf(t));
-    if (b) { if (b.scrollIntoView) b.scrollIntoView({ block: 'center' }); b.focus(); }
-  }
   // The thread an id belongs to: the thread itself, or a message in it.
   function threadOf(id) {
     for (var i = 0; i < threads.length; i++) {
@@ -713,7 +677,7 @@ function pageConversation(o) {
 
   return {
     send: send, say: say, flash: flash, reopen: reopen, render: renderThread, start: start, setLog: setLog, nodes: nodes,
-    box: reasonBox, figure: placeFigure, noteBox: noteBox, noteBtn: noteBtn, busy: busy,
+    box: reasonBox, noteBox: noteBox, noteBtn: noteBtn, busy: busy,
     log: function () { return log; }, state: function () { return state; }
   };
 }
