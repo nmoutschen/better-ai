@@ -23,7 +23,7 @@ CLAUSES = (
     "with the hand-off note on stdin",
     "the step you reached and what was agreed in the chat",
     "IF the unit already has a `.driver` file, PASS no hand-off note",
-    "`driver: on`, SAY the page opened in the browser with its own agent, and END the turn",
+    "`driver: on` without `already`, SAY the page opened in the browser with its own agent, and END the turn",
     "`driver: on` and the word `already`, SEND the user to the open page",
     "RUN `python3 <skill dir>/scripts/better.pyz link <unit>` IF they ask for a new tab",
     "`driver: off`, or no `driver:` line comes within 40 seconds, SHOW the problem in one line",
@@ -239,3 +239,10 @@ class PageAgentPromptTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShowRouteTwo(unittest.TestCase):
+    def test_publish_only_when_the_user_asks_to_share(self):
+        text = (ROOT / "skills" / "show-better" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotIn("browser cannot reach this machine and you can publish", text)
+        self.assertIn("IF the user asks to share the slides and you can publish a page", text)
