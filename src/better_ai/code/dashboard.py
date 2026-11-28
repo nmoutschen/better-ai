@@ -40,9 +40,13 @@ class Reader:
     def records(self, relative: str, keep_invalid: bool = False) -> list:
         """The records of one file, in line order; none if it does not exist. A record with errors is left out, unless
         `keep_invalid`: then it stays, with its messages in `_errors`, so the page can show what it can of it."""
+        return self.read(relative, keep_invalid).records
+
+    def read(self, relative: str, keep_invalid: bool = False) -> schema.Read:
+        """What `records` reads, with the line of each record."""
         read = schema.read_records(self.unit, relative, self.docs, self.cache, self.now, self.cutoff, keep_invalid)
         self.errors.extend(read.errors)
-        return read.records
+        return read
 
     def folder(self, pattern: str) -> list:
         return sorted(self.unit.path.glob(pattern))
@@ -122,7 +126,7 @@ def load(unit: Unit) -> dict:
     title = goal.strip().splitlines()[0].strip() if isinstance(goal, str) and goal.strip() else unit.slug
     tasks = reader.records("tasks.jsonl", keep_invalid=True)
     spec = reader.records("spec.jsonl")
-    conversation_events = reader.records(page.LOG)
+    conversation_events = page.log_records(reader.read(page.LOG))  # with their lines, which `read` counts in
     changed = mtime(unit, "decisions.jsonl")
     decisions = [decision(r, changed) for r in reader.records("decisions.jsonl", keep_invalid=True)]
     modes = {t["id"]: t.get("mode", "") for t in tasks if "id" in t}
@@ -162,7 +166,7 @@ SPEC = page.PageSpec(
     assets={"/dashboard.css": "code/dashboard.css", "/dashboard.js": "code/dashboard.js"},
     css=("/dashboard.css",),
     js=("/dashboard.js",),
-    capabilities=("decisions",),
+    capabilities=("decisions", "accept"),  # every thread can be closed and reopened
     methods=("comment",),
     items=("comment", "note", "answer"),
     empty="Nothing yet. Click a task to ask about it, or write to the coordinator below.",

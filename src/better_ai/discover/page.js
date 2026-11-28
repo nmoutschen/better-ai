@@ -100,8 +100,7 @@ function fold(text) {
 // A decision is open while it waits and the user has not answered it on the page, by the shared rule. A due move is a
 // waiting decision about the discovery, so it counts with the others.
 function openQuestions(decisions, log) {
-  const open = new Set(pageOpenDecisions(decisions, log, [], null).map(c => c.e.id));
-  return (decisions || []).filter(x => open.has(x.id));
+  return pageOpenDecisions(decisions, log);
 }
 function aboutTab(decision, items) {
   const about = decision.about || {};
@@ -210,15 +209,15 @@ function pendingChoose(log, states, moves) {
 }
 
 // ---------- The header ----------
-// The header holds figures only (DESIGN.md, stats header): the step of ten, the brief version, the open questions.
-// The step's name, the last move and the brief's state live on their tabs.
-function headerHTML(data, open) {
+// The header holds figures only (DESIGN.md, stats header): the step of ten, the brief version, and the shared figure of
+// the threads that are your turn (page.js puts it in #yourturn). The step's name, the last move and the brief's state
+// live on their tabs.
+function headerHTML(data) {
   const head = data.head || {}, briefs = data.briefs || [];
   const stat = (big, label) => '<span class="stat"><b>' + big + '</b>' + esc(label) + '</span>';
   const version = briefs.length ? 'v' + Math.max(...briefs.map(b => briefNumber(b.id))) : '–';
   return stat(esc(s(head.step) || '–') + '<span class="of"> / 10</span>', 'step') + stat(esc(version), 'brief') +
-    (open.length ? '<button type="button" class="stat" id="questions"><b>' + open.length + '</b>' + (open.length === 1 ? 'open question' : 'open questions') + '</button>'
-      : '<span class="stat"><b>0</b>open questions</span>');
+    '<span class="yourturn" id="yourturn"></span>';
 }
 
 // ---------- Tables ----------
@@ -278,11 +277,11 @@ function riskSettled(item, risk, data, known) {
   if (!answer) return '<span class="muted">Nothing yet</span>';
   return answer.type === 'decision' ? idLink(s(answer.id), known) : 'You, ' + (answer.type === 'chat' ? 'in the chat' : 'on the page');
 }
-// A waiting question about a risk, in the risk's State cell: its ID, its first sentence, its default, and ✓ and Answer.
+// A waiting question about a risk, in the risk's State cell: its ID, its first sentence, its default, Use the default and Answer.
 function riskQuestion(d, known) {
   return '<div class="rq" data-d="' + esc(d.id) + '"><p>' + idLink(d.id, known) + ': ' + esc(firstSentence(d.asked).first) + '</p>' +
     (s(d.default) ? '<p class="muted">Suggested default: ' + esc(d.default) + '</p>' : '') +
-    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">✓</button>' : '') +
+    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm btn--quiet answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">Use the default</button>' : '') +
     '<button type="button" class="btn btn--sm btn--quiet" data-answer="' + esc(d.id) + '" aria-label="Answer ' + esc(d.id) + '">Answer</button></div></div>';
 }
 function risksOf(item, data, ctx, known) {
@@ -474,7 +473,7 @@ function questionRow(d, data, ctx, known) {
   const due = (d.about || {}).type === 'discovery';
   return '<li class="q" id="row-' + esc(d.id) + '" data-d="' + esc(d.id) + '"><div><strong>' + esc(d.id) + '</strong> <span class="muted">' + aboutHTML(d, data, known) + '</span></div>' +
     '<div class="ask">' + fold(d.asked) + '</div>' + evidenceBlock(d, data) + (s(d.default) ? '<p class="muted">Suggested default: ' + esc(d.default) + '</p>' : '') +
-    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">✓</button>' : '') +
+    '<div class="row-actions">' + (s(d.default) ? '<button type="button" class="btn btn--sm btn--quiet answer" data-use="' + esc(d.id) + '" aria-label="Use the default for ' + esc(d.id) + '">Use the default</button>' : '') +
     '<button type="button" class="btn btn--sm btn--quiet" data-answer="' + esc(d.id) + '" aria-label="Answer ' + esc(d.id) + '">Answer</button>' +
     (due ? '<button type="button" class="btn btn--sm" data-open-picker' + (ctx.pending ? ' disabled' : '') + '>Choose a move…</button>' : '') + '</div></li>';
 }
@@ -555,10 +554,17 @@ const md = text => pageMarkdown(text).outerHTML;
 const markdown = text => md(s(text).replace(/<!--[^]*?-->\n?/g, ''));
 
 let conv = null, decision = null;
-const waitingOf = (c, state) => c.kind === 'decision' ? decision.waiting(c, state) : c.kind === 'note' && state[c.e.id] === 'asked';
 const currentOpen = () => openQuestions(DATA.decisions, DATA.conversation);
 const ITEM_KINDS = ['note', 'choose', 'add_evidence', 'add_result', 'remove', 'edit', 'redact'];
-const threadState = () => pageThread(pageDecisionEvents(DATA.decisions, DATA.conversation), ITEM_KINDS, null).state;
+// Each thread's state by the id that started it, from the one state machine (pageThreads): done once the coordinator
+// finished it or the user closed it.
+const threadState = () => {
+  const state = {};
+  pageThreads(pageDecisionEvents(DATA.decisions, DATA.conversation), ITEM_KINDS).forEach(t => {
+    if (t.id != null) state[t.id] = t.state === 'done' ? 'done' : t.state;
+  });
+  return state;
+};
 const currentPending = () => {
   const found = pendingChoose(DATA.conversation, threadState(), DATA.moves);
   return found || (SENT && !DATA.moves.some(m => (m.answer || {}).event === SENT.id) && !(DATA.conversation || []).some(e => e.id === SENT.id) ? SENT : null);
@@ -606,7 +612,8 @@ function paint() {
   byId('title').textContent = 'Discovery';
   const goal = byId('goal');
   goal.textContent = s(head.idea); goal.hidden = !s(head.idea);
-  setHTML(byId('status'), headerHTML(data, c.open));
+  setHTML(byId('status'), headerHTML(data));
+  conv.figure();  // the shared "N your turn" figure, in its place among the header's figures
   setHTML(panel('moves'), movesPanel(data, c));
   KIND_ORDER.forEach(kind => setHTML(panel(KIND_TAB[kind]), itemsTable(kind, data, c)));
   setHTML(panel('evidence'), evidencePanel(data, c));
@@ -818,7 +825,7 @@ view.addEventListener('keydown', event => {
   }
 });
 
-// ✓ and Answer act on the same question as in the conversation: the same answer events.
+// Use the default and Answer act on the same question as in the conversation: the same answer events.
 function answerHere(row, id, text, byDefault, done, fail) {
   conv.send('answer', { id: uid('a'), decision: id, text, default: byDefault }, 'Answer', done, fail);
 }
@@ -864,11 +871,9 @@ function tick() {
     paint();
   }, e => { if (e && e.stale) return; FAILS++; });
 }
-const waiting = (c, state) => waitingOf(c, state);
 conv = pageConversation({
   served: true, stream: false, agent: 'Coordinator', thread: byId('thread'), itemKinds: ITEM_KINDS,
-  kinds: eventKinds, steps: ['seen', 'done'], labels: { done: 'Done' }, shown: st => st === 'working' ? 'seen' : st === 'accepted' ? 'done' : st, accept: false,
-  waiting, afterSend: () => tick(), busy: formOpen,
+  kinds: eventKinds, afterSend: () => tick(), busy: formOpen, stats: () => byId('yourturn'),
 });
 decision = pageDecision({ conversation: conv, now: nowSec, md, esc, id: uid, suggested: true, next: () => { const open = DATA && currentOpen(); return open && dueMove(open) ? pickerButton : null; } });
 eventKinds.decision = (c, state, actions) => {
@@ -887,12 +892,6 @@ eventKinds.decision = (c, state, actions) => {
 byId('agents').addEventListener('click', event => {
   const button = event.target.closest('[data-goto]');
   if (button) goto(button.dataset.goto);
-});
-byId('status').addEventListener('click', event => {
-  if (!event.target.closest('#questions')) return;
-  const first = $('li.open-q', byId('thread'));
-  const target = first && ($('.use', first) || $('.answer', first));
-  if (target) { first.scrollIntoView({ block: 'nearest' }); target.focus(); }
 });
 showTab('moves');
 conv.start();

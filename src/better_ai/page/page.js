@@ -1,6 +1,6 @@
-// Every state the page gives an item, with the words of its progress mark. page.css colours a pin for each of them.
-var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied: 'You answered', followup: 'You replied',
-  working: 'Working on it', done: 'Done', accepted: 'Accepted', reopened: 'Reopened' };
+// Every state the page gives a pin, from its thread (pageThreads), with its words. page.css colours a pin for each.
+var PAGE_PIN_STATES = { new: 'Agent’s turn, not seen', seen: 'Agent’s turn, seen', working: 'Agent’s turn, working',
+  asked: 'Your turn', done: 'Done', accepted: 'Closed' };
 
 // The page token. `serve` gives it in the fragment of the address it opens (#t=...), which a browser never sends. The page
 // keeps it for the tab, so a reload still has it, and takes it out of the address bar. Every request to /rpc, /data,
@@ -179,14 +179,11 @@ function pageCommentPosition(x, y, pop) {
 // o.byId(id)     the page's own model of a comment, which offers Show, Edit and Delete; nothing when it offers none
 // o.crumb(e)     where a comment was made; o.commentBody(e) what it says (its text)
 // o.reveal(e), o.edit(it, button), o.remove(it), o.showLabel(n)   the comment's Show, Edit and Delete
-// o.kinds        renderers for the page's own kinds of event: function (c, state) returning the item, or [item, foot]
-// o.itemKinds    the user's actions the agent tracks with a state (default comment and note)
-// o.agentKinds   the agent's messages the user can reply to (default reply)
-// o.steps, o.labels, o.shown(state)   the progress steps the page has, their words, and the step a state shows as
-// o.accept       a done item offers Accept (default true); without it, a done item is finished
-// o.filter       the thread has Open and All (default true); without it, one list in time order
-// o.waiting(c, state)  an entry that waits for the user, shown last (default: the agent's own unanswered question)
-// o.latestLast   order the items by their newest message, replies included, so the newest is at the bottom, waiting ones last (default: by first message)
+// o.kinds        renderers for the page's own kinds of event: function (c, state, actions) returning the item, or [item, foot].
+//                C is the thread's first event as an entry: { kind, e (the event), replies (the rest of the thread),
+//                thread (from pageThreads) }; STATE is each user item's pin state. The item's content is the thread's
+//                first message; the buttons of FOOT, if any, are the row's buttons.
+// o.itemKinds    the user's kinds that start a thread with the agent (default comment and note)
 // o.readOnly     a copy of the page to read: no actions
 // o.stream       read the log from the server's /events (default true); otherwise the page calls setLog
 // o.afterSend()  called once the server saved an action
@@ -194,13 +191,15 @@ function pageCommentPosition(x, y, pop) {
 // o.sendMode()   a function to run instead of sending a message when the Send button is pressed, or null
 // o.busy()       the page has something open the user would lose on a reload
 // o.beforeReload()  keep the page's place before a new render loads
-// o.rendered(state)  called after each redraw with every item's state, to sync the pins
+// o.rendered(state)  called after each redraw with the state of every user item, by id, for its pin: new, seen,
+//                working, asked (your turn), done, accepted (you closed it); PAGE_PIN_STATES words them
+// o.stats        where the top bar's "N your turn" figure goes: an element, or a function that gives it (default the
+//                header's #status). A page that rewrites its own figures calls figure() after, to put it back.
 function pageConversation(o) {
   var rpcId = 0, log = [], state = {}, fed = null, itemKinds = o.itemKinds || ['comment', 'note'], kinds = o.kinds || {};
-  var agentKinds = o.agentKinds || ['reply'], agent = o.agent || pageRole().replace(/^./, function (c) { return c.toUpperCase(); }), accept = o.accept !== false, filtering = o.filter !== false;
+  var agent = o.agent || pageRole().replace(/^./, function (c) { return c.toUpperCase(); });
   function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
   function time(at) { return pageTime(at); }
-  if (!filtering) { var seg = document.querySelector('.notes-top .seg'); if (seg) seg.remove(); }
   var status = document.querySelector('.notes .status');
   function say(text, error) { if (!status) return; status.textContent = text; status.classList.toggle('error', !!error); }
   // Every action shows a toast at the bottom of the window: sending, then sent or failed.
@@ -244,18 +243,19 @@ function pageConversation(o) {
     renderThread();
   }
 
-  // ---------- The thread: everything sent and every reply, in order; a comment shows once, in its latest state ----------
+  // ---------- The panel: one row per thread, each in the one state every thread has (pageThreads) ----------
+  // A row: the state (Your turn and how long it has waited; the agent's turn with its progress; or Done), who started
+  // the thread and its first sentence, the triangle, how many messages and when the last came, and the buttons of its
+  // state. The whole head opens and folds the thread. Open lists what you have not closed: done first, then the agent's
+  // turn, then your turn last, next to the message box; All lists every thread in time order.
   var thread = o.thread || document.querySelector('.thread');
-  function body(text) { return pageMarkdown(text); }
-  function head(who, at) { var h = el('div', 'head'); h.append(el('span', 'who', who), el('span', 'when', time(at))); return h; }
-  // A reply that names the message it answers is shown under that message, so the user sees what was answered.
-  function replyBlock(e) {
-    var mine = e.type !== 'reply', r = el('div', mine ? 'reply mine' : 'reply'), h = head(mine ? 'You' : agent, e.at);
-    if (e.type === 'reopen') h.append(el('span', 'progress reopened', 'Reopened'));
-    r.append(h, body(e.text));
-    return r;
-  }
-  var filter = filtering ? 'open' : 'all', scrolledOnce = false;
+  var filter = 'open', scrolledOnce = false, threads = [];
+  // What the user has open or typed, by thread key, kept across every redraw: the threads they opened, the one box
+  // (an answer, a reply or why they reopen it), drafts and errors by box, the closes in their undo window, the closes
+  // sent but not yet in the log, and the control to focus once the next redraw is done.
+  var expanded = {}, box = null, drafts = {}, errors = {}, closing = {}, closed = {}, focusAfter = null;
+  var CLOSE_MS = 6000, BARS = ['seen', 'working', 'done'], STEP_WORDS = { new: 'Not seen', seen: 'Seen', working: 'Working', done: 'Done' };
+  var PLAIN = ['comment', 'note', 'reply'];
   document.querySelectorAll('[data-filter]').forEach(function (b) {
     b.addEventListener('click', function () {
       filter = b.dataset.filter;
@@ -263,149 +263,364 @@ function pageConversation(o) {
       renderThread();
     });
   });
-  var STEPS = o.steps || ['seen', 'working', 'done', 'accepted'],
-      LABEL = Object.assign({}, PAGE_STATES, o.labels || {});
-  // The box for an answer or a reply, under the item. The button that opened it hides in place while it is open, and
-  // the box goes only once the message is sent. By default it sends a note under the item; onSend(text, done) sends
-  // something else, such as the answer to a decision.
-  function reasonBox(li, id, label, from, onSend) {
-    if (li.querySelector('.why')) return li.querySelector('.why textarea').focus();
-    var box = el('div', 'why'), ta = el('textarea'), row = el('div', 'row2'),
-        ok = el('button', 'btn btn--sm', 'Send'), no = el('button', 'btn btn--quiet btn--sm cancel', 'Cancel');
-    ta.setAttribute('aria-label', label); ta.placeholder = label;
-    ok.type = no.type = 'button';
-    if (from) from.style.visibility = 'hidden';
-    // A redraw moves the box into a new item, whose own buttons it hid: show those again, not only the first one.
-    function close() {
-      var host = box.parentNode; box.remove(); if (from) from.style.visibility = '';
-      var again = host ? host.querySelectorAll('.foot .answer, .foot .change') : [];
-      again.forEach(function (b) { b.style.visibility = ''; });
-      // Focus goes back to the button that opened the box, so a keyboard user who cancels stays at the item. After a
-      // redraw that button is gone: its copy in the redrawn item takes the focus instead.
-      if (from) { var back = document.contains(from) ? from : again[again.length - 1]; if (back) back.focus({ preventScroll: true }); }
-    }
-    function sendIt() {
-      var r = ta.value.trim(); if (!r) return ta.focus();
-      var done = function () { close(); li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); };
-      if (onSend) return onSend(r, done);
-      send('note', { id: 'm-' + Date.now().toString(36), to: id, text: r }, label === 'Your answer' ? 'Answer' : 'Reply', done);
-    }
-    ok.addEventListener('click', sendIt); no.addEventListener('click', close);
-    ta.addEventListener('keydown', function (k) { if (k.key === 'Enter' && !k.shiftKey) { k.preventDefault(); sendIt(); } if (k.key === 'Escape') close(); });
-    row.append(ok, no); box.append(ta, row); li.append(box); box.scrollIntoView({ block: 'nearest' }); ta.focus();
+  function keyOf(t) { return t.id != null ? String(t.id) : 'at-' + threads.indexOf(t); }
+  function whoOf(e) { return e.by === 'user' ? 'You' : agent; }
+  function day(at) {
+    var d = new Date(at);
+    if (isNaN(d)) return '';
+    return d.getDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()] + ', ' + time(at);
   }
-  // The progress mark: a short bar per step fills as the agent sees an item, works on it, finishes it and the user
-  // accepts it. Before the agent sets a state, the bars are empty and the word is Sent.
-  function progressChip(st) {
-    if (st && o.shown) st = o.shown(st);
-    var k = !st ? -1 : st === 'asked' || st === 'replied' || st === 'followup' ? 0 : STEPS.indexOf(st), chip = el('span', 'progress' + (st ? ' ' + st : '')), bars = el('span', 'bars');
+  // How long a state has held, in the words of the row.
+  function age(at) {
+    var s = Math.max(0, (Date.now() - Date.parse(at)) / 1000);
+    if (isNaN(s)) return '';
+    if (s < 90) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min';
+    if (s < 36 * 3600) return Math.round(s / 3600) + ' h';
+    return Math.round(s / 86400) + ' days';
+  }
+  function aged(words, at) { var a = age(at); return a ? words + ', ' + a : words; }
+  // The first sentence of the message that started the thread, without its marks; nobody names threads.
+  function rootText(e) { return e.type === 'decision' ? (e.x && e.x.asked) || '' : e.text || e.label || e.option || ''; }
+  function gist(text) {
+    var t = pageMarkdownText(text || ''), s = t.split(/(?<=[.?!])\s/)[0];
+    return s.length > 120 ? s.slice(0, 117).replace(/\s+\S*$/, '') + '…' : s;
+  }
+  // A control the redraw can find again: KEY names it, such as "toggle:<thread>".
+  function keyed(x, key) { x.dataset.fk = key; return x; }
+  function find(key) {
+    var all = thread.querySelectorAll('[data-fk]');
+    for (var i = 0; i < all.length; i++) if (all[i].dataset.fk === key) return all[i];
+    return null;
+  }
+  function button(text, cls, on, label) {
+    var b = el('button', 'btn btn--sm' + (cls ? ' ' + cls : ''), text); b.type = 'button';
+    if (label) b.setAttribute('aria-label', label);
+    b.addEventListener('click', on);
+    return b;
+  }
+  function stateChip(t) { return t.state === 'you' ? el('span', 'chip wait', 'Your turn') : el('span', 'chip', 'Agent’s turn'); }
+  // The agent's progress: a bar per step it reached, seen, working and done (green); none before it has seen your message.
+  function progress(t) {
+    var step = t.state === 'done' ? 'done' : t.step, k = BARS.indexOf(step);
+    var chip = el('span', 'progress' + (step === 'new' ? '' : ' ' + step)), bars = el('span', 'bars');
     bars.setAttribute('aria-hidden', 'true');
-    for (var j = 0; j < STEPS.length; j++) bars.append(el('i', j <= k ? 'on' : ''));
-    chip.append(bars, el('span', '', st ? LABEL[st] || st : 'Sent'));
+    for (var j = 0; j < BARS.length; j++) bars.append(el('i', j <= k ? 'on' : ''));
+    chip.append(bars, el('span', '', aged(STEP_WORDS[step], t.since)));
     return chip;
   }
-  // One entry of the thread; without actions, as in a copy to read or a list elsewhere on the page.
-  function entryNode(c, actions) {
-    var e = c.e, li, foot;
-    if (c.kind === 'comment') {
-      li = el('li', 'msg me comment' + (c.deleted ? ' deleted' : ''));
-      var h = el('div', 'head');
-      if (e.n) h.append(el('span', 'n', e.n));
-      h.append(el('span', 'who', 'You'), el('span', 'when', time(e.at) + (c.edited ? ', edited' : '')));
-      var it = actions && o.byId && o.byId(e.id);
-      if (it && !c.deleted && state[e.id] !== 'done' && state[e.id] !== 'accepted') {
-        var where = el('button', 'link', 'Show'), edit = el('button', 'link', 'Edit'), del = el('button', 'link', 'Delete');
-        where.type = edit.type = del.type = 'button';
-        where.setAttribute('aria-label', o.showLabel(e.n)); edit.setAttribute('aria-label', 'Edit comment ' + e.n); del.setAttribute('aria-label', 'Delete comment ' + e.n);
-        where.addEventListener('click', function () { o.reveal(e); });
-        edit.addEventListener('click', function () { o.reveal(e); o.edit(it, edit); });
-        del.addEventListener('click', function () { o.remove(it); });
-        h.append(where, edit, del);
+  function body(text) { return pageMarkdown(text); }
+  // One message of an open thread, flat across the row: yours on white, the agent's on linen.
+  function message(e, t) {
+    var m = el('div', 'tmsg ' + (e.by === 'user' ? 'mine' : 'agent')), h = el('div', 'head');
+    if (e.type === 'comment' && e.n) h.append(el('span', 'n', e.n));
+    h.append(el('span', 'who', whoOf(e)), el('span', 'when', day(e.at) + (e.type === 'comment' && t.edited ? ', edited' : '')));
+    if (e.type === 'reopen') h.append(el('span', 'tag', 'Reopened'));
+    m.append(h);
+    if (e.type === 'comment') {
+      var crumb = o.crumb && o.crumb(e), said = o.commentBody ? o.commentBody(e) : body(e.text);
+      if (crumb) m.append(crumb);
+      if (said) m.append(said);
+    } else m.append(body(e.text));
+    return m;
+  }
+  // A page's own kind of first message, drawn by its renderer: its content becomes the first message, and the buttons
+  // of its foot, without its own progress (the row says the state once), become the row's buttons.
+  function kindParts(t, actions) {
+    if (!kinds[t.root.type]) return null;
+    var c = { kind: t.root.type, e: t.root, replies: t.messages.slice(1), thread: t };
+    var made = kinds[c.kind](c, state, actions), item = Array.isArray(made) ? made[0] : made, foot = Array.isArray(made) ? made[1] : null;
+    if (!item) return null;
+    var m = el('div', 'tmsg ' + (t.root.by === 'user' ? 'mine' : 'agent') + ' ' + String(item.className || '').replace(/\bopen-q\b/, '').trim());
+    Array.prototype.slice.call(item.childNodes).forEach(function (n) { m.append(n); });
+    var buttons = foot ? Array.prototype.filter.call(foot.children, function (b) { return b.tagName === 'BUTTON'; }) : [];
+    return { node: m, buttons: buttons, openQ: /\bopen-q\b/.test(item.className || ''), d: item.dataset && item.dataset.d, text: blockText(m).replace(/\s+/g, ' ').trim() };
+  }
+  // What a page's kind says, for the row's first sentence: its words without its head (who and when), each block ended
+  // by a stop, so the words of two blocks never run together.
+  var BLOCK = /^(P|DIV|LI|UL|OL|H[1-6]|BLOCKQUOTE|PRE|TABLE|TR|TD|TH|BR)$/;
+  function blockText(n) {
+    if (n.nodeType === 3) return n.textContent;
+    if (n.nodeType !== 1 || (n.classList && n.classList.contains('head'))) return '';
+    var inner = Array.prototype.map.call(n.childNodes, blockText).join('');
+    if (!BLOCK.test(n.tagName)) return inner;
+    // A block ends with a stop, so a label and the words after it read as two sentences, not one run-on line.
+    var words = inner.replace(/\s+/g, ' ').trim();
+    return words ? ' ' + words + (/[.?!:;…]$/.test(words) ? '' : '.') + ' ' : ' ';
+  }
+  // The box under an open thread: your answer or reply, or why you reopen it. Its text survives every redraw. ONSEND,
+  // from a page's own kind, sends something else, such as the answer to a decision.
+  function writeBox(t, k) {
+    var mode = box.mode, dk = k + ':' + mode, f = el('div', 'why'), domId = 'tbox-' + k.replace(/[^\w-]/g, '_');
+    var words = box.label || (mode === 'reopen' ? 'Why reopen it?' : t.state === 'you' ? 'Your answer' : 'Your reply');
+    var lab = el('label', '', words), ta = keyed(el('textarea'), 'box:' + k), err = el('p', 'err', errors[dk] || '');
+    ta.id = domId; lab.htmlFor = domId; ta.rows = 3; ta.value = drafts[dk] || '';
+    err.id = domId + '-err'; err.hidden = !errors[dk];
+    if (errors[dk]) { ta.setAttribute('aria-invalid', 'true'); ta.setAttribute('aria-describedby', err.id); }
+    ta.addEventListener('input', function () {
+      drafts[dk] = ta.value;
+      if (errors[dk]) { errors[dk] = null; err.hidden = true; ta.removeAttribute('aria-invalid'); }
+    });
+    var from = box.from, onSend = box.onSend, row = el('div', 'row2');
+    var ok = button(mode === 'reopen' ? 'Reopen' : 'Send', '', submit), no = button('Cancel', 'btn--quiet', cancel);
+    function cancel() { box = null; focusAfter = from; renderThread(); }
+    function submit() {
+      var text = ta.value.trim();
+      if (!text) {
+        errors[dk] = mode === 'reopen' ? 'Say why you reopen it.' : 'Write your ' + (/answer/i.test(words) ? 'answer' : 'reply') + ' first.';
+        focusAfter = 'box:' + k; renderThread(); return;
       }
-      li.append(h, o.crumb(e), c.deleted ? el('p', 'body', 'Deleted') : o.commentBody(e));
-    } else if (c.kind === 'note') {
-      li = el('li', 'msg me'); li.append(head('You', e.at), body(e.text));
-    } else if (c.kind === 'reply') {
-      li = el('li', 'msg agent'); li.append(replyBlock(e));
-    } else if (kinds[c.kind]) {
-      var made = kinds[c.kind](c, state, actions);
-      if (Array.isArray(made)) { li = made[0]; foot = made[1]; } else li = made;
-    } else return null;
-    c.replies.forEach(function (r) { li.append(replyBlock(r)); });
-    if (foot) li.append(foot);
-    if (agentKinds.indexOf(c.kind) >= 0 && e.id && actions) {  // the agent's own messages can be answered too; the state row closes them
-      var rf = el('div', 'foot'), mine = c.replies.filter(function (r) { return r.type === 'note'; }), last = mine[mine.length - 1];
-      if (last) rf.append(progressChip(state[last.id]));
-      var rb = el('button', 'btn btn--quiet btn--sm answer', 'Reply'); rb.type = 'button';
-      rb.addEventListener('click', function () { reasonBox(li, e.id, 'Your reply', rb); });
-      rf.append(rb); li.append(rf);
+      var done = function () {
+        drafts[dk] = ''; errors[dk] = null;
+        if (box && box.key === k) box = null;
+        focusAfter = 'toggle:' + k; renderThread();
+      };
+      if (onSend) return onSend(text, done);
+      if (mode === 'reopen') send('reopen', { to: t.id, text: text }, 'Reopen', done);
+      else send('note', noteEvent({ to: t.id, text: text }), /answer/i.test(words) ? 'Answer' : 'Reply', done);
     }
-    // The state and what the user can do with it close the item, after the latest reply, where the eye ends.
-    if (itemKinds.indexOf(c.kind) >= 0) {
-      var f = el('div', 'foot');
-      f.append(progressChip(state[e.id]));
-      // A done item is accepted with the brown check next to Reply; replying instead puts it back with the agent.
-      if (actions && accept && state[e.id] === 'done') {
-        var ok = el('button', 'btn btn--sm answer', '✓'); ok.type = 'button'; ok.title = 'Accept'; ok.setAttribute('aria-label', 'Accept');
-        ok.addEventListener('click', function () { send('accept', { to: e.id }, 'Acceptance', function () { li.setAttribute('tabindex', '-1'); li.focus({ preventScroll: true }); }); });
-        f.append(ok);
-      }
-      // Every message can be answered: Answer when the agent asked something, Reply otherwise.
-      if (actions) {
-        var asked = state[e.id] === 'asked', ans = el('button', 'btn btn--sm answer' + (asked ? '' : ' btn--quiet'), asked ? 'Answer' : 'Reply');
-        ans.type = 'button';
-        ans.addEventListener('click', function () { reasonBox(li, e.id, asked ? 'Your answer' : 'Your reply', ans); });
-        f.append(ans);
-      }
-      li.append(f);
-      if (state[e.id]) li.dataset.state = state[e.id];
-    }
-    if (e.id) li.dataset.id = e.id;
+    ta.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(); }
+    });
+    row.append(ok, no); f.append(lab, ta, err, row);
+    return f;
+  }
+  function openBox(t, mode, more) {
+    var k = keyOf(t);
+    box = Object.assign({ key: k, mode: mode, from: 'act:' + mode + ':' + k }, more);
+    expanded[k] = true; focusAfter = 'box:' + k; renderThread();
+  }
+  // Close is recorded once its 6-second window is over. Meanwhile the row stays in place as Closed with its own Undo,
+  // so closing several threads in a row keeps an Undo for each, next to what it undoes.
+  function close(t, first) {
+    var k = keyOf(t);
+    closing[k] = { first: first, timer: setTimeout(function () {
+      delete closing[k]; closed[k] = true;
+      send('accept', { to: t.id }, 'Close', null, function () { delete closed[k]; renderThread(); });
+      renderThread();
+    }, CLOSE_MS) };
+    focusAfter = 'undo:' + k; renderThread();
+  }
+  function closedRow(t, k) {
+    var li = el('li', 'trow closing'), c = closing[k], p = el('div', 'tclosed'), g = el('span', 'tgist');
+    li.dataset.state = 'done'; li.dataset.id = k;
+    g.append(el('span', 'twho', whoOf(t.root) + ': '), c.first);
+    p.append(el('span', 'chip ok', 'Closed'), g);
+    var u = keyed(button('Undo', 'btn--quiet', function () {
+      clearTimeout(c.timer); delete closing[k]; focusAfter = 'toggle:' + k; renderThread();
+    }, 'Undo closing: ' + c.first), 'undo:' + k);
+    li.append(p, u);
     return li;
   }
+  function row(t, actions, forceOpen) {
+    var k = keyOf(t);
+    if (closing[k] && actions) return closedRow(t, k);
+    var kind = kindParts(t, actions);
+    if (!kind && PLAIN.indexOf(t.root.type) < 0) return null;
+    var first = gist(t.root.type === 'decision' || PLAIN.indexOf(t.root.type) >= 0 || t.root.text ? rootText(t.root) : (kind && kind.text) || rootText(t.root)), open = forceOpen || !!expanded[k], li = el('li', 'trow');
+    li.dataset.state = t.state === 'you' ? 'asked' : t.state === 'done' ? 'done' : t.step === 'working' ? 'working' : 'seen';
+    if (t.id != null) li.dataset.id = t.id;
+    if (kind && kind.openQ) li.classList.add('open-q');
+    if (kind && kind.d) li.dataset.d = kind.d;
+    // The head opens and folds the thread: one native button, as wide as the row. A row shown elsewhere, open and
+    // without actions (nodes), has nothing to fold: its head is plain.
+    var plainHead = !actions && forceOpen;
+    var head = plainHead ? el('div', 'thead plain') : keyed(el('button', 'thead'), 'toggle:' + k), top = el('span', 'ttop'), chips = el('span', 'tchips');
+    if (!plainHead) { head.type = 'button'; head.setAttribute('aria-expanded', String(open)); }
+    var said = t.state === 'you' ? 'Your turn' : t.state === 'done' ? 'Done' : 'Agent’s turn, ' + STEP_WORDS[t.step].toLowerCase();
+    if (t.state !== 'done') chips.append(stateChip(t));
+    if (t.state === 'you') chips.append(el('span', 'tage', aged('Waiting', t.since)));
+    else chips.append(progress(t));
+    // A drawn equilateral triangle, sharp as the n14n style has it: down to open, up to fold.
+    top.append(chips);
+    if (!plainHead) {
+      var fold = el('span', 'tfold'); fold.setAttribute('aria-hidden', 'true');
+      fold.innerHTML = '<svg width="16" height="13.86" viewBox="0 0 16 13.86"><polygon points="' +
+        (open ? '0,13.86 8,0 16,13.86' : '0,0 16,0 8,13.86') + '" fill="currentColor"/></svg>';
+      top.append(fold);
+      head.setAttribute('aria-label', said + '. ' + whoOf(t.root) + ': ' + first.replace(/[.?!…]$/, '') + '. ' + (open ? 'Fold the thread' : 'Open the thread'));
+      head.addEventListener('click', function () { expanded[k] = !open; focusAfter = 'toggle:' + k; renderThread(); });
+    }
+    head.append(top);
+    if (!open) { var g = el('span', 'tgist'); g.append(el('span', 'twho', whoOf(t.root) + ': '), first); head.append(g); }
+    li.append(head);
+    if (open) {
+      var b = el('div', 'tbody');
+      t.messages.forEach(function (e, i) { b.append(i === 0 && kind ? kind.node : message(e, t)); });
+      li.append(b);
+    }
+    var editing = actions && box && box.key === k;
+    if (editing) li.append(writeBox(t, k));
+    var foot = el('div', 'tfoot'), left = el('span', 'tleft'), acts = el('span', 'tacts'), n = t.messages.length;
+    left.append(el('span', 'tmeta', (n === 1 ? '1 message' : n + ' messages') + ', last ' + day(t.last)));
+    // A comment keeps Show, Edit and Delete while it is not done.
+    var it = actions && t.root.type === 'comment' && o.byId && o.byId(t.root.id), e0 = t.root;
+    if (it && t.state !== 'done') {
+      var link = function (words, label, on) { var x = el('button', 'link', words); x.type = 'button'; x.setAttribute('aria-label', label); x.addEventListener('click', on); return x; };
+      left.append(link('Show', o.showLabel ? o.showLabel(e0.n) : 'Show comment ' + e0.n, function () { o.reveal(e0); }),
+        link('Edit', 'Edit comment ' + e0.n, function (ev) { o.reveal(e0); o.edit(it, ev && ev.target); }),
+        link('Delete', 'Delete comment ' + e0.n, function () { o.remove(it); }));
+    }
+    function act(b, name) { acts.append(keyed(b, 'act:' + name + ':' + k)); }
+    // The controls of the thread's state, the same for every kind (states.md, Controls): ✓ first on every thread you
+    // have not closed (Close, or Confirm done), then Answer or Reply, then Reopen on a done one; a thread you closed
+    // offers Reopen only. A page's own kind brings its own Answer or Reply, such as a decision's Use the default and
+    // Answer, which take that place. A thread without an id, such as a verdict from before verdicts had one, offers
+    // nothing: a reopen or a close names its thread by id.
+    if (actions && !editing && t.id != null) {
+      if (!t.closedByUser) {
+        act(button('✓', 'btn--quiet close', function () { close(t, first); }, (t.state === 'done' ? 'Confirm done: ' : 'Close: ') + first), 'close');
+        if (kind && kind.buttons.length) {
+          kind.buttons.forEach(function (b, j) { acts.append(keyed(b, /\bchange\b/.test(b.className) ? 'act:reply:' + k : 'kind:' + j + ':' + k)); });
+        } else {
+          if (t.state === 'you') act(button('Answer', 'primary', function () { openBox(t, 'reply'); }, 'Answer: ' + first), 'reply');
+          if (t.state === 'agent') act(button('Reply', 'btn--quiet', function () { openBox(t, 'reply'); }, 'Reply: ' + first), 'reply');
+        }
+      }
+      if (t.state === 'done') act(button('Reopen', 'btn--quiet', function () { openBox(t, 'reopen'); }, 'Reopen: ' + first), 'reopen');
+    }
+    foot.append(left, acts); li.append(foot);
+    return li;
+  }
+  // The threads as the page shows them: a close sent but not yet in the log already counts as closed.
+  function current() {
+    threads = pageThreads(log, itemKinds);
+    var shown = threads.filter(function (t) {
+      var k = keyOf(t);
+      if (closed[k] && t.closedByUser) delete closed[k];
+      else if (closed[k]) { t.state = 'done'; t.closedByUser = true; }
+      return !t.deleted && (PLAIN.indexOf(t.root.type) >= 0 || kinds[t.root.type]);
+    });
+    state = pinStates();
+    return shown;
+  }
+  // Each user item's state, for its pin.
+  function pinStates() {
+    var s = {};
+    threads.forEach(function (t) {
+      var v = t.closedByUser ? 'accepted' : t.state === 'done' ? 'done' : t.state === 'you' ? 'asked' : t.step;
+      t.messages.forEach(function (m) { if (m.by === 'user' && m.id != null && itemKinds.indexOf(m.type) >= 0) s[m.id] = v; });
+    });
+    return s;
+  }
+  // What has focus in the list, so a redraw puts it back, with the caret; when it is gone, the head of the row now at
+  // its place takes it.
+  function focusKey() {
+    var a = document.activeElement;
+    if (!a || !thread.contains || !thread.contains(a)) return null;
+    var li = a.closest && a.closest('li.trow'), rows = Array.prototype.slice.call(thread.querySelectorAll('li.trow'));
+    return { key: a.dataset && a.dataset.fk, index: rows.indexOf(li), start: a.selectionStart, end: a.selectionEnd };
+  }
   function renderThread() {
-    var stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
-    var model = pageThread(log, itemKinds, o.waiting, o.latestLast), entries = model.entries, open = model.open;
-    state = model.state;
-    // A box the user is typing in survives the redraw, with its text and cursor, and keeps its item on the page until
-    // it is sent or cancelled, even when the item has left Open meanwhile.
-    var kept = {};
-    thread.querySelectorAll('li[data-id] > .why').forEach(function (box) {
-      var ta = box.querySelector('textarea');
-      kept[box.parentNode.dataset.id] = { box: box, focus: document.activeElement === ta, start: ta.selectionStart, end: ta.selectionEnd };
-    });
-    if (filtering) document.querySelector('[data-filter="open"]').textContent = 'Open (' + open.length + ')';
-    if (filter === 'open') entries = entries.filter(function (c) { return open.indexOf(c) >= 0 || (c.e.id && kept[c.e.id]); });
+    var kept = focusKey(), stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
+    var all = current(), actions = !o.readOnly;
+    var live = all.filter(function (t) { return closing[keyOf(t)] || !t.closedByUser; });
+    var yours = live.filter(function (t) { return t.state === 'you'; });
+    var shown = filter === 'open' ? live.filter(function (t) { return t.state === 'done'; })
+      .concat(live.filter(function (t) { return t.state === 'agent'; }), yours) : all;
+    // A box the user is typing in keeps its thread on the page until it is sent or cancelled.
+    if (box && filter === 'open' && !shown.some(function (t) { return keyOf(t) === box.key; })) {
+      shown = shown.concat(all.filter(function (t) { return keyOf(t) === box.key; }));
+    }
+    var openBtn = document.querySelector('[data-filter="open"]'), allBtn = document.querySelector('[data-filter="all"]');
+    if (openBtn) openBtn.textContent = 'Open (' + live.length + ')';
+    if (allBtn) allBtn.textContent = 'All (' + all.length + ')';
+    figure(yours.filter(function (t) { return !closing[keyOf(t)]; }));
+    var empty = document.querySelector('.notes .empty');
+    if (empty) empty.hidden = !!all.length;
     thread.replaceChildren();
-    // Before anything is sent, both views say how to start; after, Open says when nothing is left.
-    var started = log.some(function (x) { return x.type && x.type !== 'status'; });
-    document.querySelector('.notes .empty').hidden = started;
-    entries.forEach(function (c) {
-      var li = entryNode(c, !o.readOnly); if (!li) return;
-      var k = c.e.id && kept[c.e.id];
-      if (k) { li.append(k.box); li.querySelectorAll('.foot .answer, .foot .change').forEach(function (b) { b.style.visibility = 'hidden'; }); }
-      thread.appendChild(li);
-    });
-    // Focus only once the box is back in the page: a detached element cannot take it.
-    Object.keys(kept).forEach(function (id) {
-      var k = kept[id], ta = k.box.querySelector('textarea');
-      if (k.focus && document.contains(ta)) { ta.focus({ preventScroll: true }); ta.setSelectionRange(k.start, k.end); }
-    });
-    if (filter === 'open' && started && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
-    // The conversation opens on its latest message, and follows new ones while the user is at the bottom. The scroll
-    // repeats on the next frame and once fonts load, which can make the thread taller after this render.
+    shown.forEach(function (t) { var li = row(t, actions); if (li) thread.appendChild(li); });
+    if (filter === 'open' && all.length && !live.length) thread.appendChild(el('li', 'sys', 'Nothing open: every thread is done and closed.'));
+    // The list opens on its end, next to the message box, and follows new rows while the user is at the bottom. The
+    // scroll repeats on the next frame and once fonts load, which can make the list taller after this render.
     if (stick || !scrolledOnce) {
-      var bottom = function () { thread.scrollTop = thread.scrollHeight; };
+      var bottom = function () { thread.scrollTop = thread.scrollHeight; above(); };
       bottom(); requestAnimationFrame(bottom); if (document.fonts) document.fonts.ready.then(bottom);
       if (log.length) scrolledOnce = true;
     }
+    if (focusAfter) {
+      var target = find(focusAfter); focusAfter = null;
+      if (target) { target.focus({ preventScroll: true }); if (target.scrollIntoView) target.scrollIntoView({ block: 'nearest' }); }
+    } else if (kept) {
+      var back = kept.key && find(kept.key);
+      if (!back && kept.index >= 0) {
+        var rows = thread.querySelectorAll('li.trow'), r = rows[Math.min(kept.index, rows.length - 1)];
+        back = r && (r.querySelector('.thead') || r.querySelector('[data-fk]'));
+      }
+      if (back) { back.focus({ preventScroll: true }); if (kept.start != null && back.setSelectionRange) back.setSelectionRange(kept.start, kept.end); }
+    }
+    above();
     if (o.rendered) o.rendered(state);
   }
-  // Reply under a finished item from elsewhere on the page, such as its pin: the item comes into view with the box open.
+  // While rows are out of view above, a button says how many and takes the user there.
+  var cue = null;
+  function above() {
+    if (!thread.getBoundingClientRect || !thread.parentNode) return;
+    if (!cue) {
+      cue = el('button', 'tabove'); cue.type = 'button'; cue.hidden = true;
+      cue.addEventListener('click', function () { thread.scrollTo({ top: 0 }); });
+      thread.parentNode.insertBefore(cue, thread);
+    }
+    var top = thread.getBoundingClientRect().top, n = 0;
+    thread.querySelectorAll('li.trow').forEach(function (li) { if (li.getBoundingClientRect().top < top - 4) n++; });
+    cue.hidden = !n; cue.textContent = '▲ ' + n + (n === 1 ? ' more thread above' : ' more threads above');
+  }
+  thread.addEventListener('scroll', above);
+  // The top bar's figure: how many threads are your turn; a button to the first one's Answer, or plain at none. It goes
+  // where the page says (o.stats), else in the header's #status.
+  var figureEl = null;
+  function figureSlot() {
+    if (typeof o.stats === 'function') return o.stats();
+    return o.stats || (document.getElementById ? document.getElementById('status') : null);
+  }
+  function placeFigure() {
+    var slot = figureSlot();
+    if (!slot || !figureEl) return figureEl;
+    if (slot.textContent.trim() === 'Loading…') slot.replaceChildren();
+    if (figureEl.parentNode !== slot) slot.append(figureEl);
+    return figureEl;
+  }
+  function figure(yours) {
+    // Built even while its slot is missing, such as before a page writes its header: figure() places it then.
+    if (typeof document.createElement !== 'function') return;
+    var tag = yours.length ? 'BUTTON' : 'SPAN';
+    if (!figureEl || figureEl.tagName !== tag) {
+      if (figureEl) figureEl.remove();
+      figureEl = el(tag.toLowerCase(), 'stat');
+      if (yours.length) { figureEl.type = 'button'; figureEl.addEventListener('click', goYourTurn); }
+    }
+    figureEl.replaceChildren(el('b', '', String(yours.length)), ' your turn');
+    if (yours.length) figureEl.setAttribute('aria-label', yours.length + ' your turn: go to the first');
+    figureEl.first = yours[0];
+    placeFigure();
+  }
+  function goYourTurn() {
+    var t = figureEl.first; if (!t) return;
+    if (filter !== 'open') document.querySelector('[data-filter="open"]').click();
+    var b = find('act:reply:' + keyOf(t)) || find('toggle:' + keyOf(t));
+    if (b) { if (b.scrollIntoView) b.scrollIntoView({ block: 'center' }); b.focus(); }
+  }
+  // The thread an id belongs to: the thread itself, or a message in it.
+  function threadOf(id) {
+    for (var i = 0; i < threads.length; i++) {
+      var t = threads[i];
+      if (String(t.id) === String(id) || t.messages.some(function (m) { return m.id != null && String(m.id) === String(id); })) return t;
+    }
+    return null;
+  }
+  // A box under a thread, from a page's own kind, such as a decision's Answer: FROM is the button that opened it, and
+  // takes the focus back on Cancel; ONSEND(text, done) sends what the box holds.
+  function reasonBox(_li, id, label, from, onSend) {
+    var t = threadOf(id); if (!t) return;
+    openBox(t, 'reply', { label: label, onSend: onSend, from: from && from.dataset ? from.dataset.fk : null });
+  }
+  // From elsewhere on the page, such as a pin: the thread comes into view, open, with Reopen's box when it is done and
+  // the reply box otherwise.
   function reopen(id) {
-    if (filter === 'open' && state[id] === 'accepted') document.querySelector('[data-filter="all"]').click();
-    var li = thread.querySelector('li[data-id="' + id + '"]'); if (!li) return;
-    li.scrollIntoView({ block: 'nearest' }); reasonBox(li, id, 'Your reply');
+    var t = threadOf(id); if (!t) return;
+    if (filter === 'open' && t.closedByUser) document.querySelector('[data-filter="all"]').click();
+    openBox(t, t.state === 'done' ? 'reopen' : 'reply');
   }
   // The page's whole log, when the page reads it itself; KEY is anything else the entries show, such as a deadline.
   // The thread is redrawn only when either changed, so focus and selection stay put between polls.
@@ -414,19 +629,24 @@ function pageConversation(o) {
     if (next === fed) return;
     fed = next; log = events.slice(); renderThread();
   }
-  // The user's items that match, without actions, such as the comments on one question.
+  // The rows of the user's threads that match, open and without actions, such as the comments on one task.
   function nodes(match) {
-    return pageThread(log, itemKinds, o.waiting, o.latestLast).entries
-      .filter(function (c) { return itemKinds.indexOf(c.kind) >= 0 && match(c.e); })
-      .map(function (c) { return entryNode(c, false); });
+    current();
+    return threads.filter(function (t) { return !t.deleted && itemKinds.indexOf(t.root.type) >= 0 && match(t.root); })
+      .map(function (t) { return row(t, false, true); }).filter(Boolean);
   }
 
   // ---------- The message box ----------
   var noteBox = document.querySelector('#note'), noteBtn = document.querySelector('.notes .send .btn');
   function sendNote() {
     var note = noteBox.value.trim();
-    if (!note) { noteBox.focus(); return; }
-    send('note', Object.assign({ id: 'm-' + Date.now().toString(36), text: note, to: null }, o.noteParams ? o.noteParams() : {}), 'Message', function () { noteBox.value = ''; });
+    if (!note) { say('Write your message first.', true); noteBox.focus(); return; }
+    send('note', noteEvent({ text: note, to: null }), 'Message', function () { noteBox.value = ''; });
+  }
+  // Every note the page sends, from the message box or from a row, the same way: with its id and the page's own fields
+  // (o.noteParams), which the page's events schema may require, such as the slide a deck's message is on.
+  function noteEvent(fields) {
+    return Object.assign({ id: 'm-' + Date.now().toString(36) }, fields, o.noteParams ? o.noteParams() : {});
   }
   function mode() { return o.sendMode ? o.sendMode() : null; }
   if (noteBox && !o.readOnly) {
@@ -435,9 +655,10 @@ function pageConversation(o) {
   }
 
   // ---------- Live updates ----------
+  // A close in its undo window counts too: a reload would end its timer, and the close would never be sent.
   function busy() {
-    return !!noteBox.value.trim() || (o.busy && o.busy()) ||
-      Array.prototype.some.call(document.querySelectorAll('.why textarea'), function (t) { return !!t.value.trim(); });
+    return !!(noteBox && noteBox.value.trim()) || !!(o.busy && o.busy()) || Object.keys(closing).length > 0 ||
+      Object.keys(drafts).some(function (k) { return !!(drafts[k] || '').trim(); });
   }
   // Lines in the format before this change are one count under the header, the same on every page: kept as they are.
   function oldNote(count) {
@@ -492,7 +713,7 @@ function pageConversation(o) {
 
   return {
     send: send, say: say, flash: flash, reopen: reopen, render: renderThread, start: start, setLog: setLog, nodes: nodes,
-    box: reasonBox, progress: progressChip, noteBox: noteBox, noteBtn: noteBtn,
+    box: reasonBox, figure: placeFigure, noteBox: noteBox, noteBtn: noteBtn, busy: busy,
     log: function () { return log; }, state: function () { return state; }
   };
 }
@@ -504,60 +725,104 @@ function pageTime(at) {
   return isNaN(d) ? '' : ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
 }
 
-// The thread as the log makes it, without the page: each item's state, the entries in the order they show, with the
-// replies under them, and the entries Open lists. Kept apart from the drawing so it can be tested without a browser.
-// WAITING(c, state) says which entries wait for the user and come last; by default, the agent's own question.
-// LATESTLAST puts the entries in the order of their newest message, replies included, not of their first; the waiting
-// ones still come last.
-function pageThread(log, itemKinds, waiting, latestLast) {
-  var entries = [], byKey = {}, state = {}, items = {}, home = {};
-  // The state of each item. A message under a reply belongs to the item that reply is under (HOME). pending in
-  // src/better_ai/page/__init__.py follows the same rules; tests/fixtures/threads.json holds the logs both are run on.
+// The threads of a LOG, each in one state of the one machine every thread follows (.design/conversation-panel/states.md).
+// Kept apart from the drawing so it can be tested without a browser; `threads` in src/better_ai/page/__init__.py gives
+// the same threads for the same log, and tests/fixtures/threads.json holds the logs both are run on.
+// ITEMKINDS: the user's kinds the agent tracks (comment, note, ...). Each thread, in the order it started:
+//   { id, root, messages, state: 'you' | 'agent' | 'done', step: 'new' | 'seen' | 'working', closedByUser, deleted,
+//     edited (the user's comment was sent again), since (when the state or step was set), userAt (log index of the user's latest event), last (time of the last
+//     message) }
+// A thread starts with an event that names no thread: the user's item, the agent's message on its own (a report, done),
+// a worker's `closed`, a decision from pageDecisionEvents (your turn while it waits), the user's action that is no
+// message to the agent (such as a verdict or a confirmation: closed by the user), or anything else the page shows (done). An answer names its decision; the rest name the thread, or a message in it, in `to`.
+// An agent status counts only if its `read` (the log index of the last event the agent was shown) covers the user's
+// latest event in the thread; a status without `read` counts (logs before `read`), and a done without it closes the
+// thread as your ✓ does (D13). Indexes are the conversation log's
+// own: pageDecisionEvents keeps each event's in `_i`.
+var PAGE_CONTROL = ['status', 'accept', 'accepted', 'reopen', 'delete'];
+function pageThreads(log, itemKinds) {
+  var threads = [], byId = {}, home = {}, agentRead = -1, marked = [];  // marked: the threads an agent status names
+  function threadOf(id) { return byId[home[id] || id]; }
+  function start(e, i, state) {
+    var t = { id: e.id == null ? null : e.id, root: e, messages: [e], state: state, step: 'new', closedByUser: false,
+      deleted: false, edited: false, since: e.at, userAt: e.by === 'user' ? i : -1, last: e.at };
+    if (e.id != null) byId[e.id] = t;
+    threads.push(t);
+    return t;
+  }
+  function seenStep(t, at) {
+    if (t.state === 'agent' && t.step === 'new' && agentRead >= t.userAt) { t.step = 'seen'; t.since = at; }
+  }
+  var n = 0;
   log.forEach(function (e) {
-    var to = home[e.to] || e.to;
-    if (e.type === 'status') state[e.to] = e.status;
-    else if (e.type === 'accept' || e.type === 'accepted') state[e.to] = 'accepted';
-    else if (e.type === 'reopen') state[e.to] = 'reopened';
-    else if (e.type === 'note' && to) {
-      // The user's answer to a question from the agent ends the wait: the item goes back to the agent.
-      if (state[to] === 'asked') state[to] = 'replied';
-      // A reply under a finished item is a follow-up: the item goes back to the agent.
-      else if (state[to] === 'done' || state[to] === 'accepted') state[to] = 'followup';
-      // An answer under an item is part of it; an answer to the agent's own message is an item.
-      if (e.id) { if (items[to]) home[e.id] = to; else items[e.id] = true; }
-    } else if (e.type === 'reply' && to && e.id) home[e.id] = to;
-    else if (e.id && itemKinds.indexOf(e.type) >= 0) items[e.id] = true;
+    var i = e._i != null ? e._i : n, read = agentRead;
+    if (e.type !== 'decision' || e.x == null) n++;
+    if (!e.type) return;  // a line the log could not read keeps its place, and is no event
+    var user = e.by === 'user', item = user && itemKinds.indexOf(e.type) >= 0;
+    var target = e.type === 'answer' ? e.decision : e.to, t = target != null ? threadOf(target) : null;
+    // A status on a thread that holds nothing of the user's, such as the agent's own report, is no sign of reading.
+    if (!user && typeof e.read === 'number' && !(e.type === 'status' && t && t.userAt < 0)) agentRead = Math.max(agentRead, e.read);
+    if (!t && item && e.id != null && byId[e.id] && byId[e.id].root.type === e.type) {
+      // The user's item sent again, such as an edited or restored comment: the same thread, in its state.
+      t = byId[e.id];
+      if (e.type === 'comment') { t.root = e; t.messages[0] = e; t.deleted = false; t.edited = true; }
+    } else if (!t) {
+      if (PAGE_CONTROL.indexOf(e.type) < 0) {
+        var state = item ? 'agent' : e.type === 'decision' && pageDecisionStatus(e.x || {}) === 'waiting' ? 'you' : 'done';
+        t = start(e, i, state);
+        // The user's action that is no message to the agent, such as a verdict or a confirmation, needs no reply: its
+        // thread starts closed by the user, in All and never in Open, until they write in it (D8).
+        if (user && !item && e.type !== 'note' && e.type !== 'answer') t.closedByUser = true;
+        // A worker's report that it closed a question starts closed too, the user's choice (D10): in All, with Reopen.
+        if (e.type === 'closed') t.closedByUser = true;
+        // A decision you answered is closed at once (D14); one the agent decided or that defaulted stays open, done.
+        if (e.type === 'decision' && pageDecisionStatus(e.x || {}) === 'answered') t.closedByUser = true;
+        // Later answers to the same decision join this thread, when the decision is not in the log.
+        if (e.type === 'answer' && target != null && !byId[target]) home[target] = t.id;
+      }
+    } else {
+      if (e.id != null) home[e.id] = t.id;
+      if (e.type === 'status') marked.push(t);
+      var fresh = typeof e.read !== 'number' || e.read >= t.userAt;
+      if (user && (item || e.type === 'note' || e.type === 'answer' || e.type === 'reopen')) {
+        t.messages.push(e); t.last = e.at; t.userAt = i;
+        t.state = 'agent'; t.step = 'new'; t.closedByUser = false; t.since = e.at;
+      } else if (e.type === 'reply') {
+        t.messages.push(e); t.last = e.at;  // the CLI writes the reply's status with it (done by default)
+      } else if (e.type === 'delete' && user) {
+        t.deleted = true;
+      } else if (e.type === 'accept' && user || e.type === 'accepted') {
+        // ✓, or the user's words that accept it: closes an open thread, or confirms one the agent finished.
+        if (t.state !== 'done') t.since = e.at;
+        t.state = 'done'; t.closedByUser = true; t.userAt = i;
+      } else if (e.type === 'status' && fresh && !t.closedByUser) {
+        // A thread you closed changes only when you act on it again.
+        var was = t.state + t.step;
+        if (e.status === 'asked') t.state = 'you';
+        else if (e.status === 'done') {
+          t.state = 'done';
+          // A done from before `read` (an old log) closes the thread as your ✓ does: in All, not in Open (D13).
+          if (typeof e.read !== 'number') t.closedByUser = true;
+        }
+        else if (t.state === 'agent' && (e.status === 'seen' || e.status === 'working')) t.step = e.status;
+        if (t.state + t.step !== was) t.since = e.at;
+      }
+    }
+    // Seen follows the agent's reading: a further read can cover the user's latest event of any thread.
+    if (agentRead > read) threads.forEach(function (x) { seenStep(x, e.at); });
   });
-  log.forEach(function (e, i) {
-    // What an event answers: an answer to a decision names the decision; the rest name it in `to`.
-    var to = e.type === 'answer' ? e.decision : e.to;
-    if (e.type === 'comment' || e.type === 'delete') {
-      var c = byKey[e.type === 'delete' ? e.to : e.id];
-      if (!c) { if (e.type === 'delete') return; c = byKey[e.id] = { kind: 'comment', e: e, edited: false, deleted: false, replies: [], last: i }; entries.push(c); }
-      else if (e.type === 'delete') c.deleted = true;
-      else { c.e = e; c.edited = true; c.deleted = false; }
-    } else if ((e.type === 'reply' || e.type === 'answer' || e.type === 'reopen' || (e.type === 'note' && to)) && to && byKey[to]) { byKey[to].replies.push(e); byKey[to].last = i; if (e.id) byKey[e.id] = byKey[to]; }
-    else if (e.type === 'accept' || e.type === 'accepted' || e.type === 'reopen' || e.type === 'status') return;
-    else { var n = { kind: e.type, e: e, replies: [], last: i }; if (e.id) byKey[e.id] = n; entries.push(n); }
+  threads.forEach(function (t) {
+    var r = t.root, yours = t.messages.filter(function (m) { return m.by === 'user'; }), last = yours[yours.length - 1];
+    // A report the agent posted before reports carried their own done status (an old log), with no status and no
+    // message from you: closed by you, in All and not in Open (D13).
+    if (r.type === 'reply' && r.by !== 'user' && t.userAt < 0 && marked.indexOf(t) < 0) t.closedByUser = true;
+    // A decision the record says you answered, whose latest word from you is the answer the record took: closed (D14).
+    // A later answer, to change your mind or to answer the agent's ask-back, is the agent's to apply (D15).
+    if (r.type === 'decision' && pageDecisionStatus(r.x || {}) === 'answered' && t.state !== 'you' && (!last || (((r.x || {}).answer || {}).event === last.id))) {
+      t.state = 'done'; t.closedByUser = true;
+    }
   });
-  // The user's items each entry holds, in ITEMS: the entry itself when it is one, and the answers under an entry that is
-  // not, such as the agent's own message. Open and a page's WAITING look at these, not only at the entry's own id.
-  entries.forEach(function (c) {
-    c.items = (itemKinds.indexOf(c.kind) >= 0 && c.e.id && !c.deleted ? [c.e.id] : []).concat(c.replies
-      .filter(function (r) { return r.type === 'note' && r.id && items[r.id]; }).map(function (r) { return r.id; }));
-  });
-  // A message the agent sent on its own, a question, waits for the user until they answer it or the agent closes it with
-  // a status: it counts as open and comes last, next to the message box.
-  if (latestLast) entries.sort(function (a, z) { return a.last - z.last; });
-  var waits = waiting ? function (c) { return waiting(c, state); }
-    : function (c) { return c.kind === 'reply' && !c.e.to && c.e.id && state[c.e.id] !== 'done' && state[c.e.id] !== 'accepted' && !c.replies.some(function (r) { return r.type === 'note'; }); };
-  entries = entries.filter(function (c) { return !waits(c); }).concat(entries.filter(waits));
-  // Open: the entries that hold a user's item not yet accepted, with what was said under them, and the entries waiting
-  // for the user.
-  var open = entries.filter(function (c) {
-    return c.items.some(function (id) { return state[id] !== 'accepted'; }) || waits(c);
-  });
-  return { state: state, entries: entries, open: open };
+  return threads;
 }
 
 // ---------- Markdown in messages ----------
@@ -735,33 +1000,32 @@ function pageCan(name) { return (pageConfig().capabilities || []).indexOf(name) 
 // pageDecisionEvents(decisions, conversation) is the log the thread draws: each decision as an entry of type `decision`
 // (the record in `x`), among the conversation's events, in the order things happened. Nothing comes before what it
 // answers: an answer never shows above its decision, a reply never above the answer it replies to.
-// The decision rule every page shares. A decision's status word; the user's last answer under its thread entry C; and its
-// step: 0 the user is up (Waiting for you), 1 the user answered and the agent has not applied it, 2 applied, -1 no steps.
-// A decision waits for the user at step 0: until they answer it on the page, and again once the agent asked back.
+// A decision's status word, and the user's last answer in its thread (C, the entry the panel gives a page's kind).
 function pageDecisionStatus(x) { return String(x.status || 'decided').trim().toLowerCase(); }
 function pageDecisionAnswer(c) { return c.replies.filter(function (r) { return r.type === 'answer'; }).pop(); }
-function pageDecisionStep(st, answer, state) {
-  if (st !== 'waiting' && st !== 'answered') return -1;
-  if (answer && state[answer.id] === 'asked') return 0;
-  if (st === 'answered') return 2;
-  return !answer ? 0 : (state[answer.id] === 'done' || state[answer.id] === 'accepted') ? 2 : 1;
-}
-function pageDecisionWaits(c, state) { return pageDecisionStep(pageDecisionStatus(c.e.x), pageDecisionAnswer(c), state) === 0; }
 
-// The questions open for the user, for every page's count and badges: the thread entries, from DECISIONS and the
-// conversation LOG, that wait for the user. A decision waits by the shared rule above; any other entry only when the
-// page's WAITING(c, state) says so (none: no other entry counts). ITEMKINDS are the page's item kinds, as pageThread takes.
-function pageOpenDecisions(decisions, log, itemKinds, waiting) {
-  var model = pageThread(pageDecisionEvents(decisions || [], log || []), itemKinds || [], null);
-  return model.entries.filter(function (c) {
-    if (c.deleted) return false;
-    return c.kind === 'decision' ? pageDecisionWaits(c, model.state) : !!waiting && !!waiting(c, model.state);
+// The decisions that wait for the user, for a page's own counts and badges: those whose thread, from DECISIONS and the
+// conversation LOG, is the user's turn (pageThreads): waiting and not answered on the page, or asked back about the answer.
+// Each is the decision record, in the order of DECISIONS.
+function pageOpenDecisions(decisions, log) {
+  var yours = {};
+  pageThreads(pageDecisionEvents(decisions || [], log || []), []).forEach(function (t) {
+    if (t.root.type === 'decision' && t.state === 'you' && !t.deleted) yours[t.id] = true;
   });
+  return (decisions || []).filter(function (x) { return yours[x.id]; });
 }
 
 function pageDecision(o) {
   var conv = o.conversation;
-  var status = pageDecisionStatus, answerOf = pageDecisionAnswer, step = pageDecisionStep, waiting = pageDecisionWaits;
+  var status = pageDecisionStatus, answerOf = pageDecisionAnswer;
+  // Where the decision stands, from its thread (C.thread, pageThreads): 0 the user's turn, 1 the user answered and the
+  // agent has not applied it, 2 applied, -1 a decision that asked nothing.
+  function step(c) {
+    var st = status(c.e.x), t = c.thread || {}, answer = answerOf(c);
+    if (t.state === 'you') return 0;
+    if (st !== 'waiting' && st !== 'answered') return -1;
+    return st === 'answered' || t.state === 'done' ? 2 : answer ? 1 : -1;
+  }
   function left(x) { var t = Date.parse(x.deadline); return isNaN(t) ? null : t / 1000 - o.now(); }
   function deadlineWords(x) {
     var s = o.suggested ? null : left(x);
@@ -808,9 +1072,8 @@ function pageDecision(o) {
   function head(who, label) {
     return '<div class="head"><span class="who">' + o.esc(who) + '</span><span class="when">' + o.esc(label) + '</span></div>';
   }
-  function item(c, state, actions) {
-    var x = c.e.x, st = status(x), answer = answerOf(c), n = step(st, answer, state), asked = n === 0;
-    var steps = [['asked', 'Waiting for you'], ['replied', 'You answered'], ['done', 'Applied']], STEP = steps[n];
+  function item(c, _state, actions) {
+    var x = c.e.x, st = status(x), n = step(c), asked = n === 0;
     var label = asked ? (x.default ? deadlineWords(x) : '') : n === 1 ? 'answered, waiting for the ' + pageRole()
       : n === 2 ? 'answered by you' : st === 'defaulted' ? 'decided by the default' : st === 'answered' ? 'answered by you' : 'decided';
     var li = document.createElement('li');
@@ -822,17 +1085,14 @@ function pageDecision(o) {
       : st === 'decided' && x.decision ? '\n\nDecided:\n\n' + x.decision : '';
     li.innerHTML = head(pageRole().replace(/^./, function (ch) { return ch.toUpperCase(); }), label || pageTime(x.at)) + o.md(String(x.asked || '') + after);
     li.dataset.d = x.id;
-    li.dataset.state = STEP ? STEP[0] : '';
+    // The row says the state; the foot holds only the buttons, which become the row's.
     var foot = document.createElement('div');
     foot.className = 'foot' + (asked ? ' question' : '');
     var q = pageMarkdownText(x.asked);
-    if (STEP) foot.insertAdjacentHTML('beforeend', '<span class="progress ' + STEP[0] + '"><span class="bars" aria-hidden="true">' +
-      [0, 1, 2].map(function (i) { return '<i class="' + (i <= n ? 'on' : '') + '"></i>'; }).join('') + '</span><span>' + STEP[1] + '</span></span>');
-    else if (answer) foot.append(conv.progress(state[answer.id]));
     if (actions) {
       if (asked && x.default) {
         var use = document.createElement('button');
-        use.type = 'button'; use.className = 'btn btn--sm answer use'; use.textContent = '✓'; use.title = 'Use the default';
+        use.type = 'button'; use.className = 'btn btn--sm btn--quiet answer use'; use.textContent = 'Use the default';  // D11: the check only closes
         use.setAttribute('aria-label', 'Use the default for: ' + q);
         use.addEventListener('click', function () {
           var target = nextWaiting(x.id);
@@ -850,7 +1110,7 @@ function pageDecision(o) {
         }
       }
       var change = document.createElement('button');
-      change.type = 'button'; change.className = 'btn btn--sm btn--quiet answer change';
+      change.type = 'button'; change.className = 'btn btn--sm answer change' + (asked ? '' : ' btn--quiet');
       change.textContent = asked ? 'Answer' : 'Reply';
       change.setAttribute('aria-label', (asked ? 'Answer: ' : 'Reply to: ') + q);
       change.addEventListener('click', function () {
@@ -862,17 +1122,18 @@ function pageDecision(o) {
     }
     return [li, foot];
   }
-  return { item: item, waiting: waiting, status: status, answerOf: answerOf, step: step };
+  return { item: item, status: status, answerOf: answerOf, step: step };
 }
 
 function pageDecisionEvents(decisions, conversation) {
   var entries = (decisions || []).map(function (x) { return { type: 'decision', id: x.id, x: x, at: x.at, _t: Date.parse(x.at) / 1000 || 0 }; });
   var when = {};
   entries.forEach(function (e) { when[e.id] = e._t; });
-  var events = (conversation || []).map(function (e) {
+  var events = (conversation || []).map(function (e, k) {
     var t = Math.max(Date.parse(e.at) / 1000 || 0, when[e.type === 'answer' ? e.decision : e.to] || 0);
     if (e.id) when[e.id] = t;
-    return Object.assign({}, e, { _t: t });
+    // _i: its line in the log, which `read` counts in: the one the page's data gave it (page.log_records), else its place.
+    return Object.assign({}, e, { _t: t, _i: e._i != null ? e._i : k });
   });
   return events.concat(entries).sort(function (a, z) { return a._t - z._t || (z.type === 'decision') - (a.type === 'decision'); });
 }

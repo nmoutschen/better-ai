@@ -190,8 +190,8 @@ class Rules(unittest.TestCase):
         "S108 behaviour": [r"When \[situation\], \[who\] can \[observable result\]", r"`ambiguity`"],
         "S112 page": [
             r"one or two short sentences",
-            r"MARK `working` only what you are changing now",
-            r"ASK the next question as a new message",
+            r"`working` only while you change something for it",
+            r"THEN ASK any next question about it in the same thread",
         ],
         "S113 restart": [
             r"restart it once under a new name",

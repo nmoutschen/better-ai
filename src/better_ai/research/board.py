@@ -75,7 +75,9 @@ def scan_file(unit: Unit, name: str, data: dict, cache: dict, now: datetime) -> 
     elif name == "conversation.jsonl":
         # An invalid event still shows, without the fields that failed. Without a valid `type` no branch of the
         # schema checked its other fields, so it is only listed.
-        data["conversation"] += [r for _, r in records if "_errors" not in r or isinstance(r.get("type"), str)]
+        # Each keeps its line, which `read` counts in.
+        logged = page.log_records(read)
+        data["conversation"] += [r for r in logged if "_errors" not in r or isinstance(r.get("type"), str)]
     elif folder in FOLDERS:
         for number, record in records:
             record["_born"] = at_time(record)
@@ -213,7 +215,7 @@ SPEC = page.register(
         assets={"/board.css": "research/board.css", "/board.js": "research/board.js"},
         css=("/board.css",),
         js=("/board.js",),
-        capabilities=("decisions",),
+        capabilities=("decisions", "accept"),  # every thread can be closed and reopened
         methods=("comment",),
         items=("comment", "note", "answer"),
         empty="Nothing yet. Click a question or an agent to ask about it, or write to the coordinator below.",

@@ -79,11 +79,44 @@ class LastWord(unittest.TestCase):
 
 
 class OpenDecisions(unittest.TestCase):
-    def test_every_page_counts_its_open_questions_with_the_shared_rule(self):
+    def test_every_page_counts_what_waits_for_the_user_with_the_shared_rule(self):
+        """One state machine counts: page.js's "N your turn" figure, in the page's own slot, and no figure of its own."""
         src = HERE.parent / "src" / "better_ai"
         self.assertIn("function pageOpenDecisions(", (src / "page" / "page.js").read_text(encoding="utf-8"))
-        for name in ("research/board.js", "architect/page.js", "code/dashboard.js"):
-            self.assertIn("pageOpenDecisions(", (src / name).read_text(encoding="utf-8"), name)
+        self.assertIn("pageOpenDecisions(", (src / "research" / "board.js").read_text(encoding="utf-8"))
+        for name in ("research/board.js", "architect/page.js", "code/dashboard.js", "discover/page.js"):
+            text = (src / name).read_text(encoding="utf-8")
+            self.assertRegex(text, r"stats: \(\) => [\w$]+\(['\"]yourturn['\"]\)", name)
+            self.assertNotRegex(text, r"open questions?<|waiting for you</button>|id=\"to-waiting\"", name)
+
+
+class CloseAndReopen(unittest.TestCase):
+    def test_every_live_page_lets_the_user_close_and_reopen_any_thread(self):
+        """The panel offers the check and Reopen on every page (states.md, Controls): each page's server takes them."""
+        import better_ai.architect.pagespec  # noqa: F401  (each page registers itself)
+        import better_ai.code.dashboard  # noqa: F401
+        import better_ai.discover.pagespec  # noqa: F401
+        import better_ai.show.commands  # noqa: F401
+
+        specs = dict(page.PAGES)
+        specs.setdefault("design-better", canvas.SPEC)
+        names = {
+            "architect-better",
+            "code-better",
+            "design-better",
+            "discover-better",
+            "research-better",
+            "show-better",
+        }
+        self.assertLessEqual(names, set(specs))
+        for name in sorted(names):
+            spec = specs[name]
+            self.assertIn("accept", spec.sendable(), name)
+            self.assertIn("reopen", spec.sendable(), name)
+            [path] = (HERE.parent / "src" / "better_ai").glob(f"*/schemas/{spec.events}")
+            events = json.loads(path.read_text(encoding="utf-8"))
+            for kind in ("accept", "reopen"):
+                self.assertIn(kind, events["properties"]["type"]["enum"], f"{name}: {kind}")
 
 
 class ResearchLastWord(Repo):

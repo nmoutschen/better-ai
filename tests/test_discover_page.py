@@ -35,7 +35,7 @@ class Registered(unittest.TestCase):
         spec = page.PAGES["discover-better"]
         self.assertEqual(spec.main, "discover/page.html")
         self.assertEqual(spec.aside, "page/agents.html")
-        self.assertEqual(spec.capabilities, ("decisions",))
+        self.assertEqual(spec.capabilities, ("decisions", "accept"))  # every thread can be closed and reopened
         self.assertEqual(spec.agent, "coordinator")
         self.assertEqual(spec.events, "discover-events.schema.json")
         for url in (*spec.css, *spec.js):

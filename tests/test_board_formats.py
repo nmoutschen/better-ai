@@ -1097,7 +1097,7 @@ class Verbs(unittest.TestCase):
             closed = self.rpc(url, "closed", id="c-0", question="Q-w2-4", status="answered")  # the page may not send it
             self.assertEqual(closed["error"]["code"], -32601)
             self.assertFalse((board_dir / "conversation.jsonl").exists())
-            for method in ("accept", "approve", "confirm", "delete"):  # shared parts this page does not declare
+            for method in ("approve", "confirm", "delete"):  # shared parts this page does not declare
                 self.assertEqual(self.rpc(url, method, to="c-1")["error"]["code"], -32601, method)
 
     def test_a_worker_closing_a_question_is_announced_once_and_the_board_stopped_ends_serve(self):
@@ -1389,7 +1389,9 @@ class Replies(unittest.TestCase):
             write_lines(board_dir, "conversation.jsonl", [event])
             pending = better.run(SKILL, "pending", str(board_dir), cwd=d)
             self.assertIn("c-1", pending.stdout)
-            done = better.run(SKILL, "reply", str(board_dir), "--to", "c-1", stdin="Because it fell.", cwd=d)
+            done = better.run(
+                SKILL, "reply", str(board_dir), "--to", "c-1", "--read", "0", stdin="Because it fell.", cwd=d
+            )
             self.assertEqual(done.returncode, 0, done.stderr)
             events = [json.loads(x) for x in (board_dir / "conversation.jsonl").read_text().splitlines()]
             self.assertEqual(

@@ -4,6 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { read, loadPage } = require('./harness');
+const { panelOn } = require('./dom');
 
 const source = read('page', 'page.js');
 
@@ -102,20 +103,27 @@ test('decisions enter the log among the events, nothing before what it answers',
 
 // ---- the decision question, the same on every page that shows decisions
 
+// The entry the panel gives a decision's renderer: the decision's thread from the one state machine (pageThreads), after
+// the conversation LOG.
+function entryOf(page, x, log = []) {
+  const t = Array.from(page.pageThreads(page.pageDecisionEvents([x], log), ['comment', 'note', 'answer'])).find(t => t.id === x.id);
+  return { kind: 'decision', e: t.root, replies: t.messages.slice(1), thread: t };
+}
 function decision(page, overrides, options) {
   const sent = [], boxes = [];
   const conversation = {
     send(method, params, what, done, fail) { sent.push({ method, params, what }); if (done) done(); },
     box(li, id, label, from, onSend) { boxes.push({ id, label, onSend }); },
-    progress(st) { const n = new Node('span'); n.textContent = st; return n; },
   };
   const d = page.pageDecision(Object.assign({
     conversation, now: () => Date.parse('2026-11-22T10:00:00Z') / 1000, md: t => '<p>' + t + '</p>', esc: t => String(t), id: p => p + '-1',
   }, options));
   const x = Object.assign({ id: 'D1', at: '2026-11-22T09:00:00Z', asked: 'Which size?', status: 'waiting', default: 'Take the small one', deadline: '2026-11-22T10:10:00Z' }, overrides);
-  const entry = { e: { x }, replies: [] };
-  return { d, x, entry, sent, boxes, render: (state, actions) => d.item(entry, state || {}, actions !== false) };
+  const entry = entryOf(page, x);
+  return { d, x, entry, sent, boxes, render: (log, actions) => d.item(log ? entryOf(page, x, log) : entry, {}, actions !== false) };
 }
+const ANSWER = { type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false, by: 'user', at: '2026-11-22T09:30:00Z' };
+const statusOf = (s, read = 1) => ({ type: 'status', to: 'a1', status: s, by: 'coordinator', read, at: '2026-11-22T09:31:00Z' });
 const buttons = foot => foot.children.filter(n => n.tag === 'button');
 
 test('a waiting decision shows its question, the default and the deadline, with Use the default and Answer', () => {
@@ -126,10 +134,9 @@ test('a waiting decision shows its question, the default and the deadline, with 
   assert.match(li.innerHTML, /If you don&#39;t answer|If you don't answer: Take the small one/);
   assert.match(li.innerHTML, /default in 10 min/);
   assert.match(li.className, /open-q/);
-  assert.equal(li.dataset.state, 'asked');
-  assert.match(foot.innerHTML, /Waiting for you/);
-  assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
-  assert.equal(t.d.waiting(t.entry, {}), true);
+  assert.equal(t.entry.thread.state, 'you');
+  assert.doesNotMatch(foot.innerHTML, /progress/);  // the row says the state once; the foot holds the buttons
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Use the default', 'Answer']);  // D11: the check only closes
 });
 
 test('Use the default answers with the default text, marked as the default', () => {
@@ -164,20 +171,22 @@ test('a deadline that has passed says the default is due', () => {
   assert.match(t.render()[0].innerHTML, /default due now/);
 });
 
-test('the user\'s answer moves the question on: answered, waiting for the agent, then applied', () => {
+test('the user\'s answer moves the question on, by its thread: answered, waiting for the agent, then applied', () => {
   const page = load({ agent: 'coordinator', capabilities: ['decisions'] });
   const t = decision(page);
-  t.entry.replies = [{ type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false }];
-  let [li, foot] = t.render({ a1: undefined });
-  assert.match(foot.innerHTML, /You answered/);
+  let [li, foot] = t.render([ANSWER]);
   assert.match(li.innerHTML, /answered, waiting for the coordinator/);
-  assert.equal(t.d.waiting(t.entry, {}), false);
-  assert.equal(t.d.waiting(t.entry, { a1: 'asked' }), true);  // the agent asked back: the user is up again
-  [li, foot] = t.render({ a1: 'done' });
-  assert.match(foot.innerHTML, /Applied/);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Reply']);
+  [li, foot] = t.render([ANSWER, statusOf('asked')]);  // the agent asked back: the user's turn again
+  assert.match(li.className, /open-q/);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Use the default', 'Answer']);  // D11: the check only closes
+  const before = { type: 'note', id: 'm0', to: null, text: 'hi', by: 'user', at: '2026-11-22T09:10:00Z' };
+  [li] = t.render([before, ANSWER, statusOf('asked', 0)]);  // decided before reading the answer, line 1: changes nothing
+  assert.match(li.innerHTML, /answered, waiting for the coordinator/);
+  [li] = t.render([ANSWER, statusOf('done')]);
+  assert.match(li.innerHTML, /answered by you/);
   const applied = decision(page, { status: 'answered', answer: { type: 'page', event: 'a1' } });
-  applied.entry.replies = [{ type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false }];
-  assert.deepEqual(buttons(applied.render()[1]).map(b => b.textContent), ['Reply']);
+  assert.deepEqual(buttons(applied.render([ANSWER])[1]).map(b => b.textContent), ['Reply']);
 });
 
 test('a decision the agent took, or that fell to its default, can be replied to', () => {
@@ -194,7 +203,7 @@ test('a decision the agent took, or that fell to its default, can be replied to'
 
 test('a page without actions shows the decision without buttons', () => {
   const t = decision(load({ capabilities: ['decisions'] }));
-  assert.deepEqual(buttons(t.render({}, false)[1]), []);
+  assert.deepEqual(buttons(t.render(null, false)[1]), []);
 });
 
 // ---- the strips, on every served page
@@ -249,9 +258,7 @@ test('a page that does not stream hides the closed strip again once the server a
 
 test('an answered decision the agent applied says answered by you and hides the default line', () => {
   const t = decision(load({ agent: 'coordinator', capabilities: ['decisions'] }));
-  t.entry.replies = [{ type: 'answer', id: 'a1', decision: 'D1', text: 'x', default: false }];
-  const [li, foot] = t.render({ a1: 'done' });
-  assert.match(foot.innerHTML, /Applied/);
+  const [li] = t.render([ANSWER, statusOf('done')]);
   assert.match(li.innerHTML, /answered by you/);
   assert.doesNotMatch(li.innerHTML, /decided/);
   assert.doesNotMatch(li.innerHTML, /If you don't answer/);
@@ -285,13 +292,14 @@ test('the research board and the code-better dashboard draw a decision question 
 
 // ---- the question footer, the accessible names and the focus (every page), and the suggested default (a page's option)
 
-test('the question footer is a filled check and a quiet Answer on one row, and each control names the question', () => {
+test('the question footer is an outlined check and a filled Answer on one row, and each control names the question', () => {
+  // The user's rule c13 (.design/conversation-panel/brief.md): Answer is the one filled button, the check is outlined.
   const t = decision(load({ capabilities: ['decisions'] }));
   const [, foot] = t.render();
   const [use, answer] = buttons(foot);
   assert.match(use.className, /btn--sm/);
-  assert.doesNotMatch(use.className, /btn--quiet/);
-  assert.match(answer.className, /btn--quiet/);
+  assert.match(use.className, /btn--quiet/);
+  assert.doesNotMatch(answer.className, /btn--quiet/);
   assert.match(foot.className, /\bquestion\b/);  // page.css keeps this footer on one row
   assert.equal(use.attrs['aria-label'], 'Use the default for: Which size?');
   assert.equal(answer.attrs['aria-label'], 'Answer: Which size?');
@@ -305,7 +313,7 @@ test('a page that sets suggested shows Suggested default and never a deadline or
   const [li, foot] = t.render();
   assert.match(li.innerHTML, /Suggested default: Take the small one/);
   assert.doesNotMatch(li.innerHTML, /default in|default due|If you don&#39;t answer|If you don't answer/);
-  assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Use the default', 'Answer']);  // D11: the check only closes
   const late = decision(page, { deadline: '2026-11-22T09:00:00Z' }, { suggested: true });
   assert.doesNotMatch(late.render()[0].innerHTML, /due now/);
 });
@@ -352,7 +360,7 @@ test('when the redraw replaces the next question after the check, its new check 
   const items = questions(page, ['D1', 'D2']);
   Node.focused = items[0].use;
   items[0].use.click();
-  const [, foot] = items[0].t.d.item(items[1].t.entry, {}, true);  // one pageDecision draws every question of a page  // the thread redraws the question
+  const [, foot] = items[0].t.d.item(items[1].t.entry, {}, true);  // one pageDecision draws every question of a page: the thread redraws the question
   Node.focused = null;
   await Promise.resolve(); await Promise.resolve();
   assert.equal(Node.focused, buttons(foot)[0]);
@@ -380,11 +388,11 @@ test('code-better and research-better decisions render as before, with the deadl
 test('after the check on the middle of three questions, the focus goes to the third, though the thread redrew first', () => {
   const page = load({ capabilities: ['decisions'] });
   let rows = [];
-  const conversation = { box() {}, progress: () => new Node('span'),
+  const conversation = { box() {},
     send(m, p, w, done) { load.thread['li.open-q'] = [rows[0].n, rows[2].n]; done(); } };
   const d = page.pageDecision({ conversation, now: () => 0, md: t => t, esc: String, id: p => p + '-1' });
   rows = ['D1', 'D2', 'D3'].map(id => {
-    const [n, foot] = d.item({ e: { x: { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' } }, replies: [] }, {}, true);
+    const [n, foot] = d.item(entryOf(page, { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' }), {}, true);
     n.dataset.d = id; n.found = { '.use': buttons(foot)[0], '.answer': buttons(foot)[1] };
     return { n, use: buttons(foot)[0] };
   });
@@ -581,10 +589,10 @@ test('a page out of date shows only the out of date strip: /listening goes throu
 // A conversation whose send does not finish until the test says so.
 function slowRows(page, ids, options) {
   const finish = [];
-  const conversation = { box() {}, progress: () => new Node('span'), send(m, p, w, done) { finish.push(done); } };
+  const conversation = { box() {}, send(m, p, w, done) { finish.push(done); } };
   const d = page.pageDecision(Object.assign({ conversation, now: () => 0, md: t => t, esc: String, id: p => p + '-1' }, options));
   const draw = id => {
-    const [n, foot] = d.item({ e: { x: { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' } }, replies: [] }, {}, true);
+    const [n, foot] = d.item(entryOf(page, { id, at: '2026-11-22T09:00:00Z', asked: 'Q ' + id, status: 'waiting', default: 'x' }), {}, true);
     n.dataset.d = id; n.found = { '.use': buttons(foot)[0], '.answer': buttons(foot)[1] };
     return { n, use: buttons(foot)[0] };
   };
@@ -656,4 +664,502 @@ test('the accessible names of a question carry its words without Markdown marks'
   const [use, answer] = buttons(t.render()[1]);
   assert.equal(use.attrs['aria-label'], 'Use the default for: Which size of box, see the guide?');
   assert.equal(answer.attrs['aria-label'], 'Answer: Which size of box, see the guide?');
+});
+
+// ---- the Conversation panel: one row per thread (.design/conversation-panel/design.md, S11-S23)
+// pageConversation runs on a small stand-in DOM: elements keep their children, attributes, listeners and focus, and
+// answer the simple selectors page.js uses (tag, .class, #id, [attr], [attr="v"], and one space between parts).
+
+const HOUR = 3600 * 1000;
+const at = hoursAgo => new Date(Date.now() - hoursAgo * HOUR).toISOString().slice(0, 19) + 'Z';
+// A panel on the stand-in shell, not served: what it sends goes to its own log, as on a page opened from a file.
+const panel = (log, extra, options) => panelOn(log, extra, options);
+const userNote = (id, text, h, more = {}) => Object.assign({ type: 'note', id, text, to: null, by: 'user', at: at(h) }, more);
+const agentReply = (id, to, text, h) => ({ type: 'reply', id, to, text, by: 'coordinator', at: at(h) });
+const status = (to, s, h, read) => Object.assign({ type: 'status', to, status: s, by: 'coordinator', at: at(h) }, read == null ? {} : { read });
+// One thread in each state: your turn, the agent's turn not seen, seen and working, done by the agent, closed by you.
+const EVERY_STATE = [
+  userNote('m1', 'Can we merge this into the board start? It would save a step.', 10),
+  agentReply('r1', 'm1', 'Yes. Shall I?', 9.5), status('m1', 'asked', 9.5),
+  // Done by the agent, with the line it had read (D12): written in the log before m2, so it has not read m2.
+  userNote('m5', "What's next?", 3), agentReply('r5', 'm5', 'Step 4.', 2), status('m5', 'done', 2, 3),
+  userNote('m2', 'How about AG-UI?', 8),
+  userNote('m3', 'Q3 exactly once delivery semantics are hard to achieve.', 7), status('m3', 'seen', 6),
+  userNote('m4', 'Check the schema.', 5), status('m4', 'working', 4),
+  userNote('m6', 'Old question.', 30), status('m6', 'done', 29), { type: 'accept', to: 'm6', by: 'user', at: at(28) },
+];
+const text = n => n.textContent.replace(/\s+/g, ' ').trim();
+const actions = li => li.querySelectorAll('.tacts button');
+
+test('S11 each thread is one row: its state, who started it and its first sentence, the triangle, the count and its buttons', () => {
+  const p = panel(EVERY_STATE);
+  p.filter('all');
+  const you = p.rowOf('m1'), seen = p.rowOf('m3'), working = p.rowOf('m4'), done = p.rowOf('m5'), fresh = p.rowOf('m2');
+  assert.equal(text(you.querySelector('.chip')), 'Your turn');
+  assert.match(text(you.querySelector('.tage')), /^Waiting, 10 h$/);
+  assert.equal(you.querySelector('.progress'), null);
+  assert.equal(text(you.querySelector('.tgist')), 'You: Can we merge this into the board start?');
+  assert.equal(text(fresh.querySelector('.chip')), 'Agent’s turn');
+  assert.equal(text(fresh.querySelector('.progress')), 'Not seen, 8 h');
+  assert.equal(fresh.querySelectorAll('.progress .bars i.on').length, 0);
+  assert.equal(text(seen.querySelector('.progress')), 'Seen, 6 h');
+  assert.equal(seen.querySelectorAll('.progress .bars i.on').length, 1);
+  assert.equal(text(working.querySelector('.progress')), 'Working, 4 h');
+  assert.equal(working.querySelectorAll('.progress .bars i.on').length, 2);
+  assert.equal(done.querySelector('.chip'), null);  // a done row has no step and no turn: its bars say it
+  assert.equal(text(done.querySelector('.progress')), 'Done, 2 h');
+  assert.equal(done.querySelectorAll('.progress.done .bars i.on').length, 3);
+  assert.equal(done.querySelectorAll('.progress .bars i').length, 3);
+  // The triangle is drawn: points down while folded.
+  assert.match(you.querySelector('.tfold').innerHTML, /<polygon points="0,0 16,0 8,13.86"/);
+  assert.match(text(done.querySelector('.tmeta')), /^2 messages, last \d+ \w{3}, \d\d:\d\d$/);
+  assert.match(text(fresh.querySelector('.tmeta')), /^1 message, last /);
+  const words = li => actions(li).map(b => b.textContent);
+  assert.deepEqual(words(you), ['✓', 'Answer']);
+  assert.deepEqual(words(fresh), ['✓', 'Reply']);
+  assert.deepEqual(words(working), ['✓', 'Reply']);
+  assert.deepEqual(words(done), ['✓', 'Reopen']);
+  assert.deepEqual(words(p.rowOf('m6')), ['Reopen']);
+  // The edge colour follows the state.
+  assert.deepEqual(['m1', 'm2', 'm3', 'm4', 'm5', 'm6'].map(id => p.rowOf(id).dataset.state), ['asked', 'seen', 'seen', 'working', 'done', 'done']);
+});
+
+test('S11 a thread the agent started says Agent: (its name) and a deleted comment shows no row', () => {
+  const p = panel([
+    { type: 'reply', id: 'r9', to: null, text: 'Spec check 1 found 16 gaps. Details below.', by: 'coordinator', at: at(1) },
+    { type: 'status', to: 'r9', status: 'done', by: 'coordinator', read: 0, at: at(1) },  // a report's own done (D13)
+    { type: 'comment', id: 'c1', n: 1, text: 'gone', on: {}, by: 'user', at: at(1) }, { type: 'delete', to: 'c1', by: 'user', at: at(1) },
+  ], { crumb: () => null, commentBody: () => null });
+  assert.deepEqual(p.rows().map(li => li.dataset.id), ['r9']);
+  assert.equal(text(p.rowOf('r9').querySelector('.tgist')), 'Coordinator: Spec check 1 found 16 gaps.');
+});
+
+test('S12 the head is one native button that opens and folds the thread, and keeps the focus', () => {
+  const p = panel(EVERY_STATE);
+  const head = p.rowOf('m5').querySelector('.thead');
+  assert.equal(head.tagName, 'BUTTON');
+  assert.equal(head.type, 'button');  // Enter and Space press a native button
+  assert.equal(head.getAttribute('aria-expanded'), 'false');
+  head.focus();
+  head.click();
+  const opened = p.rowOf('m5').querySelector('.thead');
+  assert.equal(opened.getAttribute('aria-expanded'), 'true');
+  assert.equal(p.document.activeElement, opened);
+  assert.match(opened.querySelector('.tfold').innerHTML, /<polygon points="0,13.86 8,0 16,13.86"/);
+  assert.ok(p.rowOf('m5').querySelector('.tbody'));
+  opened.click();
+  const folded = p.rowOf('m5').querySelector('.thead');
+  assert.equal(folded.getAttribute('aria-expanded'), 'false');
+  assert.equal(p.rowOf('m5').querySelector('.tbody'), null);
+  assert.equal(p.document.activeElement, folded);
+});
+
+test('S13 an open thread shows its messages flat across the row: yours on white, the agent\'s on linen, no box inside', () => {
+  const p = panel(EVERY_STATE);
+  p.rowOf('m5').querySelector('.thead').click();
+  const body = p.rowOf('m5').querySelector('.tbody');
+  assert.deepEqual(body.children.map(m => m.className), ['tmsg mine', 'tmsg agent']);
+  assert.equal(body.querySelectorAll('li').length, 0);
+  assert.equal(text(body.children[0].querySelector('.who')), 'You');
+  assert.equal(text(body.children[1].querySelector('.who')), 'Coordinator');
+  assert.match(text(body.children[1]), /Step 4\./);
+  assert.equal(p.rowOf('m5').querySelector('.tgist'), null);  // open, the first message shows in full below
+});
+
+test('S14 Open lists done, then the agent\'s turn, then your turn last; All lists every thread in time order; both count', () => {
+  const p = panel(EVERY_STATE);
+  assert.deepEqual(p.rows().map(li => li.dataset.id), ['m5', 'm2', 'm3', 'm4', 'm1']);
+  assert.equal(p.$('[data-filter="open"]').textContent, 'Open (5)');
+  assert.equal(p.$('[data-filter="all"]').textContent, 'All (6)');
+  p.filter('all');
+  assert.deepEqual(p.rows().map(li => li.dataset.id), ['m1', 'm5', 'm2', 'm3', 'm4', 'm6']);  // the order they started in the log
+  assert.equal(p.$('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
+});
+
+test('S14 with every thread closed, Open says nothing is open', () => {
+  const p = panel([userNote('m1', 'x', 2), { type: 'accept', to: 'm1', by: 'user', at: at(1) }]);
+  assert.equal(p.rows().length, 0);
+  assert.equal(text(p.$('.thread li.sys')), 'Nothing open: every thread is done and closed.');
+  assert.equal(p.$('.notes .empty').hidden, true);
+  assert.equal(panel([]).$('.notes .empty').hidden, false);
+});
+
+test('S15 the list opens on its end, and a button says how many rows are above the view and goes to them', () => {
+  const p = panel(null);
+  const list = p.$('.thread');
+  list.scrollHeight = 900; list.clientHeight = 300;
+  p.conv.setLog(EVERY_STATE);
+  assert.equal(list.scrollTop, 900);
+  list.rect = { top: 100 };
+  p.rows().forEach((li, k) => { li.rect = { top: 100 + k * 150 - 600 }; });
+  list.dispatch('scroll');
+  const cue = p.$('.tabove');
+  assert.equal(cue.hidden, false);
+  assert.equal(cue.textContent, '▲ 4 more threads above');
+  cue.click();
+  assert.equal(list.scrolledTo.top, 0);
+  p.rows().forEach(li => { li.rect = { top: 200 }; });
+  list.dispatch('scroll');
+  assert.equal(cue.hidden, true);
+});
+
+test('S16 the top bar says how many threads are your turn, and takes you to the first one\'s Answer', () => {
+  const log = EVERY_STATE.concat([agentReply('r2', 'm2', 'Which part?', 1), status('m2', 'asked', 1)]);
+  const p = panel(log);
+  const fig = p.$('#status button.stat');
+  assert.ok(fig);
+  assert.equal(text(fig), '2 your turn');
+  assert.equal(text(fig.querySelector('b')), '2');
+  assert.doesNotMatch(text(p.$('#status')), /Loading/);
+  p.filter('all');
+  fig.click();
+  assert.equal(p.$('[data-filter="open"]').getAttribute('aria-pressed'), 'true');
+  const focused = p.document.activeElement;
+  assert.equal(focused.textContent, 'Answer');
+  assert.equal(focused.closest('li.trow').dataset.id, 'm1');
+  const none = panel([userNote('m1', 'x', 1)]);
+  assert.equal(none.$('#status button.stat'), null);
+  assert.equal(text(none.$('#status .stat')), '0 your turn');
+});
+
+test('S17 Answer opens the thread with a labelled box under its last message; Ctrl+Enter sends a note to the thread', () => {
+  const p = panel(EVERY_STATE);
+  const answer = actions(p.rowOf('m1')).find(b => b.textContent === 'Answer');
+  answer.click();
+  const li = p.rowOf('m1'), box = li.querySelector('.why');
+  assert.ok(li.querySelector('.tbody'));
+  const order = li.children.map(c => c.className.split(' ')[0]);
+  assert.ok(order.indexOf('tbody') < order.indexOf('why'), order.join());
+  const ta = box.querySelector('textarea'), lab = box.querySelector('label');
+  assert.equal(lab.textContent, 'Your answer');
+  assert.equal(lab.htmlFor, ta.id);
+  assert.equal(p.document.activeElement, ta);
+  assert.equal(actions(li).length, 0);  // the buttons wait while the box is open
+  ta.input('Yes, merge it.');
+  ta.key('Enter', { ctrlKey: true });
+  assert.deepEqual(p.sent().map(e => [e.type, e.to, e.text]), [['note', 'm1', 'Yes, merge it.']]);
+  const after = p.rowOf('m1');
+  assert.equal(after.querySelector('.why'), null);
+  assert.equal(text(after.querySelector('.chip')), 'Agent’s turn');
+  assert.equal(text(after.querySelector('.progress')), 'Not seen, just now');
+  assert.equal(p.document.activeElement, after.querySelector('.thead'));
+});
+
+test('S17 Escape cancels the box and gives the focus back to the button that opened it; Cmd+Enter sends a reply', () => {
+  const p = panel(EVERY_STATE);
+  actions(p.rowOf('m2')).find(b => b.textContent === 'Reply').click();
+  const ta = p.rowOf('m2').querySelector('.why textarea');
+  assert.equal(p.rowOf('m2').querySelector('.why label').textContent, 'Your reply');
+  ta.key('Escape');
+  assert.equal(p.rowOf('m2').querySelector('.why'), null);
+  assert.equal(p.document.activeElement.textContent, 'Reply');
+  assert.equal(p.document.activeElement.closest('li.trow').dataset.id, 'm2');
+  p.document.activeElement.click();
+  const again = p.rowOf('m2').querySelector('.why textarea');
+  again.input('the HTTP part');
+  again.key('Enter', { metaKey: true });
+  assert.deepEqual(p.sent().map(e => [e.type, e.to, e.text]), [['note', 'm2', 'the HTTP part']]);
+  assert.match(p.sent()[0].id, /^m-/);
+});
+
+test('S18 an empty answer, reopen reason or message shows an error next to its field and records nothing', () => {
+  const p = panel(EVERY_STATE);
+  actions(p.rowOf('m1')).find(b => b.textContent === 'Answer').click();
+  p.rowOf('m1').querySelector('.why .btn').click();
+  let box = p.rowOf('m1').querySelector('.why');
+  assert.equal(text(box.querySelector('.err')), 'Write your answer first.');
+  assert.equal(box.querySelector('.err').hidden, false);
+  assert.equal(box.querySelector('textarea').getAttribute('aria-invalid'), 'true');
+  assert.equal(box.querySelector('textarea').getAttribute('aria-describedby'), box.querySelector('.err').id);
+  assert.equal(p.document.activeElement, box.querySelector('textarea'));
+  p.filter('all');
+  actions(p.rowOf('m6')).find(b => b.textContent === 'Reopen').click();
+  box = p.rowOf('m6').querySelector('.why');
+  assert.equal(box.querySelector('label').textContent, 'Why reopen it?');
+  box.querySelector('textarea').input('   ');
+  box.querySelector('.btn').click();
+  assert.equal(text(p.rowOf('m6').querySelector('.why .err')), 'Say why you reopen it.');
+  p.$('.notes .send .btn').dispatch('click');
+  assert.equal(text(p.$('.notes .send .status')), 'Write your message first.');
+  assert.match(p.$('.notes .send .status').className, /error/);
+  assert.equal(p.document.activeElement, p.$('#note'));
+  assert.deepEqual(p.sent(), []);
+});
+
+test('S19 the check closes after a 6-second window with its own Undo, and two closes keep two Undos', () => {
+  const p = panel(EVERY_STATE);
+  const close = id => actions(p.rowOf(id)).find(b => b.textContent === '✓').click();
+  close('m2');
+  let row = p.rowOf('m2');
+  assert.match(row.className, /closing/);
+  assert.equal(text(row.querySelector('.chip')), 'Closed');
+  assert.equal(p.document.activeElement, row.querySelector('button'));
+  assert.equal(p.document.activeElement.textContent, 'Undo');
+  assert.deepEqual(p.sent(), []);
+  p.tick(3000);
+  close('m1');  // the second close keeps its own Undo, and the first one's window runs on
+  assert.equal(p.$$('li.trow.closing').length, 2);
+  assert.equal(p.$('[data-filter="open"]').textContent, 'Open (5)');  // still in place while it can be undone
+  assert.equal(text(p.$('#status .stat')), '0 your turn');
+  p.tick(3000);
+  assert.deepEqual(p.sent().map(e => [e.type, e.to]), [['accept', 'm2']]);
+  assert.equal(p.rowOf('m2'), undefined);
+  p.rowOf('m1').querySelector('button').click();  // Undo
+  p.tick(6000);
+  assert.deepEqual(p.sent().map(e => [e.type, e.to]), [['accept', 'm2']]);
+  row = p.rowOf('m1');
+  assert.equal(text(row.querySelector('.chip')), 'Your turn');
+  assert.equal(p.document.activeElement, row.querySelector('.thead'));
+  p.filter('all');
+  assert.equal(text(p.rowOf('m2').querySelector('.progress')), 'Done, just now');
+  assert.deepEqual(actions(p.rowOf('m2')).map(b => b.textContent), ['Reopen']);
+});
+
+test('S19 a close in its undo window keeps the page busy, so a new render does not reload it away', () => {
+  const p = panel(EVERY_STATE);
+  assert.equal(p.conv.busy(), false);
+  actions(p.rowOf('m2')).find(b => b.textContent === '✓').click();
+  assert.equal(p.conv.busy(), true);
+  p.tick(6000);
+  assert.deepEqual(p.sent().map(e => [e.type, e.to]), [['accept', 'm2']]);
+  assert.equal(p.conv.busy(), false);
+});
+
+test('S19 after the window the focus goes to the head of the row now in its place', () => {
+  const p = panel(EVERY_STATE);
+  actions(p.rowOf('m2')).find(b => b.textContent === '✓').click();
+  p.tick(6000);
+  assert.equal(p.document.activeElement, p.rowOf('m3').querySelector('.thead'));
+});
+
+test('S20 a done thread offers Reopen, which asks why and records reopen; one the agent finished also has Confirm done', () => {
+  const p = panel(EVERY_STATE);
+  const [ok, reopen] = actions(p.rowOf('m5'));
+  assert.equal(p.label(ok), "Confirm done: What's next?");
+  assert.equal(reopen.textContent, 'Reopen');
+  reopen.click();
+  const ta = p.rowOf('m5').querySelector('.why textarea');
+  ta.input('step 4 is not done');
+  p.rowOf('m5').querySelector('.why .btn').click();
+  assert.deepEqual(p.sent().map(e => [e.type, e.to, e.text]), [['reopen', 'm5', 'step 4 is not done']]);
+  const row = p.rowOf('m5');
+  assert.equal(text(row.querySelector('.chip')), 'Agent’s turn');
+  assert.match(text(row.querySelector('.progress')), /^Not seen/);
+  assert.equal(text(row.querySelectorAll('.tbody .tmsg').pop().querySelector('.tag')), 'Reopened');
+});
+
+test('S21 Answer is the one filled button on a row; the check, Reply and Reopen are outlined', () => {
+  const p = panel(EVERY_STATE);
+  p.filter('all');
+  for (const li of p.rows()) {
+    for (const b of actions(li)) {
+      assert.match(b.className, /\bbtn\b/);
+      if (b.textContent === 'Answer') assert.doesNotMatch(b.className, /btn--quiet/);
+      else assert.match(b.className, /btn--quiet/, b.textContent);
+    }
+  }
+  assert.equal(p.$$('.tacts button').filter(b => !b.classList.contains('btn--quiet')).length, 1);
+});
+
+test('S22 the head names the state, who started the thread, its first sentence and Open or Fold; each action names the sentence', () => {
+  const p = panel(EVERY_STATE);
+  p.filter('all');
+  assert.equal(p.label(p.rowOf('m1').querySelector('.thead')), 'Your turn. You: Can we merge this into the board start. Open the thread');
+  assert.equal(p.label(p.rowOf('m3').querySelector('.thead')), 'Agent’s turn, seen. You: Q3 exactly once delivery semantics are hard to achieve. Open the thread');
+  assert.equal(p.label(p.rowOf('m2').querySelector('.thead')), 'Agent’s turn, not seen. You: How about AG-UI. Open the thread');
+  assert.equal(p.label(p.rowOf('m5').querySelector('.thead')), "Done. You: What's next. Open the thread");
+  p.rowOf('m5').querySelector('.thead').click();
+  assert.match(p.label(p.rowOf('m5').querySelector('.thead')), /Fold the thread$/);
+  const names = li => actions(li).map(p.label);
+  assert.deepEqual(names(p.rowOf('m1')), ['Close: Can we merge this into the board start?', 'Answer: Can we merge this into the board start?']);
+  assert.deepEqual(names(p.rowOf('m2')), ['Close: How about AG-UI?', 'Reply: How about AG-UI?']);
+  assert.deepEqual(names(p.rowOf('m6')), ['Reopen: Old question.']);
+  actions(p.rowOf('m2'))[0].click();
+  assert.equal(p.label(p.rowOf('m2').querySelector('button')), 'Undo closing: How about AG-UI?');
+});
+
+test('S23 a redraw keeps the focused control, and a draft with its caret', () => {
+  const p = panel(EVERY_STATE);
+  actions(p.rowOf('m2'))[1].focus();
+  p.conv.setLog(EVERY_STATE.concat([status('m3', 'working', 0.5)]));
+  assert.equal(p.document.activeElement.textContent, 'Reply');
+  assert.equal(p.document.activeElement.closest('li.trow').dataset.id, 'm2');
+  assert.ok(p.document.contains(p.document.activeElement));
+  actions(p.rowOf('m1'))[1].click();
+  const ta = p.rowOf('m1').querySelector('.why textarea');
+  ta.input('half an answ');
+  ta.setSelectionRange(4, 6);
+  p.conv.setLog(EVERY_STATE.concat([status('m3', 'working', 0.5), status('m4', 'seen', 0.2)]));
+  const again = p.rowOf('m1').querySelector('.why textarea');
+  assert.notEqual(again, ta);
+  assert.equal(again.value, 'half an answ');
+  assert.equal(p.document.activeElement, again);
+  assert.deepEqual([again.selectionStart, again.selectionEnd], [4, 6]);
+  assert.equal(p.conv.busy(), true);  // a reload would lose it: the page waits
+});
+
+test('S23 when the focused control goes, the focus moves to the head of the row now at its place', () => {
+  const p = panel(EVERY_STATE);
+  p.rowOf('m2').querySelector('.thead').focus();
+  p.conv.setLog(EVERY_STATE.concat([{ type: 'accept', to: 'm2', by: 'user', at: at(0.1) }]));
+  assert.equal(p.document.activeElement, p.rowOf('m3').querySelector('.thead'));
+});
+
+test('a comment keeps its crumb, and Show, Edit and Delete, in its row', () => {
+  const calls = [];
+  const comment = { type: 'comment', id: 'c1', n: 1, text: 'Too wide. Make it narrower.', on: { key: 'box' }, by: 'user', at: at(2) };
+  const p = panel([comment], doc => ({
+    byId: id => (id === 'c1' ? { id: 'c1', n: 1 } : null), showLabel: n => 'Show comment ' + n,
+    crumb: e => { const x = doc.createElement('p'); x.className = 'crumb'; x.textContent = 'on ' + e.on.key; return x; },
+    commentBody: e => { const x = doc.createElement('p'); x.className = 'body'; x.textContent = e.text; return x; },
+    reveal: e => calls.push(['reveal', e.id]), edit: it => calls.push(['edit', it.id]), remove: it => calls.push(['remove', it.id]),
+  }));
+  const row = p.rowOf('c1');
+  assert.equal(text(row.querySelector('.tgist')), 'You: Too wide.');
+  const links = row.querySelectorAll('.tleft .link');
+  assert.deepEqual(links.map(b => b.textContent), ['Show', 'Edit', 'Delete']);
+  assert.deepEqual(links.map(p.label), ['Show comment 1', 'Edit comment 1', 'Delete comment 1']);
+  links.forEach(b => b.click());
+  assert.deepEqual(calls, [['reveal', 'c1'], ['reveal', 'c1'], ['edit', 'c1'], ['remove', 'c1']]);
+  p.rowOf('c1').querySelector('.thead').click();
+  const first = p.rowOf('c1').querySelector('.tbody .tmsg');
+  assert.equal(text(first.querySelector('.crumb')), 'on box');
+  assert.equal(text(first.querySelector('.body')), 'Too wide. Make it narrower.');
+  assert.equal(text(first.querySelector('.n')), '1');
+});
+
+// A decision drawn by the shared renderer, in the panel's own context, as the dashboard and the board do.
+function decisionPanel(x, conversation = []) {
+  const kinds = {};
+  let ctx = null;
+  const p = panel(null, { kinds }, { setup: (context, conv) => {
+    ctx = context;
+    kinds.decision = context.pageDecision({ conversation: conv, now: () => Date.now() / 1000, md: t => context.pageEscape(t), esc: context.pageEscape, id: k => k + '-1' }).item;
+  } });
+  p.conv.setLog(ctx.pageDecisionEvents([Object.assign({ id: 'D1', at: at(2), asked: 'Which size? Pick one.', status: 'waiting' }, x)], conversation));
+  return p;
+}
+
+test('a waiting decision keeps its default, deadline, use-the-default check and Answer in its row, as your turn', () => {
+  const p = decisionPanel({ default: 'Small', deadline: new Date(Date.now() + 30 * 60000).toISOString() });
+  const row = p.rowOf('D1');
+  assert.equal(text(row.querySelector('.chip')), 'Your turn');
+  assert.equal(text(row.querySelector('.tgist')), 'Coordinator: Which size?');
+  assert.ok(row.classList.contains('open-q'));  // pageDecision finds the next open question by it
+  assert.equal(row.dataset.d, 'D1');
+  const [close, use, answer] = actions(row);
+  assert.deepEqual([close.textContent, p.label(close)], ['✓', 'Close: Which size?']);  // any thread can be closed
+  assert.equal(use.textContent, 'Use the default');  // D11: the default says its words
+  assert.equal(p.label(use), 'Use the default for: Which size? Pick one.');
+  assert.match(use.className, /btn--quiet/);
+  assert.equal(answer.textContent, 'Answer');
+  assert.doesNotMatch(answer.className, /btn--quiet/);
+  assert.equal(row.querySelectorAll('.tacts .progress').length, 0);  // the row's state says it once
+  assert.equal(text(p.$('#status .stat')), '1 your turn');
+  row.querySelector('.thead').click();
+  const body = text(p.rowOf('D1').querySelector('.tbody'));
+  assert.match(body, /If you don't answer: Small/);
+  assert.match(body, /default in 30 min/);
+  actions(p.rowOf('D1'))[2].click();
+  const ta = p.rowOf('D1').querySelector('.why textarea');
+  assert.equal(p.rowOf('D1').querySelector('.why label').textContent, 'Your answer');
+  ta.input('Large');
+  ta.key('Enter', { ctrlKey: true });
+  assert.deepEqual(p.sent().filter(e => e.type !== 'decision').map(e => [e.type, e.decision, e.text, e.default]), [['answer', 'D1', 'Large', false]]);
+  assert.equal(text(p.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
+});
+
+test('use the default answers with the default from the row', () => {
+  const p = decisionPanel({ default: 'Small' });
+  actions(p.rowOf('D1'))[1].click();
+  assert.deepEqual(p.sent().filter(e => e.type !== 'decision').map(e => [e.type, e.decision, e.text, e.default]), [['answer', 'D1', 'Small', true]]);
+});
+
+test('page kinds without controls of their own, such as an approval, keep their text and get the row\'s buttons', () => {
+  const p = panel([{ type: 'approve', id: 'ap1', option: 'After', label: 'Ship After', text: 'Looks right.', by: 'user', at: at(1) }],
+    doc => ({ itemKinds: ['comment', 'note', 'approve'], kinds: { approve: c => { const li = doc.createElement('li'); li.className = 'msg me decision'; li.textContent = 'You approved ' + c.e.label; return li; } } }));
+  const row = p.rowOf('ap1');
+  assert.equal(text(row.querySelector('.tgist')), 'You: Looks right.');
+  assert.deepEqual(actions(row).map(b => b.textContent), ['✓', 'Reply']);
+  row.querySelector('.thead').click();
+  assert.equal(text(p.rowOf('ap1').querySelector('.tbody .tmsg')), 'You approved Ship After');
+});
+
+test('a read-only copy draws the rows with no actions, and the head still opens them', () => {
+  const p = panel(EVERY_STATE, { readOnly: true });
+  assert.equal(p.$$('.tacts button').length, 0);
+  p.rowOf('m5').querySelector('.thead').click();
+  assert.ok(p.rowOf('m5').querySelector('.tbody'));
+});
+
+test('the pins get each user item\'s state from its thread', () => {
+  let seen = null;
+  const p = panel(EVERY_STATE, { rendered: s => { seen = s; } });
+  assert.deepEqual(JSON.parse(JSON.stringify(seen)), { m1: 'asked', m2: 'new', m3: 'seen', m4: 'working', m5: 'done', m6: 'accepted' });
+  assert.equal(p.conv.state().m6, 'accepted');
+});
+
+test('reopen from a pin opens the thread with the reopen box, from All when it was closed', () => {
+  const p = panel(EVERY_STATE);
+  p.conv.reopen('m6');
+  assert.equal(p.$('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(p.rowOf('m6').querySelector('.why label').textContent, 'Why reopen it?');
+});
+
+// ---- Page kinds in the rows, from the verifier's walk of the pages
+test('a done thread of a kind with its own buttons can still be confirmed and reopened: a decided decision keeps Reply between ✓ and Reopen', () => {
+  const p = decisionPanel({ status: 'decided', decision: 'Small' });
+  const row = p.rowOf('D1');
+  assert.equal(row.dataset.state, 'done');
+  assert.deepEqual(actions(row).map(b => b.textContent), ['✓', 'Reply', 'Reopen']);
+  assert.deepEqual(actions(row).map(p.label), ['Confirm done: Which size?', 'Reply to: Which size? Pick one.', 'Reopen: Which size?']);
+  actions(row)[0].click();
+  p.tick(6000);
+  assert.deepEqual(p.sent().filter(e => e.type === 'accept').map(e => e.to), ['D1']);
+  assert.equal(p.rowOf('D1'), undefined);  // closed: it left Open
+});
+
+test('the first sentence of a page kind without text is its words without its head, each block ended by a stop', () => {
+  const p = panel([{ type: 'closed', id: 'x1', by: 'worker-2', question: 'Q-4', status: 'answered', at: at(1) }], doc => ({
+    kinds: { closed: () => {
+      const li = doc.createElement('li');
+      li.innerHTML = '<div class="head"><span class="who">worker-2</span><span class="when">19:54</span></div><p class="what">Answered: Who supports ACP</p><div class="body md"><p>Zed does.</p></div>';
+      return li;
+    } } }));
+  p.filter('all');  // a worker's report starts closed (D10)
+  assert.equal(text(p.rowOf('x1').querySelector('.tgist')), 'Coordinator: Answered: Who supports ACP.');  // a stop ends each block
+});
+
+test('rows shown elsewhere (nodes) are open, without actions, and their head is plain: nothing to fold', () => {
+  const p = panel(EVERY_STATE);
+  const [row] = Array.from(p.conv.nodes(e => e.id === 'm3'));
+  const head = row.querySelector('.thead');
+  assert.equal(head.tagName, 'DIV');
+  assert.equal(head.getAttribute('aria-expanded'), null);
+  assert.equal(row.querySelector('.tfold'), null);
+  assert.equal(row.querySelectorAll('.tacts button').length, 0);
+  assert.ok(row.querySelector('.tbody'));
+});
+
+test('a row keeps its buttons on one line: the count keeps a readable width, the buttons drop below it when crowded', () => {
+  const css = read('page', 'page.css');
+  assert.match(css, /\.tfoot \{[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.tleft \{[^}]*flex:1 1 9rem/);
+  assert.match(css, /\.tacts \{[^}]*flex:none/);
+  assert.match(css, /\.tleft \{[^}]*min-width:0[^}]*flex-wrap:wrap/);
+});
+
+test('a page places the figure in its own slot with stats, and puts it back after rewriting its header with figure()', () => {
+  const p = panel(EVERY_STATE, doc => {
+    const slot = doc.createElement('span'); slot.id = 'yourturn';
+    doc.querySelector('#status').append(slot);
+    return { stats: () => doc.getElementById('yourturn') };
+  });
+  assert.equal(text(p.$('#yourturn')), '1 your turn');
+  const status = p.$('#status');
+  status.innerHTML = '<span class="stat"><b>3</b>steps</span><span class="yourturn" id="yourturn"></span>';
+  assert.equal(p.$('#yourturn .stat'), null);
+  p.conv.figure();
+  assert.equal(text(p.$('#yourturn')), '1 your turn');
+  assert.equal(p.$$('#status .stat').length, 2);  // one figure of the page's, and the one figure for your turn
 });
