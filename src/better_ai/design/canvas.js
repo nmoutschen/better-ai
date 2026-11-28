@@ -520,14 +520,14 @@
     frame.contentWindow.scrollTo({ top: Math.max(0, parseFloat(pin.style.top) - frame.contentWindow.innerHeight / 3), behavior: 'smooth' });
     setTimeout(function () { pin.classList.remove('db-flash'); }, 2800);
   }
-  var STATE_WORD = { asked: 'waiting for you', replied: 'answered, back with the agent', followup: 'you replied, back with the agent', seen: 'seen', working: 'being worked on', done: 'done, waiting for you', accepted: 'accepted', reopened: 'reopened' };
+  // A pin says the state of its comment's thread, in the words of page.js (PAGE_PIN_STATES).
   function syncPins() {
     document.querySelectorAll('iframe').forEach(function (f) {
       try { f.contentDocument.querySelectorAll('.db-pin').forEach(function (pin) {
         var it = byId(pin.dataset.id); if (!it) return;
         comments.updatePin(pin, it);
         var st = pin.dataset.state;
-        pin.title = 'Comment ' + (it ? it.n : '') + ': ' + (STATE_WORD[st] || 'new') + '. Click to open it.';
+        pin.title = 'Comment ' + it.n + ': ' + (PAGE_PIN_STATES[st] || PAGE_PIN_STATES.new).toLowerCase() + '. Click to open it.';
       }); } catch (e) {}
     });
   }
@@ -550,6 +550,8 @@
     showLabel: function (n) { return 'Show where comment ' + n + ' is'; },
     crumb: function (e) { var on = e.on || e; return crumb(on.version, on.target || {}); }, commentBody: commentBody,
     kinds: { approve: approvalItem, verdict: verdictItem }, itemKinds: ['comment', 'note', 'approve'],
+    // A question header has no figures: the "N your turn" figure sits among the controls.
+    stats: controls,
     sendMode: function () { return approval ? approval.sendMode() : null; },
     busy: function () { return !pop.hidden; },
     beforeReload: function () {
