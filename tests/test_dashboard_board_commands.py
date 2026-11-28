@@ -261,11 +261,14 @@ class Reply(unittest.TestCase):
             self.assertEqual(done.returncode, 1)
             self.assertEqual((folder / "conversation.jsonl").read_text(), before)
 
-    def test_a_reply_without_to_sets_no_status(self):
+    def test_a_reply_without_to_is_a_report_with_its_own_done_status(self):
         with tempfile.TemporaryDirectory() as d:
             folder = change(Path(d))
             self.assertEqual(run(folder, "reply", str(folder), stdin="T3 is merged.").returncode, 0)
-            self.assertEqual([e["type"] for e in lines(folder / "conversation.jsonl")], ["reply"])
+            report, done = lines(folder / "conversation.jsonl")
+            self.assertEqual(
+                (done["type"], done["to"], done["status"], done["read"]), ("status", report["id"], "done", 0)
+            )
 
 
 class ServedPage(unittest.TestCase):

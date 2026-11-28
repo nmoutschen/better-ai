@@ -583,7 +583,7 @@ class VerbsTest(Fixture):
         code_, out, err = self.cli("reply", self.unit_arg, stdin='It\'s done, "quoted" and `ticked`\n')
         self.assertEqual((code_, err), (0, ""))
         self.assertIn("Reply saved", out)
-        (event,) = self.log()
+        event = self.log()[0]  # then the report's own done status
         self.assertEqual(
             (event["type"], event["by"], event["text"], event["to"]),
             ("reply", "coordinator", 'It\'s done, "quoted" and `ticked`', None),
@@ -706,11 +706,32 @@ class VerbsTest(Fixture):
             with self.subTest(read=bad), self.assertRaises(page.EventError):
                 conv.check({**base, "read": bad})
 
+    def test_a_report_carries_its_own_done_status_with_its_own_line_as_read_D13(self):
+        """A new report is done by the agent and stays in Open until the user's check; an old one, with no status, starts
+        closed (D13)."""
+        self.seed(
+            {"type": "note", "by": "user", "id": "m1", "text": "a", "to": None},
+            {"type": "reply", "by": "coordinator", "id": "r0", "text": "old report", "to": None},
+        )
+        self.assertEqual(self.cli("reply", self.unit_arg, stdin="Built it.")[0], 0)
+        report, status = self.log()[2:]
+        self.assertEqual(
+            (status["type"], status["to"], status["status"], status["read"]), ("status", report["id"], "done", 2)
+        )
+        shown = {t["id"]: (t["state"], t["closed_by_user"]) for t in page.threads(self.log(), DEFAULT_KINDS)}
+        self.assertEqual((shown["r0"], shown[report["id"]]), (("done", True), ("done", False)))
+
+    def test_an_acceptance_the_agent_records_is_not_the_user_writing_in_the_thread(self):
+        self.seed({"type": "note", "by": "user", "id": "m1", "text": "a", "to": None})
+        self.assertEqual(self.cli("status", self.unit_arg, "accepted", "m1", "--text", stdin="Looks right")[0], 0)
+        code_, _, err = self.cli("reply", self.unit_arg, "--to", "m1", "--read", "0", stdin="Thanks.")
+        self.assertEqual(code_, 0, err)
+
     def test_reply_without_to_is_a_report_unless_asked_which_sets_asked_on_its_own_id_S6(self):
         self.assertEqual(self.cli("reply", self.unit_arg, stdin="Built it.")[0], 0)
-        self.assertEqual([e["type"] for e in self.log()], ["reply"])
+        self.assertEqual([e["type"] for e in self.log()], ["reply", "status"])
         self.assertEqual(self.cli("reply", self.unit_arg, "--state", "asked", stdin="Which size?")[0], 0)
-        question, status = self.log()[1:]
+        question, status = self.log()[2:]
         self.assertEqual((status["type"], status["to"], status["status"]), ("status", question["id"], "asked"))
         states = [(t["state"], t["step"]) for t in page.threads(self.log(), DEFAULT_KINDS)]
         self.assertEqual(states, [("done", "new"), ("you", "new")])
@@ -799,7 +820,8 @@ class VerbsTest(Fixture):
                 self.assertEqual(code_, 1, err)
                 self.assertIn("m1", err)
                 self.assertNotIn("m2", err)
-                self.assertIn("read them, then send this again", err)
+                self.assertIn("run pending", err)
+                self.assertIn("to read them, then send this again with the --read it prints", err)
                 self.assertEqual(len(self.log()), before)
         # Only the named threads count: m2 has nothing newer than line 1.
         self.assertEqual(self.cli("status", self.unit_arg, "seen", "m2", "--read", "1")[0], 0)
@@ -891,7 +913,7 @@ class VerbsTest(Fixture):
         code_, _, err = self.cli("reply", self.unit_arg, "--to", "m0", "--read", str(first), stdin="Done: b.")
         self.assertEqual(code_, 1, err)
         self.assertIn("m0", err)
-        self.assertIn("read them, then send this again", err)
+        self.assertIn("to read them, then send this again with the --read it prints", err)
         self.assertEqual(len(self.log()), before)
         self.assertEqual(self.cli("reply", self.unit_arg, "--to", "m0", "--read", str(second), stdin="Done: c.")[0], 0)
         self.assertEqual(self.last("m0")["state"], "done")

@@ -54,6 +54,32 @@ test("a decision from the records is a thread: waiting is your turn, your answer
   assert.deepEqual(states(fresh), [['D-2', 'done', 'new'], ['D-1', 'done', 'new'], ['m1', 'agent', 'seen']]);
 });
 
+test('D14: a decision you answered is closed; one the agent decided or that defaulted stays in Open, done, until your check; waiting is your turn', () => {
+  const at = m => `2026-11-28T10:${String(m).padStart(2, '0')}:00Z`;
+  const decisions = [
+    { id: 'W', at: at(0), asked: 'Which?', status: 'waiting' },
+    { id: 'A', at: at(1), asked: 'Which?', status: 'answered', answer: { type: 'chat', text: 'B' } },
+    { id: 'AE', at: at(2), asked: 'Which?', status: 'answered' },
+    { id: 'P', at: at(3), asked: 'Which?', status: 'decided', decision: 'C' },
+    { id: 'F', at: at(4), asked: 'Which?', status: 'defaulted', default: 'D' },
+    { id: 'AW', at: at(5), asked: 'Which?', status: 'waiting' },
+  ];
+  const log = [
+    { type: 'answer', id: 'a1', decision: 'AE', text: 'A', default: false, by: 'user', at: at(10) },
+    { type: 'answer', id: 'a2', decision: 'AW', text: 'A', default: false, by: 'user', at: at(11) },
+  ];
+  const states = l => Object.fromEntries(Array.from(context.pageThreads(context.pageDecisionEvents(decisions, l), ITEMS),
+    t => [t.id, [t.state, t.closedByUser]]));
+  assert.deepEqual(states(log), {
+    W: ['you', false], A: ['done', true], AE: ['done', true], P: ['done', false], F: ['done', false], AW: ['agent', false],
+  });
+  // Your check closes one the agent settled; your note under an answered one gives it back to the agent.
+  const more = log.concat([{ type: 'accept', to: 'P', by: 'user', at: at(12) },
+    { type: 'note', id: 'n1', to: 'a1', text: 'And also this.', by: 'user', at: at(13) }]);
+  const after = states(more);
+  assert.deepEqual([after.P, after.AE], [['done', true], ['agent', false]]);
+});
+
 test('every state the page gives a pin has a colour in page.css, and words for its title', () => {
   const css = read('page', 'page.css');
   assert.deepEqual(Object.keys(context.PAGE_PIN_STATES), ['new', 'seen', 'working', 'asked', 'done', 'accepted']);

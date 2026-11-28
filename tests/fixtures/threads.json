@@ -448,6 +448,19 @@
    {"id": "m3", "state": "agent", "step": "new", "closedByUser": false},
    {"id": "r1", "state": "done", "step": "new", "closedByUser": true}
   ]},
+ {"name": "old report (D13): a report with no status and no message from you starts closed by you; a new report carries its done with read and stays open; an old report you answered is the agent's turn",
+  "log": [
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "reply", "id": "r2", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "status", "to": "r2", "status": "done", "by": "coordinator", "read": 1},
+   {"type": "reply", "id": "r3", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "note", "id": "m1", "to": "r3", "text": "t", "by": "user"}
+  ],
+  "threads": [
+   {"id": "r1", "state": "done", "step": "new", "closedByUser": true},
+   {"id": "r2", "state": "done", "step": "new", "closedByUser": false},
+   {"id": "r3", "state": "agent", "step": "new", "closedByUser": false}
+  ]},
  {"name": "kind: an approval is a thread of yours",
   "items": ["comment", "note", "approve"],
   "log": [
