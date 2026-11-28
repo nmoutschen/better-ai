@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import itertools
 import json
+import os
 import re
+import shlex
 import shutil
+import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
@@ -22,6 +25,8 @@ class Candidate:
     kind: str | None
     approval: str | None = None
     codec_factory: Callable[[Send], ACPAdapter | CodexAdapter | ClaudeAdapter | DroidAdapter] | None = None
+    text: str = ""
+    mode: str | None = None
 
     def command(self, session_id: str, resume: str | None) -> tuple[str, ...]:
         if self.kind is not None:
@@ -41,9 +46,34 @@ class Candidate:
             raise ValueError("no verified protocol for this harness")
         if self.name == "claude":
             expected = resume if session_id_valid("claude", resume) else session_id
-            return ClaudeAdapter(send, expected)
+            return ClaudeAdapter(send, expected, self.mode)
+        if self.name == "codex":
+            return CodexAdapter(send, self.mode)
         return self.codec_factory(send)
 
+
+_REAL_BROWSER_TOOLS = (
+    "mcp__claude-in-chrome",
+    "mcp__Claude_Browser",
+    "mcp__remote-devices__Claude_Browser",
+    "mcp__computer-use",
+    "mcp__remote-devices__computer",
+)
+_MODES = ("manual", "accept edits", "auto", "skip approvals")
+_CLAUDE_CHAT = {
+    "manual": "manual",
+    "default": "manual",
+    "acceptEdits": "accept edits",
+    "auto": "auto",
+    "bypassPermissions": "skip approvals",
+}
+_CLAUDE_FLAGS = {
+    "manual": ("--permission-mode", "manual"),
+    "accept edits": ("--permission-mode", "acceptEdits"),
+    "auto": ("--permission-mode", "auto"),
+    "skip approvals": ("--dangerously-skip-permissions",),
+}
+_CLAUDE_REPORTED = {**_CLAUDE_CHAT, "plan": "plan", "dontAsk": "don't ask"}
 
 # Prefer specific identifiers to generic markers if one harness is started from another.
 _HARNESSES = {
@@ -64,8 +94,15 @@ _HARNESSES = {
             "--output-format",
             "stream-json",
             "--verbose",
+            "--replay-user-messages",
             "--permission-prompts",
             "host",
+            "--permission-prompt-tool",
+            "stdio",
+            # The page session never drives the user's own browser or desktop. Headless browsers stay.
+            "--no-chrome",
+            "--disallowed-tools",
+            ",".join(_REAL_BROWSER_TOOLS),
         ),
         ("CLAUDECODE",),
     ),
@@ -88,20 +125,85 @@ _UUID = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 _ACP_SESSION = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}")
 
 
-def candidate(requested: str, env: Mapping[str, str], which: Callable[[str], str | None] = shutil.which) -> Candidate:
+def _flag_values(argv: tuple[str, ...], *flags: str) -> list[str]:
+    values = []
+    for index, arg in enumerate(argv):
+        for flag in flags:
+            if arg == flag and index + 1 < len(argv):
+                values.append(argv[index + 1])
+            elif arg.startswith(f"{flag}="):
+                values.append(arg[len(flag) + 1 :])
+    return values
+
+
+def chat_mode(name: str, argv: tuple[str, ...] | list[str]) -> str | None:
+    """The approval mode the user's chat session was started in, from its own command line, or None."""
+    argv = tuple(argv)
+    if name == "claude":
+        if "--dangerously-skip-permissions" in argv:
+            return "skip approvals"
+        values = _flag_values(argv, "--permission-mode")
+        return _CLAUDE_CHAT.get(values[-1]) if values else None
+    if name == "codex":
+        if "--dangerously-bypass-approvals-and-sandbox" in argv:
+            return "skip approvals"
+        configs = [value.replace(" ", "").replace('"', "") for value in _flag_values(argv, "-c", "--config")]
+        if "--approve-for-me" in argv or "approvals_reviewer=auto_review" in configs:
+            return "auto"
+        policies = _flag_values(argv, "-a", "--ask-for-approval")
+        if policies:
+            return {"never": "skip approvals", "on-request": "manual", "untrusted": "manual"}.get(policies[-1])
+    return None
+
+
+def chat_argv(name: str, pid: int | None = None, run: Callable = subprocess.run) -> tuple[str, ...]:
+    """The command line of the harness process that runs this one, found among its ancestors; () if none."""
+    pid = os.getppid() if pid is None else pid
+    binary = _HARNESSES[name][0][0]
+    for _ in range(12):
+        shown = run(["ps", "-o", "ppid=,command=", "-p", str(pid)], capture_output=True, text=True)
+        fields = shown.stdout.strip().split(None, 1)
+        if shown.returncode or len(fields) != 2 or not fields[0].isdigit():
+            return ()
+        try:
+            argv = tuple(shlex.split(fields[1]))
+        except ValueError:
+            argv = ()
+        if argv and os.path.basename(argv[0]) == binary:
+            return argv
+        pid = int(fields[0])
+        if pid <= 1:
+            return ()
+    return ()
+
+
+def candidate(
+    requested: str,
+    env: Mapping[str, str],
+    which: Callable[[str], str | None] = shutil.which,
+    chat_argv: tuple[str, ...] | list[str] = (),
+) -> Candidate:
     """Return metadata without launching a process or reading harness settings."""
     name = requested
     if requested == "auto":
         name = next((name for name, (_, markers) in _HARNESSES.items() if any(env.get(k) for k in markers)), "")
         if not name:
-            return Candidate(None, (), "none")
+            return Candidate(
+                None,
+                (),
+                "no-harness",
+                text="No supported harness found. Run serve from Claude Code, Codex, Cursor, OpenCode, Droid or Devin.",
+            )
     if name not in _HARNESSES:
         raise ValueError(f"unknown harness: {name}")
     command, _ = _HARNESSES[name]
     executable = which(command[0])
     if executable is None:
-        return Candidate(name, (), "not-installed")
+        return Candidate(name, (), "not-installed", text=f"{name} is not installed. Install it, then serve again.")
     argv = (executable, *command[1:])
+    mode = chat_mode(name, chat_argv)
+    if name == "claude" and mode:
+        argv += _CLAUDE_FLAGS[mode]
     factories = {
         "claude": ClaudeAdapter,
         "codex": CodexAdapter,
@@ -114,8 +216,13 @@ def candidate(requested: str, env: Mapping[str, str], which: Callable[[str], str
         try:
             _opencode_config(env)
         except ValueError:
-            return Candidate(name, argv, "unsafe-mode")
-    return Candidate(name, argv, None, "webauthn", factories[name])
+            return Candidate(
+                name,
+                argv,
+                "unsafe-mode",
+                text="OpenCode's inline configuration is not valid. Fix OPENCODE_CONFIG_CONTENT, then serve again.",
+            )
+    return Candidate(name, argv, None, "webauthn", factories[name], mode=mode)
 
 
 def version_supported(name: str, version: str) -> bool:
@@ -130,6 +237,13 @@ def version_supported(name: str, version: str) -> bool:
         except ValueError:
             return False
     return release >= minimum
+
+
+def version_problem(name: str, reported: str) -> str:
+    match = None if name == "cursor" else _VERSION.search(reported)
+    found = match.group(0) if match else reported.strip()[:80] or "no version"
+    needed = ".".join(str(part) for part in _MIN_VERSION[name])
+    return f"{name} reported {found}. Version {needed} or later is required."
 
 
 def session_id_valid(name: str, session_id: Any) -> bool:
@@ -179,6 +293,8 @@ class AdapterEvent:
     options: tuple[str, ...] = ()
     requester: str | None = None
     tool_id: str | None = None
+    mode: str | None = None
+    uuid: str | None = None
 
 
 Events = tuple[AdapterEvent, ...]
@@ -207,6 +323,27 @@ def _wire_id(data: Any) -> bool:
     return type(data) in (int, str)
 
 
+_CONFIG_PATH = re.compile(r"(?:^|[\s/\\='\"])\.(?:claude|codex|cursor|factory|devin|opencode)(?:[\s/\\'\"]|$)")
+
+
+def _touches_config(data: Any) -> bool:
+    """Whether a request names a path under a harness's own configuration folder."""
+    if isinstance(data, str):
+        return _CONFIG_PATH.search(data) is not None
+    if isinstance(data, dict):
+        return any(_touches_config(value) for value in data.values())
+    if isinstance(data, list):
+        return any(_touches_config(value) for value in data)
+    return False
+
+
+def _choices(session: bool, arguments: Any) -> tuple[str, ...]:
+    """Allow for this session is offered where the harness has such a scope, never for its own config."""
+    if session and not _touches_config(arguments):
+        return ("allow_once", "allow_session", "deny")
+    return ("allow_once", "deny")
+
+
 def _failure(kind: str, text: str = "") -> Events:
     return (AdapterEvent("failed", outcome=kind, text=text),)
 
@@ -227,6 +364,8 @@ def _error_kind(error: dict, default: str) -> str:
 
 
 class _RPCAdapter:
+    _name = "the harness"
+
     def __init__(self, send: Send):
         self.send = send
         self.session_id: str | None = None
@@ -300,6 +439,7 @@ class _RPCAdapter:
 class ACPAdapter(_RPCAdapter):
     """ACP v1 documents transport and request shapes, but leaves approval enforcement to the agent."""
 
+    _name = "the agent"
     _client_info: dict = {}
 
     def open(self, cwd: str, resume: str | None) -> None:
@@ -336,9 +476,9 @@ class ACPAdapter(_RPCAdapter):
         if not session_id_valid("opencode", session_id):
             return _failure("crashed", "missing or invalid ACP session id")
         self.session_id = session_id
-        return (AdapterEvent("ready", session_id=session_id),)
+        return (AdapterEvent("ready", session_id=session_id, mode="manual"),)
 
-    def prompt(self, text: str) -> None:
+    def prompt(self, text: str, uuid: str | None = None) -> None:
         if self.session_id is None:
             raise RuntimeError("ACP session is not open")
         self._call(
@@ -382,11 +522,12 @@ class ACPAdapter(_RPCAdapter):
         for option in available if isinstance(available, list) else ():
             item = _object(option)
             name = item.get("kind")
-            if name in ("allow_once", "reject_once") and isinstance(item.get("optionId"), str):
+            if name in ("allow_once", "allow_always", "reject_once") and isinstance(item.get("optionId"), str):
                 options[name] = item["optionId"]
 
         def respond(choice: str, _reason: str) -> dict:
-            option_id = options.get("allow_once" if choice == "allow_once" else "reject_once")
+            wanted = {"allow_once": "allow_once", "allow_session": "allow_always"}.get(choice, "reject_once")
+            option_id = options.get(wanted) or (options.get("allow_once") if choice == "allow_session" else None)
             outcome = {"outcome": "selected", "optionId": option_id} if option_id else {"outcome": "cancelled"}
             return {"outcome": outcome}
 
@@ -412,7 +553,7 @@ class ACPAdapter(_RPCAdapter):
                 request_id=request_id,
                 tool=tool,
                 arguments=arguments,
-                options=("allow_once", "deny"),
+                options=_choices("allow_always" in options, arguments),
                 requester=owner,
             ),
         )
@@ -434,7 +575,7 @@ class OpenCodeAdapter(ACPAdapter):
     def _initialized(self, data: dict) -> Events:
         version = _text(_object(data.get("agentInfo")).get("version"))
         if not version_supported("opencode", version):
-            return _failure("version")
+            return _failure("version", version_problem("opencode", version))
         return super()._initialized(data)
 
     def _opened(self, data: dict) -> Events:
@@ -566,6 +707,12 @@ class DevinAdapter(_ConfiguredACPAdapter):
 class CodexAdapter(_RPCAdapter):
     """Codex app-server stdio protocol version checked against the locally shipped schema."""
 
+    _name = "codex"
+
+    def __init__(self, send: Send, chat_mode: str | None = None):
+        super().__init__(send)
+        self.chat_mode = chat_mode
+
     def open(self, cwd: str, resume: str | None) -> None:
         self._cwd = cwd
         self._resume = resume if session_id_valid("codex", resume) else None
@@ -573,8 +720,9 @@ class CodexAdapter(_RPCAdapter):
         self._changes: dict[tuple[str, str], list] = {}
 
     def _initialized(self, data: dict) -> Events:
-        if not version_supported("codex", _text(data.get("userAgent"))):
-            return _failure("version")
+        agent = _text(data.get("userAgent"))
+        if not version_supported("codex", agent):
+            return _failure("version", version_problem("codex", agent))
         self._notify("initialized", {})
         self._call("account/read", {"refreshToken": False}, self._account)
         return ()
@@ -586,27 +734,34 @@ class CodexAdapter(_RPCAdapter):
         return ()
 
     def _open_thread(self) -> None:
-        params = {"cwd": self._cwd, "approvalsReviewer": "user"}
+        # No sandbox or network setting: the page session runs under the user's own Codex configuration.
+        params = {"cwd": self._cwd, "approvalsReviewer": "auto_review" if self.chat_mode == "auto" else "user"}
+        if self.chat_mode == "skip approvals":
+            params["approvalPolicy"] = "never"
         if self._resume:
             self._call("thread/resume", {**params, "threadId": self._resume}, self._opened)
         else:
             self._call("thread/start", params, self._opened)
 
     def _opened(self, data: dict) -> Events:
-        sandbox = _object(data.get("sandbox"))
-        if (
-            data.get("approvalPolicy") not in ("untrusted", "on-request")
-            or data.get("approvalsReviewer") != "user"
-            or sandbox.get("type") not in ("workspaceWrite", "readOnly")
-        ):
+        reviewer, policy = data.get("approvalsReviewer"), data.get("approvalPolicy")
+        if reviewer != ("auto_review" if self.chat_mode == "auto" else "user"):
+            return _failure("unsafe-mode")
+        if policy == "never":
+            mode = "skip approvals"
+        elif policy in ("untrusted", "on-request"):
+            mode = "auto" if reviewer == "auto_review" else "manual"
+        else:
+            return _failure("unsafe-mode")
+        if self.chat_mode and mode != self.chat_mode:
             return _failure("unsafe-mode")
         session_id = _object(data.get("thread")).get("id")
         if not session_id_valid("codex", session_id):
             return _failure("crashed", "missing or invalid Codex thread id")
         self.session_id = session_id
-        return (AdapterEvent("ready", session_id=session_id),)
+        return (AdapterEvent("ready", session_id=session_id, mode=mode),)
 
-    def prompt(self, text: str) -> None:
+    def prompt(self, text: str, uuid: str | None = None) -> None:
         if self.session_id is None:
             raise RuntimeError("Codex thread is not open")
         self._call(
@@ -654,10 +809,22 @@ class CodexAdapter(_RPCAdapter):
             changes = item.get("changes")
             if item.get("type") == "fileChange" and isinstance(changes, list) and changes:
                 self._changes[(_text(params.get("turnId")), _text(item.get("id")))] = changes
+        if method == "item/autoApprovalReview/completed" and _object(params.get("review")).get("status") == "denied":
+            action = _object(params.get("action"))
+            tool = "Command" if action.get("type") == "command" else _text(action.get("type")) or "Action"
+            return (
+                AdapterEvent(
+                    "blocked", tool=tool, arguments=action, text=_text(_object(params.get("review")).get("rationale"))
+                ),
+            )
         if method == "serverRequest/resolved" and _wire_id(params.get("requestId")):
             request_id = params["requestId"]
             if self._approvals.pop(request_id, None) is not None:
-                return (AdapterEvent("approval_closed", request_id=request_id, outcome="expired"),)
+                return (
+                    AdapterEvent(
+                        "approval_closed", request_id=request_id, outcome="expired", text="codex resolved the request"
+                    ),
+                )
         return ()
 
     def _request(self, request_id: WireID, method: str, params: dict) -> Events:
@@ -668,16 +835,22 @@ class CodexAdapter(_RPCAdapter):
             tool = "Command"
             complete = bool(_text(params.get("command"))) and not params.get("networkApprovalContext")
             arguments = params
+            decisions = params.get("availableDecisions")
+            session = isinstance(decisions, list) and "acceptForSession" in decisions
         elif method == "item/fileChange/requestApproval":
             tool = "File change"
             changes = self._changes.get((_text(params.get("turnId")), _text(params.get("itemId"))))
             complete = bool(changes) and not params.get("grantRoot")
             arguments = {**params, "changes": changes}
+            session = True
         else:
             return super()._request(request_id, method, params)
+        options = _choices(session, arguments)
 
         def respond(choice: str, _reason: str) -> dict:
-            return {"decision": "accept" if choice == "allow_once" else "decline"}
+            if choice == "allow_session" and "allow_session" in options:
+                return {"decision": "acceptForSession"}
+            return {"decision": "accept" if choice in ("allow_once", "allow_session") else "decline"}
 
         if self.session_id is None or params.get("threadId") != self.session_id or not complete:
             self._result(request_id, respond("deny", ""))
@@ -690,7 +863,7 @@ class CodexAdapter(_RPCAdapter):
                 request_id=request_id,
                 tool=tool,
                 arguments=arguments,
-                options=("allow_once", "deny"),
+                options=options,
                 requester=owner,
             ),
         )
@@ -707,14 +880,20 @@ class CodexAdapter(_RPCAdapter):
 class ClaudeAdapter:
     """Claude Code stream-json, including the host approval channel."""
 
-    def __init__(self, send: Send, expected_session: str | None = None):
+    _name = "claude"
+
+    def __init__(self, send: Send, expected_session: str | None = None, chat_mode: str | None = None):
         self.send = send
         self.expected_session = expected_session
+        self.chat_mode = chat_mode
+        self.mode: str | None = None
         self.session_id: str | None = None
         self._ids = itertools.count(1)
         self._initialize_id: str | None = None
         self._running = False
-        self._approvals: dict[WireID, tuple[str | None, dict]] = {}
+        self._approvals: dict[WireID, tuple[str | None, tuple[dict, list]]] = {}
+        self._asked: set[str] = set()
+        self._reasons: dict[str, str] = {}
 
     def _control(self, subtype: str) -> str:
         request_id = f"page-{next(self._ids)}"
@@ -724,17 +903,18 @@ class ClaudeAdapter:
     def open(self, cwd: str, resume: str | None) -> None:
         self._initialize_id = self._control("initialize")
 
-    def prompt(self, text: str) -> None:
+    def prompt(self, text: str, uuid: str | None = None) -> None:
         if self.session_id is None:
             raise RuntimeError("Claude session is not open")
-        self.send(
-            {
-                "type": "user",
-                "message": {"role": "user", "content": text},
-                "parent_tool_use_id": None,
-                "session_id": "default",
-            }
-        )
+        message = {
+            "type": "user",
+            "message": {"role": "user", "content": text},
+            "parent_tool_use_id": None,
+            "session_id": "default",
+        }
+        if uuid:
+            message["uuid"] = uuid
+        self.send(message)
 
     def cancel(self) -> None:
         self._control("interrupt")
@@ -747,9 +927,11 @@ class ClaudeAdapter:
         pending = self._approvals.pop(request_id, None)
         if pending is None:
             return False
-        _, arguments = pending
-        if choice == "allow_once":
+        _, (arguments, scope) = pending
+        if choice in ("allow_once", "allow_session"):
             result = {"behavior": "allow", "updatedInput": arguments}
+            if choice == "allow_session" and scope:
+                result["updatedPermissions"] = scope
         else:
             result = {"behavior": "deny", "message": reason or "the page denied permission"}
         self._response(request_id, result=result)
@@ -761,42 +943,76 @@ class ClaudeAdapter:
             error = _text(response.get("error"))
             return _failure(_error_kind({"message": error}, "crashed"), error)
         data = _object(response.get("response"))
-        if not version_supported("claude", _text(data.get("claude_code_version"))):
-            return _failure("version")
-        if data.get("current_permission_mode") != "default":
+        reported = _text(data.get("claude_code_version"))
+        if not version_supported("claude", reported):
+            return _failure("version", version_problem("claude", reported))
+        mode = _CLAUDE_REPORTED.get(_text(data.get("current_permission_mode")))
+        if mode is None or (self.chat_mode and mode != self.chat_mode):
             return _failure("unsafe-mode")
         account = _object(data.get("account"))
         if not any(account.get(key) for key in ("subscriptionType", "apiKeySource", "tokenSource")):
             return _failure("login")
         if not session_id_valid("claude", self.expected_session):
             return _failure("crashed", "missing or invalid Claude session id")
+        self.mode = mode
         self.session_id = self.expected_session
-        return (AdapterEvent("ready", session_id=self.session_id),)
+        return (AdapterEvent("ready", session_id=self.session_id, mode=mode),)
 
     def _request(self, request_id: WireID, request: dict) -> Events:
         if request_id in self._approvals:
             self.answer(request_id, "deny", "duplicate request id")
             return (AdapterEvent("approval_closed", request_id=request_id, outcome="denied"),)
         if request.get("subtype") != "can_use_tool":
-            self._response(request_id, error="permission denied")
+            kind = _text(request.get("subtype")).casefold()
+            denied = "permission" in kind or "approval" in kind
+            self._response(request_id, error="permission denied" if denied else "method not supported")
             return ()
         tool, arguments = _text(request.get("tool_name")), request.get("input")
         if self.session_id is None or not tool or not isinstance(arguments, dict):
             self._response(request_id, result={"behavior": "deny", "message": "permission request is incomplete"})
             return ()
         owner = _text(request.get("agent_id")) or None
-        self._approvals[request_id] = (owner, arguments)
+        # Claude's own suggestions are its "don't ask again" scopes; a grant keeps only the session ones.
+        suggestions = request.get("permission_suggestions")
+        scope = [
+            {**item, "destination": "session"}
+            for item in (suggestions if isinstance(suggestions, list) else ())
+            if isinstance(item, dict)
+        ]
+        if request.get("suppress_always_allow_rule") is True:
+            scope = []
+        self._approvals[request_id] = (owner, (arguments, scope))
+        if tool_use_id := _text(request.get("tool_use_id")):
+            self._asked.add(tool_use_id)
         return (
             AdapterEvent(
                 "approval",
                 request_id=request_id,
                 tool=tool,
                 arguments=arguments,
-                options=("allow_once", "deny"),
+                options=_choices(bool(scope), arguments),
                 requester=owner,
                 tool_id=tool,
             ),
         )
+
+    def _blocked(self, message: dict) -> Events:
+        denials = message.get("permission_denials")
+        events = ()
+        if self.mode == "auto" and isinstance(denials, list):
+            events = tuple(
+                AdapterEvent(
+                    "blocked",
+                    tool=_text(item.get("tool_name")),
+                    arguments=item.get("tool_input"),
+                    text=self._reasons.get(_text(item.get("tool_use_id")), ""),
+                )
+                for item in map(_object, denials)
+                if _text(item.get("tool_use_id")) not in self._asked
+            )
+        self._asked.clear()
+        self._reasons.clear()
+        return events
 
     def receive(self, message: dict) -> Events:
         kind, subtype = message.get("type"), message.get("subtype")
@@ -804,8 +1020,13 @@ class ClaudeAdapter:
             response = _object(message.get("response"))
             if self._initialize_id is not None and response.get("request_id") == self._initialize_id:
                 return self._initialized(response)
+        if kind == "user" and message.get("isReplay") is True and _text(message.get("uuid")):
+            return (AdapterEvent("prompt_echoed", uuid=message["uuid"]),)
+        if kind == "system" and subtype == "permission_denied" and _text(message.get("tool_use_id")):
+            self._reasons[message["tool_use_id"]] = _text(message.get("decision_reason"))
+            return ()
         if kind == "system" and subtype == "init":
-            if message.get("permissionMode") != "default":
+            if _CLAUDE_REPORTED.get(_text(message.get("permissionMode"))) != self.mode:
                 self.session_id = None
                 return _failure("unsafe-mode")
             if message.get("session_id") != self.session_id:
@@ -852,19 +1073,24 @@ class ClaudeAdapter:
             else:
                 outcome = _error_kind({"message": text}, "crashed")
             closed = _expire_owned(self._approvals, None)
-            return (*closed, AdapterEvent("turn_ended", outcome=outcome, text=text))
+            return (*closed, *self._blocked(message), AdapterEvent("turn_ended", outcome=outcome, text=text))
         request_id = message.get("request_id")
         if _wire_id(request_id):
             if kind == "control_request":
                 return self._request(request_id, _object(message.get("request")))
             if kind == "control_cancel_request" and self._approvals.pop(request_id, None) is not None:
-                return (AdapterEvent("approval_closed", request_id=request_id, outcome="expired"),)
+                return (
+                    AdapterEvent(
+                        "approval_closed", request_id=request_id, outcome="expired", text="claude cancelled the request"
+                    ),
+                )
         return ()
 
 
 class DroidAdapter(_RPCAdapter):
     """Factory stream-jsonrpc as published in @factory/droid-sdk 0.11.0."""
 
+    _name = "droid"
     _factory_api_version = "1.0.0"
     _factory_protocol_version = "1.332.0"
     _start_methods = ("droid.initialize_session", "droid.load_session")
@@ -951,9 +1177,9 @@ class DroidAdapter(_RPCAdapter):
             request_id = _object(request).get("requestId")
             if isinstance(request_id, str) and request_id:
                 self._result(request_id, {"selectedOption": "cancel", "comment": "previous page session ended"})
-        return (AdapterEvent("ready", session_id=session_id),)
+        return (AdapterEvent("ready", session_id=session_id, mode="manual"),)
 
-    def prompt(self, text: str) -> None:
+    def prompt(self, text: str, uuid: str | None = None) -> None:
         if self.session_id is None:
             raise RuntimeError("Droid session is not open")
         self._call("droid.add_user_message", {"text": text, "queuePlacement": "end_of_turn"}, lambda _: ())
@@ -992,8 +1218,12 @@ class DroidAdapter(_RPCAdapter):
             self._result(request_id, {"selectedOption": "cancel"})
             return ()
 
+        offered = {_object(option).get("value") for option in options}
+
         def respond(choice: str, reason: str) -> dict:
-            if choice == "allow_once":
+            if choice == "allow_session" and "proceed_always" in offered:
+                return {"selectedOption": "proceed_always"}
+            if choice in ("allow_once", "allow_session"):
                 return {"selectedOption": "proceed_once"}
             result = {"selectedOption": "cancel"}
             if reason:
@@ -1008,7 +1238,7 @@ class DroidAdapter(_RPCAdapter):
                 request_id=request_id,
                 tool=", ".join(names),
                 arguments=uses,
-                options=("allow_once", "deny"),
+                options=_choices("proceed_always" in offered, uses),
                 requester=owner,
             ),
         )
@@ -1024,7 +1254,11 @@ class DroidAdapter(_RPCAdapter):
         if kind == "permission_resolved" and _wire_id(data.get("requestId")):
             request_id = data["requestId"]
             if self._approvals.pop(request_id, None) is not None:
-                return (AdapterEvent("approval_closed", request_id=request_id, outcome="expired"),)
+                return (
+                    AdapterEvent(
+                        "approval_closed", request_id=request_id, outcome="expired", text="droid resolved the request"
+                    ),
+                )
         if kind == "child_session_settled" and (owner := _text(data.get("childSessionId"))):
             return _expire_owned(self._approvals, owner)
         if kind == "settings_updated":

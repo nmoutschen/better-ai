@@ -26,7 +26,7 @@ class DrivenServeTest(Served):
         )
         try:
             first = process.stdout.readline()
-            self.assertEqual(first.strip(), "driver: off none", first or process.stderr.read())
+            self.assertEqual(first.strip(), "driver: off no-harness", first or process.stderr.read())
             serving = process.stdout.readline().strip()
             self.assertIn("Each action the user takes is printed here as one JSON line. Serving", serving)
             url, token = serving.split(" at ", 1)[1].split("#t=")

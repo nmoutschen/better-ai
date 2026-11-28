@@ -15,7 +15,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from better_ai.page.adapters import (  # noqa: E402
-    ClaudeAdapter,
     CodexAdapter,
     DroidAdapter,
     OpenCodeAdapter,
@@ -585,9 +584,12 @@ for line in sys.stdin:
     def next_kind(self, transport, *wanted):
         for _ in range(200):
             event = transport.poll(0.05)
-            if event is not None and getattr(event, "kind", None) not in ("output", None):
-                if not wanted or event.kind in wanted:
-                    return event.kind
+            if (
+                event is not None
+                and getattr(event, "kind", None) not in ("output", None)
+                and (not wanted or event.kind in wanted)
+            ):
+                return event.kind
         self.fail("no event")
 
 
