@@ -114,7 +114,6 @@ _CODEX_HELP = "`codex --help` (0.172.0)"
 _CODEX_SCHEMA = "`codex app-server generate-json-schema` (0.172.0)"
 _CURSOR_FLAGS = "https://cursor.com/docs/cli/reference/parameters"
 _CURSOR_CONFIG = "https://cursor.com/docs/cli/reference/configuration"
-_CURSOR_MODES = "https://cursor.com/docs/agent/security/run-modes"
 _DEVIN_FLAGS = "https://docs.devin.ai/cli/reference/commands"
 _DEVIN_MODES = "https://docs.devin.ai/cli/reference/permissions"
 _DROID_FLAGS = "https://docs.factory.com/reference/cli-reference"
@@ -223,15 +222,18 @@ HARNESS_FACTS: dict[str, Harness] = {
         ),
     ),
     "cursor": Harness(
-        set_by=Fact("the command line: --force, a global option; approvalMode is only reported", _CURSOR_FLAGS),
+        set_by=Fact(
+            "the command line: --force, a global option; approvalMode is only reported (unverified: no recorded ACP session; an unknown value fails closed)",
+            _CURSOR_FLAGS,
+        ),
         chat_flags=(
             ChatFlag(
                 ("-f", "--force", "--yolo"), None, "skip approvals", _CURSOR_FLAGS, argv=("--force",), reported=False
             ),
         ),
         reported=(
-            ReportedMode("approvalMode", "allowlist", "manual", _CURSOR_MODES),
-            ReportedMode("approvalMode", "auto-review", "auto", _CURSOR_MODES),
+            ReportedMode("approvalMode", "allowlist", "manual", _CURSOR_CONFIG),
+            ReportedMode("approvalMode", "auto-review", "auto", _CURSOR_CONFIG),
             ReportedMode("approvalMode", "unrestricted", "unrestricted", _CURSOR_CONFIG),
         ),
         config=(
@@ -241,7 +243,10 @@ HARNESS_FACTS: dict[str, Harness] = {
         flags_at=1,
     ),
     "devin": Harness(
-        set_by=Fact("the protocol: session/set_config_option permission_mode", _DEVIN_MODES),
+        set_by=Fact(
+            "the protocol: session/set_config_option permission_mode (unverified: the docs do not describe ACP; an unknown value fails closed)",
+            _DEVIN_MODES,
+        ),
         chat_flags=(
             _devin_mode("normal", "manual", "normal"),
             _devin_mode("auto", "manual", "normal"),
@@ -286,7 +291,8 @@ HARNESS_FACTS: dict[str, Harness] = {
             ),
         ),
         reported=tuple(
-            ReportedMode("autonomyLevel", level, level, _DROID_SETTINGS) for level in ("off", "low", "medium", "high")
+            ReportedMode("autonomyLevel", level, "manual" if level == "off" else level, _DROID_SETTINGS)
+            for level in ("off", "low", "medium", "high")
         ),
         config=(
             ConfigPath("~/.factory/", _DROID_SETTINGS),
@@ -433,6 +439,9 @@ _ACP_REQUESTS = frozenset(
         "terminal/kill",
     }
 )
+# Cursor's ACP extensions (https://cursor.com/docs/cli/acp); its two requests are still refused (S33).
+_CURSOR_NOTIFICATIONS = _ACP_NOTIFICATIONS | {"cursor/update_todos", "cursor/task", "cursor/generate_image"}
+_CURSOR_REQUESTS = _ACP_REQUESTS | {"cursor/ask_question", "cursor/create_plan"}
 # Droid: @factory/droid-sdk 0.11.0.
 _DROID_NOTIFICATIONS = frozenset({"droid.session_notification"})
 _DROID_REQUESTS = frozenset({"droid.request_permission", "droid.ask_user"})
@@ -444,6 +453,7 @@ _CLAUDE_TYPES = frozenset(
         "user",
         "result",
         "system",
+        "conversation_reset",
         "stream_event",
         "tool_progress",
         "auth_status",
@@ -1128,6 +1138,8 @@ class CursorAdapter(_ConfiguredACPAdapter):
     # The CLI documents allowlist, auto-review and unrestricted independently
     # of the agent/plan/ask profile. ACP does not require it to expose this choice.
     _harness = "cursor"
+    _notifications = _CURSOR_NOTIFICATIONS
+    _requests = _CURSOR_REQUESTS
     _permission_option = "approvalMode"
     _client_info = {"clientInfo": {"name": "better-ai", "version": "0.1.0"}}
 
