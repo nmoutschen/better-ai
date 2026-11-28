@@ -10,13 +10,23 @@ It answers `--version`, and the stream-json messages the Claude Code adapter sen
     linger         keep running after stdin closes
     ask            ask for approval of a Bash command and wait for the answer before the first reply
     cancel         ask for approval of a Bash command, then cancel the request itself a second later
+    verb           on the first prompt, ask for approval of each shell command of STUB_COMMANDS and run it if allowed
 
 STUB_DUMP, if set, is a file the stub appends its environment and every line it reads to.
+STUB_COMMANDS (verb mode) is a JSON list of shell commands. In each, {python}, {pyz} and {unit} stand for what the
+prompt's header names as approved without asking: the interpreter, the archive and the unit, quoted as the header quotes
+it. STUB_RESULT is the file that gets one JSON line for each answer: its behavior, its message and the exit code of the
+command, which runs when it is allowed.
+STUB_HANDLE, if set, makes the stub do what a page agent does with the items of a prompt: it runs `status <unit> done
+<id>` for each item whose status is new, so that the driver sees the work done. Its value is the JSON list of the
+command that runs a better verb, such as the interpreter and the archive.
 STUB_LOG, if set, is a file the stub appends its process id, its BETTER_PAGE_SESSION and its command line to.
 """
 
 import json
 import os
+import shlex
+import subprocess
 import sys
 import time
 
@@ -38,6 +48,50 @@ def finish_turn(session):
         }
     )
     say({"type": "result", "subtype": "success", "is_error": False, "result": "ok", "session_id": session})
+
+
+def header_form(prompt):
+    """The interpreter, the archive and the quoted unit the prompt's header approves (S95)."""
+    for line in prompt.splitlines():
+        if line.startswith("Approved without asking: "):
+            tokens = shlex.split(line.split("Approved without asking: ", 1)[1].split(", where")[0])
+            return tokens[0], tokens[1], shlex.quote(tokens[3])
+    return "python3", "better.pyz", "unit"
+
+
+def prompt_text(message):
+    content = message.get("message", {}).get("content", "")
+    if isinstance(content, list):
+        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    return content
+
+
+def run_commands(message):
+    """Verb mode: each command is asked in turn, with the header's form filled in."""
+    python, pyz, unit = header_form(prompt_text(message))
+    for number, template in enumerate(json.loads(os.environ["STUB_COMMANDS"])):
+        command = template.replace("{python}", shlex.quote(python)).replace("{pyz}", shlex.quote(pyz))
+        command = command.replace("{unit}", unit)
+        request = {"subtype": "can_use_tool", "tool_name": "Bash", "input": {"command": command}}
+        say({"type": "control_request", "request_id": f"verb-{number}", "request": request})
+        response = json.loads(sys.stdin.readline()).get("response", {}).get("response", {})
+        code = None
+        if response.get("behavior") == "allow":
+            code = subprocess.run(["bash", "-c", command], capture_output=True, check=False).returncode
+        answer = {"behavior": response.get("behavior"), "message": response.get("message"), "exit": code}
+        with open(os.environ["STUB_RESULT"], "a") as result:
+            result.write(json.dumps(answer) + "\n")
+
+
+def handle_items(message):
+    """STUB_HANDLE is the JSON list of the command that runs a verb (the source tree's, or an archive's)."""
+    unit = header_form(prompt_text(message))[2]
+    for line in prompt_text(message).splitlines():
+        if line.startswith("{"):
+            record = json.loads(line)
+            if record.get("status") == "new" and record.get("id"):
+                argv = [*json.loads(os.environ["STUB_HANDLE"]), "status", shlex.split(unit)[0], "done", record["id"]]
+                subprocess.run(argv, capture_output=True, check=False)
 
 
 def session_of(argv):
@@ -89,6 +143,12 @@ def main(argv):
             if "--replay-user-messages" in argv and message.get("uuid"):
                 # Claude Code echoes the prompt back with its uuid (tests/fixtures/page_wire/claude_2_1_332.json).
                 say({**message, "session_id": session, "isReplay": True})
+            if os.environ.get("STUB_HANDLE"):
+                handle_items(message)
+            if MODE == "verb" and turn == 1:
+                run_commands(message)
+                finish_turn(session)
+                continue
             if MODE in ("ask", "cancel") and turn == 1:
                 say(
                     {
