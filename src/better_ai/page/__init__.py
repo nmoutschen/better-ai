@@ -82,7 +82,7 @@ CAPABILITIES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "pins": (("comment", "delete"), ("comment",)),  # numbered pins on the page, and taking a comment back
     "accept": (("accept", "reopen"), ()),  # the user accepts what the agent finished, or puts it back
     "decisions": (("answer",), ("answer",)),  # the user answers a decision question
-    "confirm": (("confirm",), ("confirm",)),  # the user confirms a requirement in the wording shown
+    "confirm": (("confirm",), ()),  # the user confirms a requirement in the wording shown: no reply needed (D8)
     "approve": (("approve",), ("approve",)),  # the user approves, or asks for a review again
 }
 CONTENT_TYPES = {
@@ -695,8 +695,10 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
     (.design/conversation-panel/states.md): page.js `pageThreads` gives the same threads for the same log, and
     tests/fixtures/threads.json holds the logs both are run on. Each thread, in the order it started, holds `id`, `root`
     (the latest form of the event that started it), `messages`, `state` (`you`, `agent` or `done`), `step` (`new`,
-    `seen` or `working`), `closed_by_user`, `deleted`, `since` (when the state or step was set), `user_at` (the log
-    index of the user's latest event) and `last` (the time of its last message). An agent status counts only if its
+    `seen` or `working`), `closed_by_user` (also from the start, for the user's action that is no message to the agent,
+    such as a verdict or a confirmation), `deleted`, `edited` (the user's comment was sent again), `since` (when the
+    state or step was set), `user_at` (the log index of the user's latest event) and `last` (the time of its last
+    message). An agent status counts only if its
     `read` covers the user's latest event in the thread; one without `read` counts (logs before `read`). An event's
     index is its place in EVENTS, or its LINE when it has one (`log_records`)."""
     found: list[dict] = []
@@ -724,7 +726,7 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
         if t is None and item and ident in by_id and by_id[ident]["root"].get("type") == kind:
             t = by_id[ident]  # the user's item sent again, such as an edited comment: the same thread, in its state
             if kind == "comment":
-                t["root"], t["messages"][0], t["deleted"] = e, e, False
+                t["root"], t["messages"][0], t["deleted"], t["edited"] = e, e, False, True
         elif t is None:
             if kind not in CONTROL:
                 t = {
@@ -735,12 +737,20 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
                     "step": "new",
                     "closed_by_user": False,
                     "deleted": False,
+                    "edited": False,
                     "since": at,
                     "user_at": i if user else -1,
                     "last": at,
                 }
                 if isinstance(ident, str):
                     by_id[ident] = t
+                # the user's action that is no message to the agent, such as a verdict or a confirmation, needs no
+                # reply: its thread starts closed by the user, until they write in it (D8)
+                if user and not item and kind not in ("note", "answer"):
+                    t["closed_by_user"] = True
+                # a worker's report that it closed a question starts closed too, the user's choice (D10)
+                if kind == "closed":
+                    t["closed_by_user"] = True
                 found.append(t)
                 if kind == "answer" and isinstance(target, str) and target not in by_id:
                     home[target] = ident  # later answers to the same decision join this thread

@@ -9,10 +9,6 @@ const { read, stand, marked, between, loadPage, loadDashboard } = require('./har
 
 const html = read('code', 'dashboard.js');
 
-test("the dashboard's conversation opts in to latestLast", () => {
-  assert.match(html, /latestLast: true/);
-});
-
 // The dashboard's task status and agent tag, on the JSON the dashboard now reads: read out of dashboard.html between `// status:begin` and `// status:end`.
 const statusCode = marked(html, 'status');
 const { taskStatus, DONE, isDone } = new Function('esc', statusCode + '; return {taskStatus, DONE, isDone};')(s => String(s));
@@ -444,21 +440,64 @@ test("a verify that passed never shows the findings of another verifier's failed
   assert.doesNotMatch(passed, /Empty export/);
 });
 
-// The issue's thread: the agent's own message, the user's answer the coordinator asked about, a later comment.
-const ASKED_ANSWER = [
-  { type: 'reply', id: 'r1', to: null, text: 'Three questions' },
-  { type: 'note', id: 'm1', to: 'r1', text: 'answers' },
-  { type: 'reply', id: 'r2', to: 'm1', text: 'which one?' },
-  { type: 'status', to: 'm1', status: 'asked' },
-  { type: 'note', id: 'm2', to: 'r1', text: 'more' },
-  { type: 'comment', id: 'c1', n: 1, text: 'later' },
-];
+// ---- The dashboard's own kinds inside the rows of the shared panel (S24, S25): dashboard.js runs whole on the stand-in
+// shell (tests/dom.js), with the shared page.js's real panel.
+const { shellDocument, mixedDocument, panelOn, text, actions } = require('./dom');
+const at = h => new Date(Date.parse('2026-11-28T12:00:00Z') - h * 3600e3).toISOString().slice(0, 19) + 'Z';
+function liveDashboard(data) {
+  const doc = shellDocument();
+  const shared = panelOn(null, null, { document: doc, config: { agent: 'coordinator', capabilities: ['pins', 'decisions'] } });
+  const c = shared.context, env = {
+    document: mixedDocument(doc), pageConversation: o => c.pageConversation(Object.assign({}, o, { served: false })),
+    pageDecision: c.pageDecision, pageDecisionEvents: c.pageDecisionEvents, pageMarkdown: c.pageMarkdown, pageMarkdownText: c.pageMarkdownText,
+    pageTime: c.pageTime, pageEscape: c.pageEscape, pageAgents: c.pageAgents, pagePopup: c.pagePopup, pageShowErrors: () => {},
+    pageFetch: () => new Promise(() => {}), setInterval: () => {}, addEventListener: () => {}, innerWidth: 1000, innerHeight: 800,
+    getComputedStyle: stand(), CSS: { escape: s => s },
+  };
+  const page = new Function(...Object.keys(env), read('code', 'dashboard.js') + '; return {render, conv};')(...Object.values(env));
+  page.render(Object.assign({ now: Date.parse('2026-11-28T12:00:00Z') / 1000, name: 'Panel', tasks: [], agents: [], git: {} }, data));
+  return Object.assign(shared, page);
+}
+const DASH_LOG = {
+  decisions: [{ id: 'D1', at: at(3), asked: 'Keep the old endpoint? Clients still call it.', status: 'waiting', default: 'Keep it',
+    deadline: '2026-11-28T13:00:00Z', raised_by: 'builder-t4', task: 'T4' }],
+  conversation: [
+    { type: 'comment', id: 'c1', on: { kind: 'task', id: 'T4', title: 'T4 Six pages' }, text: 'Check the canvas too.', by: 'user', at: at(2) },
+    { type: 'reply', id: 'r1', to: 'c1', text: 'Done.', by: 'coordinator', at: at(1) }, { type: 'status', to: 'c1', status: 'done', by: 'coordinator', at: at(1) },
+  ],
+};
 
-test("the user's answer the coordinator asked about waits for the user: its thread comes last, under Open", () => {
+test('the dashboard draws a decision inside its row as your turn, with where it is from and its controls; a comment keeps its crumb', () => {
+  const b = liveDashboard(DASH_LOG);
+  // The dashboard feeds the panel before it writes its header: the figure is in its slot all the same.
+  assert.equal(text(b.$('#status #yourturn')), '1 your turn');
+  const d1 = b.rowOf('D1'), c1 = b.rowOf('c1');
+  assert.equal(text(d1.querySelector('.chip')), 'Your turn');
+  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Use the default', 'Answer']);
+  d1.querySelector('.thead').click();
+  const body = text(b.rowOf('D1').querySelector('.tbody'));
+  assert.match(body, /From builder-t4, task T4/);
+  assert.match(body, /If you don't answer: Keep it/);
+  assert.equal(c1.dataset.state, 'done');
+  assert.deepEqual(actions(c1).map(x => x.textContent), ['✓', 'Reopen']);
+  c1.querySelector('.thead').click();
+  assert.equal(text(b.rowOf('c1').querySelector('.crumb .el')), 'T4 Six pages');
+  // Open and All, as on every page; the figure in the dashboard's own header.
+  assert.equal(text(b.$('[data-filter="open"]')), 'Open (2)');
+  assert.equal(text(b.$('#status #yourturn')), '1 your turn');
+});
+
+test('the default answers the decision from its row, and the figure goes to 0', () => {
+  const b = liveDashboard(DASH_LOG);
+  actions(b.rowOf('D1'))[1].click();
+  assert.deepEqual(b.conv.log().filter(e => e.type === 'answer').map(e => [e.decision, e.text, e.default]), [['D1', 'Keep it', true]]);
+  assert.equal(text(b.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
+  assert.equal(text(b.$('#status #yourturn')), '0 your turn');
+});
+
+test('the dashboard gives the panel none of the options of the old per-item drawing', () => {
   let o;
-  const page = loadPage();
-  loadDashboard('0', { ...page, document: stand(), pageConversation: opts => { o = opts; return stand(); } });
-  const model = loadPage().pageThread(ASKED_ANSWER, o.itemKinds || ['comment', 'note'], o.waiting, o.latestLast);
-  assert.deepEqual(Array.from(model.entries, c => c.e.id), ['c1', 'r1']);
-  assert.ok(model.open.some(c => c.e.id === 'r1'));
+  loadDashboard('0', { ...loadPage(), document: stand(), pageConversation: opts => { o = opts; return stand(); } });
+  for (const gone of ['steps', 'labels', 'shown', 'accept', 'filter', 'waiting', 'latestLast', 'agentKinds']) assert.ok(!(gone in o), gone);
+  assert.deepEqual(Object.keys(o.kinds), ['decision']);
 });

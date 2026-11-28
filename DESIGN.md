@@ -156,6 +156,7 @@ Padding is `--space-edge` at the sides of the header, the view and the side colu
 - In the stats header the title wraps to two lines at most, then cuts off with an ellipsis. The question header wraps its controls under the title on a narrow window.
 - In the question header, keep to the controls used on every visit. Put settings changed rarely in a menu, as the canvas's Display menu.
 - A board never has both: figures go in the stats header, a question goes in the question header.
+- The one exception is page.js's "N your turn" figure, on every page that talks to the agent. A page with a stats header places it among its own figures (`.yourturn` slot) and has no other figure for what waits for you; a page with a question header places it among its controls, one line at their size.
 
 ### View patterns
 
@@ -292,6 +293,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 - Progress is three bars with a green Done step: Not seen shows none, Seen one, Working two, Done all three in moss-dark.
 - Buttons by state: Answer is the one filled (umber) button on a row, with ✓ beside it; ✓, Reply and Reopen are outlined; a thread done by the agent offers ✓ (Confirm done) and Reopen; one you closed offers Reopen. Buttons differ by more than their text.
 - ✓ closes a thread. The row stays in place as Closed with its own Undo for 6 seconds, then leaves Open and shows Done in All.
+- A page's own kind, such as a decision, an approval or a worker's report, keeps its body inside the row, and its own Answer or Reply in the place of the row's; every thread you have not closed offers ✓ first, whatever its kind, and a done one Reopen last. A user's action that needs no reply, such as a verdict or a confirmation, and a worker's report start closed: they show in All with Reopen, never in Open.
 - Do not rebuild any part of it. A page that needs the conversation embeds page.js.
 
 ### Pop-up
@@ -304,7 +306,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 ### Decision in the conversation
 
 - An agent's decision or question is a `li.msg.decision`, with an umber edge and the agent's name and time in umber.
-- An open question's footer is its state, a filled Answer and an outlined ✓ (use the default), on one row (`.foot.question`). Each control's accessible name includes the question. After ✓ the focus goes to the next open question, then to what waits next.
+- An open question's row offers ✓ (Close), an outlined "Use the default" in words, and a filled Answer, on one row. ✓ always closes or confirms a thread, never answers it. Each control's accessible name includes the question. After Use the default the focus goes to the next open question, then to what waits next.
 - The top bar counts the threads that wait for the user as the figure "N your turn".
 - A page whose defaults never apply on a timer sets `pageDecision({suggested: true})`: the default reads "Suggested default" and no deadline shows.
 

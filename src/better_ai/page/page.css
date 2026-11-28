@@ -66,6 +66,8 @@ header.bar--stats h1 { display:-webkit-box; -webkit-box-orient:vertical; -webkit
 button.stat { border:0; background:none; padding:0; color:inherit; font:inherit; cursor:pointer; }
 button.stat b { text-decoration:underline; text-underline-offset:3px; }
 button.stat:hover b, button.stat:focus-visible b { text-decoration-thickness:2px; }
+/* The slot a page that writes its own figures leaves for page.js's "N your turn" figure: the figure stands among the others. */
+.yourturn { display:contents; }
 /* Progress under a figure: a cream outline that fills. */
 .meter { width:140px; height:8px; border:1px solid var(--cream); margin-top:var(--space-tight); display:flex; }
 .meter i { display:block; height:100%; background:var(--cream); }
@@ -87,6 +89,9 @@ ul.legend li { display:inline-flex; align-items:center; gap:var(--space-control)
 .controls > .seg.cycle button[aria-pressed="false"] { visibility:hidden; }
 .controls > .seg.cycle button:first-child[aria-pressed="true"] { background:var(--cream); color:var(--umber); }
 .controls > .seg.cycle button:last-child[aria-pressed="true"] { background:transparent; color:var(--cream); }
+/* A question header has no figures: the "N your turn" figure sits among the controls, one line at their size. */
+.controls .stat { flex-direction:row; align-items:baseline; gap:var(--space-tight); margin:0; font:var(--font-small-strong); letter-spacing:0; color:var(--cream); }
+.controls .stat b { font:inherit; }
 
 /* Segmented controls: one of several options, the chosen one filled. */
 .seg { display:inline-flex; border:1px solid var(--cream); }
@@ -177,16 +182,14 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .thread { flex:1; min-height:0; overflow:auto; list-style:none; margin:0; padding:0 var(--space-edge) var(--space-item); }
 .thread > li { display:block; margin:0 0 var(--space-item); }
 
-/* An item: the user's comment, message or decision, with the replies under it and its state at the end. */
-.thread > li.msg { padding:var(--space-item) var(--space-item); background:var(--white); border:1px solid var(--line); }
-.thread > li.msg.agent { background:var(--linen); border-color:var(--sand); border-left:4px solid var(--moss-dark); }
+/* A message of a page's own kind, inside a row: its head (who and when) and its body. */
 .msg .head { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:center; margin-bottom:var(--space-tight); font-size:var(--text-small); color:var(--muted); }
 .msg .who { font-weight:700; color:var(--heading); }
 .msg.agent .who { color:var(--umber); }
 /* On linen, muted and moss-dark text fall under 4.5:1: muted text uses ink there, and so do the progress words, whose
    bars keep their colour. */
-.msg.agent, .thread .reply:not(.mine) { --muted:var(--ink); }
-.msg.agent .progress, .thread .reply:not(.mine) .progress { color:var(--ink); }
+.msg.agent { --muted:var(--ink); }
+.msg.agent .progress { color:var(--ink); }
 .msg .re { font-style:italic; }
 .msg .body { margin:var(--space-tight) 0 0; white-space:pre-wrap; font-size:var(--text-message); line-height:1.45; }
 /* A message in Markdown: its blocks keep a small gap, and wide code or tables scroll inside the message. */
@@ -211,17 +214,10 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .body.md hr { border:0; border-top:1px solid var(--line); }
 .body.md a { color:var(--umber); }
 /* On linen, the agent's code and table heads take cream, so they still stand out. */
-.msg.agent .body.md :is(code, pre, th), .thread .reply:not(.mine) .body.md :is(code, pre, th) { background:var(--cream); }
+.msg.agent .body.md :is(code, pre, th) { background:var(--cream); }
 .msg .link { margin-left:auto; border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
 .msg .head .link + .link { margin-left:var(--space-control); }
 .msg .answered { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--moss-dark); }
-/* The item's left edge carries its state, so it reads at a glance in a long thread. */
-.thread > li.msg[data-state] { border-left-width:4px; }
-.thread > li.msg[data-state="seen"], .thread > li.msg[data-state="replied"], .thread > li.msg[data-state="followup"] { border-left-color:var(--sand); }
-.thread > li.msg[data-state="asked"] { border-left-color:var(--umber); }
-.thread > li.msg[data-state="working"] { border-left-color:var(--terracotta); }
-.thread > li.msg[data-state="done"], .thread > li.msg[data-state="accepted"] { border-left-color:var(--moss-dark); }
-.thread > li.msg[data-state="reopened"] { border-left-color:var(--error); }
 /* Where a comment points: a small quote above the user's words, so every message reads alike. */
 .crumb { display:block; }
 .crumb .path { display:block; font:var(--font-small); color:var(--muted); }
@@ -232,51 +228,24 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .thread .crumb .path { font-size:var(--text-label); }
 .thread .crumb .el { font:var(--font-message); color:var(--muted); margin-top:0; }
 
-/* Replies sit under the item, edge to edge. The item's own left edge already marks it, so a reply shows by its
-   background and label, not a second bar. */
-.thread .reply { margin:var(--space-item) calc(-1 * var(--space-item)) calc(-1 * var(--space-item)); padding:var(--space-control) var(--space-item) var(--space-item); background:var(--linen); border-top:1px solid var(--line); }
-.thread .reply .who { color:var(--umber); }
-.thread .reply .body { margin:var(--space-tight) 0 0; }
-.thread .reply.mine { background:var(--white); }
-.thread .reply.mine .who { color:var(--heading); }
-/* The agent's own message is its first reply block, flush with the item so its text lines up with every other item. */
-.thread > li.msg.agent > .reply:first-child { margin:calc(-1 * var(--space-item)) calc(-1 * var(--space-item)) 0; padding:var(--space-item) var(--space-item) 0; border:0; background:none; }
-/* The state row closes the item, aligned with its text. A reply pulls its bottom edge 10px down; 16px leaves the same
-   6px gap as without one. */
-.thread .foot { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:center; margin:var(--space-control) 0 0; font-size:var(--text-small); color:var(--muted); }
-.thread .reply + .foot { margin-top:var(--space-section); }
-.thread .reply:has(+ .foot) { padding-bottom:var(--space-tight); }
-.thread .foot .answer { margin-left:auto; }
-/* An open question's footer keeps its state and its two buttons on one row. */
-.thread .foot.question { flex-wrap:nowrap; }
-.thread .foot.question .progress { min-width:0; }
-.thread .foot .answer + .answer { margin-left:0; }
-.thread .foot .mini:first-of-type { margin-left:auto; }
 .mini { width:22px; height:20px; padding:0; border:1px solid var(--line); background:var(--white); color:var(--ink); cursor:pointer;
   font:var(--font-small-strong); line-height:18px; }
 .mini:hover { border-color:var(--ink); }
-/* Progress: three short bars fill as the agent sees an item, works on it and finishes it. */
+/* Progress: three short bars fill as the agent sees a thread, works on it and finishes it. */
 .progress { white-space:nowrap; display:inline-flex; align-items:center; gap:var(--space-control); font:var(--font-label); letter-spacing:.08em;
   text-transform:uppercase; color:var(--muted); }
 .progress .bars { display:inline-flex; gap:var(--space-tight); }
 .progress .bars i { width:10px; height:4px; background:var(--line); }
-.progress.seen .bars i.on, .progress.replied .bars i.on, .progress.followup .bars i.on { background:var(--sand); }
-.progress.asked { color:var(--umber); }
+.progress.seen .bars i.on { background:var(--sand); }
 .progress.working { color:var(--terracotta-dark); }
-.progress.asked .bars i.on { background:var(--umber); }
 .progress.working .bars i.on { background:var(--terracotta); }
 .progress.working .bars i.on:last-of-type { animation:pulse-bar 1.2s ease-in-out infinite; }
-.progress.done, .progress.accepted { color:var(--moss-dark); }
-.progress.done .bars i.on, .progress.accepted .bars i.on { background:var(--moss-dark); }
-.progress.accepted::after { content:"\2713"; font-size:var(--text-small); }
-.progress.reopened { color:var(--error); }
-.progress.reopened .bars i { background:var(--terracotta); opacity:.5; }
+.progress.done { color:var(--moss-dark); }
+.progress.done .bars i.on { background:var(--moss-dark); }
 @keyframes pulse-bar { 50% { opacity:.35; } }
 @media (prefers-reduced-motion: reduce) { .progress .bars i { animation:none !important; } }
-/* The box for a reason to reopen, or for an answer. A reply above pulls its bottom edge down by the item's padding;
-   20px gives that space back. */
+/* The box for a reason to reopen, or for an answer. */
 .why { margin-top:var(--space-item); }
-.thread .reply + .why { margin-top:var(--space-edge); }
 
 /* One row per thread (pageConversation): the head, which opens and folds the thread, then its messages when open, then
    how many messages and the buttons of its state. The left edge carries the state: umber your turn, terracotta working,
@@ -288,6 +257,8 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .thread > li.trow[data-state="done"] { border-left-color:var(--moss-dark); }
 .thead { display:block; width:100%; margin:0; padding:0; border:0; background:none; text-align:left; cursor:pointer; font:inherit; color:inherit; }
 .thead:hover .tgist { text-decoration:underline; }
+.thead.plain { cursor:default; }
+.thead.plain:hover .tgist { text-decoration:none; }
 .ttop { display:flex; align-items:flex-start; gap:var(--space-control); }
 .tchips { flex:1; display:flex; flex-wrap:nowrap; align-items:center; gap:var(--space-tight) var(--space-control); min-height:28px; }
 .tchips .progress { white-space:nowrap; }
@@ -297,10 +268,10 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .tage { font:var(--font-label); letter-spacing:.08em; text-transform:uppercase; color:var(--umber); }
 .tgist { display:block; margin:var(--space-tight) 0 0; font-size:var(--text-message); line-height:1.45; color:var(--heading); }
 .twho { font-weight:700; }
-.tfoot { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:var(--space-tight) var(--space-control); margin-top:var(--space-control); }
-.tleft { display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:baseline; font-size:var(--text-small); color:var(--muted); }
+.tfoot { display:flex; flex-wrap:nowrap; justify-content:space-between; align-items:center; gap:var(--space-tight) var(--space-control); margin-top:var(--space-control); }
+.tleft { min-width:0; display:flex; flex-wrap:wrap; gap:var(--space-tight) var(--space-control); align-items:baseline; font-size:var(--text-small); color:var(--muted); }
 .tleft .link { border:0; background:none; padding:0; cursor:pointer; font:inherit; color:var(--ink); text-decoration:underline; }
-.tacts { display:flex; gap:var(--space-control); margin-left:auto; }
+.tacts { flex:none; display:flex; gap:var(--space-control); margin-left:auto; }
 .tacts .close { min-width:2.25rem; }
 /* Answer is the one filled button on a row, in the colour of what waits for you; the others are outlined. */
 .tacts .primary { padding-left:var(--space-section); padding-right:var(--space-section); }
@@ -385,7 +356,7 @@ li.trow.closing { display:flex; justify-content:space-between; align-items:cente
 .qpop .x { position:absolute; top:14px; right:12px; z-index:2; border:0; background:none; font:var(--font-body-strong); font-size:var(--text-heading); color:var(--ink); cursor:pointer; }
 .qpop .crumb { display:none; }
 .qpop .thread { flex:none; overflow:visible; padding:0; margin:0; }
-.qpop .thread > li.msg { margin-bottom:var(--space-control); }
+.qpop .thread > li.trow { margin-bottom:var(--space-control); }
 /* A question box with its button beside it. */
 .ask { display:flex; gap:var(--space-control); align-items:stretch; margin-top:var(--space-item); }
 .ask textarea { flex:1; min-height:3em; font:var(--font-message); color:var(--ink); background:var(--white); border:1px solid var(--muted); padding:var(--space-control) var(--space-control); resize:vertical; }
@@ -428,14 +399,13 @@ li.trow.closing { display:flex; justify-content:space-between; align-items:cente
 .errors code { font:var(--font-code); }
 .errors .by { color:var(--muted); }
 
-/* A comment pin, coloured by the state of its item as the conversation shows it: one rule for every state page.js sets
-   (PAGE_STATES), for every page that has pins. A page sets where a pin sits. pagePinCss in page.js builds the same rules
+/* A comment pin, coloured by the state of its thread as the conversation shows it: one rule for every state page.js sets
+   (PAGE_PIN_STATES), for every page that has pins. A page sets where a pin sits. pagePinCss in page.js builds the same rules
    for a pin drawn in a frame. */
 .pin { width:24px; height:24px; border-radius:50%; background:var(--terracotta); color:var(--heading); font:var(--font-small-strong);
   line-height:24px; text-align:center; box-shadow:0 0 0 2px var(--cream); cursor:pointer; }
 .pin[data-state="new"], .pin[data-state="working"] { background:var(--terracotta); }
-.pin[data-state="seen"], .pin[data-state="replied"], .pin[data-state="followup"] { background:var(--sand); }
+.pin[data-state="seen"] { background:var(--sand); }
 .pin[data-state="asked"] { background:var(--cream); color:var(--umber); box-shadow:0 0 0 2px var(--umber); }
 .pin[data-state="done"] { background:var(--moss-dark); color:var(--cream); }
 .pin[data-state="accepted"] { display:none; background:var(--moss-dark); color:var(--cream); }
-.pin[data-state="reopened"] { background:var(--terracotta); box-shadow:0 0 0 2px var(--cream), 0 0 0 4px var(--error); }

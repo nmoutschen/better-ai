@@ -652,7 +652,7 @@ class Architect(unittest.TestCase):
     def test_the_page_declares_the_capabilities_its_events_need(self):
         spec = page.spec_of(self.unit.skill)
         self.assertEqual(set(spec.capabilities), {"pins", "accept", "confirm", "approve"})
-        self.assertEqual(set(spec.tracked()), {"note", "comment", "confirm", "approve"})
+        self.assertEqual(set(spec.tracked()), {"note", "comment", "approve"})  # a confirmation needs no reply (D8)
         self.assertEqual(spec.events, "architect-events.schema.json")
         self.assertEqual(spec.agent, "architect")
 
