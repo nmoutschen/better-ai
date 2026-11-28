@@ -12,6 +12,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest import mock
 
@@ -30,6 +31,12 @@ SKILL = "architect-better"
 
 # The review summary the page shows for the perspectives that run again, by name.
 RERUN_SUMMARY = "reviewSummary([], {}, data.rerun.map(id => nameOf(data.perspectives, id)))"
+
+
+def svg_texts(svg, ident):
+    """The words of the element with id IDENT in an SVG drawing."""
+    element = ET.fromstring(svg).find(f".//*[@id='{ident}']")
+    return [] if element is None else [node.text for node in element.iter() if node.text and node.text.strip()]
 
 
 class Architect(unittest.TestCase):
@@ -281,6 +288,13 @@ class Architect(unittest.TestCase):
         ):
             self.assertIn(error, out)
 
+    def test_the_page_lists_only_the_running_agents_with_when_each_started(self):
+        view = model.model(self.read())
+        self.assertEqual(
+            [(a["id"], a["name"], a["task"], a["at"]) for a in view["agents"]],
+            [("A2", "poc-resume", "proof of concept", "2026-11-20T10:05:00Z")],
+        )
+
     def test_reader_loads_every_contract_file(self):
         data = self.read()
         for name in model.FILES:
@@ -321,15 +335,15 @@ class Architect(unittest.TestCase):
             "design.json:1: containers.edges[0].to: Edge 'e1': to references missing 'nowhere'", self.errors(data)
         )
         self.assertEqual(data["flows"], [])
-        self.assertEqual(data["containers"], {"before": "", "after": ""})
+        self.assertEqual(data["containers"], {"before": ""})
 
     def test_unreviewed_folder_omits_findings_controls_and_badges(self):
         (self.folder / "reviews.jsonl").unlink()
         view = model.model(self.read())
         self.assertEqual(view["reviews"], [])
         self.assertNotIn('class="mark"', view["containers"]["after"])
-        html = self.render_javascript(view, "controls(data.perspectives, data.reviews.at(-1))")
-        self.assertIn('aria-label="State"', html)
+        html = self.render_javascript(view, "controls(data.perspectives, data.reviews.at(-1), data.versions)")
+        self.assertIn('aria-label="Version"', html)
         self.assertNotIn('aria-label="Findings"', html)
 
     def test_perspective_table_marks_unconfirmed_findings(self):
@@ -367,9 +381,151 @@ class Architect(unittest.TestCase):
         design["flows"][0]["in"] = ["before"]
         path.write_text(json.dumps(design))
         flow = model.model(self.read())["flows"][0]
-        self.assertEqual((flow["new"], flow["removed"]), (False, True))
+        self.assertEqual(flow["status"], {"before": "current", "after": "removed"})
         self.assertTrue(flow["versions"]["before"])
         self.assertIn("REMOVED", flow["versions"]["after"])
+
+    # Two ways to answer orders: a queue, or the service calling the warehouse; Before polls a file.
+    ALTERNATIVES = {
+        "type": "design",
+        "alternatives": [
+            {
+                "id": "queue",
+                "name": "Queue",
+                "summary": "Orders go through a queue.",
+                "strengths": ["Absorbs peaks"],
+                "drawbacks": ["One more part to run"],
+            },
+            {
+                "id": "direct",
+                "name": "Direct call",
+                "summary": "The service calls the warehouse.",
+                "strengths": [],
+                "drawbacks": ["Fails when the warehouse is down"],
+            },
+        ],
+        "containers": {
+            "nodes": [
+                {"id": "shop", "label": "Shop", "kind": "service"},
+                {"id": "drop", "label": "Drop file", "kind": "file", "in": ["before", "direct"]},
+                {"id": "orders", "label": "Order queue", "kind": "queue", "in": ["queue"]},
+                {"id": "stock", "label": "Warehouse", "kind": "external"},
+            ],
+            "edges": [
+                {"id": "write", "from": "shop", "to": "drop", "label": "writes orders", "in": ["before"]},
+                {"id": "send", "from": "shop", "to": "orders", "label": "sends orders", "in": ["queue"]},
+                {"id": "take", "from": "orders", "to": "stock", "label": "takes orders", "in": ["queue"]},
+                {"id": "call", "from": "shop", "to": "stock", "label": "posts orders", "in": ["direct"]},
+            ],
+        },
+        "flows": [
+            {
+                "id": "order",
+                "name": "Order",
+                "participants": [{"id": "s", "box": "shop"}, {"id": "w", "box": "stock"}],
+                "steps": [
+                    {"id": "pick", "from": "s", "to": "w", "label": "order"},
+                    {"id": "ack", "from": "w", "to": "s", "label": "accepted", "kind": "response", "in": ["direct"]},
+                ],
+            },
+            {
+                "id": "drain",
+                "name": "Drain",
+                "in": ["queue"],
+                "participants": [{"id": "q", "box": "orders"}, {"id": "w", "box": "stock"}],
+                "steps": [{"id": "pull", "from": "w", "to": "q", "label": "next order"}],
+            },
+        ],
+    }
+
+    def write_design(self, design):
+        path = self.folder / "design.json"
+        old = json.loads(path.read_text())
+        path.write_text(json.dumps({**design, "at": old["at"], "by": old["by"]}))
+        for name in ("findings.jsonl", "reviews.jsonl"):  # they name parts of the example's design
+            (self.folder / name).unlink(missing_ok=True)
+
+    def test_a_design_with_no_after_shows_before_alone_and_nothing_to_approve(self):
+        design = json.loads((self.folder / "design.json").read_text())
+
+        def as_it_is(items):  # the parts Before has, with no `in`
+            return [{k: v for k, v in item.items() if k != "in"} for item in items if diagram.exists(item, "before")]
+
+        containers = design["containers"]
+        for kind in ("nodes", "edges", "groups"):
+            containers[kind] = as_it_is(containers[kind])
+        names = {node["id"] for node in containers["nodes"]}
+        for group in containers["groups"]:
+            group["members"] = [member for member in group["members"] if member in names]
+        design["flows"] = as_it_is(design["flows"])
+        for flow in design["flows"]:
+            flow["participants"], flow["steps"] = as_it_is(flow["participants"]), as_it_is(flow["steps"])
+        self.write_design(design)
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
+        view = self.load()
+        self.assertEqual(view["errors"], [])
+        self.assertEqual(view["versions"], [{"id": "before", "name": "Before"}])
+        self.assertEqual(set(view["containers"]), {"before"})
+        self.assertNotIn("NEW", view["containers"]["before"])
+        html = self.render_javascript(view, "controls(data.perspectives, data.reviews.at(-1), data.versions)")
+        self.assertNotIn('aria-label="Version"', html)
+        page_script = (PACKAGE / "page.js").read_text()
+        self.assertIn("if (!readOnly && !before &&", page_script)  # no Approve… while only Before is drawn
+
+    def test_alternatives_each_draw_their_own_version_after_the_shared_before(self):
+        self.write_design(self.ALTERNATIVES)
+        self.assertEqual(rec.run_cli("check", str(self.folder)), (0, "", ""))
+        view = self.load()
+        self.assertEqual(view["errors"], [])
+        self.assertEqual([v["id"] for v in view["versions"]], ["before", "queue", "direct"])
+        before, queue, direct = (view["containers"][v] for v in ("before", "queue", "direct"))
+        self.assertEqual(diagram.versions(self.ALTERNATIVES)[1], ("queue", "Queue"))
+        # Before has the drop file, not the queue; Queue adds the queue and removes the file; Direct keeps the file.
+        self.assertIn('id="c-before-box-drop"', before)
+        self.assertNotIn('id="c-before-box-orders"', before)
+        self.assertIn("NEW", svg_texts(queue, "c-queue-box-orders"))
+        self.assertIn("REMOVED", svg_texts(queue, "c-queue-box-drop"))
+        self.assertNotIn("REMOVED", svg_texts(direct, "c-direct-box-drop"))
+        self.assertNotIn('id="c-direct-box-orders"', direct)
+        self.assertNotIn('id="c-queue-edge-call"', queue)
+        # A flow only one alternative has is drawn in it alone, and marked new there.
+        drain = view["flows"][1]
+        self.assertEqual(drain["status"], {"queue": "new"})
+        self.assertEqual((drain["versions"]["before"], drain["versions"]["direct"]), ("", ""))
+        self.assertIn('id="flow2-queue-step-pull"', drain["versions"]["queue"])
+        self.assertIn("c-direct-box-shop", view["parts"]["box:shop"]["ids"])
+        self.assertEqual(view["parts"]["step:order/ack"]["description"], "accepted (Flows, step 1a)")
+        html = self.render_javascript(
+            view,
+            "controls([], null, data.versions) + alternativeTable(data.alternatives) + figures(data.flows[1].versions, data.versions)",
+        )
+        for words in (
+            'data-version="direct"',
+            ">Direct call<",
+            "Fails when the warehouse is down",
+            'id="alt-queue"',
+            "This flow is not part of Direct call.",
+        ):
+            self.assertIn(words, html)
+
+    def test_check_refuses_a_version_that_is_no_alternative(self):
+        design = json.loads(json.dumps(self.ALTERNATIVES))
+        design["containers"]["nodes"][2]["in"] = ["pipes"]
+        design["alternatives"][1]["id"] = "after"
+        self.write_design(design)
+        code, out, _ = rec.run_cli("check", str(self.folder))
+        self.assertEqual(code, 1)
+        self.assertIn("in names 'pipes', not before, after or an alternative", out)
+        self.assertIn("Alternative id 'after' names a version", out)
+        design["alternatives"][1]["id"] = "q-box"  # an id with a hyphen could make two element ids alike
+        self.write_design(design)
+        code, out, _ = rec.run_cli("check", str(self.folder))
+        self.assertIn("alternatives[1].id", out)
+        del design["alternatives"]
+        design["containers"]["nodes"][2]["in"] = ["queue"]
+        self.write_design(design)
+        code, out, _ = rec.run_cli("check", str(self.folder))
+        self.assertIn("in names 'queue', not before, after or an alternative", out)
 
     def test_a_requirement_source_is_shown_as_words_and_no_link_to_an_endpoint(self):
         view = model.model(self.read())
@@ -503,7 +659,7 @@ class Architect(unittest.TestCase):
 
     def test_the_page_uses_the_shared_approve_and_not_its_own_copy(self):
         script = (PACKAGE / "page.js").read_text()
-        self.assertIn("pageApprove(", script)
+        self.assertIn("pageApprovalPanel(", script)
         self.assertNotIn("conversation.send('approve'", script)
         self.assertNotIn("Could not load the design", (PACKAGE / "page.html").read_text())  # the strips are shared
         for strip in ('class="offline"', 'class="unwatched"'):
@@ -664,6 +820,10 @@ class Architect(unittest.TestCase):
         bad = self.post(url, "approve", {"id": "a9", "perspectives": ["security"], "changes": [], "text": "t"})
         self.assertIn("error", bad)
         self.assertEqual((self.folder / "conversation.jsonl").read_text(), before)
+        chosen = {"option": "queue", "label": "Build Order queue", "carries": ["c1-x"], "text": None}
+        self.assertNotIn("error", self.post(url, "approve", {**self.SENT["approve"], "id": "approval-y", **chosen}))
+        bad = self.post(url, "approve", {**self.SENT["approve"], "id": "approval-z", **chosen, "carries": "c1-x"})
+        self.assertIn("error", bad)
 
     # What the page sends, by method, as page.js sends it (the server adds type, by and at).
     SENT = {

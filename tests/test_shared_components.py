@@ -122,7 +122,7 @@ class SharedComponents(unittest.TestCase):
         self.assertIn("chip('Applies', 'plain')", script)  # a fact, not a result: plain
         self.assertIn("chip('Review runs once you approve the design', 'wait')", script)  # it waits for the user
         self.assertIn("chip('no valid source', 'error')", script)
-        self.assertIn("chip('New')", script)
+        self.assertIn('\'<span class="chip by-version"', script)  # New and Removed: a fact, no state colour
         self.assertIn("' comments'))", script)
         self.assertNotRegex(script, r"chip\([^)]*'(open|guess)'\)")
 

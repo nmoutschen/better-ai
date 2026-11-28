@@ -2,52 +2,46 @@
 
 Helps you make a decision yourself, so the choice fits what matters to you and rests on your own judgement.
 
-> **Should the decision method be a skill of its own?**
->
-> 1. **Rules only**: add "name the main drawback" to the skills that recommend.
-> 2. **A core skill**: one skill holds the method, and the others use it when you must choose.
->
-> Which way do you lean, and why? Or skip this and see my recommendation.
+![A chat: the user asks whether to move a blog to a static site; the agent lists three options with costs and one unknown, then asks which way the user leans before giving its view](img/decide-better-chat.png)
+*It lays out the options and what is unknown, then asks which way you lean before it gives its view.*
 
-*The decision that created this skill, in the form it asks: the options first, then your leaning before its view.*
-
-## What it does
-
-- **Separates your decisions from its own.** It makes the decisions about how to carry out your choice, and states them. It brings you the ones about your goals, money, time, people, or work you will maintain.
-- **Asks which way you lean before giving its view**, unless you already said. You can skip, and it then stops asking.
-- **Checks each option against what matters to you**, using the criteria you stated or the two or three you name.
-- **Gives its recommendation with the main drawback.** If it agrees with your leaning, it gives the strongest case against it.
-- **Asks instead of judging** when the options differ mainly in which of your values wins.
-
-For example:
-
-```
-/decide-better move the blog to a static site or keep the CMS
-```
-
-## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
+## When to use it
 
 - Before a decision you will live with, such as a plan, a tool, a job or a purchase.
 - When you notice you are taking the agent's answer without weighing it.
 
+You rarely need to name it: other skills use it when you must choose (see Works with below).
+
 Running it does not mean a long method. A small or easy-to-reverse decision ends with one recommendation and its drawback.
 
-Other skills use it when you must choose, so you rarely need to call it yourself (see Works with below).
+## What you can do with it
 
-</details>
+| You want to | Run | You get |
+|---|---|---|
+| Think through a decision | `/decide-better move the blog to a static site or keep the CMS` | The options, a comparison against what matters to you, and a recommendation with its main drawback |
+| Weigh the decision in the conversation | `/decide-better` | The same, for that decision |
+| Get only the answer | Say "just tell me" | Its recommendation, the main reason and the main drawback |
+| Look back at a past decision | `/decide-better` on the decision | A judgement by what was known at the time, not by how it turned out |
 
-<details>
-<summary><b>How to run it</b></summary>
+In every decision, it:
 
-- `/decide-better <decision>` helps with that decision.
-- `/decide-better` with no argument helps with the decision in the current conversation.
+- **Separates your decisions from its own.** It makes the decisions about how to carry out your choice, and states them; it brings you the ones about your goals, money, time, people, or work you will maintain.
+- **Asks which way you lean before giving its view**, unless you already said; you can skip, and it then stops asking.
+- **Checks each option against what matters to you**, using the criteria you stated or the two or three you name.
+- **Gives its recommendation with the main drawback**; if it agrees with your leaning, it gives the strongest case against it.
+- **Asks instead of judging** when the options differ mainly in which of your values wins.
 
-If you say "just tell me", it gives its recommendation, the main reason and the main drawback, and stops.
+## Your workflow
 
-</details>
+![The decide-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/decide-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
+1. Run it with the decision, or when another skill brings you a choice.
+2. Say which way you lean and why, and the two or three things that matter most. Or skip.
+3. Read the comparison and its recommendation with the main drawback.
+4. Decide. The decision stays yours.
+
+## Reference
 
 <details>
 <summary><b>What happens</b></summary>

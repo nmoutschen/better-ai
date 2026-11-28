@@ -1,0 +1,16 @@
+id: default-drops-source-topic
+rule: default-keeps-to-topic
+source:
+- SKILL.md#6.2
+situation: 'The same board as explore-researches-source-topic, in the default mode, with the goal of deciding which change
+  of release 26.3 to roll back first. Q-w2-6, proposed by a worker, asks what network tokens are: the 3-D Secure review mentions
+  them, but they are not part of the release and cannot change which change to roll back. The coordinator sets Q-w2-6 out of
+  scope. A script checks its status.'
+request: 'Carry on the research in .research/checkout-drop: the workers stopped when my session ended. Run on your own; I
+  won''t be around to answer questions.'
+graders:
+- type: command_passes
+  cmd: python "$GRADE_FILES/default_topic_dropped.py"
+  files:
+    board_lib.py: ../_checks/board_lib.py
+    default_topic_dropped.py: ../_checks/default_topic_dropped.py

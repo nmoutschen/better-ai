@@ -1,0 +1,2 @@
+{"type": "agent", "at": "2026-11-20T10:00:00Z", "by": "architect", "id": "A1", "name": "security-reviewer", "task": "review", "what": "Security", "status": "done"}
+{"type": "agent", "at": "2026-11-20T10:05:00Z", "by": "architect", "id": "A2", "name": "poc-resume", "task": "proof of concept", "what": "Can a session be resumed?", "status": "running"}

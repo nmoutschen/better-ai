@@ -41,15 +41,19 @@ IF the topic is a simple factual question, such as a date, a definition or a cur
 
 FOR every topic that is not a simple factual question, FOLLOW every remaining step, however few sources the COLLECTIONs hold. A COLLECTION you could read in a few minutes is not a reason to skip the board, its live view, the workers, the verifiers or the check for a missing COLLECTION.
 
+CHOOSE the mode. The default mode answers the user's question. IF the user wants to learn a field and see where the reading leads, rather than answer a question or make a decision, USE explore mode: READ and FOLLOW [modes/explore.md](modes/explore.md), which is mandatory in that mode and replaces the rules it names. IF the user asks a question or names a decision, USE the default mode, even when the topic is broad.
+
 IDENTIFY the user's GOAL: what they must understand, learn, decide, or do with the findings. CHOOSE the stop level from the GOAL: `high` for a quick decision, `medium` by default, `low` for an exhaustive review. The stop level and the stop rules (step 5.5) decide how much research to do. DO NOT ask the user for a budget, a number of searches, or a research size. USE a limit only when the user states one.
 
-IF you chose the MEANING, the GOAL or the stop level without the user stating it, STATE your choice in one sentence when you tell the user the board's path, so they can correct it.
+IF you chose the mode, the MEANING, the GOAL or the stop level without the user stating it, STATE your choice in one sentence when you tell the user the board's path, so they can correct it.
 
 ### 2. Keep a research board
 
 The board is the shared record of the research. Every agent reads it and adds records to it as it works.
 
 MAKE the board with `python3 <skill dir>/scripts/better.pyz create .research/<topic-slug> --by coordinator`, at the repository's top level, with the brief as JSON on stdin, so it survives the session and the research can resume. DO NOT use a temporary or session scratch directory. DO NOT commit the board unless the user asks. FOLLOW the record formats in [formats/board.md](formats/board.md): its records are the board.
+
+WHEN you resume a board whose brief has `mode` `explore`, READ and FOLLOW [modes/explore.md](modes/explore.md).
 
 TELL the user the board's path once.
 
@@ -162,9 +166,9 @@ START one worker for each open question at or above the stop level that can be r
 
 WHEN a worker stops and open questions remain, START a fresh worker to replace it. Workers stop early even when their prompt tells them to continue. IF it stopped because a COLLECTION failed, DO NOT replace it. IF the harness cannot run sub-agents in the background, START a group of workers, WAIT for them, then START the next group.
 
-IF the harness lets you choose a worker's model, USE a cheaper model than yours. IF the harness sets models only in sub-agent definition files, USE an existing definition that runs a cheaper model. DO NOT create or edit harness configuration without the user's permission.
+IF the harness lets you choose a worker's model, USE the model [agents/worker.md](agents/worker.md) names in its `model` field. IF the harness sets models only in sub-agent definition files, USE an existing definition that runs such a model. DO NOT create or edit harness configuration without the user's permission.
 
-START verifiers when the first claims appear, while workers still run: READ [agents/verifier.md](agents/verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to each verifier as its prompt. Verifiers check claims as workers add them, so a claim is checked before the research ends. A verifier is a separate agent that checks claims it did not record, because a model judges its own output too leniently. START more verifiers when unchecked claims pile up, and START a fresh one when a verifier stops while unchecked claims remain or workers still run. USE the same cheaper model as for workers.
+START verifiers when the first claims appear, while workers still run: READ [agents/verifier.md](agents/verifier.md), FILL IN its Input, and GIVE the whole file, without its HOW TO USE block, to each verifier as its prompt. Verifiers check claims as workers add them, so a claim is checked before the research ends. A verifier is a separate agent that checks claims it did not record, because a model judges its own output too leniently. START more verifiers when unchecked claims pile up, and START a fresh one when a verifier stops while unchecked claims remain or workers still run. USE the model [agents/verifier.md](agents/verifier.md) names in its `model` field.
 
 DO NOT put the answer you expect or your own conclusions in an agent's Input or on the board.
 

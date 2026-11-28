@@ -12,51 +12,64 @@ Writes, checks, reviews and audits code so it builds what you need, and leaves y
 ```
 *A scenario from the requirements it agrees with you before writing code. It checks the finished code against each one.*
 
-## What it does
+## When to use it
+
+- You want the agent to write or change code: a feature, a bug fix, a refactor or tests.
+- You want coding work already done in the conversation checked.
+- You want a review of someone else's code, such as a diff or a pull request.
+- You want to know what to improve in existing code, such as its technical debt.
+
+Running it does not mean code gets written right away. It can stop at requirements and questions, or at a report that the request works against your goal.
+
+Use something else nearby:
+
+- The change adds an interface or changes its screens, layout or flow: use [`/design-better`](design-better.md) first. It designs the change with you, then has `/code-better` build it.
+- The change adds a module, a data model, a dependency or a migration: use [`/architect-better`](architect-better.md) first. `/code-better` builds from its design and spec.
+- You only want a review of finished work of any kind: [`/review-better`](review-better.md) runs the review, and `/code-better` adds what to look for in code.
+- You rejected a result and want it corrected: use [`/do-better`](do-better.md).
+
+## What you can do with it
+
+| You want to | Run | You get |
+|---|---|---|
+| Build a change | `/code-better add a --dry-run flag to the deploy script` | The change, checked against agreed scenarios, and a report |
+| Build a large change in parallel | `/code-better` on an epic or several tickets | Builder and verifier agents per task, and a live dashboard |
+| Check the coding work in this conversation | `/code-better` | The work checked, then continued or corrected |
+| Review someone else's code | `/code-better review #123` | Findings, each with a proposed fix; no change to the code |
+| Audit existing code | `/code-better audit src/billing` | Ranked findings with proposed tasks; no change to the code |
+
+In every change, it:
 
 - **Agrees requirements as scenarios** with concrete data you can check, separate from the design and the plan.
 - **Keeps the change small.** It changes only what the task needs, and never weakens a test to make it pass.
 - **Checks the code against the scenarios**, with a limit on fix attempts, and has a separate reviewer read the diff.
 - **Reports its decisions, assumptions and checks**, so you can maintain the code.
-- **Audits existing code** for technical debt and what to improve, ranked by what each finding costs you, without changing the code.
 
-For example:
+## Your workflow
 
-```
-/code-better show late orders first on the orders page
-```
+![The code-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/code-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
+1. **Start it** with the task, or with a ticket or design to build from.
+2. **Check the scenarios.** For anything beyond a small fix, it shows the requirements as Given/When/Then scenarios with real data, with its questions next to the scenarios they affect. Correct or confirm them: this is where your time matters most.
+3. **Let it build.** It writes the code, runs the checks and gets a separate review without you. For a large change, follow it on the dashboard and answer its questions there or in the chat.
+4. **Read the report**: what changed, the decisions and assumptions it made, each check and its result, and what it listed instead of changing.
+5. **Accept it**, or reject it with [`/do-better`](do-better.md).
+
+## How long it takes
+
+**How you work with it:** you agree the scenarios at the start, then it builds on its own. You come back for questions only you can answer, and for the report.
+
+| Work | Rough time |
+|---|---|
+| Small fix | 10–15 min |
+| Feature, bug fix or refactor | 30 min–2 h |
+| Project with several tasks, built by several agents | 1–8 h |
+| Review or audit | 10–30 min |
+
+It takes longer when your test suite is slow, when there are many scenarios, and when review rounds fail. It stops after about three rounds of fixes on one check and reports what fails, instead of looping.
 
 ## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
-
-- You want the agent to write or change code.
-- You want the agent to check coding work already done in the conversation.
-- You want a review of someone else's code, such as a diff or a pull request.
-- You want to know what to improve in existing code, such as its technical debt.
-
-Use a neighbouring skill instead when:
-
-- The change adds an interface or changes its screens, layout or flow: use [`/design-better`](design-better.md) first. It designs the change with you, then has `/code-better` build it.
-- You only want a review of finished work of any kind: [`/review-better`](review-better.md) runs the review, and `/code-better` adds what to look for in code.
-- You rejected a result and want it corrected: use [`/do-better`](do-better.md).
-
-</details>
-
-<details>
-<summary><b>How to run it</b></summary>
-
-- `/code-better <task>` does that task.
-- `/code-better` with no argument checks the coding work in the current conversation, then continues or corrects it.
-- To check someone else's code, give it the diff or the pull request.
-- `/code-better audit <path>` audits that part of the code, or the whole repository without a path.
-
-Example: `/code-better add a --dry-run flag to the deploy script`
-
-Running it does not mean code gets written right away. It can stop at requirements and questions, or at a report that the request works against your goal.
-
-</details>
 
 <details>
 <summary><b>What happens</b></summary>

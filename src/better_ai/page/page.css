@@ -278,6 +278,15 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .why { margin-top:var(--space-item); }
 .thread .reply + .why { margin-top:var(--space-edge); }
 
+/* The Approve… panel (pageApprovalPanel), above the message box. */
+.approval { border:1px solid var(--sand); background:var(--white); padding:var(--space-control) var(--space-item); margin-bottom:var(--space-item); }
+.approval .menu-h { color:var(--muted); margin:0 0 var(--space-control); }
+.dopt { display:flex; align-items:center; gap:var(--space-control); font-size:var(--text-message); margin:var(--space-tight) 0; cursor:pointer; }
+.dopt input { accent-color:var(--umber); }
+.carry .menu-h { margin-top:var(--space-control); }
+.carried { margin:var(--space-tight) 0; font-size:var(--text-message); color:var(--ink); }
+.msg .with { color:var(--muted); }
+
 /* The message box, with the decision panel above it. */
 .composer { border-top:1px solid var(--line); padding:var(--space-item) var(--space-edge) var(--space-section); background:var(--cream); }
 .notes label { display:block; font-size:var(--text-message); margin:var(--space-control) 0 var(--space-tight); }

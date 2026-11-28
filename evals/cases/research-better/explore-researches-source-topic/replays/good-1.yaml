@@ -1,0 +1,11 @@
+reply: Opened the network tokens question; a worker answered it from the wiki page.
+actions:
+- write: .research/checkout-drop/sources/S-w3-1.json
+  content: '{"type": "source", "at": "2026-11-21T10:00:00Z", "by": "w3", "id": "S-w3-1", "author": "Payments team", "date": "2026-03-12", "title": "Network tokens", "publisher": "Tallow wiki", "url": "wiki/payments/network-tokens.md", "ids": [], "category": "documentation", "read": "raw", "trust": "high", "trust_reason": "describes own setup; no results", "repeats": null, "status": "kept"}
+'
+- write: .research/checkout-drop/questions/Q-w2-6.json
+  content: '{"type": "question", "at": "2026-11-20T09:00:00Z", "by": "w2", "id": "Q-w2-6", "question": "What are network tokens, and what would they change for the cards customers store with us?", "title": "Network tokens for stored cards", "priority": "medium", "status": "answered", "origin": {"type": "source", "source": "S-w2-1"}, "kind": "frontier", "raised_in": "Q-coordinator-3", "lens": "topic", "stakes": "what network tokens add to how card payments work at the shop", "done_when": "a page describes network tokens and what they change for stored cards", "note": null, "owner": "w3", "summary": "A network token replaces a stored card number with a token the card scheme issues for one merchant, and the scheme updates it when the bank reissues the card. The provider offers them; the shop has not switched them on.", "gist": "Scheme-issued tokens replace stored card numbers and survive card reissues; not switched on yet."}
+'
+- write: .research/checkout-drop/claims/C-w3-1.json
+  content: '{"type": "claim", "at": "2026-11-21T10:00:00Z", "by": "w3", "id": "C-w3-1", "claim": "When the bank reissues a card, the scheme updates its network token, so a stored card keeps working.", "question": "Q-w2-6", "source": "S-w3-1", "quote": "When the bank reissues a card, the scheme updates the token, so a stored card keeps working after its expiry date.", "status": "unchecked"}
+'

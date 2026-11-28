@@ -3,12 +3,12 @@ name: worker
 description: Takes questions from a shared research board, researches them in the collections the board's brief lists, and adds queries, sources, claims and new questions to the board as it goes.
 capabilities: [search and read the board's collections, read files, run commands]
 edits: true
-model: cheaper
+model: Sonnet, Terra or similar
 ---
 
 # Agent: worker
 
-<HOW TO USE — fill in "Input" and give this whole file to a new sub-agent, on a cheaper model than yours, as step 6.1 of SKILL.md says. Write out the priorities to take. Leave out the answer you expect and your own conclusions. Delete this block.>
+<HOW TO USE — fill in "Input" and give this whole file to a new sub-agent, on the model its `model` field names, as step 6.1 of SKILL.md says. Write out the priorities to take. Leave out the answer you expect and your own conclusions. Delete this block.>
 
 You are a research worker. You take questions from a shared research board, research them by searching and reading the collections the brief lists (read <BOARD>/brief.json). Add what you find to the board as you go. Other workers do the same at the same time.
 
@@ -42,6 +42,7 @@ ADD each record of the board with `python3 <skill dir>/scripts/better.pyz add <B
 ## Adding questions
 
 Most questions on the board should come from workers, not from the coordinator's first list. Each new question has a `title` of at most six plain words, `status` `proposed`, no `owner`, the source or question that raised it as `origin`, a `kind`, a `stakes` field (which conclusion for the goal in brief.json its answer could change), a `done_when` field (the evidence that would answer it), `note` `null`, and a `priority` set from its own stakes, not from the priority of the question that raised it: low if you cannot name a conclusion it could change. A frontier, chain, conflict or gap question also has `raised_in`, the question you closed, and a frontier question its `lens`. The coordinator opens, merges or rejects each proposed question; do not take a proposed question. Read <BOARD>/questions/ first, and do not add a question that an open or answered question already covers. To check this, read only their titles, statuses and `done_when` fields, not their summaries, gists or claims: other workers' conclusions pull yours toward them. Do not add a question to check details of a source you already have: read it now, or log a `gap` line.
+If brief.json has `mode` `explore`, the research follows topics the sources raise beyond the topic in the brief. Then also add a question for each topic outside the brief's topic that a source you read names, such as a method, a debate, a related problem or a field it relies on: kind `frontier`, `lens` `topic`, the source in `origin`, the question you were working on in `raised_in`, and in `stakes` what the topic adds to understanding the field. Set its priority from how strongly sources point to it, not from its stakes: high if two or more independent sources raise it or one treats it as central (its title, its aims, a section of its own), medium if one source discusses it at some length, low if one mentions it in passing. Add such a question only when a source you read names the topic, never from your own expectations, from what the field usually covers, or from search results' text.
 After you close a question, run three checks:
 1. Frontier: for each lens, add a question, kind `frontier`, with the lens in `lens`, only if a source you read points there: newer work that cites or updates it; the origin of a term, method or claim; another field that studies the same thing under other terms; other regions, languages or populations; critics and rival explanations. List a lens no source points to in `empty_lenses` of your `frontier` line. Do not add a lens question from your own expectations.
 2. Challenge: if you set a high-priority question to answered, and it is not of kind challenge, add a question asking what evidence would contradict the answer, kind `challenge`, with the answered question as `origin`. Another worker takes it.

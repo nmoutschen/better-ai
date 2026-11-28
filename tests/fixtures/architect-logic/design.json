@@ -1,0 +1,72 @@
+{
+ "type": "design",
+ "at": "2026-11-28T10:00:00Z",
+ "by": "architect",
+ "containers": {
+  "nodes": [
+   {"id": "user", "label": "You", "kind": "person", "detail": "the user"},
+   {"id": "page", "label": "Design page", "kind": "page", "detail": "page.html, page.js"},
+   {"id": "api", "label": "Local server", "kind": "service", "detail": "serves the page"},
+   {"id": "agent", "label": "Design agent", "kind": "agent", "detail": "drafts and answers"},
+   {"id": "db", "label": "Change folder", "kind": "files", "detail": "records as JSONL"},
+   {"id": "llm", "label": "Language model", "kind": "model", "detail": "hosted"}
+  ],
+  "edges": [
+   {"id": "notify", "from": "api", "to": "user", "label": "emails a link"},
+   {"id": "open", "from": "user", "to": "page", "label": "reviews the design"},
+   {"id": "post", "from": "page", "to": "api", "label": "sends comments"},
+   {"id": "wake", "from": "api", "to": "agent", "label": "wakes"},
+   {"id": "write", "from": "agent", "to": "db", "label": "writes records"},
+   {"id": "prompt", "from": "agent", "to": "llm", "label": "prompts"}
+  ],
+  "groups": [
+   {"id": "app", "label": "Design tool", "members": ["page", "api", "db"]},
+   {"id": "internet", "kind": "trust", "label": "Internet", "members": ["user"]},
+   {"id": "local", "kind": "trust", "label": "This machine", "members": ["page", "api", "agent", "db"]},
+   {"id": "vendor", "kind": "trust", "label": "Model vendor", "members": ["llm"]},
+   {"id": "laptop", "kind": "runs", "label": "Laptop", "members": ["api", "agent", "db"]},
+   {"id": "tab", "kind": "runs", "label": "Browser tab", "within": "laptop", "members": ["page"]},
+   {"id": "cloud", "kind": "runs", "label": "Vendor cloud", "members": ["llm"]}
+  ]
+ },
+ "flows": [
+  {
+   "id": "comment",
+   "name": "Comment on the design",
+   "participants": [
+    {"id": "p-page", "box": "page"},
+    {"id": "p-api", "box": "api"},
+    {"id": "p-user", "box": "user"}
+   ],
+   "steps": [
+    {"id": "s1", "from": "p-user", "to": "p-page", "label": "writes a comment"},
+    {"id": "s2", "from": "p-page", "to": "p-api", "label": "posts it"},
+    {"id": "s3", "from": "p-api", "to": "p-page", "label": "saved", "kind": "response"}
+   ]
+  },
+  {
+   "id": "review",
+   "name": "Review a design",
+   "kind": "logic",
+   "nodes": [
+    {"id": "start", "type": "start"},
+    {"id": "draft", "type": "step", "label": "Draft the design", "by": "agent"},
+    {"id": "wait", "type": "state", "label": "Waiting for review"},
+    {"id": "ok", "type": "decision", "label": "User approves?"},
+    {"id": "done", "type": "exit", "label": "Approved", "outcome": "positive"},
+    {"id": "drop", "type": "exit", "label": "Dropped", "outcome": "negative"}
+   ],
+   "edges": [
+    {"id": "e-start", "from": "start", "to": "draft"},
+    {"id": "e-ask", "from": "draft", "to": "wait", "label": "asks the user"},
+    {"id": "e-review", "from": "wait", "to": "ok", "label": "user answers"},
+    {"id": "e-yes", "from": "ok", "to": "done", "label": "yes"},
+    {"id": "e-again", "from": "ok", "to": "draft", "label": "changes asked"},
+    {"id": "e-reject", "from": "ok", "to": "drop", "label": "rejects"},
+    {"id": "e-remind", "from": "wait", "to": "wait", "label": "reminder, every 24 h"},
+    {"id": "e-timeout", "from": "wait", "to": "drop", "label": "timeout 7 days"},
+    {"id": "e-auto", "from": "draft", "to": "ok", "label": "no open question", "in": ["after"]}
+   ]
+  }
+ ]
+}

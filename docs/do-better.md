@@ -2,49 +2,45 @@
 
 Corrects work the agent gave you that misses what you wanted, and hands back the corrected work.
 
-> I stopped the page too early, sorry. Both items were accepted and I took that to mean you were done. Restarting it now with the built page so you can send your feedback again.
+![A chat: the user says the summary buries the decision; the agent owns the misreading, gives a revised summary that opens with the decision and its cost, and says what changed](img/do-better-chat.png)
+*It owns the error in plain words, hands back the corrected work, and says in one sentence what changed.*
 
-*A correction from building these docs, in the form this skill asks for: own the error in plain words, say what changes, and fix it.*
-
-## What it does
-
-- **Works out your goal** from the request, your feedback and the context.
-- **Finds what is actually wrong** before changing anything, and checks competing explanations.
-- **Hands back the corrected work**, with one sentence on what changed. It checks a fix to code, an interface or text the way the skill for that work would.
-- **Asks only when a decision blocks the fix**, with a few concrete choices.
-
-For example, after a result that misses:
-
-```
-/do-better the summary buries the decision
-```
-
-## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
+## When to use it
 
 - The agent's answer, document, design or code does not do what you asked, and you want it fixed now.
 - You rephrased or repeated a request, and the result still misses.
 - The agent finds a defect in work it already delivered. It checks that the defect is real, tells you in one sentence what is wrong and what it affects, then fixes it.
 
+`/code-better`, `/design-better` and `/review-better` send a result you reject here, so you may get it without naming it.
+
 Use [`/improve-better`](improve-better.md) instead when you want the fix to last across later sessions, for example in memory, instructions or a skill. `/do-better` corrects the work in front of you.
 
-</details>
+## What you can do with it
 
-<details>
-<summary><b>How to run it</b></summary>
+| You want to | Run | You get |
+|---|---|---|
+| Have the agent find what is wrong itself | `/do-better` | The corrected work, with one sentence on what changed |
+| Point at what is wrong | `/do-better the summary dropped the cost comparison I asked for` | The same; your description counts as evidence, not as a full diagnosis |
+| Retry after a correction that still missed | `/do-better` again | A fix that checks every requirement and correction so far, and changes its approach where the work went wrong |
 
-```
-/do-better [what is wrong]
-```
+In every correction, it:
 
-- Without an argument, the agent looks over its previous work and finds the mismatch itself.
-- With an argument, it treats your description as evidence of what is wrong, not as a full diagnosis.
+- **Works out your goal** from the request, your feedback and the context.
+- **Finds what is actually wrong** before changing anything, and checks competing explanations.
+- **Hands back the corrected work**, checked the way the skill for that work would check it.
+- **Asks only when a decision blocks the fix**, with a few concrete choices.
 
-Example: `/do-better the summary dropped the cost comparison I asked for`
+## Your workflow
 
-</details>
+![The do-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/do-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
+1. Run it when a result misses, with or without a description of what is wrong.
+2. Answer its question if two readings of your request lead to different fixes.
+3. Read the corrected work and the sentence on what changed.
+4. If it still misses, run it again.
+
+## Reference
 
 <details>
 <summary><b>What happens</b></summary>

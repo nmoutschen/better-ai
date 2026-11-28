@@ -35,7 +35,6 @@ code { font:var(--font-code); background:var(--linen); padding:1px var(--space-t
 .edit .btn { justify-self:start; }
 
 .view { min-height:0; overflow:auto; padding:0 var(--space-edge) var(--space-wide); }
-.tabs { overflow:auto; }
 .tabs button { white-space:nowrap; }
 .row-actions { display:flex; gap:var(--space-tight); width:112px; }
 .fig svg g[role="button"], .fig svg g[role="button"] * { cursor:crosshair; }
@@ -50,6 +49,8 @@ code { font:var(--font-code); background:var(--linen); padding:1px var(--space-t
 .boxref svg { flex:none; }
 
 .menu-h { font-weight:700; }
+.bullets { margin:0; padding-left:1.2em; }
+.dec.by-version .bullets { margin:var(--space-tight) 0 var(--space-item); }
 .pop textarea { display:block; min-height:5em; margin:var(--space-control) 0; }
 .comment-actions { display:flex; gap:var(--space-control); }
 /* Where a comment pin sits; its look and its state colours are page.css's. */

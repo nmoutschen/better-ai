@@ -24,6 +24,22 @@ READ and FOLLOW [../formats/records.md](../formats/records.md) before you first 
 
 REPLY in the page, in one or two short sentences. MARK each item `seen` when it arrives and `asked` when you need an answer. KEEP `working` on the items you are changing now, usually one. WHEN an item needs only an answer, MARK it `done` once answered. WHEN the user's answer leads to a change, MARK the item `done` once the change is in the page, and PUT your next question in a new message. MARK it `accepted` when the user accepts it in words. TREAT a reply to a finished item as work to do.
 
+### Agents you start
+
+WHEN you start an agent, such as a reviewer, a proof of concept or the spec checker, ADD it first with `python3 <skill dir>/scripts/better.pyz add <unit> agent --by <your name>`, with its `name`, `task` and `what`, and `status` `running`. The page lists the running agents for the user. WHEN it hands back, SET its `status` to `done`. WHEN it ends without a hand-back, SET it to `stopped`.
+
+### Proof of concept
+
+WHEN a decision or requirement rests on a fact that the documentation and code cannot settle, such as how a third-party tool behaves, whether a session can be resumed or whether a process survives between calls, PROPOSE a proof of concept in the page: the questions it must answer, each with the decision or requirement it bears on and the result that would change the design, and what it would use and cost. RUN it only when the user agrees, or asks for one.
+
+TO RUN it, READ and FOLLOW [../agents/proof-of-concept.md](../agents/proof-of-concept.md), FILL IN its inputs, and START it as a separate agent. GIVE it a scratch folder outside the shipped source, and NEVER the user's live page, records or data. WHILE it runs, KEEP working on the parts its questions do not affect.
+
+WHEN it hands back, PUT its results in `design.md` as evidence: in each decision's "Assumes", WRITE what was observed and whether it confirms the assumption, and UPDATE the unresolved questions. WHEN a result contradicts a decision or the design, ASK the user about the decision again, with what was observed, before you go on. POST the results in the page in one or two sentences.
+
+### Views
+
+DRAW the containers and the sequence flows the change touches. DRAW a logic flow only WHEN the change has a process with decisions, loops back or exits, or something with a lifecycle of states. GROUP the boxes by trust WHEN the security or the data and privacy perspective applies, and by where they run WHEN the change touches hosts, networks or regions. DO NOT draw a view of what the change does not touch. CHECK each loop back, exit, timeout and trust crossing against the code or the request.
+
 ### Box kinds
 
 RUN `python3 <skill dir>/scripts/better.pyz register <unit>`, then READ `register.html` in the unit for the available box kinds. USE only kinds from that register.
@@ -42,6 +58,8 @@ IF you are in a session opened by the page, DO NOT run `serve`. IF the page alre
 
 ASK the user to confirm or correct Before in the page. IF the change introduces a system or flow, NAME it in your question as not existing yet, and DO NOT add it to the `design` record before step 4. WAIT for the user's confirmation or correction and APPLY any corrections. DO NOT start step 3 before the user confirms or corrects Before: HANDLE other actions and START `wait` again; IF `wait` times out before they answer, END your turn with the question, in the chat as well as the page.
 
+IF the user's GOAL is to agree how the system works today, with no change to design yet, END the mode once the user confirms Before, and HAND BACK: the work needs no requirements, iterations or reviews. The page shows Before alone while no part of the `design` record differs between Before and After.
+
 ## 3. Agree the requirements
 
 LIST functional requirements, quality attributes and constraints, and ADD each with `python3 <skill dir>/scripts/better.pyz add <unit> requirement --by <your name>`. SET its source to where it comes from:
@@ -59,9 +77,11 @@ DRAFT quality attributes from the request and current system as observable scena
 
 USE Attribute-Driven Design (ADD 3.0). IN each iteration, PICK the requirements and constraints that drive the design of the part in scope. LIST the options before choosing one, including at least one that is not the familiar choice, and COMPARE them against those drivers. CHOOSE an approach for the draft, ASSIGN responsibilities and interfaces, and WALK the scenarios through it. USE gaps or trade-offs from that walk to choose the next iteration.
 
+WHEN two or more options give the system a different structure and neither wins on the drivers, DRAW each as an alternative for the user to choose from, instead of choosing for the draft: ADD it to `alternatives` in the `design` record with its `id`, `name`, `summary`, `strengths` and `drawbacks`, and SET `in` on each part to the versions it exists in, naming an alternative by its `id`. WALK the scenarios through each alternative.
+
 UPDATE the `design` record with `set`, using the proposed containers, relationships and flows. USE the same boxes as flow participants. PRESERVE part identities across Before and After. SET `in` on every added or removed part. CHECK and render the updated JSON as in step 2.
 
-READ and FOLLOW [../templates/design.md](../templates/design.md) for the conventional design document structure. WRITE `design.md` in the design location, linking the unit, and SET `document` in the `architect` record to its path from the repo root, with `set`. RECORD each decision in `design.md` as an output of its iteration, with the recommendation, its drivers, each rejected alternative with its reason, and the main drawback of the chosen option. A reason to reject an alternative is not a drawback. TREAT a choice that changes behaviour, cost, risk or how the system is maintained as a decision, and COMPARE its options. LIST other choices in the hand-back as assumptions you made. CHECK the evidence for vendor claims, because vendors often make claims without supporting evidence. FLAG options that rely on unsupported claims.
+READ and FOLLOW [../templates/design.md](../templates/design.md) for the conventional design document structure. WRITE `design.md` in the design location, linking the unit, and SET `document` in the `architect` record to its path from the repo root, with `set`. RECORD each decision in `design.md` as an output of its iteration, with the recommendation, its drivers, each rejected alternative with its reason, and the main drawback of the chosen option. A reason to reject an alternative is not a drawback. TREAT a choice that changes behaviour, cost, risk or how the system is maintained as a decision, and COMPARE its options. LIST other choices in the hand-back as assumptions you made. CHECK the evidence for vendor claims, because vendors often make claims without supporting evidence. FLAG options that rely on unsupported claims. WHEN a decision's drivers rest on a fact nobody has tested, FOLLOW the rule [Proof of concept](#proof-of-concept).
 
 PICK the perspectives that apply, from what the change touches and the applicable repo standards:
 
@@ -83,9 +103,16 @@ KEEP the page served. INVITE comments on boxes, arrows and flow steps. GIVE the 
 
 UPDATE the files and rendered views as the user corrects the design. WHEN the user accepts a section in words or in the page, ADD its key to `accepted` in the `architect` record, with `set`. WHEN the design is ready for review, ASK the user to choose Approve….
 
+WHEN the user chooses Approve…, READ its `option`, and APPLY the open comments its `carries` names as part of it:
+
+- An alternative's `id`: SET the `design` record to that alternative alone before step 6: in each `in`, REPLACE its `id` with `after` and DROP the ids of the other alternatives; DROP each part whose `in` is left empty, and DROP `alternatives`. RECORD the decision in `design.md` with the chosen alternative and each other alternative as rejected, with why the user did not choose it. THEN GO to step 6.
+- `after`: GO to step 6.
+- `before`: the user keeps the system as it is. DO NOT review; HAND BACK with the design as drawn and the user's note as the reason.
+- `combine` or `none`: DO NOT review. CHANGE the design as the user's note says, as a new alternative when they combine, and ASK again in the page.
+
 ## 6. Review the approved design
 
-WHEN the user chooses Approve…, START one fresh reviewer per applicable perspective on the approved design: READ and FOLLOW the perspective's reviewer from the table in step 4, and FILL IN its inputs. GIVE its `scenarios` from the scenarios of the `requirement` records that reach what the perspective covers, up to five, the most harmful first. WHEN fewer than three do, GIVE scenarios up to three and MARK each "(added)". GIVE a reviewer in `standards` only the standards that have no reviewer of their own. GIVE its `context` with the facts the review needs that the design does not show, such as where the system runs or which data is personal, not your verdict on the design or the problems you expect. GIVE its `decided` from the constraints and preferences the user stated, such as the `requirement` records with source `user`, not from the design's own decisions.
+WHEN the user approves an alternative or `after`, START one fresh reviewer per applicable perspective on the approved design: READ and FOLLOW the perspective's reviewer from the table in step 4, and FILL IN its inputs. GIVE its `scenarios` from the scenarios of the `requirement` records that reach what the perspective covers, up to five, the most harmful first. WHEN fewer than three do, GIVE scenarios up to three and MARK each "(added)". GIVE a reviewer in `standards` only the standards that have no reviewer of their own. GIVE its `context` with the facts the review needs that the design does not show, such as where the system runs or which data is personal, not your verdict on the design or the problems you expect. GIVE its `decided` from the constraints and preferences the user stated, such as the `requirement` records with source `user`, not from the design's own decisions.
 
 WAIT for every report. HOLD changes and user replies about the reviewed design while the reviewers run. THEN RUN `python3 <skill dir>/scripts/better.pyz review <unit> --perspectives <id>...` with the ids of the perspectives run.
 
@@ -95,7 +122,9 @@ DEBATE findings in the page and UPDATE the design where needed. WHEN the user di
 
 ## 7. Record decisions and extract the spec
 
-WHEN the approved design and its review are settled, ADD each decision of `design.md` worth recording with `python3 <skill dir>/scripts/better.pyz add <unit> decision --by <your name>`. ALSO write each of these decisions as a document in the decision record location, in the repo's decision record format when it has one: NAME the file as the repo names its records, KEEP its sections and PUT the drivers, rejected alternatives and main drawback within them. OTHERWISE, READ and FOLLOW [../templates/decision.md](../templates/decision.md) and NAME the file `<id>.md`.
+WHEN the approved design and its review are settled, CHECK each decision's "Assumes" and the unresolved questions in `design.md`. IF one rests on a fact that no proof of concept has tested and the documentation and code cannot settle, PROPOSE a proof of concept as the rule [Proof of concept](#proof-of-concept) says, before you extract the spec.
+
+THEN ADD each decision of `design.md` worth recording with `python3 <skill dir>/scripts/better.pyz add <unit> decision --by <your name>`. ALSO write each of these decisions as a document in the decision record location, in the repo's decision record format when it has one: NAME the file as the repo names its records, KEEP its sections and PUT the drivers, rejected alternatives and main drawback within them. OTHERWISE, READ and FOLLOW [../templates/decision.md](../templates/decision.md) and NAME the file `<id>.md`.
 
 READ and FOLLOW [../formats/specs.md](../formats/specs.md) to extract the spec from the design and decisions. INCLUDE each check the reviewers listed under "Checks once built" for behaviour the design states, with that design `section` as its source. ADD each requirement with `python3 <skill dir>/scripts/better.pyz add <unit> spec --by <your name>`, with its `statement` and its source: the `section` of the design, a request `sentence`, a `decision` id or a `requirement` id. WHEN the repo keeps its specs in a spec format or tool, write the spec there too, in its format. OTHERWISE RUN `python3 <skill dir>/scripts/better.pyz specs <unit>` and WRITE its output to `<spec location>/specs.md`, ONLY IF that file is missing or its first line is the generated marker the output starts with. IF it exists and its first line is not that marker, DO NOT overwrite it. NEVER edit a generated `specs.md` by hand; CHANGE the `spec` records with `set` and run the command again.
 

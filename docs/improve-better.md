@@ -2,55 +2,57 @@
 
 Improves what your agent carries from one session to the next: memory, instructions files, skills and workflows.
 
-```diff
- 3. LOOK at the rendered page before you show it, and FIX each version that does not load, overlaps or is cut off.
-+   FOR new directions, ALSO REVIEW them with modes/review.md before you show them, and FIX or DROP what the review confirms.
-```
-- **Evidence:** in one session the user asked by hand to review directions before seeing them.
-- **Test:** checked against recorded sessions; in another session it would have added a review round.
-- **Undo:** delete the added line.
+![A chat: the user runs improve-better; the agent reports it read 23 sessions and shows one proposal as a two-line diff to a skill, with its evidence, test result and undo step, then asks to approve, reject or change it](img/improve-better-chat.png)
+*Each proposal shows the exact change, the evidence it came from, its test result and how to undo it. Nothing changes until you approve.*
 
-*A proposal from the run that led to these docs: the change, its evidence, its test result and how to undo it.*
-
-## What it does
-
-- **Finds candidate changes in past sessions**: instructions you repeated, corrections no rule covers, and rules nothing uses.
-- **Tests each change** on past tasks it was not built from, or against what you accepted before.
-- **Proposes at most five changes**, each with its evidence, test result and how to undo it, and marks any it could not test.
-- **Applies only what you approve**, and keeps a record so later runs can undo or retire a change.
-
-For example, to look at one area:
-
-```
-/improve-better memory
-```
-
-## Reference
-
-<details>
-<summary><b>When to use it</b></summary>
+## When to use it
 
 - You keep giving the agent the same instruction, or correcting the same mistake.
 - You want to find routines the agent repeats by hand, or rules and skills that nobody uses, contradict each other or repeat each other.
 - You want to improve one area, such as memory, one skill or one workflow.
 
+Running it does not mean a change is needed. It can end with no proposal, and says so.
+
 Use [`/do-better`](do-better.md) instead when you are pointing at a defect in the work in front of you. Use [`/interview-me`](interview-me.md) when you want the agent to learn how you read, review and want it to work by asking you.
 
-</details>
+## What you can do with it
 
-<details>
-<summary><b>How to run it</b></summary>
+| You want to | Run | You get |
+|---|---|---|
+| Improve your whole setup | `/improve-better` | Up to five tested proposals from recent sessions |
+| Improve one area | `/improve-better memory` | Proposals limited to that area |
+| Run it on a schedule or at the end of a session | Ask it to set that up | A proposal for how; it sets it up only after you approve |
 
-```
-/improve-better [area to improve]
-```
+In every run, it:
 
-- Without an argument, it looks over recent sessions and your whole setup.
-- With an argument, it limits the run to that area.
+- **Finds candidate changes in past sessions.** Instructions you repeated, corrections no rule covers, and rules nothing uses.
+- **Tests each change** on past tasks it was not built from, or against what you accepted before.
+- **Proposes at most five changes**, each with its evidence, test result and how to undo it, and marks any it could not test.
+- **Applies only what you approve**, and keeps a record so later runs can undo or retire a change.
 
-Example: `/improve-better memory`
+## Your workflow
 
-</details>
+![The improve-better workflow: your steps on the top lane, the agent's on the bottom lane, in order](img/improve-better-workflow.svg)
+*Your steps are on the top lane, the agent's on the bottom one. The terracotta outline marks where your input matters most.*
+
+1. **Run it** now and then, or on one area that keeps going wrong.
+2. **Settle any conflicts** between rules it raises first.
+3. **Read each proposal**: the change, its evidence, its test result and how to undo it.
+4. **Approve or reject each one.** Only an explicit approval counts. It applies what you approved, exactly as proposed.
+
+## How long it takes
+
+**How you work with it:** it runs on its own, then stops for your decision on each proposal.
+
+| Work | Rough time |
+|---|---|
+| One area | 10–20 min |
+| Whole setup, with replay tests | 20–60 min |
+| Your decisions | A few minutes |
+
+It takes longer with more past sessions to read, and when it replays past tasks to test a change.
+
+## Reference
 
 <details>
 <summary><b>What happens</b></summary>

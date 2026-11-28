@@ -286,6 +286,15 @@ table.tbl th { font:var(--font-label); letter-spacing:.08em; text-transform:uppe
 .why { margin-top:var(--space-item); }
 .thread .reply + .why { margin-top:var(--space-edge); }
 
+/* The Approve… panel (pageApprovalPanel), above the message box. */
+.approval { border:1px solid var(--sand); background:var(--white); padding:var(--space-control) var(--space-item); margin-bottom:var(--space-item); }
+.approval .menu-h { color:var(--muted); margin:0 0 var(--space-control); }
+.dopt { display:flex; align-items:center; gap:var(--space-control); font-size:var(--text-message); margin:var(--space-tight) 0; cursor:pointer; }
+.dopt input { accent-color:var(--umber); }
+.carry .menu-h { margin-top:var(--space-control); }
+.carried { margin:var(--space-tight) 0; font-size:var(--text-message); color:var(--ink); }
+.msg .with { color:var(--muted); }
+
 /* The message box, with the decision panel above it. */
 .composer { border-top:1px solid var(--line); padding:var(--space-item) var(--space-edge) var(--space-section); background:var(--cream); }
 .notes label { display:block; font-size:var(--text-message); margin:var(--space-control) 0 var(--space-tight); }
@@ -1721,6 +1730,82 @@ function pageApprove(o) {
         function () { set(false); if (done) done(); }, fail);
     }
   };
+}
+
+// The Approve… panel of a page that asks the user to approve one of several options: one radio per option, the first
+// chosen; the open comments that come with the approval; and the message box as its note. While the panel is open, the
+// Send button reads Confirm approval and sends the approval; an option marked `note` needs a message first. Only where
+// the page declares `approve`; else null. Returns { sendMode, open }: give sendMode to pageConversation's o.sendMode.
+// o.conversation  what pageConversation returned
+// o.options()     the options, each { label, value, note }
+// o.openItems()   the open comments that come with the approval, each { id, n, text }
+// o.params()      what the page adds to each approval (optional)
+// o.intro(box)    fills a box above the options each time the panel opens (optional)
+// o.button        the button's words (default Approve…); o.needs: what to say when a note is missing
+function pageApprovalPanel(o) {
+  if (!pageCan('approve')) return null;
+  var conv = o.conversation, noteBox = conv.noteBox, noteBtn = conv.noteBtn, deciding = false, options = [], carried = [];
+  function el(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
+  var panel = el('div', 'approval'), button = el('button', 'btn btn--quiet', o.button || 'Approve…');
+  var intro = el('div', 'approval-intro'), opts = el('div', 'dopts'), carry = el('div', 'carry');
+  button.type = 'button'; button.setAttribute('aria-expanded', 'false'); panel.hidden = true;
+  opts.setAttribute('role', 'radiogroup'); opts.setAttribute('aria-label', 'Approval');
+  panel.append(el('p', 'menu-h', 'Your approval'), intro, opts, carry);
+  document.querySelector('.notes .composer').insertBefore(panel, document.querySelector('.notes .composer label'));
+  noteBtn.parentElement.insertBefore(button, noteBtn.nextSibling);
+  function picked() {
+    var radio = opts.querySelector('input[name="approval"]:checked');
+    return options.filter(function (x) { return radio && String(x.value) === radio.value; })[0];
+  }
+  function params() {
+    var pick = picked(), note = noteBox.value.trim();
+    return Object.assign({ option: pick.value, label: pick.label, carries: carried.map(function (it) { return it.id; }), text: note || null },
+      o.params ? o.params() : {});
+  }
+  function fill(on) {
+    deciding = on;
+    button.textContent = on ? 'Cancel' : (o.button || 'Approve…');
+    noteBtn.textContent = on ? 'Confirm approval' : 'Send';
+    if (!on) return;
+    intro.replaceChildren(); if (o.intro) o.intro(intro);
+    options = o.options(); opts.replaceChildren();
+    options.forEach(function (option, k) {
+      var label = el('label', 'dopt'), radio = el('input'); radio.type = 'radio'; radio.name = 'approval'; radio.value = option.value;
+      if (!k) radio.checked = true;
+      label.append(radio, ' ' + option.label); opts.append(label);
+    });
+    carried = o.openItems(); carry.replaceChildren();
+    if (carried.length) {
+      carry.append(el('p', 'menu-h', 'Comes with your open comments'));
+      carried.forEach(function (it) { carry.append(el('p', 'carried', it.n + '. ' + it.text)); });
+    }
+    noteBox.focus();
+  }
+  var approve = pageApprove({ button: button, panel: panel, label: 'Approval', params: params, onToggle: fill });
+  function send() {
+    if (picked().note && !noteBox.value.trim()) { conv.say(o.needs || 'Say why in the message.', true); return noteBox.focus(); }
+    approve.send(conv, function () { noteBox.value = ''; });
+  }
+  return { sendMode: function () { return deciding ? send : null; }, open: function () { return deciding; } };
+}
+
+// An approval in the conversation: what the user approved, the comments that came with it by number, and their note.
+function pageApprovalItem(entry, log) {
+  var e = entry.e, li = document.createElement('li'), head = document.createElement('div'), who = document.createElement('span');
+  var when = document.createElement('span'), body = document.createElement('p'), what = document.createElement('strong');
+  li.className = 'msg me decision'; head.className = 'head'; who.className = 'who'; when.className = 'when'; body.className = 'body';
+  who.textContent = 'You approved'; when.textContent = pageTime(e.at); what.textContent = e.label || e.option || e.text || '';
+  head.append(who, when); body.append(what);
+  if (e.carries && e.carries.length) {
+    var with_ = document.createElement('span'); with_.className = 'with';
+    with_.textContent = ' with comments ' + e.carries.map(function (id) {
+      var x = log.filter(function (y) { return y.id === id; })[0]; return x && x.n ? x.n : '?';
+    }).join(', ');
+    body.append(with_);
+  }
+  li.append(head, body);
+  if (e.label && e.text) { var note = document.createElement('p'); note.className = 'body'; note.textContent = e.text; li.append(note); }
+  return li;
 }
 
 // The user's confirmation of a requirement, in the wording shown. Only where the page declares `confirm`.

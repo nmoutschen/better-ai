@@ -12,3 +12,4 @@
 "agents/worker.md": "When you research a question from the board, copy each claim's quote word for word from the page you read."
 "SKILL.md#5.3": "Give every question you add a title of at most six words, its origin, kind, stakes, a done_when field and a priority from its own stakes."
 "SKILL.md#know-what-your-retrieval-tools-return": "If you cannot read a source, mark it blocked and do not use it as evidence."
+"modes/explore.md": "This board is in explore mode: open and research the questions workers propose about topics a source they read raises, even outside the original topic, and add no topic that no source names."

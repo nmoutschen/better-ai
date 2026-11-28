@@ -65,17 +65,53 @@ function decisionRecords(decisions) {
   }).join('');
 }
 
-function controls(perspectives, review) {
+// The versions to switch between, Before and each version after the change, shown only when there is more than one;
+// on Containers, the groupings to switch between, Systems and each other one the design uses.
+function controls(perspectives, review, versions = [], overlays = []) {
   const segment = (label, attr, options) => '<div class="seg seg--light" role="group" aria-label="' + label + '">' +
     options.map(([key, name]) => '<button type="button" data-' + attr + '="' + text(key) +
       '" aria-pressed="false">' + text(name) + '</button>').join('') + '</div>';
-  return '<div class="controls">' + segment('State', 'version', [['before', 'Before'], ['after', 'After']]) +
+  return '<div class="controls">' +
+    (versions.length > 1 ? segment('Version', 'version', versions.map(v => [v.id, v.name])) : '') +
+    (overlays.length ? segment('Grouping', 'overlay', [['systems', 'Systems'], ...overlays.map(o => [o.id, o.name])]) : '') +
     (review ? segment('Findings', 'findings', [['', 'No findings'], ...perspectives.map(p => [p.id, p.name])]) : '') + '</div>';
 }
 
-function figures(versions, empty = 'This flow does not exist before the change.') {
-  return Object.entries(versions).map(([state, svg]) => '<div class="fig" data-state="' + state + '" hidden>' +
-    (svg || '<p class="muted">' + text(empty) + '</p>') + '</div>').join('');
+// One drawing per version; a version that does not draw a flow says so, by the version's name. A Containers drawing
+// also names its grouping.
+function figures(drawings, versions = [], empty, overlay) {
+  const nameOf = state => (versions.find(v => v.id === state) || {}).name || state;
+  const missing = state => empty || (state === 'before' ? 'This flow does not exist before the change.' :
+    state === 'after' ? 'This flow does not exist after the change.' : 'This flow is not part of ' + nameOf(state) + '.');
+  const grouping = overlay ? ' data-overlay="' + text(overlay) + '"' : '';
+  return Object.entries(drawings).map(([state, svg]) => '<div class="fig" data-state="' + text(state) + '"' + grouping + ' hidden>' +
+    (svg || '<p class="muted">' + text(missing(state)) + '</p>') + '</div>').join('');
+}
+
+// A flow's New or Removed mark, one per version that shows it so.
+function flowMarks(status = {}) {
+  return Object.entries(status).filter(([, how]) => how !== 'current').map(([state, how]) =>
+    '<span class="chip by-version" data-state="' + text(state) + '" hidden>' + (how === 'new' ? 'New' : 'Removed') + '</span>').join('');
+}
+
+function bullets(items) {
+  return items.length ? '<ul class="bullets">' + items.map(item => '<li>' + inlineCode(item) + '</li>').join('') + '</ul>' : '<p class="muted">None given.</p>';
+}
+
+// The alternatives side by side, each with its trade-offs; each row takes a change request.
+function alternativeTable(alternatives) {
+  if (!alternatives.length) return '';
+  return '<h3>Alternatives</h3>' + table(['Alternative', 'Summary', 'Strengths', 'Drawbacks', 'Actions'], alternatives.map(alt => row([
+    '<strong>' + text(alt.name) + '</strong>', inlineCode(alt.summary) + editor('What should change in ' + alt.name),
+    bullets(alt.strengths), bullets(alt.drawbacks), '<div class="row-actions">' + changeButton + '</div>'
+  ], 'id="alt-' + text(alt.id) + '" data-record="' + text(alt.id) + '" data-name="' + text(alt.name) + '"')));
+}
+
+// The trade-offs of the alternative a diagram shows, above the diagram, shown with its version.
+function alternativeCards(alternatives) {
+  return alternatives.map(alt => '<article class="dec by-version" data-state="' + text(alt.id) + '" hidden><div class="dh"><h3>' +
+    text(alt.name) + '</h3></div><p>' + inlineCode(alt.summary) + '</p><span class="lbl">Strengths</span>' + bullets(alt.strengths) +
+    '<span class="lbl">Drawbacks</span>' + bullets(alt.drawbacks) + '</article>').join('');
 }
 
 function specSource(source) {
@@ -171,6 +207,13 @@ function changeList(since, labels, removed = []) {
   return '<details class="rej"><summary>All ' + since.length + ' changes</summary><ul>' + items.join('') + '</ul></details>';
 }
 
+// The agents at work in the side column, by the list every page shares: who, and what on. Reviewers and the spec checker
+// check what others wrote.
+function agentList(agents) {
+  const rows = agents.map(a => ({who: a.name, what: a.what, kind: a.task === 'proof of concept' ? '' : 'verifier'}));
+  return pageAgents(rows, {now: 0, quietAfter: 0, empty: 'No agent is working right now.'});
+}
+
 function threadComment(log, id) {
   const event = log.findLast(event => (event.type === 'comment' && event.id === id) || (event.type === 'delete' && event.to === id));
   return event?.type === 'comment' && byId(event.on?.id) ? event : undefined;
@@ -182,26 +225,14 @@ function start(data) {
   byId('status').innerHTML = '<span class="stat"><b id="accepted-count"></b>sections accepted</span>' +
     '<span class="stat"><b id="comment-count">0</b>open comments</span>' +
     '<button type="button" class="stat" id="questions"><b id="question-count">0</b>open questions</button>';
+  const versions = data.versions || [];
+  const alternatives = data.alternatives || [];
+  const before = versions.length < 2;  // the design draws only the system as it is: nothing to approve yet
   const tabs = all('.tabs [role="tab"]');
   const panel = key => byId('panel-' + key);
   const pop = $('.pop');
-  const reviewMenu = document.createElement('div');
-  reviewMenu.className = 'decide';
-  reviewMenu.id = 'review-menu';
-  reviewMenu.hidden = true;
-  reviewMenu.innerHTML = '<p class="menu-h"></p><p class="review-summary"></p><div class="review-changes"></div><button type="button" class="btn" id="run-review"></button>';
-  const reviewToggle = document.createElement('button');
-  reviewToggle.type = 'button';
-  reviewToggle.className = 'btn btn--quiet';
-  reviewToggle.id = 'review-toggle';
-  reviewToggle.setAttribute('aria-controls', 'review-menu');
-  const runReview = $('#run-review', reviewMenu);
-  if (!readOnly) {
-    $('#noteform').prepend(reviewMenu);
-    $('.notes .send .btn').after(reviewToggle);
-  } else {
-    $('.composer').hidden = true;
-  }
+  if (readOnly) $('.composer').hidden = true;
+  let approval = null;
   const {perspectives} = data;
   const review = data.reviews.at(-1);
   const applicable = perspectives.filter(p => p.applies);
@@ -213,7 +244,8 @@ function start(data) {
   const revKey = 'architecture-page';
   const saved = JSON.parse(sessionStorage.getItem(revKey) || '{}');
   sessionStorage.removeItem(revKey);
-  let tab, version, findings;
+  let tab, version, findings, overlay;
+  const overlays = data.overlays || [];
   const requirementWording = new Map(data.requirements.map(req => [req.id, req.wording]));
   let commentsById = new Map();
   const partByElement = new Map();
@@ -237,17 +269,20 @@ function start(data) {
       '<span data-section-status="' + key + '">' + (accepted ? chip('Accepted', 'ok') : chip('Draft')) + '</span>']);
   });
   section('overview', data.title, '<p class="lead">' + text(data.summary) + '</p><h3>Scope</h3><p>' +
-    text(data.scope) + '</p><h3>Sections</h3>' + table(['Section', 'Status'], sections));
+    text(data.scope) + '</p>' + alternativeTable(alternatives) + '<h3>Sections</h3>' + table(['Section', 'Status'], sections));
   section('requirements', 'Requirements', table(['ID', 'Kind', 'Requirement', 'Source', 'Actions'], requirementRows(data.requirements)));
-  const diagramControls = controls(applicable, review);
-  section('containers', 'Containers', diagramControls + figures(data.containers, 'The containers are not drawn: see the errors above.'));
+  const diagramControls = controls(applicable, review, versions) + alternativeCards(alternatives);
+  const notDrawn = 'The containers are not drawn: see the errors above.';
+  section('containers', 'Containers', controls(applicable, review, versions, overlays) + alternativeCards(alternatives) +
+    figures(data.containers, versions, notDrawn, overlays.length ? 'systems' : undefined) +
+    overlays.map(o => figures(o.drawings, versions, notDrawn, o.id)).join(''));
   section('flows', 'Flows', diagramControls + data.flows.map(flow =>
-    '<h3 class="figtitle">' + text(flow.name) + (flow.new ? ' ' + chip('New') : '') +
-    (flow.removed ? ' ' + chip('Removed') : '') + '</h3>' +
-    figures(flow.versions)).join(''));
+    '<h3 class="figtitle">' + text(flow.name) + ' ' + flowMarks(flow.status) + '</h3>' +
+    figures(flow.versions, versions)).join(''));
   section('perspectives', 'Perspectives', perspectiveTables(perspectives, data.findings, data.parts, review, data.removed_labels));
   section('decisions', 'Decision records', decisionRecords(data.decisions));
   section('spec', 'Spec', specTables(data.spec));
+  byId('agents').innerHTML = agentList(data.agents || []);
 
   for (const [key, part] of Object.entries(data.parts)) {
     if (key !== part.key) continue;
@@ -280,10 +315,25 @@ function start(data) {
     placePins();
   }
 
+  // Shows one version; by default the first after the change, or Before when there is none.
   function setVersion(state) {
-    version = state === 'before' ? 'before' : 'after';
+    const known = versions.map(v => v.id);
+    version = known.includes(state) ? state : known[1] || 'before';
     all('[data-version]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.version === version)));
-    all('.fig').forEach(fig => { fig.hidden = fig.dataset.state !== version; });
+    showFigures();
+  }
+
+  // Shows the Containers drawing of one grouping; Systems by default.
+  function setOverlay(key) {
+    overlay = overlays.some(o => o.id === key) ? key : 'systems';
+    all('[data-overlay]').forEach(b => { if (b.matches('button')) b.setAttribute('aria-pressed', String(b.dataset.overlay === overlay)); });
+    showFigures();
+  }
+
+  function showFigures() {
+    all('.fig, .by-version').forEach(node => {
+      node.hidden = node.dataset.state !== version || (node.dataset.overlay !== undefined && node.dataset.overlay !== overlay);
+    });
     placePins();
   }
 
@@ -347,7 +397,9 @@ function start(data) {
     const element = locate(event);
     if (!element) return;
     showTab(element.closest('[role="tabpanel"]').id.slice(6));
-    if (element.closest('.fig')) setVersion(element.closest('.fig').dataset.state);
+    const fig = element.closest('.fig');
+    if (fig?.dataset.overlay) setOverlay(fig.dataset.overlay);
+    if (fig) setVersion(fig.dataset.state);
     element.scrollIntoView({block: 'center'});
   }
 
@@ -390,11 +442,12 @@ function start(data) {
 
   const conversation = pageConversation({
     served: !readOnly, readOnly, itemKinds: items, latestLast: true, waiting,
-    kinds: {approve: logItem, confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.text),
+    kinds: {approve: entry => pageApprovalItem(entry, conversation.log()), confirm: logItem}, crumb, commentBody: event => pageMarkdown(event.text),
     byId: id => threadComment(conversation.log(), id),
     reveal, edit: editComment, remove: event => commentLayer.remove(event), showLabel: n => 'Show comment ' + n,
-    busy: () => !pop.hidden || !reviewMenu.hidden || !!$('.edit:not([hidden])'),
-    beforeReload: () => sessionStorage.setItem(revKey, JSON.stringify({tab, version, findings, scroll: view.scrollTop})),
+    busy: () => !pop.hidden || !!approval?.open() || !!$('.edit:not([hidden])'),
+    sendMode: () => approval?.sendMode() || null,
+    beforeReload: () => sessionStorage.setItem(revKey, JSON.stringify({tab, version, findings, overlay, scroll: view.scrollTop})),
     rendered: states => {
       const log = conversation.log();
       const model = pageThread(log, items, waiting, true);
@@ -460,6 +513,7 @@ function start(data) {
     const link = event.target.closest('a');
     if (button?.matches('[role="tab"]')) showTab(button.id.slice(4));
     if (button?.matches('[data-version]')) setVersion(button.dataset.version);
+    if (button?.matches('[data-overlay]')) setOverlay(button.dataset.overlay);
     if (button?.matches('[data-findings]')) { clearHighlight(); setFindings(button.dataset.findings); }
     if (link?.matches('[data-parts]')) { event.preventDefault(); revealFinding(link); }
     if (link?.matches('[data-section]')) { event.preventDefault(); showTab(link.dataset.section); }
@@ -506,7 +560,7 @@ function start(data) {
     const button = $('button', form);
     button.disabled = true;
     conversation.send('comment', {id: 'change-' + Date.now().toString(36), text: message,
-      on: {id: record.id, title: 'Change ' + record.dataset.record}}, 'Change request', () => {
+      on: {id: record.id, title: 'Change ' + (record.dataset.name || record.dataset.record)}}, 'Change request', () => {
       form.hidden = true;
       button.disabled = false;
       input.value = input.defaultValue;
@@ -540,31 +594,37 @@ function start(data) {
     if (entry) showConversation(entry.e.id);
   });
 
-  reviewToggle.textContent = review ? 'Review again…' : 'Approve…';
-  $('.menu-h', reviewMenu).textContent = review ? 'Review the changes' : 'Approve the design';
-  runReview.textContent = review ? 'Run the review again' : 'Approve and run the review';
-  runReview.disabled = !!review && !reviewNames.length;
-  const approval = readOnly ? null : pageApprove({
-    button: reviewToggle, panel: reviewMenu, label: 'Review request',
-    params: () => ({again: !!review, perspectives: reviewIds, changes: data.since,
-      text: (review ? 'Review requested again' : 'Design approved') + (reviewNames.length ? ' · ' + reviewNames.join(', ') : '')}),
-    onToggle: open => {
-      if (!open) return;
-      const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
-      const stats = byId('accepted-count').textContent + ' sections accepted · ' + openComments.textContent + ' open comments. ';
-      const removed = data.removed || [];
-      $('.review-summary', reviewMenu).textContent = review ? reviewSummary(data.since, data.change_labels, reviewNames, removed) : stats + scope;
-      $('.review-changes', reviewMenu).innerHTML = review ? changeList(data.since, data.change_labels, removed) : '';
-    }
-  });
-  if (approval) {
-    runReview.addEventListener('click', () => {
-      runReview.disabled = true;
-      approval.send(conversation, () => { runReview.disabled = false; }, () => { runReview.disabled = false; });
-    });
+  // Approve…: page.js's panel, as on design-better's canvas. Before a review: one option per alternative, or Ship After
+  // and Keep Before; after one, Review again… while a perspective has changes to review.
+  function approvalOptions() {
+    if (review) return [{label: 'Review the changes again', value: 'again'}];
+    const options = alternatives.length ?
+      [...alternatives.map(alt => ({label: 'Build ' + alt.name, value: alt.id})),
+        {label: 'Combine alternatives (say how below)', value: 'combine', note: true}] :
+      [{label: 'Ship After', value: 'after'}, {label: 'Keep Before', value: 'before'}];
+    return [...options, {label: 'None of these (say why below)', value: 'none', note: true}];
+  }
+  function approvalIntro(box) {
+    const removed = data.removed || [];
+    const scope = reviewNames.length ? 'Review: ' + reviewNames.join(', ') + '.' : 'No perspectives to review.';
+    const summary = document.createElement('p');
+    summary.className = 'review-summary';
+    summary.textContent = review ? reviewSummary(data.since, data.change_labels, reviewNames, removed) : scope;
+    const changes = document.createElement('div');
+    changes.className = 'review-changes';
+    changes.innerHTML = review ? changeList(data.since, data.change_labels, removed) : '';
+    box.append(summary, changes);
+  }
+  const openItems = () => pageThread(conversation.log(), items, waiting, true).open
+    .filter(entry => entry.kind === 'comment' && !entry.deleted).map(entry => ({id: entry.e.id, n: entry.e.n, text: entry.e.text}));
+  if (!readOnly && !before && !(review && !reviewNames.length)) {
+    approval = pageApprovalPanel({conversation, options: approvalOptions, openItems, intro: approvalIntro,
+      button: review ? 'Review again…' : 'Approve…', params: () => ({again: !!review, perspectives: reviewIds, changes: data.since}),
+      needs: 'Say how to combine them, or why none fits, in the message.'});
   }
 
   showTab(saved.tab || 'overview');
+  setOverlay(saved.overlay);
   setVersion(saved.version);
   setFindings(saved.findings);
   view.scrollTop = saved.scroll || 0;
