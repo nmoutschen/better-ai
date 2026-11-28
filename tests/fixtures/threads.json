@@ -304,7 +304,8 @@
   ]},
  {"name": "transition: the agent posts a report on its own",
   "log": [
-   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"}
+   {"type": "reply", "id": "r1", "to": null, "text": "t", "by": "coordinator"},
+   {"type": "status", "to": "r1", "status": "done", "by": "coordinator", "read": 0}
   ],
   "threads": [
    {"id": "r1", "state": "done", "step": "new", "closedByUser": false}

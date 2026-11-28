@@ -727,6 +727,7 @@ test('S11 each thread is one row: its state, who started it and its first senten
 test('S11 a thread the agent started says Agent: (its name) and a deleted comment shows no row', () => {
   const p = panel([
     { type: 'reply', id: 'r9', to: null, text: 'Spec check 1 found 16 gaps. Details below.', by: 'coordinator', at: at(1) },
+    { type: 'status', to: 'r9', status: 'done', by: 'coordinator', read: 0, at: at(1) },  // a report's own done (D13)
     { type: 'comment', id: 'c1', n: 1, text: 'gone', on: {}, by: 'user', at: at(1) }, { type: 'delete', to: 'c1', by: 'user', at: at(1) },
   ], { crumb: () => null, commentBody: () => null });
   assert.deepEqual(p.rows().map(li => li.dataset.id), ['r9']);

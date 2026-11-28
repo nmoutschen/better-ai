@@ -478,19 +478,19 @@ class Conversation:
             )
         if read >= len(events):
             raise paths.refusal(label, f"--read {read}: the log has no line {read}", f"run pending {label} again")
-        position = {id(e): n for n, e in enumerate(events)}
+        later = [e for e in events[read + 1 :] if e.get("by") == "user"]  # only the user's own events count
         newer = []
         for t in threads(events, self.items):
-            if not ({t["id"]} | {m.get("id") for m in t["messages"]}) & set(ids):
+            named = ({t["id"]} | {m.get("id") for m in t["messages"]}) - {None}
+            if not named & set(ids):
                 continue
-            wrote = [position.get(id(m), -1) for m in (t["root"], *t["messages"]) if m.get("by") == "user"]
-            if max([t["user_at"], *wrote]) > read:
+            if any(named & {e.get("id"), e.get("to"), e.get("decision")} for e in later):
                 newer.append(t["id"])
         if newer:
             raise paths.refusal(
                 label,
                 f"the user wrote in {terminal_text(', '.join(dict.fromkeys(newer)))} after line {read}",
-                "read them, then send this again",
+                f"run pending {label} to read them, then send this again with the --read it prints",
             )
         return read
 
@@ -637,7 +637,8 @@ def _reply_arguments(parser: argparse.ArgumentParser) -> None:
 )
 def reply(args: argparse.Namespace, run: cli.Run) -> int:
     """Show the agent's reply in the page's conversation, in the thread it answers, with the thread's status. Without
-    `--to` it starts a thread: a question with `--state asked` (the user's turn), else a report (done). Under a thread it
+    `--to` it starts a thread: a question with `--state asked` (the user's turn), else a report, written with its own done
+    status (its own line as `read`), so it stays in Open until the user's ✓ (D13). Under a thread it
     needs `--read`, and is refused when the user wrote in the thread after it (D12). It works without a server, so a
     resumed run can answer what the user wrote while no agent was running."""
     unit = _unit(args, run)
@@ -654,6 +655,8 @@ def reply(args: argparse.Namespace, run: cli.Run) -> int:
         events.append({"type": "status", "by": by, "to": target, "status": args.state, **read})
     elif args.state == "asked":  # a question of its own: the user's turn; any other message of its own is a report
         events.append({"type": "status", "by": by, "to": ident, "status": "asked", **read})
+    else:  # a report: done by the agent, with its own line as read, so the user's check closes it (an old one is closed)
+        events.append({"type": "status", "by": by, "to": ident, "status": "done", "read": len(conv.lines())})
     conv.write(*events)
     run.out("Reply shown in the page." if conv.answering() else "Reply saved; the page shows it when served.")
     return 0
@@ -737,6 +740,7 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
     found: list[dict] = []
     by_id: dict[str, dict] = {}
     home: dict[str, str] = {}
+    marked: set[int] = set()  # the threads an agent status names
     agent_read = -1
 
     def thread_of(ident: Any) -> dict | None:
@@ -790,6 +794,8 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
         else:
             if isinstance(ident, str):
                 home[ident] = t["id"]
+            if kind == "status":
+                marked.add(id(t))
             fresh = number is None or number >= t["user_at"]
             if user and (item or kind in ("note", "answer", "reopen")):
                 t["messages"].append(e)
@@ -820,6 +826,12 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
             for x in found:
                 if x["state"] == "agent" and x["step"] == "new" and agent_read >= x["user_at"]:
                     x["step"], x["since"] = "seen", at
+    for t in found:
+        # A report the agent posted before reports carried their own done status (an old log), with no status and no
+        # message from the user: closed by the user, in All and not in Open (D13).
+        root = t["root"]
+        if root.get("type") == "reply" and root.get("by") != "user" and t["user_at"] < 0 and id(t) not in marked:
+            t["closed_by_user"] = True
     return found
 
 

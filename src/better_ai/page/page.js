@@ -741,7 +741,7 @@ function pageTime(at) {
 // own: pageDecisionEvents keeps each event's in `_i`.
 var PAGE_CONTROL = ['status', 'accept', 'accepted', 'reopen', 'delete'];
 function pageThreads(log, itemKinds) {
-  var threads = [], byId = {}, home = {}, agentRead = -1;
+  var threads = [], byId = {}, home = {}, agentRead = -1, marked = [];  // marked: the threads an agent status names
   function threadOf(id) { return byId[home[id] || id]; }
   function start(e, i, state) {
     var t = { id: e.id == null ? null : e.id, root: e, messages: [e], state: state, step: 'new', closedByUser: false,
@@ -774,11 +774,14 @@ function pageThreads(log, itemKinds) {
         if (user && !item && e.type !== 'note' && e.type !== 'answer') t.closedByUser = true;
         // A worker's report that it closed a question starts closed too, the user's choice (D10): in All, with Reopen.
         if (e.type === 'closed') t.closedByUser = true;
+        // A decision you answered is closed at once (D14); one the agent decided or that defaulted stays open, done.
+        if (e.type === 'decision' && pageDecisionStatus(e.x || {}) === 'answered') t.closedByUser = true;
         // Later answers to the same decision join this thread, when the decision is not in the log.
         if (e.type === 'answer' && target != null && !byId[target]) home[target] = t.id;
       }
     } else {
       if (e.id != null) home[e.id] = t.id;
+      if (e.type === 'status') marked.push(t);
       var fresh = typeof e.read !== 'number' || e.read >= t.userAt;
       if (user && (item || e.type === 'note' || e.type === 'answer' || e.type === 'reopen')) {
         t.messages.push(e); t.last = e.at; t.userAt = i;
@@ -806,6 +809,16 @@ function pageThreads(log, itemKinds) {
     }
     // Seen follows the agent's reading: a further read can cover the user's latest event of any thread.
     if (agentRead > read) threads.forEach(function (x) { seenStep(x, e.at); });
+  });
+  threads.forEach(function (t) {
+    var r = t.root, yours = t.messages.filter(function (m) { return m.by === 'user'; }), last = yours[yours.length - 1];
+    // A report the agent posted before reports carried their own done status (an old log), with no status and no
+    // message from you: closed by you, in All and not in Open (D13).
+    if (r.type === 'reply' && r.by !== 'user' && t.userAt < 0 && marked.indexOf(t) < 0) t.closedByUser = true;
+    // A decision the record says you answered, whose latest word from you is that answer: closed (D14).
+    if (r.type === 'decision' && pageDecisionStatus(r.x || {}) === 'answered' && t.state !== 'you' && (!last || last.type === 'answer')) {
+      t.state = 'done'; t.closedByUser = true;
+    }
   });
   return threads;
 }

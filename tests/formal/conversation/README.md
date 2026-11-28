@@ -32,8 +32,9 @@ The model is one thread with the events above. The fold in the code (`threads` i
 - Edits and deletes: a comment sent again with its id replaces the thread's first message, and a delete hides the
   thread. Neither is modelled.
 - Threads that start closed by the user: an action of the user that is no message to the agent, such as a verdict or a
-  confirmation (D8), a worker's report that it closed a question (D10), and a thread an old log marked done (D13). The
-  model's roots all start open.
+  confirmation (D8), a worker's report that it closed a question (D10), a thread an old log marked done or an old
+  report with no status (D13), and a decision you answered (D14; one the agent decided or that defaulted stays open,
+  done). The model's roots all start open, and a new report carries its own `done` status.
 - Order: on the pages with decisions (the research board, the discover page, the code dashboard), `page.js` folds the
   events in time order, as `pageDecisionEvents` merges the decisions into the log by time, while Python folds them in
   log order. Both index an event by its line in the log, so `read` means the same in both.
