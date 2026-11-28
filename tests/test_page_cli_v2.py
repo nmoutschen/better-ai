@@ -135,12 +135,17 @@ class Unit(unittest.TestCase):
         return json.loads(path.read_text()) if path.exists() else {}
 
     def end_everything(self):
+        """End the servers a test started: SIGTERM first, so a server removes its link socket, then SIGKILL."""
         state = self.state()
-        for pid in (state.get("server_pid"), state.get("child_pid")):
-            if type(pid) is int and pid > 1 and pid != os.getpid():
-                with_group = pid == state.get("child_pid")
-                with contextlib.suppress(ProcessLookupError, PermissionError):
-                    (os.killpg if with_group else os.kill)(pid, signal.SIGKILL)
+        pids = [state.get("server_pid"), state.get("child_pid")]
+        pids = [pid for pid in pids if type(pid) is int and pid > 1 and pid != os.getpid()]
+        if type(state.get("server_pid")) is int and state["server_pid"] in pids:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.kill(state["server_pid"], signal.SIGTERM)
+            wait_for(lambda: not alive(state["server_pid"]), 5)
+        for pid in pids:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                (os.killpg if pid == state.get("child_pid") else os.kill)(pid, signal.SIGKILL)
 
     def served(self, *args, **kw):
         done = self.serve(*args, **kw)

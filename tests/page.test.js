@@ -548,3 +548,59 @@ test('an unusable time or a missing clock leaves the age out and never shows NaN
   const noNow = context.pageAgents([{ who: 'a', what: 'x', since: ago(5), last: ago(90) }], {});
   assert.doesNotMatch(noNow, /NaN|chip|No word/);
 });
+
+// ---------- A send that is repeated keeps its id (S127) ----------
+// The reply to the first send is lost; the user presses Send again. Every path makes its id when the user clicks, so the
+// page keeps the id of a send the server has not confirmed, and the server stores the event once.
+const lostThenSaved = () => { let n = 0; return () => (++n === 1 ? unreachable() : saved()); };
+const ticking = () => { const real = context.Date; let t = 1000; context.Date = class extends real { static now() { return ++t; } }; return () => { context.Date = real; }; };
+
+test('a note sent again after a lost reply carries the same id, and a note after a saved one a new id', async () => {
+  const restore = ticking();
+  try {
+    const { els, sent } = conversationOn(lostThenSaved());
+    els['#note'].value = 'my words';
+    els['.notes .send .btn'].listeners.click({ preventDefault() {} });
+    await nextTick();
+    els['.notes .send .btn'].listeners.click({ preventDefault() {} });
+    await nextTick();
+    assert.equal(sent.length, 2);
+    assert.equal(sent[0].params.id, sent[1].params.id);
+    els['#note'].value = 'my words';
+    els['.notes .send .btn'].listeners.click({ preventDefault() {} });
+    await nextTick();
+    assert.notEqual(sent[2].params.id, sent[1].params.id);
+  } finally { restore(); }
+});
+
+for (const [method, params] of [
+  ['comment', { n: 3, text: 'x', on: { slide: 1, part: null } }],
+  ['answer', { decision: 'D1', text: 'yes', default: false }],
+  ['approve', { option: 'a', text: 'ok' }],
+  ['confirm', { requirement: 'R1', wording: 'w', text: 'ok' }],
+  ['note', { to: 'm-1', text: 'a reply' }],
+]) {
+  test(`a ${method} sent again after a lost reply carries the same id`, async () => {
+    const { conv, sent } = conversationOn(lostThenSaved());
+    let made = 0;
+    const click = () => conv.send(method, Object.assign({ id: `fresh-${++made}` }, params), 'Send');  // a new id on each click
+    click();
+    await nextTick();
+    click();
+    await nextTick();
+    assert.equal(sent.length, 2);
+    assert.equal(sent[0].params.id, sent[1].params.id);
+    click();
+    await nextTick();
+    assert.notEqual(sent[2].params.id, sent[1].params.id, 'once saved, the next send is a new event');
+  });
+}
+
+test('a different text is a different send, with its own id', async () => {
+  const { conv, sent } = conversationOn(unreachable);
+  conv.send('note', { id: 'a', text: 'one', to: null }, 'Message');
+  await nextTick();
+  conv.send('note', { id: 'b', text: 'two', to: null }, 'Message');
+  await nextTick();
+  assert.deepEqual(sent.map(s => s.params.id), ['a', 'b']);
+});

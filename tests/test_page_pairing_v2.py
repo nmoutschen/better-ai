@@ -387,6 +387,26 @@ class InProcess(Tabs):
         self.assertEqual(len(self.log_lines()), 1)
         self.assertEqual(len(self.driver.events), 1)
 
+    def test_an_event_edited_and_then_sent_as_before_is_a_new_line(self):  # S127
+        a, b = dict(NOTE, text="A"), dict(NOTE, text="B")
+        for params in (a, b, a):
+            self.assertEqual(self.call(self.secret, "note", params)["result"], "saved")
+        self.assertEqual([json.loads(line)["text"] for line in self.log_lines()], ["A", "B", "A"])
+        self.call(self.secret, "note", a)  # the last one again, as after a lost reply
+        self.assertEqual(len(self.log_lines()), 3)
+
+    def test_a_failure_while_opening_a_tab_is_answered_and_revokes_the_token(self):  # N4
+        self.driven.open_tab = mock.Mock(side_effect=RuntimeError("boom"))
+        with self.page.link_control(self.driven):
+            path = (self.folder / ".page-link").read_text()
+            with socket.socket(socket.AF_UNIX) as control:
+                control.settimeout(5)
+                control.connect(path)
+                control.sendall(f"open-tab {self.driven.identity}\n".encode())
+                reply = control.makefile("rb").readline(300).decode().strip()
+        self.assertRegex(reply, r"^off no-server: \S")
+        self.assertFalse(self.driven.pairing.token)
+
     def test_stop_and_start_twice_are_success(self):  # S128
         for method in ("agent_stop", "agent_stop", "agent_start", "agent_start"):
             self.assertEqual(self.call(self.secret, method)["result"], True, method)
@@ -463,6 +483,28 @@ class VerbsKnowThePageAgentTest(Unit):
         self.assertTrue(self.notice_for("another"))
         self.assertEqual(self.notice_for("the-tag"), [])
         self.assertEqual(self.notice_for("the-session"), [])
+
+
+class LiveServerTest(Unit):
+    def test_a_server_pid_that_is_not_a_serve_of_this_unit_is_no_live_server(self):  # N2
+        from better_ai import page
+
+        unit = better_unit(self.root, self.folder)
+        (self.folder / ".driver").write_text(json.dumps({"version": 1, "server_pid": os.getpid()}))
+        (self.folder / ".driver").chmod(0o600)
+        answer = {"unit": page.unit_identity(unit), "session": "s", "state": "idle", "mark_age": 0, "waiting": 0}
+        with mock.patch.object(page, "server_answer", return_value=answer):
+            self.assertEqual(page.live_server(unit), {})
+            with mock.patch.object(page, "is_serve_of", return_value=True):
+                self.assertTrue(page.live_server(unit))
+
+    def test_the_tag_is_written_by_the_driver_not_by_start_driver(self):  # N1
+        import inspect
+
+        from better_ai.page import driver, start_driver
+
+        self.assertNotIn("save_state", inspect.getsource(start_driver))
+        self.assertIn('"tag"', inspect.getsource(driver.Driver._checkpoint))
 
 
 class StaticTest(unittest.TestCase):
@@ -557,6 +599,7 @@ class ServedTest(Browser):
         done = self.link()
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertRegex(done.stdout.strip(), r"^link: off no-server: \S")
+        self.assertIn("serve .show/deck again", done.stdout)
         self.assertEqual(done.stdout.count("\n"), 1)
 
     def test_link_with_a_stale_record_of_a_server_says_no_server(self):  # S68
