@@ -11,6 +11,7 @@ import http.client
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -691,28 +692,61 @@ class SpellingsTest(Unit):
 class SpacedPathTest(Unit):
     """A unit whose path holds a space is the same unit to the old-server check (round 2 F2)."""
 
-    def test_a_serve_whose_unit_path_has_spaces_is_recognised(self):  # S108
+    def test_the_old_server_is_known_by_its_pid_and_start_time_not_its_command_line(self):  # S108, D22
         from types import SimpleNamespace
         from unittest import mock
 
         from better_ai import page
 
-        unit = SimpleNamespace(path=Path("/tmp/my  decks/a b/.show/deck"))
-        commands = {
-            "python3 /x y/better.pyz serve /tmp/my  decks/a b/.show/deck --no-browser": True,
-            "python3 /x y/better.pyz serve --linger 0.2 /tmp/my  decks/a b/.show/deck/": True,
-            "python3 better.pyz serve a b/.show/deck": True,  # relative, from /tmp/my  decks
-            "python3 better.pyz serve /tmp/my  decks/a b/.show/deck2": False,
-            "python3 better.pyz serve /tmp/my  decks/a b/.show": False,
-            "python3 better.pyz reply /tmp/my  decks/a b/.show/deck": False,
+        unit = SimpleNamespace(path=Path('/tmp/ lead/"q" x/.show/deck'))
+        recorded = "Sat Nov 28 12:00:00 2026"
+        cases = {
+            (recorded, recorded): True,
+            (recorded, "Sat Nov 28 12:00:01 2026"): False,  # the pid was reused by another process
+            (recorded, None): False,  # nothing runs at that pid
+            (None, recorded): False,  # no start time recorded
         }
-        for line, expected in commands.items():
+        for (stored, running), expected in cases.items():
             with (
-                self.subTest(line),
-                mock.patch.object(page, "command_of", return_value=line),
-                mock.patch.object(page, "cwd_of", return_value="/tmp/my  decks"),
+                self.subTest(stored=stored, running=running),
+                mock.patch.object(page, "current_state", return_value={"server_pid": 4242, "server_started": stored}),
+                mock.patch.object(page, "process_started", return_value=running, create=True),
+                mock.patch.object(page, "command_of", side_effect=AssertionError("no command line parsing")),
             ):
                 self.assertIs(page.is_serve_of(4242, unit), expected)
+
+    def stopped_server_is_ended(self, name, spellings):
+        spaced = self.root / name
+        spaced.mkdir()
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
+        subprocess.run([*git, "init", "-q", "-b", "main"], cwd=spaced, check=True)
+        subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "x"], cwd=spaced, check=True)
+        done = better.call("show-better", "create", ".show/deck", "--by", "t", stdin=json.dumps(SHOW), cwd=spaced)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.folder = spaced / ".show" / "deck"
+        for spelling in spellings:
+            with self.subTest(spelling):
+                self.served()
+                old = self.state()["server_pid"]
+                os.kill(old, signal.SIGSTOP)
+                # A shell runs the serve, so the quoted spelling is the shell's quoting, as a user would type it.
+                done = subprocess.run(
+                    " ".join([*map(shlex.quote, better.command("serve")), spelling, "--no-browser"]),
+                    shell=True,
+                    cwd=self.root,
+                    env=stub_env(),
+                    input="",
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertTrue(wait_for(lambda pid=old: not alive(pid)))
+                self.end_everything()
+                (self.folder / ".server").unlink(missing_ok=True)
+
+    def test_a_stopped_server_of_a_unit_with_a_leading_space_is_ended(self):  # S108, round 3 B2
+        self.stopped_server_is_ended(" lead decks", (" lead decks/.show/deck", '" lead decks/.show/deck"'))
 
     def test_a_stopped_server_of_a_unit_with_a_space_is_ended(self):  # S108, round 2 F2
         spaced = self.root / "my decks"
