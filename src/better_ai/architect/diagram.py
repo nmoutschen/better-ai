@@ -966,7 +966,8 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed):
 
     The labels that reach right of a column share the gap after it with the labels of the routed edges that enter the
     next column, which end 12 before it: when the widest of each would not fit side by side, each side wraps to its
-    share, and `route_wrap` gives the routed edges' wraps."""
+    share, and `route_wrap` gives the routed edges' wraps where a placement finds them meeting. A self-loop's planned
+    wrap is the narrow one it falls back to: it is drawn at full width where that meets nothing."""
     top_items = {slot[0] for slot in slots if slot}
     apart = [edge for edge in flow["edges"] if edge["id"] in back | jumps and edge["from"] != edge["to"]]
     apart.sort(key=lambda e: abs(x[e["from"]] - x[e["to"]]))
@@ -1016,7 +1017,7 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed):
     def gap_limit(node, offset):
         """The widest a label that starts `offset` right of the node's column may be."""
         if column(node) + 1 not in entering:
-            return GAP - 70
+            return share - offset
         return max(share / 2, share - entering[column(node) + 1]) - offset
 
     def fit(edge, limit):
@@ -1111,9 +1112,11 @@ def _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed):
     }
 
 
-def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
+def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of, narrowed=frozenset()):
     """One placement of a logic flow, with the forward edges in `jumps` drawn as connectors and the edges back in
-    `no_arc` never as arcs."""
+    `no_arc` never as arcs. The labels of the routed edges in `narrowed` wrap to their share of the gap before their
+    target's column; a routed label that meets a label reaching into that gap is added to them and the flow is placed
+    again."""
     routed = [edge for edge in forward if edge["id"] not in jumps]
     slots = [[] for _ in range(max(level.values(), default=0) + 1)]
     for node in nodes:
@@ -1159,8 +1162,8 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
     x = {item: column * (COLW + GAP) for column, slot in enumerate(slots) for item in slot}
     edges = {edge["id"]: edge for edge in flow["edges"]}
     top = _plan_tops(flow, nodes, edges, slots, x, back, jumps, no_arc, routed)
-    for ident, limit in top["route_wrap"].items():
-        labels[ident] = _label_lines(edges[ident], limit)
+    for ident in narrowed:
+        labels[ident] = _label_lines(edges[ident], top["route_wrap"][ident])
     box_heights = {ident: logic_box_height(node, boxes_of) for ident, node in nodes.items()}
     heights = {
         ident: max(box_heights[ident], sum(15 * len(labels[e["id"]]) + 14 for e in incoming[ident]) + 16)
@@ -1217,7 +1220,7 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
 
     for edge in flow["edges"]:
         ident, source, target = edge["id"], edge["from"], edge["to"]
-        if plans.get(ident, ("arc",))[0] == "arc":
+        if ident not in plans or plans[ident][0] == "arc":
             continue
         number += 1
         sx, tx = spot[source, ident], spot[target, ident]
@@ -1231,6 +1234,7 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
             "label_at": (sx + 14, sy - 18 - up),
         }
         place_label(ident, True)
+    route_lines = [segment for points in routes.values() for segment in pairwise(points)]
     for node, own in selfs.items():
         bx, by_, bw, _ = boxes[node]
         start, rise = top["loops"][node], 14
@@ -1247,12 +1251,11 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
             loops[edge["id"]] = {"kind": "self", "paths": [path], "label_at": (far + 6, by_ - rise - 4)}
             # Its label is planned narrow enough to share the gap after the column with the labels entering the
             # next one; it takes its full width where that meets no other label and no line. It is never taller.
-            place_label(edge["id"], True, GAP - 70)
+            place_label(edge["id"], True, min(GAP - 70, GAP - 18 - (far + 6 - bx - bw)))
             box = label_boxes.get(edge["id"])
-            others = [other for ident, other in label_boxes.items() if ident != edge["id"]]
-            lines = [segment for points in routes.values() for segment in pairwise(points)]
+            others = [other for ident, other in label_boxes.items() if ident != edge["id"]] + list(boxes.values())
             if box and (
-                any(_boxes_meet(box, other) for other in others) or any(_segment_through(t, box) for t in lines)
+                any(_boxes_meet(box, other) for other in others) or any(_segment_through(t, box) for t in route_lines)
             ):
                 place_label(edge["id"], True)
             labelled = edge.get("label") or removable(edge)
@@ -1265,7 +1268,7 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
     ceiling = min([box[1] for box in boxes.values()] + [y + 38 for y in tops], default=0)
     for edge in flow["edges"]:
         ident, source, target = edge["id"], edge["from"], edge["to"]
-        if plans.get(ident, ("",))[0] != "arc":
+        if ident not in plans or plans[ident][0] != "arc":
             continue
         sx, tx = spot[source, ident], spot[target, ident]
         sy, ty = boxes[source][1], boxes[target][1]
@@ -1277,6 +1280,18 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
         }
         place_label(ident, False)
 
+    gap_labels = [
+        box for ident, box in label_boxes.items() if loops.get(ident, {}).get("kind") in ("self", "connector")
+    ]
+    meeting = {
+        ident
+        for ident in top["route_wrap"]
+        if ident not in narrowed
+        and ident in label_boxes
+        and any(_boxes_meet(label_boxes[ident], box) for box in gap_labels)
+    }
+    if meeting:
+        return _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of, narrowed | meeting)
     apart_forward = {ident: loops.pop(ident) for ident in list(loops) if ident in jumps}
     points = [point for path in routes.values() for point in path]
     points += [point for loop in [*loops.values(), *apart_forward.values()] for path in loop["paths"] for point in path]
