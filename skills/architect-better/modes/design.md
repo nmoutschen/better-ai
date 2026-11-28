@@ -22,10 +22,10 @@ READ and FOLLOW [../formats/records.md](../formats/records.md) before you first 
 
 - TRACK each thread with `python3 <skill dir>/scripts/better.pyz status <unit> seen|working <id>`: `seen` when you read it, `working` only while you change something for it.
 - REPLY in the user's thread, under the item you answer, with `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id>`, your words on stdin, in one or two short sentences. The reply sets the thread's state: `done` by default, `--state asked` when you ask the user something about it, `--state working` when you reply before you have made the change. ONCE an answer leads to a change, REPLY done, THEN ASK any next question about it in the same thread, with `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id> --state asked`.
-- ASK one question per message. POST a message without `--to` only to start a new subject: with `--state asked` when it is a question, without `--state` when it is a report, which needs no answer.
+- ASK one question per message. POST a message without `--to` only to start a new subject: with `--state asked` when it is a question, without `--state` when it is a report, which needs no answer. IF a question you posted no longer needs an answer, REPLY done under it with `python3 <skill dir>/scripts/better.pyz reply <unit> --to <its id>`.
 - The user closes a thread with ✓. A thread you replied done stays in the user's Open list until they close it. Any message from the user in a thread gives it back to you: READ it as part of that thread.
 
-KEEP `working` on the threads you are changing now, usually one. The user may also accept a thread in words: MARK it `accepted`.
+KEEP `working` on the threads you are changing now, usually one. The user may also accept a thread in words: RUN `python3 <skill dir>/scripts/better.pyz status <unit> accepted <id>... --text`, with the user's words on stdin.
 
 ### Agents you start
 

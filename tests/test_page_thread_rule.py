@@ -21,14 +21,6 @@ RULES = [
     "ASK one question per message. POST a message without `--to` only to start a new subject: with `--state asked` when it is a question, without `--state` when it is a report, which needs no answer.",
     "The user closes a thread with ✓. A thread you replied done stays in the user's Open list until they close it. Any message from the user in a thread gives it back to you: READ it as part of that thread.",
 ]
-# The rules of the agent's list in PRINCIPLES.md carry no command, so the sentences without one must appear there.
-PRINCIPLE_SENTENCES = [
-    "ASK one question per message.",
-    "The user closes a thread with ✓.",
-    "A thread you replied done stays in the user's Open list until they close it.",
-    "Any message from the user in a thread gives it back to you: READ it as part of that thread.",
-    "REPLY in the user's thread, under the item you answer",
-]
 FORBIDDEN = ["in a new message", "no `--to`"]
 
 
@@ -41,7 +33,7 @@ def normal(text: str) -> str:
 
 class PageThreadRule(unittest.TestCase):
     def test_each_skill_has_the_four_rules(self):
-        for name in SKILL_FILES:
+        for name in SKILL_FILES + ["PRINCIPLES.md"]:
             text = normal((ROOT / name).read_text())
             for rule in RULES:
                 self.assertIn(rule, text, name)
@@ -52,10 +44,18 @@ class PageThreadRule(unittest.TestCase):
             for bad in FORBIDDEN:
                 self.assertNotIn(bad, text, name)
 
-    def test_principles_say_the_same_rules(self):
-        text = normal((ROOT / "PRINCIPLES.md").read_text())
-        for sentence in PRINCIPLE_SENTENCES:
-            self.assertIn(sentence, text)
+    def test_every_ask_names_the_thread(self):
+        # An ASK about a note under an item goes back in that thread, never in a message of its own.
+        for name in SKILL_FILES:
+            for line in (ROOT / name).read_text().splitlines():
+                if "ASK in one sentence" in line:
+                    self.assertIn("--to <id> --state asked", normal(line), name)
+
+    def test_acceptance_in_words_gives_the_command(self):
+        for name in SKILL_FILES:
+            for line in (ROOT / name).read_text().splitlines():
+                if "accept a thread in words" in line:
+                    self.assertIn("accepted <id>... --text", normal(line), name)
 
     def test_status_lists_do_not_include_asked(self):
         for name in SKILL_FILES:
