@@ -265,6 +265,12 @@ class Reply(unittest.TestCase):
 class ServedPage(unittest.TestCase):
     """`serve` shows the page, takes what the user sends in the schema's terms, and `pending` lists it."""
 
+    def temp_dir(self) -> str:
+        """A temporary folder removed when the test ends, after the server stop that start registered later."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return tmp.name
+
     def start(self, folder: Path):
         url, self.token = better_module.serve_page("code-better", folder)
         self.addCleanup(better_module.stop_page, folder)
@@ -278,42 +284,42 @@ class ServedPage(unittest.TestCase):
             return json.loads(r.read())
 
     def test_the_page_its_data_and_the_events_it_accepts(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = change(Path(d))
-            decision = {"type": "decision", "at": AT, "by": "coordinator", "id": "D1", "raised_by": "coordinator"}
-            decision |= {"about": {"type": "change"}, "asked": "Count weekends?", "status": "waiting"}
-            decision |= {"default": "No", "deadline": None}
-            write(folder, "decisions.jsonl", [decision])
-            url = self.start(folder)
-            with urllib.request.urlopen(url, timeout=5) as r:
-                page = r.read().decode()
-            for part in ("/dashboard.js", "/page.js", 'id="tables"'):
-                self.assertIn(part, page)
-            self.assertNotIn("__PAGE_", page)
-            with urllib.request.urlopen(
-                urllib.request.Request(url + "data", headers=better_module.page_headers(self.token)), timeout=5
-            ) as r:
-                data = json.loads(r.read())
-            self.assertEqual(data["decisions"][0]["status"], "waiting")
-            for asset in ("dashboard.js", "dashboard.css", "page.js", "page.css"):
-                with urllib.request.urlopen(url + asset, timeout=5) as r:
-                    self.assertEqual(r.status, 200)
-            events = {
-                "comment": {"id": "c-x", "text": "why?", "on": {"kind": "agent", "id": "b1", "title": "b1"}},
-                "note": {"id": "m-x", "text": "hi", "to": None},
-                "answer": {"id": "a-x", "decision": "D1", "text": "Business days only.", "default": False},
-            }
-            for method, params in events.items():
-                self.assertEqual(self.send(url, method, params).get("result"), "saved", method)
-            refused = self.send(url, "answer", {**events["answer"], "id": "a-y", "text": ""})
-            self.assertEqual(refused["error"]["code"], -32602)
-            self.assertIn("text", refused["error"]["message"])
-            self.assertIn("error", self.send(url, "approve", {"id": "x"}))  # the page declares no approve
-            out = run(folder, "pending", str(folder)).stdout
-            items = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
-            answer = next(i for i in items if i["type"] == "answer")
-            self.assertEqual((answer["decision"], answer["status"]), ("D1", "new"))
-            self.assertEqual(run(folder, "check", str(folder)).returncode, 0)
+        d = self.temp_dir()  # removed after stop_page, which addCleanup runs first
+        folder = change(Path(d))
+        decision = {"type": "decision", "at": AT, "by": "coordinator", "id": "D1", "raised_by": "coordinator"}
+        decision |= {"about": {"type": "change"}, "asked": "Count weekends?", "status": "waiting"}
+        decision |= {"default": "No", "deadline": None}
+        write(folder, "decisions.jsonl", [decision])
+        url = self.start(folder)
+        with urllib.request.urlopen(url, timeout=5) as r:
+            page = r.read().decode()
+        for part in ("/dashboard.js", "/page.js", 'id="tables"'):
+            self.assertIn(part, page)
+        self.assertNotIn("__PAGE_", page)
+        with urllib.request.urlopen(
+            urllib.request.Request(url + "data", headers=better_module.page_headers(self.token)), timeout=5
+        ) as r:
+            data = json.loads(r.read())
+        self.assertEqual(data["decisions"][0]["status"], "waiting")
+        for asset in ("dashboard.js", "dashboard.css", "page.js", "page.css"):
+            with urllib.request.urlopen(url + asset, timeout=5) as r:
+                self.assertEqual(r.status, 200)
+        events = {
+            "comment": {"id": "c-x", "text": "why?", "on": {"kind": "agent", "id": "b1", "title": "b1"}},
+            "note": {"id": "m-x", "text": "hi", "to": None},
+            "answer": {"id": "a-x", "decision": "D1", "text": "Business days only.", "default": False},
+        }
+        for method, params in events.items():
+            self.assertEqual(self.send(url, method, params).get("result"), "saved", method)
+        refused = self.send(url, "answer", {**events["answer"], "id": "a-y", "text": ""})
+        self.assertEqual(refused["error"]["code"], -32602)
+        self.assertIn("text", refused["error"]["message"])
+        self.assertIn("error", self.send(url, "approve", {"id": "x"}))  # the page declares no approve
+        out = run(folder, "pending", str(folder)).stdout
+        items = [json.loads(line) for line in out.splitlines() if line.startswith("{")]
+        answer = next(i for i in items if i["type"] == "answer")
+        self.assertEqual((answer["decision"], answer["status"]), ("D1", "new"))
+        self.assertEqual(run(folder, "check", str(folder)).returncode, 0)
 
     def test_a_line_in_the_format_before_this_change_is_a_notice_not_a_warning(self):
         old = {

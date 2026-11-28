@@ -1036,6 +1036,12 @@ class Verbs(unittest.TestCase):
             self.assertEqual(refused.returncode, 1)
             self.assertFalse((empty / "board.html").exists())
 
+    def temp_dir(self) -> str:
+        """A temporary folder removed when the test ends, after the server stop that start registered later."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return tmp.name
+
     def served(self, board_dir: Path):
         url, self.token = better.serve_page(SKILL, board_dir, "--linger", "0.2")
         self.addCleanup(better.stop_page, board_dir)
@@ -1064,29 +1070,27 @@ class Verbs(unittest.TestCase):
             return json.loads(r.read())
 
     def test_the_served_page_has_the_boards_files_takes_its_events_and_refuses_the_rest(self):
-        with tempfile.TemporaryDirectory() as d:
-            board_dir = made_board(Path(d))
-            write_entry(
-                board_dir, claim("C-w2-9", question="Q-w9-1")
-            )  # a bad record: the page is served, with its error
-            process, url = self.served(board_dir)
-            status, text = self.get(url)
-            self.assertEqual(status, 200)
-            for linked in ('href="/board.css"', 'src="/board.js"', 'src="/page.js"', 'href="/page.css"', 'id="map"'):
-                self.assertIn(linked, text)
-            for asset in ("board.js", "board.css", "page.js", "page.css"):
-                self.assertEqual(self.get(url + asset)[0], 200, asset)
-            self.assertEqual(self.get(url + "board.html")[0], 404)  # only the fixed table is served
-            self.assertEqual(self.get(url + "brief.json")[0], 404)
-            status, text = self.get(url + "data")
-            data = json.loads(text)
-            self.assertEqual((status, data["brief"]["status"]), (200, "running"))
-            self.assertEqual(({e["file"] for e in data["errors"]}, len(data["claims"])), ({"claims/C-w2-9.json"}, 1))
-            closed = self.rpc(url, "closed", id="c-0", question="Q-w2-4", status="answered")  # the page may not send it
-            self.assertEqual(closed["error"]["code"], -32601)
-            self.assertFalse((board_dir / "conversation.jsonl").exists())
-            for method in ("accept", "approve", "confirm", "delete"):  # shared parts this page does not declare
-                self.assertEqual(self.rpc(url, method, to="c-1")["error"]["code"], -32601, method)
+        d = self.temp_dir()  # removed after stop_page, which addCleanup runs first
+        board_dir = made_board(Path(d))
+        write_entry(board_dir, claim("C-w2-9", question="Q-w9-1"))  # a bad record: the page is served, with its error
+        process, url = self.served(board_dir)
+        status, text = self.get(url)
+        self.assertEqual(status, 200)
+        for linked in ('href="/board.css"', 'src="/board.js"', 'src="/page.js"', 'href="/page.css"', 'id="map"'):
+            self.assertIn(linked, text)
+        for asset in ("board.js", "board.css", "page.js", "page.css"):
+            self.assertEqual(self.get(url + asset)[0], 200, asset)
+        self.assertEqual(self.get(url + "board.html")[0], 404)  # only the fixed table is served
+        self.assertEqual(self.get(url + "brief.json")[0], 404)
+        status, text = self.get(url + "data")
+        data = json.loads(text)
+        self.assertEqual((status, data["brief"]["status"]), (200, "running"))
+        self.assertEqual(({e["file"] for e in data["errors"]}, len(data["claims"])), ({"claims/C-w2-9.json"}, 1))
+        closed = self.rpc(url, "closed", id="c-0", question="Q-w2-4", status="answered")  # the page may not send it
+        self.assertEqual(closed["error"]["code"], -32601)
+        self.assertFalse((board_dir / "conversation.jsonl").exists())
+        for method in ("accept", "approve", "confirm", "delete"):  # shared parts this page does not declare
+            self.assertEqual(self.rpc(url, method, to="c-1")["error"]["code"], -32601, method)
 
     def test_a_worker_closing_a_question_is_announced_once_and_the_board_stopped_ends_serve(self):
         with tempfile.TemporaryDirectory() as d:
