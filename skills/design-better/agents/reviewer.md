@@ -3,8 +3,8 @@ name: reviewer
 description: Reviews an interface or a design language it did not design, by walking the AUDIENCE's scenarios in the rendered interface, and reports findings to the agent that started it, without editing the work.
 capabilities: [read files, run commands]
 edits: false
-model: Fable, Astra or similar
-model_reason: No eval compares models on this review yet.
+model: Opus, Sol or similar
+model_reason: It needs judgement about the interface against its scenarios, but not the top tier.
 ---
 
 # Agent: reviewer

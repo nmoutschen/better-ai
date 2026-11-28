@@ -3,8 +3,8 @@ name: spec-checker
 description: Checks, in both directions, the links between a spec and the approved design, decisions and request it comes from, and reports gaps to the architect-better agent that started it, without editing the spec.
 capabilities: [read files]
 edits: false
-model: Fable, Astra or similar
-model_reason: It must find what the spec leaves out, not only confirm the links it has, and no eval compares models on it; cheap judges matched frontier ones only on whether a source supports a citation.
+model: Sonnet, Terra or similar
+model_reason: It checks links between a spec and its sources, which is mostly mechanical; cheap and frontier judges matched on whether a source supports a claim.
 ---
 
 # Agent: spec-checker

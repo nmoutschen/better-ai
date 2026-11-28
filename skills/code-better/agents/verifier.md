@@ -3,8 +3,8 @@ name: verifier
 description: Reviews a change it did not build against the spec and the recorded decisions, and reports findings to the agent that started it, without editing the code.
 capabilities: [read files, run commands]
 edits: false
-model: Fable, Astra or similar
-model_reason: No eval compares models on this review yet.
+model: Opus, Sol or similar
+model_reason: It needs judgement about the code against its spec, but not the top tier.
 ---
 
 # Agent: verifier

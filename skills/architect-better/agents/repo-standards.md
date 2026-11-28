@@ -3,8 +3,8 @@ name: repo-standards
 description: Reviews a design it did not make, or a system against its design, against one of the repository's own standards, and reports findings to the architect-better agent that started it, without editing the design.
 capabilities: [read files]
 edits: false
-model: Fable, Astra or similar
-model_reason: No eval compares models on this perspective yet.
+model: Sonnet, Terra or similar
+model_reason: It checks a design against one written standard, which is close to mechanical.
 ---
 
 # Agent: repo-standards

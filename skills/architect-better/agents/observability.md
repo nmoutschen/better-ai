@@ -3,8 +3,8 @@ name: observability
 description: Reviews a design it did not make, or a system against its design, for how operators learn that the system fails and find out why, and reports findings to the architect-better agent that started it, without editing the design.
 capabilities: [read files]
 edits: false
-model: Fable, Astra or similar
-model_reason: No eval compares models on this perspective yet.
+model: Opus, Sol or similar
+model_reason: It needs judgement about the design, but not the top tier.
 ---
 
 # Agent: observability

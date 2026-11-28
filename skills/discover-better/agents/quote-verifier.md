@@ -3,8 +3,8 @@ name: quote-verifier
 description: Checks that a quote an analyst added as evidence occurs in the raw text of its source, a web page it reads with its web tools or a file or connector item it re-reads, and sets the evidence's outcome; the coordinator of the discovery starts it.
 capabilities: [use web tools, run commands, read files, write files, use the connectors the sources name]
 edits: true
-model: Sonnet, Terra or similar
-model_reason: A design choice to save cost; it checks that a quote occurs in its source, which needs no judgement.
+model: Haiku or similar
+model_reason: It checks that a quote occurs in its source, which is mechanical.
 ---
 
 # Agent: quote-verifier

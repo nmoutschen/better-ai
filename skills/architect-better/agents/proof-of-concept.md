@@ -3,8 +3,8 @@ name: proof-of-concept
 description: Runs a throwaway proof of concept that answers questions a design rests on and documentation cannot settle, such as how a third-party tool behaves, and reports what it observed to the architect-better agent that started it, without changing the design or the shipped source.
 capabilities: [read files, run commands, write files]
 edits: false
-model: Opus, Sol or similar
-model_reason: It reports what code did when run, not a judgement of the design, and no eval compares models on it.
+model: Sonnet, Terra or similar
+model_reason: It writes throwaway code and reports what it did, with no judgement of the design.
 ---
 
 # Agent: proof-of-concept
