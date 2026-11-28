@@ -438,7 +438,9 @@ li.trow.closing { display:flex; justify-content:space-between; align-items:cente
 .pinbar { position:fixed; left:0; right:0; bottom:0; z-index:4; display:flex; align-items:center; gap:var(--space-item);
   padding:var(--space-control) var(--space-edge); background:var(--cream); border-top:2px solid var(--ink); }
 .pinbar[hidden] { display:none; }
-.pinbar-text { flex:1; margin:0; font:var(--font-small); }
+.pinbar-text { flex:1; margin:0; font:var(--font-small); white-space:pre-line; }
+/* A notice keeps its line breaks: the driver error gives its log path on a line of its own. */
+.agents .notice div { white-space:pre-line; }
 @media (max-width:900px) {
   body { padding-bottom:6rem; }
   .agents .notice { display:none; }

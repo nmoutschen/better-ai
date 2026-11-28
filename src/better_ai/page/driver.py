@@ -81,8 +81,16 @@ NOTICES = {
     "crashed-again": "The same error came back: {}. Fix it in a terminal, then press Start.",
     "not-handling": "All agents are stopped because they did not handle your message. Their last reply and denied calls "
     "are in {}. Press Start to retry, or reword your message.",
-    "driver": "The page's agents stopped because of an error: {}. Ask the agent in your chat to serve this page again. Log: {}.",
+    # Two sentences of one value each: the log path goes on a line of its own, which the page keeps (white-space).
+    "driver": "The page's agents stopped because of an error: {}. Ask the agent in your chat to serve this page again."
+    "\nLog: {}.",
     "protocol": "All agents are stopped because the harness protocol is unknown: {}. Update better-ai, or use a version it was tested with.",
+    "version": "All agents are stopped because the harness version is not supported: {}. Update the harness, then serve again.",
+    "unsafe-mode": "All agents are stopped because the harness runs in an approval mode the page cannot use: {}. "
+    "Change the harness's approval mode, then serve again.",
+    "not-installed": "All agents are stopped because {} is not installed. Install it, then serve again.",
+    "no-harness": "All agents are stopped because no supported harness was found. "
+    "Start a harness this machine can drive, then serve again.",
     "stopped": "All agents are stopped. Press Start to have them read your messages.",
     "stopping": "The agents are stopping.",
     "stalled": "The agents have shown no output for 10 minutes. Press Stop to end them, or keep waiting.",
@@ -450,10 +458,18 @@ class Driver:
             return []
 
     def _text(self, state: str, details: dict) -> str | None:
-        """The finished notice for stopped, failed and closed; null for every other state (decision D7)."""
-        message = str(details.get("message", ""))[:500]
+        """The finished notice for stopped, failed and closed; null for every other state (decision D7). A notice whose
+        value is empty drops it with its colon, so no notice ends a sentence on ": ."."""
+        message = str(details.get("message", "")).strip()[:500]
+
+        def said(name: str, *values) -> str:
+            template = NOTICES[name]
+            if not message and ": {}" in template.split("\n")[0]:
+                template = template.replace(": {}", "", 1)
+            return template.format(*values)
+
         if state == "closed":
-            return NOTICES["idle"] if details.get("kind") == "idle" else NOTICES["closed"].format(message)
+            return NOTICES["idle"] if details.get("kind") == "idle" else said("closed", message)
         if state in ("stopped", "stopping", "stalled"):
             return NOTICES[state]
         if state != "failed":
@@ -461,16 +477,18 @@ class Driver:
         kind = details.get("kind", "crashed")
         if kind == "crashed" and details.get("again"):
             kind = "crashed-again"
-        if kind == "login":
+        if kind in ("login", "not-installed"):
             return NOTICES[kind].format(display_name(self.harness))
+        if kind == "no-harness":
+            return NOTICES[kind]
         if (
             kind == "not-handling"
         ):  # one value, the log's path; the items, final message and denied calls are there (D30)
             return NOTICES[kind].format(details.get("log", self.unit.target(LOG)))
         if kind == "driver":
-            return NOTICES[kind].format(message, details.get("log", self.unit.target(LOG)))
+            return said(kind, *([message] if message else []), details.get("log", self.unit.target(LOG)))
         if kind in NOTICES:
-            return NOTICES[kind].format(message)
+            return said(kind, message)
         return ACTIONS.get(kind, message)
 
     def _force(self, state: str, details: dict, since: float | None = None) -> None:
