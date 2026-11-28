@@ -1057,12 +1057,22 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
             for end in (edge["from"], edge["to"]):
                 on_top.setdefault(end, []).append(edge["id"])
 
+    # Loops on a node's own top right corner take its right end: the other attachments share the rest.
+    selfs = {}
+    for edge in flow["edges"]:
+        if edge["from"] == edge["to"]:
+            selfs.setdefault(edge["from"], []).append(edge)
+
     def top_x(node, ident):
         bx, _, bw, _ = boxes[node]
         if nodes[node]["type"] == "start":
             return bx + bw / 2
         spots = on_top[node]
-        return bx + bw * (spots.index(ident) + 1) / (len(spots) + 1)
+        if node not in selfs:
+            return bx + bw * (spots.index(ident) + 1) / (len(spots) + 1)
+        # From the left end, so that the labels, which run right, have room before the loops.
+        room = bw - 36 - 12 * len(selfs[node])
+        return bx + 16 + (room - 16) * spots.index(ident) / len(spots)
 
     loops, number = {}, 0
     for edge in flow["edges"]:
@@ -1088,30 +1098,51 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
                 "paths": [[(sx, sy), (sx, sy - 13)], [(tx, ty - 13), (tx, ty)]],
                 "label_at": (sx + 14, sy - 18),
             }
-    rank = {}
-    for edge in flow["edges"]:
-        if edge["from"] == edge["to"]:
-            # Several loops on one node nest: each next one rises higher, reaches further out and comes back lower.
-            k = rank[edge["from"]] = rank.get(edge["from"], -1) + 1
-            bx, by_, bw, _ = boxes[edge["from"]]
-            rise, out, back = 14 + 16 * k, 14 + 12 * k, 8 + 8 * k
+            if source in selfs and nodes[source]["type"] != "start":
+                # Its label ends before the loops on the node's corner, which move right to make room. A word is
+                # never broken.
+                bx, _, bw, _ = boxes[source]
+                word = max((width(w, LABEL) for w in edge.get("label", "").split()), default=0)
+                loops[ident]["wrap"] = min(GAP - 70, max(word, bx + bw - 12 * len(selfs[source]) - 6 - (sx + 14)))
+
+    def place_label(ident, anchor_start):
+        """The lines of an edge drawn apart, wrapped to its room, and its label's box."""
+        loop, edge = loops[ident], edges[ident]
+        lines = wrap(edge.get("label", ""), LABEL, loop.get("wrap", GAP - 70))
+        loop["lines"] = lines = lines + (["REMOVED"] if removable(edge) else [])
+        if not edge.get("label") and not removable(edge):
+            return
+        lx, ly = loop["label_at"]
+        w = max(width(line, LABEL) for line in lines)
+        anchor = lx if anchor_start else lx - w / 2
+        label_boxes[ident] = (anchor, ly - 15 * len(lines) + 3, w, 15 * (len(lines) - 1) + 13)
+
+    for ident, loop in loops.items():
+        place_label(ident, loop["kind"] != "arc")
+    for node, own in selfs.items():
+        # Several loops on one node nest: each next one starts further left, rises higher, reaches further out and
+        # comes back lower. They start right of the labels of the connectors that leave the node's top, and each one
+        # rises above the label of the one inside it. The labels stand in a column right of the outermost loop, each
+        # at the height of its own loop's top.
+        bx, by_, bw, _ = boxes[node]
+        mine = [e for e in on_top.get(node, []) if e in label_boxes and edges[e]["from"] == node]
+        mine = [e for e in mine if loops[e]["kind"] == "connector"]
+        ends = [label_boxes[e][0] + label_boxes[e][2] + 6 for e in mine]
+        start = min(max([bx + bw - 36 - 12 * (len(own) - 1), *ends]), bx + bw - 12 * len(own))
+        rise = 14
+        far = bx + bw + 14 + 12 * (len(own) - 1)
+        for k, edge in enumerate(own):
+            out, back = 14 + 12 * k, 8 + 8 * k
             path = [
-                (bx + bw - 36 - 12 * k, by_),
-                (bx + bw - 36 - 12 * k, by_ - rise),
+                (start + 12 * (len(own) - 1 - k), by_),
+                (start + 12 * (len(own) - 1 - k), by_ - rise),
                 (bx + bw + out, by_ - rise),
                 (bx + bw + out, by_ + back),
                 (bx + bw, by_ + back),
             ]
-            loops[edge["id"]] = {"kind": "self", "paths": [path], "label_at": (bx + bw + out + 6, by_ - rise - 6)}
-    for ident, loop in loops.items():
-        lines = wrap(edges[ident].get("label", ""), LABEL, GAP - 70) + (["REMOVED"] if removable(edges[ident]) else [])
-        loop["lines"] = lines
-        if not edges[ident].get("label") and not removable(edges[ident]):
-            continue
-        lx, ly = loop["label_at"]
-        w = max(width(line, LABEL) for line in lines)
-        anchor = lx - w / 2 if loop["kind"] == "arc" else lx
-        label_boxes[ident] = (anchor, ly - 15 * len(lines) + 3, w, 15 * (len(lines) - 1) + 13)
+            loops[edge["id"]] = {"kind": "self", "paths": [path], "label_at": (far + 6, by_ - rise + 5)}
+            place_label(edge["id"], True)
+            rise += max(16, 15 * len(loops[edge["id"]]["lines"]) + 3)
 
     apart_forward = {ident: loops.pop(ident) for ident in list(loops) if ident in jumps}
     points = [point for path in routes.values() for point in path]

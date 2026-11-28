@@ -235,9 +235,24 @@ class LogicFlowDrawing(unittest.TestCase):
         self.assertIn("NEGATIVE END", texts(root, diagram.part_id(f"{self.view}-after", "step", "drop")))
 
     def test_example_logic_flow_geometry(self):
-        shape = self.shape
+        self.assert_drawn_clear(self.flow, self.shape)
+
+    def test_two_labelled_loops_and_a_connector_on_one_node_are_clear(self):
+        """Issue #174: an outer loop ran through the inner loop's label and the connector on the node's top."""
+        self.flow["edges"] += [
+            {"id": "e-retry", "from": "wait", "to": "wait", "label": "retry after an error"},
+            {"id": "e-poke", "from": "ok", "to": "wait", "label": "asks again"},
+        ]
+        shape = diagram.logic_layout(self.flow, self.layout)
+        self.assertEqual(shape["loops"]["e-retry"]["kind"], "self")
+        self.assertIn(shape["loops"]["e-poke"]["kind"], ("arc", "connector"))
+        self.assert_drawn_clear(self.flow, shape)
+
+    def assert_drawn_clear(self, flow, shape):
+        """No line crosses another, a node it does not join, a connector or a label; no label overlaps a node or
+        another label."""
         lines = {ident: segments(points) for ident, points in shape["routes"].items()}
-        for ident, loop in shape["loops"].items():
+        for ident, loop in {**shape["loops"], **shape["jumps"]}.items():
             lines[ident] = [s for points in loop["paths"] for s in segments(points)]
         idents = list(lines)
         for i, a in enumerate(idents):
@@ -245,7 +260,7 @@ class LogicFlowDrawing(unittest.TestCase):
                 for s in lines[a]:
                     for t in lines[b]:
                         self.assertFalse(cross(s, t), (a, b, s, t))
-        edges = {e["id"]: e for e in self.flow["edges"]}
+        edges = {e["id"]: e for e in flow["edges"]}
         for ident, parts in lines.items():
             ends = {edges[ident]["from"], edges[ident]["to"]}
             for node, box in shape["boxes"].items():
@@ -261,13 +276,13 @@ class LogicFlowDrawing(unittest.TestCase):
             for b, s in labels[i + 1 :]:
                 self.assertFalse(overlap(r, s), (a, b))
         # A connector's circle and an edge's label are in the way of every other edge too.
-        circles = {
-            ident: (cx - 9, cy - 9, 18, 18)
-            for ident, loop in shape["loops"].items()
+        circles = [
+            (ident, (cx - 9, cy - 9, 18, 18))
+            for ident, loop in {**shape["loops"], **shape["jumps"]}.items()
             for cx, cy in loop.get("circles", [])
-        }
+        ]
         for ident, parts in lines.items():
-            for other, rect in [*circles.items(), *labels]:
+            for other, rect in [*circles, *labels]:
                 if other == ident:
                     continue
                 for s in parts:
