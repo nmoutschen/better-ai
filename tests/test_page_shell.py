@@ -982,6 +982,7 @@ class EndingTest(Fixture):
                 published.set()
 
         unit, _, server, serving, driven, host = self.driven_page(Closing())
+        self.get(host, "/agent")  # a live tab polls every 2 s
         stopper = threading.Thread(
             target=page.stop_serving,
             args=(server, serving, driven, unit, None, ("idle", "no page was open")),
@@ -995,6 +996,18 @@ class EndingTest(Fixture):
             self.assertEqual((status, json.loads(body)["state"]), (200, "closed"))
             stopper.join(5)
         self.assertFalse(stopper.is_alive(), "the server waits for no more than the page's poll of closed")
+
+    def test_a_paired_tab_that_does_not_poll_does_not_delay_the_end_B1_S105(self):
+        # A tab that paired and then closed (or a client that never polls) gets no grace: the server ends at once.
+        class Closing(FakeDriver):
+            def close(self, kind="stopped", reason="server stopped"):
+                pass
+
+        unit, _, server, serving, driven, host = self.driven_page(Closing())
+        started = time.monotonic()
+        with mock.patch.object(page, "CLOSED_GRACE", 10, create=True):
+            page.stop_serving(server, serving, driven, unit, None, ("idle", "no page was open"))
+        self.assertLess(time.monotonic() - started, 2)
 
 
 class LinkReplyTest(Fixture):
