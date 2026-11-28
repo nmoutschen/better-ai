@@ -169,7 +169,7 @@
       }
     },
     "verdict": {
-      "description": "the user's thumb on a version; null takes it back",
+      "description": "the user's thumb on a version; null takes it back. Its id, from the page since threads have ids, lets the user reopen it; one from before has none",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -188,6 +188,9 @@
         },
         "by": {
           "const": "user"
+        },
+        "id": {
+          "$ref": "base.schema.json#/$defs/id"
         },
         "version": {
           "type": "string",

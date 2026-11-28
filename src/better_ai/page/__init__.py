@@ -748,6 +748,9 @@ def threads(events: list, item_types: tuple[str, ...]) -> list[dict]:
                 # reply: its thread starts closed by the user, until they write in it (D8)
                 if user and not item and kind not in ("note", "answer"):
                     t["closed_by_user"] = True
+                # a worker's report that it closed a question starts closed too, the user's choice (D10)
+                if kind == "closed":
+                    t["closed_by_user"] = True
                 found.append(t)
                 if kind == "answer" and isinstance(target, str) and target not in by_id:
                     home[target] = ident  # later answers to the same decision join this thread

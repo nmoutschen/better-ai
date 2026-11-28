@@ -336,14 +336,17 @@ function pageConversation(o) {
     var buttons = foot ? Array.prototype.filter.call(foot.children, function (b) { return b.tagName === 'BUTTON'; }) : [];
     return { node: m, buttons: buttons, openQ: /\bopen-q\b/.test(item.className || ''), d: item.dataset && item.dataset.d, text: blockText(m).replace(/\s+/g, ' ').trim() };
   }
-  // What a page's kind says, for the row's first sentence: its words without its head (who and when), a space between
-  // blocks, so words of two paragraphs never run together.
+  // What a page's kind says, for the row's first sentence: its words without its head (who and when), each block ended
+  // by a stop, so the words of two blocks never run together.
   var BLOCK = /^(P|DIV|LI|UL|OL|H[1-6]|BLOCKQUOTE|PRE|TABLE|TR|TD|TH|BR)$/;
   function blockText(n) {
     if (n.nodeType === 3) return n.textContent;
     if (n.nodeType !== 1 || (n.classList && n.classList.contains('head'))) return '';
     var inner = Array.prototype.map.call(n.childNodes, blockText).join('');
-    return BLOCK.test(n.tagName) ? ' ' + inner + ' ' : inner;
+    if (!BLOCK.test(n.tagName)) return inner;
+    // A block ends with a stop, so a label and the words after it read as two sentences, not one run-on line.
+    var words = inner.replace(/\s+/g, ' ').trim();
+    return words ? ' ' + words + (/[.?!:;…]$/.test(words) ? '' : '.') + ' ' : ' ';
   }
   // The box under an open thread: your answer or reply, or why you reopen it. Its text survives every redraw. ONSEND,
   // from a page's own kind, sends something else, such as the answer to a decision.
@@ -374,7 +377,7 @@ function pageConversation(o) {
       };
       if (onSend) return onSend(text, done);
       if (mode === 'reopen') send('reopen', { to: t.id, text: text }, 'Reopen', done);
-      else send('note', { id: 'm-' + Date.now().toString(36), to: t.id, text: text }, /answer/i.test(words) ? 'Answer' : 'Reply', done);
+      else send('note', noteEvent({ to: t.id, text: text }), /answer/i.test(words) ? 'Answer' : 'Reply', done);
     }
     ta.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { e.preventDefault(); cancel(); }
@@ -460,19 +463,22 @@ function pageConversation(o) {
         link('Delete', 'Delete comment ' + e0.n, function () { o.remove(it); }));
     }
     function act(b, name) { acts.append(keyed(b, 'act:' + name + ':' + k)); }
+    // The controls of the thread's state, the same for every kind (states.md, Controls): ✓ first on every thread you
+    // have not closed (Close, or Confirm done), then Answer or Reply, then Reopen on a done one; a thread you closed
+    // offers Reopen only. A page's own kind brings its own Answer or Reply, such as a decision's Use the default and
+    // Answer, which take that place. A thread without an id, such as a verdict from before verdicts had one, offers
+    // nothing: a reopen or a close names its thread by id.
     if (actions && !editing && t.id != null) {
-      if (kind && kind.buttons.length) {
-        // A done thread can be confirmed and reopened, whatever its kind; ✓ comes first, Reopen last, as on every row.
-        if (t.state === 'done' && !t.closedByUser) act(button('✓', 'btn--quiet close', function () { close(t, first); }, 'Confirm done: ' + first), 'close');
-        // The page's own controls, such as a decision's use-the-default check and Answer.
-        kind.buttons.forEach(function (b, j) { acts.append(keyed(b, /\bchange\b/.test(b.className) ? 'act:reply:' + k : 'kind:' + j + ':' + k)); });
-        if (t.state === 'done') act(button('Reopen', 'btn--quiet', function () { openBox(t, 'reopen'); }, 'Reopen: ' + first), 'reopen');
-      } else {
-        if (!t.closedByUser) act(button('✓', 'btn--quiet close', function () { close(t, first); }, (t.state === 'done' ? 'Confirm done: ' : 'Close: ') + first), 'close');
-        if (t.state === 'you') act(button('Answer', 'primary', function () { openBox(t, 'reply'); }, 'Answer: ' + first), 'reply');
-        if (t.state === 'agent') act(button('Reply', 'btn--quiet', function () { openBox(t, 'reply'); }, 'Reply: ' + first), 'reply');
-        if (t.state === 'done') act(button('Reopen', 'btn--quiet', function () { openBox(t, 'reopen'); }, 'Reopen: ' + first), 'reopen');
+      if (!t.closedByUser) {
+        act(button('✓', 'btn--quiet close', function () { close(t, first); }, (t.state === 'done' ? 'Confirm done: ' : 'Close: ') + first), 'close');
+        if (kind && kind.buttons.length) {
+          kind.buttons.forEach(function (b, j) { acts.append(keyed(b, /\bchange\b/.test(b.className) ? 'act:reply:' + k : 'kind:' + j + ':' + k)); });
+        } else {
+          if (t.state === 'you') act(button('Answer', 'primary', function () { openBox(t, 'reply'); }, 'Answer: ' + first), 'reply');
+          if (t.state === 'agent') act(button('Reply', 'btn--quiet', function () { openBox(t, 'reply'); }, 'Reply: ' + first), 'reply');
+        }
       }
+      if (t.state === 'done') act(button('Reopen', 'btn--quiet', function () { openBox(t, 'reopen'); }, 'Reopen: ' + first), 'reopen');
     }
     foot.append(left, acts); li.append(foot);
     return li;
@@ -635,7 +641,12 @@ function pageConversation(o) {
   function sendNote() {
     var note = noteBox.value.trim();
     if (!note) { say('Write your message first.', true); noteBox.focus(); return; }
-    send('note', Object.assign({ id: 'm-' + Date.now().toString(36), text: note, to: null }, o.noteParams ? o.noteParams() : {}), 'Message', function () { noteBox.value = ''; });
+    send('note', noteEvent({ text: note, to: null }), 'Message', function () { noteBox.value = ''; });
+  }
+  // Every note the page sends, from the message box or from a row, the same way: with its id and the page's own fields
+  // (o.noteParams), which the page's events schema may require, such as the slide a deck's message is on.
+  function noteEvent(fields) {
+    return Object.assign({ id: 'm-' + Date.now().toString(36) }, fields, o.noteParams ? o.noteParams() : {});
   }
   function mode() { return o.sendMode ? o.sendMode() : null; }
   if (noteBox && !o.readOnly) {
@@ -760,6 +771,8 @@ function pageThreads(log, itemKinds) {
         // The user's action that is no message to the agent, such as a verdict or a confirmation, needs no reply: its
         // thread starts closed by the user, in All and never in Open, until they write in it (D8).
         if (user && !item && e.type !== 'note' && e.type !== 'answer') t.closedByUser = true;
+        // A worker's report that it closed a question starts closed too, the user's choice (D10): in All, with Reopen.
+        if (e.type === 'closed') t.closedByUser = true;
         // Later answers to the same decision join this thread, when the decision is not in the log.
         if (e.type === 'answer' && target != null && !byId[target]) home[target] = t.id;
       }
@@ -1059,7 +1072,7 @@ function pageDecision(o) {
     if (actions) {
       if (asked && x.default) {
         var use = document.createElement('button');
-        use.type = 'button'; use.className = 'btn btn--sm btn--quiet answer use'; use.textContent = '✓'; use.title = 'Use the default';
+        use.type = 'button'; use.className = 'btn btn--sm btn--quiet answer use'; use.textContent = 'Use the default';  // D11: the check only closes
         use.setAttribute('aria-label', 'Use the default for: ' + q);
         use.addEventListener('click', function () {
           var target = nextWaiting(x.id);

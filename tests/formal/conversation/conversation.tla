@@ -1,8 +1,10 @@
 ---------------------------- MODULE conversation ----------------------------
 (***************************************************************************)
 (* The state of one thread of a live page's conversation, as the user and *)
-(* the agent change it at the same time (src/better_ai/page/page.js       *)
-(* `pageThread`, src/better_ai/page/__init__.py `all_items`).             *)
+(* the agent change it at the same time, by the per-item rules built     *)
+(* before the thread machine: page.js `pageThread` and an earlier         *)
+(* `all_items`, both since replaced by `pageThreads` and `threads`, which *)
+(* thread.tla models.                                                      *)
 (*                                                                         *)
 (* The log is `conversation.jsonl`: every action appends one event, and   *)
 (* an item's state is read back from the whole log. Each side acts on     *)
@@ -73,7 +75,7 @@ Items == Created(log)
 RootClosed == \E k \in 1..Len(log) : log[k].t = "accept" /\ log[k].to = 0
 
 \* ---------- What the page shows ----------
-\* Open, as page.js `pageThread` counts it: an item not closed, or the agent's own message no one answered yet.
+\* Open, as the removed page.js `pageThread` counted it: an item not closed, or the agent's own message no one answered yet.
 ThreadOpen ==
   \/ \E i \in Items : State(i) # "accepted"
   \/ (Root = "agent" /\ Items = {} /\ ~RootClosed)

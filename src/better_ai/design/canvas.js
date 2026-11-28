@@ -286,7 +286,7 @@
     b.addEventListener('click', function () {
       var v = labels[+b.dataset.v];
       { var d = verdicts[v] === b.dataset.verdict ? null : b.dataset.verdict;
-        send('verdict', { version: v, verdict: d }, d ? (d === 'up' ? 'Thumbs up' : 'Thumbs down') + ' for ' + v : 'Verdict on ' + v + ' withdrawn'); }
+        send('verdict', { id: 'v-' + Date.now().toString(36), version: v, verdict: d }, d ? (d === 'up' ? 'Thumbs up' : 'Thumbs down') + ' for ' + v : 'Verdict on ' + v + ' withdrawn'); }
     });
   });
 

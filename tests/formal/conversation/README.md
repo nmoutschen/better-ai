@@ -5,7 +5,8 @@ same time. TLC checks each model against the invariants named in its config.
 
 ## Models
 
-- `conversation.tla`: the per-item rules as built (`pageThread`, `all_items`). `Root = "item"` is the user's own
+- `conversation.tla`: the per-item rules as they were built before this change (page.js `pageThread` and an earlier
+  `all_items`, both since replaced by the one thread machine, `pageThreads` and `threads`). `Root = "item"` is the user's own
   comment or message; `Root = "agent"` is a message the agent posted, with each user note an item of its own.
   `CloseAnyTime` is whether the page offers Close on every open thread; `StaleGuard` is whether a status that
   predates the user's latest event is ignored.
