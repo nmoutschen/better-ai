@@ -410,6 +410,16 @@ class Groupings(unittest.TestCase):
         self.assertEqual(model.render_diagrams(plain, {})[2], [])
 
 
+class PlainDesigns(unittest.TestCase):
+    def test_a_design_without_group_kinds_keeps_its_drawing_size(self):
+        """S24: the example design's Containers drawing has the viewBox the renderer gave it before this change."""
+        design = json.loads((ROOT / "tests" / "fixtures" / "architect-example" / "design.json").read_text())
+        layout = diagram.layout(design)
+        for state in ("before", "after"):
+            root = ET.fromstring(diagram.svg_containers(layout, state))
+            self.assertEqual(root.get("viewBox"), "-24 -24 1580 839", state)
+
+
 class UserOnTheLeft(unittest.TestCase):
     def test_person_boxes_first_column(self):
         design = example()

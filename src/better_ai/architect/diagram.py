@@ -274,10 +274,10 @@ def layout(design: dict) -> dict:
             continue
         y, bands, total = place_bands(slots, heights, [g for g in groups if group_kind(g) == kind], chains, x)
         routes, extra = route_edges(edges, chains, incoming, outgoing, labels, x, y, heights, total)
-        # Return lanes may sit outside the outer columns, and the outline of a group holding another outside its
-        # members; the drawing spans them all.
+        # Return lanes may sit outside the outer columns, and the outline of a group holding another further out than
+        # the 16 the drawing's margin already holds; the drawing spans them all.
         xs = [point[0] for points in routes.values() for point in points]
-        xs += [edge for _, band_left, _, band_width, _ in bands for edge in (band_left, band_left + band_width)]
+        xs += [edge for _, band_left, _, band_w, _ in bands for edge in (band_left + 16, band_left + band_w - 16)]
         left, right = min([0, *xs]), max([width, *xs])
         drawn[key] = {
             "x": x,
