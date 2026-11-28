@@ -37,11 +37,16 @@ function parseHTML(doc, html) {
 class El {
   constructor(doc, tag) {
     Object.assign(this, { ownerDocument: doc, tagName: tag.toUpperCase(), nodeType: 1, children: [], parentNode: null, attributes: {},
-      dataset: {}, className: '', hidden: false, value: '', listeners: {}, style: {}, scrollTop: 0, scrollHeight: 0, clientHeight: 0,
+      dataset: {}, className: '', hidden: false, value: '', listeners: {}, style: { setProperty() {}, removeProperty() {} }, scrollTop: 0, scrollHeight: 0, clientHeight: 0,
       disabled: false });
   }
   get childNodes() { return this.children; }
   get firstChild() { return this.children[0] || null; }
+  get parentElement() { return this.parentNode && this.parentNode.nodeType === 1 ? this.parentNode : null; }
+  get nextSibling() { const p = this.parentNode; return p ? p.children[p.children.indexOf(this) + 1] || null : null; }
+  get previousSibling() { const p = this.parentNode; return p ? p.children[p.children.indexOf(this) - 1] || null : null; }
+  get firstElementChild() { return this.children.find(c => c.nodeType === 1) || null; }
+  get lastElementChild() { return this.children.filter(c => c.nodeType === 1).pop() || null; }
   get classList() {
     const n = this, list = () => n.className.split(/\s+/).filter(Boolean);
     return { contains: c => list().includes(c), add: c => { if (!list().includes(c)) n.className = list().concat(c).join(' '); },

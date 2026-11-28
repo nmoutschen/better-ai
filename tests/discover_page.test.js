@@ -642,7 +642,7 @@ test('the page draws its kinds inside rows: a decision as your turn with its def
   const d1 = p.rowOf('D1'), ch = p.rowOf('ch1');
   assert.equal(text(d1.querySelector('.chip')), 'Your turn');
   assert.equal(text(d1.querySelector('.tgist')), 'Coordinator: Is P1 the main problem?');
-  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Answer']);
+  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Use the default', 'Answer']);
   d1.querySelector('.thead').click();
   assert.match(text(p.rowOf('D1').querySelector('.tbody')), /Suggested default: Yes/);
   assert.equal(text(ch.querySelector('.chip')), 'Agent’s turn');
@@ -653,7 +653,7 @@ test('the page draws its kinds inside rows: a decision as your turn with its def
 
 test('answering a decision from its row records the answer; the figure counts one fewer', () => {
   const p = liveDiscover(fixture());
-  actions(p.rowOf('D1'))[1].click();
+  actions(p.rowOf('D1'))[2].click();
   const box = p.rowOf('D1').querySelector('.why textarea');
   box.input('No, P2 is.');
   box.key('Enter', { ctrlKey: true });

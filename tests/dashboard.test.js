@@ -473,7 +473,7 @@ test('the dashboard draws a decision inside its row as your turn, with where it 
   assert.equal(text(b.$('#status #yourturn')), '1 your turn');
   const d1 = b.rowOf('D1'), c1 = b.rowOf('c1');
   assert.equal(text(d1.querySelector('.chip')), 'Your turn');
-  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Answer']);
+  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Use the default', 'Answer']);
   d1.querySelector('.thead').click();
   const body = text(b.rowOf('D1').querySelector('.tbody'));
   assert.match(body, /From builder-t4, task T4/);
@@ -489,7 +489,7 @@ test('the dashboard draws a decision inside its row as your turn, with where it 
 
 test('the default answers the decision from its row, and the figure goes to 0', () => {
   const b = liveDashboard(DASH_LOG);
-  actions(b.rowOf('D1'))[0].click();
+  actions(b.rowOf('D1'))[1].click();
   assert.deepEqual(b.conv.log().filter(e => e.type === 'answer').map(e => [e.decision, e.text, e.default]), [['D1', 'Keep it', true]]);
   assert.equal(text(b.rowOf('D1').querySelector('.chip')), 'Agent’s turn');
   assert.equal(text(b.$('#status #yourturn')), '0 your turn');

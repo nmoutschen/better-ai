@@ -256,14 +256,15 @@ test('the board draws its kinds inside rows: a decision as your turn with its de
   const d1 = b.rowOf('D1'), x1 = b.rowOf('x1'), c1 = b.rowOf('c1');
   assert.equal(text(d1.querySelector('.chip')), 'Your turn');
   assert.equal(text(d1.querySelector('.tgist')), 'Coordinator: Search the forums too?');
-  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Answer']);
-  assert.equal(x1.dataset.state, 'done');
-  assert.deepEqual(actions(x1).map(x => x.textContent), ['✓', 'Reopen']);
+  assert.deepEqual(actions(d1).map(x => x.textContent), ['✓', 'Use the default', 'Answer']);
+  assert.equal(x1, undefined);  // a worker report starts closed (D10): All only
   assert.equal(text(c1.querySelector('.chip')), 'Agent’s turn');
   assert.deepEqual(actions(c1).map(x => x.textContent), ['✓', 'Reply']);
-  x1.querySelector('.thead').click();
+  b.filter('all');
+  assert.deepEqual(actions(b.rowOf('x1')).map(x => x.textContent), ['Reopen']);
+  b.rowOf('x1').querySelector('.thead').click();
   assert.match(text(b.rowOf('x1').querySelector('.tbody')), /Answered: Page speed/);
-  d1.querySelector('.thead').click();
+  b.rowOf('D1').querySelector('.thead').click();
   assert.match(text(b.rowOf('D1').querySelector('.tbody')), /If you don't answer: No/);
   b.rowOf('c1').querySelector('.thead').click();
   assert.equal(text(b.rowOf('c1').querySelector('.crumb .el')), 'Page speed');
@@ -274,7 +275,7 @@ test('the board draws its kinds inside rows: a decision as your turn with its de
 
 test('answering the decision from its row records the answer and makes it the agent\'s turn; the figure says 0', () => {
   const b = liveBoard(BOARD_LOG);
-  actions(b.rowOf('D1'))[1].click();
+  actions(b.rowOf('D1'))[2].click();
   const box = b.rowOf('D1').querySelector('.why textarea');
   box.input('Yes, the forums too.');
   box.key('Enter', { ctrlKey: true });

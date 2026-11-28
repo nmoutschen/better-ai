@@ -485,7 +485,7 @@
    {"id": "a1", "state": "agent", "step": "seen", "closedByUser": false},
    {"id": "a3", "state": "done", "step": "new", "closedByUser": false}
   ]},
- {"name": "kind: a worker's closed question is a report, and your note under it is the agent's turn",
+ {"name": "kind (D10): a worker's closed question is a report that starts closed by you; your note under it is the agent's turn",
   "items": ["comment", "note", "answer"],
   "log": [
    {"type": "closed", "id": "x1", "by": "worker-2", "question": "Q4", "status": "answered"},
@@ -495,6 +495,18 @@
   ],
   "threads": [
    {"id": "x1", "state": "agent", "step": "working", "closedByUser": false},
-   {"id": "x2", "state": "done", "step": "new", "closedByUser": false}
+   {"id": "x2", "state": "done", "step": "new", "closedByUser": true}
+  ]},
+ {"name": "kind (D10): an agent status on a worker report you have not opened changes nothing; your reopen puts it with the agent",
+  "items": ["comment", "note", "answer"],
+  "log": [
+   {"type": "closed", "id": "x1", "by": "worker-2", "question": "Q4", "status": "answered"},
+   {"type": "status", "to": "x1", "status": "asked", "by": "coordinator", "read": 0},
+   {"type": "closed", "id": "x2", "by": "worker-3", "question": "Q5", "status": "answered"},
+   {"type": "reopen", "to": "x2", "text": "not answered", "by": "user"}
+  ],
+  "threads": [
+   {"id": "x1", "state": "done", "step": "new", "closedByUser": true},
+   {"id": "x2", "state": "agent", "step": "new", "closedByUser": false}
   ]}
 ]

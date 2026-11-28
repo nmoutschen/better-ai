@@ -136,7 +136,7 @@ test('a waiting decision shows its question, the default and the deadline, with 
   assert.match(li.className, /open-q/);
   assert.equal(t.entry.thread.state, 'you');
   assert.doesNotMatch(foot.innerHTML, /progress/);  // the row says the state once; the foot holds the buttons
-  assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Use the default', 'Answer']);  // D11: the check only closes
 });
 
 test('Use the default answers with the default text, marked as the default', () => {
@@ -179,7 +179,7 @@ test('the user\'s answer moves the question on, by its thread: answered, waiting
   assert.deepEqual(buttons(foot).map(b => b.textContent), ['Reply']);
   [li, foot] = t.render([ANSWER, statusOf('asked')]);  // the agent asked back: the user's turn again
   assert.match(li.className, /open-q/);
-  assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Use the default', 'Answer']);  // D11: the check only closes
   const before = { type: 'note', id: 'm0', to: null, text: 'hi', by: 'user', at: '2026-11-22T09:10:00Z' };
   [li] = t.render([before, ANSWER, statusOf('asked', 0)]);  // decided before reading the answer, line 1: changes nothing
   assert.match(li.innerHTML, /answered, waiting for the coordinator/);
@@ -313,7 +313,7 @@ test('a page that sets suggested shows Suggested default and never a deadline or
   const [li, foot] = t.render();
   assert.match(li.innerHTML, /Suggested default: Take the small one/);
   assert.doesNotMatch(li.innerHTML, /default in|default due|If you don&#39;t answer|If you don't answer/);
-  assert.deepEqual(buttons(foot).map(b => b.textContent), ['✓', 'Answer']);
+  assert.deepEqual(buttons(foot).map(b => b.textContent), ['Use the default', 'Answer']);  // D11: the check only closes
   const late = decision(page, { deadline: '2026-11-22T09:00:00Z' }, { suggested: true });
   assert.doesNotMatch(late.render()[0].innerHTML, /due now/);
 });
@@ -1045,8 +1045,9 @@ test('a waiting decision keeps its default, deadline, use-the-default check and 
   assert.equal(text(row.querySelector('.tgist')), 'Coordinator: Which size?');
   assert.ok(row.classList.contains('open-q'));  // pageDecision finds the next open question by it
   assert.equal(row.dataset.d, 'D1');
-  const [use, answer] = actions(row);
-  assert.equal(use.textContent, '✓');
+  const [close, use, answer] = actions(row);
+  assert.deepEqual([close.textContent, p.label(close)], ['✓', 'Close: Which size?']);  // any thread can be closed
+  assert.equal(use.textContent, 'Use the default');  // D11: the default says its words
   assert.equal(p.label(use), 'Use the default for: Which size? Pick one.');
   assert.match(use.className, /btn--quiet/);
   assert.equal(answer.textContent, 'Answer');
@@ -1057,7 +1058,7 @@ test('a waiting decision keeps its default, deadline, use-the-default check and 
   const body = text(p.rowOf('D1').querySelector('.tbody'));
   assert.match(body, /If you don't answer: Small/);
   assert.match(body, /default in 30 min/);
-  actions(p.rowOf('D1'))[1].click();
+  actions(p.rowOf('D1'))[2].click();
   const ta = p.rowOf('D1').querySelector('.why textarea');
   assert.equal(p.rowOf('D1').querySelector('.why label').textContent, 'Your answer');
   ta.input('Large');
@@ -1068,7 +1069,7 @@ test('a waiting decision keeps its default, deadline, use-the-default check and 
 
 test('use the default answers with the default from the row', () => {
   const p = decisionPanel({ default: 'Small' });
-  actions(p.rowOf('D1'))[0].click();
+  actions(p.rowOf('D1'))[1].click();
   assert.deepEqual(p.sent().filter(e => e.type !== 'decision').map(e => [e.type, e.decision, e.text, e.default]), [['answer', 'D1', 'Small', true]]);
 });
 
@@ -1116,14 +1117,14 @@ test('a done thread of a kind with its own buttons can still be confirmed and re
   assert.equal(p.rowOf('D1'), undefined);  // closed: it left Open
 });
 
-test('the first sentence of a page kind without text is its words without its head, a space between its blocks', () => {
+test('the first sentence of a page kind without text is its words without its head, each block ended by a stop', () => {
   const p = panel([{ type: 'closed', id: 'x1', by: 'worker-2', question: 'Q-4', status: 'answered', at: at(1) }], doc => ({
     kinds: { closed: () => {
       const li = doc.createElement('li');
       li.innerHTML = '<div class="head"><span class="who">worker-2</span><span class="when">19:54</span></div><p class="what">Answered: Who supports ACP</p><div class="body md"><p>Zed does.</p></div>';
       return li;
     } } }));
-  assert.equal(text(p.rowOf('x1').querySelector('.tgist')), 'Coordinator: Answered: Who supports ACP Zed does.');
+  assert.equal(text(p.rowOf('x1').querySelector('.tgist')), 'Coordinator: Answered: Who supports ACP.');  // a stop ends each block
 });
 
 test('rows shown elsewhere (nodes) are open, without actions, and their head is plain: nothing to fold', () => {
