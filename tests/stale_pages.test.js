@@ -12,7 +12,7 @@ function wholeBoard(pageFetch) {
   const page = loadPage();
   const env = { document: stand(), pageConversation: () => stand(), pageDecision: page.pageDecision, pageDecisionEvents: page.pageDecisionEvents, pageOpenDecisions: page.pageOpenDecisions,
     pageMarkdown: t => ({ outerHTML: String(t) }), pageMarkdownText: String, pageTime: page.pageTime, pageEscape: page.pageEscape,
-    pageAgents: page.pageAgents, pagePopup: page.pagePopup, pageShowErrors: () => {}, addEventListener: () => {}, innerWidth: 1000,
+    pageAgents: page.pageAgents, pageApprovals: page.pageApprovals, pageOpenApproval: page.pageOpenApproval, pagePopup: page.pagePopup, pageShowErrors: () => {}, addEventListener: () => {}, innerWidth: 1000,
     innerHeight: 800, getComputedStyle: stand(), pageFetch, setInterval: () => {} };
   const body = read('research', 'board.js') + '; return {tick, closed: () => CLOSED_PAGE, setBoard: d => { D = prepare(d); }};';
   return new Function(...Object.keys(env), body)(...Object.values(env));

@@ -7,7 +7,7 @@ var PAGE_STATES = { new: 'Sent', seen: 'Seen', asked: 'Waiting for you', replied
 // /events and /wait goes through pageFetch, which sends it; the server answers a page without it as out of date. The
 // page then drops the token it saved: a reload cannot fix it, only the address the agent gave.
 var pageDriven = pageConfig().driven === true;
-var PAGE_STALE = pageDriven ? 'Opened elsewhere. Ask for a new link.' :
+var PAGE_STALE = pageDriven ? 'This tab is no longer connected. Use the newer tab, or ask the agent in your chat to reopen the page.' :
   'page out of date: open the address the agent gave';
 var pageIsStale = false;
 var pageToken = (function () {
@@ -59,57 +59,246 @@ function pageFetch(url, init) {
   });
 }
 
-function pageDriverText(agent) {
-  if (agent.age > 3 || agent.kind === 'driver') {
-    return "The page's agent driver stopped. Ask the agent in your chat to serve this page again.";
-  }
-  if (agent.state === 'failed') {
-    var kind = agent.kind, action = agent.action;
-    if (kind === 'login' && agent.harness) action = 'Log in to ' + agent.harness + ' in a terminal, then press Start.';
-    if (kind === 'not-installed' && agent.harness) action = agent.harness + ' CLI not found on PATH.';
-    var details = [];
-    if (kind === 'not-handling') {
-      if (agent.items && agent.items.length) details.push('Items: ' + agent.items.join(', '));
-      if (agent.final_message) details.push('Last reply: ' + agent.final_message);
-      if (agent.denied && agent.denied.length) {
-        details.push('Denied calls: ' + agent.denied.map(function (call) { return call.tool + ' (' + call.reason + ')'; }).join(', '));
-      }
-      if (agent.log) details.push('Log: ' + agent.log);
-      action = 'Start retries. You can also reword the comment.';
-    }
-    return [kind, agent.message].concat(details, action).filter(Boolean).join(' · ');
-  }
-  var states = {
-    starting: 'Starting', idle: 'Idle', working: 'Working', stopping: 'Stopping',
-    stopped: 'Stopped', stalled: 'Stalled. Use Stop in the approval tab if needed.'
-  };
-  return states[agent.state] || '';
+// ---------- The page's agents: their state, Stop and Start, and the approval pop-up ----------
+// A driven page asks /agent every 2 s. The body is the one the driver builds (decision D1): state, text (the notice for
+// that state, or null), mark_age (seconds since the driver last marked itself alive), approvals (each { id, who, tool,
+// arguments, summary, since, options }), workers (each { name, item, waiting }) and blocked (each { tool, arguments,
+// reason }). The page shows what it says and adds nothing: the notice and Stop or Start in the Agents section, a waiting
+// worker's row, the tab title, and each request in one pop-up.
+var PAGE_DRIVER_DOWN = "The page's agent driver stopped. Ask the agent in your chat to serve this page again.";
+var PAGE_OWN_WAITING = "The page's agent is waiting for you to allow a tool call. Open the request to answer it.";
+var PAGE_UNSENT = 'May not have been sent; check after the page reopens.';
+var PAGE_WAITING = 'Waiting for you: ';
+var PAGE_CHOICES = { allow_once: 'Allow once', allow_session: 'Allow for this session', deny: 'Deny' };
+var PAGE_STOP_ASK = 'All agents stop now, and any request waiting for you is denied. Recorded work is kept; work in progress is lost. Press Start to continue.';
+var pageAgentState = null;    // the last /agent body, null before the first answer
+var pageDriverDown = false;   // the mark is older than 3 s, or the server did not answer
+var pageAgentRows = null;     // the rows and options of the last list pageAgents drew
+var pageAgentsHtml = '';      // what that list was last written as
+var pageThreadDraw = null;    // draws the conversation again, set by pageConversation
+var pageWaitingItems = 0;     // the entries of the conversation that wait for the user
+var pageDialogOpen = null;    // the pop-up that is open: { pop, opener, approval }
+var pageToastTimer = null, pageRpcCount = 0;
+
+function pageEl(tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; }
+
+// The toast at the bottom of the window, which screen readers read as a status.
+function pageFlash(text, kind) {
+  var toast = document.querySelector('.toast');
+  clearTimeout(pageToastTimer);
+  toast.textContent = text; toast.className = 'toast ' + (kind || ''); toast.hidden = false;
+  if (kind !== 'error' && kind !== 'busy') pageToastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
+}
+
+// The requests waiting for the user, the oldest first; none while the driver is gone, as it could not take an answer.
+function pageApprovals() {
+  if (!pageAgentState || pageDriverDown) return [];
+  return (pageAgentState.approvals || []).slice().sort(function (a, z) { return a.since < z.since ? -1 : a.since > z.since ? 1 : 0; });
+}
+function pageWaitingWorkers() {
+  return pageAgentState && !pageDriverDown ? (pageAgentState.workers || []).filter(function (w) { return w.waiting; }) : [];
+}
+// The words under the Agents heading: what the driver says of the agents' state, or that the driver is gone.
+var PAGE_REQUEST_WAITS = 'A request waits for you.';
+function pageAgentNotice() {
+  if (pageDriverDown) return PAGE_DRIVER_DOWN;
+  return (pageAgentState && pageAgentState.text) || '';
+}
+// Stop while the agents run, Start once they stopped or failed (except on the driver's own error, which needs serving the
+// page again), nothing while they stop, after the page closed or while the driver is gone.
+function pageAgentControl() {
+  var a = pageAgentState;
+  if (!a || pageDriverDown || pageIsStale) return '';
+  if (['idle', 'working', 'waiting', 'stalled'].indexOf(a.state) >= 0) return 'stop';
+  return (a.state === 'stopped' || a.state === 'failed') && a.kind !== 'driver' ? 'start' : '';
+}
+
+// The call to the page's server for what is not a message: the answers to requests, Stop and Start. Resolves when the
+// server accepted it; rejects with the server's reason, or with PAGE_UNSENT when the server could not be reached.
+function pageControl(method, params) {
+  return pageFetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: ++pageRpcCount, method: method, params: params || {} }) })
+    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      if (r.error) { if (r.error.code === -32001) pageStale(); throw new Error(r.error.message); }
+      return r.result;
+    }, function (error) { throw error && error.stale ? error : new Error(PAGE_UNSENT); });
+}
+function pageControlFailed(error) { if (!(error && error.stale)) pageFlash(error.message, 'error'); }
+
+// The pop-up (.pop) of a question to the user, over the page: the words in its header, a body, and buttons. It takes the
+// focus on the button at FOCUS and keeps it inside; Escape closes it; the focus then goes back to OPENER.
+//   o.role  dialog or alertdialog    o.title  the header    o.body  a node under it    o.buttons  [{ text, label, quiet, click }]
+function pageDialog(o) {
+  pageDialogClose();
+  var pop = pageEl('div', 'pop center'), row = pageEl('div', 'row2');
+  pop.setAttribute('role', o.role); pop.setAttribute('aria-label', o.title);
+  if (o.role === 'alertdialog') pop.setAttribute('aria-modal', 'true');
+  var buttons = o.buttons.map(function (b) {
+    var button = pageEl('button', 'btn' + (b.quiet ? ' btn--quiet' : ''), b.text);
+    button.type = 'button'; if (b.label) button.setAttribute('aria-label', b.label);
+    button.addEventListener('click', b.click);
+    row.append(button);
+    return button;
+  });
+  pop.append(pageEl('p', 'target', o.title)); if (o.body) pop.append(o.body); pop.append(row);
+  pop.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { e.preventDefault(); pageDialogClose(); return; }
+    if (e.key !== 'Tab') return;
+    var last = buttons.length - 1, at = buttons.indexOf(e.target);
+    if (e.shiftKey && at <= 0) { e.preventDefault(); buttons[last].focus(); }
+    else if (!e.shiftKey && at === last) { e.preventDefault(); buttons[0].focus(); }
+  });
+  document.body.append(pop);
+  pageDialogOpen = { pop: pop, opener: o.opener, approval: o.approval,
+    row: o.opener && o.opener.getAttribute ? o.opener.getAttribute('data-approval-for') : null };
+  buttons[o.focus].focus();
+}
+function pageDialogClose() {
+  var open = pageDialogOpen;
+  if (!open) return;
+  pageDialogOpen = null;
+  open.pop.remove();
+  // A redraw replaces the row the pop-up opened from: its new copy takes the focus.
+  var back = open.opener && document.contains(open.opener) ? open.opener : open.row ? document.querySelector('[data-approval-for="' + open.row + '"]') : null;
+  if (back) back.focus();
+}
+
+// The confirm before Stop. Only "Stop all agents" sends it.
+function pageStopAsk(opener) {
+  pageDialog({ role: 'alertdialog', title: 'Stop all agents?', opener: opener, focus: 1, body: pageEl('p', 'ask', PAGE_STOP_ASK), buttons: [
+    { text: 'Stop all agents', click: function () { pageDialogClose(); pageControl('agent_stop').catch(pageControlFailed); } },
+    { text: 'Cancel', quiet: true, click: pageDialogClose }
+  ] });
+}
+
+// One request in the pop-up: who wants what, the tool and its arguments as text, and one button for each answer it
+// offers. Each button's name says what it answers. The request stays until the driver says it is gone.
+function pageApprovalAsk(a, opener) {
+  var args = pageEl('pre', 'args');
+  args.textContent = a.tool + '\n' + a.arguments;
+  pageDialog({ role: 'dialog', title: a.who + ' wants ' + a.summary + '. Allow it?', opener: opener, approval: a.id, focus: 0, body: args,
+    buttons: a.options.map(function (choice, i) {
+      return { text: PAGE_CHOICES[choice], quiet: i > 0, label: PAGE_CHOICES[choice] + ': ' + a.who + ', ' + a.tool + ' ' + a.arguments,
+        click: function () {
+          var all = pageDialogOpen.pop.querySelectorAll('button');
+          all.forEach(function (b) { b.disabled = true; });
+          pageControl('permission_answer', { id: a.id, choice: choice }).then(pageDialogClose, function (error) {
+            all.forEach(function (b) { b.disabled = false; });
+            pageControlFailed(error);
+          });
+        } };
+    }) });
+}
+// The oldest waiting request of NAME's worker, or of anyone when no name is given. False when nothing waits.
+function pageOpenApproval(name, opener) {
+  var found = pageApprovals().filter(function (a) { return !name || a.who === name; })[0];
+  if (!found) return false;
+  pageApprovalAsk(found, opener || document.activeElement);
+  return true;
+}
+
+// The tab title starts with PAGE_WAITING while anything waits for the user: a request, or an entry of the conversation.
+// A page writes its own title when it redraws, so this runs at every poll and every redraw, and never doubles the prefix.
+function pageSetTitle() {
+  if (!pageDriven) return;
+  var title = String(document.title || ''), plain = title.indexOf(PAGE_WAITING) === 0 ? title.slice(PAGE_WAITING.length) : title;
+  var next = (pageApprovals().length || pageWaitingItems ? PAGE_WAITING : '') + plain;
+  if (next !== title) document.title = next;
+}
+
+// The Agents section: the page's own, or the same one made at the top of the side column. Returns it.
+function pageAgentSection() {
+  var section = document.querySelector('.agentsec');
+  if (section) return section;
+  section = pageEl('section', 'agentsec'); section.setAttribute('aria-labelledby', 'agents-h');
+  var top = pageEl('div', 'notes-top'), heading = pageEl('h2', 'section-h', 'Agents'), list = pageEl('ul', 'agents');
+  heading.id = 'agents-h'; list.id = 'agents';
+  top.append(heading); section.append(top, list);
+  var notes = document.querySelector('.notes');
+  notes.insertBefore(section, notes.firstChild);
+  return section;
+}
+// Stop or Start beside the Agents heading, and again in the bar pinned to the bottom of narrow windows, which also holds the
+// notice there. Made once; the poll sets them. Returns { buttons, notice, bar }.
+function pageAgentControls() {
+  var section = pageAgentSection(), bar = pageEl('div', 'pinbar'), notice = pageEl('p', 'pinbar-text');
+  notice.setAttribute('role', 'status'); bar.append(notice);
+  // Below 900 px the Agents section is out of view, so the bar also opens the oldest request (D18).
+  var open = pageEl('button', 'btn btn--sm pin-open'); open.type = 'button'; open.hidden = true; open.textContent = 'Open the request';
+  open.addEventListener('click', function () { pageOpenApproval(null, open); });
+  bar.append(open);
+  var buttons = [section.querySelector('.notes-top'), bar].map(function (host) {
+    var button = pageEl('button', 'btn btn--sm agent-ctl'); button.type = 'button'; button.hidden = true;
+    button.addEventListener('click', function () {
+      if (button.dataset.act === 'stop') pageStopAsk(button);
+      else pageControl('agent_start').catch(pageControlFailed);
+    });
+    host.append(button);
+    return button;
+  });
+  document.body.append(bar);
+  return { buttons: buttons, notice: notice, bar: bar, open: open };
+}
+function pageAgentDraw(chrome) {
+  var act = pageAgentControl(), notice = pageAgentNotice();
+  chrome.buttons.forEach(function (button) {
+    button.hidden = !act; button.dataset.act = act;
+    if (!act) return;
+    button.textContent = act === 'stop' ? 'Stop' : 'Start';
+    button.className = 'btn btn--sm agent-ctl ' + (act === 'stop' ? 'btn--stop' : 'btn--start');
+    button.setAttribute('aria-label', act === 'stop' ? 'Stop all agents' : 'Start all agents');
+  });
+  var waits = pageApprovals().length > 0;
+  chrome.open.hidden = !waits;
+  chrome.notice.textContent = notice || (waits ? PAGE_REQUEST_WAITS : '');
+  chrome.bar.hidden = !act && !notice && !waits;
+  pageAgentsRefresh();
+  pageSetTitle();
+  if (pageDialogOpen && pageDialogOpen.approval && !pageApprovals().some(function (a) { return a.id === pageDialogOpen.approval; })) pageDialogClose();
+}
+// The Agents list again, with the notice and the waiting rows as they are now, from the rows the page last gave it.
+function pageAgentsRefresh() {
+  var list = document.getElementById('agents');
+  if (!list) return;
+  var last = pageAgentRows || { rows: [], o: { now: Date.now() / 1000, empty: '' } }, before = pageAgentsHtml;
+  var html = pageAgents(last.rows, last.o);
+  if (html !== before) list.innerHTML = html;
 }
 
 function pageWatchDriver() {
-  var strip = document.getElementById('agent-status');
-  var controls = document.getElementById('agent-controls');
-  var stopped = pageDriverText({ kind: 'driver' });
-  var pending = null;
-  function show(text) {
-    strip.hidden = pageIsStale;
-    controls.hidden = pageIsStale || text === stopped;
-    if (strip.textContent !== text) strip.textContent = text;
-  }
+  var chrome = pageAgentControls(), pending = null;
+  function down() { pageDriverDown = true; pageAgentDraw(chrome); }
   function poll() {
-    if (pageIsStale) { strip.hidden = controls.hidden = true; return; }
-    if (pending) { pending.abort(); show(stopped); }
+    if (pageIsStale) { pageAgentDraw(chrome); return; }
+    if (pending) { pending.abort(); down(); }
     var request = pending = new AbortController();
     pageFetch('/agent', { signal: request.signal }).then(function (reply) {
       if (!reply.ok) throw new Error('Agent status unavailable');
       return reply.json();
     }).then(function (agent) {
-      if (pending === request) { pending = null; show(pageDriverText(agent)); }
-    }).catch(function () {
-      if (pending === request) { pending = null; show(stopped); }
+      if (pending !== request) return;
+      pending = null;
+      var changed = JSON.stringify([agent.blocked, agent.approvals]) !== JSON.stringify(pageAgentState && [pageAgentState.blocked, pageAgentState.approvals]);
+      pageAgentState = agent; pageDriverDown = agent.mark_age > 3; pageAgentDraw(chrome);
+      if (changed && pageThreadDraw) pageThreadDraw();
+    }).catch(function (error) {
+      if (pending !== request) return;
+      pending = null;
+      if (error && error.stale) pageAgentDraw(chrome); else down();
     });
     pagePollAgain(poll, 2000);
   }
+  // A press on a waiting worker's row opens its request, before the page's own handler for rows sees it.
+  document.addEventListener('click', function (e) {
+    var row = e.target.closest && e.target.closest('[data-approval-for]');
+    if (!row) return;
+    e.stopPropagation(); e.preventDefault();
+    pageOpenApproval(row.getAttribute('data-approval-for'), row);
+  }, true);
+  // Pages write their own title when they redraw: the prefix is put back whenever the title changes.
+  var title = document.querySelector('title');
+  if (title && typeof MutationObserver !== 'undefined') new MutationObserver(pageSetTitle).observe(title, { childList: true, characterData: true, subtree: true });
   pagePairing.then(poll);
 }
 if (pageDriven) pageWatchDriver();
@@ -285,15 +474,10 @@ function pageConversation(o) {
   var status = document.querySelector('.notes .status');
   function say(text, error) { if (!status) return; status.textContent = text; status.classList.toggle('error', !!error); }
   // Every action shows a toast at the bottom of the window: sending, then sent or failed.
-  var toast = document.querySelector('.toast'), toastTimer = null;
-  function flash(text, kind) {
-    clearTimeout(toastTimer);
-    toast.textContent = text; toast.className = 'toast ' + (kind || ''); toast.hidden = false;
-    if (kind !== 'error' && kind !== 'busy') toastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
-  }
+  var flash = pageFlash;
   // DONE runs once the server saved the action; FAIL when it did not, such as to enable a button again. The user's text
   // stays where it was typed: DONE is what clears it. A refusal by the server, such as an event its schema rejects, shows
-  // the server's reason; only an unreachable server is shown as closed.
+  // the server's reason; when it cannot be reached, the send may or may not have arrived.
   function send(method, params, what, done, fail) {
     if (o.readOnly) return;
     var event = Object.assign({ type: method, at: new Date().toISOString().slice(0, 19) + 'Z', by: 'user' }, params);
@@ -312,8 +496,8 @@ function pageConversation(o) {
       }, function (error) {
         undo();
         var refused = error && error.refused;
-        flash('Not sent: ' + what.toLowerCase() + '. ' + (refused ? error.message : 'The page is closed.'), 'error');
-        say(refused ? 'Not sent: ' + error.message : 'Not sent: the page is closed. Ask the ' + pageRole() + ' to restart it.', true);
+        flash(refused ? 'Not sent: ' + what.toLowerCase() + '. ' + error.message : PAGE_UNSENT, 'error');
+        say(refused ? 'Not sent: ' + error.message : PAGE_UNSENT, true);
         if (fail) fail();
       });
   }
@@ -439,7 +623,8 @@ function pageConversation(o) {
         f.append(ans);
       }
       li.append(f);
-      if (state[e.id]) li.dataset.state = state[e.id];
+      // The edge shows the state the footer's mark shows, whatever the page maps a state to.
+      if (state[e.id]) li.dataset.state = o.shown ? o.shown(state[e.id]) : state[e.id];
     }
     if (e.id) li.dataset.id = e.id;
     return li;
@@ -473,6 +658,11 @@ function pageConversation(o) {
       if (k.focus && document.contains(ta)) { ta.focus({ preventScroll: true }); ta.setSelectionRange(k.start, k.end); }
     });
     if (filter === 'open' && started && !entries.length) thread.appendChild(el('li', 'sys', 'Nothing open: you accepted everything.'));
+    // A call that auto mode blocked has nothing to answer: a notice, last, which says what to do instead.
+    if (pageAgentState) (pageAgentState.blocked || []).forEach(function (b) {
+      thread.appendChild(el('li', 'sys', 'Auto mode blocked ' + b.tool + ' ' + b.arguments + ' (' + b.reason + '). Run it yourself, or tell the agent how to go on.'));
+    });
+    pageWaitingItems = model.waiting.length; pageSetTitle();
     // The conversation opens on its latest message, and follows new ones while the user is at the bottom. The scroll
     // repeats on the next frame and once fonts load, which can make the thread taller after this render.
     if (stick || !scrolledOnce) {
@@ -482,6 +672,7 @@ function pageConversation(o) {
     }
     if (o.rendered) o.rendered(state);
   }
+  pageThreadDraw = renderThread;
   // Reply under a finished item from elsewhere on the page, such as its pin: the item comes into view with the box open.
   function reopen(id) {
     if (filter === 'open' && state[id] === 'accepted') document.querySelector('[data-filter="all"]').click();
@@ -641,7 +832,7 @@ function pageThread(log, itemKinds, waiting, latestLast) {
   var open = entries.filter(function (c) {
     return c.items.some(function (id) { return state[id] !== 'accepted'; }) || waits(c);
   });
-  return { state: state, entries: entries, open: open };
+  return { state: state, entries: entries, open: open, waiting: entries.filter(waits) };
 }
 
 // ---------- Markdown in messages ----------
@@ -1110,18 +1301,38 @@ function pageAgents(rows, o) {
     var n = Math.floor((now - (typeof at === 'number' ? at : Date.parse(at))) / 60000);
     return isFinite(n) ? Math.max(0, n) : null;
   }
-  if (!rows.length) return '<li class="muted">' + pageEscape(o.empty) + '</li>';
-  return rows.map(function (r) {
+  // The agents that wait for the user come first, each with the wait chip and a press that opens its request; one the page
+  // has no row for gets a row of its own. Without a driver nothing waits and the rows are as given.
+  var waiting = pageWaitingWorkers().map(function (w) { return w.name; });
+  var given = rows;
+  rows = rows.slice();
+  waiting.forEach(function (name) {
+    if (!rows.some(function (r) { return r.who === name; })) rows.push({ who: name, what: (pageAgentState.workers || []).filter(function (w) { return w.name === name; })[0].item });
+  });
+  rows = rows.filter(function (r) { return waiting.indexOf(r.who) >= 0; }).concat(rows.filter(function (r) { return waiting.indexOf(r.who) < 0; }));
+  var notice = pageAgentNotice();
+  pageAgentRows = { rows: given, o: o };
+  // A request from an agent that has no row here, the page's own, has no row to press: a row with its sentence and a button
+  // instead. It is not the state notice, which narrow windows show in the pinned bar, so it stays in the list at every width.
+  var own = pageApprovals().filter(function (a) { return !(pageAgentState.workers || []).some(function (w) { return w.name === a.who; }); })[0];
+  var list = (notice ? '<li class="notice" role="status"><div>' + pageEscape(notice) + '</div></li>' : '') +
+    (own ? '<li><div>' + pageEscape(PAGE_OWN_WAITING) + '<button type="button" class="btn btn--sm" data-approval-for="' + pageEscape(own.who) + '">Open the request</button></div></li>' : '') +
+    rows.map(function (r) {
+    var waits = waiting.indexOf(r.who) >= 0;
     var attrs = Object.keys(r.data || {}).map(function (k) { return ' data-' + pageEscape(k) + '="' + pageEscape(r.data[k]) + '"'; }).join('');
-    var tag = (r.data ? 'button type="button"' : 'div') + (r.kind ? ' class="' + pageEscape(r.kind) + '"' : '') + attrs;
+    var tag = (r.data || waits ? 'button type="button"' : 'div') + (r.kind ? ' class="' + pageEscape(r.kind) + '"' : '') + attrs +
+      (waits ? ' data-approval-for="' + pageEscape(r.who) + '"' : '');
     var age = r.since != null ? minutes(r.since) : null, quiet = r.last != null ? minutes(r.last) : null;
     return '<li><' + tag + '><b>' + pageEscape(r.who) + '</b><span dir="auto">' + pageEscape(r.what) + '</span>' +
-      (age !== null ? '<span class="chip working">' + pageEscape(r.state || 'Working') + ', ' + age + ' min</span>' : '') +
+      (waits ? '<span class="chip wait">Waiting for you</span>' : age !== null ? '<span class="chip working">' + pageEscape(r.state || 'Working') + ', ' + age + ' min</span>' : '') +
       (r.second ? '<em class="second">second try</em>' : '') +
       (quiet !== null && o.quietAfter > 0 && quiet * 60 >= o.quietAfter ? '<em class="dry">No word from ' + pageEscape(r.who) + ' for ' + quiet + ' min</em>' : '') +
       (r.note ? '<em class="dry">' + pageEscape(r.note) + '</em>' : '') +
-      '</' + (r.data ? 'button' : 'div') + '></li>';
+      '</' + (r.data || waits ? 'button' : 'div') + '></li>';
   }).join('');
+  if (!list && o.empty) list = '<li class="muted">' + pageEscape(o.empty) + '</li>';
+  pageAgentsHtml = list;
+  return list;
 }
 
 // The details pop-up (.qpop) of a page, one at a time, over the page: it opens with its title in focus, keeps Tab inside

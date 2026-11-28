@@ -141,6 +141,8 @@ var canvasDescribe = (function () {
         }
       }
     };
+    // Each real pointer event is said to the page, which acts on a click only soon after one.
+    document.addEventListener('pointerup', e => { if (e.isTrusted) port.postMessage({kind: 'pointer'}); }, true);
     document.addEventListener('click', e => {
       if (!e.isTrusted || !(e.target instanceof Element)) return;
       const found = Array.from(pins).find(entry => entry[1].contains(e.target));

@@ -366,7 +366,7 @@ document.addEventListener("submit", ev => {
 });
 document.addEventListener("click", ev => {
   const t = ev.target;
-  if (t.closest("#to-waiting")) { const q = document.querySelector("#thread .open-q"); if (!q) return;
+  if (t.closest("#to-waiting")) { if (pageOpenApproval()) return; const q = document.querySelector("#thread .open-q"); if (!q) return;
     q.scrollIntoView({block: "start"}); const b = q.querySelector(".change"); if (b) b.focus({preventScroll: true}); return; }
   const r = t.closest("[data-range]");
   if (r) { RANGE = r.dataset.range; drawRange(); if (D) drawTables(D); return; }
@@ -399,7 +399,7 @@ function render(d) {
   // A question the user answered in the page no longer waits for them, even before the coordinator applies the answer.
   // It waits again when the coordinator asked back about the answer.
   conv.setLog(pageDecisionEvents(d.decisions, d.conversation), (d.decisions || []).map(x => [x.id, x.status, x.answer, x.decision, x._changed]));
-  const waitingN = pageOpenDecisions(d.decisions, d.conversation).length;
+  const waitingN = pageOpenDecisions(d.decisions, d.conversation).length + pageApprovals().length;
   const stat = (n, label, cls) => `<span class="stat${cls ? " " + cls : ""}"><b>${n}</b>${label}</span>`;
   setHTML($("status"), (tasks.length ? `<span class="stat"><b>${done}<span class="of"> / ${tasks.length}</span></b>tasks done
       <span class="meter" aria-hidden="true"><i style="width:${(100 * done / tasks.length).toFixed(0)}%"></i></span></span>` : "")
