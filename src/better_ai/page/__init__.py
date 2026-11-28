@@ -1494,6 +1494,7 @@ def serve(args: argparse.Namespace, run: cli.Run) -> int:
                 )
             note = read_note(run)
             settle_old_server(unit, state)
+            stop_orphan(unit)
             report_last_end(run, unit)
             refuse_repeat(unit, run.info.hash)
         except Refused as error:
@@ -1588,6 +1589,13 @@ def settle_old_server(unit: Unit, state: dict) -> None:
     address = served_address(unit)
     if address and server_answer(unit, 0.5) is None:
         remove_if_ours(unit, ADDRESS, address.encode())
+
+
+def stop_orphan(unit: Unit) -> None:
+    """End the harness process an earlier server left behind, and record that, before the driver looks at the unit."""
+    from .driver_state import end_orphan_child
+
+    end_orphan_child(unit)
 
 
 def clock(moment: Any) -> str:

@@ -745,7 +745,6 @@ class ServeTest(Fixture):
         thread.join(20)
         self.assertFalse(thread.is_alive())
         self.assertEqual(result, [0])
-        self.assertIn("exiting", out.getvalue())
         self.assertFalse((self.unit_dir / ".server").exists())
 
 

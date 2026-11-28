@@ -1097,7 +1097,9 @@ class Verbs(unittest.TestCase):
             ):
                 runner = serve_until_stopped(board_dir, io.StringIO())
                 for _ in range(200):  # the driver is up once it has written its session
-                    if (board_dir / ".driver").exists() and "session" in (board_dir / ".driver").read_text():
+                    if (board_dir / ".driver").exists() and json.loads((board_dir / ".driver").read_text()).get(
+                        "session"
+                    ):
                         break
                     time.sleep(0.05)
                 os.environ["BETTER_PAGE_SESSION"] = json.loads((board_dir / ".driver").read_text())["session"]
