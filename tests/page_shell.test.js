@@ -1065,6 +1065,16 @@ test('S19 the check closes after a 6-second window with its own Undo, and two cl
   assert.deepEqual(actions(p.rowOf('m2')).map(b => b.textContent), ['Reopen']);
 });
 
+test('S19 a close in its undo window keeps the page busy, so a new render does not reload it away', () => {
+  const p = panel(EVERY_STATE);
+  assert.equal(p.conv.busy(), false);
+  actions(p.rowOf('m2')).find(b => b.textContent === '✓').click();
+  assert.equal(p.conv.busy(), true);
+  p.tick(6000);
+  assert.deepEqual(p.sent().map(e => [e.type, e.to]), [['accept', 'm2']]);
+  assert.equal(p.conv.busy(), false);
+});
+
 test('S19 after the window the focus goes to the head of the row now in its place', () => {
   const p = panel(EVERY_STATE);
   actions(p.rowOf('m2')).find(b => b.textContent === '✓').click();
