@@ -95,7 +95,7 @@ NOTICES = {
     "stopping": "The agents are stopping.",
     "stalled": "The agents have shown no output for 10 minutes. Press Stop to end them, or keep waiting.",
     "idle": "This page is closed after 30 minutes with no activity. Ask the agent in your chat to reopen it.",
-    "closed": "This page has closed: {}.",
+    "closed": "This page has closed: {}. Ask the agent in your chat to reopen it.",
 }
 
 # What an approval asks for, in the words after "<who> wants".
