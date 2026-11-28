@@ -122,6 +122,19 @@ class LogicFlowChecks(unittest.TestCase):
         self.assertIn("'ok'", found)
         self.assertIn("label", found)
 
+    def test_a_start_replaced_between_versions_is_one_start_in_each(self):
+        design = example()
+        flow = logic(design)
+        flow["nodes"][0]["in"] = ["before"]
+        flow["edges"][0]["in"] = ["before"]
+        flow["nodes"].append({"id": "start2", "type": "start", "in": ["after"]})
+        flow["edges"].append({"id": "e-s2", "from": "start2", "to": "draft", "in": ["after"]})
+        self.assertEqual(diagram.validate(design), [])
+        design = example()
+        logic(design)["nodes"][0]["in"] = ["after"]
+        logic(design)["edges"][0]["in"] = ["after"]
+        self.assertIn("start", errors(design))  # Before draws the flow with no start
+
     def test_logic_flow_needs_one_start(self):
         design = example()
         logic(design)["nodes"].append({"id": "start2", "type": "start"})
@@ -260,6 +273,16 @@ class LogicFlowDrawing(unittest.TestCase):
                 for s in parts:
                     self.assertFalse(through(s, rect), (ident, other, s))
 
+    def test_two_loops_on_one_node_are_drawn_apart(self):
+        self.flow["edges"].append({"id": "e-ping", "from": "wait", "to": "wait", "label": "heartbeat"})
+        shape = diagram.logic_layout(self.flow, self.layout)
+        remind, ping = shape["loops"]["e-remind"], shape["loops"]["e-ping"]
+        self.assertNotEqual(remind["paths"], ping["paths"])
+        self.assertFalse(overlap(shape["label_boxes"]["e-remind"], shape["label_boxes"]["e-ping"]))
+        for s in segments(remind["paths"][0]):
+            for t in segments(ping["paths"][0]):
+                self.assertFalse(cross(s, t), (s, t))
+
     def test_logic_before_after(self):
         before, after = self.svg("before"), self.svg("after")
         new = diagram.part_id(f"{self.view}-after", "step", "e-auto")
@@ -358,6 +381,17 @@ class Groupings(unittest.TestCase):
         self.assertIn("Crosses a trust boundary", ET.tostring(root, encoding="unicode"))
         plain = ET.tostring(ET.fromstring(diagram.drawings(design)["containers-after.svg"]), encoding="unicode")
         self.assertNotIn("crossing", plain)
+
+    def test_a_trust_group_marks_crossings_only_in_the_versions_it_exists_in(self):
+        design = example()
+        groups = design["containers"]["groups"]
+        design["containers"]["groups"] = [g for g in groups if g["id"] != "vendor"]  # the model is in no trust group
+        next(g for g in design["containers"]["groups"] if g["id"] == "local")["in"] = ["after"]
+        files = diagram.drawings(design)
+        for state, marked in (("before", False), ("after", True)):
+            root = ET.fromstring(files[f"containers-trust-{state}.svg"])
+            edge = root.find(f".//*[@id='ctrust-{state}-edge-prompt']", NS)
+            self.assertEqual(edge.find(".//*[@class='crossing']", NS) is not None, marked, state)
 
     def test_overlay_switch(self):
         overlays = [{"id": "trust", "name": "Trust"}, {"id": "runs", "name": "Where it runs"}]

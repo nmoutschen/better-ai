@@ -255,7 +255,11 @@ def _logic_problems(flow, number, box_ids, drawn, index, reference) -> list[tupl
     problems: list[tuple[str, str]] = []
     where, field = f"Flow {number + 1}", f"flows[{number}]"
     nodes, edges = flow["nodes"], flow["edges"]
-    index([*nodes, *edges], f"{where} nodes and edges", f"{field}.nodes")
+    index(nodes, f"{where} nodes", f"{field}.nodes")
+    node_and_edge = index(edges, f"{where} edges", f"{field}.edges") & {node["id"] for node in nodes}
+    for at, edge in enumerate(edges):
+        if edge["id"] in node_and_edge:
+            problems.append((f"{field}.edges[{at}].id", f"{where} edges: Duplicate id {edge['id']!r} (also a node)"))
     node_ids = {node["id"] for node in nodes}
     kinds = {node["id"]: node["type"] for node in nodes}
     for at, node in enumerate(nodes):
@@ -264,9 +268,6 @@ def _logic_problems(flow, number, box_ids, drawn, index, reference) -> list[tupl
     for at, edge in enumerate(edges):
         for key in ("from", "to"):
             reference(edge, key, node_ids, f"{where} edge", f"{field}.edges[{at}]")
-    starts = [node["id"] for node in nodes if node["type"] == "start"]
-    if len(starts) != 1:
-        problems.append((f"{field}.nodes", f"{where}: needs exactly one start node, has {len(starts)}"))
     for at, edge in enumerate(edges):
         if kinds.get(edge["from"]) == "exit":
             problems.append((f"{field}.edges[{at}]", f"{where} edge {edge['id']!r}: an exit has no outgoing edge"))
@@ -276,6 +277,9 @@ def _logic_problems(flow, number, box_ids, drawn, index, reference) -> list[tupl
         if not exists_in(flow, state):
             continue
         here = {node["id"] for node in nodes if exists_in(node, state)}
+        starts = [node["id"] for node in nodes if node["type"] == "start" and node["id"] in here]
+        if len(starts) != 1:
+            found.setdefault(("", "flow", f"needs exactly one start node, has {len(starts)}"), []).append(state)
         links = [e for e in edges if exists_in(e, state) and e["from"] in here and e["to"] in here]
         outgoing: dict[str, list[dict]] = {}
         for edge in links:
@@ -290,7 +294,7 @@ def _logic_problems(flow, number, box_ids, drawn, index, reference) -> list[tupl
                 if not edge.get("label"):
                     message = f"outcome {edge['id']!r} needs a label"
                     found.setdefault((node, "decision", message), []).append(state)
-        if len(starts) != 1 or starts[0] not in here:
+        if len(starts) != 1:
             continue
         reached, pending = set(), [starts[0]]
         while pending:
@@ -313,7 +317,8 @@ def _logic_problems(flow, number, box_ids, drawn, index, reference) -> list[tupl
             elif node not in ending:
                 found.setdefault((node, "node", "cannot reach an exit"), []).append(state)
     for (node, what, message), states in found.items():
-        problems.append((f"{field}.nodes", f"{where} {what} {node!r}: {message} (in {', '.join(states)})"))
+        subject = f"{where}" if what == "flow" else f"{where} {what} {node!r}"
+        problems.append((f"{field}.nodes", f"{subject}: {message} (in {', '.join(states)})"))
     return problems
 
 

@@ -618,7 +618,8 @@ def svg_containers(layout: dict, state: str, overlay: str = "systems") -> str:
     box_marks, edge_marks = [], []
     zone = {}
     for group, x, y, gw, gh in geometry["groups"]:
-        zone.update(dict.fromkeys(group["members"], group["id"]))
+        if exists(group, state):  # a removed trust group no longer decides what crosses a boundary
+            zone.update(dict.fromkeys(group["members"], group["id"]))
         if visible(group, state):
             out.extend(draw_group(group, x, y, gw, gh, prefix, appearance(group, state)))
     layout = {**layout, **geometry}
@@ -1087,17 +1088,21 @@ def _place_logic(flow, nodes, back, forward, level, jumps, no_arc, boxes_of):
                 "paths": [[(sx, sy), (sx, sy - 13)], [(tx, ty - 13), (tx, ty)]],
                 "label_at": (sx + 14, sy - 18),
             }
+    rank = {}
     for edge in flow["edges"]:
         if edge["from"] == edge["to"]:
+            # Several loops on one node nest: each next one rises higher, reaches further out and comes back lower.
+            k = rank[edge["from"]] = rank.get(edge["from"], -1) + 1
             bx, by_, bw, _ = boxes[edge["from"]]
+            rise, out, back = 14 + 16 * k, 14 + 12 * k, 8 + 8 * k
             path = [
-                (bx + bw - 36, by_),
-                (bx + bw - 36, by_ - 14),
-                (bx + bw + 14, by_ - 14),
-                (bx + bw + 14, by_ + 8),
-                (bx + bw, by_ + 8),
+                (bx + bw - 36 - 12 * k, by_),
+                (bx + bw - 36 - 12 * k, by_ - rise),
+                (bx + bw + out, by_ - rise),
+                (bx + bw + out, by_ + back),
+                (bx + bw, by_ + back),
             ]
-            loops[edge["id"]] = {"kind": "self", "paths": [path], "label_at": (bx + bw + 20, by_ - 20)}
+            loops[edge["id"]] = {"kind": "self", "paths": [path], "label_at": (bx + bw + out + 6, by_ - rise - 6)}
     for ident, loop in loops.items():
         lines = wrap(edges[ident].get("label", ""), LABEL, GAP - 70) + (["REMOVED"] if removable(edges[ident]) else [])
         loop["lines"] = lines
