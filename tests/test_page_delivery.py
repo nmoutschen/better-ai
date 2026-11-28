@@ -111,6 +111,29 @@ class DeliveryTest(shell.Fixture):
         expected = [{**item, "status": {0: "working", 1: "seen"}.get(n, "new")} for n, item in enumerate(sent[:-1])]
         self.assertEqual(records, [*expected, sent[-1]])
 
+    def test_rpc_edits_to_excluded_states_reach_pending_with_their_state(self):
+        _, host = self.serve()
+        states = ["working", "asked", "done", "accepted"]
+        for number, state in enumerate([*states, "stale"], 1):
+            self.assertEqual(
+                self.rpc(host, "comment", {"id": f"c{number}", "n": number, "on": {}, "text": state}).get("result"),
+                "saved",
+            )
+        for number, state in enumerate([*states, "working"], 1):
+            self.assertEqual(self.cli("status", self.unit_arg, state, f"c{number}", "--text", stdin="Agreed")[0], 0)
+        for number, state in enumerate(states, 1):
+            self.assertEqual(
+                self.rpc(host, "comment", {"id": f"c{number}", "n": number, "on": {}, "text": f"edited {state}"}).get(
+                    "result"
+                ),
+                "saved",
+            )
+        expected = [(f"c{number}", state, f"edited {state}") for number, state in enumerate(states, 1)]
+        code, out, err = self.cli("pending", self.unit_arg)
+        self.assertEqual((code, err), (0, ""))
+        lines = out.splitlines()[:-1]
+        self.assertEqual([(item["id"], item["status"], item["text"]) for item in map(json.loads, lines)], expected)
+
     def test_pending_reads_all_sent_ids_once_active_prompt_items_are_seen(self):
         self.conv = shell.page.Conversation(self.unit(), self.spec, self.docs)
         self.seed(note("unrelated"), status("unrelated", "seen"), *(note(f"m{n}") for n in range(25)))

@@ -10,7 +10,7 @@ It answers `--version`, and the stream-json messages the Claude Code adapter sen
     linger         keep running after stdin closes
     ask            ask for approval of a Bash command before the first reply
 
-STUB_LOG, if set, is a file the stub appends its process id and command line to.
+STUB_LOG, if set, is a file the stub appends its process id, its BETTER_PAGE_SESSION and its command line to.
 """
 
 import json
@@ -40,7 +40,7 @@ def main(argv):
         return 0
     if os.environ.get("STUB_LOG"):
         with open(os.environ["STUB_LOG"], "a") as log:
-            log.write(f"{os.getpid()} {' '.join(argv)}\n")
+            log.write(f"{os.getpid()} {os.environ.get('BETTER_PAGE_SESSION')} {' '.join(argv)}\n")
     session = session_of(argv)
     turn = 0
     for line in sys.stdin:

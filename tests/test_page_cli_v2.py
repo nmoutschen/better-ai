@@ -490,26 +490,24 @@ def better_unit(root, folder):
 class DriverErrorTest(Unit):
     BOOT = "from better_ai.page import driver\n\ndef boom(self, *args):\n    raise RuntimeError('boom')\n\ndriver.Driver._open = boom\n"
 
-    def test_the_same_driver_error_refuses_the_serve_after_it_came_back_twice(self):  # S106, S107
+    def test_the_same_driver_error_that_ended_two_serves_refuses_the_third(self):  # S106, S107
         first = self.serve(boot=self.BOOT)
         self.assertEqual(first.returncode, 1, first.stdout)
         self.assertRegex(first.stdout, r"^driver: off driver: boom; see \S+\.driver\.log\n$")
         self.assertNotIn("the last session ended", first.stderr)
         second = self.serve(boot=self.BOOT)
         self.assertRegex(second.stderr, r"the last session ended at \d\d:\d\d: .*boom")
-        self.assertEqual(self.serve(boot=self.BOOT).returncode, 1)
-        self.assertEqual(self.state()["ended"]["repeats"], 2)
-        fourth = self.serve(boot=self.BOOT)
-        self.assertEqual(fourth.returncode, 1)
+        third = self.serve(boot=self.BOOT)
+        self.assertEqual(third.returncode, 1)
         self.assertRegex(
-            fourth.stdout,
+            third.stdout,
             r"^driver: off driver: the same error came back: .*boom; see \S+; this is a better-ai problem\n$",
         )
 
     def test_a_changed_build_is_not_refused(self):  # S106
-        for _ in range(3):
+        for _ in range(2):
             self.serve(boot=self.BOOT)
-        self.assertEqual(self.state()["ended"]["repeats"], 2)
+        self.assertEqual(self.state()["ended"]["repeats"], 1)
         self.assertEqual(self.serve().returncode, 1)  # the same program: refused
         update = json.loads((self.folder / ".driver").read_text())
         update["ended"]["build"] = "an older build"
@@ -596,6 +594,146 @@ class VerbNoticeTest(Unit):
                 done = self.verb(*args, stdin="yes", env=env)
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
                 self.assertIn("cannot record an acceptance", done.stderr)
+
+
+def session_in_log(log: Path) -> str:
+    """The BETTER_PAGE_SESSION the last harness process started with, from the stub's log."""
+    return log.read_text().splitlines()[-1].split()[1]
+
+
+class PageAgentTest(Unit):
+    def test_the_page_agent_may_write_after_a_resume(self):  # S80, round 1 B1
+        log = self.root / "stub.log"
+        env = stub_env(STUB_LOG=str(log))
+        self.served(env=env)
+        os.kill(self.state()["server_pid"], signal.SIGTERM)
+        self.assertTrue(wait_for(lambda: not (self.folder / ".server").exists()))
+        self.served(env=env)
+        tag = session_in_log(log)
+        done = self.verb("reply", ".show/deck", stdin="from the page agent", env=stub_env(BETTER_PAGE_SESSION=tag))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("its own agent", done.stdout + done.stderr)
+        chat = self.verb("reply", ".show/deck", stdin="from the chat")
+        self.assertEqual(chat.returncode, 4)
+
+
+class SpellingsTest(Unit):
+    """One unit has many spellings; each is the same unit to the notice, the refusal and the old-server check."""
+
+    def spellings(self):
+        link = self.root.parent / f"link-{self.root.name}"
+        link.symlink_to(self.root)
+        self.addCleanup(link.unlink)
+        sub = self.root / "sub"
+        sub.mkdir()
+        return [
+            (".show/deck/", self.root),
+            ("./.show/deck", self.root),
+            (str(self.folder), self.root),
+            ("../.show/deck", sub),
+            (str(link / ".show" / "deck"), self.root),
+        ]
+
+    def run_in(self, cwd, *args, stdin=""):
+        return subprocess.run(
+            better.command(*args), cwd=cwd, env=stub_env(), input=stdin, capture_output=True, text=True, timeout=60
+        )
+
+    def serve_as(self, spelling, cwd):
+        return subprocess.run(
+            better.command("serve", spelling, "--no-browser"),
+            cwd=cwd,
+            env=stub_env(),
+            input="",
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def test_a_chat_agent_is_refused_whatever_the_spelling_the_server_was_started_with(self):  # S37, S80
+        for spelling, cwd in self.spellings():
+            with self.subTest(spelling):
+                done = self.serve_as(spelling, cwd)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                for other, other_cwd in self.spellings():
+                    chat = self.run_in(other_cwd, "reply", other, stdin="hi")
+                    self.assertEqual(chat.returncode, 4, f"{other}: {chat.stdout}{chat.stderr}")
+                    self.assertIn("its own agent", chat.stderr)
+                self.end_everything()
+                (self.folder / ".server").unlink(missing_ok=True)
+
+    def test_a_second_serve_in_any_spelling_finds_the_server(self):  # S28
+        self.assertEqual(self.serve_as(".show/deck/", self.root).returncode, 0)
+        for spelling, cwd in self.spellings():
+            with self.subTest(spelling):
+                done = self.serve_as(spelling, cwd)
+                self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+
+    def test_a_stopped_server_served_as_another_spelling_is_ended(self):  # S108
+        for spelling, cwd in self.spellings():
+            with self.subTest(spelling):
+                self.assertEqual(self.serve_as(".show/deck/", self.root).returncode, 0)
+                old = self.state()["server_pid"]
+                os.kill(old, signal.SIGSTOP)
+                done = self.serve_as(spelling, cwd)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertTrue(wait_for(lambda pid=old: not alive(pid)))
+                self.end_everything()
+                (self.folder / ".server").unlink(missing_ok=True)
+
+
+class MachineOutputTest(Unit):
+    def test_no_machine_read_verb_gets_the_notice_on_stdout(self):  # S37, round 1 B4
+        from unittest import mock
+
+        from better_ai import cli, page, resources
+
+        machine = {}
+        for skill in (
+            "architect-better",
+            "code-better",
+            "design-better",
+            "discover-better",
+            "research-better",
+            "show-better",
+        ):
+            os.environ["BETTER_AI_SKILL"] = skill
+            loaded = cli.load(resources.build_info())
+            for verb in cli._verbs_of(loaded):
+                if verb.machine_output:
+                    machine.setdefault(verb.name, []).append(skill)
+        self.assertEqual(set(machine), {"pending", "render", "summary", "specs"})
+        os.environ["BETTER_AI_SKILL"] = "show-better"
+        unit = better_unit(self.root, self.folder)
+        alive_state = {"alive": {"session": "s", "state": "idle", "since": 0, "waiting": 0}}
+        for name in machine:
+            with self.subTest(name), mock.patch.object(page, "live_server", return_value=alive_state):
+                out, err = [], []
+                run = cli.Run(cli.load(resources.build_info()), resources.build_info())
+                run.out, run.err = out.append, err.append
+                verb = next(v for v in cli.VERBS if v.name == name)
+                args = type("Args", (), {"_verb": verb, "unit": str(unit.path)})()
+                self.assertIsNone(page.drive_guard(args, run))
+                self.assertEqual(out, [])
+                self.assertTrue(err)
+
+
+class WaitingNoticeTest(Unit):
+    def test_the_notice_says_the_agent_waits_for_an_approval_since_when(self):  # S122
+        from better_ai import page
+
+        unit = better_unit(self.root, self.folder)
+        since = time.mktime((2026, 11, 28, 14, 2, 0, 0, 0, -1))
+        state = {"alive": {"session": "s", "state": "waiting", "since": since, "waiting": 1}}
+        self.assertIn("this page's agent is waiting for your approval since 14:02", page.notice_text(unit, state))
+
+    def test_a_real_open_approval_shows_in_the_notice(self):  # S122
+        done = self.served(env=stub_env(STUB_MODE="ask"))
+        secret = self.pair(done)
+        self.request("POST", "/rpc", {"jsonrpc": "2.0", "id": 1, "method": "note", "params": NOTE}, secret)
+        self.assertTrue(wait_for(lambda: json.loads(self.request("GET", "/alive")[1])["state"] == "waiting", 20))
+        check = self.verb("check", ".show/deck")
+        self.assertRegex(check.stdout, r"this page's agent is waiting for your approval since \d\d:\d\d")
 
 
 class PendingTest(Unit):
