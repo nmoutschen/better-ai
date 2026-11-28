@@ -9,7 +9,9 @@ It answers `--version`, and the stream-json messages the Claude Code adapter sen
     old            report a version below the minimum
     linger         keep running after stdin closes
     ask            ask for approval of a Bash command and wait for the answer before the first reply
+    cancel         ask for approval of a Bash command, then cancel the request itself a second later
 
+STUB_DUMP, if set, is a file the stub appends its environment and every line it reads to.
 STUB_LOG, if set, is a file the stub appends its process id, its BETTER_PAGE_SESSION and its command line to.
 """
 
@@ -53,9 +55,15 @@ def main(argv):
     if os.environ.get("STUB_LOG"):
         with open(os.environ["STUB_LOG"], "a") as log:
             log.write(f"{os.getpid()} {os.environ.get('BETTER_PAGE_SESSION')} {' '.join(argv)}\n")
+    if os.environ.get("STUB_DUMP"):
+        with open(os.environ["STUB_DUMP"], "a") as dump:
+            dump.write(json.dumps(dict(os.environ)) + "\n")
     session = session_of(argv)
     turn = 0
     for line in sys.stdin:
+        if os.environ.get("STUB_DUMP"):
+            with open(os.environ["STUB_DUMP"], "a") as dump:
+                dump.write(line)
         if MODE == "hang":
             time.sleep(600)
         try:
@@ -78,7 +86,7 @@ def main(argv):
         elif message.get("type") == "user":
             turn += 1
             say({"type": "system", "subtype": "init", "session_id": session, "permissionMode": "default"})
-            if MODE == "ask" and turn == 1:
+            if MODE in ("ask", "cancel") and turn == 1:
                 say(
                     {
                         "type": "control_request",
@@ -86,6 +94,10 @@ def main(argv):
                         "request": {"subtype": "can_use_tool", "tool_name": "Bash", "input": {"command": "ls"}},
                     }
                 )
+                if MODE == "cancel":
+                    time.sleep(1)
+                    say({"type": "control_cancel_request", "request_id": "ask-1"})
+                    finish_turn(session)
                 continue  # the turn goes on once the approval is answered
             finish_turn(session)
     if MODE == "linger":
