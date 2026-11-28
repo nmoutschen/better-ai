@@ -596,6 +596,21 @@ for (const [method, params] of [
   });
 }
 
+test('once the log shows a send the server saved without answering, the same text later is a new event with a new id', async () => {
+  // verifier-t2b B3: the reply to "yes" is lost, but the server saved it; the user later sends "yes" again, for a new question.
+  const restore = ticking();
+  try {
+    const { conv, sent } = conversationOn(lostThenSaved());
+    conv.send('note', { id: 'm-first', text: 'yes', to: null }, 'Send');
+    await nextTick();
+    conv.setLog([{ type: 'note', id: 'm-first', text: 'yes', to: null, at: '2026-11-28T15:00:00Z' }], 'k1');
+    conv.send('note', { id: 'm-later', text: 'yes', to: null }, 'Send');
+    await nextTick();
+    assert.equal(sent.length, 2);
+    assert.equal(sent[1].params.id, 'm-later', 'the saved send is not reused');
+  } finally { restore(); }
+});
+
 test('a different text is a different send, with its own id', async () => {
   const { conv, sent } = conversationOn(unreachable);
   conv.send('note', { id: 'a', text: 'one', to: null }, 'Message');
