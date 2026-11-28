@@ -553,7 +553,7 @@ test('an unusable time or a missing clock leaves the age out and never shows NaN
 // The reply to the first send is lost; the user presses Send again. Every path makes its id when the user clicks, so the
 // page keeps the id of a send the server has not confirmed, and the server stores the event once.
 const lostThenSaved = () => { let n = 0; return () => (++n === 1 ? unreachable() : saved()); };
-const ticking = () => { const real = context.Date; let t = 1000; context.Date = class extends real { static now() { return ++t; } }; return () => { context.Date = real; }; };
+const ticking = () => { let t = 1000; context.Date = class extends Date { static now() { return ++t; } }; return () => { delete context.Date; }; };
 
 test('a note sent again after a lost reply carries the same id, and a note after a saved one a new id', async () => {
   const restore = ticking();

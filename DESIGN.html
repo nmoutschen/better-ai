@@ -1260,8 +1260,14 @@ function pageConversation(o) {
   // DONE runs once the server saved the action; FAIL when it did not, such as to enable a button again. The user's text
   // stays where it was typed: DONE is what clears it. A refusal by the server, such as an event its schema rejects, shows
   // the server's reason; when it cannot be reached, the send may or may not have arrived.
+  // A send whose reply was lost may have been saved. Each path makes its id when the user clicks, so the page keeps the id of
+  // a send the server has not confirmed or refused, and a repeat of the same method and content goes out under it: the
+  // server then stores the event once (S127). The id is dropped once the server answers.
+  var unconfirmed = {};
   function send(method, params, what, done, fail) {
     if (o.readOnly) return;
+    var key = typeof params.id === 'string' ? method + JSON.stringify(Object.assign({}, params, { id: 0 })) : null;
+    if (key) { params = Object.assign({}, params, { id: unconfirmed[key] || params.id }); unconfirmed[key] = params.id; }
     var event = Object.assign({ type: method, at: new Date().toISOString().slice(0, 19) + 'Z', by: 'user' }, params);
     if (o.apply) o.apply(event, true);
     if (!o.served) { log.push(event); renderThread(); flash(what + ' saved on this page. ' + (o.unsent || ''), 'ok'); if (done) done(); return; }
@@ -1274,10 +1280,12 @@ function pageConversation(o) {
         return r;
       })
       .then(function () {
+        if (key) delete unconfirmed[key];
         flash('✓ ' + what + ' sent to the ' + agent.toLowerCase(), 'ok'); say(''); if (done) done(); if (o.afterSend) o.afterSend();
       }, function (error) {
         undo();
         var refused = error && error.refused;
+        if (refused && key) delete unconfirmed[key];
         flash(refused ? 'Not sent: ' + what.toLowerCase() + '. ' + error.message : PAGE_UNSENT, 'error');
         say(refused ? 'Not sent: ' + error.message : PAGE_UNSENT, true);
         if (fail) fail();

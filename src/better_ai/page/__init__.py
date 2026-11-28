@@ -457,15 +457,12 @@ class Conversation:
         return delivery.select(events, found, self.items, after, carry_ids, recover_ids, admitted_edits=admitted_edits)
 
     def has(self, event: dict) -> bool:
-        """Whether the log holds an event of this type and id with this content, whatever its time: a send that came
-        twice (S127). An event with no id is never the same one."""
+        """Whether the latest event of this type and id has this content, whatever its time: a send that came twice
+        (S127). An edit that goes back to an earlier text is a new line. An event with no id is never the same one."""
         if not isinstance(event.get("id"), str):
             return False
-        return any(
-            {k: v for k, v in old.items() if k != "at"} == event
-            for old in self.events()
-            if old.get("type") == event["type"] and old.get("id") == event["id"]
-        )
+        same = [old for old in self.events() if old.get("type") == event["type"] and old.get("id") == event["id"]]
+        return bool(same) and {k: v for k, v in same[-1].items() if k != "at"} == event
 
     def write(self, *events: dict) -> list:
         """Append the agent's own events; one that fails its schema is refused with the validator's message."""
@@ -1190,7 +1187,7 @@ def live_server(unit: Unit) -> dict:
     if not state:
         return {}
     info = server_answer(unit)
-    if not info:
+    if not info or not is_serve_of(state.get("server_pid"), unit):
         return {}
     return {**state, "alive": info}
 
@@ -1369,7 +1366,11 @@ class DrivenPage:
         with self.link_lock:
             before = self.pairing.generation
             address = self.main_link()
-            if not webbrowser.open(address):
+            try:
+                opened = webbrowser.open(address)
+            except webbrowser.Error:
+                opened = False
+            if not opened:
                 self.pairing.revoke()
                 return "off no-browser: could not open a browser on this machine; run link where your browser runs"
             if not self.pairing.wait_after(before, LINK_WAIT):
@@ -1391,7 +1392,7 @@ def link_request(unit) -> str:
     `off <kind>: <problem>`. The path of the socket is not a browser credential."""
     from .driver_state import private_bytes
 
-    nothing = f"off no-server: no page is being served for {unit.label}"
+    nothing = f"off no-server: no page is being served for {unit.label}; run serve {unit.label} again"
     try:
         path = Path(private_bytes(unit, LINK_SOCKET).decode())
     except ValueError:
@@ -1449,6 +1450,10 @@ def link_control(driven):
                     connection.sendall(reply.encode() + b"\n")
                 except OSError:
                     pass
+                except Exception:  # whatever went wrong, the one who asked gets an answer and no token is left open
+                    driven.pairing.revoke()
+                    with contextlib.suppress(OSError):
+                        connection.sendall(b"off no-server: the page server could not open a tab; run serve again\n")
 
         def serve_links():
             while not stopping.is_set():
@@ -1955,7 +1960,6 @@ def check_harness(candidate, unit: Unit, deadline: float) -> None:
 def start_driver(driven, candidate, conv, run, deadline, note, archive) -> None:
     from .adapters import child_environment, session_id_valid
     from .driver import Driver, StartError
-    from .driver_state import save_state
     from .transport import ProcessTransport
 
     env = os.environ.copy()
@@ -2004,7 +2008,6 @@ def start_driver(driven, candidate, conv, run, deadline, note, archive) -> None:
             raise Off("login", f"log in to {candidate.name} in a terminal, then run serve again") from None
         raise Off(error.kind, str(error)) from None
     driven.ready = True
-    save_state(conv.unit, {"tag": driven.driver.tag})  # the name the page agent's verbs carry, for the verbs' notice
 
 
 def wait_until_done(args, run, unit, conv, driven) -> tuple[str, str]:
