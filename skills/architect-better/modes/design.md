@@ -19,10 +19,13 @@ READ and FOLLOW [../formats/records.md](../formats/records.md) before you first 
 
 - RUN `python3 <skill dir>/scripts/better.pyz wait <unit>` to wait for new actions. WHEN it returns, START it again and HANDLE those actions.
 - RUN `python3 <skill dir>/scripts/better.pyz pending <unit>` to read open items and their threads on each wake or resume.
-- RUN `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id>`, with your words on stdin, to reply under the item you answer.
-- RUN `python3 <skill dir>/scripts/better.pyz status <unit> <state> <id>...` to set the state of items.
 
-REPLY in the page, in one or two short sentences. MARK each item `seen` when it arrives. A reply sets the state of its item: `done` by default, `--state asked` when you need an answer, `--state working` when you reply before the change. KEEP `working` on the items you are changing now, usually one. ASK one question per message. POST a question with `reply --state asked`: with `--to <id>` when it asks back about the user's item, and without `--to` when it starts a new question; and a report without `--state`: a report needs no answer and is done at once. WHEN the user's answer leads to a change, REPLY done once the change is in the page, and PUT your next question in a new message. ANY message from the user in a thread gives it back to you. The user closes a thread with ✓: an item is finished only when the user closes it, or accepts it in words (then MARK it `accepted`).
+- TRACK each thread with `python3 <skill dir>/scripts/better.pyz status <unit> seen|working <id>`: `seen` when you read it, `working` only while you change something for it.
+- REPLY in the user's thread, under the item you answer, with `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id>`, your words on stdin, in one or two short sentences. The reply sets the thread's state: `done` by default, `--state asked` when you ask the user something about it, `--state working` when you reply before you have made the change. ONCE an answer leads to a change, REPLY done, THEN ASK any next question about it in the same thread, with `python3 <skill dir>/scripts/better.pyz reply <unit> --to <id> --state asked`.
+- ASK one question per message. POST a message without `--to` only to start a new subject: with `--state asked` when it is a question, without `--state` when it is a report, which needs no answer.
+- The user closes a thread with ✓. A thread you replied done stays in the user's Open list until they close it. Any message from the user in a thread gives it back to you: READ it as part of that thread.
+
+KEEP `working` on the threads you are changing now, usually one. The user may also accept a thread in words: MARK it `accepted`.
 
 ### Agents you start
 
