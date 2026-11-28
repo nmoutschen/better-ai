@@ -16,6 +16,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -55,6 +56,15 @@ class ConversationLines(unittest.TestCase):
         self.root = Path(os.path.realpath(tmp.name))
         self.payloads = []
 
+    def test_the_static_architect_page_gets_the_events_with_their_lines(self):
+        """architect-better's `render` embeds `Conversation.logged()`: the readable events, each with its line."""
+        folder = code_records.change(self.root / "logged")
+        write_log(folder)
+        unit = paths.resolve_unit(str(folder), code.SKILL)
+        conv = page.Conversation(unit, dashboard.SPEC, {})
+        self.assertEqual([e.get("_i") for e in conv.logged()], [0, 2, 3])
+        self.assertEqual(states(page.threads(conv.logged(), ("note",))), [["m1", "agent", "new"]])
+
     def positional(self, unit, spec) -> list:
         """The thread states of the unit's log read by line position, as `pending` reads it."""
         return states(page.threads(page.Conversation(unit, spec, {}).events(), spec.tracked()))
@@ -70,7 +80,7 @@ class ConversationLines(unittest.TestCase):
                 "kinds": list(spec.tracked()),
                 "decisions": data.get("decisions") or [],
                 "conversation": data["conversation"],
-                "expected": expected,
+                "positional": page.Conversation(unit, spec, {}).events(),
             }
         )
 
@@ -112,15 +122,19 @@ class ConversationLines(unittest.TestCase):
             [node, str(HERE / "threads-of.js"), str(payloads)], capture_output=True, text=True, timeout=120
         )
         self.assertEqual(run.returncode, 0, run.stderr)
-        for drawn, sent in zip(json.loads(run.stdout), self.payloads, strict=True):
-            self.assertEqual(drawn["threads"], sent["expected"], drawn["label"])
+        for drawn in json.loads(run.stdout):
+            self.assertIn(["m1", "agent", "new"], drawn["threads"], drawn["label"])
+            self.assertEqual(drawn["threads"], drawn["positional"], drawn["label"])
 
     def wait_counts_the_cut_off_line(self, folder, unit):
         """`wait` records the last line it showed, counting the cut-off line, so the agent's next status counts."""
         write_log(folder, LINES[:2])
         (folder / ".conversation-seen").write_text("2")  # an earlier wait showed m1 and the cut-off line
         (folder / ".conversation-read").unlink(missing_ok=True)
-        conv = page.Conversation(unit, dashboard.SPEC, page.load_docs(code.SKILL))
+        conv = page.Conversation(unit, dashboard.SPEC, {})  # it only serves: nothing is checked
+        skill = mock.patch.dict(os.environ, {"BETTER_AI_SKILL": "code-better"})
+        skill.start()
+        self.addCleanup(skill.stop)
         server = page.make_server(unit, dashboard.SPEC, conv, resources.build_info())
         threading.Thread(target=server.serve_forever, kwargs={"poll_interval": page.POLL}, daemon=True).start()
         self.addCleanup(server.server_close)
