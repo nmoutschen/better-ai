@@ -91,7 +91,7 @@ class Case(unittest.TestCase):
         self.triggers = []
         self.workers = []
 
-    def driver(self, launch=None, harness="stub", **options):
+    def driver(self, launch=None, harness="stub", paired=True, **options):
         if not (self.root / ".driver").exists():
             # A session that was opened earlier is resumed: a new one starts with a turn of its own (S93).
             self.saved()
@@ -116,7 +116,8 @@ class Case(unittest.TestCase):
             **options,
         )
         self.addCleanup(driver.close)
-        driver.tab_paired()
+        if paired:
+            driver.tab_paired()
         return driver
 
     def state(self):
@@ -785,6 +786,23 @@ class LingerTests(Case):
         self.assertTrue(driver.idle_expired())
         driver.agent()
         self.assertFalse(driver.idle_expired())
+
+
+    def test_work_held_until_a_tab_pairs_does_not_keep_the_page(self):
+        # S77 holds the turn until a tab pairs; with no tab, a stopped unit still lingers out (S32) and the idle limit
+        # still ends the server (S104). Once a tab pairs, the held turn starts and keeps the page again.
+        now = 1000.0
+        self.clock = lambda: now
+        self.conv.item("one")
+        driver = self.driver(paired=False)
+        driver.start()
+        eventually(driver.can_linger)
+        self.assertFalse(self.peers[0].prompt_arrived.is_set())
+        now += 31 * 60
+        self.assertTrue(driver.idle_expired())
+        driver.tab_paired()
+        self.assertTrue(self.peers[0].prompt_arrived.wait(2))
+        self.assertFalse(driver.can_linger())
 
 
 class RoundTwoTests(Case):
