@@ -156,6 +156,7 @@ Padding is `--space-edge` at the sides of the header, the view and the side colu
 - In the stats header the title wraps to two lines at most, then cuts off with an ellipsis. The question header wraps its controls under the title on a narrow window.
 - In the question header, keep to the controls used on every visit. Put settings changed rarely in a menu, as the canvas's Display menu.
 - A board never has both: figures go in the stats header, a question goes in the question header.
+- The one exception is page.js's "N your turn" figure, on every page that talks to the agent. A page with a stats header places it among its own figures (`.yourturn` slot) and has no other figure for what waits for you; a page with a question header places it among its controls, one line at their size.
 
 ### View patterns
 
@@ -292,6 +293,7 @@ All of these are in page.css. A board that needs one uses it; it does not restyl
 - Progress is three bars with a green Done step: Not seen shows none, Seen one, Working two, Done all three in moss-dark.
 - Buttons by state: Answer is the one filled (umber) button on a row, with ✓ beside it; ✓, Reply and Reopen are outlined; a thread done by the agent offers ✓ (Confirm done) and Reopen; one you closed offers Reopen. Buttons differ by more than their text.
 - ✓ closes a thread. The row stays in place as Closed with its own Undo for 6 seconds, then leaves Open and shows Done in All.
+- A page's own kind, such as a decision, an approval or a worker's report, keeps its body and controls inside the row; a done thread of any kind still offers ✓ (Confirm done) and Reopen. A user's action that needs no reply, such as a verdict or a confirmation, starts closed: it shows in All, never in Open.
 - Do not rebuild any part of it. A page that needs the conversation embeds page.js.
 
 ### Pop-up
